@@ -835,6 +835,13 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Whether the control at `identity` declared focus-presentation-inert
+  /// slots — see `ViewGraph.hasFocusPresentationInertSlots(for:)`.
+  @MainActor
+  package func hasFocusPresentationInertSlots(for identity: Identity) -> Bool {
+    viewGraph.hasFocusPresentationInertSlots(for: identity)
+  }
+
   /// Identities of the `@FocusedValue`/`@FocusedBinding` readers, derived from the
   /// focused-value reader attribution recorded during resolve. Single-pass
   /// focus-sync invalidates exactly these on a pure focused-value change so the

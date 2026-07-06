@@ -921,14 +921,42 @@ package final class ViewGraph {
   /// descendant reachable. The dirty-frontier path instead queues the existing
   /// exact/descendant nodes and lets evaluator-target planning choose the
   /// nearest reachable roots.
-  package func invalidateAndQueueDirtyDescendants(of identities: Set<Identity>) {
+  package func invalidateAndQueueDirtyDescendants(
+    of identities: Set<Identity>,
+    focusPresentationMembers: Set<Identity> = []
+  ) {
     let viewNodeIDs = Set(
-      identityByNodeID.compactMap { viewNodeID, identity in
-        identities.contains { target in
+      identityByNodeID.compactMap { viewNodeID, identity -> ViewNodeID? in
+        if identities.contains(where: { target in
           identity == target || identity.isDescendant(of: target)
+        }) {
+          return viewNodeID
+        }
+        // Focus/press members honor focus-presentation-inert slot
+        // declarations: a descendant below a slot the member itself declared
+        // needs neither recompute nor queueing (see
+        // `focusPresentationInertSlotExempts(member:identity:)`). One
+        // non-exempting matching member keeps the node queued.
+        let matchingMembers = focusPresentationMembers.filter { member in
+          identity == member || identity.isDescendant(of: member)
+        }
+        guard !matchingMembers.isEmpty else {
+          return nil
+        }
+        return matchingMembers.contains { member in
+          !focusPresentationInertSlotExempts(member: member, identity: identity)
         } ? viewNodeID : nil
       }
     )
+    if ReuseDenialTrace.isEnabled {
+      for member in focusPresentationMembers {
+        let slots = nodeIfExists(for: member)?
+          .focusPresentationInertSlotIdentities ?? []
+        ReuseDenialTrace.recordSuppressionScopeDescription(
+          "member-slots(\(member.path))=\(slots.count)"
+        )
+      }
+    }
     guard !viewNodeIDs.isEmpty else {
       return
     }
@@ -938,6 +966,59 @@ package final class ViewGraph {
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
       nodesByNodeID: nodesByNodeID
     )
+  }
+
+  /// Records a focus-presentation-inert slot declaration on the declaring
+  /// control's node — see `ViewNode.declareFocusPresentationInertSlot(_:)`.
+  /// No-op when the control has no graph node yet (a declaration always runs
+  /// inside the control's own resolve, so the node exists on live paths).
+  package func declareFocusPresentationInertSlot(
+    _ slotIdentity: Identity,
+    forControl controlIdentity: Identity
+  ) {
+    guard let node = nodeIfExists(for: controlIdentity) else {
+      if ReuseDenialTrace.isEnabled {
+        ReuseDenialTrace.recordSuppressionScopeDescription(
+          "inert-slot-NO-NODE(control=\(controlIdentity.path))"
+        )
+      }
+      return
+    }
+    if ReuseDenialTrace.isEnabled,
+      !node.focusPresentationInertSlotIdentities.contains(slotIdentity)
+    {
+      ReuseDenialTrace.recordSuppressionScopeDescription(
+        "inert-slot(control=\(controlIdentity.path),slot=\(slotIdentity.path))"
+      )
+    }
+    node.declareFocusPresentationInertSlot(slotIdentity)
+  }
+
+  /// Whether `identity` sits at or below a focus-presentation-inert slot that
+  /// `member` (a focus/press suppression-scope member) itself declared, which
+  /// exempts it from the member's descendant suppression cone. The slot node
+  /// itself is included: its handed-down value is covered by the same promise.
+  package func focusPresentationInertSlotExempts(
+    member: Identity,
+    identity: Identity
+  ) -> Bool {
+    guard let node = nodeIfExists(for: member) else {
+      return false
+    }
+    return node.focusPresentationInertSlotIdentities.contains { slot in
+      identity.isDescendant(of: slot)
+    }
+  }
+
+  /// Whether the control at `identity` has declared any
+  /// focus-presentation-inert slots. The run loop uses this to decide whether
+  /// a focus/press move's tracker invalidation of that identity can ride the
+  /// suppression scope instead of the frame's invalidation set — for a
+  /// declaring control the invalidation's blanket descendant cone would
+  /// conflict-deny exactly the content the slot declaration exempts.
+  package func hasFocusPresentationInertSlots(for identity: Identity) -> Bool {
+    nodeIfExists(for: identity)?
+      .focusPresentationInertSlotIdentities.isEmpty == false
   }
 
   package func queueDirty(
@@ -1919,6 +2000,7 @@ package final class ViewGraph {
     }
     if suppressed {
       ReuseDenialTrace.record("suppressed")
+      ReuseDenialTrace.recordSuppressedIdentity(identity.path)
       return
     }
     guard let node = nodeIfExists(for: identity) else {

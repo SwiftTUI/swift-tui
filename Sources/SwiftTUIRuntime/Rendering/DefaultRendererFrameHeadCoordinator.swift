@@ -324,7 +324,10 @@ struct DefaultRendererFrameHeadCoordinator {
     else {
       return
     }
-    viewGraph.invalidateAndQueueDirtyDescendants(of: scope.identities)
+    viewGraph.invalidateAndQueueDirtyDescendants(
+      of: scope.identities,
+      focusPresentationMembers: scope.focusPresentationMembers
+    )
   }
 
   /// Whether this frame's narrow evaluation may have changed the

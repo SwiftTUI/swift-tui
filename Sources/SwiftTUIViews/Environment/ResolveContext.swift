@@ -392,13 +392,25 @@ public struct ResolveContext: Equatable, Sendable {
   /// Suppressed identities recompute even when disjoint from ordinary
   /// invalidation. The run loop scopes this to focus/press runtime readers and
   /// active animation cones, with a conservative full-suppression fallback for
-  /// identity-agnostic animation work.
+  /// identity-agnostic animation work. Focus/press members honor
+  /// focus-presentation-inert slot declarations recorded on the member's own
+  /// graph node (a `TabView`'s content slot), so a near-root focused container
+  /// does not put its whole content subtree into the recompute cone.
   @MainActor
   package func effectiveSuppressesRetainedReuse(
     at identity: Identity
   ) -> Bool {
-    effectiveFrameResolveInputs?.retainedReuseSuppressionScope
-      .suppresses(identity: identity) ?? false
+    guard
+      let scope = effectiveFrameResolveInputs?.retainedReuseSuppressionScope
+    else {
+      return false
+    }
+    return scope.suppresses(identity: identity) { member, identity in
+      viewGraph?.focusPresentationInertSlotExempts(
+        member: member,
+        identity: identity
+      ) ?? false
+    }
   }
 
   /// Whether this frame's forced evaluation is fully named by a FINITE

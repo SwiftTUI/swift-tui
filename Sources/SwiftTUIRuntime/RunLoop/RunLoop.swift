@@ -37,6 +37,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package var progressProbe: RunLoopProgressProbe?
+  /// Retains the tracker's invalidation filter: `FocusTracker.invalidator` is
+  /// weak, and the filter must outlive the install (see
+  /// ``installFocusTrackerInvalidator()``).
+  private var focusTrackerInvalidationFilter: FocusPresentationInvalidationFilter?
   package var liveRegionAnnouncer = LiveRegionAnnouncer()
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
@@ -259,12 +263,29 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     }
   }
 
+  /// Installs the focus tracker's invalidator: the scheduler, behind a filter
+  /// that drops move notifications for controls with declared
+  /// focus-presentation-inert slots (their recompute rides the retained-reuse
+  /// suppression scope; the raw identity invalidation would conflict-deny the
+  /// exempted content). Package so test harnesses that drive frames without
+  /// `run()` install the same wiring.
+  package func installFocusTrackerInvalidator() {
+    let renderer = renderer
+    let filter = FocusPresentationInvalidationFilter(
+      base: scheduler
+    ) { identity in
+      renderer.hasFocusPresentationInertSlots(for: identity)
+    }
+    focusTrackerInvalidationFilter = filter
+    focusTracker.invalidator = filter
+  }
+
   private func runWithInstalledAnimationSinks() async throws -> RunLoopResult<State> {
     // See ``SoundnessViolationCounts/currentTotals()``: report only
     // violations recorded during this run loop's own lifetime.
     lastSeenSoundnessViolationCounts = .currentTotals()
     stateContainer.invalidator = scheduler
-    focusTracker.invalidator = scheduler
+    installFocusTrackerInvalidator()
     observationBridge.attachInvalidator(scheduler)
 
     let usesRawTerminalMode = runtimeConfiguration.output == .tui

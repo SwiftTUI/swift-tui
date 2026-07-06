@@ -3,6 +3,14 @@ package import SwiftTUICore
 package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   package var suppressesAll: Bool
   package var identities: Set<Identity>
+  /// Focus/press-leg members (runtime focus readers plus the old/new
+  /// focus/press identities). They match exactly like `identities` — self,
+  /// ancestors, and descendants — except that a descendant sitting below a
+  /// focus-presentation-inert slot *declared by the matched member itself* is
+  /// exempt (see `suppresses(identity:isFocusPresentationDescendantExempt:)`).
+  /// Animation cones stay in `identities`: an animating subtree needs its
+  /// registrations re-established regardless of presentation promises.
+  package var focusPresentationMembers: Set<Identity>
   /// `true` when the run loop certifies that every identity this frame's
   /// forced evaluation must recompute is named in `identities` — INCLUDING
   /// the case where that set is empty. A pending stranded-batch completion
@@ -19,15 +27,17 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   package init(
     suppressesAll: Bool = false,
     identities: Set<Identity> = [],
+    focusPresentationMembers: Set<Identity> = [],
     namesForcedEvaluation: Bool = false
   ) {
     self.suppressesAll = suppressesAll
     self.identities = identities
+    self.focusPresentationMembers = focusPresentationMembers
     self.namesForcedEvaluation = namesForcedEvaluation
   }
 
   package var isEmpty: Bool {
-    !suppressesAll && identities.isEmpty
+    !suppressesAll && identities.isEmpty && focusPresentationMembers.isEmpty
   }
 
   package mutating func formUnion(_ newIdentities: Set<Identity>) {
@@ -44,14 +54,67 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
     identities.insert(identity)
   }
 
+  package mutating func formUnionFocusPresentationMembers(
+    _ newIdentities: Set<Identity>
+  ) {
+    guard !suppressesAll else {
+      return
+    }
+    focusPresentationMembers.formUnion(newIdentities)
+  }
+
+  package mutating func insertFocusPresentationMember(_ identity: Identity) {
+    guard !suppressesAll else {
+      return
+    }
+    focusPresentationMembers.insert(identity)
+  }
+
+  /// Conservative matching: focus-presentation members behave exactly like
+  /// cone members. Callers with graph access should prefer
+  /// ``suppresses(identity:isFocusPresentationDescendantExempt:)``.
   package func suppresses(identity: Identity) -> Bool {
+    suppresses(identity: identity) { _, _ in false }
+  }
+
+  /// Whether retained reuse is suppressed for `identity`.
+  ///
+  /// Cone members (`identities`) match self, ancestors, and descendants.
+  /// Focus-presentation members match the same way, except a *descendant-only*
+  /// match may be exempted by the predicate — called as
+  /// `(member, identity)` — when the identity sits below a
+  /// focus-presentation-inert slot the member itself declared. A match as
+  /// self-or-ancestor is never exempt (the member must recompute, and its
+  /// ancestor chain must stay denied so evaluation reaches it), and one
+  /// non-exempting matching member keeps the identity suppressed.
+  package func suppresses(
+    identity: Identity,
+    isFocusPresentationDescendantExempt: (Identity, Identity) -> Bool
+  ) -> Bool {
     if suppressesAll {
       return true
     }
-    return identities.contains { suppressedIdentity in
-      identity == suppressedIdentity
-        || identity.isAncestor(of: suppressedIdentity)
+    if identities.contains(where: { suppressedIdentity in
+      identity.isAncestor(of: suppressedIdentity)
         || identity.isDescendant(of: suppressedIdentity)
+    }) {
+      return true
+    }
+    var descendantOnlyMembers: [Identity] = []
+    for member in focusPresentationMembers {
+      if identity.isAncestor(of: member) {
+        // Self-inclusive: covers `identity == member` too.
+        return true
+      }
+      if identity.isDescendant(of: member) {
+        descendantOnlyMembers.append(member)
+      }
+    }
+    guard !descendantOnlyMembers.isEmpty else {
+      return false
+    }
+    return descendantOnlyMembers.contains { member in
+      !isFocusPresentationDescendantExempt(member, identity)
     }
   }
 }

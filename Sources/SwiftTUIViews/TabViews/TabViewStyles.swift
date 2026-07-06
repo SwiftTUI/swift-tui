@@ -331,13 +331,23 @@ public struct TabViewStyleBodyConfiguration: Sendable {
   public struct Content: PrimitiveView, ResolvableView, Sendable {
     package var activeContentIndex: Int?
     package var payload: LazySubviewPayload?
+    /// The declaring `TabView`'s control identity — the identity focus rests
+    /// on while the tab strip is focused. Recorded so the content slot can
+    /// declare itself focus-presentation-inert for that control: the values
+    /// this slot receives derive from the authored tabs and the selection
+    /// only, never from the control's focus/press presentation, so a focus
+    /// move onto/off the strip must not pull the whole content subtree into
+    /// the retained-reuse suppression cone.
+    package var controlIdentity: Identity?
 
     package init(
       activeContentIndex: Int?,
-      payload: LazySubviewPayload?
+      payload: LazySubviewPayload?,
+      controlIdentity: Identity? = nil
     ) {
       self.activeContentIndex = activeContentIndex
       self.payload = payload
+      self.controlIdentity = controlIdentity
     }
 
     package func resolveElements(
@@ -345,6 +355,13 @@ public struct TabViewStyleBodyConfiguration: Sendable {
     ) -> [ResolvedNode] {
       guard let payload else {
         return []
+      }
+
+      if let controlIdentity {
+        context.viewGraph?.declareFocusPresentationInertSlot(
+          context.identity,
+          forControl: controlIdentity
+        )
       }
 
       // Keep the style-owned content slot transparent while preserving the

@@ -203,6 +203,9 @@ package final class ViewNode {
     get { evaluationState.suppressesStructuralLifecycle }
     set { evaluationState.suppressesStructuralLifecycle = newValue }
   }
+  package var focusPresentationInertSlotIdentities: Set<Identity> {
+    evaluationState.focusPresentationInertSlotIdentities
+  }
   private var nextChangeModifierOrdinal: Int {
     get { frameState.nextChangeModifierOrdinal }
     set { frameState.nextChangeModifierOrdinal = newValue }
@@ -1481,6 +1484,19 @@ package final class ViewNode {
   ) {
     self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
   }
+
+  /// Declares one focus-presentation-inert child slot on this control's node —
+  /// see ``EvaluationState/focusPresentationInertSlotIdentities`` for the
+  /// promise this records. Idempotent; the equal-value guard keeps repeated
+  /// per-resolve declarations from bumping the checkpoint generation.
+  package func declareFocusPresentationInertSlot(_ slotIdentity: Identity) {
+    guard
+      !evaluationState.focusPresentationInertSlotIdentities.contains(slotIdentity)
+    else {
+      return
+    }
+    evaluationState.focusPresentationInertSlotIdentities.insert(slotIdentity)
+  }
 }
 
 extension ViewNode {
@@ -1589,6 +1605,7 @@ extension ViewNode {
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
+      focusPresentationInertSlotIdentities: focusPresentationInertSlotIdentities,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       // nextTaskModifierOrdinal was checkpointed but historically omitted from

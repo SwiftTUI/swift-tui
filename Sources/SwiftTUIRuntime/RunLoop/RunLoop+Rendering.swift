@@ -442,7 +442,9 @@ extension RunLoop {
       if convergence.scrollPositionChanged {
         renderer.forceRootEvaluation(source: .focusSyncRerender)
       } else if convergence.focusedValuesChanged {
-        suppressionScope.formUnion(renderer.focusedValuesDependentIdentities())
+        suppressionScope.formUnionFocusPresentationMembers(
+          renderer.focusedValuesDependentIdentities()
+        )
       }
     }
     if retainedReuseFrameSafety.requiresRootEvaluation {
@@ -468,23 +470,37 @@ extension RunLoop {
 
     let currentFocusIdentity = focusTracker.currentFocusIdentity
     if currentFocusIdentity != previousFrameFocusIdentity {
-      scope.formUnion(renderer.runtimeFocusStateDependentIdentities())
+      let readers = renderer.runtimeFocusStateDependentIdentities()
+      scope.formUnionFocusPresentationMembers(readers)
       if let previousFrameFocusIdentity {
-        scope.insert(previousFrameFocusIdentity)
+        scope.insertFocusPresentationMember(previousFrameFocusIdentity)
       }
       if let currentFocusIdentity {
-        scope.insert(currentFocusIdentity)
+        scope.insertFocusPresentationMember(currentFocusIdentity)
       }
+      recordSuppressionScopeLegIfTracing(
+        leg: "focus-move",
+        old: previousFrameFocusIdentity,
+        new: currentFocusIdentity,
+        readers: readers
+      )
     }
 
     if pressedIdentity != previousFramePressedIdentity {
-      scope.formUnion(renderer.runtimeFocusStateDependentIdentities())
+      let readers = renderer.runtimeFocusStateDependentIdentities()
+      scope.formUnionFocusPresentationMembers(readers)
       if let previousFramePressedIdentity {
-        scope.insert(previousFramePressedIdentity)
+        scope.insertFocusPresentationMember(previousFramePressedIdentity)
       }
       if let pressedIdentity {
-        scope.insert(pressedIdentity)
+        scope.insertFocusPresentationMember(pressedIdentity)
       }
+      recordSuppressionScopeLegIfTracing(
+        leg: "press-move",
+        old: previousFramePressedIdentity,
+        new: pressedIdentity,
+        readers: readers
+      )
     }
 
     let controller = renderer.internalAnimationController
@@ -493,6 +509,11 @@ extension RunLoop {
       scope.formUnion(activePropertyIdentities)
       requiresRootEvaluation = true
       rootEvaluationSource = .animationPropertySafety
+      if ReuseDenialTrace.isEnabled {
+        ReuseDenialTrace.recordSuppressionScopeDescription(
+          "anim-props(\(activePropertyIdentities.count))"
+        )
+      }
     }
     if controller.lastTickResult.hasPendingWork,
       activePropertyIdentities.isEmpty
@@ -524,6 +545,11 @@ extension RunLoop {
         scope.formUnion(attributableIdentities)
         requiresRootEvaluation = true
         rootEvaluationSource = .animationPendingWorkSafety
+        if ReuseDenialTrace.isEnabled {
+          ReuseDenialTrace.recordSuppressionScopeDescription(
+            "anim-pending(\(attributableIdentities.count))"
+          )
+        }
       }
     }
     return .init(
@@ -531,6 +557,31 @@ extension RunLoop {
       requiresRootEvaluation: requiresRootEvaluation,
       rootEvaluationSource: rootEvaluationSource
     )
+  }
+
+  /// Diagnostic-only (inert unless `SWIFTTUI_REUSE_TRACE`): attributes one
+  /// focus/press leg of the frame's retained-reuse suppression scope, so a
+  /// broad `suppressed=` count on a transition frame can be traced to the
+  /// member whose ancestor/descendant matching produced it (e.g. a near-root
+  /// focused container covers its whole subtree).
+  private func recordSuppressionScopeLegIfTracing(
+    leg: String,
+    old: Identity?,
+    new: Identity?,
+    readers: Set<Identity>
+  ) {
+    guard ReuseDenialTrace.isEnabled else {
+      return
+    }
+    var description = "\(leg)(old=\(old?.path ?? "nil"),new=\(new?.path ?? "nil")"
+    if readers.isEmpty {
+      description += ",readers=0)"
+    } else {
+      let readerPaths = readers.map(\.path).sorted().prefix(8)
+      description +=
+        ",readers=\(readers.count)[\(readerPaths.joined(separator: "+"))])"
+    }
+    ReuseDenialTrace.recordSuppressionScopeDescription(description)
   }
 
   private func appendPendingAccessibilityAnnouncements(

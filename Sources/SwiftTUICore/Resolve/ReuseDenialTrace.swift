@@ -42,10 +42,25 @@ package enum ReuseDenialTrace {
   package private(set) static var reasonCounts: [String: Int] = [:]
   package private(set) static var environmentKeyDiffCounts: [String: Int] = [:]
   package private(set) static var invalidatedIdentityPaths: Set<String> = []
+  package private(set) static var suppressionScopeDescriptions: [String] = []
 
   package static func record(_ reason: String) {
     guard isEnabled else { return }
     reasonCounts[reason, default: 0] += 1
+  }
+
+  /// Identity paths denied for `suppressed` this frame (capped), so a
+  /// multi-hundred-node `suppressed=` count can be decomposed by subtree —
+  /// e.g. tab-strip chrome vs content payload on a focus-move frame.
+  package private(set) static var suppressedIdentityPaths: [String] = []
+
+  private static let maxRecordedSuppressedIdentityPaths = 512
+
+  package static func recordSuppressedIdentity(_ path: String) {
+    guard isEnabled,
+      suppressedIdentityPaths.count < maxRecordedSuppressedIdentityPaths
+    else { return }
+    suppressedIdentityPaths.append(path)
   }
 
   package static func recordEnvironmentKeyDiff(_ key: String) {
@@ -60,17 +75,31 @@ package enum ReuseDenialTrace {
     invalidatedIdentityPaths.insert(path)
   }
 
+  /// Records a description of one leg of the frame's retained-reuse
+  /// suppression scope (focus move, press move, animation cones), so a
+  /// multi-hundred-node `suppressed=` count can be attributed to the member
+  /// identities whose ancestor/descendant matching produced it. Recorded by
+  /// the run loop when it composes the scope; appears as a `| scope:` segment
+  /// on the frame's trace line.
+  package static func recordSuppressionScopeDescription(_ description: String) {
+    guard isEnabled else { return }
+    suppressionScopeDescriptions.append(description)
+  }
+
   package static func reset() {
     reasonCounts.removeAll(keepingCapacity: true)
     environmentKeyDiffCounts.removeAll(keepingCapacity: true)
     invalidatedIdentityPaths.removeAll(keepingCapacity: true)
+    suppressionScopeDescriptions.removeAll(keepingCapacity: true)
+    suppressedIdentityPaths.removeAll(keepingCapacity: true)
   }
 
   /// Writes the accumulated histogram to stderr (if non-empty) and resets it.
   /// Called at `ViewGraph.beginFrame`, so each line summarizes the frame that
   /// just finished resolving.
   package static func dumpAndReset(frameID: UInt64) {
-    guard isEnabled, !reasonCounts.isEmpty else {
+    guard isEnabled, !reasonCounts.isEmpty || !suppressionScopeDescriptions.isEmpty
+    else {
       reset()
       return
     }
@@ -86,6 +115,12 @@ package enum ReuseDenialTrace {
     }
     if !invalidatedIdentityPaths.isEmpty {
       line += " | invalidated: " + invalidatedIdentityPaths.sorted().joined(separator: ",")
+    }
+    if !suppressionScopeDescriptions.isEmpty {
+      line += " | scope: " + suppressionScopeDescriptions.joined(separator: ";")
+    }
+    if !suppressedIdentityPaths.isEmpty {
+      line += " | suppressed-paths: " + suppressedIdentityPaths.joined(separator: ",")
     }
     line += "\n"
     emit(line)

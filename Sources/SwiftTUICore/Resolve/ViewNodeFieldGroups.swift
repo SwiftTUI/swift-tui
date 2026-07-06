@@ -63,6 +63,16 @@ extension ViewNode {
     package var evaluationDepth: Int = 0
     package var hasCommittedPresence: Bool = false
     package var suppressesStructuralLifecycle: Bool = false
+    /// Child slot identities this control declared focus-presentation-inert:
+    /// a promise that the values the control hands each slot cannot vary with
+    /// the control's own focus/press presentation (a `TabView`'s content slot
+    /// derives from the authored tabs and the selection only). The run loop's
+    /// focus/press retained-reuse suppression skips descendant matching below
+    /// a declared slot — but only when the scope member is the declaring
+    /// control itself: a cascade from any other ancestor may change the
+    /// authored inputs the promise is conditioned on, so it keeps full-cone
+    /// suppression. Insert-only per resolve; departs with the node.
+    package var focusPresentationInertSlotIdentities: Set<Identity> = []
   }
 
   /// Reuse/freshness gating consumed by the reconciler's skip fast-paths:

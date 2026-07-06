@@ -269,7 +269,8 @@ extension TabView {
       overflowTrigger: overflowTrigger,
       content: .init(
         activeContentIndex: selectedIndex,
-        payload: activeContentPayload
+        payload: activeContentPayload,
+        controlIdentity: context.identity
       )
     )
     let child = tabStyle.resolveBody(
