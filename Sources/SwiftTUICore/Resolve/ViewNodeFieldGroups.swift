@@ -73,6 +73,18 @@ extension ViewNode {
     /// authored inputs the promise is conditioned on, so it keeps full-cone
     /// suppression. Insert-only per resolve; departs with the node.
     package var focusPresentationInertSlotIdentities: Set<Identity> = []
+    /// Child slot identities this control declared focus-presentation
+    /// *value-verified*: unlike an inert slot, the values the control hands
+    /// the slot MAY vary with its own focus/press presentation (a `TabView`'s
+    /// strip items carry an `isFocused` flag) — but they carry every
+    /// focus-derived input, so an `Equatable`-equal value proves the subtree's
+    /// output is unchanged. Descendants below one are exempt from the
+    /// focus-member dirty-queue walk and from the *memoized* (value-verified)
+    /// reuse denial only; value-blind Layer-A reuse stays denied, so a slot
+    /// whose value flipped fails the memo compare and recomputes fresh. The
+    /// member==declarer pairing applies exactly as for inert slots.
+    /// Insert-only per resolve; departs with the node.
+    package var focusPresentationValueVerifiedSlotIdentities: Set<Identity> = []
   }
 
   /// Reuse/freshness gating consumed by the reconciler's skip fast-paths:

@@ -312,8 +312,17 @@ func resolveView<V: View>(
   // root evaluation only makes the walk *reach* every node — each reached node
   // still independently chooses reuse here — so affected nodes additionally
   // skip this fast path.
+  let suppressesRetainedReuse = context.effectiveSuppressesRetainedReuse(
+    at: context.identity
+  )
+  // The memo layer may additionally be exempted below a focus-presentation
+  // value-verified slot (suppresses-value-verified ⊆ suppresses-retained, so
+  // the extra walk only runs for identities the broad gate already denied).
+  let suppressesValueVerifiedReuse =
+    suppressesRetainedReuse
+    && context.effectiveSuppressesValueVerifiedReuse(at: context.identity)
   if !context.withinChurnedSubtree,
-    !context.effectiveSuppressesRetainedReuse(at: context.identity),
+    !suppressesRetainedReuse,
     let reused = context.viewGraph?.reusableSnapshot(
       for: context.identity,
       invalidatedIdentities: context.effectiveInvalidatedIdentities,
@@ -345,11 +354,14 @@ func resolveView<V: View>(
   // structural descendant of an invalidated ancestor whose own view value is
   // structurally unchanged (and it has no recorded dependencies and passes every
   // non-dirty reuse guard), the body re-run is redundant — reuse the committed
-  // subtree via the same path as Layer A. Behind the same focus/press
-  // suppression gate. `Equatable`-only, so it is inert on trees that do not opt
-  // in (a non-`Equatable` view leaves `memoViewValue` nil and bails immediately).
+  // subtree via the same path as Layer A. Behind the focus/press suppression
+  // gate's *value-verified* variant: below a focus-presentation value-verified
+  // slot the memo compare itself proves the handed-down value unchanged, which
+  // is exactly the hazard the value-blind gate exists for. `Equatable`-only, so
+  // it is inert on trees that do not opt in (a non-`Equatable` view leaves
+  // `memoViewValue` nil and bails immediately).
   if !context.withinChurnedSubtree,
-    !context.effectiveSuppressesRetainedReuse(at: context.identity),
+    !suppressesValueVerifiedReuse,
     let reused = context.viewGraph?.memoizedReusableSnapshot(
       for: context.identity,
       viewValue: view,
@@ -364,6 +376,16 @@ func resolveView<V: View>(
       invalidator: context.invalidationProxy?.invalidator
     )
   {
+    #if DEBUG
+      if suppressesRetainedReuse {
+        // This reuse went through a value-verified-slot exemption; pin the
+        // invariant that makes it sound (see the oracle's doc).
+        context.viewGraph?.debugAssertMemoReuseSubtreeFreeOfRuntimeFocusDependencies(
+          reused,
+          uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys
+        )
+      }
+    #endif
     context.viewGraph?.restoreRuntimeRegistrations(
       for: reused,
       into: context.runtimeRegistrations
@@ -380,7 +402,7 @@ func resolveView<V: View>(
   if ReuseDenialTrace.isEnabled {
     context.viewGraph?.recordReuseDenialIfTracing(
       for: context.identity,
-      suppressed: context.effectiveSuppressesRetainedReuse(at: context.identity),
+      suppressed: suppressesRetainedReuse,
       environment: context.environment,
       transaction: context.transaction,
       invalidatedIdentities: context.effectiveInvalidatedIdentities

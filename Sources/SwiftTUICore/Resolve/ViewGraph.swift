@@ -932,11 +932,15 @@ package final class ViewGraph {
         }) {
           return viewNodeID
         }
-        // Focus/press members honor focus-presentation-inert slot
-        // declarations: a descendant below a slot the member itself declared
-        // needs neither recompute nor queueing (see
-        // `focusPresentationInertSlotExempts(member:identity:)`). One
-        // non-exempting matching member keeps the node queued.
+        // Focus/press members honor focus-presentation slot declarations: a
+        // descendant below an inert OR value-verified slot the member itself
+        // declared needs no queueing (see
+        // `focusPresentationInertSlotExempts(member:identity:)` /
+        // `focusPresentationValueVerifiedSlotExempts(member:identity:)`; the
+        // value-verified kind still denies value-blind Layer-A reuse — the
+        // member's own body re-run re-presents its values, and the memo
+        // compare decides recompute-vs-reuse per slot). One non-exempting
+        // matching member keeps the node queued.
         let matchingMembers = focusPresentationMembers.filter { member in
           identity == member || identity.isDescendant(of: member)
         }
@@ -945,6 +949,7 @@ package final class ViewGraph {
         }
         return matchingMembers.contains { member in
           !focusPresentationInertSlotExempts(member: member, identity: identity)
+            && !focusPresentationValueVerifiedSlotExempts(member: member, identity: identity)
         } ? viewNodeID : nil
       }
     )
@@ -952,8 +957,10 @@ package final class ViewGraph {
       for member in focusPresentationMembers {
         let slots = nodeIfExists(for: member)?
           .focusPresentationInertSlotIdentities ?? []
+        let valueVerifiedSlots = nodeIfExists(for: member)?
+          .focusPresentationValueVerifiedSlotIdentities ?? []
         ReuseDenialTrace.recordSuppressionScopeDescription(
-          "member-slots(\(member.path))=\(slots.count)"
+          "member-slots(\(member.path))=\(slots.count)+vv\(valueVerifiedSlots.count)"
         )
       }
     }
@@ -1019,6 +1026,52 @@ package final class ViewGraph {
   package func hasFocusPresentationInertSlots(for identity: Identity) -> Bool {
     nodeIfExists(for: identity)?
       .focusPresentationInertSlotIdentities.isEmpty == false
+  }
+
+  /// Records a focus-presentation value-verified slot declaration on the
+  /// declaring control's node — see
+  /// `ViewNode.declareFocusPresentationValueVerifiedSlot(_:)`. No-op when the
+  /// control has no graph node yet (a declaration always runs inside the
+  /// control's own resolve, so the node exists on live paths).
+  package func declareFocusPresentationValueVerifiedSlot(
+    _ slotIdentity: Identity,
+    forControl controlIdentity: Identity
+  ) {
+    guard let node = nodeIfExists(for: controlIdentity) else {
+      if ReuseDenialTrace.isEnabled {
+        ReuseDenialTrace.recordSuppressionScopeDescription(
+          "vv-slot-NO-NODE(control=\(controlIdentity.path))"
+        )
+      }
+      return
+    }
+    if ReuseDenialTrace.isEnabled,
+      !node.focusPresentationValueVerifiedSlotIdentities.contains(slotIdentity)
+    {
+      ReuseDenialTrace.recordSuppressionScopeDescription(
+        "vv-slot(control=\(controlIdentity.path),slot=\(slotIdentity.path))"
+      )
+    }
+    node.declareFocusPresentationValueVerifiedSlot(slotIdentity)
+  }
+
+  /// Whether `identity` sits at or below a focus-presentation value-verified
+  /// slot that `member` (a focus/press suppression-scope member) itself
+  /// declared. Such a descendant is exempt from the member's dirty-queue walk
+  /// and from *memoized* (value-verified) reuse denial — but never from
+  /// value-blind Layer-A denial: the slot's handed-down value may flip with
+  /// the member's focus presentation, and only an `Equatable`-equal value
+  /// proves the subtree unchanged.
+  package func focusPresentationValueVerifiedSlotExempts(
+    member: Identity,
+    identity: Identity
+  ) -> Bool {
+    guard let node = nodeIfExists(for: member) else {
+      return false
+    }
+    return node.focusPresentationValueVerifiedSlotIdentities.contains { slot in
+      identity.isDescendant(of: slot)
+    }
   }
 
   package func queueDirty(
@@ -2191,6 +2244,44 @@ package final class ViewGraph {
     )
     return snapshot
   }
+
+  #if DEBUG
+    /// Value-verified-slot soundness oracle: when the memo layer reuses a
+    /// subtree that value-blind Layer-A suppression would have denied (a
+    /// focus/press move's member cone, exempted through a value-verified
+    /// slot), no node in that subtree may carry a recorded *wholesale*
+    /// runtime-focus dependency (`focusedIdentity`/`pressedIdentity`
+    /// environment keys): such a reader is unioned into every focus move's
+    /// scope as a full member, which makes the reused root an
+    /// ancestor-of-member — an unexemptable match that blocks the memo gate.
+    /// Reaching this assert with such a dependency means the member union
+    /// and the memo exemption disagree. Side-field sentinel reads are legal
+    /// here: their output can only change when the moved identity is at or
+    /// below the reader, and the moved identities' own cones are never
+    /// exempted.
+    package func debugAssertMemoReuseSubtreeFreeOfRuntimeFocusDependencies(
+      _ resolved: ResolvedNode,
+      uncoveredEnvironmentKeys: Set<ObjectIdentifier>
+    ) {
+      var stack = [resolved]
+      while let next = stack.popLast() {
+        if let node = nodeIfExists(for: next.identity) {
+          assert(
+            node.dependencies.environmentReads.isDisjoint(
+              with: uncoveredEnvironmentKeys
+            ),
+            """
+            memoized reuse under a focus/press suppression scope served a \
+            subtree containing a wholesale runtime-focus reader at \
+            \(next.identity.path); the reader should have been a scope member \
+            blocking this reuse
+            """
+          )
+        }
+        stack.append(contentsOf: next.children)
+      }
+    }
+  #endif
 
   @discardableResult
   package func applySnapshot(

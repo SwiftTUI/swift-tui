@@ -206,6 +206,9 @@ package final class ViewNode {
   package var focusPresentationInertSlotIdentities: Set<Identity> {
     evaluationState.focusPresentationInertSlotIdentities
   }
+  package var focusPresentationValueVerifiedSlotIdentities: Set<Identity> {
+    evaluationState.focusPresentationValueVerifiedSlotIdentities
+  }
   private var nextChangeModifierOrdinal: Int {
     get { frameState.nextChangeModifierOrdinal }
     set { frameState.nextChangeModifierOrdinal = newValue }
@@ -1526,6 +1529,20 @@ package final class ViewNode {
     }
     evaluationState.focusPresentationInertSlotIdentities.insert(slotIdentity)
   }
+
+  /// Declares one focus-presentation value-verified child slot on this
+  /// control's node — see
+  /// ``EvaluationState/focusPresentationValueVerifiedSlotIdentities`` for the
+  /// promise this records. Idempotent; the equal-value guard keeps repeated
+  /// per-resolve declarations from bumping the checkpoint generation.
+  package func declareFocusPresentationValueVerifiedSlot(_ slotIdentity: Identity) {
+    guard
+      !evaluationState.focusPresentationValueVerifiedSlotIdentities.contains(slotIdentity)
+    else {
+      return
+    }
+    evaluationState.focusPresentationValueVerifiedSlotIdentities.insert(slotIdentity)
+  }
 }
 
 extension ViewNode {
@@ -1635,6 +1652,7 @@ extension ViewNode {
       hasCommittedPresence: hasCommittedPresence,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       focusPresentationInertSlotIdentities: focusPresentationInertSlotIdentities,
+      focusPresentationValueVerifiedSlotIdentities: focusPresentationValueVerifiedSlotIdentities,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       // nextTaskModifierOrdinal was checkpointed but historically omitted from

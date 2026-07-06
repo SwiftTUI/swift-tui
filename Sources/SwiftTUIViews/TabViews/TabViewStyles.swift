@@ -169,6 +169,11 @@ public struct TabViewStyleItemConfiguration: Sendable {
   }
 }
 
+/// `Equatable` so style item views can hold the configuration as their memo
+/// value: an item whose configuration (and any other stored inputs) compare
+/// equal across a frame can be value-verified-reused instead of recomputed.
+extension TabViewStyleItemConfiguration: Equatable {}
+
 public struct TabViewOverflowTriggerConfiguration: Sendable {
   public var label: String
   public var isSelected: Bool
@@ -227,6 +232,10 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
     }
   }
 }
+
+/// `Equatable` for the same memo-boundary reason as
+/// ``TabViewStyleItemConfiguration``.
+extension TabViewOverflowTriggerConfiguration: Equatable {}
 
 public struct TabViewOverflowMenuPresentation: Sendable {
   public var triggerLeadingWidth: Int

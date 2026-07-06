@@ -415,6 +415,41 @@ public struct ResolveContext: Equatable, Sendable {
     }
   }
 
+  /// Like ``effectiveSuppressesRetainedReuse(at:)`` but for the *memoized*
+  /// (value-verified) reuse layer: descendant-only matches below a
+  /// focus-presentation **value-verified** slot the matched member itself
+  /// declared are additionally exempt. A value-verified slot's handed-down
+  /// value may flip with the member's focus presentation, so value-blind
+  /// Layer-A reuse must stay denied there — but the memo layer proves the
+  /// value unchanged before reusing, which covers exactly that hazard.
+  /// Ancestor-of-member and exact-member matches are never exempted: a
+  /// wholesale focus reader (`isFocused` bake / `@Environment` wrapper)
+  /// inside a slot is a scope member in its own right, and its ancestors must
+  /// keep recomputing.
+  @MainActor
+  package func effectiveSuppressesValueVerifiedReuse(
+    at identity: Identity
+  ) -> Bool {
+    guard
+      let scope = effectiveFrameResolveInputs?.retainedReuseSuppressionScope
+    else {
+      return false
+    }
+    return scope.suppresses(identity: identity) { member, identity in
+      guard let viewGraph else {
+        return false
+      }
+      return viewGraph.focusPresentationInertSlotExempts(
+        member: member,
+        identity: identity
+      )
+        || viewGraph.focusPresentationValueVerifiedSlotExempts(
+          member: member,
+          identity: identity
+        )
+    }
+  }
+
   /// Whether this frame's forced evaluation is fully named by a FINITE
   /// retained-reuse suppression scope. Such frames (pure focus moves,
   /// non-property animation ticks, pending stranded-batch drains) carry no

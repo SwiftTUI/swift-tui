@@ -188,10 +188,7 @@ private struct UnderlineTabStyleBody: View {
         ForEach(Array(configuration.visibleItems.indices), id: \.self) { index in
           let item = configuration.visibleItems[index]
           item.route {
-            UnderlineTabStyleItemView(
-              configuration: configuration,
-              item: item
-            )
+            UnderlineTabStyleItemView(item: item)
           }
         }
         Spacer(minLength: 0)
@@ -213,8 +210,13 @@ private struct PowerlineTabStyleBody: View {
           let item = configuration.visibleItems[index]
           item.route {
             PowerlineTabStyleItemView(
-              configuration: configuration,
-              item: item
+              item: item,
+              showsTrailingSeparator: item.index < configuration.items.count - 1,
+              trailingSeparatorStyle: powerlineSeparatorStyle(
+                index: item.index,
+                activeIndex: configuration.selectedIndex ?? 0
+              ),
+              styleEnvironment: configuration.styleEnvironment
             )
           }
         }
@@ -237,19 +239,13 @@ private struct LiteralTabsTabStyleBody: View {
           ForEach(Array(configuration.visibleItems.indices), id: \.self) { index in
             let item = configuration.visibleItems[index]
             item.route {
-              LiteralTabsTabStyleItemView(
-                configuration: configuration,
-                item: item
-              )
+              LiteralTabsTabStyleItemView(item: item)
             }
           }
 
           if let trigger = configuration.overflowTrigger {
             trigger.route {
-              LiteralTabsOverflowTriggerView(
-                configuration: configuration,
-                trigger: trigger
-              )
+              LiteralTabsOverflowTriggerView(trigger: trigger)
             }
           }
 
@@ -283,8 +279,10 @@ private struct LiteralTabsTabStyleBody: View {
   }
 }
 
-private struct UnderlineTabStyleItemView: View {
-  let configuration: TabViewStyleBodyConfiguration
+/// `Equatable` memo boundary: stores only the item configuration, so an
+/// unchanged item under a `TabView` focus/press move (a value-verified slot)
+/// or an invalidated ancestor is value-verified-reused instead of recomputed.
+private struct UnderlineTabStyleItemView: View, Equatable {
   let item: TabViewStyleItemConfiguration
 
   var body: some View {
@@ -310,21 +308,24 @@ private struct UnderlineTabStyleItemView: View {
   }
 }
 
-private struct PowerlineTabStyleItemView: View {
-  let configuration: TabViewStyleBodyConfiguration
+/// `Equatable` memo boundary (see ``UnderlineTabStyleItemView``): the body
+/// inputs derived from the whole-strip configuration (trailing separator
+/// presence/style, style environment) are precomputed by the strip body and
+/// stored as plain values so equality covers them.
+private struct PowerlineTabStyleItemView: View, Equatable {
   let item: TabViewStyleItemConfiguration
+  let showsTrailingSeparator: Bool
+  let trailingSeparatorStyle: PowerlineSeparatorStyle
+  let styleEnvironment: StyleEnvironmentSnapshot
 
   var body: some View {
     powerlineTabItem(
       label: item.label.displayText,
       isSelected: item.isSelected,
-      showsTrailingSeparator: item.index < configuration.items.count - 1,
-      trailingSeparatorStyle: powerlineSeparatorStyle(
-        index: item.index,
-        activeIndex: configuration.selectedIndex ?? 0
-      ),
+      showsTrailingSeparator: showsTrailingSeparator,
+      trailingSeparatorStyle: trailingSeparatorStyle,
       tone: .accent,
-      styleEnvironment: configuration.styleEnvironment
+      styleEnvironment: styleEnvironment
     )
     .background {
       if item.isFocused {
@@ -335,8 +336,8 @@ private struct PowerlineTabStyleItemView: View {
   }
 }
 
-private struct LiteralTabsTabStyleItemView: View {
-  let configuration: TabViewStyleBodyConfiguration
+/// `Equatable` memo boundary (see ``UnderlineTabStyleItemView``).
+private struct LiteralTabsTabStyleItemView: View, Equatable {
   let item: TabViewStyleItemConfiguration
 
   var body: some View {
@@ -363,8 +364,8 @@ private struct LiteralTabsTabStyleItemView: View {
   }
 }
 
-private struct LiteralTabsOverflowTriggerView: View {
-  let configuration: TabViewStyleBodyConfiguration
+/// `Equatable` memo boundary (see ``UnderlineTabStyleItemView``).
+private struct LiteralTabsOverflowTriggerView: View, Equatable {
   let trigger: TabViewOverflowTriggerConfiguration
 
   var body: some View {
@@ -426,13 +427,16 @@ private struct LiteralTabsStripBaseRule: PrimitiveView, ResolvableView {
   }
 }
 
-private struct LiteralTabsOverflowMenuRowView: View {
-  let configuration: TabViewStyleBodyConfiguration
+/// `Equatable` memo boundary (see ``UnderlineTabStyleItemView``): the menu
+/// width derived from the whole option list is precomputed by the menu body
+/// and stored as a plain value so equality covers it.
+private struct LiteralTabsOverflowMenuRowView: View, Equatable {
   let item: TabViewStyleItemConfiguration
-  let overflowIndices: [Int]
+  let styleEnvironment: StyleEnvironmentSnapshot
+  let rowMinWidth: Int
 
   var body: some View {
-    let rowChrome = configuration.styleEnvironment.rowChrome(
+    let rowChrome = styleEnvironment.rowChrome(
       isEnabled: true,
       isFocused: item.isFocused,
       isSelected: item.isSelected
@@ -451,12 +455,7 @@ private struct LiteralTabsOverflowMenuRowView: View {
     .foregroundStyle(rowChrome.foregroundStyle)
     .drawMetadata(.init(opacity: rowChrome.opacity))
     .frame(
-      minWidth: .finite(
-        literalTabOverflowMenuWidth(
-          options: configuration.options,
-          overflowIndices: overflowIndices
-        )
-      ),
+      minWidth: .finite(rowMinWidth),
       alignment: .leading
     )
   }
@@ -466,14 +465,18 @@ private struct LiteralTabsOverflowMenuView: View {
   let configuration: TabViewStyleBodyConfiguration
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
+    let rowMinWidth = literalTabOverflowMenuWidth(
+      options: configuration.options,
+      overflowIndices: configuration.presentation.overflowMenu?.overflowIndices ?? []
+    )
+    return VStack(alignment: .leading, spacing: 0) {
       ForEach(Array(configuration.overflowItems.indices), id: \.self) { index in
         let item = configuration.overflowItems[index]
         item.overflowRoute {
           LiteralTabsOverflowMenuRowView(
-            configuration: configuration,
             item: item,
-            overflowIndices: configuration.presentation.overflowMenu?.overflowIndices ?? []
+            styleEnvironment: configuration.styleEnvironment,
+            rowMinWidth: rowMinWidth
           )
         }
       }

@@ -94,6 +94,39 @@ extension TabView {
       )
     }
 
+    // The strip item routes are focus-presentation *value-verified* slots:
+    // their configurations carry every focus-derived input (`isFocused`), so
+    // on a focus/press move onto/off this control an item whose value
+    // compares `Equatable`-equal is provably unchanged and may memo-reuse
+    // instead of recomputing — while the flipped item's compare fails and
+    // recomputes. Mirrors the certified state-write cone
+    // (`stripFocusInvalidationIdentities`): visible items, the overflow
+    // trigger, and the expanded overflow items.
+    if let viewGraph = context.viewGraph {
+      for index in stylePresentation.visibleOptionIndices
+      where options.indices.contains(index) {
+        viewGraph.declareFocusPresentationValueVerifiedSlot(
+          tabItemIdentity(for: context.identity, index: index),
+          forControl: context.identity
+        )
+      }
+      if let overflow = stylePresentation.overflowMenu {
+        viewGraph.declareFocusPresentationValueVerifiedSlot(
+          tabOverflowTriggerIdentity(for: context.identity),
+          forControl: context.identity
+        )
+        if overflow.isExpanded {
+          for index in overflow.overflowIndices
+          where options.indices.contains(index) {
+            viewGraph.declareFocusPresentationValueVerifiedSlot(
+              tabOverflowItemIdentity(for: context.identity, index: index),
+              forControl: context.identity
+            )
+          }
+        }
+      }
+    }
+
     if isEnabled {
       let binding = selection
       let orderedTags = options.map(\.tag)
