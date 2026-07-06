@@ -66,6 +66,11 @@ package struct RuntimeRegistrationSet {
   /// for a `scratch()` set.
   package let allRegistries: [any RuntimeRegistry]
 
+  /// The `isEffectRegistry` subset of ``allRegistries``, precomputed so the
+  /// per-node effect-republication walk (every live node, every commit) does
+  /// not re-filter the full registry list per node (F63).
+  package let effectRegistries: [any RuntimeRegistry]
+
   package init(
     actionRegistry: LocalActionRegistry? = nil,
     keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
@@ -116,6 +121,7 @@ package struct RuntimeRegistrationSet {
       dropDestinationRegistry,
     ]
     allRegistries = members.compactMap { $0 }
+    effectRegistries = allRegistries.filter(\.isEffectRegistry)
   }
 
   @MainActor

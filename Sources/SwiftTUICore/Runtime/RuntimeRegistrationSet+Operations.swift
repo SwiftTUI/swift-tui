@@ -79,7 +79,7 @@ extension RuntimeRegistrationSet {
   /// runtime applies side effects for that node.
   package func restoreEffectRegistrations(from handlers: NodeHandlers) {
     let context = RuntimeRegistrationRestoreContext()
-    for registry in allRegistries where registry.isEffectRegistry {
+    for registry in effectRegistries {
       registry.restore(from: handlers, context: context)
     }
   }

@@ -97,6 +97,26 @@ struct RuntimeRegistrationKindTotalityTests {
     #expect(fingerprintNamespaces(set.publicationOracleFingerprint()) == effectNamespaces)
   }
 
+  @Test("hasEffectRegistrations agrees with the effect-kind classification")
+  func hasEffectRegistrationsAgreesWithEffectKinds() {
+    // The effect-republication walk skips nodes where
+    // `hasEffectRegistrations` is false (F63), so the disjunction must cover
+    // exactly the effect families: a kind classified as effect here whose
+    // family is missing from `hasEffectRegistrations` would make the walk
+    // silently drop that family's live handlers.
+    for kind in RuntimeRegistrationKind.allCases {
+      let identity = testIdentity("Root", "Leaf")
+      let node = makeRecordingNode(identity: identity)
+      ViewNodeContext.withValue(node) {
+        record(kind, on: node, identity: identity)
+      }
+      #expect(
+        node.registeredHandlers.hasEffectRegistrations == Self.isEffectKind(kind),
+        "kind \(kind) hasEffectRegistrations mismatch"
+      )
+    }
+  }
+
   // MARK: - Per-kind expectations
 
   /// The `registry|key` namespaces one recorded registration of this family

@@ -512,6 +512,18 @@ package struct NodeHandlers {
     Self.allRecordFields.contains { !$0.isEmpty(self) }
   }
 
+  /// `true` when any effect family has content. The effect families are
+  /// exactly the restore sources of the `isEffectRegistry` registries
+  /// (lifecycle, task, preference observation); the always-full effect
+  /// republication walk visits every live node each commit, and this guard
+  /// lets the handler-less bulk skip the per-registry restore calls (F63).
+  /// A new effect family must join this disjunction when its registry sets
+  /// `isEffectRegistry` — `restoreEffectRegistrations` reads only these
+  /// three today.
+  package var hasEffectRegistrations: Bool {
+    !lifecycle.isEmpty || !task.isEmpty || !preferenceObservation.isEmpty
+  }
+
   package mutating func recordAction(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,

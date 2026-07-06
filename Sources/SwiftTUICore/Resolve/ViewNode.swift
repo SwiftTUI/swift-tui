@@ -1283,6 +1283,13 @@ package final class ViewNode {
   package func restoreOwnEffectRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
+    // Effect-less nodes (the bulk of the live tree) restore nothing; each
+    // effect registry's `restore` is already a no-op for empty handlers, so
+    // this skip is behavior-preserving (mirrors the guard in
+    // `restoreOwnRuntimeRegistrations`).
+    guard registeredHandlers.hasEffectRegistrations else {
+      return
+    }
     registrations.restoreEffectRegistrations(from: registeredHandlers)
   }
 

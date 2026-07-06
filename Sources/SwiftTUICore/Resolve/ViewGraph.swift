@@ -2518,6 +2518,30 @@ package final class ViewGraph {
     committedRuntimeRegistrationFingerprint = precomputed ?? currentRuntimeRegistrationFingerprint()
   }
 
+  /// The `.unchanged`-publication commit record: nothing was re-evaluated
+  /// this frame, so no node's registrations mutated and no node entered or
+  /// left the live set — the previously committed fingerprint is still
+  /// byte-accurate. Keeping it skips the full O(liveNodeIDs) rebuild that
+  /// `.unchanged` commits used to pay every frame (F63). The DEBUG recompute
+  /// pins that premise; the first frame (no committed fingerprint yet) still
+  /// rebuilds.
+  package func recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame() {
+    guard committedRuntimeRegistrationFingerprint != nil else {
+      recordCommittedRuntimeRegistrationFingerprint()
+      return
+    }
+    #if DEBUG
+      assert(
+        committedRuntimeRegistrationFingerprint == currentRuntimeRegistrationFingerprint(),
+        """
+        an .unchanged-publication frame changed the runtime-registration \
+        fingerprint — a registration mutated or a node entered/left the live \
+        set without recording a publication
+        """
+      )
+    #endif
+  }
+
   package func runtimeRegistrationDeltaRequiresFullPublication(
     _ delta: RuntimeRegistrationPublicationDelta
   ) -> Bool {

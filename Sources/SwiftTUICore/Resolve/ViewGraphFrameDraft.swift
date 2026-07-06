@@ -138,6 +138,7 @@ package final class ViewGraphFrameDraft {
     // this nil and the record call rebuilds.
     var committedFingerprint: RuntimeRegistrationGraphFingerprint?
     var usedScopedRestore = false
+    var publicationIsUnchanged = false
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
@@ -148,6 +149,7 @@ package final class ViewGraphFrameDraft {
       // handlers. Keep high-volume and order-sensitive registries untouched so
       // unchanged commits do not duplicate focus candidates or handlers.
       restoredNodeCount = 0
+      publicationIsUnchanged = true
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
     case .all:
       commitFingerprintDeltaPublication(
@@ -247,7 +249,11 @@ package final class ViewGraphFrameDraft {
         )
       }
     }
-    viewGraph.recordCommittedRuntimeRegistrationFingerprint(committedFingerprint)
+    if publicationIsUnchanged {
+      viewGraph.recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame()
+    } else {
+      viewGraph.recordCommittedRuntimeRegistrationFingerprint(committedFingerprint)
+    }
     didCommit = true
     var diagnostics = liveRegistrations.diagnostics()
     if publicationDiagnosticsEnabled {
