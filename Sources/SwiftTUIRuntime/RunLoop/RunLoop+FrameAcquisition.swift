@@ -87,6 +87,8 @@ extension RunLoop {
     case .rendered(let outcome):
       renderOutcome = outcome
     case .elided:
+      // The elided commit published state — progress happened.
+      consecutivePreStartCancelCount = 0
       return .elided
     }
     if let skippedFrame = recordSkippedCancellableFrame(
@@ -151,11 +153,36 @@ extension RunLoop {
     guard renderMode != .asyncNoCancel else {
       return false
     }
+    // Forward-progress bound for the pre-start cancel path (the tab-leave
+    // livelock, report 2026-07-05-001): a prepared frame whose commit would
+    // stop an invalidation source — a tab leave carrying the leaving tab's
+    // `taskCancel` — is superseded by that source on every cycle, so after
+    // `maxConsecutivePreStartCancels` consecutive newer-intent cancels the
+    // queued tail must run. The completed-frame policy still decides
+    // commit-vs-drop for it, so input coalescing degrades gracefully: a
+    // forced tail that is genuinely visual-only and superseded is dropped,
+    // itself bounded by `progress_starvation`.
+    guard consecutivePreStartCancelCount < Self.maxConsecutivePreStartCancels else {
+      // Trace-visible, like the completed-frame policy's progress_starvation:
+      // the queued tail this decision protects will run uncancellable. The
+      // event has no frame number of its own — it precedes the acquisition
+      // it protects.
+      progressProbe?.record(
+        .preStartCancelBoundHeld,
+        frameNumber: 0
+      )
+      return false
+    }
     return scheduler.hasPendingFrame(at: .now())
   }
 
   private func awaitQueuedTailCancellationSignalForMode() async {
     guard renderMode != .asyncNoCancel else {
+      return
+    }
+    // At the forward-progress bound the queued tail is not cancellable, so
+    // there is no signal to wait for (see `shouldCancelQueuedTailForMode`).
+    guard consecutivePreStartCancelCount < Self.maxConsecutivePreStartCancels else {
       return
     }
     guard !scheduler.hasPendingFrame(at: .now()) else {

@@ -19,9 +19,10 @@
 # forms (usleep/nanosleep/Thread.sleep) were added 2026-05-30 after a flake
 # audit found they slipped past the original regex set.
 #
-# Baseline composition (15): 6 DispatchSemaphore barriers
-# (TerminalPresentationTests x4, AsyncFrameTailRenderingTests x1,
-# TerminalHostPresentationBatchingTests x1) + 4 fixed sleeps
+# Baseline composition (14): 5 DispatchSemaphore barriers
+# (TerminalPresentationTests x4, TerminalHostPresentationBatchingTests x1 —
+# the AsyncFrameTailRenderingTests worker gate moved to Tests/Support as the
+# shared AsyncFrameTailBlockingGate, where sanctioned primitives live) + 4 fixed sleeps
 # (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
 # usleep, RenderDiffTests x1 Thread.sleep) + 3 process/loop watchdogs
 # (EntryPointLaunchTests x1 Task.sleep, GeometryReaderSurfaceTests x1

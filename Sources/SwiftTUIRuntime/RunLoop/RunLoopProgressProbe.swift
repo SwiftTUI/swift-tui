@@ -8,6 +8,11 @@ import SwiftTUICore
     case frameCommitted = "frame_committed"
     case eventDrain = "event_drain"
     case schedulerIdle = "scheduler_idle"
+    /// The pre-start cancel budget is exhausted: this queued frame tail is
+    /// not cancellable and will run to its commit-or-drop decision (the
+    /// forward-progress bound for the tab-leave livelock, report
+    /// 2026-07-05-001).
+    case preStartCancelBoundHeld = "pre_start_cancel_bound_held"
   }
 
   @_spi(Runners) public var sequence: UInt64

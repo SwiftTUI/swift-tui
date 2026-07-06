@@ -25,6 +25,14 @@ extension RunLoop {
   ) -> FrameAcquisitionOutcome? {
     switch renderOutcome.tailJobState {
     case .cancelledBeforeStart:
+      // Only newer-intent cancels count toward the forward-progress bound: a
+      // stale-baseline skip means a sibling frame committed (progress
+      // happened), so it resets the run instead.
+      if renderOutcome.tailCancelReason == "newer_render_intent" {
+        consecutivePreStartCancelCount += 1
+      } else {
+        consecutivePreStartCancelCount = 0
+      }
       reportRuntimeIssues(renderOutcome.runtimeIssues)
       appendLifecycleCarryForward(
         convergence.lifecycleCarryForward,
@@ -52,6 +60,9 @@ extension RunLoop {
       )
       return .skipped
     case .droppedCompleted:
+      // The tail ran to completion — the pre-start cancel run is broken.
+      // Drop starvation is separately bounded by `progress_starvation`.
+      consecutivePreStartCancelCount = 0
       reportRuntimeIssues(renderOutcome.runtimeIssues)
       appendLifecycleCarryForward(
         convergence.lifecycleCarryForward,
@@ -78,6 +89,11 @@ extension RunLoop {
       )
       return .skipped
     case .queued, .started, .completed:
+      // No reset here: a COMPLETED convergence pass can still belong to a
+      // frame that a later pass abandons, and resetting per pass lets an
+      // input frame's multi-pass convergence stretch the pre-start cancel
+      // run past the bound. The reset for genuinely applied frames lives in
+      // `applyAcquiredFrame`.
       return nil
     }
   }

@@ -79,6 +79,24 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
   package var cancelledRenderCount = 0
+  /// Consecutive `cancelled_before_start` outcomes caused by a newer render
+  /// intent. The forward-progress bound for the pre-start cancel path: once
+  /// this reaches ``maxConsecutivePreStartCancels``, the next queued tail is
+  /// not cancellable and runs to its commit-or-drop decision. Without the
+  /// bound, a prepared frame whose commit would stop an invalidation source
+  /// (a tab leave carrying the leaving tab's `taskCancel`) can be superseded
+  /// by that source on every cycle, forever — the gallery tab-leave livelock
+  /// (report 2026-07-05-001). Reset on any outcome that ran a tail
+  /// (committed, dropped) or otherwise made progress (elided commit,
+  /// stale-baseline skip after a sibling's commit).
+  package var consecutivePreStartCancelCount = 0
+  /// Mirror of `CompletedFramePolicy.maxConsecutiveVisualOnlyDrops` for the
+  /// cancelled-before-start path: after this many consecutive pre-start
+  /// cancels the next tail must run. The completed-frame policy then still
+  /// decides commit-vs-drop, so input coalescing degrades gracefully (a
+  /// forced tail that is genuinely visual-only and superseded is dropped,
+  /// itself bounded by `progress_starvation`).
+  package static var maxConsecutivePreStartCancels: Int { 2 }
   package var nextSemanticHostFrameSequence: UInt64 = 0
   package var previousPresentedRasterSurface: RasterSurface?
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []

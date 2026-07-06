@@ -150,6 +150,8 @@ extension RunLoop {
     // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
     previousFrameFocusIdentity = focusTracker.currentFocusIdentity
     previousFramePressedIdentity = pressedIdentity
+    // A frame was genuinely applied: the pre-start cancel run is broken.
+    consecutivePreStartCancelCount = 0
     let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
       since: previousPreferenceObservations
     )
