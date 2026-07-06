@@ -17,7 +17,7 @@ extension DefaultRenderer {
       draft: draft,
       tailOutput: tailOutput
     )
-    let (commit, commitDuration) = previewCompletedFrameCommit(
+    let preview = previewCompletedFrameCommit(
       draft: draft,
       tailOutput: tailOutput,
       resolved: resolved
@@ -26,8 +26,8 @@ extension DefaultRenderer {
       draft: draft,
       tailOutput: tailOutput,
       resolved: resolved,
-      commit: commit,
-      commitDuration: commitDuration,
+      commit: preview.commit,
+      commitDuration: preview.duration,
       workerTimings: workerTimings
     )
     let eligibility = CommittedFrameArtifactBuilder.eligibility(
@@ -43,6 +43,7 @@ extension DefaultRenderer {
       resolved: resolved,
       workerTimings: workerTimings,
       previewArtifacts: artifacts,
+      previewLifecyclePlan: preview.lifecyclePlan,
       eligibility: eligibility,
       newestDesiredGeneration: newestDesiredGeneration,
       dropDecision: (completedFramePolicy ?? .dropCompletedVisualOnly).decide(
@@ -114,7 +115,11 @@ extension DefaultRenderer {
       resolved: candidate.resolved,
       placed: tail.placed,
       semantics: tail.semantics,
-      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates,
+      preview: (
+        lifecyclePlan: candidate.previewLifecyclePlan,
+        commitPlan: candidate.previewArtifacts.commitPlan
+      )
     )
     let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: candidate.draft,
@@ -134,22 +139,38 @@ extension DefaultRenderer {
     return artifacts
   }
 
+  /// Commits a frame's graph and registration effects and produces its
+  /// commit plan.
+  ///
+  /// When `preview` is supplied (the async ordered-commit path), the
+  /// lifecycle plan and commit plan computed for the drop-eligibility
+  /// preview are reused instead of recomputed: nothing runs on the main
+  /// actor between preview and commit, `CommitPlanner.plan` is a pure
+  /// function of inputs that are identical across the two calls, and
+  /// `finalizeFrame` DEBUG-asserts the previewed lifecycle plan against a
+  /// recompute (F61). The one-shot/sync path passes no preview and plans
+  /// here as before.
   @MainActor
   func commitFrameEffects(
     draft: FrameHeadDraft,
     resolved: ResolvedNode,
     placed: PlacedNode,
     semantics: SemanticSnapshot,
-    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate],
+    preview: (lifecyclePlan: ViewGraphFrameLifecycleEventPlan, commitPlan: CommitPlan)? = nil
   ) -> CommittedFrameEffects {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.graphRootIdentity,
         resolved: resolved,
-        placed: placed
+        placed: placed,
+        previewedPlan: preview?.lifecyclePlan
       )
       runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
+      if let preview {
+        return preview.commitPlan
+      }
       return commitPlanner.plan(
         resolved: resolved,
         placed: placed,
@@ -225,26 +246,30 @@ extension DefaultRenderer {
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
     resolved: ResolvedNode
-  ) -> (commit: CommitPlan, duration: Duration) {
+  ) -> (
+    commit: CommitPlan, lifecyclePlan: ViewGraphFrameLifecycleEventPlan, duration: Duration
+  ) {
     let tail = tailOutput.tail
     draft.transaction.materializePreparedState()
     defer {
       draft.transaction.suspendPreparedState()
     }
 
-    return measurePhase(clock: draft.clock) {
-      let lifecycleEvents = viewGraph.previewLifecycleEvents(
+    let (planned, duration) = measurePhase(clock: draft.clock) {
+      let lifecyclePlan = viewGraph.previewLifecycleEventPlan(
         resolved: resolved,
         placed: tail.placed
       )
-      return commitPlanner.plan(
+      let commit = commitPlanner.plan(
         resolved: resolved,
         placed: tail.placed,
         semantics: tail.semantics,
         transaction: draft.frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
+        lifecycleEvents: lifecyclePlan.events
       )
+      return (commit: commit, lifecyclePlan: lifecyclePlan)
     }
+    return (commit: planned.commit, lifecyclePlan: planned.lifecyclePlan, duration: duration)
   }
 
   @MainActor

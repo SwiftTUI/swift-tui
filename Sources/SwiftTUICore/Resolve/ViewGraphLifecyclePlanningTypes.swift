@@ -6,8 +6,14 @@
 
 /// The lifecycle events a frame should emit, plus the viewport-lifecycle
 /// bookkeeping the graph carries forward to the next frame.
-struct ViewGraphFrameLifecycleEventPlan {
-  var events: [LifecycleEvent]
+///
+/// `package` visibility: the async commit path previews this plan for the
+/// completed-frame drop decision and hands the SAME plan back to
+/// ``ViewGraph/finalizeFrame`` on ordered commit, so the plan is computed
+/// once per committed frame instead of twice (F61). The runtime carries the
+/// value opaquely between those two calls.
+package struct ViewGraphFrameLifecycleEventPlan {
+  package var events: [LifecycleEvent]
   var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
   var viewportLifecycleOrder: [ViewportLifecycleKey]
 }

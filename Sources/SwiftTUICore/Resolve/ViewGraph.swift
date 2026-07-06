@@ -2155,6 +2155,16 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
+    previewLifecycleEventPlan(
+      resolved: resolved,
+      placed: placed
+    ).events
+  }
+
+  package func previewLifecycleEventPlan(
+    resolved: ResolvedNode,
+    placed: PlacedNode?
+  ) -> ViewGraphFrameLifecycleEventPlan {
     // The finalize-frame teardown barrier emits the departed subtrees'
     // cancel/disappear events (an entity-routed removal deferred out of the
     // structural diff resolves here, once the full old-vs-new entity set is
@@ -2169,13 +2179,14 @@ package final class ViewGraph {
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
-    ).events
+    )
   }
 
   package func finalizeFrame(
     rootIdentity: Identity,
     resolved: ResolvedNode,
-    placed: PlacedNode?
+    placed: PlacedNode?,
+    previewedPlan: ViewGraphFrameLifecycleEventPlan? = nil
   ) -> [LifecycleEvent] {
     root = nodeIfExists(for: rootIdentity)
     let activeEntities = entityIdentities(in: resolved)
@@ -2193,10 +2204,36 @@ package final class ViewGraph {
       node.setLifecycleState(.alive)
     }
 
-    let lifecyclePlan = frameLifecycleEventPlan(
-      resolved: resolved,
-      placed: placed
-    )
+    // The async ordered-commit path already planned this frame's lifecycle
+    // events for its drop-eligibility preview; nothing runs between the
+    // preview and this finalize on the main actor, so the plan is reused
+    // instead of recomputed (F61). The DEBUG recompute pins that premise: a
+    // divergence means some state feeding the planner changed between
+    // preview and commit, which would have shipped as a silently different
+    // committed plan.
+    let lifecyclePlan: ViewGraphFrameLifecycleEventPlan
+    if let previewedPlan {
+      #if DEBUG
+        let recomputed = frameLifecycleEventPlan(
+          resolved: resolved,
+          placed: placed
+        )
+        assert(
+          recomputed.events == previewedPlan.events,
+          "previewed lifecycle events diverged from the committed frame's plan"
+        )
+        assert(
+          recomputed.viewportLifecycleOrder == previewedPlan.viewportLifecycleOrder,
+          "previewed viewport-lifecycle order diverged from the committed frame's plan"
+        )
+      #endif
+      lifecyclePlan = previewedPlan
+    } else {
+      lifecyclePlan = frameLifecycleEventPlan(
+        resolved: resolved,
+        placed: placed
+      )
+    }
     latestLifecycleEvents = lifecyclePlan.events
     viewportLifecycleNodesByKey = lifecyclePlan.viewportLifecycleNodesByKey
     viewportLifecycleOrder = lifecyclePlan.viewportLifecycleOrder

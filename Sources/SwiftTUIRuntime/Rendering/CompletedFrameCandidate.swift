@@ -14,6 +14,11 @@ struct CompletedFrameCandidate {
   /// runtime registrations are checkpoint-restored after building it; actual
   /// side effects are applied only by `commitCompletedFrameCandidate`.
   var previewArtifacts: FrameArtifacts
+  /// The lifecycle plan computed for the preview. Ordered commit hands it
+  /// back to `ViewGraph.finalizeFrame` so the plan is computed once per
+  /// committed frame (F61); nothing runs on the main actor between preview
+  /// and commit, so the plans are identical (DEBUG-asserted in finalize).
+  var previewLifecyclePlan: ViewGraphFrameLifecycleEventPlan
   var eligibility: FrameDropEligibility
   var newestDesiredGeneration: RenderGeneration
   var dropDecision: CompletedFrameDropDecision
