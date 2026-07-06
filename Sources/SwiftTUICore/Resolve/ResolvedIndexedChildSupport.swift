@@ -14,16 +14,32 @@ extension IndexedChildSource {
   package var workerResolvedChildren: [ResolvedNode]? { nil }
 }
 
+/// Resolve-time aggregate of every layout-offload disqualifier in a subtree.
+///
+/// `count`/`firstIdentity` keep their original meaning — main-actor-only
+/// *custom layouts* — because they feed the `customLayoutFallbackCount`
+/// diagnostic channel (TSV column, drop-eligibility blocker). The two
+/// additional counters cover the remaining offload disqualifiers so the
+/// frame-tail eligibility queries are O(1) summary reads instead of
+/// full-tree scans (F35).
 package struct CustomLayoutFallbackSummary: Equatable, Sendable {
   package var count: Int
   package var firstIdentity: Identity?
+  /// Indexed child sources in the subtree whose `canRunOnWorker` is `false`.
+  package var mainActorOnlyIndexedChildSourceCount: Int
+  /// Layout-realized content boundaries in the subtree.
+  package var layoutRealizedContentCount: Int
 
   package init(
     count: Int = 0,
-    firstIdentity: Identity? = nil
+    firstIdentity: Identity? = nil,
+    mainActorOnlyIndexedChildSourceCount: Int = 0,
+    layoutRealizedContentCount: Int = 0
   ) {
     self.count = count
     self.firstIdentity = firstIdentity
+    self.mainActorOnlyIndexedChildSourceCount = mainActorOnlyIndexedChildSourceCount
+    self.layoutRealizedContentCount = layoutRealizedContentCount
   }
 
   package mutating func record(_ identity: Identity) {
@@ -33,11 +49,21 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     }
   }
 
+  package mutating func recordMainActorOnlyIndexedChildSource() {
+    mainActorOnlyIndexedChildSourceCount += 1
+  }
+
+  package mutating func recordLayoutRealizedContent() {
+    layoutRealizedContentCount += 1
+  }
+
   package mutating func merge(_ other: Self) {
     count += other.count
     if firstIdentity == nil {
       firstIdentity = other.firstIdentity
     }
+    mainActorOnlyIndexedChildSourceCount += other.mainActorOnlyIndexedChildSourceCount
+    layoutRealizedContentCount += other.layoutRealizedContentCount
   }
 }
 

@@ -123,6 +123,7 @@ package struct ResolvedNode: Equatable, Sendable {
   }
   package var layoutRealizedContent: LayoutRealizedContentBoundary? {
     didSet {
+      recomputeCustomLayoutFallbackSummary()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -292,7 +293,8 @@ package struct ResolvedNode: Equatable, Sendable {
       identity: identity,
       layoutBehavior: layoutBehavior,
       children: children,
-      indexedChildSource: indexedChildSource
+      indexedChildSource: indexedChildSource,
+      layoutRealizedContent: layoutRealizedContent
     )
   }
 
@@ -339,13 +341,20 @@ package struct ResolvedNode: Equatable, Sendable {
     identity: Identity,
     layoutBehavior: LayoutBehavior,
     children: [ResolvedNode],
-    indexedChildSource: (any IndexedChildSource)?
+    indexedChildSource: (any IndexedChildSource)?,
+    layoutRealizedContent: LayoutRealizedContentBoundary?
   ) -> CustomLayoutFallbackSummary {
     var summary = CustomLayoutFallbackSummary()
     if case .custom(let handle) = layoutBehavior,
       !handle.canRunOnWorker
     {
       summary.record(identity)
+    }
+    if let indexedChildSource, !indexedChildSource.canRunOnWorker {
+      summary.recordMainActorOnlyIndexedChildSource()
+    }
+    if layoutRealizedContent != nil {
+      summary.recordLayoutRealizedContent()
     }
     if let workerChildren = indexedChildSource?.workerResolvedChildren {
       for child in workerChildren {
