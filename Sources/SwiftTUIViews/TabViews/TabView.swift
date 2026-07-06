@@ -147,7 +147,15 @@ extension TabView {
               setStoredFocusedTabIndex(
                 0,
                 in: ownerNode,
-                invalidationIdentity: context.identity
+                invalidationIdentity: context.identity,
+                certifiedInvalidationIdentities: certifiedStripFocusIdentities(
+                  controlIdentity: context.identity,
+                  ownerNode: ownerNode,
+                  selectedIndex: selectedIndex,
+                  optionCount: options.count,
+                  presentation: stylePresentation,
+                  nextStoredIndex: 0
+                )
               )
               return true
             case KeyPress(.end, modifiers: []):
@@ -159,7 +167,15 @@ extension TabView {
               setStoredFocusedTabIndex(
                 max(0, options.count - 1),
                 in: ownerNode,
-                invalidationIdentity: context.identity
+                invalidationIdentity: context.identity,
+                certifiedInvalidationIdentities: certifiedStripFocusIdentities(
+                  controlIdentity: context.identity,
+                  ownerNode: ownerNode,
+                  selectedIndex: selectedIndex,
+                  optionCount: options.count,
+                  presentation: stylePresentation,
+                  nextStoredIndex: max(0, options.count - 1)
+                )
               )
               return true
             case KeyPress(.escape, modifiers: [])
@@ -215,7 +231,15 @@ extension TabView {
               setStoredFocusedTabIndex(
                 nil,
                 in: ownerNode,
-                invalidationIdentity: context.identity
+                invalidationIdentity: context.identity,
+                certifiedInvalidationIdentities: certifiedStripFocusIdentities(
+                  controlIdentity: context.identity,
+                  ownerNode: ownerNode,
+                  selectedIndex: selectedIndex,
+                  optionCount: options.count,
+                  presentation: stylePresentation,
+                  nextStoredIndex: nil
+                )
               )
               return false
             default:
@@ -246,6 +270,7 @@ extension TabView {
               focusedIndexOwnerNode: ownerNode,
               orderedTags: orderedTags,
               selectedIndex: selectedIndex,
+              presentation: stylePresentation,
               invalidationIdentity: context.identity
             )
           }
@@ -510,6 +535,17 @@ private func moveStoredTabFocus(
       optionCount: optionCount
     )
     ?? (direction > 0 ? -1 : optionCount)
+  // The synthetic off-strip anchors (-1 / optionCount) fall out of the
+  // certified set naturally: no visible or overflow index matches them.
+  let certifiedIdentities = { (nextIndex: Int) -> Set<Identity>? in
+    invalidationIdentity.map { controlIdentity in
+      stripFocusInvalidationIdentities(
+        controlIdentity: controlIdentity,
+        presentation: presentation,
+        flippedIndices: [currentIndex, nextIndex]
+      )
+    }
+  }
 
   if let overflow = presentation.overflowMenu, !overflow.isExpanded {
     let overflowIndices = Set(overflow.overflowIndices)
@@ -523,7 +559,8 @@ private func moveStoredTabFocus(
       setStoredFocusedTabIndex(
         nextIndex,
         in: ownerNode,
-        invalidationIdentity: invalidationIdentity
+        invalidationIdentity: invalidationIdentity,
+        certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
       )
       return
     }
@@ -539,13 +576,15 @@ private func moveStoredTabFocus(
       setStoredFocusedTabIndex(
         overflowFocusIndex,
         in: ownerNode,
-        invalidationIdentity: invalidationIdentity
+        invalidationIdentity: invalidationIdentity,
+        certifiedInvalidationIdentities: certifiedIdentities(overflowFocusIndex)
       )
     } else {
       setStoredFocusedTabIndex(
         nextIndex,
         in: ownerNode,
-        invalidationIdentity: invalidationIdentity
+        invalidationIdentity: invalidationIdentity,
+        certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
       )
     }
     return
@@ -558,7 +597,8 @@ private func moveStoredTabFocus(
   setStoredFocusedTabIndex(
     nextIndex,
     in: ownerNode,
-    invalidationIdentity: invalidationIdentity
+    invalidationIdentity: invalidationIdentity,
+    certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
   )
 }
 
@@ -629,10 +669,18 @@ private func moveStoredOverflowMenuFocus(
     max(currentOverflowPosition + direction, 0),
     overflow.overflowIndices.count - 1
   )
+  let nextIndex = overflow.overflowIndices[nextOverflowPosition]
   setStoredFocusedTabIndex(
-    overflow.overflowIndices[nextOverflowPosition],
+    nextIndex,
     in: ownerNode,
-    invalidationIdentity: invalidationIdentity
+    invalidationIdentity: invalidationIdentity,
+    certifiedInvalidationIdentities: invalidationIdentity.map { controlIdentity in
+      stripFocusInvalidationIdentities(
+        controlIdentity: controlIdentity,
+        presentation: presentation,
+        flippedIndices: [currentIndex, nextIndex]
+      )
+    }
   )
   return true
 }
@@ -643,6 +691,7 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   focusedIndexOwnerNode: SwiftTUICore.ViewNode?,
   orderedTags: [SelectionTag],
   selectedIndex: Int?,
+  presentation: TabViewStylePresentation,
   invalidationIdentity: Identity? = nil
 ) -> Bool {
   guard
@@ -655,10 +704,20 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   else {
     return false
   }
+  // Normalizes storage onto the already-displayed index (old == new), so the
+  // certified cone is the single resolved item plus the trigger; the
+  // selection write below carries its own (broad) invalidation.
   setStoredFocusedTabIndex(
     index,
     in: focusedIndexOwnerNode,
-    invalidationIdentity: invalidationIdentity
+    invalidationIdentity: invalidationIdentity,
+    certifiedInvalidationIdentities: invalidationIdentity.map { controlIdentity in
+      stripFocusInvalidationIdentities(
+        controlIdentity: controlIdentity,
+        presentation: presentation,
+        flippedIndices: [index]
+      )
+    }
   )
   return setBoundSelection(selectionBinding, to: orderedTags[index])
 }
@@ -680,13 +739,82 @@ private func storedFocusedTabIndex(
 private func setStoredFocusedTabIndex(
   _ index: Int?,
   in ownerNode: SwiftTUICore.ViewNode?,
-  invalidationIdentity: Identity? = nil
+  invalidationIdentity: Identity? = nil,
+  certifiedInvalidationIdentities: Set<Identity>? = nil
 ) {
   ownerNode?.setStateSlot(
     ordinal: tabFocusedIndexStateSlot,
     value: index,
-    invalidationIdentity: invalidationIdentity
+    invalidationIdentity: invalidationIdentity,
+    certifiedInvalidationIdentities: certifiedInvalidationIdentities
   )
+}
+
+/// Resolves the old and new *display* indices for a stored-index write (the
+/// display index falls back to the selection when storage is nil) and returns
+/// the certified strip cone between them.
+@MainActor
+private func certifiedStripFocusIdentities(
+  controlIdentity: Identity,
+  ownerNode: SwiftTUICore.ViewNode?,
+  selectedIndex: Int?,
+  optionCount: Int,
+  presentation: TabViewStylePresentation,
+  nextStoredIndex: Int?
+) -> Set<Identity> {
+  let currentIndex = resolvedFocusedTabIndex(
+    storedIndex: storedFocusedTabIndex(in: ownerNode),
+    selectedIndex: selectedIndex,
+    optionCount: optionCount
+  )
+  let nextIndex = resolvedFocusedTabIndex(
+    storedIndex: nextStoredIndex,
+    selectedIndex: selectedIndex,
+    optionCount: optionCount
+  )
+  return stripFocusInvalidationIdentities(
+    controlIdentity: controlIdentity,
+    presentation: presentation,
+    flippedIndices: [currentIndex, nextIndex]
+  )
+}
+
+/// The strip-chrome subtrees whose resolved output can differ when the stored
+/// strip-focus index moves between `flippedIndices` (the resolved old/new
+/// display indices): the flipped visible bar items, the flipped overflow-menu
+/// items while the menu is expanded, and the overflow trigger (whose
+/// focused/expanded presentation tracks the focused domain) whenever an
+/// overflow surface exists. The stored index is read only by the declaring
+/// `TabView`'s own body — its re-run rides the state-dirty queue — and the
+/// content slot is `f(authored, selection)`, which a pure strip-focus move
+/// cannot change (the same promise the focus-presentation-inert slot
+/// declaration certifies for tracker moves). Styles that do not stamp these
+/// route identities fail the certified write's liveness check and keep the
+/// reader-attributed broad cone.
+private func stripFocusInvalidationIdentities(
+  controlIdentity: Identity,
+  presentation: TabViewStylePresentation,
+  flippedIndices: [Int?]
+) -> Set<Identity> {
+  var identities: Set<Identity> = []
+  let visibleIndices = Set(presentation.visibleOptionIndices)
+  for case let index? in flippedIndices {
+    if visibleIndices.contains(index) {
+      identities.insert(tabItemIdentity(for: controlIdentity, index: index))
+    }
+    if let overflow = presentation.overflowMenu,
+      overflow.isExpanded,
+      overflow.overflowIndices.contains(index)
+    {
+      identities.insert(
+        tabOverflowItemIdentity(for: controlIdentity, index: index)
+      )
+    }
+  }
+  if presentation.overflowMenu != nil {
+    identities.insert(tabOverflowTriggerIdentity(for: controlIdentity))
+  }
+  return identities
 }
 
 @MainActor

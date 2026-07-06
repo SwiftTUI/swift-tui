@@ -2983,6 +2983,31 @@ package final class ViewGraph {
     viewNodeID(for: identity) != nil || nearestLiveAncestorNodeID(for: identity) != nil
   }
 
+  /// Whether every identity reaches live graph work at or below itself —
+  /// WITHOUT the nearest-live-ancestor remap `nodeIDsForInvalidation`
+  /// applies. A certified state-write invalidation
+  /// (`ViewNode.setStateSlot(ordinal:value:certifiedInvalidationIdentities:)`)
+  /// relies on reuse-conflict denial reaching the certified subtrees; an
+  /// identity with no node at or below it would deny nothing while its queue
+  /// remap re-broadened onto the ancestor, so the caller must fall back to
+  /// reader attribution instead.
+  package func allIdentitiesReachLiveSubtrees(
+    _ identities: Set<Identity>
+  ) -> Bool {
+    let unmatched = identities.filter { viewNodeID(for: $0) == nil }
+    guard !unmatched.isEmpty else {
+      return true
+    }
+    var remaining = unmatched
+    for identity in nodeIDByIdentity.keys {
+      remaining = remaining.filter { !identity.isDescendant(of: $0) }
+      if remaining.isEmpty {
+        return true
+      }
+    }
+    return false
+  }
+
   private func dirtyPlanBaseDiagnostics(
     invalidatedIdentities: Set<Identity>,
     unmappedIdentities: [Identity]

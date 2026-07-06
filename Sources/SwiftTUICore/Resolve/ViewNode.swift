@@ -419,7 +419,8 @@ package final class ViewNode {
   package func setStateSlot<Value>(
     ordinal: Int,
     value: Value,
-    invalidationIdentity: Identity? = nil
+    invalidationIdentity: Identity? = nil,
+    certifiedInvalidationIdentities: Set<Identity>? = nil
   ) {
     var slot = stateSlots[ordinal] ?? .init()
     let didChange = slot.set(value)
@@ -429,7 +430,8 @@ package final class ViewNode {
       ownerGraph?.queueDirtyForStateChange(key)
       let invalidationIdentities = stateChangeInvalidationIdentities(
         for: key,
-        explicit: invalidationIdentity
+        explicit: invalidationIdentity,
+        certified: certifiedInvalidationIdentities
       )
       InvalidationSourceTrace.note("state-write", invalidationIdentities)
       let animationRequest = AnimationContextStorage.currentRequest
@@ -457,15 +459,42 @@ package final class ViewNode {
   /// open. Falls back to the owner identity when no readers were recorded
   /// (deferred / conditional reads, or no owning graph) so a change is never
   /// dropped.
+  ///
+  /// `certified`, when provided, replaces reader attribution entirely: the
+  /// caller certifies that these identities cover every subtree whose
+  /// resolved output can differ because of this write, *beyond the owner's
+  /// own re-evaluation* (which rides `queueDirtyForStateChange` regardless).
+  /// This narrows a self-read presentation slot whose reading owner is a
+  /// near-root container — reader attribution would conflict-deny the
+  /// owner's whole descendant cone — down to the chrome the write actually
+  /// changes (`TabView`'s stored strip-focus index). It applies only when
+  /// every certified identity reaches live graph work at or below itself; a
+  /// tree that never materialized them (a custom style that does not stamp
+  /// the route identities) keeps the reader-attributed broad cone, because
+  /// certified identities with no live subtree would deny no reuse while the
+  /// queue boundary remapped them onto an ancestor.
   private func stateChangeInvalidationIdentities(
     for key: StateSlotKey,
-    explicit: Identity?
+    explicit: Identity?,
+    certified: Set<Identity>? = nil
   ) -> Set<Identity> {
     let ownerIdentity = explicit ?? identity
     guard let ownerGraph else {
       return [ownerIdentity]
     }
     let readers = ownerGraph.stateDependentIdentities(for: key)
+    if let certified, !certified.isEmpty,
+      // Certification covers subtrees beyond the owner's own re-run. A
+      // reader on any OTHER node needs its own invalidation, which the
+      // certified set cannot promise to include — interior-hosting seams can
+      // store the slot on an ancestor evaluator's node while the control's
+      // body records the read on its own node — so foreign readers keep
+      // reader attribution.
+      readers.subtracting([identity]).isEmpty,
+      ownerGraph.allIdentitiesReachLiveSubtrees(certified)
+    {
+      return certified
+    }
     return readers.isEmpty ? [ownerIdentity] : readers
   }
 
