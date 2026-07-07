@@ -45,6 +45,7 @@ extension ViewGraph {
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
     package var changeObservationValues: [ChangeObservationValueKey: String]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
+    package var pendingRuntimeRegistrationRefreshRoots: Set<Identity>
 
     package var invalidatedIdentities: Set<Identity> {
       identities(for: invalidatedNodeIDs)

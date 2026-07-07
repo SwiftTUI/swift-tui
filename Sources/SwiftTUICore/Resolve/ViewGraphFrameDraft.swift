@@ -143,6 +143,17 @@ package final class ViewGraphFrameDraft {
     var committedFingerprint: RuntimeRegistrationGraphFingerprint?
     var usedScopedRestore = false
     var publicationIsUnchanged = false
+    // In-place registration refreshes (a reused toolbar strip re-capturing its
+    // item actions in the late-preference stage) mutate node records outside
+    // any dirty plan; their refreshed records reach the live registry only
+    // through this publication. Merge them in — on a plan-less frame this
+    // escalates `.unchanged` to a narrow `.subtrees` publication, keeping the
+    // `.unchanged` commit's byte-stable-fingerprint premise (the F63 DEBUG
+    // oracle) true by construction.
+    let refreshRoots = viewGraph.takePendingRuntimeRegistrationRefreshRoots()
+    if !refreshRoots.isEmpty {
+      recordSubtreePublication(rootedAt: refreshRoots)
+    }
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live

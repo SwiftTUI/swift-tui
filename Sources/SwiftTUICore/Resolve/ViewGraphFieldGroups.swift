@@ -130,5 +130,11 @@ extension ViewGraph {
     // a live node. See `ChangeLifecycleModifier`.
     package var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] = [:]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
+    // Identities whose registrations were refreshed in place since the last
+    // commit (`ViewGraph.refreshActionRegistration`), owed to the next
+    // commit's publication. Checkpointed with the group: a discarded frame's
+    // restore rolls the queued roots back alongside the node records they
+    // describe.
+    package var pendingRuntimeRegistrationRefreshRoots: Set<Identity> = []
   }
 }

@@ -436,6 +436,100 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  @Test("in-place action refresh escalates a plan-less commit's publication")
+  func inPlaceActionRefreshEscalatesPlanlessCommitPublication() {
+    let rootIdentity = testIdentity("Root")
+    let itemIdentity = testIdentity("Root", "Item")
+
+    // Seed: one node holding an action registration — the toolbar strip item
+    // shape (`<strip>/base/content/Layout[i]`).
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let itemNode = graph.beginEvaluation(identity: itemIdentity, invalidator: nil)
+    itemNode.recordActionRegistration(
+      identity: itemIdentity,
+      handler: { true },
+      followUpInvalidationIdentity: nil
+    )
+    graph.finishEvaluation(
+      itemNode,
+      resolved: ResolvedNode(identity: itemIdentity, kind: .view("Item")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: itemIdentity, kind: .view("Item"))]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    // Frame 1: full publish; the commit records the registration fingerprint.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    initialDraft.commitRuntimeRegistrations(from: graph)
+
+    // Between commits: the reused toolbar strip re-captures the item's action
+    // in place (late-preference reconciliation). The refresh restores only a
+    // frame-scoped resolve-context registry, so the refreshed record reaches
+    // the persistent live registry solely through the next commit's
+    // publication.
+    let contextRegistry = LocalActionRegistry()
+    var refreshedHandlerRan = false
+    graph.refreshActionRegistration(
+      identity: itemIdentity,
+      handler: {
+        refreshedHandlerRan = true
+        return true
+      },
+      followUpInvalidationIdentity: nil,
+      in: contextRegistry
+    )
+
+    // Frame 2: nothing re-evaluated — no dirty plan is recorded. The queued
+    // refresh root must escalate the publication from `.unchanged` to a
+    // narrow `.subtrees`, so (a) the refreshed record reaches the live
+    // registry, and (b) the `.unchanged` commit's byte-stable-fingerprint
+    // premise (the F63 DEBUG oracle at
+    // `recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame`)
+    // stays true — pre-fix this commit trapped there (the gallery
+    // todo-delete crash).
+    let planlessDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let diagnostics = planlessDraft.commitRuntimeRegistrations(from: graph)
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+
+    // The refreshed handler reached BOTH registries: the frame-scoped one the
+    // refresh restored directly, and the live one via the escalated commit.
+    #expect(contextRegistry.dispatch(identity: itemIdentity))
+    #expect(refreshedHandlerRan)
+    refreshedHandlerRan = false
+    #expect(liveRegistrations.actionRegistry?.dispatch(identity: itemIdentity) == true)
+    #expect(refreshedHandlerRan)
+
+    // A follow-up plan-less commit with no interleaved refresh stays
+    // `.unchanged` — and must not trap the oracle.
+    let unchangedDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let unchangedDiagnostics = unchangedDraft.commitRuntimeRegistrations(from: graph)
+    #expect(unchangedDiagnostics.publication.publicationMode == "unchanged")
+  }
+
   @Test(".all publication scopes restore to changed registration subtrees")
   func allPublicationScopesRestoreToChangedRegistrationSubtrees() {
     let rootIdentity = testIdentity("Root")

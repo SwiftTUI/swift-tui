@@ -323,6 +323,10 @@ package final class ViewGraph {
     get { frameCommit.committedRuntimeRegistrationFingerprint }
     set { frameCommit.committedRuntimeRegistrationFingerprint = newValue }
   }
+  private var pendingRuntimeRegistrationRefreshRoots: Set<Identity> {
+    get { frameCommit.pendingRuntimeRegistrationRefreshRoots }
+    set { frameCommit.pendingRuntimeRegistrationRefreshRoots = newValue }
+  }
   /// F29: derived cache behind ``makeCheckpoint()`` — one live image per node,
   /// refreshed by generation compare, handed out as an O(1) COW copy. Meta-state
   /// outside the checkpointed field groups: it is never part of a checkpoint,
@@ -614,7 +618,8 @@ package final class ViewGraph {
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
       changeObservationValues: changeObservationValues.mapValues { $0.storedTypeDescription },
-      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint
+      committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
+      pendingRuntimeRegistrationRefreshRoots: pendingRuntimeRegistrationRefreshRoots
     )
   }
 
@@ -709,6 +714,28 @@ package final class ViewGraph {
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )
+    // The registry restored above is frame-scoped (resolve-context) state, not
+    // the persistent live registry — the refreshed handler reaches the live
+    // registry only through the node record via the commit publication. Queue
+    // the identity as a publication root so the committing draft escalates an
+    // `.unchanged` publication to cover it: without this, a frame that formed
+    // no dirty plan commits `.unchanged` while this node's registration
+    // mutated — the stale live handler survives and the F63 `.unchanged`
+    // fingerprint oracle traps (the gallery todo-delete crash).
+    pendingRuntimeRegistrationRefreshRoots.insert(identity)
+  }
+
+  /// Drains the identities whose registrations were refreshed in place since
+  /// the last commit (`refreshActionRegistration`). The committing frame
+  /// draft merges these into its publication so the refreshed records reach
+  /// the live registry even on frames that formed no dirty plan.
+  package func takePendingRuntimeRegistrationRefreshRoots() -> [Identity] {
+    guard !pendingRuntimeRegistrationRefreshRoots.isEmpty else {
+      return []
+    }
+    let roots = pendingRuntimeRegistrationRefreshRoots.sorted()
+    pendingRuntimeRegistrationRefreshRoots.removeAll()
+    return roots
   }
 
   package func invalidate(_ identities: Set<Identity>) {
