@@ -610,6 +610,18 @@ package final class ViewNode {
     invalidator?.requestInvalidation(of: [identity])
   }
 
+  /// Test seam: counts reader-attributed runtime state-flip invalidations
+  /// (``invalidateStateSlotReadersForRuntimeChange``) so tests can pin that a
+  /// runtime-applied `@FocusState` value lands exactly once per genuine
+  /// change — a re-fire means a re-hosted slot re-seeded from its authored
+  /// default and treated the unchanged runtime value as a change.
+  @MainActor
+  package enum RuntimeStateFlipProbe {
+    package private(set) static var count = 0
+    package static func record() { count += 1 }
+    package static func reset() { count = 0 }
+  }
+
   /// Reader-attributed invalidation for a runtime-applied state-slot change
   /// (a `@FocusState` flip applied by focus-sync's binding re-derive). The
   /// invalidated set is the receiving `.focused()` registration identity
@@ -633,6 +645,7 @@ package final class ViewNode {
     if invalidationIdentities.isEmpty {
       invalidationIdentities = [identity]
     }
+    RuntimeStateFlipProbe.record()
     InvalidationSourceTrace.note("runtime-state-flip", invalidationIdentities)
     ownerGraph?.queueDirty(invalidationIdentities)
     invalidator?.requestInvalidation(of: invalidationIdentities)

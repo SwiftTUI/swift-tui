@@ -284,6 +284,62 @@ struct PresentationPortalForceQueueTests {
     )
   }
 
+  @Test("portal attachment content keeps one stable state owner across passes")
+  func portalAttachmentStateOwnerStableAcrossPasses() async throws {
+    ViewNode.RuntimeStateFlipProbe.reset()
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueStateOwnerRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Open Sheet") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("FocusedMarker") }
+          },
+          .press(KeyPress(.escape)),
+          .awaitCondition {
+            terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        SheetStateOwnerProbe()
+      }
+    )
+
+    // The palette-shaped sheet adopts default focus into its TextField and
+    // a genuine value reader shows the applied @FocusState.
+    #expect(outcome.frames.contains { $0.contains("FocusedMarker") })
+    // The runtime focus flip should land EXACTLY once (the adoption). A
+    // second reader-attributed flip invalidation means the flip RE-FIRED:
+    // the attachment content's state owner moved to a different host node
+    // on a later pass, the re-hosted slot re-seeded from its authored
+    // default, and focus-sync treated the unchanged runtime value as a
+    // change — re-invalidating the sheet cone one extra frame per open
+    // (and, in the same class, dropping any @State written by a superseded
+    // pass).
+    //
+    // KNOWN ISSUE (root-caused, fix pending): single-child declared-child
+    // flattening lets the wrapper's committed snapshot claim the child's
+    // identity (`normalizeResolvedElements` count==1 returns the child node
+    // as the wrapper's resolved root), so after the wrapper's first commit,
+    // `beginEvaluation(childIdentity)` resolves to the WRAPPER node and the
+    // child's @State/@FocusState re-host there with fresh slots. Creation
+    // pass hosts on the child's own node; every later pass on the wrapper —
+    // exactly one spurious flip per presentation open. The fix belongs in
+    // the identity→node occupancy resolution (prefer the authored child's
+    // live node over a flattening wrapper), tracked in
+    // docs/reports/2026-07-06-008 (org repo).
+    withKnownIssue(
+      "single-child flattening aliases the child identity onto the wrapper; state re-hosts on later passes"
+    ) {
+      #expect(ViewNode.RuntimeStateFlipProbe.count == 1)
+    }
+  }
+
   @Test("imperative presentation still opens without the portal force-queue")
   func imperativePresentationUnaffected() async throws {
     let outcome = try await runPortalForceQueueScenario(
@@ -472,6 +528,58 @@ private struct SheetRerenderReCarryProbe: View {
       }
       Text("Background")
     }
+  }
+}
+
+private struct SheetStateOwnerProbe: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack {
+      Button("Open Sheet") {
+        isPresented = true
+      }
+      .panel(id: "stateOwnerHost")
+      .paletteSheet("Palette", isPresented: $isPresented) { _ in
+        SheetStateOwnerContent()
+      }
+      Text("Background")
+    }
+  }
+}
+
+/// Gallery-command-palette replica: the outer wrapper returns a single-child
+/// `Group` (the gallery's documented workaround that gives the stateful body
+/// a declared-child node of its own on the creation pass), and the body is a
+/// @FocusState-bound TextField that takes default focus on open plus a
+/// genuine value reader of the binding. The @FocusState slot lives on
+/// whatever node hosts the body — the state owner the stable-owner test pins
+/// across passes.
+private struct SheetStateOwnerContent: View {
+  var body: some View {
+    Group {
+      SheetStateOwnerBody()
+    }
+  }
+}
+
+private struct SheetStateOwnerBody: View {
+  @State private var query = ""
+  @FocusState private var isQueryFocused: Bool
+  @Namespace private var focusNamespace
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(isQueryFocused ? "FocusedMarker" : "UnfocusedMarker")
+      TextField("Filter", text: $query)
+        .focused($isQueryFocused)
+        .prefersDefaultFocus(in: focusNamespace)
+      Divider()
+      Text("SheetBodyMarker")
+    }
+    .padding(1)
+    .frame(minWidth: 44, alignment: .leading)
+    .focusScope(focusNamespace)
   }
 }
 
