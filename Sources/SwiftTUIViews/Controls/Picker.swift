@@ -62,40 +62,36 @@ extension Picker {
 
     if isEnabled {
       let binding = selection
-      let authoringContext =
-        (currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
-        .withEnvironmentValues(context.environmentValues)
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: authoringScope
+      )
+      intake.registerKeyHandler(identity: context.identity) { event in
         let delta = pickerStyle.selectionDelta(for: event)
         guard let delta, !options.isEmpty else {
           return false
         }
 
-        return withImperativeAuthoringContext(authoringContext) {
-          stepBoundSelection(
-            binding,
-            orderedTags: options.map(\.tag),
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: options.map(\.tag),
+          delta: delta
+        )
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
+      intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
           return false
         }
 
-        return withImperativeAuthoringContext(authoringContext) {
-          stepBoundSelection(
-            binding,
-            orderedTags: options.map(\.tag),
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: options.map(\.tag),
+          delta: delta
+        )
       }
 
       for (index, option) in options.enumerated() {
@@ -105,14 +101,12 @@ extension Picker {
             index: index
           )
         )
-        context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
+        intake.registerPointerHandler(routeID: routeID) { event in
           guard case .down(.primary) = event.kind else {
             return false
           }
 
-          return withImperativeAuthoringContext(authoringContext) {
-            setBoundSelection(binding, to: option.tag)
-          }
+          return setBoundSelection(binding, to: option.tag)
         }
       }
 
@@ -120,7 +114,7 @@ extension Picker {
         let triggerRouteID = runtimePrimaryRouteID(
           for: pickerTriggerIdentity(for: context.identity)
         )
-        context.localPointerHandlerRegistry?.register(routeID: triggerRouteID) { _ in
+        intake.registerPointerHandler(routeID: triggerRouteID) { _ in
           false
         }
       }

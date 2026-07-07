@@ -69,18 +69,16 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
       // registration; the command will never fire.
       return [node]
     }
-    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
-      .withEnvironmentValues(context.environmentValues)
-    context.commandRegistry?.registerKeyCommand(
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
+    )
+    intake.registerKeyCommand(
       at: node.identity,
       binding: binding,
       description: description,
       isEnabled: isEnabled,
-      action: {
-        withImperativeAuthoringContext(dynamicPropertyScope) {
-          action()
-        }
-      }
+      action: action
     )
     return [node]
   }

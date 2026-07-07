@@ -94,17 +94,14 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let authoringContext = currentImperativeAuthoringContextSnapshot()?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(context: context)
     let lifecycleAction = action
     let handlerID =
-      context.localLifecycleRegistry?.registerAppear(
+      intake.registerAppearHandler(
         identity: node.identity,
         ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
         handler: {
-          withImperativeAuthoringContext(authoringContext) {
-            lifecycleAction()
-          }
+          lifecycleAction()
         }
       ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
@@ -126,17 +123,14 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let authoringContext = currentImperativeAuthoringContextSnapshot()?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(context: context)
     let lifecycleAction = action
     let handlerID =
-      context.localLifecycleRegistry?.registerDisappear(
+      intake.registerDisappearHandler(
         identity: node.identity,
         ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
         handler: {
-          withImperativeAuthoringContext(authoringContext) {
-            lifecycleAction()
-          }
+          lifecycleAction()
         }
       ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
@@ -155,8 +149,7 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let authoringContext = currentImperativeAuthoringContextSnapshot()?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(context: context)
     let node = content.resolve(in: context)
     let viewGraph = context.viewGraph
     let ownerNode = viewGraph?.nodeForIdentity(node.identity)
@@ -222,13 +215,11 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     let lifecycleAction = action
 
     let handlerID =
-      context.localLifecycleRegistry?.registerChange(
+      intake.registerChangeHandler(
         identity: node.identity,
         ordinal: modifierOrdinal,
         handler: {
-          withImperativeAuthoringContext(authoringContext) {
-            lifecycleAction(oldValue, value)
-          }
+          lifecycleAction(oldValue, value)
         }
       ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
     ownerNode?.queueChangeHandler(handlerID)
@@ -290,8 +281,7 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let authoringContext = currentImperativeAuthoringContextSnapshot()?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(context: context)
     let taskAction = action
     let lifecycleIdentity = node.identity
     recordLifecycleEvaluationOwner(
@@ -316,19 +306,13 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
           : "\(lifecycleIdentity)#task[\(taskOrdinal)]"
       }
     let descriptor = TaskDescriptor(id: descriptorID, priority: priority)
-    if let taskRegistry = context.localTaskRegistry {
-      taskRegistry.register(
-        identity: lifecycleIdentity,
-        registration: .init(
-          descriptor: descriptor,
-          operation: {
-            await withImperativeAuthoringContext(authoringContext) {
-              await taskAction()
-            }
-          }
-        )
-      )
-    }
+    intake.registerTask(
+      identity: lifecycleIdentity,
+      descriptor: descriptor,
+      operation: {
+        await taskAction()
+      }
+    )
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
       .init(tasks: [descriptor])
     )

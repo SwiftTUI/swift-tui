@@ -192,6 +192,70 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(surfaceText(primary.host).contains("action:injected"))
   }
 
+  // F16 capture-parity tests (2026-07-06). Each pins that a handler family's
+  // dispatch re-establishes the registration-time environment. The gesture and
+  // hover captures predate the c32bf74a ResolveContext stamping, and the
+  // preference-change path ran the legacy full-AuthoringContext wrap (no
+  // environment restore at all) — red until the shared descriptor-intake
+  // capture (F16) routes every family through one stamped capture point.
+
+  @Test("@Environment read from gesture onChanged/onEnded sees the injected value")
+  func gestureCallbacksEnvironmentReadSeeInjectedValue() throws {
+    let fixture = GestureEnvironmentReadFixture()
+    let primary = makeRunLoop(rootName: "GestureEnvRead") { fixture }
+
+    try renderInitial(primary.runLoop)
+
+    let region = try #require(primary.runLoop.latestSemanticSnapshot.interactionRegions.first)
+    let startCell = centerPoint(of: region.rect)
+    let start = Point(startCell)
+    let dragged = Point(CellPoint(x: startCell.x + 3, y: startCell.y))
+
+    _ = primary.runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: start))))
+    try renderPending(primary.runLoop)
+    _ = primary.runLoop.handle(.input(.mouse(.init(kind: .dragged(.primary), location: dragged))))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("changed:injected"))
+
+    _ = primary.runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: dragged))))
+    try renderPending(primary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("ended:injected"))
+  }
+
+  @Test("@Environment read from onPointerHover sees the injected value")
+  func pointerHoverEnvironmentReadSeesInjectedValue() throws {
+    let fixture = PointerHoverEnvironmentReadFixture()
+    let primary = makeRunLoop(rootName: "HoverEnvRead") { fixture }
+
+    try renderInitial(primary.runLoop)
+
+    _ = primary.runLoop.handle(
+      .input(.mouse(.init(kind: .moved, location: Point(x: 2, y: 1))))
+    )
+    try renderPending(primary.runLoop)
+
+    // First leg: the hover handler fired at all (guards the drive mechanism,
+    // so an env failure below cannot be confused with a missed dispatch).
+    #expect(!surfaceText(primary.host).contains("hovers:0"))
+    #expect(surfaceText(primary.host).contains("hover:injected"))
+  }
+
+  @Test("@Environment read from onPreferenceChange sees the injected value")
+  func preferenceChangeEnvironmentReadSeesInjectedValue() throws {
+    let fixture = PreferenceChangeEnvironmentReadFixture()
+    let primary = makeRunLoop(rootName: "PreferenceEnvRead") { fixture }
+
+    try renderInitial(primary.runLoop)
+    // Flip the preference source so the observation fires post-registration.
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("p"), modifiers: .ctrl))
+    try renderPending(primary.runLoop)
+
+    #expect(!surfaceText(primary.host).contains("changes:0"))
+    #expect(surfaceText(primary.host).contains("change:injected"))
+  }
+
   @Test(
     "onAppear mutates the graph that revealed the child when the same view instance is hosted twice"
   )
@@ -648,6 +712,96 @@ private struct ButtonEnvironmentReadContent: View {
       Button("Read") {
         actionRead = probe
       }
+    }
+  }
+}
+
+private struct GestureEnvironmentReadFixture: View {
+  var body: some View {
+    GestureEnvironmentReadContent()
+      .environment(\.dispatchContextProbe, "injected")
+  }
+}
+
+private struct GestureEnvironmentReadContent: View {
+  @Environment(\.dispatchContextProbe) private var probe
+  @State private var changedRead = "unread"
+  @State private var endedRead = "unread"
+
+  var body: some View {
+    Text("changed:\(changedRead)|ended:\(endedRead)")
+      .frame(minWidth: 48, maxWidth: 48, minHeight: 1, maxHeight: 1)
+      .gesture(
+        DragGesture()
+          .onChanged { _ in
+            changedRead = probe
+          }
+          .onEnded { _ in
+            endedRead = probe
+          }
+      )
+  }
+}
+
+private struct PointerHoverEnvironmentReadFixture: View {
+  var body: some View {
+    PointerHoverEnvironmentReadContent()
+      .environment(\.dispatchContextProbe, "injected")
+  }
+}
+
+private struct PointerHoverEnvironmentReadContent: View {
+  @Environment(\.dispatchContextProbe) private var probe
+  @State private var hovers = 0
+  @State private var hoverRead = "unread"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("hovers:\(hovers)|hover:\(hoverRead)")
+      Text("Target")
+        .frame(minWidth: 12, maxWidth: 12, minHeight: 1, maxHeight: 1)
+        .onPointerHover { _ in
+          hovers += 1
+          hoverRead = probe
+        }
+    }
+  }
+}
+
+private enum ProbeStringPreferenceKey: PreferenceKey {
+  static let defaultValue = ""
+  static func reduce(value: inout String, nextValue: () -> String) {
+    value = nextValue()
+  }
+}
+
+private struct PreferenceChangeEnvironmentReadFixture: View {
+  var body: some View {
+    PreferenceChangeEnvironmentReadContent()
+      .environment(\.dispatchContextProbe, "injected")
+  }
+}
+
+private struct PreferenceChangeEnvironmentReadContent: View {
+  @Environment(\.dispatchContextProbe) private var probe
+  @State private var flag = false
+  @State private var changes = 0
+  @State private var changeRead = "unread"
+
+  var body: some View {
+    Panel(id: "pref-scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("changes:\(changes)|change:\(changeRead)").focusable(true)
+        Text("flag:\(flag)")
+          .preference(key: ProbeStringPreferenceKey.self, value: flag ? "b" : "a")
+      }
+    }
+    .keyCommand("FlipPreference", key: .character("p"), modifiers: .ctrl) {
+      flag.toggle()
+    }
+    .onPreferenceChange(ProbeStringPreferenceKey.self) { _ in
+      changes += 1
+      changeRead = probe
     }
   }
 }

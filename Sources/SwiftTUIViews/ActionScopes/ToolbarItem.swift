@@ -89,15 +89,16 @@ public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
+    )
     var wrappedConfig = config
     wrappedConfig.sourceIdentity = node.identity
-    wrappedConfig.action = { [action = config.action] in
-      withImperativeAuthoringContext(dynamicPropertyScope) {
-        action()
-      }
-    }
+    // Nested wrap: the config's own construction-time capture (if any) stays
+    // innermost and wins at dispatch; this attachment-scope wrap is the
+    // fallback for configs constructed outside any authoring context.
+    wrappedConfig.action = intake.wrappingSendable(config.action)
     node.preferenceValues.merge(
       ToolbarItemsPreferenceKey.self,
       value: [wrappedConfig]

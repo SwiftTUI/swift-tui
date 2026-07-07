@@ -138,27 +138,24 @@ extension Stepper {
     if isEnabled {
       let bounds = bounds
       let step = step
-      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          withAuthoringContext(dynamicPropertyScope) {
-            let next = steppedControlValue(
-              from: binding.wrappedValue,
-              delta: 1,
-              step: step,
-              bounds: bounds
-            )
-            guard next != binding.wrappedValue else {
-              return false
-            }
-            binding.wrappedValue = next
-            return true
-          }
-        },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: authoringScope
       )
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+      intake.registerAction(identity: context.identity) {
+        let next = steppedControlValue(
+          from: binding.wrappedValue,
+          delta: 1,
+          step: step,
+          bounds: bounds
+        )
+        guard next != binding.wrappedValue else {
+          return false
+        }
+        binding.wrappedValue = next
+        return true
+      }
+      intake.registerKeyHandler(identity: context.identity) { event in
         let deltaCount: Int
         switch event {
         case .arrowLeft:
@@ -169,14 +166,12 @@ extension Stepper {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: deltaCount,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: deltaCount,
+          step: step,
+          bounds: bounds
+        )
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
@@ -187,49 +182,43 @@ extension Stepper {
         for: stepperIncrementIdentity(for: context.identity)
       )
 
-      context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
+      intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
         else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: wheelDelta,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: wheelDelta,
+          step: step,
+          bounds: bounds
+        )
       }
-      context.localPointerHandlerRegistry?.register(routeID: decrementRouteID) { event in
+      intake.registerPointerHandler(routeID: decrementRouteID) { event in
         guard case .down(.primary) = event.kind else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: -1,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: -1,
+          step: step,
+          bounds: bounds
+        )
       }
-      context.localPointerHandlerRegistry?.register(routeID: incrementRouteID) { event in
+      intake.registerPointerHandler(routeID: incrementRouteID) { event in
         guard case .down(.primary) = event.kind else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: 1,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: 1,
+          step: step,
+          bounds: bounds
+        )
       }
     }
 

@@ -121,27 +121,24 @@ extension Slider {
     if isEnabled {
       let bounds = bounds
       let step = step
-      let dynamicPropertyScope = currentAuthoringContext()
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          withAuthoringContext(dynamicPropertyScope) {
-            let next = steppedControlValue(
-              from: binding.wrappedValue,
-              delta: 1,
-              step: step,
-              bounds: bounds
-            )
-            guard next != binding.wrappedValue else {
-              return false
-            }
-            binding.wrappedValue = next
-            return true
-          }
-        },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: nil
       )
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+      intake.registerAction(identity: context.identity) {
+        let next = steppedControlValue(
+          from: binding.wrappedValue,
+          delta: 1,
+          step: step,
+          bounds: bounds
+        )
+        guard next != binding.wrappedValue else {
+          return false
+        }
+        binding.wrappedValue = next
+        return true
+      }
+      intake.registerKeyHandler(identity: context.identity) { event in
         let deltaCount: Int
         switch event {
         case .arrowLeft:
@@ -152,14 +149,12 @@ extension Slider {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: deltaCount,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: deltaCount,
+          step: step,
+          bounds: bounds
+        )
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
@@ -167,47 +162,41 @@ extension Slider {
         for: sliderTrackIdentity(for: context.identity)
       )
 
-      context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
+      intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
         else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundControlValue(
-            binding,
-            delta: wheelDelta,
-            step: step,
-            bounds: bounds
-          )
-        }
+        return updateBoundControlValue(
+          binding,
+          delta: wheelDelta,
+          step: step,
+          bounds: bounds
+        )
       }
-      context.localPointerHandlerRegistry?.register(routeID: trackRouteID) { event in
+      intake.registerPointerHandler(routeID: trackRouteID) { event in
         switch event.kind {
         case .down(.primary), .dragged(.primary), .up(.primary):
-          return withAuthoringContext(dynamicPropertyScope) {
-            binding.wrappedValue = sliderValue(
-              at: event.location.location.x,
-              in: event.targetRect,
-              bounds: bounds,
-              step: step
-            )
-            return true
-          }
+          binding.wrappedValue = sliderValue(
+            at: event.location.location.x,
+            in: event.targetRect,
+            bounds: bounds,
+            step: step
+          )
+          return true
         case .scrolled(let deltaX, let deltaY):
           guard let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY) else {
             return false
           }
 
-          return withAuthoringContext(dynamicPropertyScope) {
-            updateBoundControlValue(
-              binding,
-              delta: wheelDelta,
-              step: step,
-              bounds: bounds
-            )
-          }
+          return updateBoundControlValue(
+            binding,
+            delta: wheelDelta,
+            step: step,
+            bounds: bounds
+          )
         default:
           return false
         }

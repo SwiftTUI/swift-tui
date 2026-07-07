@@ -99,19 +99,16 @@ public struct KeyPressModifier: PrimitiveViewModifier, Sendable {
     guard context.environmentValues.isEnabled else {
       return [node]
     }
-    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
-      .withEnvironmentValues(context.environmentValues)
-    context.localKeyHandlerRegistry?.register(
-      identity: node.identity,
-      keyPressHandler: { keyPress in
-        guard match.matches(keyPress) else {
-          return false
-        }
-        return withImperativeAuthoringContext(dynamicPropertyScope) {
-          action(keyPress) == .handled
-        }
-      }
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
     )
+    intake.registerKeyPressHandler(identity: node.identity) { keyPress in
+      guard match.matches(keyPress) else {
+        return false
+      }
+      return action(keyPress) == .handled
+    }
     return [node]
   }
 }

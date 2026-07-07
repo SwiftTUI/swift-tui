@@ -72,10 +72,10 @@ extension List {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentAuthoringContext()
-      let mutationScope =
-        currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: nil
+      )
       let activate: @MainActor (SelectionTag) -> Bool = { tag in
         guard let value = pickerSelectionValue(from: tag, as: SelectionValue.self) else {
           return false
@@ -86,7 +86,7 @@ extension List {
         onActivate?(value)
         return true
       }
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+      intake.registerKeyHandler(identity: context.identity) { event in
         let delta: Int?
         switch event {
         case .arrowUp:
@@ -97,9 +97,7 @@ extension List {
           guard let selectedIndex, rows.indices.contains(selectedIndex) else {
             return false
           }
-          return withImperativeAuthoringContext(mutationScope) {
-            activate(rows[selectedIndex].tag)
-          }
+          return activate(rows[selectedIndex].tag)
         default:
           delta = nil
         }
@@ -108,30 +106,26 @@ extension List {
           return false
         }
 
-        return withImperativeAuthoringContext(mutationScope) {
-          stepBoundSelection(
-            binding,
-            orderedTags: rows.map(\.tag),
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: rows.map(\.tag),
+          delta: delta
+        )
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
+      intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
           return false
         }
 
-        return withImperativeAuthoringContext(mutationScope) {
-          stepBoundSelection(
-            binding,
-            orderedTags: rows.map(\.tag),
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: rows.map(\.tag),
+          delta: delta
+        )
       }
 
       for (rowIndex, row) in rows.enumerated() {
@@ -139,16 +133,10 @@ extension List {
           for: context.identity,
           rowIndex: rowIndex
         )
-        context.localActionRegistry?.register(
-          identity: rowIdentity,
-          handler: {
-            withImperativeAuthoringContext(mutationScope) {
-              activate(row.tag)
-            }
-          },
-          followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
-        )
-        context.localKeyHandlerRegistry?.register(identity: rowIdentity) { event in
+        intake.registerAction(identity: rowIdentity) {
+          activate(row.tag)
+        }
+        intake.registerKeyHandler(identity: rowIdentity) { event in
           let delta: Int?
           switch event {
           case .arrowUp:
@@ -167,9 +155,7 @@ extension List {
             max(rowIndex + delta, rows.startIndex),
             rows.index(before: rows.endIndex)
           )
-          _ = withImperativeAuthoringContext(mutationScope) {
-            setBoundSelection(binding, to: rows[targetIndex].tag)
-          }
+          _ = setBoundSelection(binding, to: rows[targetIndex].tag)
           return false
         }
       }

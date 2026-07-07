@@ -6,16 +6,17 @@ package func registerTextInputBinding(
   value: Binding<TextInputValue>,
   traits: TextInputTraits,
   layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap? = { _ in nil },
-  authoringContext: ImperativeAuthoringContextSnapshot?,
+  authoringScope: AuthoringContext?,
   in context: ResolveContext
 ) {
   guard context.environmentValues.isEnabled else {
     return
   }
 
-  guard let keyHandlerRegistry = context.localKeyHandlerRegistry else {
-    return
-  }
+  let intake = HandlerDescriptorIntake(
+    context: context,
+    fallbackAuthoringScope: authoringScope
+  )
 
   let handle: @MainActor (KeyPress) -> Bool = { keyPress in
     guard let command = textInputCommand(for: keyPress, traits: traits) else {
@@ -28,26 +29,24 @@ package func registerTextInputBinding(
       value: value,
       traits: traits,
       layout: layout,
-      authoringContext: authoringContext,
       clipboardWriteAction: context.environmentValues.clipboardWriteAction,
       clipboardReadAction: context.environmentValues.clipboardReadAction
     )
   }
 
-  keyHandlerRegistry.register(identity: context.identity, keyPressHandler: handle)
-  keyHandlerRegistry.register(identity: context.identity) { event in
+  intake.registerKeyPressHandler(identity: context.identity, handler: handle)
+  intake.registerKeyHandler(identity: context.identity) { event in
     handle(KeyPress(event))
   }
-  keyHandlerRegistry.register(
+  intake.registerPasteHandler(
     identity: context.identity,
-    pasteHandler: { content in
+    handler: { content in
       applyTextInputCommand(
         .insertText(content),
         binding: binding,
         value: value,
         traits: traits,
         layout: layout,
-        authoringContext: authoringContext,
         clipboardWriteAction: context.environmentValues.clipboardWriteAction,
         clipboardReadAction: context.environmentValues.clipboardReadAction
       )
@@ -61,54 +60,51 @@ private func applyTextInputCommand(
   value: Binding<TextInputValue>,
   traits: TextInputTraits,
   layout: @escaping @MainActor (TextInputValue) -> TextInputLayoutMap?,
-  authoringContext: ImperativeAuthoringContextSnapshot?,
   clipboardWriteAction: ClipboardWriteAction,
   clipboardReadAction: ClipboardReadAction
 ) -> Bool {
-  withImperativeAuthoringContext(authoringContext) {
-    let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
-    let resolvedCommand: TextInputCommand
-    if command == .pasteClipboard {
-      guard let clipboardText = clipboardReadAction() else {
-        return true
-      }
-      resolvedCommand = .insertText(clipboardText)
-    } else {
-      resolvedCommand = command
+  let currentValue = value.wrappedValue.synchronized(with: binding.wrappedValue)
+  let resolvedCommand: TextInputCommand
+  if command == .pasteClipboard {
+    guard let clipboardText = clipboardReadAction() else {
+      return true
     }
-    let mutation = TextInputReducer().reduce(
-      currentValue,
-      command: resolvedCommand,
-      traits: traits,
-      layout: layout(currentValue)
-    )
-    let isClipboardCommand =
-      command == .copySelection || command == .cutSelection
-      || command == .pasteClipboard
-    let didWriteClipboard: Bool
-    if let clipboardText = mutation.clipboardText {
-      guard clipboardWriteAction(clipboardText) else {
-        return isClipboardCommand
-      }
-      didWriteClipboard = true
-    } else {
-      didWriteClipboard = false
-    }
-
-    guard
-      mutation.value != currentValue || mutation.shouldWriteBinding || didWriteClipboard
-        || isClipboardCommand
-    else {
-      return false
-    }
-
-    value.wrappedValue = mutation.value
-    if mutation.shouldWriteBinding {
-      binding.wrappedValue = mutation.value.text
-    }
-    return mutation.shouldRequestFrame || mutation.shouldWriteBinding || didWriteClipboard
-      || isClipboardCommand
+    resolvedCommand = .insertText(clipboardText)
+  } else {
+    resolvedCommand = command
   }
+  let mutation = TextInputReducer().reduce(
+    currentValue,
+    command: resolvedCommand,
+    traits: traits,
+    layout: layout(currentValue)
+  )
+  let isClipboardCommand =
+    command == .copySelection || command == .cutSelection
+    || command == .pasteClipboard
+  let didWriteClipboard: Bool
+  if let clipboardText = mutation.clipboardText {
+    guard clipboardWriteAction(clipboardText) else {
+      return isClipboardCommand
+    }
+    didWriteClipboard = true
+  } else {
+    didWriteClipboard = false
+  }
+
+  guard
+    mutation.value != currentValue || mutation.shouldWriteBinding || didWriteClipboard
+      || isClipboardCommand
+  else {
+    return false
+  }
+
+  value.wrappedValue = mutation.value
+  if mutation.shouldWriteBinding {
+    binding.wrappedValue = mutation.value.text
+  }
+  return mutation.shouldRequestFrame || mutation.shouldWriteBinding || didWriteClipboard
+    || isClipboardCommand
 }
 
 package func textInputCommand(

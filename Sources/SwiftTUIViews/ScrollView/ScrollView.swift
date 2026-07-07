@@ -85,39 +85,35 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       )
       if context.environmentValues.isEnabled {
         let binding = position
-        let authoringContext =
-          (currentImperativeAuthoringContextSnapshot()
-          ?? ImperativeAuthoringContextSnapshot(interactionAuthoringScope))?
-          .withEnvironmentValues(context.environmentValues)
-        context.localScrollPositionRegistry?.register(
+        let intake = HandlerDescriptorIntake(
+          context: context,
+          fallbackAuthoringScope: interactionAuthoringScope
+        )
+        intake.registerScrollPosition(
           identity: context.identity,
           currentOffset: {
             let current = binding.wrappedValue
             return ScrollOffset(x: current.x, y: current.y)
           },
           applyOffset: { offset in
-            withImperativeAuthoringContext(authoringContext) {
-              binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
-            }
+            binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
           }
         )
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
-          context.localKeyHandlerRegistry?.register(identity: identity) { event in
-            withImperativeAuthoringContext(authoringContext) {
-              if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
-                return context.localScrollPositionRegistry?.scrollToEdge(
-                  edge,
-                  scopeIdentity: context.identity
-                ) ?? false
-              }
-
-              var next = binding.wrappedValue
-              guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
-                return false
-              }
-              binding.wrappedValue = next
-              return true
+          intake.registerKeyHandler(identity: identity) { event in
+            if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
+              return context.localScrollPositionRegistry?.scrollToEdge(
+                edge,
+                scopeIdentity: context.identity
+              ) ?? false
             }
+
+            var next = binding.wrappedValue
+            guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
+              return false
+            }
+            binding.wrappedValue = next
+            return true
           }
         }
         registerKeyHandler(context.identity, nil)
@@ -128,25 +124,23 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         )
 
         let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-        context.localPointerHandlerRegistry?.register(
+        intake.registerPointerHandler(
           routeID: rootRouteID,
           handler: makeScrollBodyPointerHandler(
             scrollAxes: axes,
             binding: binding,
-            panBinding: $panAnchor,
-            authoringContext: authoringContext
+            panBinding: $panAnchor
           )
         )
 
         let registerIndicatorPointerHandler: (ScrollIndicatorAxis, Identity) -> Void = {
           axis, identity in
           let routeID = runtimePrimaryRouteID(for: identity)
-          context.localPointerHandlerRegistry?.register(
+          intake.registerPointerHandler(
             routeID: routeID,
             handler: makeIndicatorPointerHandler(
               axis: axis,
-              binding: binding,
-              authoringContext: authoringContext
+              binding: binding
             )
           )
         }
@@ -207,40 +201,37 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   private func makeScrollBodyPointerHandler(
     scrollAxes: Axis.Set,
     binding: Binding<ScrollPosition>,
-    panBinding: Binding<ScrollPanAnchor?>,
-    authoringContext: ImperativeAuthoringContextSnapshot?
+    panBinding: Binding<ScrollPanAnchor?>
   ) -> @MainActor (LocalPointerEvent) -> Bool {
     return { event in
       switch event.kind {
       case .scrolled(let deltaX, let deltaY):
-        return withImperativeAuthoringContext(authoringContext) {
-          let current = binding.wrappedValue
-          var next = current
-          var changed = false
-          if scrollAxes.contains(.horizontal), deltaX != 0 {
-            next.scrollBy(x: deltaX)
-            changed = true
-          }
-          if scrollAxes.contains(.vertical), deltaY != 0 {
-            next.scrollBy(y: deltaY)
-            changed = true
-          }
-
-          guard changed else {
-            return false
-          }
-
-          if let ctx = event.scrollContext {
-            next = clampedScrollOffset(next, in: ctx)
-          }
-
-          guard next != current else {
-            return false
-          }
-
-          binding.wrappedValue = next
-          return true
+        let current = binding.wrappedValue
+        var next = current
+        var changed = false
+        if scrollAxes.contains(.horizontal), deltaX != 0 {
+          next.scrollBy(x: deltaX)
+          changed = true
         }
+        if scrollAxes.contains(.vertical), deltaY != 0 {
+          next.scrollBy(y: deltaY)
+          changed = true
+        }
+
+        guard changed else {
+          return false
+        }
+
+        if let ctx = event.scrollContext {
+          next = clampedScrollOffset(next, in: ctx)
+        }
+
+        guard next != current else {
+          return false
+        }
+
+        binding.wrappedValue = next
+        return true
 
       // Direct-manipulation panning: a touch/pointer drag that starts on the
       // scroll view's own content (not on an inner control) pans the content
@@ -271,56 +262,50 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         guard canPanX || canPanY else {
           return false
         }
-        return withImperativeAuthoringContext(authoringContext) {
-          panBinding.wrappedValue = ScrollPanAnchor(
-            startLocation: event.location.location,
-            startOffset: binding.wrappedValue
-          )
-          return true
-        }
+        panBinding.wrappedValue = ScrollPanAnchor(
+          startLocation: event.location.location,
+          startOffset: binding.wrappedValue
+        )
+        return true
 
       case .dragged(.primary):
         guard let anchor = panBinding.wrappedValue else {
           return false
         }
-        return withImperativeAuthoringContext(authoringContext) {
-          let current = binding.wrappedValue
-          let location = event.location.location
-          var next = anchor.startOffset
-          // Content follows the finger: dragging down (location.y increases)
-          // reveals content above (offset decreases). This is the natural
-          // touch convention, opposite the wheel's `.scrolled` mapping. The
-          // fractional delta is rounded so sub-cell drags track smoothly.
-          if scrollAxes.contains(.horizontal) {
-            next.x = Int(
-              (Double(anchor.startOffset.x) - (location.x - anchor.startLocation.x)).rounded()
-            )
-          }
-          if scrollAxes.contains(.vertical) {
-            next.y = Int(
-              (Double(anchor.startOffset.y) - (location.y - anchor.startLocation.y)).rounded()
-            )
-          }
-          if let ctx = event.scrollContext {
-            next = clampedScrollOffset(next, in: ctx)
-          } else {
-            next.x = max(0, next.x)
-            next.y = max(0, next.y)
-          }
-          if next != current {
-            binding.wrappedValue = next
-          }
-          return true
+        let current = binding.wrappedValue
+        let location = event.location.location
+        var next = anchor.startOffset
+        // Content follows the finger: dragging down (location.y increases)
+        // reveals content above (offset decreases). This is the natural
+        // touch convention, opposite the wheel's `.scrolled` mapping. The
+        // fractional delta is rounded so sub-cell drags track smoothly.
+        if scrollAxes.contains(.horizontal) {
+          next.x = Int(
+            (Double(anchor.startOffset.x) - (location.x - anchor.startLocation.x)).rounded()
+          )
         }
+        if scrollAxes.contains(.vertical) {
+          next.y = Int(
+            (Double(anchor.startOffset.y) - (location.y - anchor.startLocation.y)).rounded()
+          )
+        }
+        if let ctx = event.scrollContext {
+          next = clampedScrollOffset(next, in: ctx)
+        } else {
+          next.x = max(0, next.x)
+          next.y = max(0, next.y)
+        }
+        if next != current {
+          binding.wrappedValue = next
+        }
+        return true
 
       case .up(.primary):
         guard panBinding.wrappedValue != nil else {
           return false
         }
-        return withImperativeAuthoringContext(authoringContext) {
-          panBinding.wrappedValue = nil
-          return true
-        }
+        panBinding.wrappedValue = nil
+        return true
 
       default:
         return false
@@ -334,8 +319,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   /// indicator's axis, using exactly the state the inline handler captured.
   private func makeIndicatorPointerHandler(
     axis: ScrollIndicatorAxis,
-    binding: Binding<ScrollPosition>,
-    authoringContext: ImperativeAuthoringContextSnapshot?
+    binding: Binding<ScrollPosition>
   ) -> @MainActor (LocalPointerEvent) -> Bool {
     return { event in
       switch event.kind {
@@ -351,37 +335,35 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         else {
           return false
         }
-        return withImperativeAuthoringContext(authoringContext) {
-          let current = binding.wrappedValue
-          var next = current
-          switch axis {
-          case .horizontal:
-            next.scrollTo(
-              x: metrics.targetOffset(
-                for: event.location,
-                currentOffset: next.x
-              )
+        let current = binding.wrappedValue
+        var next = current
+        switch axis {
+        case .horizontal:
+          next.scrollTo(
+            x: metrics.targetOffset(
+              for: event.location,
+              currentOffset: next.x
             )
-          case .vertical:
-            next.scrollTo(
-              y: metrics.targetOffset(
-                for: event.location,
-                currentOffset: next.y
-              )
+          )
+        case .vertical:
+          next.scrollTo(
+            y: metrics.targetOffset(
+              for: event.location,
+              currentOffset: next.y
             )
-          }
-
-          if next != current {
-            binding.wrappedValue = next
-            return true
-          }
-
-          if case .down(.primary) = event.kind {
-            return true
-          }
-
-          return false
+          )
         }
+
+        if next != current {
+          binding.wrappedValue = next
+          return true
+        }
+
+        if case .down(.primary) = event.kind {
+          return true
+        }
+
+        return false
       default:
         return false
       }

@@ -50,23 +50,14 @@ extension Toggle {
 
     if isEnabled {
       let binding = isOn
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          [
-            authoringContext =
-              (currentImperativeAuthoringContextSnapshot()
-              ?? ImperativeAuthoringContextSnapshot(authoringScope))?
-              .withEnvironmentValues(context.environmentValues)
-          ] in
-          withImperativeAuthoringContext(authoringContext) {
-            binding.wrappedValue.toggle()
-            return true
-          }
-        },
-        followUpInvalidationIdentity: (currentImperativeAuthoringContextSnapshot()
-          ?? ImperativeAuthoringContextSnapshot(authoringScope))?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: authoringScope
       )
+      intake.registerAction(identity: context.identity) {
+        binding.wrappedValue.toggle()
+        return true
+      }
     }
 
     let child = toggleBody(
@@ -182,9 +173,7 @@ extension TextField {
       text,
       value: $textInputValue,
       traits: .singleLine,
-      authoringContext: (currentImperativeAuthoringContextSnapshot()
-        ?? ImperativeAuthoringContextSnapshot(authoringScope))?
-        .withEnvironmentValues(context.environmentValues),
+      authoringScope: authoringScope,
       in: context
     )
     let presentation = TextInputPresentation(
@@ -292,22 +281,14 @@ extension DisclosureGroup {
 
     if isEnabled {
       let binding = isExpanded
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          [
-            authoringContext =
-              currentImperativeAuthoringContextSnapshot()
-              ?? ImperativeAuthoringContextSnapshot(authoringScope)
-          ] in
-          withImperativeAuthoringContext(authoringContext) {
-            binding.wrappedValue.toggle()
-            return true
-          }
-        },
-        followUpInvalidationIdentity: (currentImperativeAuthoringContextSnapshot()
-          ?? ImperativeAuthoringContextSnapshot(authoringScope))?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: authoringScope
       )
+      intake.registerAction(identity: context.identity) {
+        binding.wrappedValue.toggle()
+        return true
+      }
     }
 
     let child = disclosureBody(

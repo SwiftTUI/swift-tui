@@ -108,11 +108,14 @@ extension Table {
 
     if isEnabled, let selection {
       let binding = selection
-      let dynamicPropertyScope = currentAuthoringContext()
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: nil
+      )
       let selectableTags = selectableRowIndices.compactMap { rowIndex in
         resolvedRows[rowIndex].tag
       }
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+      intake.registerKeyHandler(identity: context.identity) { event in
         let delta: Int?
         switch event {
         case .arrowUp:
@@ -127,30 +130,26 @@ extension Table {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          stepBoundSelection(
-            binding,
-            orderedTags: selectableTags,
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: selectableTags,
+          delta: delta
+        )
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
+      intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
-          stepBoundSelection(
-            binding,
-            orderedTags: selectableTags,
-            delta: delta
-          )
-        }
+        return stepBoundSelection(
+          binding,
+          orderedTags: selectableTags,
+          delta: delta
+        )
       }
 
       for rowIndex in selectableRowIndices {
@@ -164,14 +163,12 @@ extension Table {
             rowIndex: rowIndex
           )
         )
-        context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
+        intake.registerPointerHandler(routeID: routeID) { event in
           guard case .down(.primary) = event.kind else {
             return false
           }
 
-          return withAuthoringContext(dynamicPropertyScope) {
-            setBoundSelection(binding, to: tag)
-          }
+          return setBoundSelection(binding, to: tag)
         }
       }
     }

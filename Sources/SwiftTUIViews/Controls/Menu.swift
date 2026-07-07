@@ -68,20 +68,14 @@ extension Menu {
 
     if isEnabled {
       let binding = expansionBinding
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          [
-            authoringContext = currentImperativeAuthoringContextSnapshot()?
-              .withEnvironmentValues(context.environmentValues)
-          ] in
-          withImperativeAuthoringContext(authoringContext) {
-            binding.wrappedValue.toggle()
-            return true
-          }
-        },
-        followUpInvalidationIdentity: currentImperativeAuthoringContextSnapshot()?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        fallbackAuthoringScope: nil
       )
+      intake.registerAction(identity: context.identity) {
+        binding.wrappedValue.toggle()
+        return true
+      }
     }
 
     // Wrap the trigger row with the menu presentation modifier so the

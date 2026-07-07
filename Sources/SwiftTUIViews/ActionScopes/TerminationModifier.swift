@@ -36,15 +36,13 @@ public struct TerminationRequestModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
-      .withEnvironmentValues(context.environmentValues)
-    context.localTerminationRegistry?.register(
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
+    )
+    intake.registerTerminationHandler(
       identity: node.identity,
-      handler: { request in
-        withImperativeAuthoringContext(dynamicPropertyScope) {
-          action(request)
-        }
-      }
+      handler: action
     )
     return [node]
   }

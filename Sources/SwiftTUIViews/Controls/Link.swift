@@ -274,18 +274,20 @@ private func registerOpenLinkAction(
   identity: Identity,
   in context: ResolveContext
 ) {
-  guard context.environmentValues.isEnabled,
-    let localActionRegistry = context.localActionRegistry
-  else {
+  guard context.environmentValues.isEnabled else {
     return
   }
 
   let openLinkAction = context.environmentValues.openLinkAction
-  localActionRegistry.register(
+  let intake = HandlerDescriptorIntake(context: context)
+  // The action value's own construction-time capture stays innermost and
+  // wins at dispatch; the follow-up targets the action's authoring view (or
+  // none), matching the pre-intake registration exactly.
+  intake.registerAction(
     identity: identity,
+    followUpInvalidationIdentity: openLinkAction.authoringContext?.viewIdentity,
     handler: {
       openLinkAction(destination)
-    },
-    followUpInvalidationIdentity: openLinkAction.authoringContext?.viewIdentity
+    }
   )
 }

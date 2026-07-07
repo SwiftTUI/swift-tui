@@ -90,17 +90,15 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = (currentImperativeAuthoringContextSnapshot() ?? authoringContext)?
-      .withEnvironmentValues(context.environmentValues)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
+    )
     let contribution = ActivePaletteCommand(
       name: name,
       description: description,
       isEnabled: isEnabled,
-      action: {
-        withImperativeAuthoringContext(dynamicPropertyScope) {
-          action()
-        }
-      }
+      action: intake.wrappingSendable(action)
     )
     node.preferenceValues.merge(
       PaletteCommandsPreferenceKey.self,

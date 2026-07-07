@@ -112,21 +112,14 @@ extension Button {
     let buttonStyle = context.environmentValues.buttonStyle
 
     if context.environmentValues.isEnabled, let action {
-      let dynamicPropertyScope = authoringScope ?? currentAuthoringContext()
-      let mutationScope =
-        (ImperativeAuthoringContextSnapshot(dynamicPropertyScope)
-        ?? currentImperativeAuthoringContextSnapshot())?
-        .withEnvironmentValues(context.environmentValues)
-      context.localActionRegistry?.register(
-        identity: context.identity,
-        handler: {
-          withImperativeAuthoringContext(mutationScope) {
-            action()
-            return true
-          }
-        },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringAuthoringScope: authoringScope
       )
+      intake.registerAction(identity: context.identity) {
+        action()
+        return true
+      }
     }
 
     let effectiveProminence = buttonStyle.resolvedProminence(

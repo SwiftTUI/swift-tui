@@ -66,7 +66,15 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
       context.localGestureStateRegistry?.clearBindings(for: node.identity)
     }
 
-    let recognizer = gesture._makeRecognizer(context: buildContext)
+    // The combinator decorators (`onEnded`/`onChanged`/`map`/`updating`)
+    // self-capture their dispatch scope from the ambient during
+    // `_makeRecognizer`; establish the resolve context's stamped
+    // registration environment around the build so those captures see the
+    // attachment point's environment, not the enclosing body's (F16).
+    let intake = HandlerDescriptorIntake(context: context)
+    let recognizer = intake.withRegistrationEnvironmentScope {
+      gesture._makeRecognizer(context: buildContext)
+    }
     gestureRegistry.registerStacked(identity: node.identity, recognizer: recognizer)
 
     // Forward pointer events through the recognizer. The handler

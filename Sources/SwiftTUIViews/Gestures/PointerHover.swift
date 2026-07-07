@@ -37,14 +37,13 @@ public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
     // `Button`/`onKeyPress`: without it a `@State` mutation inside the hover
     // handler is not attributed to an owner node, so it never schedules a frame
     // and the hover-driven state change is not rendered.
-    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
-    context.localPointerHandlerRegistry?.registerHover(
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackSnapshot: authoringContext
+    )
+    intake.registerPointerHoverHandler(
       routeID: routeID,
-      handler: { phase in
-        withImperativeAuthoringContext(dynamicPropertyScope) {
-          action(phase)
-        }
-      }
+      handler: action
     )
     node.semanticMetadata = node.semanticMetadata.merging(
       SemanticMetadata(

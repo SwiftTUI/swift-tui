@@ -182,16 +182,13 @@ where
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    let dynamicPropertyScope = currentAuthoringContext()
-    context.localPreferenceObservationRegistry?.register(
+    let intake = HandlerDescriptorIntake(context: context)
+    intake.registerPreferenceObservation(
       identity: node.identity,
       key: Key.self,
-      value: node.preferenceValues[Key.self]
-    ) { value in
-      withAuthoringContext(dynamicPropertyScope) {
-        action(value)
-      }
-    }
+      value: node.preferenceValues[Key.self],
+      action: action
+    )
     return [node]
   }
 }
