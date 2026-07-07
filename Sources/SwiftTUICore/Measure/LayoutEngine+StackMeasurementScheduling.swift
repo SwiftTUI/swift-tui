@@ -46,48 +46,32 @@ extension LayoutEngine {
       spacingOverride: spacing
     ).reduce(0, +)
     let availableMain = max(0, proposedMain - spacingBudget)
-    let idealMainSizes = idealMeasurements.map {
-      mainDimension(of: $0.measuredSize, for: axis)
-    }
-    var allocatedMainSizes = idealMainSizes
-    let idealMainTotal = idealMainSizes.reduce(0, +)
 
-    if idealMainTotal < availableMain {
-      distributeExtraSpaceToFlexibleChildren(
-        children,
-        into: &allocatedMainSizes,
-        axis: axis,
-        extraSpace: availableMain - idealMainTotal
-      )
-    } else if idealMainTotal > availableMain {
-      compressStackChildren(
-        children,
-        idealMeasurements: idealMeasurements,
-        axis: axis,
-        allocatedMainSizes: &allocatedMainSizes,
-        overflow: idealMainTotal - availableMain
-      )
-    }
-
-    work.append(
-      .finishStackAllocated(
-        node,
-        originalProposal: originalProposal,
-        effectiveProposal: effectiveProposal,
-        children: children,
-        axis: axis,
-        childCount: children.count,
-        allocatedMainSizes: allocatedMainSizes
-      )
+    let plan = makeStackAllocationPlan(
+      children: children,
+      idealMeasurements: idealMeasurements,
+      axis: axis
     )
-    for index in children.indices.reversed() {
-      let allocatedProposal = stackProposal(
-        axis: axis,
-        main: .finite(allocatedMainSizes[index]),
-        cross: crossDimension(of: effectiveProposal, for: axis)
-      )
-      work.append(.measure(children[index], allocatedProposal))
-    }
+    let state = StackSequentialAllocationState(
+      plan: plan,
+      position: 0,
+      remainingMain: availableMain,
+      allocatedMainSizes: idealMeasurements.map {
+        mainDimension(of: $0.measuredSize, for: axis)
+      },
+      measurements: Array(repeating: nil, count: children.count)
+    )
+    continueStackAllocation(
+      node,
+      originalProposal: originalProposal,
+      effectiveProposal: effectiveProposal,
+      children: children,
+      axis: axis,
+      state: state,
+      passContext: passContext,
+      work: &work,
+      results: &results
+    )
   }
 
   func scheduleStackCrossReconciliation(

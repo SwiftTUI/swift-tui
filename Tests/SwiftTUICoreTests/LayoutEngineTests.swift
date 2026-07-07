@@ -245,6 +245,142 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.bounds.origin.x) == [0, 2])
   }
 
+  @Test("stack surplus is shared between a Spacer and a flexible sibling")
+  func stackSurplusSharesBetweenSpacerAndFlexibleSibling() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "mixed",
+      axis: .horizontal,
+      children: [
+        leaf("rigid", size: .init(width: 2, height: 1)),
+        spacer("spacer"),
+        flexibleWidthFrame(
+          "flexible",
+          maxWidth: .infinity,
+          child: leaf("flexible-content", size: .init(width: 1, height: 1))
+        ),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 10, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [2, 4, 4])
+  }
+
+  @Test("stack surplus honors layout priority before lower-priority flexibles")
+  func stackSurplusHonorsLayoutPriority() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "priority-surplus",
+      axis: .horizontal,
+      children: [
+        flexibleWidthFrame(
+          "high",
+          maxWidth: .infinity,
+          child: leaf("high-content", size: .init(width: 1, height: 1)),
+          layoutMetadata: .init(layoutPriority: 1)
+        ),
+        flexibleWidthFrame(
+          "low",
+          maxWidth: .infinity,
+          child: leaf("low-content", size: .init(width: 1, height: 1))
+        ),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 12, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 12, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [12, 0])
+  }
+
+  @Test("stack surplus flows past a max-capped flexible to its siblings")
+  func stackSurplusRedistributesAboveMaxCaps() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "capped",
+      axis: .horizontal,
+      children: [
+        flexibleWidthFrame(
+          "capped-frame",
+          maxWidth: 4,
+          child: leaf("capped-content", size: .init(width: 1, height: 1))
+        ),
+        flexibleWidthFrame(
+          "unbounded",
+          maxWidth: .infinity,
+          child: leaf("unbounded-content", size: .init(width: 1, height: 1))
+        ),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 20, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [4, 16])
+  }
+
+  @Test("stack surplus skips fixedSize subtrees instead of losing their share")
+  func stackSurplusSkipsFixedSizeSubtrees() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "fixed-size",
+      axis: .horizontal,
+      children: [
+        flexibleWidthFrame(
+          "pinned",
+          maxWidth: .infinity,
+          child: leaf("pinned-content", size: .init(width: 1, height: 1)),
+          layoutMetadata: .init(fixedSizeHorizontal: true)
+        ),
+        flexibleWidthFrame(
+          "absorbing",
+          maxWidth: .infinity,
+          child: leaf("absorbing-content", size: .init(width: 1, height: 1))
+        ),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 10, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [1, 9])
+  }
+
+  @Test("stack compression divides space equally within a priority tier")
+  func stackCompressionDividesEquallyWithinPriorityTier() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "equal-compression",
+      axis: .horizontal,
+      children: [
+        leaf("wide", size: .init(width: 30, height: 1)),
+        leaf("narrow", size: .init(width: 10, height: 1)),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 20, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [10, 10])
+  }
+
   @Test("lazy stack measurement matches eager stack measurement")
   func lazyStackMeasurementMatchesEagerStackMeasurement() {
     let engine = LayoutEngine()
@@ -1118,6 +1254,29 @@ private func spacer(_ name: String) -> ResolvedNode {
     identity: testIdentity(name),
     kind: .view("Spacer"),
     intrinsicSize: .zero
+  )
+}
+
+private func flexibleWidthFrame(
+  _ name: String,
+  maxWidth: ProposedDimension,
+  child: ResolvedNode,
+  layoutMetadata: LayoutMetadata = .init()
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("FlexibleFrame"),
+    children: [child],
+    layoutBehavior: .flexibleFrame(
+      minWidth: nil,
+      idealWidth: nil,
+      maxWidth: maxWidth,
+      minHeight: nil,
+      idealHeight: nil,
+      maxHeight: nil,
+      alignment: .topLeading
+    ),
+    layoutMetadata: layoutMetadata
   )
 }
 

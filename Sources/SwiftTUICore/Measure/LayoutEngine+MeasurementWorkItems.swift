@@ -58,14 +58,22 @@ enum MeasurementWorkItem {
     spacing: Int?,
     childCount: Int
   )
-  case finishStackAllocated(
+  case stackAllocateStep(
     ResolvedNode,
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
     children: [ResolvedNode],
     axis: Axis,
-    childCount: Int,
-    allocatedMainSizes: [Int]
+    state: StackSequentialAllocationState
+  )
+  case finishStackAllocationBatch(
+    ResolvedNode,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    children: [ResolvedNode],
+    axis: Axis,
+    state: StackSequentialAllocationState,
+    batchPositions: Range<Int>
   )
   case finishStackReconciliation(
     ResolvedNode,

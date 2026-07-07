@@ -220,44 +220,59 @@ extension LayoutEngine {
           work: &work,
           results: &results
         )
-      case .finishStackAllocated(
+      case .stackAllocateStep(
         let node,
         let originalProposal,
         let effectiveProposal,
         let children,
         let axis,
-        let childCount,
-        let allocatedMainSizes
+        var state
       ):
-        var allocatedMeasurements = popMeasurements(from: &results, count: childCount)
-        for index in children.indices where isSpacer(children[index]) {
-          allocatedMeasurements[index].measuredSize = settingMainDimension(
-            of: allocatedMeasurements[index].measuredSize,
-            for: axis,
-            to: allocatedMainSizes[index]
-          )
-        }
-        guard case .unspecified = crossDimension(of: effectiveProposal, for: axis) else {
-          results.append(
-            makeMeasuredNode(
-              for: node,
-              originalProposal: originalProposal,
-              effectiveProposal: effectiveProposal,
-              childMeasurements: allocatedMeasurements,
-              selectedChildIndex: nil,
-              passContext: passContext
-            )
-          )
-          break
-        }
-
-        scheduleStackCrossReconciliation(
+        let measurement = popMeasurement(from: &results)
+        let childIndex = state.plan.order[state.position]
+        state.measurements[childIndex] = measurement
+        // Spacers never absorb their offer themselves — their committed
+        // size is the allocated value (forced at completion), so charge
+        // that; everyone else charges the actual measured response.
+        let consumed =
+          isSpacer(children[childIndex])
+          ? state.allocatedMainSizes[childIndex]
+          : mainDimension(of: measurement.measuredSize, for: axis)
+        state.remainingMain = max(0, state.remainingMain - consumed)
+        state.position += 1
+        continueStackAllocation(
           node,
           originalProposal: originalProposal,
           effectiveProposal: effectiveProposal,
           children: children,
           axis: axis,
-          measurements: allocatedMeasurements,
+          state: state,
+          passContext: passContext,
+          work: &work,
+          results: &results
+        )
+      case .finishStackAllocationBatch(
+        let node,
+        let originalProposal,
+        let effectiveProposal,
+        let children,
+        let axis,
+        var state,
+        let batchPositions
+      ):
+        // Batch consumption was charged at scheduling time (unbounded
+        // children size exactly to their offer); only merge results.
+        let batchMeasurements = popMeasurements(from: &results, count: batchPositions.count)
+        for (offset, position) in batchPositions.enumerated() {
+          state.measurements[state.plan.order[position]] = batchMeasurements[offset]
+        }
+        continueStackAllocation(
+          node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          children: children,
+          axis: axis,
+          state: state,
           passContext: passContext,
           work: &work,
           results: &results
