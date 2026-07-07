@@ -812,18 +812,38 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
             continuation.yield(event)
           case .awaitCondition(let predicate):
             timeoutLog.note("step \(index): await start")
-            let waitTask = Task { @MainActor in
-              await frameSignal.wait(until: predicate)
+            // Deadline, then one short drain-grace retry. The gate runs 228
+            // suites concurrently on the MainActor; a multi-second stretch of
+            // synchronous actor occupancy freezes this reader's whole event
+            // chain (yield -> adapter -> pump -> frame) together with the
+            // deadline's own sleep continuation, so on a starved runner the
+            // deadline fires exactly when the queue starts draining — and the
+            // awaited frame can land milliseconds behind it (observed on the
+            // 2026-07-07 Linux gate: a 35 s freeze, then the frame 4 ms after
+            // the deadline). Because the deadline cannot fire mid-freeze, a
+            // short second wait after expiry is enough to let the queued
+            // chain drain no matter how long the freeze lasted; a genuinely
+            // dead scenario still records a diagnosable timeout within
+            // deadline + grace.
+            var satisfied = false
+            for deadline in [Duration.seconds(20), Duration.seconds(5)] {
+              let waitTask = Task { @MainActor in
+                await frameSignal.wait(until: predicate)
+              }
+              let timeoutTask = Task { @MainActor in
+                try? await Task.sleep(for: deadline)
+                waitTask.cancel()
+              }
+              await waitTask.value
+              timeoutTask.cancel()
+              if predicate() {
+                satisfied = true
+                timeoutLog.note("step \(index): await satisfied")
+                break
+              }
+              timeoutLog.note("step \(index): deadline \(deadline) hit")
             }
-            let timeoutTask = Task { @MainActor in
-              try? await Task.sleep(for: .seconds(20))
-              waitTask.cancel()
-            }
-            await waitTask.value
-            timeoutTask.cancel()
-            if predicate() {
-              timeoutLog.note("step \(index): await satisfied")
-            } else {
+            if !satisfied {
               timeoutLog.recordTimeout(step: index)
             }
           }
