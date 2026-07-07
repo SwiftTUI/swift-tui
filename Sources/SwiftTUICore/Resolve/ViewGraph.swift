@@ -198,6 +198,10 @@ package final class ViewGraph {
     get { index.detachedHostedSubtreeHostByRoot }
     set { index.detachedHostedSubtreeHostByRoot = newValue }
   }
+  private var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
+    get { index.flattenedStateOwnerNodeIDByIdentity }
+    set { index.flattenedStateOwnerNodeIDByIdentity = newValue }
+  }
   private var rootEvaluator: (@MainActor () -> Void)? {
     get { rootEvaluation.rootEvaluator }
     set { rootEvaluation.rootEvaluator = newValue }
@@ -478,6 +482,19 @@ package final class ViewGraph {
       // keep it whenever it is genuinely live (steady frames, G13 siblings,
       // re-homed controls).
       recordDetachedHostedNode(shadowedNodeID, hostedByNodeID: node.viewNodeID)
+      // A shadowed node AUTHORED at the claimed identity that holds state
+      // slots is a single-child flattening's state owner, not a chain
+      // interior: the child resolved onto its own node, then this wrapper's
+      // one-element body normalized to that child element and claimed its
+      // identity. Register the authored node so authoring-host resolution
+      // keeps hosting the child's `@State`/`@FocusState` there instead of
+      // re-seeding fresh slots on this absorber every later pass.
+      if let shadowed = nodesByNodeID[shadowedNodeID],
+        shadowed.identity == node.resolvedIdentity,
+        !shadowed.stateSlots.isEmpty
+      {
+        flattenedStateOwnerNodeIDByIdentity[node.resolvedIdentity] = shadowedNodeID
+      }
     }
     nodeIDByIdentity[node.resolvedIdentity] = node.viewNodeID
     identityByNodeID[node.viewNodeID] = node.resolvedIdentity
@@ -563,6 +580,7 @@ package final class ViewGraph {
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       detachedHostedSubtreeRootsByHost: detachedHostedSubtreeRootsByHost,
       detachedHostedSubtreeHostByRoot: detachedHostedSubtreeHostByRoot,
+      flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
       viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
@@ -735,6 +753,14 @@ package final class ViewGraph {
       if occupant === registered {
         return registered
       }
+      // Single-child flattening: the occupant is the absorber that claimed
+      // the registered node's identity at commit, but the registered node
+      // stays the live slot host (authoring-host resolution keeps hosting
+      // there). Deferring to the occupant would land imperative writes in
+      // slots the child's body never reads again.
+      if flattenedStateOwnerNodeIDByIdentity[registered.identity] == registered.viewNodeID {
+        return registered
+      }
       // The registered node's own identity is the exact index key its
       // successor occupies; the authoring identity below can name a different
       // node when state slots live on a wrapper (a capture-host or modifier
@@ -742,6 +768,11 @@ package final class ViewGraph {
       if let occupant {
         return occupant
       }
+    }
+    // A re-minted identity's index entry can name a flattening absorber;
+    // the authored successor holding the live slots wins over it.
+    if let stateOwner = flattenedStateOwnerNode(for: identity) {
+      return stateOwner
     }
     if let reminted = nodeIfExists(for: identity) {
       return reminted
@@ -1867,6 +1898,15 @@ package final class ViewGraph {
         !node.wasPresentAtFrameStart || !node.visitedThisFrame(currentFrameID),
         node.parent == nil
       else {
+        continue
+      }
+      // A flatten-shadowed state owner is reachable by construction —
+      // authoring-host resolution prefers it over its absorber — and its
+      // lifetime anchors to the absorber's hosted-detached edge. Reclaiming
+      // it here (the creation frame leaves it parentless: the absorber's
+      // apply absorbed its output) would drop the live `@State`/`@FocusState`
+      // slots it hosts and re-seed them on the absorber next pass.
+      if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
         continue
       }
       // An entity's live home is never reclaimed here: adoption and the
@@ -3305,8 +3345,33 @@ package final class ViewGraph {
           }
         }
       } else {
+        // Single-child flattening tiebreak: the occupant is the absorber
+        // whose committed root identity is this identity, but the authored
+        // child node registered here holds the live state slots. Authoring
+        // must land on the authored node — hosting the child's body on the
+        // absorber re-seeds `@State`/`@FocusState` from authored defaults
+        // (one spurious focus flip per presentation open; writes through a
+        // superseded pass's host silently orphaned). Planning and value
+        // stitching keep resolving the identity index to the absorber.
+        if existing.identity != identity,
+          let stateOwner = flattenedStateOwnerNode(for: identity),
+          stateOwner !== existing
+        {
+          return stateOwner
+        }
         return existing
       }
+    }
+
+    // The identity index entry can vanish while the authored state owner
+    // lives on (the absorber stopped flattening, and its reindex removed the
+    // entry it claimed). Re-adopt the live owner rather than minting a fresh
+    // node over its state.
+    if entityIdentity == nil,
+      let stateOwner = flattenedStateOwnerNode(for: identity)
+    {
+      nodeIDByIdentity[identity] = stateOwner.viewNodeID
+      return stateOwner
     }
 
     nextViewNodeIDRawValue &+= 1
@@ -3326,6 +3391,20 @@ package final class ViewGraph {
       node.entityDisplacedOccupantFrameID = currentFrameID
     }
     return node
+  }
+
+  /// The live authored node registered as the state owner for `identity`
+  /// while a single-child flattening absorber claims its identity index
+  /// entry — see `GraphIndex.flattenedStateOwnerNodeIDByIdentity`.
+  private func flattenedStateOwnerNode(
+    for identity: Identity
+  ) -> ViewNode? {
+    guard !flattenedStateOwnerNodeIDByIdentity.isEmpty,
+      let nodeID = flattenedStateOwnerNodeIDByIdentity[identity]
+    else {
+      return nil
+    }
+    return nodeIfExists(for: nodeID)
   }
 
   private func bindEntityIdentity(
@@ -3760,6 +3839,9 @@ package final class ViewGraph {
       nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
     }
     taskDescriptorNodeSlots = taskDescriptorNodeSlots.filter { $0.key.node != node.viewNodeID }
+    if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
+      flattenedStateOwnerNodeIDByIdentity.removeValue(forKey: node.identity)
+    }
     if nodeIDByIdentity[node.identity] == node.viewNodeID {
       nodeIDByIdentity.removeValue(forKey: node.identity)
     }

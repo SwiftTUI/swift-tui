@@ -27,6 +27,22 @@ extension ViewGraph {
     // edges when the host departs. See `recordDetachedHostedSubtree`.
     package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] = [:]
     package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] = [:]
+    // Authored state-owner nodes whose identity index entry a single-child
+    // flattening absorber claimed: `normalizeResolvedElements(count == 1)`
+    // lets a wrapper commit a snapshot whose root identity is its only
+    // child's, so the wrapper owns `nodeIDByIdentity[childIdentity]` —
+    // planning and invalidation must keep landing there (its evaluator
+    // re-runs the collapsed chain and stitches the output). The authored
+    // child node keeps the live `@State`/`@FocusState` slots, so identity →
+    // node resolution for AUTHORING (`beginEvaluation`, imperative-state
+    // re-keys) prefers it through this map — otherwise every post-commit
+    // pass re-hosts the slots on the absorber, re-seeded from authored
+    // defaults. Recorded by `reindexIdentity` when the shadowed occupant is
+    // authored at the claimed identity and holds state slots; removed when
+    // that node leaves the graph. See `pruneAbsorbedShadowedNodes` (the
+    // owner's lifetime anchors to the absorber's hosted-detached edge) and
+    // `liveStateOwnerNode`.
+    package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
   }
 
   /// The root evaluator closure and the identity it re-roots from.

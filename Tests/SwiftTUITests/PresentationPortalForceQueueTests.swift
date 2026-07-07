@@ -313,31 +313,20 @@ struct PresentationPortalForceQueueTests {
     // The palette-shaped sheet adopts default focus into its TextField and
     // a genuine value reader shows the applied @FocusState.
     #expect(outcome.frames.contains { $0.contains("FocusedMarker") })
-    // The runtime focus flip should land EXACTLY once (the adoption). A
+    // The runtime focus flip must land EXACTLY once (the adoption). A
     // second reader-attributed flip invalidation means the flip RE-FIRED:
     // the attachment content's state owner moved to a different host node
     // on a later pass, the re-hosted slot re-seeded from its authored
     // default, and focus-sync treated the unchanged runtime value as a
     // change — re-invalidating the sheet cone one extra frame per open
     // (and, in the same class, dropping any @State written by a superseded
-    // pass).
-    //
-    // KNOWN ISSUE (root-caused, fix pending): single-child declared-child
-    // flattening lets the wrapper's committed snapshot claim the child's
-    // identity (`normalizeResolvedElements` count==1 returns the child node
-    // as the wrapper's resolved root), so after the wrapper's first commit,
-    // `beginEvaluation(childIdentity)` resolves to the WRAPPER node and the
-    // child's @State/@FocusState re-host there with fresh slots. Creation
-    // pass hosts on the child's own node; every later pass on the wrapper —
-    // exactly one spurious flip per presentation open. The fix belongs in
-    // the identity→node occupancy resolution (prefer the authored child's
-    // live node over a flattening wrapper), tracked in
-    // docs/reports/2026-07-06-008 (org repo).
-    withKnownIssue(
-      "single-child flattening aliases the child identity onto the wrapper; state re-hosts on later passes"
-    ) {
-      #expect(ViewNode.RuntimeStateFlipProbe.count == 1)
-    }
+    // pass). Single-child declared-child flattening lets the wrapper's
+    // committed snapshot claim the child's identity
+    // (`normalizeResolvedElements` count==1 returns the child element as
+    // the wrapper's resolved root); the flatten-shadowed state-owner
+    // tiebreak (`ViewGraph.flattenedStateOwnerNodeIDByIdentity`) keeps the
+    // authored child node hosting the slots across every later pass.
+    #expect(ViewNode.RuntimeStateFlipProbe.count == 1)
   }
 
   @Test("imperative presentation still opens without the portal force-queue")
