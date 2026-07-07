@@ -1,5 +1,13 @@
 import SwiftTUICore
 
+/// Node-kind name of the zero-size presentation trigger leaf, exposed so the
+/// run loop's focus-sync rerender re-carry filter can recognize live trigger
+/// leaves by their resolved kind instead of string-matching identity paths
+/// (see `RunLoop.rerenderScheduledFrame(from:convergence:)`).
+package enum PresentationTriggerLeafNode {
+  package static let kindName = "__presentationTrigger"
+}
+
 /// A zero-size, layout-inert sibling leaf that is the **sole reader** of a
 /// presentation's `isPresented` binding.
 ///
@@ -35,7 +43,7 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = ResolvedNode(
       identity: context.identity,
-      kind: .view("__presentationTrigger"),
+      kind: .view(PresentationTriggerLeafNode.kindName),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       intrinsicSize: .zero

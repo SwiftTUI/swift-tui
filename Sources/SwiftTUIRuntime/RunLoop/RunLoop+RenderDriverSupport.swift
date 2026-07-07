@@ -80,14 +80,31 @@ extension RunLoop {
   /// evaluation could target (the queue boundary would drop them anyway,
   /// census-visible), and mid-frame arrivals stay pending in the scheduler
   /// for the next frame regardless (the rerender only peeks).
+  ///
+  /// One exemption narrows the re-carry: a live presentation trigger leaf
+  /// is dropped from the RE-CARRIED originals (never from the mid-frame
+  /// relocation set). Re-carrying the trigger re-queues it dirty, which
+  /// makes the frame head predict a portal reconcile escalation and root
+  /// the whole rerender pass at the portal — re-resolving background and
+  /// overlay a second time on every presentation open whose frame relocates
+  /// focus. The leaf is childless, so its cone protects nothing; see
+  /// `DefaultRenderer.droppingInertPresentationTriggerLeaves(from:)`.
   func rerenderScheduledFrame(
     from scheduledFrame: ScheduledFrame,
     convergence: FocusSyncConvergenceState
   ) -> ScheduledFrame {
     var rerender = scheduledFrame
+    let reCarried = renderer.droppingInertPresentationTriggerLeaves(
+      from: scheduledFrame.invalidatedIdentities
+    )
+    if InvalidationSourceTrace.isEnabled {
+      InvalidationSourceTrace.note(
+        "rerender-recarry-exempt",
+        scheduledFrame.invalidatedIdentities.subtracting(reCarried)
+      )
+    }
     rerender.invalidatedIdentities = renderer.rerenderInvalidationTargets(
-      scheduledFrame.invalidatedIdentities
-        .union(convergence.midFrameRelocationInvalidations),
+      reCarried.union(convergence.midFrameRelocationInvalidations),
       contentRootIdentity: rootIdentity
     )
     return rerender

@@ -907,6 +907,33 @@ public struct DefaultRenderer {
     return translated.filter { viewGraph.hasLiveInvalidationTarget(for: $0) }
   }
 
+  /// Filters a focus-sync rerender's RE-CARRIED original invalidation set:
+  /// live presentation trigger leaves are dropped. The trigger is a
+  /// childless zero-size leaf whose activation read was fully consumed by
+  /// the pass that already resolved it — there is no subtree under it for
+  /// the re-carry's conflict cone to protect, and its body reads only the
+  /// presentation activation state, which cannot change between passes of
+  /// the same frame (state writes route through the scheduler to the next
+  /// frame). Re-carrying it re-queues it dirty, and a queued-dirty
+  /// declared-source emitter makes the frame head predict a portal
+  /// reconcile escalation — rooting the whole rerender pass at the portal
+  /// and re-resolving background + overlay a second time per open. Callers
+  /// must never apply this to mid-frame relocation invalidations: a genuine
+  /// mid-frame activation change (a `@FocusState`-derived binding) reaches
+  /// the trigger through reader attribution on that set and must re-dirty
+  /// it.
+  @MainActor
+  package func droppingInertPresentationTriggerLeaves(
+    from identities: Set<Identity>
+  ) -> Set<Identity> {
+    identities.filter { identity in
+      !viewGraph.isChildlessLeaf(
+        identity,
+        kind: .view(PresentationTriggerLeafNode.kindName)
+      )
+    }
+  }
+
   @MainActor
   package func liveNodeIDSnapshot() -> Set<ViewNodeID> {
     viewGraph.liveNodeIDSnapshot()

@@ -782,6 +782,22 @@ package final class ViewGraph {
     return false
   }
 
+  /// Whether the live node at `identity` is a childless leaf of `kind`.
+  /// Used by the run loop's focus-sync rerender to recognize re-carried
+  /// invalidation identities whose re-resolve cannot host relocated content
+  /// (the zero-size presentation trigger leaf) — see
+  /// `RunLoop.rerenderScheduledFrame(from:convergence:)`. A missing node
+  /// returns `false` so departed identities keep their re-carry semantics.
+  package func isChildlessLeaf(
+    _ identity: Identity,
+    kind: NodeKind
+  ) -> Bool {
+    guard let node = nodeIfExists(for: identity) else {
+      return false
+    }
+    return node.children.isEmpty && node.committed.kind == kind
+  }
+
   package func translatePresentationPortalInvalidations(
     _ identities: Set<Identity>,
     portalRootIdentity: Identity,

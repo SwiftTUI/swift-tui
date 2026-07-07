@@ -226,6 +226,64 @@ struct PresentationPortalForceQueueTests {
     #expect(!finalFrame.contains("ToastBodyMarker"))
   }
 
+  @Test("focus-sync rerender passes do not re-carry the trigger into a portal-root pass")
+  func rerenderPassesDropInertTriggerReCarry() async throws {
+    let outcome = try await runPortalForceQueueScenario(
+      rootLabel: "PortalForceQueueRerenderReCarryRoot",
+      steps: { terminal in
+        [
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("Open Sheet") }
+          },
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("SheetBodyMarker") }
+          },
+          .press(KeyPress(.character("x"))),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("x") }
+          },
+          .press(KeyPress(.escape)),
+          .awaitCondition {
+            terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]
+      },
+      viewBuilder: {
+        SheetRerenderReCarryProbe()
+      }
+    )
+
+    // Behavior contract: the sheet opens same-frame, focus relocates into its
+    // TextField (the typed character echoes), and ESC dismisses it — all the
+    // semantics the trigger's ORIGINAL invalidation (pass 1) provides.
+    #expect(outcome.frames.contains { $0.contains("SheetBodyMarker") })
+    #expect(outcome.frames.contains { $0.contains("x") })
+    let finalFrame = try #require(outcome.frames.last)
+    #expect(!finalFrame.contains("SheetBodyMarker"))
+    #expect(finalFrame.contains("Background"))
+    // Narrowing contract: the committed row is the focus-sync rerender pass
+    // (focus relocation into/out of the modal reruns the frame body). The
+    // rerender re-carries the original invalidation set for reuse-denial
+    // safety, but the presentation trigger is a childless zero-size leaf —
+    // re-carrying it re-queues it dirty, which predicts a portal reconcile
+    // escalation and roots the ENTIRE rerender pass at the portal
+    // (re-resolving background + overlay a second time each open). The
+    // trigger's activation was fully consumed by the eager pass; the
+    // committed rerender rows must plan narrowly.
+    #expect(
+      outcome.rows.allSatisfy { row in
+        row["runtime_publication_portal_root_predicted"] != "1"
+      }
+    )
+    #expect(
+      outcome.rows.allSatisfy { row in
+        row["runtime_publication_portal_escalated"] != "1"
+      }
+    )
+  }
+
   @Test("imperative presentation still opens without the portal force-queue")
   func imperativePresentationUnaffected() async throws {
     let outcome = try await runPortalForceQueueScenario(
@@ -398,6 +456,39 @@ private struct SheetForceQueueOpenProbe: View {
       }
       Text("Background")
     }
+  }
+}
+
+private struct SheetRerenderReCarryProbe: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack {
+      Button("Open Sheet") {
+        isPresented = true
+      }
+      .sheet(isPresented: $isPresented) {
+        SheetRerenderReCarryContent()
+      }
+      Text("Background")
+    }
+  }
+}
+
+/// Sheet content modeled on the gallery command palette: a TextField that
+/// takes default focus on open, so the open frame is guaranteed to run the
+/// focus-sync rerender (relocation into the modal).
+private struct SheetRerenderReCarryContent: View {
+  @State private var query = ""
+  @Namespace private var focusNamespace
+
+  var body: some View {
+    VStack {
+      Text("SheetBodyMarker")
+      TextField("Query", text: $query)
+        .prefersDefaultFocus(in: focusNamespace)
+    }
+    .focusScope(focusNamespace)
   }
 }
 
