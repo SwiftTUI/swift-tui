@@ -433,6 +433,7 @@ private enum DependencyAxis: Hashable {
   case observableObjectToken
   case runtimeFocusEnvironmentKey
   case runtimeFocusSideFieldRead
+  case runtimeFocusTargetScopedRead
 }
 
 @MainActor
@@ -470,9 +471,20 @@ private func dependencyAxes(
   if !sideFieldReads.isEmpty {
     axes.insert(.runtimeFocusSideFieldRead)
   }
+  // Target-scoped side-field reads (`focusedIdentity(comparedAgainst:)`)
+  // record their own sentinel plus the compared identities
+  // (`DependencySet.focusComparisonTargets`); the focus-move predicates
+  // treat such a reader as affected only by moves onto its targets.
+  let targetScopedReads = dependencies.environmentReads.intersection(
+    [EnvironmentValues.runtimeFocusTargetScopedReadDependencyKey]
+  )
+  if !targetScopedReads.isEmpty {
+    axes.insert(.runtimeFocusTargetScopedRead)
+  }
   if !dependencies.environmentReads
     .subtracting(runtimeFocusReads)
     .subtracting(sideFieldReads)
+    .subtracting(targetScopedReads)
     .isEmpty
   {
     axes.insert(.environmentKey)

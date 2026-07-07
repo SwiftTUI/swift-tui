@@ -3074,30 +3074,61 @@ package final class ViewGraph {
     viewNodeID(for: identity) != nil || nearestLiveAncestorNodeID(for: identity) != nil
   }
 
-  /// Whether any node on the root path TO `identity` (self-inclusive)
-  /// recorded a dependency on `key` in its last evaluation. The run loop's
-  /// focus/press scope legs use this with the runtime-focus side-field
-  /// sentinel: framework controls compare those side-fields against
-  /// identities at or below themselves, so a focus move onto `identity` can
-  /// only change the output of readers on its root path — an identity whose
-  /// path carries no reader needs no recompute cone at all (a chrome-only
-  /// member). Containment-bake and wrapper readers are outside this
-  /// reasoning by construction: they record the wholesale-union
-  /// `FocusedIdentityKey` dependency instead.
-  package func hasEnvironmentDependentNodeOnPath(
-    to identity: Identity,
-    key: ObjectIdentifier
+  /// Whether a runtime-focus side-field reader on the root path TO
+  /// `identity` (self-inclusive) is AFFECTED by a focus/press move onto or
+  /// off `identity`. The run loop's focus/press scope legs and the tracker's
+  /// move-notification filter use this: framework controls compare the
+  /// side-fields against identities at or below themselves, so a focus move
+  /// onto `identity` can only change the output of readers on its root path
+  /// — an identity whose path carries no affected reader needs no recompute
+  /// cone at all (a chrome-only member).
+  ///
+  /// Two reader classes, distinguished by sentinel key:
+  /// - `broadKey` readers recorded a plain side-field read; any move on
+  ///   their path affects them.
+  /// - `targetScopedKey` readers declared the exact identities they compare
+  ///   against (`DependencySet.focusComparisonTargets`); they are affected
+  ///   only when the moved identity is among their targets — a sheet's
+  ///   `ScrollView` compares exclusively against itself and its synthetic
+  ///   indicator identities, so a move onto an unrelated content descendant
+  ///   leaves its output byte-identical and must not block that
+  ///   descendant's demotion.
+  ///
+  /// Containment-bake and wrapper readers are outside this reasoning by
+  /// construction: they record the wholesale-union `FocusedIdentityKey`
+  /// dependency instead.
+  package func hasRuntimeFocusReaderOnPath(
+    affecting identity: Identity,
+    broadKey: ObjectIdentifier,
+    targetScopedKey: ObjectIdentifier
   ) -> Bool {
-    guard let dependents = environmentDependents[key], !dependents.isEmpty
-    else {
+    let broadDependents = environmentDependents[broadKey] ?? []
+    let targetScopedDependents = environmentDependents[targetScopedKey] ?? []
+    guard !broadDependents.isEmpty || !targetScopedDependents.isEmpty else {
       return false
     }
     var current: Identity? = identity
     while let prefix = current {
-      if let viewNodeID = viewNodeID(for: prefix),
-        dependents.contains(viewNodeID)
-      {
-        return true
+      if let viewNodeID = viewNodeID(for: prefix) {
+        if broadDependents.contains(viewNodeID) {
+          if ReuseDenialTrace.isEnabled {
+            ReuseDenialTrace.recordSuppressionScopeDescription(
+              "focus-reader-path(reader=\(prefix.path))"
+            )
+          }
+          return true
+        }
+        if targetScopedDependents.contains(viewNodeID),
+          let node = nodeIfExists(for: prefix),
+          node.dependencies.focusComparisonTargets.contains(identity)
+        {
+          if ReuseDenialTrace.isEnabled {
+            ReuseDenialTrace.recordSuppressionScopeDescription(
+              "focus-reader-path(target-reader=\(prefix.path))"
+            )
+          }
+          return true
+        }
       }
       current = prefix.parent
     }

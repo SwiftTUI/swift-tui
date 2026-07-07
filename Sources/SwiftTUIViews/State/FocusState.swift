@@ -66,9 +66,28 @@ private final class FocusStateStorage<Value: Equatable> {
 private struct FocusStateLocation<Value: Equatable> {
   var bindingKey: FocusBindingKey
   var bindingID: String
+  /// Ensures the backing slot storage exists (seeded from the local box)
+  /// WITHOUT recording a read: merely mentioning `$focus` in a body hosts
+  /// the storage but presents nothing derived from it, so the touch must not
+  /// make the owner a recorded reader of its own slot — that would put the
+  /// owner's whole cone back into every runtime flip's reader-attributed
+  /// invalidation.
+  var prime: () -> Void
   var snapshot: () -> FocusStateSnapshot<Value>
+  /// `snapshot` without read attribution, for registry bookkeeping (the
+  /// `.focused()` registration's captured `isSelected`/`hasPendingRequest`/
+  /// generation): those captures parameterize the focus registry, not the
+  /// resolved output — the flip path keeps them fresh by invalidating the
+  /// registration identity itself, so recording them as value reads would
+  /// only re-broaden the flip cone to the registration's whole hosting node.
+  var bookkeepingSnapshot: () -> FocusStateSnapshot<Value>
   var requestValue: (Value) -> Void
-  var applyRuntimeValue: (Value, _ observedRequestGeneration: UInt64) -> Bool
+  /// Applies a runtime focus flip. `registrationIdentity` is the resolved
+  /// identity of the `.focused()` registration site that received the flip;
+  /// on a genuine change it is invalidated (alongside the slot's recorded
+  /// value readers) so the site re-registers with fresh bookkeeping.
+  var applyRuntimeValue:
+    (Value, _ observedRequestGeneration: UInt64, _ registrationIdentity: Identity?) -> Bool
 }
 
 @MainActor
@@ -212,7 +231,10 @@ public struct FocusState<Value: Equatable> {
     if let context = currentAuthoringContext() {
       let location = makeLocation(for: context)
       box.remember(location)
-      _ = location.snapshot()
+      // Materialize the backing slot (seeded from the local box) without
+      // recording a read: mentioning `$focus` hosts the storage, it does not
+      // consume the value. Genuine reads go through `snapshot`.
+      location.prime()
       return location
     }
 
@@ -249,11 +271,16 @@ public struct FocusState<Value: Equatable> {
       // captured instance goes stale after such a restore — a runtime focus
       // flip would then write a detached ghost and only reach the live slot a
       // frame late, once a re-registration re-captured it.
+      //
+      // Storage resolution is read-attribution-free (`primedStateSlot`):
+      // infrastructure touches (the prime, focus-sync's runtime
+      // re-application) are not value reads. Genuine reads record through
+      // the `snapshot` closure below.
       let seedValue = seedSnapshot.value
       let seedHasPendingRequest = seedSnapshot.hasPendingRequest
       let seedRequestGeneration = seedSnapshot.requestGeneration
       let liveStorage: @MainActor () -> FocusStateStorage<Value> = {
-        viewNode.stateSlot(
+        viewNode.primedStateSlot(
           ordinal: ordinal,
           seed: FocusStateStorage(
             value: seedValue,
@@ -262,24 +289,49 @@ public struct FocusState<Value: Equatable> {
           )
         )
       }
+      let readKey = StateSlotKey(owner: viewNode.viewNodeID, ordinal: ordinal)
 
       return FocusStateLocation(
         bindingKey: bindingKey,
         bindingID: bindingID,
+        prime: {
+          _ = liveStorage()
+        },
         snapshot: {
+          // A value read is a genuine dependency of the node evaluating it
+          // (a body read records on the body). Outside resolve there is no
+          // evaluated output that could go stale (imperative reads see live
+          // storage at call time), so nothing is recorded.
+          if let reader = ViewNodeContext.current {
+            reader.recordStateReadDependency(readKey)
+          }
+          return liveStorage().currentSnapshot()
+        },
+        bookkeepingSnapshot: {
           liveStorage().currentSnapshot()
         },
         requestValue: { newValue in
           liveStorage().requestValue(newValue)
+          // An authored request must reach a re-resolve of the registration
+          // site to be consumed (`hasPendingRequest` is published at
+          // resolve); the owner cone guarantees that regardless of reader
+          // attribution.
           viewNode.requestInvalidation()
         },
-        applyRuntimeValue: { newValue, observedRequestGeneration in
+        applyRuntimeValue: { newValue, observedRequestGeneration, registrationIdentity in
           let didChange = liveStorage().applyRuntimeValue(
             newValue,
             observedRequestGeneration: observedRequestGeneration
           )
           if didChange {
-            viewNode.requestInvalidation()
+            // Focus-sync applied a runtime flip: invalidate the receiving
+            // registration site (so it re-registers with fresh bookkeeping)
+            // plus the slot's recorded value readers — not the owner's
+            // whole identity cone.
+            viewNode.invalidateStateSlotReadersForRuntimeChange(
+              ordinal: ordinal,
+              registrationScope: registrationIdentity
+            )
           }
           return didChange
         }
@@ -296,13 +348,17 @@ public struct FocusState<Value: Equatable> {
         suffix: .local(ObjectIdentifier(box))
       ),
       bindingID: "FocusState.local[\(ObjectIdentifier(box))]",
+      prime: {},
       snapshot: {
+        box.currentLocalSnapshot()
+      },
+      bookkeepingSnapshot: {
         box.currentLocalSnapshot()
       },
       requestValue: { newValue in
         box.requestLocalValue(newValue)
       },
-      applyRuntimeValue: { newValue, observedRequestGeneration in
+      applyRuntimeValue: { newValue, observedRequestGeneration, _ in
         box.applyRuntimeLocalValue(
           newValue,
           observedRequestGeneration: observedRequestGeneration
@@ -322,23 +378,40 @@ extension FocusState.Binding {
     location.bindingID
   }
 
+  /// Registry bookkeeping (attribution-free): what the `.focused()`
+  /// registration captures. These parameterize the focus registry, not the
+  /// resolved output; the flip path keeps them fresh by invalidating the
+  /// registration identity, so they must not mark the registering node a
+  /// value reader.
   package var hasPendingRequest: Bool {
-    location.snapshot().hasPendingRequest
+    location.bookkeepingSnapshot().hasPendingRequest
+  }
+
+  /// The storage's current value, read attribution-free for registration
+  /// bookkeeping (`isSelected`). See ``hasPendingRequest``.
+  package var registrationValue: Value {
+    location.bookkeepingSnapshot().value
   }
 
   /// The storage's current authored-request generation. Registration sites
   /// capture this at resolve and pass it back through
-  /// ``applyRuntimeValue(_:observedRequestGeneration:)`` so runtime
-  /// re-application can never consume a request the registration predates.
+  /// ``applyRuntimeValue(_:observedRequestGeneration:registrationIdentity:)``
+  /// so runtime re-application can never consume a request the registration
+  /// predates.
   package var requestGeneration: UInt64 {
-    location.snapshot().requestGeneration
+    location.bookkeepingSnapshot().requestGeneration
   }
 
   package func applyRuntimeValue(
     _ newValue: Value,
-    observedRequestGeneration: UInt64
+    observedRequestGeneration: UInt64,
+    registrationIdentity: Identity?
   ) -> Bool {
-    location.applyRuntimeValue(newValue, observedRequestGeneration)
+    location.applyRuntimeValue(
+      newValue,
+      observedRequestGeneration,
+      registrationIdentity
+    )
   }
 }
 
@@ -372,16 +445,18 @@ public struct BoolFocusBindingModifier: PrimitiveViewModifier {
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     let observedRequestGeneration = binding.requestGeneration
+    let registrationIdentity = node.identity
     context.localFocusBindingRegistry?.register(
-      identity: node.identity,
+      identity: registrationIdentity,
       bindingKey: binding.bindingKey,
       bindingID: binding.bindingID,
       hasPendingRequest: binding.hasPendingRequest,
-      isSelected: binding.wrappedValue,
+      isSelected: binding.registrationValue,
       applyRuntimeFocus: { isFocused in
         binding.applyRuntimeValue(
           isFocused,
-          observedRequestGeneration: observedRequestGeneration
+          observedRequestGeneration: observedRequestGeneration,
+          registrationIdentity: registrationIdentity
         )
       }
     )
@@ -400,25 +475,28 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifi
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     let observedRequestGeneration = binding.requestGeneration
+    let registrationIdentity = node.identity
     context.localFocusBindingRegistry?.register(
-      identity: node.identity,
+      identity: registrationIdentity,
       bindingKey: binding.bindingKey,
       bindingID: binding.bindingID,
       hasPendingRequest: binding.hasPendingRequest,
-      isSelected: binding.wrappedValue == value,
+      isSelected: binding.registrationValue == value,
       applyRuntimeFocus: { isFocused in
         if isFocused {
           return binding.applyRuntimeValue(
             value,
-            observedRequestGeneration: observedRequestGeneration
+            observedRequestGeneration: observedRequestGeneration,
+            registrationIdentity: registrationIdentity
           )
         }
-        guard binding.wrappedValue == value else {
+        guard binding.registrationValue == value else {
           return false
         }
         return binding.applyRuntimeValue(
           nil,
-          observedRequestGeneration: observedRequestGeneration
+          observedRequestGeneration: observedRequestGeneration,
+          registrationIdentity: registrationIdentity
         )
       }
     )

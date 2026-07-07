@@ -49,7 +49,7 @@ extension Picker {
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let pickerStyle = context.environmentValues.pickerStyle
-    let isFocused = context.environmentValues.focusedIdentity == context.identity
+    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let options = resolvedOptions(in: context.child(component: .named("PickerOptions")))

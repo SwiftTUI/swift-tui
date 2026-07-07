@@ -93,6 +93,17 @@ private enum PickerLineWidthKey: EnvironmentKey {
 /// to chrome-only members.
 private enum RuntimeFocusSideFieldReadKey {}
 
+/// Attribution-only sentinel for TARGET-SCOPED side-field reads
+/// (`focusedIdentity(comparedAgainst:)`): the reader declared the exact
+/// identities its comparisons target, recorded per-node as
+/// `DependencySet.focusComparisonTargets`. The focus-move path predicate
+/// treats such a reader as affected only when the moved identity is among
+/// its targets, so a distant container reader (a sheet's `ScrollView`,
+/// which compares exclusively against itself and its synthetic indicator
+/// identities) does not block the chrome-only demotion of an unrelated
+/// content descendant.
+private enum RuntimeFocusTargetScopedReadKey {}
+
 extension EnvironmentValues {
   package static var runtimeFocusStateDependencyKeys: Set<ObjectIdentifier> {
     [
@@ -103,6 +114,10 @@ extension EnvironmentValues {
 
   package static var runtimeFocusSideFieldReadDependencyKey: ObjectIdentifier {
     ObjectIdentifier(RuntimeFocusSideFieldReadKey.self)
+  }
+
+  package static var runtimeFocusTargetScopedReadDependencyKey: ObjectIdentifier {
+    ObjectIdentifier(RuntimeFocusTargetScopedReadKey.self)
   }
 
   package static func runtimeFocusStateDependencyKey(
@@ -248,7 +263,7 @@ extension EnvironmentValues {
   /// keyed subscript) under the sentinel key. Framework readers compare
   /// these fields against identities at or below themselves, so a focus
   /// move's recompute cone only needs the readers on the moved identity's
-  /// root path — the predicate `ViewGraph.hasEnvironmentDependentNodeOnPath`
+  /// root path — the predicate `ViewGraph.hasRuntimeFocusReaderOnPath`
   /// consumes this attribution. Infrastructure reads (the context bake and
   /// override plumbing) use the raw `_focusedIdentity` field instead, so
   /// they do not flag every node.
@@ -257,6 +272,47 @@ extension EnvironmentValues {
       ViewNodeContext.current?.recordEnvironmentRead(
         Self.runtimeFocusSideFieldReadDependencyKey
       )
+    }
+  }
+
+  /// Target-scoped side-field read: the caller declares the EXACT identities
+  /// its comparisons target (all at or below itself, per the framework read
+  /// audit — a reader comparing against anything else must use the plain
+  /// `focusedIdentity` getter). Records the target-scoped sentinel plus the
+  /// declared targets on the evaluating node; the focus-move predicates then
+  /// treat this reader as affected only when the moved identity is among the
+  /// targets, so its presence on a content descendant's root path does not
+  /// block that descendant's chrome-only demotion. This matters doubly for
+  /// controls resolved as value-only children (no own view node): their
+  /// reads land on the nearest evaluated ANCESTOR node, and one broad read
+  /// there would re-broaden every focus move inside that whole subtree.
+  package func focusedIdentity(
+    comparedAgainst targets: Set<Identity>
+  ) -> Identity? {
+    recordTargetScopedRuntimeFocusRead(targets)
+    return _focusedIdentity
+  }
+
+  /// The `pressedIdentity` counterpart of
+  /// ``focusedIdentity(comparedAgainst:)`` — controls compare the pressed
+  /// side-field against themselves for press chrome.
+  package func pressedIdentity(
+    comparedAgainst targets: Set<Identity>
+  ) -> Identity? {
+    recordTargetScopedRuntimeFocusRead(targets)
+    return _pressedIdentity
+  }
+
+  private func recordTargetScopedRuntimeFocusRead(
+    _ targets: Set<Identity>
+  ) {
+    MainActor.assumeIsolated {
+      if let reader = ViewNodeContext.current {
+        reader.recordEnvironmentRead(
+          Self.runtimeFocusTargetScopedReadDependencyKey
+        )
+        reader.recordFocusComparisonTargets(targets)
+      }
     }
   }
 

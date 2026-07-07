@@ -843,16 +843,20 @@ public struct DefaultRenderer {
   }
 
   /// Whether any node on the root path to `identity` consulted the
-  /// runtime-focus side-fields during its last evaluation — the predicate
-  /// that keeps a focus/press move's old/new identity a FULL suppression
-  /// member. A reader-free path demotes it to a chrome-only member: its
-  /// focus presentation is host-side chrome (semantic snapshot + tracker),
-  /// no resolve output on that path can vary with the move.
+  /// runtime-focus side-fields during its last evaluation in a way a move
+  /// onto/off `identity` can affect — the predicate that keeps a focus/press
+  /// move's old/new identity a FULL suppression member. A path free of
+  /// affected readers demotes it to a chrome-only member: its focus
+  /// presentation is host-side chrome (semantic snapshot + tracker), no
+  /// resolve output on that path can vary with the move. Target-scoped
+  /// readers (`focusedIdentity(comparedAgainst:)`) count only when
+  /// `identity` is among their declared comparison targets.
   @MainActor
   package func hasRuntimeFocusReaderOnPath(to identity: Identity) -> Bool {
-    viewGraph.hasEnvironmentDependentNodeOnPath(
-      to: identity,
-      key: EnvironmentValues.runtimeFocusSideFieldReadDependencyKey
+    viewGraph.hasRuntimeFocusReaderOnPath(
+      affecting: identity,
+      broadKey: EnvironmentValues.runtimeFocusSideFieldReadDependencyKey,
+      targetScopedKey: EnvironmentValues.runtimeFocusTargetScopedReadDependencyKey
     )
   }
 

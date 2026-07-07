@@ -16,6 +16,10 @@ package final class DependencyTracker {
     currentDependencies.observableReads.insert(id)
   }
 
+  package func recordFocusComparisonTargets(_ targets: Set<Identity>) {
+    currentDependencies.focusComparisonTargets.formUnion(targets)
+  }
+
   package func reset() -> DependencySet {
     defer {
       currentDependencies = .init()

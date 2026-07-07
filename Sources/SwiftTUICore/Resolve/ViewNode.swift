@@ -270,15 +270,18 @@ package final class ViewNode {
   /// write cannot forget to record. The only remaining explicit calls cover
   /// mutations of the reference-typed `dependencyTracker`, which property
   /// observation cannot see (`recordStateReadDependency`,
-  /// `recordEnvironmentRead`, `recordObservableRead`).
+  /// `recordEnvironmentRead`, `recordObservableRead`,
+  /// `recordFocusComparisonTargets`).
   private func recordCheckpointMutation() {
     checkpointMutationGeneration &+= 1
   }
 
   /// The explicit recording seam for mutations of the reference-typed
   /// `dependencyTracker`: it is the one mutable member property observation
-  /// cannot see (a `let` class), so its three mutation entry points call this
-  /// by hand. Every other checkpoint-covered mutation records structurally via
+  /// cannot see (a `let` class), so its mutation entry points
+  /// (`recordStateReadDependency`, `recordEnvironmentRead`,
+  /// `recordObservableRead`, `recordFocusComparisonTargets`) call this by
+  /// hand. Every other checkpoint-covered mutation records structurally via
   /// the stored-property `didSet` observers.
   private func recordDependencyTrackerMutation() {
     checkpointMutationGeneration &+= 1
@@ -381,10 +384,6 @@ package final class ViewNode {
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
-    var slot = stateSlots[ordinal] ?? .init()
-    slot.initializeIfNeeded(with: seed())
-    stateSlots[ordinal] = slot
-
     let readKey = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
     if let reader = ViewNodeContext.current {
       // Reader-attributed: the dependency belongs to the node actually
@@ -396,6 +395,24 @@ package final class ViewNode {
       // No evaluating reader in scope (a read outside resolve): record on self.
       dependencyTracker.recordStateRead(readKey)
     }
+
+    return primedStateSlot(ordinal: ordinal, seed: seed())
+  }
+
+  /// Slot access without read attribution. Runtime plumbing that must reach
+  /// the storage without becoming a recorded reader uses this — the
+  /// `@FocusState` location's storage resolution and its prime touch: a body
+  /// that merely *projects* a binding hosts the slot but presents nothing
+  /// derived from it, and attributing that touch as a read would put the
+  /// owner in every runtime flip's invalidation set, re-broadening the
+  /// reader-attributed cone to the owner's whole subtree.
+  package func primedStateSlot<Value>(
+    ordinal: Int,
+    seed: @autoclosure () -> Value
+  ) -> Value {
+    var slot = stateSlots[ordinal] ?? .init()
+    slot.initializeIfNeeded(with: seed())
+    stateSlots[ordinal] = slot
 
     guard slot.stores(Value.self) else {
       let slotTypes = stateSlots.keys.sorted().map { index in
@@ -580,9 +597,45 @@ package final class ViewNode {
     dependencyTracker.recordObservableRead(key)
   }
 
+  package func recordFocusComparisonTargets(
+    _ targets: Set<Identity>
+  ) {
+    recordDependencyTrackerMutation()
+    dependencyTracker.recordFocusComparisonTargets(targets)
+  }
+
   package func requestInvalidation() {
+    InvalidationSourceTrace.note("node-request", [identity])
     ownerGraph?.queueDirty([identity])
     invalidator?.requestInvalidation(of: [identity])
+  }
+
+  /// Reader-attributed invalidation for a runtime-applied state-slot change
+  /// (a `@FocusState` flip applied by focus-sync's binding re-derive). The
+  /// invalidated set is the receiving `.focused()` registration identity
+  /// (`registrationScope` — its re-resolve refreshes the registry's captured
+  /// `isSelected`/`hasPendingRequest`, and the ancestor-chain conflict
+  /// denial reaches the hosting node that re-runs it) plus the slot's
+  /// recorded genuine value readers (a body that read the value recomputes).
+  /// The owner's whole identity cone — which blanketed every sibling of the
+  /// bound control — is used only as a fallback when neither exists, so a
+  /// change is never dropped.
+  package func invalidateStateSlotReadersForRuntimeChange(
+    ordinal: Int,
+    registrationScope: Identity?
+  ) {
+    let key = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+    var invalidationIdentities =
+      ownerGraph?.stateDependentIdentities(for: key) ?? []
+    if let registrationScope {
+      invalidationIdentities.insert(registrationScope)
+    }
+    if invalidationIdentities.isEmpty {
+      invalidationIdentities = [identity]
+    }
+    InvalidationSourceTrace.note("runtime-state-flip", invalidationIdentities)
+    ownerGraph?.queueDirty(invalidationIdentities)
+    invalidator?.requestInvalidation(of: invalidationIdentities)
   }
 
   package func setLifecycleState(

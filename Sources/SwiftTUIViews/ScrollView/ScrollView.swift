@@ -45,7 +45,21 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         environment: context.environmentValues.scrollIndicatorVisibility
       )
       let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-      let focusedIdentity = context.environmentValues.focusedIdentity
+      // Target-scoped side-field read: this body compares `focusedIdentity`
+      // exclusively against the scroll view itself and its two synthetic
+      // indicator identities, so a focus move onto anything else (a focused
+      // control inside the scrolled content) leaves this output
+      // byte-identical. Declaring the targets keeps this container off the
+      // affected-reader path of content-descendant focus moves — a sheet's
+      // content scroll view must not re-broaden the chrome-only demotion of
+      // focusables inside it.
+      let focusedIdentity = context.environmentValues.focusedIdentity(
+        comparedAgainst: [
+          context.identity,
+          verticalScrollIndicatorIdentity(for: context.identity),
+          horizontalScrollIndicatorIdentity(for: context.identity),
+        ]
+      )
       let isFocused = focusedIdentity == context.identity
       let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
       var focusedIndicatorAxes: AxisSet = []

@@ -37,7 +37,7 @@ extension TabView {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity == context.identity
+    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)

@@ -47,7 +47,7 @@ extension SecureField {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity == context.identity
+    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let textFieldStyle = context.environmentValues.textFieldStyle
