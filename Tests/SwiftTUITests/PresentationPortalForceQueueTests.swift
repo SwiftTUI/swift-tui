@@ -416,8 +416,10 @@ private func runPortalForceQueueScenario<V: View>(
     RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled = wasEnabled
   }
 
+  let timeoutLog = PortalForceQueueTimeoutLog()
   let terminal = PortalForceQueueRecordingTerminalHost(
-    surfaceSize: .init(width: 60, height: 16)
+    surfaceSize: .init(width: 60, height: 16),
+    timeline: timeoutLog
   )
   let rootIdentity = testIdentity(rootLabel)
   let diagnosticsURL = FileManager.default.temporaryDirectory
@@ -426,7 +428,6 @@ private func runPortalForceQueueScenario<V: View>(
     try? FileManager.default.removeItem(at: diagnosticsURL)
   }
 
-  let timeoutLog = PortalForceQueueTimeoutLog()
   let inputReader = PortalForceQueueAwaitedInputReader(
     frameSignal: terminal.frameSignal,
     timeoutLog: timeoutLog,
@@ -455,7 +456,9 @@ private func runPortalForceQueueScenario<V: View>(
     Issue.record(
       """
       input steps \(timeoutLog.timedOutSteps) timed out awaiting their frame \
-      condition; last frames:
+      condition; timeline:
+      \(timeoutLog.events.joined(separator: "\n"))
+      last frames:
       \(terminal.frames.suffix(3).joined(separator: "\n=== frame ===\n"))
       """
     )
@@ -695,17 +698,20 @@ private final class PortalForceQueueRecordingTerminalHost: PresentationSurface {
   let appearance: TerminalAppearance
   private(set) var frames: [String] = []
   private var lastPresentedSurface: RasterSurface?
+  private let timeline: PortalForceQueueTimeoutLog?
 
   let frameSignal = MainActorConditionSignal()
 
   init(
     surfaceSize: CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
-    appearance: TerminalAppearance = .fallback
+    appearance: TerminalAppearance = .fallback,
+    timeline: PortalForceQueueTimeoutLog? = nil
   ) {
     self.surfaceSize = surfaceSize
     self.capabilityProfile = capabilityProfile
     self.appearance = appearance
+    self.timeline = timeline
   }
 
   func enableRawMode() throws {}
@@ -737,7 +743,14 @@ private final class PortalForceQueueRecordingTerminalHost: PresentationSurface {
 
   private func notifyFrameObservers() {
     let frameSignal = self.frameSignal
+    let timeline = self.timeline
+    let frameIndex = frames.count
+    let summary = frames.last?
+      .split(separator: "\n")
+      .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+      .map { String($0.trimmingCharacters(in: .whitespaces).prefix(24)) }
     MainActor.assumeIsolated {
+      timeline?.note("frame \(frameIndex) presented: \(summary ?? "<blank>")")
       frameSignal.notify()
     }
   }
@@ -749,13 +762,25 @@ private enum PortalForceQueueInputStep {
 }
 
 /// Records await steps that hit their deadline so a wrong predicate fails the
-/// test with diagnosable state instead of hanging the serialized suite.
+/// test with diagnosable state instead of hanging the serialized suite. Also
+/// keeps an elapsed-time event timeline (frame arrivals, step transitions) so
+/// a deadline hit on a starved CI runner shows *where* the time went.
 @MainActor
 private final class PortalForceQueueTimeoutLog {
   private(set) var timedOutSteps: [Int] = []
+  private(set) var events: [String] = []
+  private let start = ContinuousClock.now
 
   func recordTimeout(step: Int) {
     timedOutSteps.append(step)
+    note("step \(step): timed out")
+  }
+
+  func note(_ message: String) {
+    let elapsed = start.duration(to: .now)
+    let milliseconds = elapsed.components.seconds * 1000
+      + elapsed.components.attoseconds / 1_000_000_000_000_000
+    events.append("+\(milliseconds)ms \(message)")
   }
 }
 
@@ -783,8 +808,10 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
         for (index, step) in steps.enumerated() {
           switch step {
           case .press(let event):
+            timeoutLog.note("step \(index): yield \(event.key)")
             continuation.yield(event)
           case .awaitCondition(let predicate):
+            timeoutLog.note("step \(index): await start")
             let waitTask = Task { @MainActor in
               await frameSignal.wait(until: predicate)
             }
@@ -794,7 +821,9 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
             }
             await waitTask.value
             timeoutTask.cancel()
-            if !predicate() {
+            if predicate() {
+              timeoutLog.note("step \(index): await satisfied")
+            } else {
               timeoutLog.recordTimeout(step: index)
             }
           }
