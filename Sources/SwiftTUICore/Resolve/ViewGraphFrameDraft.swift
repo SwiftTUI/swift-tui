@@ -66,11 +66,15 @@ package final class ViewGraphFrameDraft {
     recordDirtyPlanDiagnostics(dirtyPlanDiagnostics)
   }
 
-  package func recordPresentationPortalRootQueued(_ queued: Bool) {
+  package func recordPresentationPortalRootQueued(
+    _ queued: Bool,
+    predicted: Bool
+  ) {
     guard publicationDiagnosticsEnabled else {
       return
     }
     publicationDiagnostics.presentationPortalRootQueued = queued
+    publicationDiagnostics.presentationPortalRootPredicted = predicted
     publicationDiagnostics.presentationPortalEscalated = false
   }
 

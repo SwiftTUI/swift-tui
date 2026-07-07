@@ -21,7 +21,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
       content: content,
       isPresented: isPresented,
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
       let item = PromptPresentationItem(
@@ -42,11 +42,14 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
           )
         },
         contentPayloads: [],
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
 
@@ -82,7 +85,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
       content: content,
       isPresented: isPresented,
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
       let item = PromptPresentationItem(
@@ -98,11 +101,14 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
             portalEntryID: portalEntryID
           )
         },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
 
@@ -137,7 +143,7 @@ package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveView
       content: content,
       isPresented: isPresented,
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
       let item = PromptPresentationItem(
@@ -154,11 +160,14 @@ package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveView
             modalPolicy: .nonModal
           )
         },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
 
@@ -221,7 +230,7 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
         absorbed = background.preferenceValues[PaletteCommandsPreferenceKey.self]
         background.preferenceValues[PaletteCommandsPreferenceKey.self] = []
       }
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
       let item = PromptPresentationItem(
@@ -237,11 +246,14 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
             portalEntryID: portalEntryID
           )
         },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
 

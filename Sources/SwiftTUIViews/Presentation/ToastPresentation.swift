@@ -267,7 +267,8 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     let active = isPresented.wrappedValue
     context.presentationTriggerObserver?.record(
       sourceIdentity: node.identity,
-      isActive: active
+      isActive: active,
+      emitterIdentity: node.identity
     )
     guard active else {
       return [node]

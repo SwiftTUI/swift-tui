@@ -28,7 +28,7 @@ package struct BuiltinItemPopoverPresentationModifier<
       content: content,
       isActive: { itemBinding.wrappedValue != nil },
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       // Re-read inside the leaf's resolve: same call stack as the `isActive`
       // check, and the read stays attributed to the leaf.
       guard let currentItem = itemBinding.wrappedValue else {
@@ -54,11 +54,14 @@ package struct BuiltinItemPopoverPresentationModifier<
             modalPolicy: .disablesBaseInteraction
           )
         },
-        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             itemBinding.wrappedValue = nil
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
@@ -107,7 +110,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
       content: content,
       isActive: { isPresented?.wrappedValue ?? true },
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
@@ -116,7 +119,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
       let itemID = portalEntryID.description
       let dismiss: @MainActor @Sendable () -> Void = {
         [
-          isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity,
+          isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity,
           dismissedTipID, tipID
         ] in
         withAuthoringContext(dismissAuthoringContext) {
@@ -126,7 +129,10 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
             dismissedTipID.wrappedValue = tipID
           }
         }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+        requestPresentationDismissReconcile(
+          dismissInvalidator,
+          triggerIdentity: triggerIdentity
+        )
       }
       let performAction: @MainActor @Sendable (PopoverTipAction) -> Void = { tipAction in
         withAuthoringContext(actionAuthoringContext) {

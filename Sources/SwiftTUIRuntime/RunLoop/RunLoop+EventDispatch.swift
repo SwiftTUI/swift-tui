@@ -57,8 +57,11 @@ extension RunLoop {
       || KeyBinding.allowsModifierlessCommands(for: keyPress.key)
     {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
+      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
       if commandRegistry.dispatch(key: binding, along: commandDispatchScopePath()) {
-        scheduler.requestInvalidation(of: [rootIdentity])
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
         return nil
       }
     }
@@ -92,16 +95,17 @@ extension RunLoop {
       // readers (reader attribution), so the coarse root sweep is redundant
       // whenever the dispatch invalidated anything — and a full-tree re-resolve
       // on every key is expensive (e.g. re-running a presenting view's whole
-      // body for each character typed into a focused TextField). Mirror the
-      // control-action path (`recordFollowUpInvalidation`): keep the root sweep
-      // only as the backstop for handlers with untracked side effects, which
-      // schedule nothing.
-      let handlerRequestedInvalidation =
-        schedulerPendingInvalidations() != invalidationsBeforeDispatch
-      if !handlerRequestedInvalidation {
-        scheduler.requestInvalidation(of: [rootIdentity])
-      }
+      // body for each character typed into a focused TextField). An UNHANDLED
+      // key gets no backstop either (mirroring the control-action path, which
+      // records follow-ups only for handled dispatches): the handler declined
+      // the event, and every fall-through branch below carries its own
+      // backstop — a declined ESC previously root-swept here before the
+      // framework dismiss branch even ran, riding the close transition's
+      // replayed sets as `root_invalidated`.
       if handled {
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
         return nil
       }
     }
@@ -125,8 +129,11 @@ extension RunLoop {
     // they auto-expire.
     if keyPress == KeyPress(.escape, modifiers: []) {
       if let dismiss = renderer.topmostEscapeDismissAction() {
+        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
         dismiss()
-        scheduler.requestInvalidation(of: [rootIdentity])
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
         return nil
       }
     }
@@ -161,8 +168,11 @@ extension RunLoop {
       if let pop = renderer.topmostNavigationDestinationPopAction(
         along: currentFocusScopePath()
       ) {
+        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
         pop()
-        scheduler.requestInvalidation(of: [rootIdentity])
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
         return nil
       }
     }
@@ -223,14 +233,17 @@ extension RunLoop {
       )
       if consumed { return }
     }
-    if let focusedIdentity = focusTracker.currentFocusIdentity,
-      localKeyHandlerRegistry.dispatchPaste(
+    if let focusedIdentity = focusTracker.currentFocusIdentity {
+      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+      if localKeyHandlerRegistry.dispatchPaste(
         identity: focusedIdentity,
         content: pasteEvent.content
-      )
-    {
-      scheduler.requestInvalidation(of: [rootIdentity])
-      return
+      ) {
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        )
+        return
+      }
     }
     // Fall through: re-emit the paste content as a sequence of
     // character key events so text-input views (TextEditor,

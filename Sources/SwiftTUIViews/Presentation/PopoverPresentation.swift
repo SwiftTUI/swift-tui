@@ -90,7 +90,7 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
       content: content,
       isPresented: isPresented,
       in: context
-    ) { background in
+    ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: "popover")
       let itemID = portalEntryID.description
@@ -108,11 +108,14 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
             modalPolicy: .disablesBaseInteraction
           )
         },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
         }
       )
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)

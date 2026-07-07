@@ -71,6 +71,25 @@ extension RunLoop {
     (scheduler as? FrameScheduler)?.pendingInvalidatedIdentities ?? []
   }
 
+  /// Requests the coarse root sweep after a consumed event dispatch — but only
+  /// when the dispatched action scheduled no invalidation of its own
+  /// (mirroring ``recordFollowUpInvalidation(for:schedulerInvalidationsBeforeDispatch:)``).
+  /// An action whose writes are tracked has already invalidated its precise
+  /// readers; the redundant sweep would put the root identity in the frame's
+  /// raw set — `root_invalidated` disables selective evaluation wholesale, and
+  /// a presentation transition replays that set on every tick until it
+  /// converges. The sweep stays as the backstop for actions with untracked
+  /// side effects, which schedule nothing.
+  func requestDispatchBackstopInvalidation(
+    schedulerInvalidationsBeforeDispatch before: Set<Identity>
+  ) {
+    guard schedulerPendingInvalidations() == before else {
+      return
+    }
+    InvalidationSourceTrace.note("dispatch-backstop", [rootIdentity])
+    scheduler.requestInvalidation(of: [rootIdentity])
+  }
+
   /// Records a control action's coarse follow-up invalidation — but skips it
   /// when the action already requested a (reader-attributed) invalidation, so a
   /// redundant owner-scope sweep does not re-resolve a disjoint subtree.

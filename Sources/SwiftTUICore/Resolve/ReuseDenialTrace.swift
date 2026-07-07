@@ -86,12 +86,23 @@ package enum ReuseDenialTrace {
     suppressionScopeDescriptions.append(description)
   }
 
+  /// Records one dirty-plan's frontier target identities (per resolve pass),
+  /// so overlapping-target multiplicity — the same subtree resolved by more
+  /// than one frontier evaluator in a frame — is attributable from the trace.
+  package private(set) static var planTargetDescriptions: [String] = []
+
+  package static func recordPlanTargets(_ paths: [String]) {
+    guard isEnabled else { return }
+    planTargetDescriptions.append(paths.joined(separator: "+"))
+  }
+
   package static func reset() {
     reasonCounts.removeAll(keepingCapacity: true)
     environmentKeyDiffCounts.removeAll(keepingCapacity: true)
     invalidatedIdentityPaths.removeAll(keepingCapacity: true)
     suppressionScopeDescriptions.removeAll(keepingCapacity: true)
     suppressedIdentityPaths.removeAll(keepingCapacity: true)
+    planTargetDescriptions.removeAll(keepingCapacity: true)
   }
 
   /// Writes the accumulated histogram to stderr (if non-empty) and resets it.
@@ -121,6 +132,9 @@ package enum ReuseDenialTrace {
     }
     if !suppressedIdentityPaths.isEmpty {
       line += " | suppressed-paths: " + suppressedIdentityPaths.joined(separator: ",")
+    }
+    if !planTargetDescriptions.isEmpty {
+      line += " | plan-targets: " + planTargetDescriptions.joined(separator: ";")
     }
     line += "\n"
     emit(line)

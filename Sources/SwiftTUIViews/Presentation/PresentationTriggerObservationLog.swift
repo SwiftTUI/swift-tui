@@ -33,11 +33,21 @@ package final class PresentationTriggerObservationLog {
 
   private(set) package var observations: [Observation] = []
 
+  /// Sticky map from a declaration's source identity to the emitter node that
+  /// reports it (the presentation trigger leaf; the emitting node itself for
+  /// inline emitters like toasts). Unlike ``observations`` this survives
+  /// ``reset()``: the frame head consults it *before* planning a selective
+  /// frame — a dirty emitter for a declared source is guaranteed to re-resolve
+  /// and re-observe, so the head can root the plan at the portal directly
+  /// instead of running a narrow plan whose work the escalation re-does.
+  private(set) package var emitterIdentitiesBySource: [Identity: Identity] = [:]
+
   package init() {}
 
   package func record(
     sourceIdentity: Identity,
-    isActive: Bool
+    isActive: Bool,
+    emitterIdentity: Identity? = nil
   ) {
     observations.append(
       Observation(
@@ -45,6 +55,9 @@ package final class PresentationTriggerObservationLog {
         isActive: isActive
       )
     )
+    if let emitterIdentity {
+      emitterIdentitiesBySource[sourceIdentity] = emitterIdentity
+    }
   }
 
   package func reset() {

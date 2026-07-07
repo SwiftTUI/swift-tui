@@ -755,6 +755,33 @@ package final class ViewGraph {
     nodeIfExists(for: identity) != nil
   }
 
+  /// Whether the node at `identity` is queued dirty work for the next
+  /// selective plan, or sits below a queued dirty ancestor whose re-resolve
+  /// reaches it (same ancestry walk as the dirty-frontier planner, crossing
+  /// capture-hosted island seams via `evaluationHost`). The frame head uses
+  /// this to predict — before planning — that a presentation emitter will
+  /// re-resolve this frame and escalate the plan to the portal root, so the
+  /// narrow plan the escalation would re-do is skipped entirely.
+  package func hasQueuedDirtyEvaluationPath(
+    to identity: Identity
+  ) -> Bool {
+    guard let node = nodeIfExists(for: identity) else {
+      return false
+    }
+    var current: ViewNode? = node
+    var visited: Set<ObjectIdentifier> = []
+    while let candidate = current {
+      guard visited.insert(ObjectIdentifier(candidate)).inserted else {
+        return false
+      }
+      if candidate.isDirty, graphLocalDirtyNodeIDs.contains(candidate.viewNodeID) {
+        return true
+      }
+      current = candidate.parent ?? candidate.evaluationHost
+    }
+    return false
+  }
+
   package func translatePresentationPortalInvalidations(
     _ identities: Set<Identity>,
     portalRootIdentity: Identity,
@@ -1411,6 +1438,11 @@ package final class ViewGraph {
       return false
     }
 
+    if ReuseDenialTrace.isEnabled {
+      ReuseDenialTrace.recordPlanTargets(
+        plan.frontierNodeIDs.compactMap { nodesByNodeID[$0]?.identity.path }
+      )
+    }
     for viewNodeID in plan.frontierNodeIDs {
       nodesByNodeID[viewNodeID]?.evaluate()
     }

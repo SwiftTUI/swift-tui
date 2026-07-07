@@ -80,7 +80,10 @@ struct DefaultRendererFrameHeadCoordinator {
       resolveContext: resolveContext,
       resolveInputs: resolveInputs
     )
-    graphDraft.recordPresentationPortalRootQueued(portal.queuedRoot)
+    graphDraft.recordPresentationPortalRootQueued(
+      portal.queuedRoot,
+      predicted: portal.predictedRoot
+    )
     let resolvedHead = resolveGraphHead(
       resolveContext: resolveContext,
       graphDraft: graphDraft,
@@ -418,9 +421,33 @@ struct DefaultRendererFrameHeadCoordinator {
     // ancestor at the queue boundary (`ViewGraph.nodeIDsForInvalidation`,
     // F10 slice 1) — for an absent overlay host that is the portal root
     // itself, whose re-resolve recomposes the overlay.
+    // Pre-plan escalation prediction: a queued-dirty emitter (or one below a
+    // queued dirty ancestor) for a DECLARED source is guaranteed to re-resolve
+    // this frame and re-observe, so the post-plan reconcile escalation would
+    // root the frame at the portal anyway — after a narrow plan already
+    // re-resolved overlapping subtrees. Rooting the plan here runs the frame
+    // as ONE portal-root pass instead (transition-replay frames of an open
+    // sheet previously paid narrow-plan + escalation ≈ 2× resolve). A departed
+    // declared source (node pruned) is the same story. New activations (source
+    // not yet declared) keep the cheap narrow plan and reach the portal root
+    // through the post-plan escalation backstop, as do declared sources whose
+    // emitter identity is not (yet) known to the sticky observation map.
+    let declaredSources = presentationPortalDraft.declaredSourceIdentities()
+    let emittersBySource =
+      presentationPortalState.triggerObservations.emitterIdentitiesBySource
+    let predictedReconcileEscalation = declaredSources.contains { source in
+      guard viewGraph.containsNode(for: source) else {
+        return true
+      }
+      guard let emitter = emittersBySource[source] else {
+        return false
+      }
+      return viewGraph.hasQueuedDirtyEvaluationPath(to: emitter)
+    }
     let shouldQueuePresentationPortalRoot =
       !hasExistingPresentationPortalRoot
       || !resolveInputs.usesSelectiveEvaluation
+      || predictedReconcileEscalation
     if shouldQueuePresentationPortalRoot {
       viewGraph.queueDirty([presentationPortalContext.identity])
     }
@@ -428,6 +455,7 @@ struct DefaultRendererFrameHeadCoordinator {
     return PresentationPortalPreparation(
       graphRootIdentity: presentationPortalContext.identity,
       queuedRoot: shouldQueuePresentationPortalRoot,
+      predictedRoot: predictedReconcileEscalation,
       draft: presentationPortalDraft
     )
   }
@@ -627,6 +655,7 @@ private struct FrameHeadBaselineCheckpoints {
 private struct PresentationPortalPreparation {
   var graphRootIdentity: Identity
   var queuedRoot: Bool
+  var predictedRoot: Bool
   var draft: PresentationPortalDraft
 }
 

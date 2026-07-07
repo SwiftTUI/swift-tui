@@ -23,6 +23,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var reconciledInvalidatedNodeCount: Int
   package var selectiveEvaluationDisabledReasons: [String]
   package var presentationPortalRootQueued: Bool?
+  package var presentationPortalRootPredicted: Bool?
   package var presentationPortalEscalated: Bool?
   package var graphCheckpointBaselineNodeCount: Int?
   package var graphCheckpointPreparedNodeCount: Int?
@@ -51,6 +52,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     reconciledInvalidatedNodeCount: Int = 0,
     selectiveEvaluationDisabledReasons: [String] = [],
     presentationPortalRootQueued: Bool? = nil,
+    presentationPortalRootPredicted: Bool? = nil,
     presentationPortalEscalated: Bool? = nil,
     graphCheckpointBaselineNodeCount: Int? = nil,
     graphCheckpointPreparedNodeCount: Int? = nil,
@@ -78,6 +80,7 @@ package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
     self.reconciledInvalidatedNodeCount = reconciledInvalidatedNodeCount
     self.selectiveEvaluationDisabledReasons = selectiveEvaluationDisabledReasons
     self.presentationPortalRootQueued = presentationPortalRootQueued
+    self.presentationPortalRootPredicted = presentationPortalRootPredicted
     self.presentationPortalEscalated = presentationPortalEscalated
     self.graphCheckpointBaselineNodeCount = graphCheckpointBaselineNodeCount
     self.graphCheckpointPreparedNodeCount = graphCheckpointPreparedNodeCount

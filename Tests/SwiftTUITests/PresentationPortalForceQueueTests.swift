@@ -84,6 +84,11 @@ struct PresentationPortalForceQueueTests {
     // pass escalated and composed the sheet into its focus regions. The
     // committed row is therefore root-forced; the escalation flag is pinned
     // directly on the (focus-neutral) toast scenario instead.
+    //
+    // A formed row may queue the portal root only through the PRE-PLAN
+    // reconcile prediction (a queued-dirty emitter for a declared source —
+    // the open sheet's follow-up frames); the unconditional install-queue
+    // stays retired.
     #expect(outcome.frames.contains { $0.contains("SheetBodyMarker") })
     let formedRows = outcome.rows.filter { row in
       row["runtime_dirty_plan_result"] == "formed"
@@ -92,6 +97,7 @@ struct PresentationPortalForceQueueTests {
     #expect(
       formedRows.allSatisfy { row in
         row["runtime_publication_portal_root_queued"] == "0"
+          || row["runtime_publication_portal_root_predicted"] == "1"
       }
     )
   }
@@ -125,16 +131,30 @@ struct PresentationPortalForceQueueTests {
     let finalFrame = try #require(outcome.frames.last)
     #expect(!finalFrame.contains("ToastBodyMarker"))
     // Toasts adopt no focus, so no eager focus-sync rerender replaces the
-    // escalating pass: the committed open and close frames each carry the
-    // escalation, on a formed (never install-queued) selective plan.
+    // reconciling pass. The OPEN reaches the portal via the post-plan
+    // escalation (the source is not yet declared, so the pre-plan prediction
+    // cannot see it): a formed, never install-queued selective plan whose
+    // emitter observation escalates. The CLOSE reaches it via the pre-plan
+    // prediction instead (declared source + queued-dirty emitter), so the
+    // committed close frame roots the plan at the portal directly — one
+    // pass, no narrow-plan-then-escalation double resolve.
     let escalatedRows = outcome.rows.filter { row in
       row["runtime_publication_portal_escalated"] == "1"
     }
-    #expect(escalatedRows.count >= 2)
+    #expect(escalatedRows.count >= 1)
     #expect(
       escalatedRows.allSatisfy { row in
         row["runtime_publication_portal_root_queued"] == "0"
           && row["runtime_dirty_plan_result"] == "formed"
+      }
+    )
+    let predictedRows = outcome.rows.filter { row in
+      row["runtime_publication_portal_root_predicted"] == "1"
+    }
+    #expect(predictedRows.count >= 1)
+    #expect(
+      predictedRows.allSatisfy { row in
+        row["runtime_publication_portal_root_queued"] == "1"
       }
     )
   }

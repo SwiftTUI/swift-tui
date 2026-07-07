@@ -51,7 +51,8 @@ struct PresentationTriggerLeaf: PrimitiveView, ResolvableView {
     // activation change is what escalates the frame to a portal reconcile.
     context.presentationTriggerObserver?.record(
       sourceIdentity: sourceIdentity,
-      isActive: active
+      isActive: active,
+      emitterIdentity: context.identity
     )
     if active {
       node.preferenceValues.merge(
@@ -83,7 +84,7 @@ func resolvePresentationModifier<Base: View>(
   in context: ResolveContext,
   prepareBackground: (inout ResolvedNode) -> Void = { _ in },
   declaration:
-    @escaping @MainActor (_ background: ResolvedNode) ->
+    @escaping @MainActor (_ background: ResolvedNode, _ triggerIdentity: Identity) ->
     PresentationCoordinatorDeclarationPreferenceValue
 ) -> [ResolvedNode] {
   resolvePresentationModifier(
@@ -107,21 +108,23 @@ func resolvePresentationModifier<Base: View>(
   in context: ResolveContext,
   prepareBackground: (inout ResolvedNode) -> Void = { _ in },
   declaration:
-    @escaping @MainActor (_ background: ResolvedNode) ->
+    @escaping @MainActor (_ background: ResolvedNode, _ triggerIdentity: Identity) ->
     PresentationCoordinatorDeclarationPreferenceValue
 ) -> [ResolvedNode] {
   var background = content.resolve(in: context.child(component: .named("base")))
   prepareBackground(&background)
   let resolvedBackground = background
+  let triggerContext = context.child(component: .named("__presentationTrigger"))
+  let triggerIdentity = triggerContext.identity
   let trigger = PresentationTriggerLeaf(
     sourceIdentity: resolvedBackground.identity,
     isActive: isActive
   ) {
-    declaration(resolvedBackground)
+    declaration(resolvedBackground, triggerIdentity)
   }
   let triggerNode = resolveView(
     trigger,
-    in: context.child(component: .named("__presentationTrigger"))
+    in: triggerContext
   )
   return [
     ResolvedNode(
@@ -133,4 +136,20 @@ func resolvePresentationModifier<Base: View>(
       layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading)
     )
   ]
+}
+
+/// A dismiss action's reconcile backstop: invalidates the presentation's
+/// zero-size trigger leaf so its re-resolve re-reads the activation state and
+/// reports the deactivation (escalating the frame to a portal reconcile) even
+/// when the dismiss's binding write is untracked and scheduled no invalidation
+/// of its own. O(1) by construction — the leaf has no descendants. The
+/// previous backstop swept the whole `sourceIdentity` background, re-resolving
+/// it on every dismissal even though nothing under it changed.
+@MainActor
+func requestPresentationDismissReconcile(
+  _ invalidator: (any Invalidating)?,
+  triggerIdentity: Identity
+) {
+  InvalidationSourceTrace.note("presentation-dismiss", [triggerIdentity])
+  invalidator?.requestInvalidation(of: [triggerIdentity])
 }

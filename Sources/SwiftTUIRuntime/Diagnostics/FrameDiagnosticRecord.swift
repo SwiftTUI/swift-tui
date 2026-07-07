@@ -58,6 +58,7 @@ public struct FrameDiagnosticRecord: Sendable {
   package var runtimePublicationReconciledInvalidatedNodeCount: Int = 0
   package var runtimeSelectiveEvaluationDisabledReasons: [String] = []
   package var runtimePublicationPresentationPortalRootQueued: Bool?
+  package var runtimePublicationPresentationPortalRootPredicted: Bool?
   package var runtimePublicationPresentationPortalEscalated: Bool?
   package var runtimePublicationGraphCheckpointBaselineNodeCount: Int?
   package var runtimePublicationGraphCheckpointPreparedNodeCount: Int?
