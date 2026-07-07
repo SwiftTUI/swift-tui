@@ -135,7 +135,6 @@ classifications:
     - SwiftTUIViews.ScrollViewReader
     - SwiftTUIViews.Section
     - SwiftTUIViews.SecureField
-    - SwiftTUIViews.SendableLayout
     - SwiftTUIViews.Slider
     - SwiftTUIViews.Spacer
     - SwiftTUIViews.Spinner

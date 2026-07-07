@@ -9,10 +9,9 @@ import SwiftTUICore
 // placement into a top-left origin.
 //
 // Split out of `CustomLayout.swift`. The four declarations are widened from
-// `private` to file-internal so the layout proxies (`SendableLayoutWorkerProxy`,
-// `LayoutProxyBox`) and `LayoutSubview.place` can reach them across files.
-// `internal` (not `package`) is the minimal level — this machinery is entirely
-// SwiftTUIViews-internal.
+// `private` to file-internal so `LayoutWorkerProxy` and `LayoutSubview.place`
+// can reach them across files. `internal` (not `package`) is the minimal
+// level — this machinery is entirely SwiftTUIViews-internal.
 
 struct LayoutSubviewPlacementRecord {
   var position: LayoutPoint

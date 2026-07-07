@@ -195,9 +195,10 @@ Some content cannot be sized until its container's geometry is known —
 **layout-dependent content realization**: the affected subtree is realized once
 the enclosing geometry resolves, rather than guessed and corrected.
 
-Custom layouts run on the main actor unless they conform to `SendableLayout`
-(value and cache `Sendable`, with stable measurement/placement reuse
-signatures), which lets the renderer evaluate them on the frame-tail worker.
+Custom layouts are `Sendable` values with `Sendable` caches — `Layout` itself
+requires both — so the renderer can evaluate any custom layout on the
+frame-tail worker. Layouts may additionally publish stable
+measurement/placement reuse signatures to opt into cross-frame reuse.
 
 ## The four execution modes
 

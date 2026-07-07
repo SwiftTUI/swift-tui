@@ -438,20 +438,15 @@ private func toolbarLayoutSignature<L: Layout>(
   if let builtinLayout = layout as? any BuiltinLayoutBehaviorProviding {
     return "builtin:\(layoutType):\(String(reflecting: builtinLayout.builtinLayoutBehavior))"
   }
-  if let sendableLayout = layout as? any SendableLayout {
-    return "sendable:\(layoutType):measure:\(sendableLayout.measurementReuseSignature):"
-      + "place:\(sendableLayout.placementReuseSignature)"
-  }
-
   guard
-    let measurementLayout = layout as? any MeasurementLayoutReuseProviding,
-    let placementLayout = layout as? any PlacementLayoutReuseProviding
+    let measurementSignature = layout.measurementReuseSignature,
+    let placementSignature = layout.placementReuseSignature
   else {
     return nil
   }
 
-  return "custom:\(layoutType):measure:\(measurementLayout.measurementLayoutReuseSignature):"
-    + "place:\(placementLayout.placementLayoutReuseSignature)"
+  return "signed:\(layoutType):measure:\(measurementSignature):"
+    + "place:\(placementSignature)"
 }
 
 private func toolbarPlacementSignature(

@@ -14,9 +14,10 @@
 /// is only built on the trap path; the only success-path cost over a bare
 /// `assumeIsolated` is the executor-identity check itself.
 ///
-/// This is the shared, instrumented form of the guard `LayoutProxyBox` pioneered
-/// for the same hazard; prefer it over a bare `MainActor.assumeIsolated` at every
-/// `nonisolated` bridge into `@MainActor`-only state.
+/// This is the shared, instrumented form of the guard the (since-deleted)
+/// `LayoutProxyBox` pioneered for the same hazard; prefer it over a bare
+/// `MainActor.assumeIsolated` at every `nonisolated` bridge into
+/// `@MainActor`-only state.
 @inline(__always)
 package func withCheckedMainActorAccess<T: Sendable>(
   _ accessor: StaticString,

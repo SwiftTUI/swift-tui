@@ -635,8 +635,8 @@ struct AsyncFrameTailRenderingTests {
       })
   }
 
-  @Test("custom layout falls back for layout while raster still suspends")
-  func customLayoutFallbackKeepsLayoutInlineButSuspendsRaster() async throws {
+  @Test("plain custom layout runs layout on the frame-tail worker")
+  func plainCustomLayoutRunsLayoutOnFrameTailWorker() async throws {
     let rootIdentity = testIdentity("AsyncCustomLayoutFallbackRoot")
     let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
@@ -666,19 +666,46 @@ struct AsyncFrameTailRenderingTests {
     let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let mainActorTimings = try #require(artifacts.diagnostics.timing.mainActorTimings)
 
-    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
-    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == rootIdentity)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
     guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
       Issue.record("expected custom layout root")
       return
     }
-    #expect(customLayoutHandle.executionCapability == .mainActorOnly)
-    #expect(!customLayoutHandle.canRunOnWorker)
-    #expect(customLayoutHandle.workerProxy == nil)
-    #expect(workerTimings.layoutEnqueueToStart == .zero)
-    #expect(workerTimings.layoutCompute == .zero)
+    #expect(customLayoutHandle.executionCapability == .worker)
+    #expect(customLayoutHandle.canRunOnWorker)
+    #expect(customLayoutHandle.workerProxy != nil)
+    #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(mainActorTimings.suspended != .zero)
+  }
+
+  @Test("open popover keeps frame-tail layout on the worker")
+  func openPopoverKeepsFrameTailLayoutOnWorker() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      Text("Anchor")
+        .popover(
+          isPresented: .constant(true),
+          arrowEdge: .trailing
+        ) {
+          Text("Details")
+        }
+        .frame(width: 36, height: 8, alignment: .topLeading),
+      context: .init(
+        identity: testIdentity("AsyncPopoverOffloadRoot"),
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 36, height: 8)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains("Details"))
   }
 
   @Test("worker-safe custom layout snapshot runs layout on the frame-tail worker")
@@ -745,8 +772,8 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
   }
 
-  @Test("layout-realized content keeps main-actor-only realized layouts inline")
-  func layoutRealizedContentWithMainActorCustomLayoutStaysInline() async throws {
+  @Test("layout-realized content realizes on the main actor then relayouts on the worker")
+  func layoutRealizedContentWithCustomLayoutRelayoutsOnWorker() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
       GeometryReader { _ in
         AsyncFrameTailCustomLayout {
@@ -762,8 +789,11 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.work.layoutDependentRealizations == 1)
     #expect(artifacts.diagnostics.work.layoutDependentMainActorFallbacks == 1)
-    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
-    #expect(workerTimings.layoutCompute == .zero)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    // Realization itself is main-actor-only, but the realized snapshot's
+    // relayout offloads now that the custom layout is worker-capable —
+    // pre-F11 the plain `Layout` disqualified offload and this stayed zero.
+    #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains("geometry custom"))
   }
@@ -1172,8 +1202,8 @@ struct AsyncFrameTailRenderingTests {
     #expect(raster.contains("lazy row 0"))
   }
 
-  @Test("lazy indexed child with main-actor custom layout still blocks worker layout")
-  func lazyIndexedChildWithMainActorCustomLayoutStillBlocksWorkerLayout() async throws {
+  @Test("lazy indexed child with plain custom layout keeps layout on the worker")
+  func lazyIndexedChildWithPlainCustomLayoutKeepsLayoutOnWorker() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
       ScrollView([.vertical], showsIndicators: true) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -1190,9 +1220,9 @@ struct AsyncFrameTailRenderingTests {
     let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 1)
-    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity != nil)
-    #expect(workerTimings.layoutCompute == .zero)
+    #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
+    #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains("custom lazy"))
   }
@@ -4111,14 +4141,14 @@ private final class AsyncRecursiveCustomLayoutProxy: LayoutPassContextCustomLayo
   }
 }
 
-private struct AsyncFrameTailSendableLayout: SendableLayout {
+private struct AsyncFrameTailSendableLayout: Layout {
   let recorder: AsyncFrameTailSendableLayoutRecorder
 
-  var measurementReuseSignature: String {
+  var measurementReuseSignature: String? {
     "AsyncFrameTailSendableLayout.measure"
   }
 
-  var placementReuseSignature: String {
+  var placementReuseSignature: String? {
     "AsyncFrameTailSendableLayout.place"
   }
 
@@ -4164,14 +4194,14 @@ private struct AsyncFrameTailSendableLayout: SendableLayout {
   }
 }
 
-private struct AsyncFrameTailSendableGuideLayout: SendableLayout {
+private struct AsyncFrameTailSendableGuideLayout: Layout {
   let recorder: AsyncFrameTailSendableLayoutRecorder
 
-  var measurementReuseSignature: String {
+  var measurementReuseSignature: String? {
     "AsyncFrameTailSendableGuideLayout.measure"
   }
 
-  var placementReuseSignature: String {
+  var placementReuseSignature: String? {
     "AsyncFrameTailSendableGuideLayout.place"
   }
 

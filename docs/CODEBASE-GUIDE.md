@@ -195,9 +195,9 @@ the child. `LayoutEngine` (`Sources/SwiftTUICore/Measure/LayoutEngine.swift:1`)
 drives both measure and place — note the directory split (`Measure/` for sizing,
 `Place/` for positioning) is *one* `LayoutEngine` struct with `+`-suffixed extension
 files, **not** two types. The authored `Layout` protocol
-(`Sources/SwiftTUIViews/Layout/CustomLayout.swift:117`) is the public hook; custom
-layouts run on the main actor unless they conform to `SendableLayout`, which lets the
-renderer run them on the frame-tail worker.
+(`Sources/SwiftTUIViews/Layout/CustomLayout.swift:117`) is the public hook; `Layout`
+requires `Sendable` (value and cache), so the renderer can run any custom layout on
+the frame-tail worker.
 
 **The host boundary is a committed contract, never renderer internals.** Below
 `commit`, every host consumes a *committed* frame: a `RasterSurface` plus a
@@ -281,9 +281,9 @@ explains, the seven phase products are the *data model*; the runtime stages
 are the *scheduling model* over the same work. The scheduling boundaries matter for
 concurrency: **`resolve` (head) and `commit` stay on the main actor; the fused tail
 (`measure → place → semantics → draw → raster`) may run off the main actor** for
-throughput. This actor split is why a custom `Layout` must be `SendableLayout` to run
-on the worker (see the map's layout note), and why nothing in the tail may touch
-live `ViewGraph`/`@State` mutable state.
+throughput. This actor split is why `Layout` requires `Sendable` (value and cache) — the
+worker may run any custom layout (see the map's layout note) — and why nothing
+in the tail may touch live `ViewGraph`/`@State` mutable state.
 
 **Where the boundaries are.** The other flows hand off to this one at precise points:
 

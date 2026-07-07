@@ -114,7 +114,14 @@ public struct LayoutSubview {
 /// Convenience alias used by custom layout implementations.
 public typealias LayoutSubviews = [LayoutSubview]
 /// A custom layout algorithm.
-public protocol Layout {
+///
+/// A layout is a `Sendable` value: SwiftTUI may evaluate
+/// ``sizeThatFits(proposal:subviews:cache:)`` and
+/// ``placeSubviews(in:proposal:subviews:cache:)`` on the frame-tail layout
+/// worker, away from the main actor. Store only value-semantic,
+/// concurrency-safe state in a layout; read mutable app state before
+/// constructing the layout and pass the resolved values in.
+public protocol Layout: Sendable {
   /// Scratch state for one measure/place layout pass.
   ///
   /// SwiftTUI shares this cache between ``sizeThatFits(proposal:subviews:cache:)``
@@ -123,8 +130,25 @@ public protocol Layout {
   /// placement, so custom layouts must not rely on it persisting across frames,
   /// proposals, structural changes, or binding-driven invalidations. SwiftTUI
   /// intentionally does not expose a cross-frame cache reuse hook; store durable
-  /// layout state outside `Cache`.
-  associatedtype Cache = Void
+  /// layout state outside `Cache`. The cache must be `Sendable` because layout
+  /// passes can run on the frame-tail worker.
+  associatedtype Cache: Sendable = Void
+
+  /// A stable signature for measurement reuse across frames, or `nil` to opt
+  /// out of cross-frame measurement reuse.
+  ///
+  /// Include every layout value field that can change measurement. Two layout
+  /// instances with the same measurement signature may reuse retained
+  /// measurement work.
+  var measurementReuseSignature: String? { get }
+
+  /// A stable signature for placement reuse across frames, or `nil` to opt
+  /// out of cross-frame placement reuse.
+  ///
+  /// Include every layout value field that can change placement. Two layout
+  /// instances with the same placement signature may reuse retained placement
+  /// work.
+  var placementReuseSignature: String? { get }
 
   /// Creates the pass-local scratch cache for this layout.
   func makeCache(subviews: LayoutSubviews) -> Cache
@@ -153,31 +177,13 @@ public protocol Layout {
   )
 }
 
-/// A custom layout whose value and cache can be evaluated on the frame-tail
-/// worker.
-///
-/// Conforming to this protocol is an opt-in contract: the layout value, its
-/// cache, and any state captured by its callbacks must be safe to use away from
-/// the main actor. Layouts that conform to `Layout` but not `SendableLayout`
-/// remain correct and continue to run through the main-actor custom-layout
-/// bridge.
-public protocol SendableLayout: Layout, Sendable where Cache: Sendable {
-  /// A stable signature for measurement reuse across frames.
-  ///
-  /// Include every layout value field that can change measurement. Two layout
-  /// instances with the same measurement signature may reuse retained
-  /// measurement work.
-  var measurementReuseSignature: String { get }
-
-  /// A stable signature for placement reuse across frames.
-  ///
-  /// Include every layout value field that can change placement. Two layout
-  /// instances with the same placement signature may reuse retained placement
-  /// work.
-  var placementReuseSignature: String { get }
-}
-
 extension Layout {
+  /// Layouts opt out of cross-frame measurement reuse by default.
+  public var measurementReuseSignature: String? { nil }
+
+  /// Layouts opt out of cross-frame placement reuse by default.
+  public var placementReuseSignature: String? { nil }
+
   public func updateCache(
     _ cache: inout Cache,
     subviews: LayoutSubviews
@@ -185,19 +191,6 @@ extension Layout {
     cache = makeCache(subviews: subviews)
   }
 
-  @MainActor
-  public func callAsFunction<Content: View>(
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    return LayoutContainer(
-      layout: AnyLayout(self),
-      authoringScope: currentAuthoringContext(),
-      content: content()
-    )
-  }
-}
-
-extension SendableLayout {
   @MainActor
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
@@ -225,25 +218,14 @@ package protocol StackMinimumLayoutProviding {
   ) -> Int?
 }
 
-// `AnyLayoutBox` and the type-erasure engine live in
-// `CustomLayoutErasure.swift`.
-
-package protocol MeasurementLayoutReuseProviding {
-  var measurementLayoutReuseSignature: String { get }
-}
-
-package protocol PlacementLayoutReuseProviding {
-  var placementLayoutReuseSignature: String { get }
-}
-
-// `ConcreteAnyLayoutBox` and `SendableLayoutWorkerProxy` live in
+// `AnyLayoutBox`, `ConcreteAnyLayoutBox`, and `LayoutWorkerProxy` live in
 // `CustomLayoutErasure.swift`.
 
 /// A type-erased custom layout.
 public struct AnyLayout: Layout {
   /// The type-erased cache storage used by `AnyLayout`.
-  public struct Cache {
-    fileprivate var storage: Any
+  public struct Cache: Sendable {
+    fileprivate var storage: any Sendable
   }
 
   private let box: any AnyLayoutBox
@@ -261,57 +243,12 @@ public struct AnyLayout: Layout {
     let box = ConcreteAnyLayoutBox(layout: layout)
     self.box = box
     if box.builtinLayoutBehavior == nil {
-      let proxyBox = LayoutProxyBox(box: box)
+      let workerProxy = LayoutWorkerProxy(layout: layout)
       customLayoutHandle = CustomLayoutHandle(
-        proxyBox,
-        measurementReuseSignature: box.measurementReuseSignature,
-        placementReuseSignature: box.placementReuseSignature,
-        placementHandler: { engine, node, measured, bounds, passContext in
-          proxyBox.placeSubviews(
-            engine: engine,
-            node: node,
-            measured: measured,
-            in: bounds,
-            passContext: passContext
-          )
-        },
-        stackMinimumMainSizeHandler: { engine, node, idealMeasurement, axis, passContext in
-          proxyBox.stackMinimumMainSize(
-            engine: engine,
-            node: node,
-            idealMeasurement: idealMeasurement,
-            axis: axis,
-            passContext: passContext
-          )
-        }
-      )
-    } else {
-      customLayoutHandle = nil
-    }
-  }
-
-  /// Erases a worker-safe layout value.
-  @MainActor
-  public init<L: SendableLayout>(_ layout: L) {
-    let box = ConcreteAnyLayoutBox(layout: layout)
-    self.box = box
-    if box.builtinLayoutBehavior == nil {
-      let proxyBox = LayoutProxyBox(box: box)
-      let workerProxy = SendableLayoutWorkerProxy(layout: layout)
-      customLayoutHandle = CustomLayoutHandle(
-        proxyBox,
+        workerProxy,
         measurementReuseSignature: layout.measurementReuseSignature,
         placementReuseSignature: layout.placementReuseSignature,
         workerProxy: workerProxy,
-        placementHandler: { engine, node, measured, bounds, passContext in
-          proxyBox.placeSubviews(
-            engine: engine,
-            node: node,
-            measured: measured,
-            in: bounds,
-            passContext: passContext
-          )
-        },
         stackMinimumMainSizeHandler: { engine, node, idealMeasurement, axis, passContext in
           workerProxy.stackMinimumMainSize(
             engine: engine,
@@ -325,6 +262,16 @@ public struct AnyLayout: Layout {
     } else {
       customLayoutHandle = nil
     }
+  }
+
+  /// Forwards the erased layout's measurement reuse signature.
+  public var measurementReuseSignature: String? {
+    box.measurementReuseSignature
+  }
+
+  /// Forwards the erased layout's placement reuse signature.
+  public var placementReuseSignature: String? {
+    box.placementReuseSignature
   }
 
   // Widened from `fileprivate` to file-internal so `LayoutContainer` (in
@@ -391,4 +338,4 @@ extension AnyLayout {
   }
 }
 
-// `LayoutContainer` and `LayoutProxyBox` live in `CustomLayoutErasure.swift`.
+// `LayoutContainer` lives in `CustomLayoutErasure.swift`.

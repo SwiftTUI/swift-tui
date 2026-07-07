@@ -14,7 +14,7 @@ import SwiftTUICore
 // memberwise initializer must be visible across the two files. The nested
 // `IndicatorInsets` stays `private` — nothing outside this layout uses it.
 
-struct ScrollViewLayout: SendableLayout, StackMinimumLayoutProviding {
+struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   private struct IndicatorInsets: Equatable {
     var trailing: Int = 0
     var bottom: Int = 0
@@ -258,11 +258,11 @@ struct ScrollViewLayout: SendableLayout, StackMinimumLayoutProviding {
 }
 
 extension ScrollViewLayout {
-  var measurementReuseSignature: String {
+  var measurementReuseSignature: String? {
     "ScrollViewLayout:\(axes.rawValue):\(showsIndicators)"
   }
 
-  var placementReuseSignature: String {
+  var placementReuseSignature: String? {
     "ScrollViewLayout:\(axes.rawValue):\(showsIndicators):\(position.x):\(position.y)"
   }
 }

@@ -114,7 +114,11 @@ the one.
   refactored into the shared release-checked helper
   `withCheckedMainActorAccess` (`SwiftTUICore/Support/CheckedMainActorAccess.swift`)
   covering all five entry points (`247e4dc3`), after the deterministic
-  off-main trap landed in `78417f02`.
+  off-main trap landed in `78417f02`. **Deleted 2026-07-06 (F11):** `Layout`
+  now requires `Sendable` (and `Cache: Sendable`), every custom layout runs
+  through the `Mutex`-backed `LayoutWorkerProxy`, and `LayoutProxyBox` — the
+  unsynchronized `cachedStates` dictionary this seam guarded — no longer
+  exists. The suspect surface is gone by construction, not just checked.
 - *`FrameScheduler`* — redesigned lock-based and `Sendable`
   (`OSAllocatedUnfairLock` around all coalescing state, `Pipeline/Scheduler.swift`),
   landed `39b7d739` with `FrameSchedulerConcurrencyTests`. This closed the

@@ -3426,9 +3426,10 @@ SwiftTUIViews.AnyLayout.Cache
 SwiftTUIViews.AnyLayout.callAsFunction(content:)
 SwiftTUIViews.AnyLayout.init(_:)
 SwiftTUIViews.AnyLayout.init(_:)
-SwiftTUIViews.AnyLayout.init(_:)
 SwiftTUIViews.AnyLayout.makeCache(subviews:)
+SwiftTUIViews.AnyLayout.measurementReuseSignature
 SwiftTUIViews.AnyLayout.placeSubviews(in:proposal:subviews:cache:)
+SwiftTUIViews.AnyLayout.placementReuseSignature
 SwiftTUIViews.AnyLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.AnyLayout.updateCache(_:subviews:)
 SwiftTUIViews.AnyListStyle
@@ -3895,7 +3896,11 @@ SwiftTUIViews.Layout.Cache
 SwiftTUIViews.Layout.callAsFunction(content:)
 SwiftTUIViews.Layout.makeCache(subviews:)
 SwiftTUIViews.Layout.makeCache(subviews:)
+SwiftTUIViews.Layout.measurementReuseSignature
+SwiftTUIViews.Layout.measurementReuseSignature
 SwiftTUIViews.Layout.placeSubviews(in:proposal:subviews:cache:)
+SwiftTUIViews.Layout.placementReuseSignature
+SwiftTUIViews.Layout.placementReuseSignature
 SwiftTUIViews.Layout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.Layout.updateCache(_:subviews:)
 SwiftTUIViews.Layout.updateCache(_:subviews:)
@@ -4208,10 +4213,6 @@ SwiftTUIViews.SegmentedPickerStyle.makeBody(configuration:)
 SwiftTUIViews.SegmentedPickerStyle.selectionDelta(for:)
 SwiftTUIViews.SegmentedPickerStyle.snapshotLabel
 SwiftTUIViews.SemanticMetadataModifier
-SwiftTUIViews.SendableLayout
-SwiftTUIViews.SendableLayout.callAsFunction(content:)
-SwiftTUIViews.SendableLayout.measurementReuseSignature
-SwiftTUIViews.SendableLayout.placementReuseSignature
 SwiftTUIViews.Shape
 SwiftTUIViews.Shape.body
 SwiftTUIViews.Shape.fill()

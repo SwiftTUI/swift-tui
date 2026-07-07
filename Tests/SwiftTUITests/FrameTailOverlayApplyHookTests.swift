@@ -44,9 +44,10 @@ import Testing
 /// `Sources/SwiftTUICore/Support/Boxed.swift:36-43`) actually tears across the
 /// main/worker seam, or whether the corruptor is instead the genuinely
 /// unsynchronized `assumeIsolated` dictionary writes
-/// (`ForEachIndexedChildSource.cache`, `LayoutProxyBox.cachedStates`) — the
-/// second, stronger candidate, which needs a `ForEach`/`AnyLayout`-driven tree
-/// reaching the worker and a different (layout-stage) parking seam.
+/// (`ForEachIndexedChildSource.cache`, and — until F11 deleted it —
+/// `LayoutProxyBox.cachedStates`) — the second, stronger candidate, which
+/// needs a `ForEach`/`AnyLayout`-driven tree reaching the worker and a
+/// different (layout-stage) parking seam.
 @Suite("FrameTailOverlayApplyHook", .serialized)
 @MainActor
 struct FrameTailOverlayApplyHookTests {

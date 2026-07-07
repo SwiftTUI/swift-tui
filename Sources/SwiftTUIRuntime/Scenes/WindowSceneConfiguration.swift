@@ -33,12 +33,12 @@ public import SwiftTUIViews
   }
 }
 
-package struct WindowHostLayout: SendableLayout {
-  package var measurementReuseSignature: String {
+package struct WindowHostLayout: Layout {
+  package var measurementReuseSignature: String? {
     "WindowHostLayout"
   }
 
-  package var placementReuseSignature: String {
+  package var placementReuseSignature: String? {
     "WindowHostLayout"
   }
 
