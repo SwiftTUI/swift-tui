@@ -323,6 +323,7 @@ function encodeBase64(value) {
 // src/WebHostSurfaceTransport.ts
 var recordPrefix = "\x1E";
 var textEncoder = new TextEncoder;
+var SUPPORTED_SURFACE_VERSION = 3;
 
 class WebHostOutputDecoder {
   textDecoder = new TextDecoder;
@@ -392,6 +393,17 @@ class WebHostOutputDecoder {
     }
     try {
       const frame = JSON.parse(line.slice(`${recordPrefix}surface:`.length));
+      if (declaresNewerSurfaceVersion(frame)) {
+        return {
+          type: "runtimeIssue",
+          issue: {
+            severity: "error",
+            code: "surface.unsupportedVersion",
+            message: `SwiftTUI surface version ${frame.version} is newer than the supported ${SUPPORTED_SURFACE_VERSION}`,
+            description: "The app emitted a surface record with version " + `${frame.version}, but this @swifttui/web runtime understands ` + `versions up to ${SUPPORTED_SURFACE_VERSION}. Update @swifttui/web ` + "to render it."
+          }
+        };
+      }
       if (isWebHostSurfaceFrame(frame)) {
         this.lastSurfaceFrame = frame;
         return { type: "surface", frame };
@@ -438,6 +450,13 @@ class WebHostOutputDecoder {
       preferredGridHeight: frame.preferredGridHeight
     };
   }
+}
+function declaresNewerSurfaceVersion(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const version = value.version;
+  return typeof version === "number" && Number.isSafeInteger(version) && version > SUPPORTED_SURFACE_VERSION;
 }
 function isWebHostClipboardRecord(value) {
   return !!value && typeof value === "object" && typeof value.text === "string";
