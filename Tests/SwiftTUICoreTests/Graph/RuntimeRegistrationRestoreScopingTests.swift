@@ -530,6 +530,124 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(unchangedDiagnostics.publication.publicationMode == "unchanged")
   }
 
+  @Test("layout-realized re-install escalates a plan-less commit's publication")
+  func layoutRealizedReinstallEscalatesPlanlessCommitPublication() {
+    let rootIdentity = testIdentity("Root")
+    let boundaryIdentity = testIdentity("Root", "Reader")
+    let contentIdentity = testIdentity("Root", "Reader", "content")
+
+    // Seed: a layout-realized boundary (the GeometryReader shape) whose
+    // realized content holds an action registration.
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let boundaryNode = graph.beginEvaluation(identity: boundaryIdentity, invalidator: nil)
+    let contentNode = graph.beginEvaluation(identity: contentIdentity, invalidator: nil)
+    contentNode.recordActionRegistration(
+      identity: contentIdentity,
+      handler: { true },
+      followUpInvalidationIdentity: nil
+    )
+    let resolvedContent = ResolvedNode(identity: contentIdentity, kind: .view("Content"))
+    graph.finishEvaluation(
+      contentNode,
+      resolved: resolvedContent,
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      boundaryNode,
+      resolved: ResolvedNode(
+        identity: boundaryIdentity,
+        kind: .view("GeometryReader"),
+        children: [resolvedContent]
+      ),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(
+            identity: boundaryIdentity,
+            kind: .view("GeometryReader"),
+            children: [resolvedContent]
+          )
+        ]
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    // Frame 1: full publish; the commit records the registration fingerprint.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    initialDraft.commitRuntimeRegistrations(from: graph)
+
+    // Between commits: layout re-realizes the boundary content (a terminal
+    // resize changes the proposal, so the per-pass realization cache misses).
+    // The realize re-resolves the content — re-recording its registrations —
+    // and installs the realized children on the graph.
+    var refreshedHandlerRan = false
+    let reRealizedContent = graph.beginEvaluation(
+      identity: contentIdentity,
+      invalidator: nil
+    )
+    reRealizedContent.recordActionRegistration(
+      identity: contentIdentity,
+      handler: {
+        refreshedHandlerRan = true
+        return true
+      },
+      followUpInvalidationIdentity: nil
+    )
+    graph.finishEvaluation(
+      reRealizedContent,
+      resolved: resolvedContent,
+      accessedStateSlots: 0
+    )
+    graph.installLayoutRealizedChildren(
+      for: boundaryIdentity,
+      children: [resolvedContent]
+    )
+
+    // Frame 2: nothing re-evaluated — no dirty plan is recorded. The queued
+    // boundary root must escalate the publication from `.unchanged` to a
+    // narrow `.subtrees`, so (a) the re-realized content's registrations
+    // reach the live registry, and (b) the `.unchanged` commit's
+    // byte-stable-fingerprint premise (the F63 DEBUG oracle at
+    // `recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame`)
+    // stays true — pre-fix this commit trapped there (the gallery Life-tab
+    // resize crash).
+    let planlessDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let diagnostics = planlessDraft.commitRuntimeRegistrations(from: graph)
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+
+    // The refreshed handler reached the live registry via the escalated commit.
+    #expect(liveRegistrations.actionRegistry?.dispatch(identity: contentIdentity) == true)
+    #expect(refreshedHandlerRan)
+
+    // A follow-up plan-less commit with no interleaved re-realization stays
+    // `.unchanged` — and must not trap the oracle.
+    let unchangedDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let unchangedDiagnostics = unchangedDraft.commitRuntimeRegistrations(from: graph)
+    #expect(unchangedDiagnostics.publication.publicationMode == "unchanged")
+  }
+
   @Test(".all publication scopes restore to changed registration subtrees")
   func allPublicationScopesRestoreToChangedRegistrationSubtrees() {
     let rootIdentity = testIdentity("Root")

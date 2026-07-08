@@ -726,9 +726,10 @@ package final class ViewGraph {
   }
 
   /// Drains the identities whose registrations were refreshed in place since
-  /// the last commit (`refreshActionRegistration`). The committing frame
-  /// draft merges these into its publication so the refreshed records reach
-  /// the live registry even on frames that formed no dirty plan.
+  /// the last commit (`refreshActionRegistration`,
+  /// `installLayoutRealizedChildren`). The committing frame draft merges
+  /// these into its publication so the refreshed records reach the live
+  /// registry even on frames that formed no dirty plan.
   package func takePendingRuntimeRegistrationRefreshRoots() -> [Identity] {
     guard !pendingRuntimeRegistrationRefreshRoots.isEmpty else {
       return []
@@ -1821,6 +1822,22 @@ package final class ViewGraph {
     for identity: Identity,
     children: [ResolvedNode]
   ) {
+    // A layout-dependent realization (a GeometryReader body) re-resolves its
+    // content during the frame tail's layout pass — outside any dirty plan.
+    // That resolve re-records the content's runtime registrations (bumping
+    // node mutation generations) and this install can move nodes in or out of
+    // the live set. On a frame that formed no dirty plan (a terminal-resize
+    // frame: no state is dirty, but the new proposal re-realizes every
+    // boundary) the publication would stay `.unchanged`, the refreshed
+    // records would never reach the live registry, and the F63 DEBUG
+    // fingerprint oracle would trap (the gallery Life-tab resize crash).
+    // Queue the boundary as a publication root so the committing draft
+    // escalates to a `.subtrees` publication covering the realized content —
+    // the same escalation as `refreshActionRegistration`. Realized content
+    // resolves under the boundary's identity, so a boundary-rooted subtree
+    // covers it. Queued before the node guard: the realize resolve has
+    // already evaluated content nodes even when the boundary itself is gone.
+    pendingRuntimeRegistrationRefreshRoots.insert(identity)
     guard let node = nodeIfExists(for: identity) else {
       return
     }
