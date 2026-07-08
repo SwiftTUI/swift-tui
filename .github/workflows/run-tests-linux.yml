@@ -133,10 +133,17 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
+      - name: Ensure gdb for hang diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gdb >/dev/null 2>&1 || sudo apt-get install -y --no-install-recommends gdb
+
       - name: Run repo gate
         shell: bash
         env:
           STUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
+          STUI_HANG_DIAGNOSTICS: "1"
           STUI_SKIP_PUBLIC_API_BASELINE: "1"
           STUI_SKIP_TERMUIPERF: "1"
         run: |

@@ -301,6 +301,67 @@ kill_process_tree() {
   send_signal "$signal" "$pid"
 }
 
+descendant_pids() {
+  pid=$1
+
+  for child in $(process_children "$pid"); do
+    printf '%s\n' "$child"
+    descendant_pids "$child"
+  done
+}
+
+# Pre-kill hang diagnostics (STUI_HANG_DIAGNOSTICS=1): when the step watchdog
+# fires, capture per-thread kernel wait channels and full thread backtraces of
+# the test-runner processes BEFORE terminating them, so a wedged step leaves
+# evidence of WHAT it was blocked on instead of just "timed out". Linux-only
+# by construction (wchan/gdb); inert unless explicitly enabled.
+dump_hang_diagnostics() {
+  root_pid=$1
+
+  [ "${STUI_HANG_DIAGNOSTICS:-0}" = "1" ] || return 0
+
+  pid_list=$root_pid
+  for pid in $(descendant_pids "$root_pid"); do
+    pid_list="$pid_list,$pid"
+  done
+
+  >&2 echo "HANG-DIAGNOSTICS: capturing state of process tree rooted at $root_pid"
+  >&2 ps -o pid,stat,pcpu,etimes,comm -p "$pid_list" 2>/dev/null || true
+
+  gdb_command=""
+  if command -v gdb >/dev/null 2>&1; then
+    gdb_command="gdb"
+    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+      # ptrace of a non-child needs privilege when yama/ptrace_scope=1.
+      gdb_command="sudo -n gdb"
+    fi
+  fi
+
+  dumped=0
+  for pid in $root_pid $(descendant_pids "$root_pid"); do
+    comm=$(cat "/proc/$pid/comm" 2>/dev/null || echo '?')
+    case "$comm" in
+    *swift* | *xctest* | *Packag*) ;;
+    *) continue ;;
+    esac
+
+    thread_count=$(ls "/proc/$pid/task" 2>/dev/null | wc -l)
+    >&2 echo "HANG-DIAGNOSTICS: pid $pid ($comm) threads=$thread_count"
+    >&2 echo "--- per-thread state/wchan: pid $pid ---"
+    >&2 ps -L -o tid,stat,pcpu,wchan:32,comm -p "$pid" 2>/dev/null || true
+
+    if [ "$dumped" -lt 3 ] && [ -n "$gdb_command" ]; then
+      >&2 echo "--- gdb thread backtraces: pid $pid ($comm) ---"
+      $gdb_command --batch -p "$pid" \
+        -ex "set pagination off" \
+        -ex "set print thread-events off" \
+        -ex "thread apply all bt 24" 2>&1 |
+        sed 's/^/[gdb] /' >&2 || true
+      dumped=$((dumped + 1))
+    fi
+  done
+}
+
 run_logged_command() {
   log_file=$1
   status_file=$2
@@ -343,6 +404,7 @@ run_logged_command() {
         printf '%s\n' "$detail" >"$timeout_file"
         printf '%s\n' 124 >"$status_file"
         >&2 echo "TIMEOUT: command $detail; terminating process tree rooted at pid $command_pid."
+        dump_hang_diagnostics "$command_pid"
         kill_process_tree "$command_pid" TERM
         sleep "$step_timeout_kill_grace_seconds"
         if kill -0 "$command_pid" 2>/dev/null; then
