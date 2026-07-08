@@ -159,15 +159,46 @@ defense-in-depth: snapshot-convert in the one-shot commit path before
 `storeCommittedFrame` (weigh against the full-tree recursion cost on every one-shot
 commit). Full analysis: org-root `docs/reports/2026-05-30-flake-bcd-investigation.md`.
 
-**Status.** Open (`#12`). Fix deferred (user decision, 2026-05-29). Both identified
-static off-main-reach paths closed 2026-05-30; all suspect seams release-checked
-2026-07-02 (see above), so the register's stale "next move is dynamic
-instrumentation" judgment now has teeth: raw-signal crashes falsify the checked-seam
-race class outright. The `beforeOverlayApply` parked-worker forced-repro remains
-designed-but-unlanded (`FrameTailOverlayApplyHookTests.swift` header documents the
-experiment; the stronger corruptor candidate needs a layout-stage parking seam that
-does not exist yet). The release soundness lane's serialized flaky-trio step is the
-standing soak.
+**Status (2026-07-07): DORMANT — watching via the daily soak.** Zero occurrences
+since the seams were release-checked (2026-07-02): recent CI failure logs
+contain no `SIGSEGV`/`SIGBUS` signatures (all recent gate reds were the known
+MainActor-freeze timeout or genuine test failures), and multiple heavy local
+load-testing sessions since have not sighted it. Two of the three historical
+crash sites no longer exist: `SendableLayoutWorkerProxy` and the
+`LayoutProxyBox` corruptor candidate were **deleted outright by F11
+(2026-07-06)** — the strongest suspect surface is gone by construction.
+
+**Soak integrity note (2026-07-07).** The lane's flaky-trio step was
+**inert from 2026-07-03 to 2026-07-07**: `--num-workers` without `--parallel`
+is rejected by SwiftPM, the script died 130 ms in, and the
+`continue-on-error` step reported green anyway — so "the soak has been quiet"
+was vacuous for that window. Fixed (`--parallel --num-workers 1`); the
+serialized flaky-trio soak is genuinely running from 2026-07-08 onward, and
+the dormancy evidence above deliberately does not lean on the inert window.
+Lesson: a signal-only (`continue-on-error`) step needs its own liveness
+check — an instant arg-error failure is indistinguishable from a quiet pass
+at the workflow-status level.
+
+**Forced-repro retired (2026-07-07).** The parked-worker `beforeOverlayApply`
+repro stays unlanded *by decision*, not backlog: its weaker target (the `Boxed`
+COW path) was judged value-semantics-safe and the hook seam is already landed +
+ordering-guarded; its stronger target needed a layout-stage parking seam and
+that target was deleted with F11. A new repro would need a new corruption
+hypothesis, and none exists — the register's own conclusion stands: the pursuit
+is dynamic. To that end the soak's flaky arm now runs under glibc allocator
+guards (`MALLOC_CHECK_=3`, `MALLOC_PERTURB_` — `release_soundness_lane.sh
+--flaky-only`), so heap misuse traps near its source instead of surfacing as
+anonymous torn bytes.
+
+**Tracking.** The historical `SwiftTUI/swift-tui#12` reference predates the
+public repository (no such issue exists there); **this register entry is the
+tracker of record**. Re-open criteria:
+
+- a **`preconditionIsolated` trap naming an accessor** = the old race class,
+  finally located — file against the named seam;
+- a **raw `SIGSEGV`/`SIGBUS`** (or an allocator-guard abort) = non-race heap
+  corruption — the guard's trap site is the lead; escalate locally on macOS
+  with `DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib` on the flaky trio.
 
 ---
 

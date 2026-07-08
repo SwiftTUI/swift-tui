@@ -53,8 +53,21 @@ mode="${1:-}"
 
 case "$mode" in
   --flaky-only)
+    # Flake #1's prescribed dynamic pursuit (docs/KNOWN-TEST-FLAKES.md): all
+    # statically identified corruptor candidates are resolved (release-checked
+    # or deleted outright), so if the corruption ever recurs the lead is heap
+    # misuse, not an isolation race. glibc allocator guards make that trap
+    # near the corruption site instead of surfacing as anonymous torn bytes:
+    # MALLOC_CHECK_=3 aborts on detected heap misuse, MALLOC_PERTURB_ poisons
+    # freed memory. Inert on macOS (glibc-only), active on the Linux soak.
+    MALLOC_CHECK_=3 && export MALLOC_CHECK_
+    MALLOC_PERTURB_=165 && export MALLOC_PERTURB_
+    # `--num-workers` requires `--parallel` (SwiftPM rejects it bare — this
+    # arm was dying on that arg error 130 ms in from 2026-07-03 to
+    # 2026-07-07 while the continue-on-error step reported green; one
+    # parallel worker = the intended serialized run).
     for suite in $FLAKY_SUITES $ISOLATED_ASYNC_SUITES; do
-      release_test --filter "SwiftTUITests.$suite" --num-workers 1
+      release_test --filter "SwiftTUITests.$suite" --parallel --num-workers 1
     done
     ;;
   --race-checks)

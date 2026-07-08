@@ -110,7 +110,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh ./Scripts/release_soundness_lane.sh --flaky-only
+          # continue-on-error masked a 100%-broken lane for days (an arg error
+          # killed the script 130 ms in while the run stayed green) — annotate
+          # loudly so a red here is visible in the run summary either way.
+          if ! sh ./Scripts/release_soundness_lane.sh --flaky-only; then
+            echo "::warning title=Release soundness flaky lane::flaky-trio run failed — crash signal (docs/KNOWN-TEST-FLAKES.md #1) or lane breakage; inspect this step's log"
+            exit 1
+          fi
 
       - name: Actor data-race checks variant
         if: ${{ github.event_name == 'schedule' || inputs.run_race_checks }}
