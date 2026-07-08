@@ -164,7 +164,7 @@ extension DefaultRenderer {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.graphRootIdentity,
         resolved: resolved,
-        placed: placed,
+        placed: placed.viewportVisibilitySummary,
         previewedPlan: preview?.lifecyclePlan
       )
       runtimeRegistrationDiagnostics = commitFrameHeadDraftEffects(draft)
@@ -258,7 +258,7 @@ extension DefaultRenderer {
     let (planned, duration) = measurePhase(clock: draft.clock) {
       let lifecyclePlan = viewGraph.previewLifecycleEventPlan(
         resolved: resolved,
-        placed: tail.placed
+        placed: tail.placed.viewportVisibilitySummary
       )
       let commit = commitPlanner.plan(
         resolved: resolved,

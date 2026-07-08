@@ -77,14 +77,15 @@ deny_types=(
 # value replaces the `PlacedNode` parameter).  Stored as (file, type) pairs so
 # the allowlist is robust to line-number shifts.
 allowlist=(
-  "Sources/SwiftTUICore/Resolve/ViewGraph.swift|PlacedNode"
-  "Sources/SwiftTUICore/Resolve/ViewGraphLifecyclePlanning.swift|PlacedNode"
-  "Sources/SwiftTUICore/Resolve/ViewGraphLifecycleEventCollection.swift|PlacedNode"
+  # EMPTY — Phase 1a inverted the PlacedNode viewport-lifecycle seam
+  # (a ViewportVisibilitySummary value now replaces the PlacedNode parameter).
+  # The graph/render boundary is clean. DO NOT add entries to widen it.
 )
 
 is_allowlisted() {
   file=$1
   type=$2
+  [ "${#allowlist[@]}" -eq 0 ] && return 1
   for entry in "${allowlist[@]}"; do
     if [ "$entry" = "$file|$type" ]; then
       return 0
@@ -136,4 +137,4 @@ These names belong to the render layer (SwiftTUICore) that graph code (SwiftTUIG
 See docs/plans/2026-07-08-001-graph-render-boundary-manifest.md (in the swift-tui-org coordination root) and Phase 1a (the PlacedNode viewport-lifecycle inversion) for how each coupling is removed."
 fi
 
-printf '[check_graph_render_layering] ok — graph layer names no render-engine types beyond the allowlisted PlacedNode lifecycle seam.\n'
+printf '[check_graph_render_layering] ok — graph layer (Resolve/, Runtime/, Pipeline/Scheduler.swift, Animation/) names no render-engine types.\n'

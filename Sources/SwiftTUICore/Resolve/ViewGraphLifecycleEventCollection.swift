@@ -76,7 +76,7 @@ enum ViewGraphLifecycleEventCollector {
 
   static func frameLifecycleEventPlan(
     resolved: ResolvedNode,
-    placed: PlacedNode?,
+    placed: ViewportVisibilitySummary?,
     nodesByNodeID: [ViewNodeID: ViewNode],
     nodeIDByIdentity: [Identity: ViewNodeID],
     frameOrder: [ViewNodeID],

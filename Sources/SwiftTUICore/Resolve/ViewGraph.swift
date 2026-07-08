@@ -2418,7 +2418,7 @@ package final class ViewGraph {
   @discardableResult
   package func applySnapshot(
     _ resolved: ResolvedNode,
-    placed: PlacedNode? = nil,
+    placed: ViewportVisibilitySummary? = nil,
     invalidator: (any Invalidating)? = nil
   ) -> [LifecycleEvent] {
     beginFrame()
@@ -2447,7 +2447,7 @@ package final class ViewGraph {
 
   package func finalizeFrame(
     resolved: ResolvedNode,
-    placed: PlacedNode?
+    placed: ViewportVisibilitySummary?
   ) -> [LifecycleEvent] {
     return finalizeFrame(
       rootIdentity: resolved.identity,
@@ -2458,7 +2458,7 @@ package final class ViewGraph {
 
   package func previewLifecycleEvents(
     resolved: ResolvedNode,
-    placed: PlacedNode?
+    placed: ViewportVisibilitySummary?
   ) -> [LifecycleEvent] {
     previewLifecycleEventPlan(
       resolved: resolved,
@@ -2468,7 +2468,7 @@ package final class ViewGraph {
 
   package func previewLifecycleEventPlan(
     resolved: ResolvedNode,
-    placed: PlacedNode?
+    placed: ViewportVisibilitySummary?
   ) -> ViewGraphFrameLifecycleEventPlan {
     // The finalize-frame teardown barrier emits the departed subtrees'
     // cancel/disappear events (an entity-routed removal deferred out of the
@@ -2490,7 +2490,7 @@ package final class ViewGraph {
   package func finalizeFrame(
     rootIdentity: Identity,
     resolved: ResolvedNode,
-    placed: PlacedNode?,
+    placed: ViewportVisibilitySummary?,
     previewedPlan: ViewGraphFrameLifecycleEventPlan? = nil
   ) -> [LifecycleEvent] {
     root = nodeIfExists(for: rootIdentity)
@@ -3979,7 +3979,7 @@ package final class ViewGraph {
 
   private func frameLifecycleEventPlan(
     resolved: ResolvedNode,
-    placed: PlacedNode?
+    placed: ViewportVisibilitySummary?
   ) -> ViewGraphFrameLifecycleEventPlan {
     ViewGraphLifecycleEventCollector.frameLifecycleEventPlan(
       resolved: resolved,

@@ -286,7 +286,7 @@ struct Phase2CommitPlannerTests {
     let graph = ViewGraph()
     let lifecycleEvents = graph.applySnapshot(
       resolved,
-      placed: placed
+      placed: placed.viewportVisibilitySummary
     )
     let plan = CommitPlanner().plan(
       resolved: resolved,
@@ -329,7 +329,7 @@ struct Phase2CommitPlannerTests {
     _ = graph.applySnapshot(previous)
     let lifecycleEvents = graph.applySnapshot(
       next,
-      placed: placed
+      placed: placed?.viewportVisibilitySummary
     )
     return CommitPlanner().plan(
       resolved: next,

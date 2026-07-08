@@ -8,7 +8,7 @@ private struct ViewGraphViewportLifecycleEventPlan {
 enum ViewGraphLifecyclePlanner {
   static func plan(
     resolved: ResolvedNode,
-    placed: PlacedNode?,
+    placed: ViewportVisibilitySummary?,
     input: ViewGraphLifecyclePlanningInput
   ) -> ViewGraphFrameLifecycleEventPlan {
     let viewportPlan = viewportLifecycleEventPlan(
@@ -54,7 +54,7 @@ enum ViewGraphLifecyclePlanner {
 
   private static func collectViewportLifecycleEvents(
     from resolved: ResolvedNode,
-    placed: PlacedNode?,
+    placed: ViewportVisibilitySummary?,
     viewportLifecycleNodesByKey: inout [ViewportLifecycleKey: LifecycleStateNode],
     seenKeys: inout Set<ViewportLifecycleKey>,
     order: inout [ViewportLifecycleKey],
@@ -98,7 +98,7 @@ enum ViewGraphLifecyclePlanner {
 
   private static func viewportLifecycleEventPlan(
     from resolved: ResolvedNode,
-    placed: PlacedNode?,
+    placed: ViewportVisibilitySummary?,
     previousViewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode],
     previousViewportLifecycleOrder: [ViewportLifecycleKey],
     nodeIDByIdentity: [Identity: ViewNodeID]
@@ -195,7 +195,7 @@ enum ViewGraphLifecyclePlanner {
   }
 
   private static func recordViewportLifecycleVisibility(
-    of node: PlacedNode,
+    of node: ViewportVisibilitySummary,
     viewportLifecycleNodesByKey: inout [ViewportLifecycleKey: LifecycleStateNode],
     seenKeys: inout Set<ViewportLifecycleKey>,
     nodeIDByIdentity: [Identity: ViewNodeID],
