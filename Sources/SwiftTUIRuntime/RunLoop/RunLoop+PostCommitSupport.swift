@@ -183,20 +183,19 @@ extension RunLoop {
     }
     let now = MonotonicInstant.now()
     let nextTick = now.advanced(by: animationController.animationFrameInterval)
-    // This re-arm exists ONLY to stop the run loop from idling with un-drained
-    // animation work (the PhaseAnimator-stall case). When the skip was caused by
-    // a newer render intent — an invalidation / input already queued, or a sooner
-    // deadline already armed — the frame loop's next `consumeReadyFrame` will
-    // drive that work itself, so an extra animation deadline is redundant. During
-    // a transition burst (e.g. switching away from a still-animating tab, whose
-    // teardown keeps invalidating), re-arming on every superseded frame compounds
-    // those redundant deadlines into a cancel-cascade: paced no-op/elided frames
-    // that keep the loop hot and delay the new tab's first real paint (the "slow,
-    // momentarily blank tab switch"). Only re-arm when nothing is already due
-    // within the next tick, so the pump still can't stall but no longer spins.
-    guard !scheduler.hasPendingFrame(at: nextTick) else {
-      return
-    }
+    // CLAMP, don't guard (F79): this used to decline when
+    // `scheduler.hasPendingFrame(at: nextTick)` — but a pending CAUSE
+    // (input/invalidation) is not durable wake insurance: the frame draining
+    // it can itself be skipped, leaving live animation work with no armed
+    // deadline, parked until the next input ("stuck until you scroll"). The
+    // unconditional arm is safe on both axes the old guard worried about:
+    // the scheduler coalesces deadlines as a set, so re-arming is idempotent
+    // and only ever ADDS the tick this live work genuinely needs; and the
+    // transition-burst cancel-cascade the guard was introduced for
+    // (`7dcddf11` — switching away from a still-animating tab kept the pump
+    // hot) was phantom orphaned work, root-fixed by the departed-identity
+    // prune in `AnimationController.processResolvedTree`, which keeps this
+    // method's `requiresContinuedAnimationFrames` entry condition truthful.
     scheduler.requestDeadline(nextTick)
   }
 }
