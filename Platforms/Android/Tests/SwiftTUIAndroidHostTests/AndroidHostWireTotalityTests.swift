@@ -87,6 +87,32 @@ func android_host_focus_semantics_tokens_match_the_shared_wire_map() throws {
   #expect(focusPresentation["hasFocusedRegion"] as? Bool == true)
 }
 
+@Test
+func android_host_totality_fixture_matches_encoder_output() throws {
+  // `Fixtures/Transport/android-frame-totality.json` is the cross-repo
+  // canonical fixture: swift-tui-android's SwiftTUIFrameTest parses a
+  // byte-identical copy from its test resources, and the coordination root's
+  // transport_fixture_sync gate keeps the copies in lockstep. Regenerate with
+  // STUI_REGENERATE_TRANSPORT_FIXTURES=1 (see docs/DEVELOPMENT.md).
+  let encoded = String(decoding: try AndroidHostFrameEncoder.encode(wireTotalityFrame()), as: UTF8.self)
+  let url = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("Fixtures")
+    .appendingPathComponent("Transport")
+    .appendingPathComponent("android-frame-totality.json")
+
+  if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+    try (encoded + "\n").write(to: url, atomically: true, encoding: .utf8)
+  }
+
+  let fixture = try String(contentsOf: url, encoding: .utf8)
+  #expect(encoded == fixture.trimmingCharacters(in: .newlines))
+}
+
 /// Every host-serialized field populated to a distinctive non-default value.
 /// Two cells cover the union of cell keys (a styled hyperlink lead and a
 /// continuation); two image attachments cover the union of image keys (an

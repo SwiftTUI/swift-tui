@@ -105,20 +105,40 @@ Fixture **recording mode must never be enabled in the committed repo state** —
 the gate checks for this, because a repo left in recording mode would make the
 fixture tests pass unconditionally.
 
+## Transport wire fixtures
+
+`Fixtures/Transport/` holds the wire fixtures shared with the sibling host
+repos: `swift-tui-web` mirrors the web-surface and terminal-style files in its
+own `Fixtures/Transport/`, and `swift-tui-android` mirrors
+`android-frame-totality.json` in its test resources. The coordination root's
+`//:transport_fixture_sync` gate byte-compares every mirrored copy, so a
+wire-contract change here goes red in org CI until the sibling copies are
+re-synced. The two `*-totality.*` fixtures are generated — re-run their pin
+tests with `STUI_REGENERATE_TRANSPORT_FIXTURES=1` after an intentional wire
+change, copy the results to the sibling repos, and commit all sides. The
+hand-authored fixtures (`web-surface-basic/styled`, terminal style) are edited
+in place and copied the same way.
+
 ## Public API baseline
 
 `Scripts/generate_public_api_inventory.sh` derives the public-symbol baseline
 from `swift package dump-symbol-graph`, classified through
-`docs/public_api_overrides.yml`, and writes two committed files:
+`docs/public_api_overrides.yml`, and writes three committed files:
 
 - `docs/PUBLIC_API_BASELINE.md` — a grouped, human-readable inventory.
 - `docs/.public-api-baseline.txt` — a flat sorted list, the machine-grep target.
+- `docs/.spi-api-baseline.txt` — the flat SPI-only surface (a second,
+  SPI-inclusive dump minus the public dump). `@_spi(Runners)` is the host
+  contract the swiftui/web/android host repos consume, so changes here must
+  be coordinated with those repos; the baseline makes an SPI break a visible
+  diff instead of a silent downstream failure.
 
 Run the script with no arguments to regenerate them; run it with `--check` (as
 the gate does) to fail when they are stale. Any change that adds or removes a
 public symbol must regenerate these files. New public symbols also need a
-classification entry in `docs/public_api_overrides.yml`. The prose rationale
-for the surface lives in [PUBLIC-API.md](PUBLIC-API.md).
+classification entry in `docs/public_api_overrides.yml` (the SPI baseline is
+classification-free). The prose rationale for the surface lives in
+[PUBLIC-API.md](PUBLIC-API.md).
 
 ## Releases
 

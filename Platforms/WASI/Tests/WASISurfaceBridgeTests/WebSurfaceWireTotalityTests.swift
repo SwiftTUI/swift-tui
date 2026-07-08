@@ -198,7 +198,44 @@ struct WebSurfaceWireTotalityTests {
     #expect(nodes[1]["hidden"] == nil)
   }
 
+  @Test("the canonical shared totality fixture matches the encoder output")
+  func canonicalFixtureMatchesEncoderOutput() throws {
+    // `Fixtures/Transport/web-surface-totality.txt` is the cross-repo
+    // canonical fixture: swift-tui-web's decoder tests parse a byte-identical
+    // copy, and the coordination root's transport_fixture_sync gate keeps the
+    // copies in lockstep — so this pin is what makes an encoder change
+    // propagate loudly to the sibling repo instead of silently drifting.
+    // Regenerate with STUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
+    // sync flow described in docs/DEVELOPMENT.md.
+    let encoded = WebSurfaceFrameEncoder.encode(Self.fullyPopulatedFrame())
+    let url = Self.fixtureURL("web-surface-totality.txt")
+
+    if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+      try encoded
+        .replacingOccurrences(of: "\u{001E}", with: "\\u001E")
+        .write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    let fixture = try String(contentsOf: url, encoding: .utf8)
+      .replacingOccurrences(of: "\\u001E", with: "\u{001E}")
+    #expect(encoded == fixture)
+  }
+
   // MARK: - Fixtures
+
+  private static func fixtureURL(
+    _ filename: String
+  ) -> URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Fixtures")
+      .appendingPathComponent("Transport")
+      .appendingPathComponent(filename)
+  }
 
   /// Every host-serialized field populated to a distinctive non-default value,
   /// including the fields the web wire historically dropped: hyperlinks, a

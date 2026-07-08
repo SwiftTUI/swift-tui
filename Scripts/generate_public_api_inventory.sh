@@ -69,25 +69,32 @@ if [[ -n "${PUBLIC_API_SWIFT_JOBS}" ]]; then
   SWIFT_PACKAGE_ARGS+=(--jobs "${PUBLIC_API_SWIFT_JOBS}")
 fi
 
-if ! swiftly run swift package \
-  "${SWIFT_PACKAGE_ARGS[@]}" \
-  dump-symbol-graph \
-  --minimum-access-level public \
-  >"${DUMP_LOG}" 2>&1; then
-  if grep -Eq "Failed to emit symbol graph for '.*Package(Discovered)?Tests'" "${DUMP_LOG}"; then
-    echo "[generate_public_api_inventory] Ignoring SwiftPM synthetic package-test symbol graph failure." >&2
-    grep -E "Failed to emit symbol graph" "${DUMP_LOG}" >&2 || true
-  else
-    cat "${DUMP_LOG}" >&2
-    exit 1
+run_symbol_graph_dump() {
+  if ! swiftly run swift package \
+    "${SWIFT_PACKAGE_ARGS[@]}" \
+    dump-symbol-graph \
+    --minimum-access-level public \
+    "$@" \
+    >"${DUMP_LOG}" 2>&1; then
+    if grep -Eq "Failed to emit symbol graph for '.*Package(Discovered)?Tests'" "${DUMP_LOG}"; then
+      echo "[generate_public_api_inventory] Ignoring SwiftPM synthetic package-test symbol graph failure." >&2
+      grep -E "Failed to emit symbol graph" "${DUMP_LOG}" >&2 || true
+    else
+      cat "${DUMP_LOG}" >&2
+      exit 1
+    fi
   fi
-fi
+}
 
 # Locate the symbolgraph directory the SwiftPM driver chose (per-arch).
-SYMBOLGRAPH_DIR="$(
+locate_symbolgraph_dir() {
   find "${SYMBOLGRAPH_SCRATCH_DIR}" -type d -name symbolgraph -prune -print 2>/dev/null \
     | head -n 1
-)"
+}
+
+run_symbol_graph_dump
+
+SYMBOLGRAPH_DIR="$(locate_symbolgraph_dir)"
 if [[ -z "${SYMBOLGRAPH_DIR:-}" ]] || [[ ! -d "${SYMBOLGRAPH_DIR}" ]]; then
   echo "[generate_public_api_inventory] Could not locate symbolgraph output directory under ${SYMBOLGRAPH_SCRATCH_DIR}/" >&2
   exit 1
@@ -95,12 +102,31 @@ fi
 
 echo "[generate_public_api_inventory] Symbolgraph dir: ${SYMBOLGRAPH_DIR}" >&2
 
+# Preserve the public dump, then rerun with SPI included (warm build — only
+# the extraction reruns). The SPI-only delta between the two dumps becomes
+# docs/.spi-api-baseline.txt, the tracked @_spi host contract (F58).
+PUBLIC_SYMBOLGRAPH_KEEP="$(mktemp -d -t swift-tui-symbolgraph-public.XXXXXX)"
+trap 'rm -f "${DUMP_LOG}"; rm -rf "${PUBLIC_SYMBOLGRAPH_KEEP}"' EXIT
+cp -R "${SYMBOLGRAPH_DIR}/." "${PUBLIC_SYMBOLGRAPH_KEEP}/"
+
+echo "[generate_public_api_inventory] Running SPI-inclusive dump-symbol-graph..." >&2
+rm -rf "${SYMBOLGRAPH_DIR}"
+run_symbol_graph_dump --include-spi-symbols
+
+SPI_SYMBOLGRAPH_DIR="$(locate_symbolgraph_dir)"
+if [[ -z "${SPI_SYMBOLGRAPH_DIR:-}" ]] || [[ ! -d "${SPI_SYMBOLGRAPH_DIR}" ]]; then
+  echo "[generate_public_api_inventory] Could not locate SPI symbolgraph output directory under ${SYMBOLGRAPH_SCRATCH_DIR}/" >&2
+  exit 1
+fi
+
 # Drive the markdown + flat-list generator.
 GENERATE_ARGS=(
-  --symbolgraph-dir "${SYMBOLGRAPH_DIR}"
+  --symbolgraph-dir "${PUBLIC_SYMBOLGRAPH_KEEP}"
   --overrides "docs/public_api_overrides.yml"
   --baseline-md "docs/PUBLIC_API_BASELINE.md"
   --baseline-flat "docs/.public-api-baseline.txt"
+  --spi-symbolgraph-dir "${SPI_SYMBOLGRAPH_DIR}"
+  --baseline-spi "docs/.spi-api-baseline.txt"
 )
 if [[ "${CHECK_ONLY}" -eq 1 ]]; then
   GENERATE_ARGS+=(--check)

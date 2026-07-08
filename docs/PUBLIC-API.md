@@ -5,8 +5,12 @@ app-facing API, what is package-only, what was removed, and the policies that
 keep new API consistent with the rest.
 
 A machine-generated enumeration of every public symbol lives in
-`PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). Both
-are generated and checked by `Scripts/generate_public_api_inventory.sh` — see
+`PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
+`@_spi` surface — most importantly `@_spi(Runners)`, the host contract the
+swiftui/web/android host repos consume — is tracked separately in
+`.spi-api-baseline.txt`, so an SPI break is a reviewable diff here instead of
+a silent downstream failure. All are generated and checked by
+`Scripts/generate_public_api_inventory.sh` — see
 [DEVELOPMENT.md](DEVELOPMENT.md#public-api-baseline). Those files answer "is
 symbol X public?"; this document answers "should I use X, and why is it shaped
 this way?".

@@ -35,6 +35,10 @@ interface Args {
   overrides: string;
   baselineMd: string;
   baselineFlat: string;
+  /** SPI-inclusive symbol graph dir; enables the SPI baseline (F58). */
+  spiSymbolgraphDir?: string;
+  /** Output path for the flat SPI-only baseline; paired with the above. */
+  baselineSpi?: string;
   check: boolean;
   allowMissingModules: string[];
 }
@@ -51,11 +55,20 @@ function parseArgs(argv: readonly string[]): Args {
     }
     return v;
   };
+  const spiSymbolgraphDir = get("--spi-symbolgraph-dir");
+  const baselineSpi = get("--baseline-spi");
+  if ((spiSymbolgraphDir === undefined) !== (baselineSpi === undefined)) {
+    throw new Error(
+      "--spi-symbolgraph-dir and --baseline-spi must be passed together",
+    );
+  }
   return {
     symbolgraphDir: required("--symbolgraph-dir"),
     overrides: required("--overrides"),
     baselineMd: required("--baseline-md"),
     baselineFlat: required("--baseline-flat"),
+    spiSymbolgraphDir,
+    baselineSpi,
     check: argv.includes("--check"),
     allowMissingModules: values(argv, "--allow-missing-module"),
   };
@@ -521,6 +534,51 @@ function renderFlatBaseline(reports: ReadonlyArray<ModuleReport>): string {
 }
 
 // ---------------------------------------------------------------------------
+// SPI baseline (F58)
+//
+// The public baseline above intentionally excludes SPI. The SPI baseline is a
+// second, classification-free flat ratchet for the `@_spi` host contract
+// (`@_spi(Runners)` is what the swiftui/web/android host repos consume):
+// SPI-only symbols = (SPI-inclusive dump) − (public dump), both collected the
+// same raw way so the subtraction is exact and the public pipeline stays
+// byte-identical.
+
+/**
+ * Every non-synthesized public/open symbol under `symbolgraphDir` for the
+ * configured modules, as `Module.path.components` lines. Raw — no
+ * classification, no external-extension shaping — so two dumps subtract
+ * cleanly. Returns the modules with no main symbol graph alongside the set.
+ */
+async function rawFlatSymbolSet(
+  symbolgraphDir: string,
+): Promise<{ lines: Set<string>; missingModules: ModuleName[] }> {
+  const lines = new Set<string>();
+  const missingModules: ModuleName[] = [];
+  for (const module of ALL_MODULES) {
+    const symbols = await loadModuleSymbols(symbolgraphDir, module);
+    if (!symbols) {
+      missingModules.push(module);
+      continue;
+    }
+    for (const sym of [...symbols.main, ...symbols.external]) {
+      if (isSynthesizedSymbol(sym)) continue;
+      if (sym.accessLevel !== "public" && sym.accessLevel !== "open") continue;
+      lines.add(`${module}.${sym.pathComponents.join(".")}`);
+    }
+  }
+  return { lines, missingModules };
+}
+
+function renderSpiFlatBaseline(
+  spiLines: ReadonlySet<string>,
+  publicLines: ReadonlySet<string>,
+): string {
+  const spiOnly = [...spiLines].filter((line) => !publicLines.has(line));
+  spiOnly.sort();
+  return spiOnly.join("\n") + "\n";
+}
+
+// ---------------------------------------------------------------------------
 // Drift detection
 
 interface DriftReport {
@@ -690,8 +748,35 @@ async function main(): Promise<void> {
     },
   );
 
+  let renderedSpiFlat: string | undefined;
+  let spiBaselineStale = false;
+  let spiPartial = false;
+  if (args.spiSymbolgraphDir && args.baselineSpi) {
+    const spiSet = await rawFlatSymbolSet(args.spiSymbolgraphDir);
+    const publicSet = await rawFlatSymbolSet(args.symbolgraphDir);
+    spiPartial =
+      spiSet.missingModules.length > 0 || publicSet.missingModules.length > 0;
+    renderedSpiFlat = renderSpiFlatBaseline(spiSet.lines, publicSet.lines);
+    if (!spiPartial) {
+      const existingSpi = await readFileIfExists(args.baselineSpi);
+      spiBaselineStale = existingSpi !== renderedSpiFlat;
+    } else if (args.check) {
+      console.error(
+        "[generate_public_api_inventory] Skipping exact SPI baseline comparison; " +
+          "it requires a symbol graph for every public module.",
+      );
+    }
+  }
+
   if (args.check) {
     const failures: string[] = [];
+    if (spiBaselineStale) {
+      failures.push(
+        "SPI API baseline is stale (the @_spi host contract changed). " +
+          "Run Scripts/generate_public_api_inventory.sh to regenerate, and " +
+          "coordinate the change with the swiftui/web/android host repos.",
+      );
+    }
     if (drift.baselineStale) {
       const message = drift.partialBaseline
         ? "Public API baseline is stale for modules emitted on this platform. " +
@@ -763,6 +848,16 @@ async function main(): Promise<void> {
   console.log(
     `[generate_public_api_inventory] Wrote ${args.baselineMd} and ${args.baselineFlat}.`,
   );
+  if (renderedSpiFlat !== undefined && args.baselineSpi) {
+    if (spiPartial) {
+      console.error(
+        "[generate_public_api_inventory] Refusing to regenerate a partial SPI baseline.",
+      );
+      process.exit(1);
+    }
+    await writeFileEnsuringDir(args.baselineSpi, renderedSpiFlat);
+    console.log(`[generate_public_api_inventory] Wrote ${args.baselineSpi}.`);
+  }
   if (drift.pendingReview.length > 0) {
     console.log(
       `[generate_public_api_inventory] NOTE: ${drift.pendingReview.length} top-level symbol(s) classified as "pending-review". See ${args.baselineMd}.`,
