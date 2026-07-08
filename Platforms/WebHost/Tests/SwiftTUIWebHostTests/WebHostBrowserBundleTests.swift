@@ -37,4 +37,22 @@ struct WebHostBrowserBundleTests {
 
     #expect(html.contains("?token=test-token"))
   }
+
+  @Test("browser bundle records the swift-tui-web revision it was built from")
+  func browserBundleRecordsBuildProvenance() throws {
+    // Scripts/update_webhost_bundle.sh writes this stamp; the coordination
+    // root's webhost_bundle_provenance gate compares it against the pinned
+    // swift-tui-web submodule to catch stale vendored bundles (F56).
+    let provenance = try WebHostBrowserBundle.resource(for: "/bundle-provenance.json")
+    let decoded = try JSONSerialization.jsonObject(with: provenance.data)
+    let record = try #require(decoded as? [String: Any])
+
+    let revision = try #require(record["webRevision"] as? String)
+    #expect(revision.count == 40)
+    #expect(revision.allSatisfy { $0.isHexDigit })
+    let describe = try #require(record["webDescribe"] as? String)
+    #expect(!describe.isEmpty)
+    let builtAt = try #require(record["builtAt"] as? String)
+    #expect(!builtAt.isEmpty)
+  }
 }

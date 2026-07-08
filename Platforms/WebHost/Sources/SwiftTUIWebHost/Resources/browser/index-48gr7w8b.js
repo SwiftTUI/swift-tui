@@ -327,6 +327,7 @@ var textEncoder = new TextEncoder;
 class WebHostOutputDecoder {
   textDecoder = new TextDecoder;
   bufferedText = "";
+  lastSurfaceFrame;
   feed(chunk) {
     this.bufferedText += this.textDecoder.decode(chunk, { stream: true });
     const records = [];
@@ -375,6 +376,16 @@ class WebHostOutputDecoder {
       return { type: "text", text: `${line}
 ` };
     }
+    if (line.startsWith(`${recordPrefix}frameDiagnostic:`)) {
+      try {
+        const record = JSON.parse(line.slice(`${recordPrefix}frameDiagnostic:`.length));
+        if (isWebHostFrameDiagnosticRecord(record)) {
+          return { type: "frameDiagnostic", diagnostic: record };
+        }
+      } catch {}
+      return { type: "text", text: `${line}
+` };
+    }
     if (!line.startsWith(`${recordPrefix}surface:`)) {
       return { type: "text", text: `${line}
 ` };
@@ -382,11 +393,50 @@ class WebHostOutputDecoder {
     try {
       const frame = JSON.parse(line.slice(`${recordPrefix}surface:`.length));
       if (isWebHostSurfaceFrame(frame)) {
+        this.lastSurfaceFrame = frame;
         return { type: "surface", frame };
+      }
+      if (isWebHostSurfaceDeltaFrame(frame)) {
+        const materialized = this.materializeDeltaFrame(frame);
+        if (materialized) {
+          this.lastSurfaceFrame = materialized;
+          return { type: "surface", frame: materialized };
+        }
       }
     } catch {}
     return { type: "text", text: `${line}
 ` };
+  }
+  materializeDeltaFrame(frame) {
+    const baseline = this.lastSurfaceFrame;
+    if (!baseline || baseline.width !== frame.width || baseline.height !== frame.height) {
+      return;
+    }
+    const rows = baseline.rows.slice();
+    for (const [row, cells] of frame.deltaRows) {
+      if (!Number.isSafeInteger(row) || row < 0 || row >= frame.height) {
+        return;
+      }
+      rows[row] = cells;
+    }
+    return {
+      version: baseline.version,
+      sequence: frame.sequence,
+      width: frame.width,
+      height: frame.height,
+      styles: frame.styles,
+      rows,
+      images: frame.images,
+      damage: frame.damage,
+      accessibilityTree: frame.accessibilityTree,
+      accessibilityAnnouncements: frame.accessibilityAnnouncements,
+      scrollRegions: frame.scrollRegions,
+      links: frame.links,
+      linkTargets: frame.linkTargets,
+      focusPresentation: frame.focusPresentation,
+      preferredGridWidth: frame.preferredGridWidth,
+      preferredGridHeight: frame.preferredGridHeight
+    };
   }
 }
 function isWebHostClipboardRecord(value) {
@@ -398,6 +448,13 @@ function isWebHostRuntimeIssue(value) {
   }
   const record = value;
   return (record.severity === "warning" || record.severity === "error") && typeof record.code === "string" && typeof record.message === "string" && typeof record.description === "string" && (record.identity === undefined || typeof record.identity === "string") && (record.source === undefined || typeof record.source === "string");
+}
+function isWebHostFrameDiagnosticRecord(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value;
+  return record.format === "swift-tui-frame-diagnostics-v1" && Array.isArray(record.header) && record.header.every((field) => typeof field === "string") && Array.isArray(record.fields) && record.fields.every((field) => typeof field === "string");
 }
 function encodeResizeControlMessage(columns, rows, cellWidth, cellHeight) {
   const normalizedColumns = Math.max(1, Math.round(columns));
@@ -448,7 +505,49 @@ function isWebHostSurfaceFrame(value) {
     return false;
   }
   const frame = value;
-  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.rows) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements));
+  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+}
+function isWebHostSurfaceDeltaFrame(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const frame = value;
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+}
+function hasValidAdditiveFrameFields(frame) {
+  return (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+}
+function isWebHostSurfaceLinks(value) {
+  return Array.isArray(value) && value.every(isWebHostSurfaceLinkRow);
+}
+function isWebHostSurfaceLinkRow(value) {
+  return Array.isArray(value) && value.length === 2 && Number.isSafeInteger(value[0]) && value[0] >= 0 && Array.isArray(value[1]) && value[1].every(isWebHostSurfaceLinkRun);
+}
+function isWebHostSurfaceLinkRun(value) {
+  if (!Array.isArray(value) || value.length !== 3) {
+    return false;
+  }
+  const [x, span, targetIndex] = value;
+  return Number.isSafeInteger(x) && x >= 0 && Number.isSafeInteger(span) && span >= 1 && Number.isSafeInteger(targetIndex) && targetIndex >= 0;
+}
+function isWebHostSurfaceLinkTargets(value) {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+function isWebHostFocusPresentation(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const presentation = value;
+  return (presentation.focusedIdentity === undefined || typeof presentation.focusedIdentity === "string") && (presentation.semantics === "none" || presentation.semantics === "automatic" || presentation.semantics === "activate" || presentation.semantics === "edit") && typeof presentation.prefersTextInput === "boolean" && typeof presentation.hasFocusedRegion === "boolean";
+}
+function isWebHostSurfaceDeltaRow(value) {
+  return Array.isArray(value) && value.length === 2 && Number.isSafeInteger(value[0]) && value[0] >= 0 && isWebHostSurfaceRow(value[1]);
+}
+function isWebHostSurfaceRow(value) {
+  return Array.isArray(value) && value.every(isWebHostSurfaceCell);
+}
+function isWebHostSurfaceCell(value) {
+  return Array.isArray(value) && value.length === 4 && Number.isSafeInteger(value[0]) && value[0] >= 0 && typeof value[1] === "string" && Number.isSafeInteger(value[2]) && value[2] >= 1 && Number.isSafeInteger(value[3]) && value[3] >= 0;
 }
 function isWebHostAccessibilityNodes(value) {
   return Array.isArray(value) && value.every(isWebHostAccessibilityNode);
@@ -458,7 +557,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.liveRegion === undefined || node.liveRegion === "off" || node.liveRegion === "polite" || node.liveRegion === "assertive") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean");
+  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || node.liveRegion === "off" || node.liveRegion === "polite" || node.liveRegion === "assertive") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean");
 }
 function isWebHostAccessibilityPoint(value) {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => typeof entry === "number");
@@ -499,6 +598,16 @@ function isWebHostSurfaceDamageRange(value) {
 function isWebHostSurfaceImageFormat(value) {
   return value === "png" || value === "jpeg" || value === "gif";
 }
+function isWebHostScrollRegions(value) {
+  return Array.isArray(value) && value.every(isWebHostScrollRegion);
+}
+function isWebHostScrollRegion(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const region = value;
+  return typeof region.id === "string" && isWebHostSurfaceRect(region.rect) && isWebHostSurfaceSize(region.offset) && isWebHostSurfaceSize(region.content);
+}
 function isWebHostSurfaceRect(value) {
   return Array.isArray(value) && value.length === 4 && value.every((entry) => typeof entry === "number");
 }
@@ -523,6 +632,7 @@ class BrowserWASIBridge {
     this.environment = {
       TUIGUI_MODE: "browser",
       TUIGUI_TRANSPORT: "surface",
+      TUIGUI_SURFACE_DELTA: "1",
       TUIGUI_SCENE: options.sceneId,
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),
@@ -548,6 +658,12 @@ class BrowserWASIBridge {
             break;
           case "clipboard":
             sink.writeClipboard?.(record.text);
+            break;
+          case "runtimeIssue":
+            sink.notifyRuntimeIssue?.(record.issue);
+            break;
+          case "frameDiagnostic":
+            sink.recordFrameDiagnostic?.(record.diagnostic);
             break;
           case "text":
             sink.writeOutput?.(record.text);
@@ -695,6 +811,9 @@ class WebSocketSceneBridge {
         break;
       case "runtimeIssue":
         sink.notifyRuntimeIssue?.(record.issue);
+        break;
+      case "frameDiagnostic":
+        sink.recordFrameDiagnostic?.(record.diagnostic);
         break;
       case "text":
         sink.writeOutput?.(record.text);
@@ -1367,6 +1486,497 @@ function drawBraille(context, codePoint, rect) {
   return true;
 }
 
+// src/CanvasSurfacePainter.ts
+class CanvasSurfacePainter {
+  imageCache = new Map;
+  canvas;
+  requestRedraw = () => {};
+  attach(canvas, requestRedraw) {
+    this.canvas = canvas;
+    this.requestRedraw = requestRedraw;
+  }
+  paint(metrics, frame, damage) {
+    const canvas = this.canvas;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) {
+      return;
+    }
+    const dirtyRegion = frame ? this.dirtyRegionForDamage(damage, frame, metrics) : undefined;
+    if (dirtyRegion?.rects.length === 0) {
+      return;
+    }
+    const scale = globalThis.window?.devicePixelRatio || 1;
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.textBaseline = "alphabetic";
+    context.fillStyle = webTUITerminalBackgroundColor(metrics.style);
+    if (dirtyRegion) {
+      for (const rect of dirtyRegion.rects) {
+        context.clearRect(rect.x, rect.y, rect.width, rect.height);
+        context.fillRect(rect.x, rect.y, rect.width, rect.height);
+      }
+    } else {
+      context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+      context.fillRect(0, 0, metrics.columns * metrics.cellWidth, metrics.rows * metrics.cellHeight);
+    }
+    if (!frame) {
+      return;
+    }
+    this.drawRows(context, frame, metrics, dirtyRegion);
+    this.drawImages(context, frame.images ?? [], metrics, dirtyRegion);
+  }
+  drawRows(context, frame, metrics, dirtyRegion) {
+    if (dirtyRegion) {
+      for (const [y, ranges] of dirtyRegion.rows) {
+        const row = frame.rows[y] ?? [];
+        this.drawRow(context, frame, metrics, row, y, ranges);
+      }
+      return;
+    }
+    for (let y = 0;y < frame.rows.length; y += 1) {
+      const row = frame.rows[y] ?? [];
+      this.drawRow(context, frame, metrics, row, y);
+    }
+  }
+  drawRow(context, frame, metrics, row, y, ranges) {
+    for (const cell of row) {
+      const [x, text, span, styleIndex] = cell;
+      if (ranges !== undefined && !cellIntersectsRanges(x, span, ranges)) {
+        continue;
+      }
+      const style = frame.styles[styleIndex] ?? undefined;
+      this.drawCell(context, metrics, x, y, text, span, style);
+    }
+  }
+  drawImages(context, images, metrics, dirtyRegion) {
+    for (const image of images) {
+      this.drawImage(context, image, metrics, dirtyRegion);
+    }
+  }
+  drawImage(context, image, metrics, dirtyRegion) {
+    const decodedImage = this.cachedImage(image);
+    if (!decodedImage) {
+      return;
+    }
+    const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
+    const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
+    if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      return;
+    }
+    if (dirtyRegion && !dirtyRegionIntersectsCellRect(dirtyRegion, clipX, clipY, clipWidth, clipHeight)) {
+      return;
+    }
+    context.save();
+    context.beginPath();
+    context.rect(clipX * metrics.cellWidth, clipY * metrics.cellHeight, clipWidth * metrics.cellWidth, clipHeight * metrics.cellHeight);
+    context.clip();
+    context.drawImage(decodedImage, boundsX * metrics.cellWidth, boundsY * metrics.cellHeight, boundsWidth * metrics.cellWidth, boundsHeight * metrics.cellHeight);
+    context.restore();
+  }
+  cachedImage(image) {
+    const cached = this.imageCache.get(image.id);
+    if (cached?.image) {
+      return cached.image;
+    }
+    if (!cached?.promise && image.dataBase64) {
+      const promise = decodeImage(image.dataBase64, image.format);
+      this.imageCache.set(image.id, { promise });
+      promise.then((decodedImage) => {
+        const latest = this.imageCache.get(image.id);
+        if (latest?.promise !== promise) {
+          return;
+        }
+        this.imageCache.set(image.id, { image: decodedImage });
+        this.requestRedraw();
+      }).catch(() => {
+        this.imageCache.delete(image.id);
+      });
+    }
+    return;
+  }
+  drawCell(context, metrics, x, y, text, span, style) {
+    const rectX = x * metrics.cellWidth;
+    const rectY = y * metrics.cellHeight;
+    const width = Math.max(1, span) * metrics.cellWidth;
+    const background = resolvedBackground(style, metrics.style);
+    const foreground = resolvedForeground(style, metrics.style);
+    const opacity = style?.opacity ?? 1;
+    if (background) {
+      context.globalAlpha = opacity;
+      context.fillStyle = background;
+      context.fillRect(rectX, rectY, width, metrics.cellHeight);
+    }
+    if (text !== " ") {
+      context.globalAlpha = opacity;
+      context.fillStyle = foreground;
+      context.strokeStyle = foreground;
+      if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
+        x: rectX,
+        y: rectY,
+        width,
+        height: metrics.cellHeight
+      })) {
+        context.font = fontForStyle(metrics.style, style);
+        context.fillText(text, rectX, rectY + Math.floor((metrics.cellHeight + metrics.style.fontSize) / 2) - 2);
+      }
+    }
+    this.drawTextLine(context, metrics, rectX, rectY, width, style?.underline, "underline", foreground);
+    this.drawTextLine(context, metrics, rectX, rectY, width, style?.strikethrough, "strike", foreground);
+    context.globalAlpha = 1;
+  }
+  dirtyRegionForDamage(damage, frame, metrics) {
+    if (!damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay) {
+      return;
+    }
+    const rects = [];
+    const rows = new Map;
+    for (const [row, ranges] of damage.textRows) {
+      if (row < 0 || row >= frame.height) {
+        continue;
+      }
+      if (ranges.length === 0) {
+        rects.push(cellRect(metrics, 0, row, frame.width));
+        rows.set(row, "full");
+        continue;
+      }
+      const rowRanges = rows.get(row) === "full" ? [] : [...rows.get(row) ?? []];
+      for (const [start, end] of ranges) {
+        const lowerBound = Math.max(0, Math.min(frame.width, Math.floor(start)));
+        const upperBound = Math.max(lowerBound, Math.min(frame.width, Math.ceil(end)));
+        if (lowerBound >= upperBound) {
+          continue;
+        }
+        rects.push(cellRect(metrics, lowerBound, row, upperBound - lowerBound));
+        rowRanges.push({ start: lowerBound, end: upperBound });
+      }
+      if (rows.get(row) !== "full" && rowRanges.length > 0) {
+        rows.set(row, normalizeCellRanges(rowRanges));
+      }
+    }
+    return { rects, rows };
+  }
+  drawTextLine(context, metrics, x, y, width, line, placement, fallbackColor) {
+    if (!line) {
+      return;
+    }
+    context.strokeStyle = line.color ?? fallbackColor;
+    context.lineWidth = line.pattern === "double" ? 2 : 1;
+    if (line.pattern === "dot") {
+      context.setLineDash([1, 3]);
+    } else if (line.pattern === "dash") {
+      context.setLineDash([4, 3]);
+    } else {
+      context.setLineDash([]);
+    }
+    const lineY = placement === "underline" ? y + metrics.cellHeight - 2 : y + Math.floor(metrics.cellHeight / 2);
+    context.beginPath();
+    context.moveTo(x, lineY);
+    context.lineTo(x + width, lineY);
+    context.stroke();
+    context.setLineDash([]);
+  }
+}
+function fontForStyle(terminalStyle, style) {
+  const emphasis = style?.em ?? 0;
+  const italic = (emphasis & 2) !== 0 ? "italic " : "";
+  const weight = (emphasis & 1) !== 0 ? "700 " : "";
+  return `${italic}${weight}${terminalStyle.fontSize}px ${terminalStyle.fontFamily}`;
+}
+function cellRect(metrics, x, y, span) {
+  return {
+    x: x * metrics.cellWidth,
+    y: y * metrics.cellHeight,
+    width: Math.max(1, span) * metrics.cellWidth,
+    height: metrics.cellHeight
+  };
+}
+async function decodeImage(dataBase64, format) {
+  const bytes = decodeBase64Bytes(dataBase64);
+  const blob = new Blob([bytes], { type: `image/${format}` });
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(blob);
+  }
+  return new Promise((resolve, reject) => {
+    const image = new Image;
+    const url = URL.createObjectURL(blob);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`Failed to decode ${format} image`));
+    };
+    image.src = url;
+  });
+}
+function decodeBase64Bytes(value) {
+  if (typeof atob === "function") {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0;index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  }
+  return new Uint8Array(Buffer.from(value, "base64"));
+}
+function normalizeCellRanges(ranges) {
+  const sorted = ranges.filter((range) => range.end > range.start).sort((lhs, rhs) => lhs.start - rhs.start || lhs.end - rhs.end);
+  const normalized = [];
+  for (const range of sorted) {
+    const previous = normalized[normalized.length - 1];
+    if (previous && range.start <= previous.end) {
+      previous.end = Math.max(previous.end, range.end);
+      continue;
+    }
+    normalized.push({ ...range });
+  }
+  return normalized;
+}
+function cellIntersectsRanges(x, span, ranges) {
+  if (ranges === "full") {
+    return true;
+  }
+  const start = Math.floor(x);
+  const end = start + Math.max(1, Math.ceil(span));
+  return ranges.some((range) => start < range.end && end > range.start);
+}
+function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
+  const startRow = Math.max(0, Math.floor(y));
+  const endRow = Math.max(startRow, Math.ceil(y + height));
+  const rectRange = {
+    start: Math.floor(x),
+    end: Math.floor(x) + Math.max(1, Math.ceil(width))
+  };
+  for (let row = startRow;row < endRow; row += 1) {
+    const ranges = region.rows.get(row);
+    if (!ranges) {
+      continue;
+    }
+    if (cellIntersectsRanges(rectRange.start, rectRange.end - rectRange.start, ranges)) {
+      return true;
+    }
+  }
+  return false;
+}
+function resolvedForeground(style, terminalStyle) {
+  if ((style?.em ?? 0) & 16) {
+    return style?.bg ?? terminalStyle.theme.background;
+  }
+  return style?.fg ?? terminalStyle.theme.foreground;
+}
+function resolvedBackground(style, terminalStyle) {
+  if ((style?.em ?? 0) & 16) {
+    return style?.fg ?? terminalStyle.theme.foreground;
+  }
+  return style?.bg;
+}
+
+// src/InputEventEncoder.ts
+class InputEventEncoder {
+  encodeKey(event) {
+    const key = keyInputFromKeyboardEvent(event);
+    if (!key) {
+      return;
+    }
+    return encodeKeyInputMessage({
+      ...key,
+      modifiers: modifierMask(event)
+    });
+  }
+  encodePaste(text) {
+    return encodePasteInputMessage(text);
+  }
+  encodePointerDown(location, button, event) {
+    return encodeMouseInputMessage({
+      kind: "down",
+      x: location.x,
+      y: location.y,
+      button,
+      modifiers: modifierMask(event)
+    });
+  }
+  encodePointerUp(location, button, event) {
+    return encodeMouseInputMessage({
+      kind: "up",
+      x: location.x,
+      y: location.y,
+      button,
+      modifiers: modifierMask(event)
+    });
+  }
+  encodePointerMove(location, button, event) {
+    return encodeMouseInputMessage({
+      kind: event.buttons ? "dragged" : "moved",
+      x: location.x,
+      y: location.y,
+      button,
+      modifiers: modifierMask(event)
+    });
+  }
+  encodeWheel(location, event) {
+    return encodeMouseInputMessage({
+      kind: "scrolled",
+      x: location.x,
+      y: location.y,
+      deltaX: normalizedWheelDelta(event.deltaX),
+      deltaY: normalizedWheelDelta(event.deltaY),
+      modifiers: modifierMask(event)
+    });
+  }
+  pointerButton(button) {
+    return pointerButton(button);
+  }
+}
+function keyInputFromKeyboardEvent(event) {
+  switch (event.key) {
+    case "Enter":
+      return { key: "return" };
+    case " ":
+      return { key: "space" };
+    case "Tab":
+      return { key: "tab" };
+    case "ArrowLeft":
+      return { key: "arrowLeft" };
+    case "ArrowRight":
+      return { key: "arrowRight" };
+    case "ArrowUp":
+      return { key: "arrowUp" };
+    case "ArrowDown":
+      return { key: "arrowDown" };
+    case "Backspace":
+      return { key: "backspace" };
+    case "Escape":
+      return { key: "escape" };
+    case "Home":
+      return { key: "home" };
+    case "End":
+      return { key: "end" };
+    default: {
+      const characters = Array.from(event.key);
+      if (characters.length !== 1) {
+        return;
+      }
+      return {
+        key: "character",
+        character: characters[0]
+      };
+    }
+  }
+}
+function pointerButton(button) {
+  switch (button) {
+    case 1:
+      return "middle";
+    case 2:
+      return "secondary";
+    default:
+      return "primary";
+  }
+}
+function modifierMask(event) {
+  let mask = 0;
+  if (event.shiftKey) {
+    mask |= 1;
+  }
+  if (event.altKey) {
+    mask |= 2;
+  }
+  if (event.ctrlKey) {
+    mask |= 4;
+  }
+  return mask;
+}
+function normalizedWheelDelta(delta) {
+  if (delta > 0) {
+    return 1;
+  }
+  if (delta < 0) {
+    return -1;
+  }
+  return 0;
+}
+
+// src/PointerGeometry.ts
+function cellLocationForEvent(event, metrics) {
+  const location = rawCellLocationForEvent(event, metrics);
+  if (!location) {
+    return;
+  }
+  const cellX = Math.floor(location.x);
+  const cellY = Math.floor(location.y);
+  if (cellX < 0 || cellY < 0 || cellX >= metrics.columns || cellY >= metrics.rows) {
+    return;
+  }
+  return location;
+}
+function rawCellLocationForEvent(event, metrics) {
+  const rect = metrics.rect;
+  if (!rect) {
+    return;
+  }
+  const x = (event.clientX - rect.left) / metrics.cellWidth;
+  const y = (event.clientY - rect.top) / metrics.cellHeight;
+  return { x, y };
+}
+function linkTargetAt(links, linkTargets, location) {
+  if (!links || !linkTargets || linkTargets.length === 0) {
+    return;
+  }
+  const cellX = Math.floor(location.x);
+  const cellY = Math.floor(location.y);
+  for (const [row, runs] of links) {
+    if (row !== cellY) {
+      continue;
+    }
+    for (const [x, span, targetIndex] of runs) {
+      if (cellX >= x && cellX < x + span) {
+        return linkTargets[targetIndex];
+      }
+    }
+  }
+  return;
+}
+function wheelTargetCanScroll(regions, location, deltaX, deltaY) {
+  if (!regions || regions.length === 0) {
+    return false;
+  }
+  const cellX = Math.floor(location.x);
+  const cellY = Math.floor(location.y);
+  for (const region of regions) {
+    const [rx, ry, rw, rh] = region.rect;
+    if (cellX < rx || cellY < ry || cellX >= rx + rw || cellY >= ry + rh) {
+      continue;
+    }
+    if (regionCanScrollInDirection(region, deltaX, deltaY)) {
+      return true;
+    }
+  }
+  return false;
+}
+function regionCanScrollInDirection(region, deltaX, deltaY) {
+  const [, , viewportWidth, viewportHeight] = region.rect;
+  const [offsetX, offsetY] = region.offset;
+  const [contentWidth, contentHeight] = region.content;
+  const maxX = Math.max(0, contentWidth - viewportWidth);
+  const maxY = Math.max(0, contentHeight - viewportHeight);
+  const clampedX = Math.min(Math.max(0, offsetX), maxX);
+  const clampedY = Math.min(Math.max(0, offsetY), maxY);
+  if (deltaY > 0 && clampedY < maxY) {
+    return true;
+  }
+  if (deltaY < 0 && clampedY > 0) {
+    return true;
+  }
+  if (deltaX > 0 && clampedX < maxX) {
+    return true;
+  }
+  if (deltaX < 0 && clampedX > 0) {
+    return true;
+  }
+  return false;
+}
+
 // src/AccessibilityTree.ts
 class AccessibilityTreeMounter {
   element;
@@ -1384,49 +1994,49 @@ class AccessibilityTreeMounter {
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
-    this.element.replaceChildren();
-    this.nodesById.clear();
-    for (const node of nodes) {
-      const element = this.elementForNode(node, metrics);
-      this.nodesById.set(node.id, element);
+    const visibleNodes = nodes.filter((node) => !node.hidden);
+    const previousById = this.nodesById;
+    const nextById = new Map;
+    for (const node of visibleNodes) {
+      const existing = previousById.get(node.id);
+      const element = existing ?? document.createElement("div");
+      this.applyNodeAttributes(element, node, metrics);
+      nextById.set(node.id, element);
     }
-    for (const node of nodes) {
-      const element = this.nodesById.get(node.id);
+    for (const id of previousById.keys()) {
+      if (!nextById.has(id)) {
+        previousById.get(id)?.remove();
+      }
+    }
+    this.nodesById = nextById;
+    for (const node of visibleNodes) {
+      const element = nextById.get(node.id);
       if (!element) {
         continue;
       }
-      const parent = node.parentId ? this.nodesById.get(node.parentId) : undefined;
+      const parent = node.parentId ? nextById.get(node.parentId) : undefined;
       (parent ?? this.element).appendChild(element);
     }
-    this.announceLiveRegionChanges(nodes, announcements);
-    const focused = nodes.find((node) => node.isFocused);
+    this.announceLiveRegionChanges(visibleNodes, announcements);
+    const focused = visibleNodes.find((node) => node.isFocused);
     if ((options.synchronizeFocus ?? true) && focused) {
       this.nodesById.get(focused.id)?.focus?.({ preventScroll: true });
     }
   }
-  elementForNode(node, metrics) {
-    const element = document.createElement("div");
+  applyNodeAttributes(element, node, metrics) {
     element.id = `swifttui-a11y-${stableDOMId(node.id)}`;
     element.dataset.accessibilityId = node.id;
     element.tabIndex = node.isFocused ? 0 : -1;
     const role = roleMapping(node.role);
-    if (role.role) {
-      element.setAttribute("role", role.role);
-    }
-    if (role.level !== undefined) {
-      element.setAttribute("aria-level", String(role.level));
-    }
-    if (node.label) {
-      element.setAttribute("aria-label", node.label);
-    }
-    if (node.hint) {
-      element.setAttribute("aria-description", node.hint);
-    }
-    if (node.liveRegion) {
-      element.setAttribute("aria-live", node.liveRegion);
-    }
+    setOrRemoveAttribute(element, "role", role.role);
+    setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : undefined);
+    setOrRemoveAttribute(element, "aria-label", node.label || undefined);
+    setOrRemoveAttribute(element, "aria-description", node.hint || undefined);
+    setOrRemoveAttribute(element, "aria-live", node.liveRegion || undefined);
     if (node.isFocused) {
       element.dataset.focused = "true";
+    } else {
+      delete element.dataset.focused;
     }
     const [x, y, width, height] = node.rect;
     element.style.position = "absolute";
@@ -1434,7 +2044,6 @@ class AccessibilityTreeMounter {
     element.style.top = `${y * metrics.cellHeight}px`;
     element.style.width = `${Math.max(1, width) * metrics.cellWidth}px`;
     element.style.height = `${Math.max(1, height) * metrics.cellHeight}px`;
-    return element;
   }
   announceLiveRegionChanges(nodes, announcements) {
     const candidates = nodes.filter((node) => node.liveRegion && node.liveRegion !== "off" && node.label);
@@ -1471,6 +2080,13 @@ class AccessibilityTreeMounter {
     }).join(`
 `);
   }
+}
+function setOrRemoveAttribute(element, name, value) {
+  if (value === undefined) {
+    element.removeAttribute(name);
+    return;
+  }
+  element.setAttribute(name, value);
 }
 function applyScreenReaderOnlyStyle(element) {
   element.style.position = "absolute";
@@ -1560,15 +2176,24 @@ function stableDOMId(id) {
 }
 
 // src/WebHostSceneRuntime.ts
+function legacyWheelMode(captureWheelInput) {
+  if (captureWheelInput === undefined) {
+    return "chain";
+  }
+  return captureWheelInput ? "capture" : "passive";
+}
+
 class WebHostSceneRuntime {
   descriptor;
   element;
   terminalMount;
   bridge;
   onInput;
+  onFrameDiagnostic;
   synchronizeAccessibilityFocus;
-  captureWheelInput;
-  imageCache = new Map;
+  wheelMode;
+  painter = new CanvasSurfacePainter;
+  inputEncoder = new InputEventEncoder;
   currentStyle;
   canvas;
   accessibilityTree;
@@ -1582,6 +2207,8 @@ class WebHostSceneRuntime {
   cellHeight = 18;
   activePointerButton = "primary";
   hasCapturedPointer = false;
+  onOpenHyperlink;
+  pointerDownLinkTarget;
   lastSentResize;
   isVisible = false;
   constructor(options) {
@@ -1589,8 +2216,10 @@ class WebHostSceneRuntime {
     this.currentStyle = normalizeWebHostTerminalStyle(options.style);
     this.bridge = options.bridge;
     this.onInput = options.onInput;
+    this.onFrameDiagnostic = options.onFrameDiagnostic;
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
-    this.captureWheelInput = options.captureWheelInput ?? true;
+    this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
+    this.onOpenHyperlink = options.onOpenHyperlink;
     this.element = document.createElement("section");
     this.element.className = "webhost-scene";
     this.element.dataset.sceneId = options.descriptor.id;
@@ -1613,6 +2242,7 @@ class WebHostSceneRuntime {
     canvas.className = "webhost-scene__surface";
     canvas.setAttribute("aria-hidden", "true");
     this.canvas = canvas;
+    this.painter.attach(canvas, () => this.draw());
     this.accessibilityTree = new AccessibilityTreeMounter;
     this.terminalMount.replaceChildren(canvas, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     this.installInputHandlers();
@@ -1621,6 +2251,7 @@ class WebHostSceneRuntime {
       presentSurface: (frame) => this.presentSurface(frame),
       writeClipboard: (text) => this.writeClipboard(text),
       notifyRuntimeIssue: (issue) => this.notifyRuntimeIssue(issue),
+      recordFrameDiagnostic: (diagnostic) => this.recordFrameDiagnostic(diagnostic),
       writeOutput: (text) => this.writeOutput(text),
       writeError: (text) => this.writeOutput(text)
     });
@@ -1668,6 +2299,9 @@ class WebHostSceneRuntime {
   notifyRuntimeIssue(issue) {
     console.log(issue.description);
   }
+  recordFrameDiagnostic(diagnostic) {
+    this.onFrameDiagnostic?.(diagnostic);
+  }
   async writeClipboard(text) {
     const clipboard = globalThis.navigator?.clipboard;
     if (!clipboard?.writeText) {
@@ -1694,6 +2328,29 @@ class WebHostSceneRuntime {
     this.draw(previousFrame && !resized ? frame.damage : undefined);
     this.syncAccessibilityTree();
   }
+  get preferredGridSize() {
+    const frame = this.currentFrame;
+    if (frame?.preferredGridWidth === undefined || frame.preferredGridHeight === undefined) {
+      return;
+    }
+    return { width: frame.preferredGridWidth, height: frame.preferredGridHeight };
+  }
+  get focusPresentation() {
+    return this.currentFrame?.focusPresentation;
+  }
+  linkTarget(location) {
+    return linkTargetAt(this.currentFrame?.links, this.currentFrame?.linkTargets, location);
+  }
+  openHyperlink(url) {
+    if (this.onOpenHyperlink) {
+      this.onOpenHyperlink(url);
+      return;
+    }
+    if (!/^https?:/i.test(url)) {
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
   applyStyle(style) {
     applyWebHostTerminalStyle(this.element, style);
     this.element.style.padding = "0.75rem";
@@ -1704,6 +2361,7 @@ class WebHostSceneRuntime {
     this.element.style.gridTemplateRows = "auto 1fr";
     this.terminalMount.style.position = "relative";
     this.terminalMount.style.overflow = "hidden";
+    this.terminalMount.style.overscrollBehavior = "contain";
     this.terminalMount.style.outline = "none";
     this.terminalMount.style.background = webTUITerminalBackgroundColor(this.currentStyle);
     this.terminalMount.style.minHeight = `${this.cellHeight * 8}px`;
@@ -1731,14 +2389,11 @@ class WebHostSceneRuntime {
       if (event.metaKey || event.isComposing) {
         return;
       }
-      const key = keyInputFromKeyboardEvent(event);
-      if (!key) {
+      const message = this.inputEncoder.encodeKey(event);
+      if (!message) {
         return;
       }
-      this.onInput(encodeKeyInputMessage({
-        ...key,
-        modifiers: modifierMask(event)
-      }));
+      this.onInput(message);
       event.preventDefault();
     };
     const handlePaste = (event) => {
@@ -1746,7 +2401,7 @@ class WebHostSceneRuntime {
       if (!text) {
         return;
       }
-      this.onInput(encodePasteInputMessage(text));
+      this.onInput(this.inputEncoder.encodePaste(text));
       event.preventDefault();
     };
     const handlePointerDown = (event) => {
@@ -1754,34 +2409,29 @@ class WebHostSceneRuntime {
       if (!location) {
         return;
       }
-      const button = pointerButton(event.button);
+      const button = this.inputEncoder.pointerButton(event.button);
       this.activePointerButton = button;
       this.hasCapturedPointer = true;
+      this.pointerDownLinkTarget = button === "primary" ? this.linkTarget(location) : undefined;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
-      this.onInput(encodeMouseInputMessage({
-        kind: "down",
-        x: location.x,
-        y: location.y,
-        button,
-        modifiers: modifierMask(event)
-      }));
+      this.onInput(this.inputEncoder.encodePointerDown(location, button, event));
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       this.terminalMount.releasePointerCapture?.(event.pointerId);
       this.hasCapturedPointer = false;
+      const downLinkTarget = this.pointerDownLinkTarget;
+      this.pointerDownLinkTarget = undefined;
       if (!location) {
         return;
       }
-      this.onInput(encodeMouseInputMessage({
-        kind: "up",
-        x: location.x,
-        y: location.y,
-        button: pointerButton(event.button) ?? this.activePointerButton,
-        modifiers: modifierMask(event)
-      }));
+      const button = this.inputEncoder.pointerButton(event.button) ?? this.activePointerButton;
+      this.onInput(this.inputEncoder.encodePointerUp(location, button, event));
+      if (downLinkTarget !== undefined && this.linkTarget(location) === downLinkTarget) {
+        this.openHyperlink(downLinkTarget);
+      }
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
@@ -1789,30 +2439,23 @@ class WebHostSceneRuntime {
       if (!location) {
         return;
       }
-      this.onInput(encodeMouseInputMessage({
-        kind: event.buttons ? "dragged" : "moved",
-        x: location.x,
-        y: location.y,
-        button: this.activePointerButton,
-        modifiers: modifierMask(event)
-      }));
+      if (!this.hasCapturedPointer) {
+        this.terminalMount.style.cursor = this.linkTarget(location) !== undefined ? "pointer" : "";
+      }
+      this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event));
     };
     const handleWheel = (event) => {
-      if (!this.captureWheelInput) {
+      if (this.wheelMode === "passive") {
         return;
       }
       const location = this.cellLocation(event);
       if (!location) {
         return;
       }
-      this.onInput(encodeMouseInputMessage({
-        kind: "scrolled",
-        x: location.x,
-        y: location.y,
-        deltaX: normalizedWheelDelta(event.deltaX),
-        deltaY: normalizedWheelDelta(event.deltaY),
-        modifiers: modifierMask(event)
-      }));
+      if (this.wheelMode === "chain" && !wheelTargetCanScroll(this.currentFrame?.scrollRegions, location, event.deltaX, event.deltaY)) {
+        return;
+      }
+      this.onInput(this.inputEncoder.encodeWheel(location, event));
       event.preventDefault();
     };
     this.terminalMount.addEventListener("keydown", handleKeyDown);
@@ -1883,53 +2526,12 @@ class WebHostSceneRuntime {
       this.cellHeight = Math.max(1, Math.round(this.currentStyle.fontSize * 1.35));
       return;
     }
-    context.font = this.fontForStyle();
+    context.font = fontForStyle(this.currentStyle);
     this.cellWidth = Math.max(1, Math.ceil(context.measureText("W").width));
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
   draw(damage) {
-    const canvas = this.canvas;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) {
-      return;
-    }
-    const scale = globalThis.window?.devicePixelRatio || 1;
-    context.setTransform(scale, 0, 0, scale, 0, 0);
-    context.textBaseline = "alphabetic";
-    const frame = this.currentFrame;
-    const dirtyRects = frame ? this.dirtyRectsForDamage(damage, frame) : undefined;
-    if (dirtyRects?.length === 0) {
-      return;
-    }
-    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
-    if (dirtyRects) {
-      for (const rect of dirtyRects) {
-        context.clearRect(rect.x, rect.y, rect.width, rect.height);
-        context.fillRect(rect.x, rect.y, rect.width, rect.height);
-      }
-    } else {
-      context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
-      context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
-    }
-    if (!frame) {
-      return;
-    }
-    this.drawRows(context, frame, dirtyRects);
-    this.drawImages(context, frame.images ?? [], dirtyRects);
-  }
-  drawRows(context, frame, dirtyRects) {
-    for (let y = 0;y < frame.rows.length; y += 1) {
-      const row = frame.rows[y] ?? [];
-      for (const cell of row) {
-        const [x, text, span, styleIndex] = cell;
-        const cellRect = this.cellRect(x, y, span);
-        if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, cellRect))) {
-          continue;
-        }
-        const style = frame.styles[styleIndex] ?? undefined;
-        this.drawCell(context, x, y, text, span, style);
-      }
-    }
+    this.painter.paint(this.surfaceMetrics(), this.currentFrame, damage);
   }
   syncAccessibilityTree() {
     const tree = this.accessibilityTree;
@@ -1943,281 +2545,30 @@ class WebHostSceneRuntime {
       synchronizeFocus: this.synchronizeAccessibilityFocus
     });
   }
-  drawImages(context, images, dirtyRects) {
-    for (const image of images) {
-      this.drawImage(context, image, dirtyRects);
-    }
-  }
-  drawImage(context, image, dirtyRects) {
-    const decodedImage = this.cachedImage(image);
-    if (!decodedImage) {
-      return;
-    }
-    const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
-    const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
-    if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
-      return;
-    }
-    const imageRect = {
-      x: clipX * this.cellWidth,
-      y: clipY * this.cellHeight,
-      width: clipWidth * this.cellWidth,
-      height: clipHeight * this.cellHeight
-    };
-    if (dirtyRects && !dirtyRects.some((rect) => rectsIntersect(rect, imageRect))) {
-      return;
-    }
-    context.save();
-    context.beginPath();
-    context.rect(clipX * this.cellWidth, clipY * this.cellHeight, clipWidth * this.cellWidth, clipHeight * this.cellHeight);
-    context.clip();
-    context.drawImage(decodedImage, boundsX * this.cellWidth, boundsY * this.cellHeight, boundsWidth * this.cellWidth, boundsHeight * this.cellHeight);
-    context.restore();
-  }
-  cachedImage(image) {
-    const cached = this.imageCache.get(image.id);
-    if (cached?.image) {
-      return cached.image;
-    }
-    if (!cached?.promise && image.dataBase64) {
-      const promise = decodeImage(image.dataBase64, image.format);
-      this.imageCache.set(image.id, { promise });
-      promise.then((decodedImage) => {
-        const latest = this.imageCache.get(image.id);
-        if (latest?.promise !== promise) {
-          return;
-        }
-        this.imageCache.set(image.id, { image: decodedImage });
-        this.draw();
-      }).catch(() => {
-        this.imageCache.delete(image.id);
-      });
-    }
-    return;
-  }
-  drawCell(context, x, y, text, span, style) {
-    const rectX = x * this.cellWidth;
-    const rectY = y * this.cellHeight;
-    const width = Math.max(1, span) * this.cellWidth;
-    const background = resolvedBackground(style, this.currentStyle);
-    const foreground = resolvedForeground(style, this.currentStyle);
-    const opacity = style?.opacity ?? 1;
-    if (background) {
-      context.globalAlpha = opacity;
-      context.fillStyle = background;
-      context.fillRect(rectX, rectY, width, this.cellHeight);
-    }
-    if (text !== " ") {
-      context.globalAlpha = opacity;
-      context.fillStyle = foreground;
-      context.strokeStyle = foreground;
-      if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
-        x: rectX,
-        y: rectY,
-        width,
-        height: this.cellHeight
-      })) {
-        context.font = this.fontForStyle(style);
-        context.fillText(text, rectX, rectY + Math.floor((this.cellHeight + this.currentStyle.fontSize) / 2) - 2);
-      }
-    }
-    this.drawTextLine(context, rectX, rectY, width, style?.underline, "underline", foreground);
-    this.drawTextLine(context, rectX, rectY, width, style?.strikethrough, "strike", foreground);
-    context.globalAlpha = 1;
-  }
-  dirtyRectsForDamage(damage, frame) {
-    if (!damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay) {
-      return;
-    }
-    const rects = [];
-    for (const [row, ranges] of damage.textRows) {
-      if (row < 0 || row >= frame.height) {
-        continue;
-      }
-      if (ranges.length === 0) {
-        rects.push(this.cellRect(0, row, frame.width));
-        continue;
-      }
-      for (const [start, end] of ranges) {
-        const lowerBound = Math.max(0, Math.min(frame.width, Math.floor(start)));
-        const upperBound = Math.max(lowerBound, Math.min(frame.width, Math.ceil(end)));
-        if (lowerBound >= upperBound) {
-          continue;
-        }
-        rects.push(this.cellRect(lowerBound, row, upperBound - lowerBound));
-      }
-    }
-    return rects;
-  }
-  cellRect(x, y, span) {
+  surfaceMetrics() {
     return {
-      x: x * this.cellWidth,
-      y: y * this.cellHeight,
-      width: Math.max(1, span) * this.cellWidth,
-      height: this.cellHeight
+      columns: this.columns,
+      rows: this.rows,
+      cellWidth: this.cellWidth,
+      cellHeight: this.cellHeight,
+      style: this.currentStyle
     };
   }
-  drawTextLine(context, x, y, width, line, placement, fallbackColor) {
-    if (!line) {
-      return;
-    }
-    context.strokeStyle = line.color ?? fallbackColor;
-    context.lineWidth = line.pattern === "double" ? 2 : 1;
-    if (line.pattern === "dot") {
-      context.setLineDash([1, 3]);
-    } else if (line.pattern === "dash") {
-      context.setLineDash([4, 3]);
-    } else {
-      context.setLineDash([]);
-    }
-    const lineY = placement === "underline" ? y + this.cellHeight - 2 : y + Math.floor(this.cellHeight / 2);
-    context.beginPath();
-    context.moveTo(x, lineY);
-    context.lineTo(x + width, lineY);
-    context.stroke();
-    context.setLineDash([]);
-  }
-  fontForStyle(style) {
-    const emphasis = style?.em ?? 0;
-    const italic = (emphasis & 2) !== 0 ? "italic " : "";
-    const weight = (emphasis & 1) !== 0 ? "700 " : "";
-    return `${italic}${weight}${this.currentStyle.fontSize}px ${this.currentStyle.fontFamily}`;
+  pointerMetrics() {
+    return {
+      rect: this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.(),
+      cellWidth: this.cellWidth,
+      cellHeight: this.cellHeight,
+      columns: this.columns,
+      rows: this.rows
+    };
   }
   cellLocation(event) {
-    const location = this.rawCellLocation(event);
-    if (!location) {
-      return;
-    }
-    const cellX = Math.floor(location.x);
-    const cellY = Math.floor(location.y);
-    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
-      return;
-    }
-    return location;
+    return cellLocationForEvent(event, this.pointerMetrics());
   }
   rawCellLocation(event) {
-    const rect = this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.();
-    if (!rect) {
-      return;
-    }
-    const x = (event.clientX - rect.left) / this.cellWidth;
-    const y = (event.clientY - rect.top) / this.cellHeight;
-    return { x, y };
+    return rawCellLocationForEvent(event, this.pointerMetrics());
   }
-}
-async function decodeImage(dataBase64, format) {
-  const bytes = decodeBase64Bytes(dataBase64);
-  const blob = new Blob([bytes], { type: `image/${format}` });
-  if (typeof createImageBitmap === "function") {
-    return createImageBitmap(blob);
-  }
-  return new Promise((resolve, reject) => {
-    const image = new Image;
-    const url = URL.createObjectURL(blob);
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error(`Failed to decode ${format} image`));
-    };
-    image.src = url;
-  });
-}
-function decodeBase64Bytes(value) {
-  if (typeof atob === "function") {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0;index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return bytes;
-  }
-  return new Uint8Array(Buffer.from(value, "base64"));
-}
-function keyInputFromKeyboardEvent(event) {
-  switch (event.key) {
-    case "Enter":
-      return { key: "return" };
-    case " ":
-      return { key: "space" };
-    case "Tab":
-      return { key: "tab" };
-    case "ArrowLeft":
-      return { key: "arrowLeft" };
-    case "ArrowRight":
-      return { key: "arrowRight" };
-    case "ArrowUp":
-      return { key: "arrowUp" };
-    case "ArrowDown":
-      return { key: "arrowDown" };
-    case "Backspace":
-      return { key: "backspace" };
-    case "Escape":
-      return { key: "escape" };
-    case "Home":
-      return { key: "home" };
-    case "End":
-      return { key: "end" };
-    default: {
-      const characters = Array.from(event.key);
-      if (characters.length !== 1) {
-        return;
-      }
-      return {
-        key: "character",
-        character: characters[0]
-      };
-    }
-  }
-}
-function pointerButton(button) {
-  switch (button) {
-    case 1:
-      return "middle";
-    case 2:
-      return "secondary";
-    default:
-      return "primary";
-  }
-}
-function modifierMask(event) {
-  let mask = 0;
-  if (event.shiftKey) {
-    mask |= 1;
-  }
-  if (event.altKey) {
-    mask |= 2;
-  }
-  if (event.ctrlKey) {
-    mask |= 4;
-  }
-  return mask;
-}
-function normalizedWheelDelta(delta) {
-  if (delta > 0) {
-    return 1;
-  }
-  if (delta < 0) {
-    return -1;
-  }
-  return 0;
-}
-function rectsIntersect(lhs, rhs) {
-  return lhs.x < rhs.x + rhs.width && lhs.x + lhs.width > rhs.x && lhs.y < rhs.y + rhs.height && lhs.y + lhs.height > rhs.y;
-}
-function resolvedForeground(style, terminalStyle) {
-  if ((style?.em ?? 0) & 16) {
-    return style?.bg ?? terminalStyle.theme.background;
-  }
-  return style?.fg ?? terminalStyle.theme.foreground;
-}
-function resolvedBackground(style, terminalStyle) {
-  if ((style?.em ?? 0) & 16) {
-    return style?.fg ?? terminalStyle.theme.foreground;
-  }
-  return style?.bg;
 }
 
 // src/WebHostApp.ts
