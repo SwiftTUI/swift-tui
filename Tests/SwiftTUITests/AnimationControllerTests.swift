@@ -1447,6 +1447,150 @@ struct AnimationPipelineIntegrationTests {
   }
 
   @Test(
+    "untransitioned removal reclaims a repeatForever animation and quiesces the pump"
+  )
+  func untransitionedRemovalReclaimsRepeatForeverAnimation() throws {
+    // F44 leg (b): a subtree removed WITHOUT a registered `.transition()`
+    // (tab switch, bare `if`) skips the removal loop entirely, so before the
+    // departed-identity prune its in-flight `.repeatForever` entry survived
+    // in `activeAnimations` forever — `requiresContinuedAnimationFrames`
+    // stayed true and the 33 ms pump re-armed for the rest of the session.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(200))
+      .repeatForever(autoreverses: true)
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    struct Probe: View {
+      let showAnimating: Bool
+      let offset: Int
+      var body: some View {
+        VStack {
+          Text("head")
+          if showAnimating {
+            Text("anim").offset(x: offset, y: 0)
+          }
+        }
+      }
+    }
+
+    _ = renderer.render(
+      Probe(showAnimating: true, offset: 0),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+    #expect(controller.activeAnimationCount == 0)
+
+    var animate = TransactionSnapshot()
+    animate.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      Probe(showAnimating: true, offset: 20),
+      context: ResolveContext(identity: rootIdentity, transaction: animate),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+    #expect(
+      controller.activeAnimationCount >= 1,
+      "the offset change should start a repeatForever animation"
+    )
+
+    // Remove the animating subtree with NO transition registered and no
+    // animation intent — the untransitioned-removal class.
+    _ = renderer.render(
+      Probe(showAnimating: false, offset: 20),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+
+    #expect(
+      controller.activeAnimationCount == 0,
+      "departed identities' animations must be reclaimed, got \(controller.activeAnimationCount)"
+    )
+    #expect(
+      !controller.requiresContinuedAnimationFrames,
+      "the pump must quiesce once the removed repeatForever is reclaimed"
+    )
+    #expect(
+      controller.frameDropEligibilityBlockers.isEmpty,
+      "no blockers should remain, got \(controller.frameDropEligibilityBlockers)"
+    )
+  }
+
+  @Test(
+    "untransitioned removal drops the orphaned withAnimation completion and clears blockers"
+  )
+  func untransitionedRemovalDropsOrphanedCompletion() throws {
+    // F44 leg (a): the orphaned completion's batch refcount could never
+    // reach zero (its carrier animation was removed with the subtree), so
+    // `.animationCompletion` stayed in the frame-drop blockers for the rest
+    // of the session — visual-only frames could never drop again. The
+    // departed-identity prune releases the batch WITHOUT firing the closure
+    // (its awaiter died with the owning subtree; see
+    // `requiresContinuedAnimationFrames`).
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let batchID = AnimationBatchID(991)
+    let fired = Mutex(false)
+    controller.registerCompletion(batchID: batchID) {
+      fired.withLock { $0 = true }
+    }
+
+    struct Probe: View {
+      let showAnimating: Bool
+      let offset: Int
+      var body: some View {
+        VStack {
+          Text("head")
+          if showAnimating {
+            Text("anim").offset(x: offset, y: 0)
+          }
+        }
+      }
+    }
+
+    _ = renderer.render(
+      Probe(showAnimating: true, offset: 0),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+
+    var animate = TransactionSnapshot()
+    animate.animationRequest = .animate(animation.animationBox)
+    animate.animationBatchID = batchID
+    _ = renderer.render(
+      Probe(showAnimating: true, offset: 20),
+      context: ResolveContext(identity: rootIdentity, transaction: animate),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+    #expect(controller.activeAnimationCount >= 1)
+    #expect(
+      controller.frameDropEligibilityBlockers.contains(.animationCompletion),
+      "the registered completion should block frame drops while in flight"
+    )
+
+    _ = renderer.render(
+      Probe(showAnimating: false, offset: 20),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+
+    #expect(controller.activeAnimationCount == 0)
+    #expect(
+      controller.frameDropEligibilityBlockers.isEmpty,
+      "orphaned completion must not pin .animationCompletion forever, got \(controller.frameDropEligibilityBlockers)"
+    )
+    #expect(
+      !fired.withLock { $0 },
+      "an orphaned completion is dropped, never fired (its awaiter died with the subtree)"
+    )
+  }
+
+  @Test(
     "conditional toggle still fires insertion transition when parent is stable"
   )
   func conditionalToggleFiresInsertionTransition() throws {

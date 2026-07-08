@@ -995,6 +995,29 @@ package final class AnimationController: Sendable {
       newLiveNodeIDs.contains(viewNodeID)
     }
 
+    // Reclaim animations whose identities left the live tree WITHOUT a
+    // registered transition (tab switch, bare `if`) — the resolve-time prune
+    // the quiesce logic in `requiresContinuedAnimationFrames` promises. The
+    // removal loop above only reaches identities with a
+    // `previousTransitionsByNodeID` entry; an untransitioned removal skipped
+    // everything, stranding `activeAnimations` entries (a removed
+    // `.repeatForever` re-armed the 33 ms pump for the rest of the session)
+    // and batch refcounts that could never reach zero (their completion
+    // closures pinned `.animationCompletion` into the frame-drop blockers
+    // permanently). Identities mid-exit-overlay are exempt: their entries
+    // were superseded when the removal was planned, and the overlay ticks
+    // through `removingNodes`, not `activeAnimations`. Orphaned completions
+    // are dropped, never fired — their awaiters died with the subtree.
+    let exitOverlayIdentities = removingIdentitySet
+    let departedKeys = activeAnimations.keys.filter { key in
+      !newIdentities.contains(key.identity)
+        && !exitOverlayIdentities.contains(key.identity)
+    }
+    for key in departedKeys {
+      guard let entry = activeAnimations.removeValue(forKey: key) else { continue }
+      releaseBatch(entry.batchID, firingCompletion: false)
+    }
+
     previousSnapshots = newSnapshots
     previousIdentities = newIdentities
     previousTreeRoot = node
@@ -1305,12 +1328,24 @@ package final class AnimationController: Sendable {
     batchRefCounts[batchID, default: 0] += 1
   }
 
-  private func releaseBatch(_ batchID: AnimationBatchID?) {
+  /// `firingCompletion: false` is the departed-identity prune's arm: when the
+  /// LAST retainer of a batch left the live tree untransitioned, its
+  /// completion's awaiter died with the owning subtree, so the closure is
+  /// dropped rather than fired (firing would double-resume a finished
+  /// continuation — see ``requiresContinuedAnimationFrames``). If a live
+  /// animation in the same batch releases last instead, the completion fires
+  /// normally through the default arm.
+  private func releaseBatch(
+    _ batchID: AnimationBatchID?,
+    firingCompletion: Bool = true
+  ) {
     guard let batchID, let count = batchRefCounts[batchID] else { return }
     let newCount = count - 1
     if newCount <= 0 {
       batchRefCounts.removeValue(forKey: batchID)
-      if let closure = completionClosures.removeValue(forKey: batchID) {
+      if let closure = completionClosures.removeValue(forKey: batchID),
+        firingCompletion
+      {
         fireOrDeferCompletion(closure)
       }
     } else {
