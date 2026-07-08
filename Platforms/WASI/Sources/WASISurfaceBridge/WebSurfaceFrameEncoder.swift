@@ -137,6 +137,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: projection.semantics,
       focusedIdentity: projection.focusedIdentity,
       damage: projection.rasterDamage,
+      preferredLayoutSize: projection.preferredLayoutSize,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
@@ -154,6 +155,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: projection.semantics,
       focusedIdentity: projection.focusedIdentity,
       damage: projection.rasterDamage,
+      preferredLayoutSize: projection.preferredLayoutSize,
       fallbackBackground: fallbackBackground,
       state: &state
     )
@@ -165,6 +167,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
+    preferredLayoutSize: CellSize? = nil,
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
@@ -175,6 +178,7 @@ package enum WebSurfaceFrameEncoder {
         semanticSnapshot: semanticSnapshot,
         focusedIdentity: focusedIdentity,
         damage: damage,
+        preferredLayoutSize: preferredLayoutSize,
         fallbackBackground: fallbackBackground,
         knownImageIDs: &state.knownImageIDs
       )
@@ -193,6 +197,7 @@ package enum WebSurfaceFrameEncoder {
         semanticSnapshot: semanticSnapshot,
         focusedIdentity: focusedIdentity,
         damage: damage,
+        preferredLayoutSize: preferredLayoutSize,
         fallbackBackground: fallbackBackground,
         knownImageIDs: &state.knownImageIDs
       )
@@ -206,6 +211,7 @@ package enum WebSurfaceFrameEncoder {
       semanticSnapshot: semanticSnapshot,
       focusedIdentity: focusedIdentity,
       damage: damage,
+      preferredLayoutSize: preferredLayoutSize,
       fallbackBackground: fallbackBackground,
       state: &state
     )
@@ -220,6 +226,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
+    preferredLayoutSize: CellSize? = nil,
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>
   ) -> String {
@@ -283,6 +290,12 @@ package enum WebSurfaceFrameEncoder {
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
+    json += encodeAdditiveFields(
+      for: surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      preferredLayoutSize: preferredLayoutSize
+    )
     json += "}\n"
     return json
   }
@@ -293,6 +306,7 @@ package enum WebSurfaceFrameEncoder {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage,
+    preferredLayoutSize: CellSize? = nil,
     fallbackBackground: Color,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
@@ -354,8 +368,114 @@ package enum WebSurfaceFrameEncoder {
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
+    json += encodeAdditiveFields(
+      for: surface,
+      semanticSnapshot: semanticSnapshot,
+      focusedIdentity: focusedIdentity,
+      preferredLayoutSize: preferredLayoutSize
+    )
     json += "}\n"
     return json
+  }
+
+  /// The F19 additive fields, shared by the full and delta record shapes. All
+  /// of them are optional object keys so deployed decoders ignore rather than
+  /// reject them, and none of them move the `version` literal — see the
+  /// `HostWireSchema` wire-evolution policy.
+  private static func encodeAdditiveFields(
+    for surface: RasterSurface,
+    semanticSnapshot: SemanticSnapshot?,
+    focusedIdentity: Identity?,
+    preferredLayoutSize: CellSize?
+  ) -> String {
+    var json = ""
+    if let links = encodeLinks(for: surface) {
+      json += ",\"links\":[\(links.rows)]"
+      json += ",\"linkTargets\":[\(links.targets)]"
+    }
+    if let presentation = semanticSnapshot?.focusPresentation(for: focusedIdentity),
+      presentation.focusedIdentity != nil
+    {
+      json += ",\"focusPresentation\":\(encodeFocusPresentation(presentation))"
+    }
+    if let preferredLayoutSize {
+      json += ",\"preferredGridWidth\":\(preferredLayoutSize.width)"
+      json += ",\"preferredGridHeight\":\(preferredLayoutSize.height)"
+    }
+    return json
+  }
+
+  /// Per-row hyperlink runs plus a deduplicated URL table, derived from
+  /// consecutive same-target `RasterCell.hyperlink` values. Continuation cells
+  /// are covered by their lead cell's span, mirroring `encodeRow`.
+  private static func encodeLinks(
+    for surface: RasterSurface
+  ) -> (rows: String, targets: String)? {
+    var targets: [String] = []
+    var rows: [String] = []
+    for (y, row) in surface.cells.enumerated() {
+      var runs: [String] = []
+      var runStart = 0
+      var runSpan = 0
+      var runTarget = -1
+      func closeRun() {
+        guard runSpan > 0 else {
+          return
+        }
+        runs.append("[\(runStart),\(runSpan),\(runTarget)]")
+        runSpan = 0
+      }
+      for (x, cell) in row.enumerated() {
+        guard !cell.isContinuation else {
+          continue
+        }
+        guard let hyperlink = cell.hyperlink else {
+          closeRun()
+          continue
+        }
+        let target: Int
+        if let existing = targets.firstIndex(of: hyperlink) {
+          target = existing
+        } else {
+          targets.append(hyperlink)
+          target = targets.count - 1
+        }
+        let span = max(1, cell.spanWidth)
+        if runSpan > 0, runTarget == target, runStart + runSpan == x {
+          runSpan += span
+        } else {
+          closeRun()
+          runStart = x
+          runSpan = span
+          runTarget = target
+        }
+      }
+      closeRun()
+      if !runs.isEmpty {
+        rows.append("[\(y),[\(runs.joined(separator: ","))]]")
+      }
+    }
+    guard !rows.isEmpty else {
+      return nil
+    }
+    return (
+      rows.joined(separator: ","),
+      targets.map(jsonString).joined(separator: ",")
+    )
+  }
+
+  private static func encodeFocusPresentation(
+    _ presentation: FocusPresentation
+  ) -> String {
+    var fields: [String] = []
+    if let focusedIdentity = presentation.focusedIdentity {
+      fields.append("\"focusedIdentity\":\(jsonString(focusedIdentity.path))")
+    }
+    fields.append(
+      "\"semantics\":\(jsonString(HostWireSchema.focusSemanticsToken(presentation.semantics)))")
+    fields.append("\"prefersTextInput\":\(presentation.prefersTextInput ? "true" : "false")")
+    fields.append("\"hasFocusedRegion\":\(presentation.hasFocusedRegion ? "true" : "false")")
+    return "{" + fields.joined(separator: ",") + "}"
   }
 
   private static func encodedRowsAndStyles(
@@ -450,6 +570,9 @@ package enum WebSurfaceFrameEncoder {
       }
       if let hint = node.hint {
         fields.append("\"hint\":\(jsonString(hint))")
+      }
+      if node.hidden {
+        fields.append("\"hidden\":true")
       }
       if let liveRegion = node.liveRegion {
         fields.append("\"liveRegion\":\(jsonString(liveRegion.description))")

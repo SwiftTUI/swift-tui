@@ -403,7 +403,7 @@ struct WebSurfaceTransportTests {
     let mixedNode = try #require(tree.dropFirst(3).first)
     #expect(mixedNode["id"] as? String == "root/group/mixed")
     #expect(mixedNode["role"] as? String == "group")
-    #expect(mixedNode["hidden"] == nil)
+    #expect(mixedNode["hidden"] as? Bool == true)
   }
 
   @Test("encoder emits v2 imperative accessibility announcements")

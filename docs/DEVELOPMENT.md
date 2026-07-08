@@ -144,7 +144,11 @@ the release is an internal preview.
 source changes in `SwiftTUI/swift-tui-web`, update the bundle in `swift-tui`
 with `Scripts/update_webhost_bundle.sh --web-checkout ../swift-tui-web`, run
 `bun run test`, and commit the resource update with the matching web release
-version in the commit message.
+version in the commit message. The script stamps
+`Resources/browser/bundle-provenance.json` with the web checkout's revision;
+the coordination root's `webhost_bundle_provenance` gate compares that stamp
+against the pinned `swift-tui-web` submodule, so a bundle left stale after web
+runtime changes fails org CI instead of silently shipping an old runtime.
 
 Runnable examples and the WebExample static demo are validated in
 `SwiftTUI/swift-tui-examples`. A fresh examples clone validates against public
