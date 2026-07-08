@@ -13,6 +13,37 @@ public final class InputReader: InputReading, TerminalInputReading,
   private let mouseCoordinateMode: Mutex<MouseCoordinateMode>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
 
+  #if !canImport(WASILibc)
+    /// Live dispatch read-sources, registered so ``withInputSuspended(_:)``
+    /// can pause them around a capability probe's reads of the shared input
+    /// descriptor (F42).
+    private struct SuspendableSourceRegistry {
+      var nextID: UInt64 = 0
+      var sources: [UInt64: (source: any DispatchSourceRead, queue: DispatchQueue)] = [:]
+    }
+
+    private let suspendableSources = OSAllocatedUnfairLock(
+      uncheckedState: SuspendableSourceRegistry()
+    )
+
+    private func registerSuspendableSource(
+      _ source: any DispatchSourceRead,
+      queue: DispatchQueue
+    ) -> UInt64 {
+      suspendableSources.withLockUnchecked { registry in
+        registry.nextID += 1
+        registry.sources[registry.nextID] = (source, queue)
+        return registry.nextID
+      }
+    }
+
+    private func unregisterSuspendableSource(_ id: UInt64) {
+      suspendableSources.withLockUnchecked { registry in
+        _ = registry.sources.removeValue(forKey: id)
+      }
+    }
+  #endif
+
   /// Creates an input reader bound to `fileDescriptor`.
   public init(
     fileDescriptor: Int32 = 0,
@@ -182,6 +213,7 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode
         ) { parser, input in
@@ -263,6 +295,7 @@ extension InputReader {
         }
 
         source.setCancelHandler {
+          self.unregisterSuspendableSource(suspendableID)
           scheduledFlush?.cancel()
           flushPendingMouseEvents()
           continuation.finish()
@@ -285,6 +318,7 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
+        let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
           transform: transform
@@ -319,6 +353,7 @@ extension InputReader {
         }
 
         source.setCancelHandler {
+          self.unregisterSuspendableSource(suspendableID)
           continuation.finish()
         }
 
@@ -330,4 +365,31 @@ extension InputReader {
       }
     }
   #endif
+}
+
+extension InputReader: TerminalInputSuspending {
+  /// Suspends every live read source, barriers their queues so no in-flight
+  /// drain can still consume the probe's reply, runs `body`, then resumes.
+  /// Called from the main-actor capability probe; not reentrant.
+  package func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
+    #if canImport(WASILibc)
+      return try body()
+    #else
+      let entries = suspendableSources.withLockUnchecked { registry in
+        Array(registry.sources.values)
+      }
+      for entry in entries {
+        entry.source.suspend()
+      }
+      for entry in entries {
+        entry.queue.sync {}
+      }
+      defer {
+        for entry in entries {
+          entry.source.resume()
+        }
+      }
+      return try body()
+    #endif
+  }
 }

@@ -56,9 +56,15 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
+      let terminalHost = TerminalHost(capabilityProfile: capabilityProfile)
+      let inputReader = InputReader()
+      // The capability probes read the same input descriptor the reader's
+      // dispatch source owns; the gate suspends the reader for each probe's
+      // write→read cycle so the reply cannot be consumed by the reader (F42).
+      terminalHost.inputSuspensionGate = inputReader
       let resources = SceneSessionResources(
-        presentationSurface: TerminalHost(capabilityProfile: capabilityProfile),
-        terminalInputReader: InputReader(),
+        presentationSurface: terminalHost,
+        terminalInputReader: inputReader,
         signalReader: defaultSignalReader(),
         frameSink: frameSink,
         runtimeConfiguration: configuration
@@ -75,13 +81,17 @@ final class SceneRuntime {
         isTTY: isTTY
       )
       .applying(configuration)
+      let terminalHost = TerminalHost(
+        inputFileDescriptor: pty.masterFD,
+        outputFileDescriptor: pty.masterFD,
+        capabilityProfile: capabilityProfile
+      )
+      let inputReader = InputReader(fileDescriptor: pty.masterFD)
+      // Same shared-descriptor probe race as the primary path (F42).
+      terminalHost.inputSuspensionGate = inputReader
       let resources = SceneSessionResources(
-        presentationSurface: TerminalHost(
-          inputFileDescriptor: pty.masterFD,
-          outputFileDescriptor: pty.masterFD,
-          capabilityProfile: capabilityProfile
-        ),
-        terminalInputReader: InputReader(fileDescriptor: pty.masterFD),
+        presentationSurface: terminalHost,
+        terminalInputReader: inputReader,
         runtimeConfiguration: configuration
       )
       resources.runtimeIssueSink = .standardError

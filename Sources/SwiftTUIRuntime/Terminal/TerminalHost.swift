@@ -83,6 +83,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     var capabilityProbe = TerminalHostCapabilityProbeState()
     private var presentationSession = TerminalPresentationSession()
 
+    /// Suspends the live terminal input reader while the capability probes
+    /// read the shared input descriptor, so the reader's dispatch source
+    /// cannot race the probe for the terminal's reply (F42). `nil` — no
+    /// reader wired (tests, non-tty runs) — probes unguarded as before.
+    package var inputSuspensionGate: (any TerminalInputSuspending)?
+
     public convenience init(
       inputFileDescriptor: Int32 = 0,
       outputFileDescriptor: Int32 = 1,

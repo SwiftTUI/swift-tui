@@ -149,7 +149,31 @@ import SwiftTUICore
       return supported
     }
 
+    /// Runs `body` with the live input reader suspended, when a gate is
+    /// wired. The capability replies arrive on the shared input descriptor,
+    /// so an unsuspended reader races the probe for them — whoever loses the
+    /// race either eats the reply (mis-detection) or burns the full timeout
+    /// ladder (the historical 0.5–1 s first-image stall, F42).
+    ///
+    /// Visibility note: shared with `performInputCapabilityQuery` in
+    /// `TerminalMouseCoordinateResolution.swift`, so file-internal rather
+    /// than private.
+    func withInputSuspensionGate<T>(_ body: () throws -> T) rethrows -> T {
+      if let inputSuspensionGate {
+        return try inputSuspensionGate.withInputSuspended(body)
+      }
+      return try body()
+    }
+
     private func performGraphicsQuery(
+      _ query: TerminalGraphicsQuery
+    ) throws -> [UInt8] {
+      try withInputSuspensionGate {
+        try performGraphicsQueryOnUncontendedDescriptor(query)
+      }
+    }
+
+    private func performGraphicsQueryOnUncontendedDescriptor(
       _ query: TerminalGraphicsQuery
     ) throws -> [UInt8] {
       try controller.write(query.request, to: outputFileDescriptor)

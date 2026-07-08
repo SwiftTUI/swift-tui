@@ -177,6 +177,16 @@ import SwiftTUICore
     func performInputCapabilityQuery(
       _ query: TerminalInputCapabilityQuery
     ) throws -> [UInt8] {
+      // Same shared-descriptor race as the graphics probes (F42): suspend the
+      // live input reader for the whole write→read cycle when a gate is wired.
+      try withInputSuspensionGate {
+        try performInputCapabilityQueryOnUncontendedDescriptor(query)
+      }
+    }
+
+    private func performInputCapabilityQueryOnUncontendedDescriptor(
+      _ query: TerminalInputCapabilityQuery
+    ) throws -> [UInt8] {
       try controller.write(query.request, to: outputFileDescriptor)
       var buffer: [UInt8] = []
 

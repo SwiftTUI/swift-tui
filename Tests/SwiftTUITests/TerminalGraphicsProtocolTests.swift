@@ -15,6 +15,46 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
+  @Test("graphics probes read the input descriptor only while the reader is suspended")
+  func graphicsProbesReadOnlyWhileInputReaderSuspended() throws {
+    // F42: the probe's blocking reads race the live InputReader's dispatch
+    // source for the same input fd; whoever wins eats the terminal's reply.
+    // With a suspension gate wired, EVERY probe read must happen inside a
+    // suspension window so the reply cannot be consumed by the reader.
+    let gate = SpyInputSuspensionGate()
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [Array("\u{001B}[?62;4c".utf8)]
+    )
+    let readsTotal = LockedBox(0)
+    let readsSuspended = LockedBox(0)
+    controller.onRead = {
+      readsTotal.withLock { $0 += 1 }
+      if gate.isSuspended {
+        readsSuspended.withLock { $0 += 1 }
+      }
+    }
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "xterm"]
+    )
+    host.inputSuspensionGate = gate
+
+    _ = host.resolvedGraphicsCapabilities(probingProtocols: true)
+
+    #expect(gate.engagements >= 1, "the probe must engage the suspension gate")
+    let total = readsTotal.value
+    #expect(total > 0, "the probe should have read the input descriptor")
+    #expect(
+      readsSuspended.value == total,
+      "every probe read must happen while the live input reader is suspended (\(readsSuspended.value)/\(total) were)"
+    )
+  }
+
   @Test("terminal host enables SGR-Pixels after live mode-query support")
   func terminalHostEnablesSGRPixelsAfterLiveModeQuerySupport() throws {
     let controller = GraphicsProtocolMockTerminalController(
@@ -1981,6 +2021,15 @@ private final class GraphicsProtocolMockTerminalController:
   private let cellPixelSizeValue: PixelSize?
   private let queuedReadResponsesStorage: LockedBox<[[UInt8]]>
   private let writesStorage = LockedBox<[String]>([])
+  private let onReadStorage = LockedBox<(@Sendable () -> Void)?>(nil)
+
+  /// Observes every `read(from:maxBytes:timeoutMilliseconds:)` call, so a
+  /// test can assert WHEN the probe reads (e.g. only while the live input
+  /// reader is suspended — F42).
+  var onRead: (@Sendable () -> Void)? {
+    get { onReadStorage.value }
+    set { onReadStorage.value = newValue }
+  }
 
   private(set) var writes: [String] {
     get { writesStorage.value }
@@ -2030,11 +2079,31 @@ private final class GraphicsProtocolMockTerminalController:
     maxBytes _: Int,
     timeoutMilliseconds _: Int
   ) throws -> [UInt8] {
-    queuedReadResponsesStorage.withLock { queuedReadResponses in
+    onReadStorage.value?()
+    return queuedReadResponsesStorage.withLock { queuedReadResponses in
       guard !queuedReadResponses.isEmpty else {
         return []
       }
       return queuedReadResponses.removeFirst()
     }
+  }
+}
+
+/// Spy `TerminalInputSuspending`: records engagements and exposes whether a
+/// suspension window is currently open, so probe reads can assert they only
+/// happen inside one (F42).
+private final class SpyInputSuspensionGate: TerminalInputSuspending {
+  private let state = LockedBox<(engagements: Int, depth: Int)>((0, 0))
+
+  var engagements: Int { state.value.engagements }
+  var isSuspended: Bool { state.value.depth > 0 }
+
+  func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
+    state.withLock {
+      $0.engagements += 1
+      $0.depth += 1
+    }
+    defer { state.withLock { $0.depth -= 1 } }
+    return try body()
   }
 }
