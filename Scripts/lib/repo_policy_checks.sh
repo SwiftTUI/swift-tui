@@ -145,6 +145,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check graph/render layering" \
+    "./Scripts/check_graph_render_layering.sh" \
+    ./Scripts/check_graph_render_layering.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check test synchronisation policies" \
     "./Scripts/check_test_sync_policies.sh" \
     ./Scripts/check_test_sync_policies.sh
