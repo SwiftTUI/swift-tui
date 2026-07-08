@@ -299,6 +299,10 @@ jobs:
           fi
           swiftly run swift sdk list
 
+      # --target, not --product: for an automatic library product SwiftPM
+      # builds the whole package graph, which includes deliberately
+      # non-WASI targets (SwiftTUIPTYCPrimitives fork/exec, dladdr helpers).
+      # The target build is exactly the SwiftTUIWASI closure.
       - name: Cross-compile SwiftTUIWASI for wasm32-wasi
         shell: bash
         env:
@@ -308,7 +312,7 @@ jobs:
           . "${SWIFTLY_HOME_DIR}/env.sh"
           swiftly run swift build \
             --swift-sdk "swift-${SWIFT_VERSION}-RELEASE_wasm" \
-            --product SwiftTUIWASI
+            --target SwiftTUIWASI
 
   macos-gate:
     name: macOS repo gate

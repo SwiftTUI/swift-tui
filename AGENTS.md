@@ -72,7 +72,9 @@ internal source-layout context lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE
   via `EnvFrameTraceSink`), so the Repo Gate now has a dedicated
   `wasm32-wasi cross-compile` CI lane building the `SwiftTUIWASI` product.
   Cross-build locally before pushing WASI-adjacent changes: `swiftly run swift
-  build --swift-sdk swift-6.3.1-RELEASE_wasm --product SwiftTUIWASI`.
+  build --swift-sdk swift-6.3.1-RELEASE_wasm --target SwiftTUIWASI` (`--target`,
+  not `--product` — a library-product build pulls the whole package graph,
+  including deliberately non-WASI PTY targets).
 - Treat fixture changes as evidence, not housekeeping — see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
 - For runtime state bugs, distinguish transient flicker from true state loss.
