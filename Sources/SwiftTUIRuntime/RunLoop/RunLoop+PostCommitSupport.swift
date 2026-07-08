@@ -189,13 +189,14 @@ extension RunLoop {
     // it can itself be skipped, leaving live animation work with no armed
     // deadline, parked until the next input ("stuck until you scroll"). The
     // unconditional arm is safe on both axes the old guard worried about:
-    // the scheduler coalesces deadlines as a set, so re-arming is idempotent
-    // and only ever ADDS the tick this live work genuinely needs; and the
-    // transition-burst cancel-cascade the guard was introduced for
-    // (`7dcddf11` — switching away from a still-animating tab kept the pump
-    // hot) was phantom orphaned work, root-fixed by the departed-identity
-    // prune in `AnimationController.processResolvedTree`, which keeps this
-    // method's `requiresContinuedAnimationFrames` entry condition truthful.
+    // the scheduler min-coalesces re-arms into its single deadline slot, so
+    // re-arming is idempotent and only ever ADDS the tick this live work
+    // genuinely needs; and the transition-burst cancel-cascade the guard was
+    // introduced for (`7dcddf11` — switching away from a still-animating tab
+    // kept the pump hot) was phantom orphaned work, root-fixed by the
+    // departed-identity prune in `AnimationController.processResolvedTree`,
+    // which keeps this method's `requiresContinuedAnimationFrames` entry
+    // condition truthful.
     scheduler.requestDeadline(nextTick)
   }
 }
