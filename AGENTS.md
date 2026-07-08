@@ -67,12 +67,12 @@ internal source-layout context lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE
   stay **WASI-safe and strict-memory-safety clean**: import every libc
   (`Darwin`/`Glibc`/`Android`/`Musl`), compile the path-based POSIX surface out
   under `#if !canImport(WASILibc)` (model on `DiagnosticTraceSink` /
-  `TerminalPOSIXController`), and mark each unsafe call `unsafe`. The Linux Repo
-  Gate does **not** compile wasm32-wasi, so a WASI-only break ships green and
-  only surfaces in the `swift-tui-examples` / `swift-tui-site` gates after a tag
-  is cut (hit at 0.0.19, again at 0.0.26 via `EnvFrameTraceSink`). Cross-build
-  before tagging: `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm
-  --target SwiftTUIRuntime`.
+  `TerminalPOSIXController`), and mark each unsafe call `unsafe`. WASI-only
+  breaks shipped green through the Linux-only gate twice (0.0.19, and 0.0.26
+  via `EnvFrameTraceSink`), so the Repo Gate now has a dedicated
+  `wasm32-wasi cross-compile` CI lane building the `SwiftTUIWASI` product.
+  Cross-build locally before pushing WASI-adjacent changes: `swiftly run swift
+  build --swift-sdk swift-6.3.1-RELEASE_wasm --product SwiftTUIWASI`.
 - Treat fixture changes as evidence, not housekeeping — see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
 - For runtime state bugs, distinguish transient flicker from true state loss.

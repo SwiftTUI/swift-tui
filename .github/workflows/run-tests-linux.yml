@@ -5,6 +5,11 @@ on:
     branches:
       - main
   pull_request:
+  # Nightly run: the only trigger that exercises the macOS lane automatically.
+  # macOS is the primary user platform for a terminal UI framework but was
+  # workflow_dispatch-only, so releases shipped on Linux-only signal.
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       run_arm64:
@@ -21,8 +26,10 @@ on:
 permissions:
   contents: read
 
+# The event name keeps scheduled runs in their own group: a push to main must
+# not cancel the in-flight nightly macOS lane (its only automatic signal).
 concurrency:
-  group: repo-gate-${{ github.ref }}
+  group: repo-gate-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -193,10 +200,120 @@ jobs:
             exit 1
           fi
 
+  # Cross-compiles the WASI surface on every push/PR. The Linux gate never
+  # builds wasm32-wasi, so a WASI-only break (unguarded C stdio/POSIX outside
+  # `#if canImport(WASILibc)`) shipped green at 0.0.19 and again at 0.0.26 and
+  # only surfaced in the swift-tui-examples / swift-tui-site gates after the
+  # tag was cut. Building the SwiftTUIWASI product covers the WASI runner shim
+  # plus, transitively, the whole library surface (Core, Views, Runtime).
+  wasi-cross-compile:
+    name: wasm32-wasi cross-compile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # The toolchain version tracks the pinned .swift-version. The value is
+      # validated against a strict pattern before any downstream use so
+      # attacker-controlled file contents (e.g. on a fork PR) cannot inject
+      # shell into the steps below; it is then passed via env, never
+      # interpolated directly into a run script.
+      - name: Resolve pinned Swift version
+        id: swift
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < .swift-version)"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "::error::Unexpected .swift-version contents: '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install Linux Swift dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+
+      - name: Cache Swiftly toolchain
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.local/bin/swiftly
+          key: ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
+          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
+          mkdir -p "$SWIFTLY_BIN_DIR"
+          export PATH="$SWIFTLY_BIN_DIR:$PATH"
+
+          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+            cd "$tmpdir"
+            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
+            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
+            tar -zxf "$swiftly_archive"
+            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          fi
+
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
+
+      - name: Install the wasm32-wasi Swift SDK
+        shell: bash
+        env:
+          SWIFT_VERSION: ${{ steps.swift.outputs.version }}
+        run: |
+          set -euo pipefail
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          case "$SWIFT_VERSION" in
+            6.3.1)
+              WASM_SDK_CHECKSUM="bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2"
+              ;;
+            *)
+              echo "::error::No pinned wasm SDK checksum for Swift ${SWIFT_VERSION}"
+              exit 1
+              ;;
+          esac
+          if ! swiftly run swift sdk list | grep -q "swift-${SWIFT_VERSION}-RELEASE_wasm"; then
+            swiftly run swift sdk install \
+              "https://download.swift.org/swift-${SWIFT_VERSION}-release/wasm-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_wasm.artifactbundle.tar.gz" \
+              --checksum "$WASM_SDK_CHECKSUM"
+          fi
+          swiftly run swift sdk list
+
+      - name: Cross-compile SwiftTUIWASI for wasm32-wasi
+        shell: bash
+        env:
+          SWIFT_VERSION: ${{ steps.swift.outputs.version }}
+        run: |
+          set -euo pipefail
+          . "${SWIFTLY_HOME_DIR}/env.sh"
+          swiftly run swift build \
+            --swift-sdk "swift-${SWIFT_VERSION}-RELEASE_wasm" \
+            --product SwiftTUIWASI
+
   macos-gate:
     name: macOS repo gate
     runs-on: macos-26
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_macos) }}
     timeout-minutes: 30
 
     steps:
@@ -326,7 +443,7 @@ jobs:
         shell: bash
         env:
           RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
-          RUN_MACOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
+          RUN_MACOS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_macos) }}
         run: |
           set -euo pipefail
           mkdir -p .ci-results
