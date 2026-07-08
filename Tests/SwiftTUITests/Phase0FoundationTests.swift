@@ -79,8 +79,122 @@ struct Phase0FoundationTests {
     let secondFrame = try #require(scheduler.consumeReadyFrame(at: deadline))
     #expect(secondFrame.causes == Set([.deadline]))
     #expect(secondFrame.triggeredDeadline == deadline)
-    #expect(secondFrame.nextDeadline == nil)
+    // The later deadline must SURVIVE the earlier one firing (F41): the
+    // single-slot min-coalescing this test used to codify silently discarded
+    // it, which is how a long-press timer's wake was eaten by any nearer
+    // animation/momentum tick.
+    #expect(secondFrame.nextDeadline == laterDeadline)
     #expect(scheduler.hasPendingFrame(at: deadline) == false)
+
+    let thirdFrame = try #require(scheduler.consumeReadyFrame(at: laterDeadline))
+    #expect(thirdFrame.causes == Set([.deadline]))
+    #expect(thirdFrame.triggeredDeadline == laterDeadline)
+    #expect(thirdFrame.nextDeadline == nil)
+  }
+
+  @Test("deadlines coalesce as a set: firing the nearest retains the rest")
+  func schedulerRetainsLaterDeadlinesAcrossConsumes() throws {
+    // The long-press loss shape (F41): a gesture arms its wake once at
+    // press + 500 ms; a nearer animation tick (33 ms) must not eat it.
+    let scheduler = FrameScheduler()
+    let now = MonotonicInstant(offset: .seconds(20_000))
+    let longPressWake = now.advanced(by: .milliseconds(500))
+    let animationTick = now.advanced(by: .milliseconds(33))
+
+    scheduler.requestDeadline(longPressWake)
+    scheduler.requestDeadline(animationTick)
+    // Duplicate arms coalesce.
+    scheduler.requestDeadline(animationTick)
+
+    let tickFrame = try #require(
+      scheduler.consumeReadyFrame(at: now.advanced(by: .milliseconds(40)))
+    )
+    #expect(tickFrame.triggeredDeadline == animationTick)
+    #expect(tickFrame.nextDeadline == longPressWake)
+
+    // The long-press wake still fires on its own timer.
+    let pressFrame = try #require(scheduler.consumeReadyFrame(at: longPressWake))
+    #expect(pressFrame.triggeredDeadline == longPressWake)
+    #expect(pressFrame.nextDeadline == nil)
+  }
+
+  @Test("multiple overdue deadlines drain in one frame at the latest due instant")
+  func schedulerDrainsAllOverdueDeadlinesInOneFrame() throws {
+    let scheduler = FrameScheduler()
+    let now = MonotonicInstant(offset: .seconds(30_000))
+    let first = now.advanced(by: .milliseconds(10))
+    let second = now.advanced(by: .milliseconds(20))
+    let future = now.advanced(by: .seconds(5))
+
+    scheduler.requestDeadline(second)
+    scheduler.requestDeadline(first)
+    scheduler.requestDeadline(future)
+
+    let frame = try #require(scheduler.consumeReadyFrame(at: now.advanced(by: .seconds(1))))
+    // Both overdue deadlines drain in this frame; the triggered instant is the
+    // LATEST due one so every consumer whose deadline passed sees itself due.
+    #expect(frame.triggeredDeadline == second)
+    #expect(frame.nextDeadline == future)
+    #expect(scheduler.hasPendingFrame(at: now.advanced(by: .seconds(1))) == false)
+  }
+
+  @Test("deadlines armed during a drain pass are withheld until the next pass")
+  func schedulerWithholdsDeadlinesArmedAfterTheDrainPassCut() throws {
+    let scheduler = FrameScheduler()
+    let base = MonotonicInstant(offset: .seconds(40_000))
+    let preArmed = base.advanced(by: .milliseconds(10))
+    scheduler.requestDeadline(preArmed)
+    let cut = scheduler.deadlineArmCut
+
+    // Consuming under the cut sees the pre-armed deadline.
+    let now = base.advanced(by: .milliseconds(100))
+    let frame = try #require(scheduler.consumeReadyFrame(at: now, armedBefore: cut))
+    #expect(frame.triggeredDeadline == preArmed)
+
+    // A re-arm DURING the pass — already due, the slow-machine shape — is
+    // withheld from this pass...
+    let inPassReArm = base.advanced(by: .milliseconds(50))
+    scheduler.requestDeadline(inPassReArm)
+    #expect(scheduler.consumeReadyFrame(at: now, armedBefore: cut) == nil)
+
+    // ...but never lost: the outer loop's live view still reports it pending,
+    // and the next pass's cut admits it.
+    #expect(scheduler.hasPendingFrame(at: now))
+    #expect(scheduler.nextWakeInstant(after: now) == now)
+    let nextFrame = try #require(
+      scheduler.consumeReadyFrame(at: now, armedBefore: scheduler.deadlineArmCut)
+    )
+    #expect(nextFrame.triggeredDeadline == inPassReArm)
+    #expect(nextFrame.nextDeadline == nil)
+  }
+
+  @Test("a drain pass terminates even when every consumed frame re-arms a due deadline")
+  func schedulerDrainPassTerminatesUnderPerpetualReArm() {
+    // The red-pin livelock shape (report 2026-07-07-008): per-frame cost at or
+    // above the animation cadence means every frame's re-arm is already due by
+    // the drain's re-check, so a cut-free surviving set never quiesces. The
+    // pass cut bounds the drain to deadlines armed before pass entry.
+    let scheduler = FrameScheduler()
+    var now = MonotonicInstant(offset: .seconds(50_000))
+    scheduler.requestDeadline(now)
+    let cut = scheduler.deadlineArmCut
+
+    var consumedFrames = 0
+    while consumedFrames < 100,
+      scheduler.consumeReadyFrame(at: now, armedBefore: cut) != nil
+    {
+      consumedFrames += 1
+      // Simulate a frame slower than the 33 ms cadence whose animation
+      // re-arm is therefore already due at the loop's re-check.
+      now = now.advanced(by: .milliseconds(40))
+      scheduler.requestDeadline(now.advanced(by: .milliseconds(-5)))
+    }
+
+    #expect(consumedFrames == 1, "the pass must end once pre-cut deadlines drain")
+    #expect(
+      scheduler.hasPendingFrame(at: now),
+      "the withheld re-arm must survive for the next pass"
+    )
   }
 
   @Test("commit staging boundaries route semantics, lifecycle, and handlers explicitly")

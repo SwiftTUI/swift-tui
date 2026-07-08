@@ -89,6 +89,43 @@ package protocol PendingFrameAwaiting: AnyObject {
   func waitForPendingFrame(at now: MonotonicInstant) async
 }
 
+/// A drain-pass boundary for deadline consumption: deadlines armed at or after
+/// the cut are withheld from `consumeReadyFrame(at:armedBefore:)` — deferred to
+/// the next pass, never discarded. Captured by a frame driver at pass entry so
+/// one drain is bounded to the work armed before it began (see
+/// ``DrainPassDeadlineCutting``).
+package struct DeadlineArmCut: Equatable, Sendable {
+  package var rawValue: UInt64
+
+  package init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+}
+
+/// Bounds a drain-until-quiescent frame loop against deadline livelock (the
+/// F41 reland shape, report 2026-07-07-008). The scheduler keeps every armed
+/// deadline until due, so later deadlines survive nearer ones — but on a
+/// machine whose per-frame cost meets or exceeds the animation cadence, each
+/// frame's re-arm would be due again by the drain's re-check and the loop
+/// would never quiesce. A driver captures ``deadlineArmCut`` once at pass
+/// entry and consumes with it: deadlines armed during the pass only become
+/// consumable on the next pass, so the pass's consumable set is finite and
+/// strictly shrinking. `hasPendingFrame`/`nextWakeInstant` deliberately keep
+/// the live view (withheld deadlines included) so the outer loop re-enters or
+/// schedules its wake promptly.
+package protocol DrainPassDeadlineCutting: AnyObject {
+  /// The cut for one drain pass: a snapshot of the arm ordering. Deadlines
+  /// armed after this read are withheld from consumes that pass this cut.
+  var deadlineArmCut: DeadlineArmCut { get }
+
+  /// `consumeReadyFrame(at:)` restricted to deadlines armed before `cut`.
+  /// Pending causes (input, invalidation, signal, external) are unaffected.
+  func consumeReadyFrame(
+    at now: MonotonicInstant,
+    armedBefore cut: DeadlineArmCut
+  ) -> ScheduledFrame?
+}
+
 /// Scheduler contract used by the runtime event loop.
 public protocol FrameScheduling: Invalidating {
   func requestInput()
@@ -115,12 +152,32 @@ public final class FrameScheduler: FrameScheduling, Sendable {
   /// The coalescing state mutated by every `request*` call and drained by
   /// `consumeReadyFrame`. Held behind `coalescingLock` so requests from any
   /// thread cannot race the main-actor run loop.
+  /// One armed wake deadline. `armOrdinal` records arm ORDER (not time) so a
+  /// drain pass can be bounded to the deadlines armed before it began — see
+  /// ``DrainPassDeadlineCutting``.
+  private struct PendingDeadline {
+    var instant: MonotonicInstant
+    var armOrdinal: UInt64
+  }
+
   private struct CoalescingState {
     var pendingCauses: Set<WakeCause> = []
     var invalidatedIdentities: Set<Identity> = []
     var signalNames: Set<String> = []
     var externalReasons: Set<String> = []
-    var nextDeadline: MonotonicInstant?
+    /// Every armed wake deadline, sorted ascending by instant and deduplicated
+    /// by instant. This was a single min-coalesced slot, which silently
+    /// DISCARDED any later deadline when a nearer one was armed — a long-press
+    /// timer's 500 ms wake was eaten by any 33 ms animation/momentum tick, and
+    /// the gesture only resolved via fallbacks (F41). Kept small in practice:
+    /// an animation tick, at most a few gesture/momentum wakes. The survival
+    /// semantics require the drivers' drain-pass cut (report 2026-07-07-008):
+    /// without it, a machine slower than the animation cadence finds a due
+    /// deadline at every drain re-check and never quiesces.
+    var pendingDeadlines: [PendingDeadline] = []
+    /// Monotonic arm counter backing ``DeadlineArmCut``. Never reset — a cut
+    /// captured before `reset()` must stay meaningful.
+    var nextDeadlineArmOrdinal: UInt64 = 0
     var pendingAnimationRequest: AnimationRequest = .inherit
     var pendingAnimationBatchID: AnimationBatchID?
     /// Tally of `request*` calls received since the last `consumeReadyFrame`.
@@ -191,10 +248,23 @@ public final class FrameScheduler: FrameScheduling, Sendable {
 
   public func requestDeadline(_ deadline: MonotonicInstant) {
     coalescingLock.withLock { state in
-      if let existing = state.nextDeadline {
-        state.nextDeadline = min(existing, deadline)
+      // Insert sorted by instant; a duplicate instant coalesces into the
+      // EXISTING entry (keeping its earlier arm ordinal, so a re-arm of an
+      // already-armed instant cannot push it behind a drain-pass cut it was
+      // already inside).
+      if let index = state.pendingDeadlines.firstIndex(where: { deadline <= $0.instant }) {
+        if state.pendingDeadlines[index].instant != deadline {
+          state.pendingDeadlines.insert(
+            PendingDeadline(instant: deadline, armOrdinal: state.nextDeadlineArmOrdinal),
+            at: index
+          )
+          state.nextDeadlineArmOrdinal += 1
+        }
       } else {
-        state.nextDeadline = deadline
+        state.pendingDeadlines.append(
+          PendingDeadline(instant: deadline, armOrdinal: state.nextDeadlineArmOrdinal)
+        )
+        state.nextDeadlineArmOrdinal += 1
       }
       state.pendingIntentRequestCount += 1
     }
@@ -204,7 +274,8 @@ public final class FrameScheduler: FrameScheduling, Sendable {
 
   public func hasPendingFrame(at now: MonotonicInstant = .now()) -> Bool {
     coalescingLock.withLock { state in
-      !state.pendingCauses.isEmpty || (state.nextDeadline.map { $0 <= now } ?? false)
+      !state.pendingCauses.isEmpty
+        || (state.pendingDeadlines.first.map { $0.instant <= now } ?? false)
     }
   }
 
@@ -216,7 +287,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
         return now
       }
 
-      guard let nextDeadline = state.nextDeadline else {
+      guard let nextDeadline = state.pendingDeadlines.first?.instant else {
         return nil
       }
       return nextDeadline <= now ? now : nextDeadline
@@ -226,8 +297,39 @@ public final class FrameScheduler: FrameScheduling, Sendable {
   public func consumeReadyFrame(
     at now: MonotonicInstant = .now()
   ) -> ScheduledFrame? {
+    consumeReadyFrame(at: now, armOrdinalBelow: .max)
+  }
+
+  private func consumeReadyFrame(
+    at now: MonotonicInstant,
+    armOrdinalBelow cut: UInt64
+  ) -> ScheduledFrame? {
     coalescingLock.withLock { state in
-      let deadlineDue = state.nextDeadline.map { $0 <= now } ?? false
+      // Every due deadline armed below the cut drains into this one frame;
+      // later deadlines SURVIVE (they used to be discarded by the single-slot
+      // min-coalesce — F41). The triggered instant is the LATEST consumed due
+      // deadline so every consumer whose deadline passed (gesture drains,
+      // momentum) sees itself due. Due deadlines at/after the cut are
+      // WITHHELD, not lost: they stay pending for the next drain pass, which
+      // is what bounds a drain on a machine slower than the animation cadence
+      // (report 2026-07-07-008).
+      let duePrefixCount = state.pendingDeadlines.prefix { $0.instant <= now }.count
+      var triggeredDeadline: MonotonicInstant?
+      if duePrefixCount > 0 {
+        var withheld: [PendingDeadline] = []
+        for pending in state.pendingDeadlines[..<duePrefixCount] {
+          if pending.armOrdinal < cut {
+            // Ascending instants: the last consumed entry is the latest due.
+            triggeredDeadline = pending.instant
+          } else {
+            withheld.append(pending)
+          }
+        }
+        if triggeredDeadline != nil {
+          state.pendingDeadlines.replaceSubrange(0..<duePrefixCount, with: withheld)
+        }
+      }
+      let deadlineDue = triggeredDeadline != nil
       guard !state.pendingCauses.isEmpty || deadlineDue else {
         return nil
       }
@@ -242,8 +344,8 @@ public final class FrameScheduler: FrameScheduling, Sendable {
         invalidatedIdentities: state.invalidatedIdentities,
         signalNames: state.signalNames.sorted(),
         externalReasons: state.externalReasons.sorted(),
-        triggeredDeadline: deadlineDue ? state.nextDeadline : nil,
-        nextDeadline: deadlineDue ? nil : state.nextDeadline,
+        triggeredDeadline: triggeredDeadline,
+        nextDeadline: state.pendingDeadlines.first?.instant,
         animationRequest: state.pendingAnimationRequest,
         animationBatchID: state.pendingAnimationBatchID,
         intentRequestCount: state.pendingIntentRequestCount
@@ -256,9 +358,6 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.pendingAnimationRequest = .inherit
       state.pendingAnimationBatchID = nil
       state.pendingIntentRequestCount = 0
-      if deadlineDue {
-        state.nextDeadline = nil
-      }
 
       return scheduled
     }
@@ -273,7 +372,9 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.pendingAnimationRequest = .inherit
       state.pendingAnimationBatchID = nil
       state.pendingIntentRequestCount = 0
-      state.nextDeadline = nil
+      // The arm ordinal is deliberately NOT reset: a drain-pass cut captured
+      // before a reset must keep excluding deadlines armed after it.
+      state.pendingDeadlines.removeAll(keepingCapacity: true)
     }
   }
 
@@ -345,6 +446,19 @@ public final class FrameScheduler: FrameScheduling, Sendable {
 extension FrameScheduler: WakeNotifyingFrameScheduling {
   package func setWakeHandler(_ handler: (@Sendable () -> Void)?) {
     wakeHandlerLock.withLockUnchecked { $0 = handler }
+  }
+}
+
+extension FrameScheduler: DrainPassDeadlineCutting {
+  package var deadlineArmCut: DeadlineArmCut {
+    DeadlineArmCut(rawValue: coalescingLock.withLock { $0.nextDeadlineArmOrdinal })
+  }
+
+  package func consumeReadyFrame(
+    at now: MonotonicInstant,
+    armedBefore cut: DeadlineArmCut
+  ) -> ScheduledFrame? {
+    consumeReadyFrame(at: now, armOrdinalBelow: cut.rawValue)
   }
 }
 

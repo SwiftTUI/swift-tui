@@ -1260,6 +1260,113 @@ struct OffscreenFrameElisionRuntimeTests {
     )
   }
 
+  // MARK: - Slow-machine drain termination (F41 reland guard)
+
+  /// The red-pin livelock guard (report 2026-07-07-008): on a machine whose
+  /// per-frame cost meets or exceeds the 33 ms animation cadence, every
+  /// deadline a live `repeatForever` animation re-arms during a drain is
+  /// already due by the loop's re-check. With the scheduler's surviving
+  /// deadline set (F41) and no drain-pass cut, one `renderPendingFramesAsync`
+  /// call never returns — the hang that killed the Linux push gate at pin
+  /// `9f2a8bfd` (this suite's interleave test was the deterministic victim on
+  /// GitHub's 4-core runners). The frame drivers now bound each drain pass to
+  /// the deadlines armed before pass entry, so this call must return on ANY
+  /// machine.
+  ///
+  /// Machine speed is simulated, not assumed: the injectable
+  /// `frameReadinessClock` advances 40 ms per read — past the animation
+  /// cadence — so every in-pass re-arm is already due at the next consume,
+  /// exactly the CI-class runner shape, however fast the real host is.
+  @Test(
+    "a drain pass returns on a machine slower than the animation cadence",
+    .timeLimit(.minutes(1))
+  )
+  func drainPassReturnsWhenFrameCostExceedsAnimationCadence() async throws {
+    let terminalSize = CellSize(width: 20, height: 2)
+    let rootIdentity = testIdentity("SlowMachineDrain", "Root")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        OffscreenAnimatedProbe()
+      }
+    )
+
+    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
+    }
+
+    // Mount + settle the onAppear follow-up on the real clock so the
+    // repeatForever registration is deterministic (synchronous driver — same
+    // rationale as the tests above; see docs/KNOWN-TEST-FLAKES.md).
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    var settleFrames = 0
+    while scheduler.hasPendingFrame(at: .now()) && settleFrames < 400 {
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      settleFrames += 1
+    }
+    #expect(
+      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+      "the repeatForever animation must be in flight before the slow drain"
+    )
+
+    // The seed deadline is armed AT the clock's start instant so the pass's
+    // first consume (which reads exactly `drainStart`) sees it due — armed
+    // any later it would sit in the first read's future and the drain would
+    // return vacuously, never establishing the re-arm chain under test.
+    let drainStart = MonotonicInstant.now()
+    let clock = SteppingReadinessClock(start: drainStart, step: .milliseconds(40))
+    runLoop.frameReadinessClock = { [clock] in clock.nextReading() }
+
+    // One drain pass on the simulated slow machine. RETURNING is the
+    // regression assertion: without the drain-pass deadline cut this awaits
+    // forever (caught here by the time limit rather than a CI step watchdog).
+    scheduler.requestDeadline(drainStart)
+    let framesBeforeDrain = renderedFrames
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &renderedFrames,
+      eventPump: nil
+    )
+    #expect(
+      renderedFrames > framesBeforeDrain,
+      "the seed deadline must have driven at least one frame (elided or committed)"
+    )
+
+    // The cut withholds in-pass re-arms; it must not LOSE them — the
+    // animation pump stays alive for the next pass.
+    #expect(
+      scheduler.hasPendingFrame(at: .now().advanced(by: .seconds(60))),
+      "the in-pass animation re-arm must stay pending for the next drain pass"
+    )
+  }
+
   /// Builds a minimal one-shot `FrameHeadTransaction` (no abort checkpoints)
   /// wired to the given live animation controller via a real
   /// `AnimationFrameDraft`. One-shot mode is sufficient here: `commitElided()`
@@ -1321,6 +1428,27 @@ private func resolvedLeaf(identity: Identity, opacity: Double) -> ResolvedNode {
     kind: .view("Leaf"),
     drawMetadata: metadata
   )
+}
+
+/// A frame-readiness clock that advances past the animation cadence on every
+/// read, simulating a machine whose per-frame cost exceeds the 33 ms animation
+/// interval regardless of real host speed (the red-pin CI-runner class, report
+/// 2026-07-07-008).
+@MainActor
+private final class SteppingReadinessClock {
+  private var reading: MonotonicInstant
+  private let step: Duration
+
+  init(start: MonotonicInstant, step: Duration) {
+    reading = start
+    self.step = step
+  }
+
+  func nextReading() -> MonotonicInstant {
+    let current = reading
+    reading = reading.advanced(by: step)
+    return current
+  }
 }
 
 /// Records which post-injection stages a render executor reached. The

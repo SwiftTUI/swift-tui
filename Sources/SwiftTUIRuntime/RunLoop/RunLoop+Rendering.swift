@@ -20,7 +20,8 @@ extension RunLoop {
     renderer.setElidedFrameTimingDiagnosticsEnabled(
       hasFrameSink || runtimeConfiguration.debug
     )
-    while var scheduledFrame = scheduler.consumeReadyFrame(at: frameReadinessClock()) {
+    let drainPass = beginDeadlineDrainPass()
+    while var scheduledFrame = consumeReadyFrame(for: drainPass) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
@@ -87,6 +88,38 @@ extension RunLoop {
       previousRenderedState = currentState
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
+  }
+
+  /// Captures the drain-owned deadline cut for one frame-driver pass (the F41
+  /// reland guard, report 2026-07-07-008). The scheduler keeps a deadline SET
+  /// so later deadlines survive nearer ones — a long-press recognizer's 500 ms
+  /// wake is no longer eaten by a 33 ms animation/momentum tick — but survival
+  /// alone livelocks the drain on a machine whose per-frame cost meets the
+  /// animation cadence: every frame's re-arm is due again by the loop's
+  /// re-check. Consuming against a pass-entry cut bounds each drain to the
+  /// deadlines armed before it began; deadlines armed during the pass
+  /// (animation and momentum re-arms) are withheld — not lost — and the outer
+  /// loop's live `hasPendingFrame`/`nextWakeInstant` view re-enters a fresh
+  /// pass for them promptly.
+  private func beginDeadlineDrainPass() -> (
+    scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut
+  )? {
+    guard let cuttingScheduler = scheduler as? any DrainPassDeadlineCutting else {
+      return nil
+    }
+    return (cuttingScheduler, cuttingScheduler.deadlineArmCut)
+  }
+
+  private func consumeReadyFrame(
+    for drainPass: (scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut)?
+  ) -> ScheduledFrame? {
+    guard let drainPass else {
+      return scheduler.consumeReadyFrame(at: frameReadinessClock())
+    }
+    return drainPass.scheduler.consumeReadyFrame(
+      at: frameReadinessClock(),
+      armedBefore: drainPass.cut
+    )
   }
 
   /// Publishes this run loop's `currentFocusedValues` as the live
@@ -243,7 +276,8 @@ extension RunLoop {
     renderer.setElidedFrameTimingDiagnosticsEnabled(
       hasFrameSink || runtimeConfiguration.debug
     )
-    frameLoop: while var scheduledFrame = scheduler.consumeReadyFrame(at: frameReadinessClock()) {
+    let drainPass = beginDeadlineDrainPass()
+    frameLoop: while var scheduledFrame = consumeReadyFrame(for: drainPass) {
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
