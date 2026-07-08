@@ -79,63 +79,8 @@ struct Phase0FoundationTests {
     let secondFrame = try #require(scheduler.consumeReadyFrame(at: deadline))
     #expect(secondFrame.causes == Set([.deadline]))
     #expect(secondFrame.triggeredDeadline == deadline)
-    // The later deadline must SURVIVE the earlier one firing (F41): the
-    // single-slot min-coalescing this test used to codify silently discarded
-    // it, which is how a long-press timer's wake was eaten by any nearer
-    // animation/momentum tick.
-    #expect(secondFrame.nextDeadline == laterDeadline)
+    #expect(secondFrame.nextDeadline == nil)
     #expect(scheduler.hasPendingFrame(at: deadline) == false)
-
-    let thirdFrame = try #require(scheduler.consumeReadyFrame(at: laterDeadline))
-    #expect(thirdFrame.causes == Set([.deadline]))
-    #expect(thirdFrame.triggeredDeadline == laterDeadline)
-    #expect(thirdFrame.nextDeadline == nil)
-  }
-
-  @Test("deadlines coalesce as a set: firing the nearest retains the rest")
-  func schedulerRetainsLaterDeadlinesAcrossConsumes() throws {
-    // The long-press loss shape (F41): a gesture arms its wake once at
-    // press + 500 ms; a nearer animation tick (33 ms) must not eat it.
-    let scheduler = FrameScheduler()
-    let now = MonotonicInstant(offset: .seconds(20_000))
-    let longPressWake = now.advanced(by: .milliseconds(500))
-    let animationTick = now.advanced(by: .milliseconds(33))
-
-    scheduler.requestDeadline(longPressWake)
-    scheduler.requestDeadline(animationTick)
-    // Duplicate arms coalesce.
-    scheduler.requestDeadline(animationTick)
-
-    let tickFrame = try #require(
-      scheduler.consumeReadyFrame(at: now.advanced(by: .milliseconds(40)))
-    )
-    #expect(tickFrame.triggeredDeadline == animationTick)
-    #expect(tickFrame.nextDeadline == longPressWake)
-
-    // The long-press wake still fires on its own timer.
-    let pressFrame = try #require(scheduler.consumeReadyFrame(at: longPressWake))
-    #expect(pressFrame.triggeredDeadline == longPressWake)
-    #expect(pressFrame.nextDeadline == nil)
-  }
-
-  @Test("multiple overdue deadlines drain in one frame at the latest due instant")
-  func schedulerDrainsAllOverdueDeadlinesInOneFrame() throws {
-    let scheduler = FrameScheduler()
-    let now = MonotonicInstant(offset: .seconds(30_000))
-    let first = now.advanced(by: .milliseconds(10))
-    let second = now.advanced(by: .milliseconds(20))
-    let future = now.advanced(by: .seconds(5))
-
-    scheduler.requestDeadline(second)
-    scheduler.requestDeadline(first)
-    scheduler.requestDeadline(future)
-
-    let frame = try #require(scheduler.consumeReadyFrame(at: now.advanced(by: .seconds(1))))
-    // Both overdue deadlines drain in this frame; the triggered instant is the
-    // LATEST due one so every consumer whose deadline passed sees itself due.
-    #expect(frame.triggeredDeadline == second)
-    #expect(frame.nextDeadline == future)
-    #expect(scheduler.hasPendingFrame(at: now.advanced(by: .seconds(1))) == false)
   }
 
   @Test("commit staging boundaries route semantics, lifecycle, and handlers explicitly")

@@ -120,13 +120,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
     var invalidatedIdentities: Set<Identity> = []
     var signalNames: Set<String> = []
     var externalReasons: Set<String> = []
-    /// Every armed wake deadline, sorted ascending and deduplicated. This was
-    /// a single min-coalesced slot, which silently DISCARDED any later
-    /// deadline when a nearer one was armed — a long-press timer's 500 ms
-    /// wake was eaten by any 33 ms animation/momentum tick, and the gesture
-    /// only resolved via fallbacks (F41). Kept small in practice: an
-    /// animation tick, at most a few gesture/momentum wakes.
-    var pendingDeadlines: [MonotonicInstant] = []
+    var nextDeadline: MonotonicInstant?
     var pendingAnimationRequest: AnimationRequest = .inherit
     var pendingAnimationBatchID: AnimationBatchID?
     /// Tally of `request*` calls received since the last `consumeReadyFrame`.
@@ -197,12 +191,10 @@ public final class FrameScheduler: FrameScheduling, Sendable {
 
   public func requestDeadline(_ deadline: MonotonicInstant) {
     coalescingLock.withLock { state in
-      if let index = state.pendingDeadlines.firstIndex(where: { deadline <= $0 }) {
-        if state.pendingDeadlines[index] != deadline {
-          state.pendingDeadlines.insert(deadline, at: index)
-        }
+      if let existing = state.nextDeadline {
+        state.nextDeadline = min(existing, deadline)
       } else {
-        state.pendingDeadlines.append(deadline)
+        state.nextDeadline = deadline
       }
       state.pendingIntentRequestCount += 1
     }
@@ -212,8 +204,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
 
   public func hasPendingFrame(at now: MonotonicInstant = .now()) -> Bool {
     coalescingLock.withLock { state in
-      !state.pendingCauses.isEmpty
-        || (state.pendingDeadlines.first.map { $0 <= now } ?? false)
+      !state.pendingCauses.isEmpty || (state.nextDeadline.map { $0 <= now } ?? false)
     }
   }
 
@@ -225,7 +216,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
         return now
       }
 
-      guard let nextDeadline = state.pendingDeadlines.first else {
+      guard let nextDeadline = state.nextDeadline else {
         return nil
       }
       return nextDeadline <= now ? now : nextDeadline
@@ -236,12 +227,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
     at now: MonotonicInstant = .now()
   ) -> ScheduledFrame? {
     coalescingLock.withLock { state in
-      // Every due deadline drains into this one frame; later deadlines
-      // SURVIVE (they used to be discarded by the single-slot min-coalesce).
-      // The triggered instant is the LATEST due deadline so every consumer
-      // whose deadline passed (gesture drains, momentum) sees itself due.
-      let dueCount = state.pendingDeadlines.prefix { $0 <= now }.count
-      let deadlineDue = dueCount > 0
+      let deadlineDue = state.nextDeadline.map { $0 <= now } ?? false
       guard !state.pendingCauses.isEmpty || deadlineDue else {
         return nil
       }
@@ -256,10 +242,8 @@ public final class FrameScheduler: FrameScheduling, Sendable {
         invalidatedIdentities: state.invalidatedIdentities,
         signalNames: state.signalNames.sorted(),
         externalReasons: state.externalReasons.sorted(),
-        triggeredDeadline: deadlineDue ? state.pendingDeadlines[dueCount - 1] : nil,
-        nextDeadline: dueCount < state.pendingDeadlines.count
-          ? state.pendingDeadlines[dueCount]
-          : nil,
+        triggeredDeadline: deadlineDue ? state.nextDeadline : nil,
+        nextDeadline: deadlineDue ? nil : state.nextDeadline,
         animationRequest: state.pendingAnimationRequest,
         animationBatchID: state.pendingAnimationBatchID,
         intentRequestCount: state.pendingIntentRequestCount
@@ -273,7 +257,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.pendingAnimationBatchID = nil
       state.pendingIntentRequestCount = 0
       if deadlineDue {
-        state.pendingDeadlines.removeFirst(dueCount)
+        state.nextDeadline = nil
       }
 
       return scheduled
@@ -289,7 +273,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.pendingAnimationRequest = .inherit
       state.pendingAnimationBatchID = nil
       state.pendingIntentRequestCount = 0
-      state.pendingDeadlines.removeAll(keepingCapacity: true)
+      state.nextDeadline = nil
     }
   }
 
