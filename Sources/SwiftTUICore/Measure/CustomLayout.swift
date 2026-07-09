@@ -70,12 +70,6 @@ extension LayoutPassContextCustomLayoutProxy {
   }
 }
 
-/// Execution mode advertised by a custom layout handle.
-package enum CustomLayoutExecutionCapability: Equatable, Sendable {
-  case mainActorOnly
-  case worker
-}
-
 /// Interface implemented by custom layouts that can execute on the frame-tail
 /// worker without crossing a main-actor-isolated proxy.
 package protocol WorkerCustomLayoutProxy: Sendable {
@@ -180,7 +174,7 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
 }
 
 /// Reference wrapper used to carry a custom layout through the pipeline.
-package final class CustomLayoutHandle: Sendable {
+package final class CustomLayoutHandle: CustomLayoutToken {
   package let proxy: any CustomLayoutProxy
   package let workerProxy: (any WorkerCustomLayoutProxy)?
   package let measurementReuseSignature: String?

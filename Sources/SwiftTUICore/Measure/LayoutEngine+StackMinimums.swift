@@ -344,7 +344,10 @@ extension LayoutEngine {
       return childMinimums.first ?? 0
     case .viewThatFits:
       return childMinimums.max() ?? 0
-    case .custom(let handle):
+    case .custom(let token):
+      guard let handle = token as? CustomLayoutHandle else {
+        preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+      }
       return handle.stackMinimumMainSize(
         engine: self,
         node: node,

@@ -66,7 +66,7 @@ package enum LayoutBehavior: Sendable {
   )
   case decoration(primaryIndex: Int, alignment: Alignment)
   case viewThatFits(AxisSet)
-  case custom(CustomLayoutHandle)
+  case custom(any CustomLayoutToken)
 }
 
 extension LayoutBehavior: Equatable {
@@ -166,7 +166,7 @@ extension LayoutBehavior: Equatable {
     case (.viewThatFits(let lhsAxes), .viewThatFits(let rhsAxes)):
       return lhsAxes == rhsAxes
     case (.custom(let lhsHandle), .custom(let rhsHandle)):
-      return lhsHandle == rhsHandle
+      return lhsHandle === rhsHandle
     default:
       return false
     }

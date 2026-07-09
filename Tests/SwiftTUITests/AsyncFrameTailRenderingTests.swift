@@ -668,7 +668,9 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
     #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
-    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+    guard case .custom(let customLayoutToken) = artifacts.resolvedTree.layoutBehavior,
+      let customLayoutHandle = customLayoutToken as? CustomLayoutHandle
+    else {
       Issue.record("expected custom layout root")
       return
     }
@@ -728,7 +730,9 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
     #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
-    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+    guard case .custom(let customLayoutToken) = artifacts.resolvedTree.layoutBehavior,
+      let customLayoutHandle = customLayoutToken as? CustomLayoutHandle
+    else {
       Issue.record("expected custom layout root")
       return
     }
@@ -884,7 +888,9 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.work.customLayoutFallbackCount == 0)
     #expect(artifacts.diagnostics.work.firstCustomLayoutFallbackIdentity == nil)
-    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+    guard case .custom(let customLayoutToken) = artifacts.resolvedTree.layoutBehavior,
+      let customLayoutHandle = customLayoutToken as? CustomLayoutHandle
+    else {
       Issue.record("expected custom layout root")
       return
     }

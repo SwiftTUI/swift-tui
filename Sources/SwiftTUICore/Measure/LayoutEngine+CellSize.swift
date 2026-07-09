@@ -265,7 +265,10 @@ extension LayoutEngine {
       return childMeasurements[primaryIndex].measuredSize
     case .viewThatFits:
       return childMeasurements.first?.measuredSize ?? .zero
-    case .custom(let handle):
+    case .custom(let token):
+      guard let handle = token as? CustomLayoutHandle else {
+        preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+      }
       return handle.measureContainer(
         engine: self,
         node: resolved,

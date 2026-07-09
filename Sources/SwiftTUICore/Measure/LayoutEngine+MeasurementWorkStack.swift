@@ -555,7 +555,10 @@ extension LayoutEngine {
         ),
         work: &work
       )
-    case .custom(let handle):
+    case .custom(let token):
+      guard let handle = token as? CustomLayoutHandle else {
+        preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+      }
       guard
         passContext?.enterCustomLayoutCompatibilityBoundary(
           identity: node.identity,
