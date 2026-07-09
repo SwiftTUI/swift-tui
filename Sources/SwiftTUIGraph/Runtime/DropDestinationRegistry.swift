@@ -46,8 +46,7 @@ package struct DropDestinationRegistrySnapshot: Sendable {
 /// innermost attention target, the inverse of broad-shortcut routing.
 @MainActor
 package final class DropDestinationRegistry: Equatable {
-  private var handlersByScope: [Identity: DropDestinationHandler] = [:]
-  private var ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  private var store = IdentityKeyedRegistryStorage<DropDestinationHandler>()
 
   package init() {}
 
@@ -68,12 +67,12 @@ package final class DropDestinationRegistry: Equatable {
     at scope: Identity,
     handler: @escaping DropDestinationHandler
   ) {
-    handlersByScope[scope] = handler
-    ownersByScope[scope] = .current(identity: scope)
+    let owner = RuntimeRegistrationOwnerKey.current(identity: scope)
+    store.set(handler, for: scope, owner: owner)
     ViewNodeContext.current?.recordDropDestinationRegistration(
       DropDestinationRegistrySnapshot(
         handlersByScope: [scope: handler],
-        ownersByScope: [scope: ownersByScope[scope] ?? .init(identity: scope)]
+        ownersByScope: [scope: owner]
       )
     )
   }
@@ -89,7 +88,7 @@ package final class DropDestinationRegistry: Equatable {
 
   /// Returns the registered handler at `scope`, if any.
   package func handler(at scope: Identity) -> DropDestinationHandler? {
-    handlersByScope[scope]
+    store[scope]
   }
 
   /// Walks `scopePath` from leaf to root, invoking the first registered
@@ -108,7 +107,7 @@ package final class DropDestinationRegistry: Equatable {
     along scopePath: [Identity]
   ) -> Bool {
     for scope in scopePath.reversed() {
-      guard let handler = handlersByScope[scope] else { continue }
+      guard let handler = store[scope] else { continue }
       if handler(paths, context) {
         return true
       }
@@ -118,37 +117,24 @@ package final class DropDestinationRegistry: Equatable {
 
   /// Clears every registration.
   package func reset() {
-    handlersByScope.removeAll(keepingCapacity: true)
-    ownersByScope.removeAll(keepingCapacity: true)
+    store.reset()
   }
 
   package func snapshot() -> DropDestinationRegistrySnapshot {
     DropDestinationRegistrySnapshot(
-      handlersByScope: handlersByScope,
-      ownersByScope: ownersByScope
+      handlersByScope: store.values,
+      ownersByScope: store.ownersByIdentity
     )
   }
 
   package func restore(_ snapshot: DropDestinationRegistrySnapshot) {
-    guard !snapshot.isEmpty else {
-      return
-    }
-
-    for (identity, handler) in snapshot.handlersByScope {
-      handlersByScope[identity] = handler
-      ownersByScope[identity] = snapshot.ownersByScope[identity] ?? .init(identity: identity)
-    }
+    store.restore(snapshot.handlersByScope, ownersByIdentity: snapshot.ownersByScope)
   }
 
   /// Removes every registration whose identity sits under any of
   /// `roots`. Called by `RuntimeRegistrationSet.removeSubtrees` during
   /// partial re-resolves so stale handlers don't linger.
   package func removeSubtrees(rootedAt roots: [Identity]) {
-    guard !roots.isEmpty else { return }
-    for identity in handlersByScope.keys
-    where (ownersByScope[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots) {
-      handlersByScope.removeValue(forKey: identity)
-      ownersByScope.removeValue(forKey: identity)
-    }
+    store.removeSubtrees(rootedAt: roots)
   }
 }

@@ -23,8 +23,7 @@ public enum TerminationDisposition: Equatable, Sendable {
 package final class LocalTerminationRegistry: Equatable {
   package typealias Handler = @MainActor (TerminationRequest) -> TerminationDisposition
 
-  private var handlers: [Identity: [Handler]] = [:]
-  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  private var store = IdentityKeyedRegistryStorage<[Handler]>()
 
   package init() {}
 
@@ -39,8 +38,11 @@ package final class LocalTerminationRegistry: Equatable {
     identity: Identity,
     handler: @escaping Handler
   ) {
-    handlers[identity, default: []].append(handler)
-    ownersByIdentity[identity] = .current(identity: identity)
+    store.set(
+      (store[identity] ?? []) + [handler],
+      for: identity,
+      owner: .current(identity: identity)
+    )
     ViewNodeContext.current?.recordTerminationHandlerRegistration(
       identity: identity,
       handler: handler
@@ -58,7 +60,7 @@ package final class LocalTerminationRegistry: Equatable {
       orderedIdentities.append(identity)
     }
 
-    let remaining = handlers.keys
+    let remaining = store.values.keys
       .filter { !visited.contains($0) }
       .sorted { lhs, rhs in
         if lhs.components.count != rhs.components.count {
@@ -69,7 +71,7 @@ package final class LocalTerminationRegistry: Equatable {
     orderedIdentities.append(contentsOf: remaining)
 
     for identity in orderedIdentities {
-      guard let identityHandlers = handlers[identity] else {
+      guard let identityHandlers = store[identity] else {
         continue
       }
       for handler in identityHandlers.reversed() {
@@ -83,40 +85,23 @@ package final class LocalTerminationRegistry: Equatable {
   }
 
   package func reset() {
-    handlers.removeAll(keepingCapacity: true)
-    ownersByIdentity.removeAll(keepingCapacity: true)
+    store.reset()
   }
 
   package func removeSubtrees(
     rootedAt roots: [Identity]
   ) {
-    guard !roots.isEmpty else {
-      return
-    }
-
-    for identity in handlers.keys.filter({
-      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
-    }) {
-      handlers.removeValue(forKey: identity)
-      ownersByIdentity.removeValue(forKey: identity)
-    }
+    store.removeSubtrees(rootedAt: roots)
   }
 
   package func snapshot() -> [Identity: [Handler]] {
-    handlers
+    store.values
   }
 
   package func restore(
     _ snapshot: [Identity: [Handler]],
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
-    guard !snapshot.isEmpty else {
-      return
-    }
-
-    for (identity, handlers) in snapshot {
-      self.handlers[identity] = handlers
-      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
-    }
+    store.restore(snapshot, ownersByIdentity: ownersByIdentity)
   }
 }

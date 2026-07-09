@@ -77,8 +77,7 @@ package struct CommandRegistrySnapshot: Sendable {
 /// but no action fires — strict shallowest-wins semantics.
 @MainActor
 package final class CommandRegistry: Equatable {
-  private var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
-  private var ownersByScope: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  private var store = IdentityKeyedRegistryStorage<[KeyBinding: RegisteredKeyCommand]>()
 
   package init() {}
 
@@ -94,7 +93,7 @@ package final class CommandRegistry: Equatable {
     isEnabled: Bool,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
-    var table = keyCommandsByScope[scope] ?? [:]
+    var table = store[scope] ?? [:]
     // No duplicate-overwrite alarm here (F104): this live table carries the
     // previous frame's entries across re-resolves (registration is eager;
     // publication reconciles later), so `table[binding] != nil` is the
@@ -109,12 +108,12 @@ package final class CommandRegistry: Equatable {
       isEnabled: isEnabled,
       action: action
     )
-    keyCommandsByScope[scope] = table
-    ownersByScope[scope] = .current(identity: scope)
+    let owner = RuntimeRegistrationOwnerKey.current(identity: scope)
+    store.set(table, for: scope, owner: owner)
     ViewNodeContext.current?.recordCommandRegistration(
       CommandRegistrySnapshot(
         keyCommandsByScope: [scope: table],
-        ownersByScope: [scope: ownersByScope[scope] ?? .init(identity: scope)]
+        ownersByScope: [scope: owner]
       )
     )
   }
@@ -125,7 +124,7 @@ package final class CommandRegistry: Equatable {
     at scope: Identity,
     matching binding: KeyBinding
   ) -> RegisteredKeyCommand? {
-    keyCommandsByScope[scope]?[binding]
+    store[scope]?[binding]
   }
 
   /// Walks the focus chain shallowest-first and fires the first
@@ -151,26 +150,18 @@ package final class CommandRegistry: Equatable {
 
   /// Clears every registration.
   package func reset() {
-    keyCommandsByScope.removeAll(keepingCapacity: true)
-    ownersByScope.removeAll(keepingCapacity: true)
+    store.reset()
   }
 
   package func snapshot() -> CommandRegistrySnapshot {
     CommandRegistrySnapshot(
-      keyCommandsByScope: keyCommandsByScope,
-      ownersByScope: ownersByScope
+      keyCommandsByScope: store.values,
+      ownersByScope: store.ownersByIdentity
     )
   }
 
   package func restore(_ snapshot: CommandRegistrySnapshot) {
-    guard !snapshot.isEmpty else {
-      return
-    }
-
-    for (identity, commands) in snapshot.keyCommandsByScope {
-      keyCommandsByScope[identity] = commands
-      ownersByScope[identity] = snapshot.ownersByScope[identity] ?? .init(identity: identity)
-    }
+    store.restore(snapshot.keyCommandsByScope, ownersByIdentity: snapshot.ownersByScope)
   }
 
   /// Removes every key-command registered at any identity whose path is
@@ -179,11 +170,6 @@ package final class CommandRegistry: Equatable {
   /// don't duplicate stale entries and abandoned scopes don't linger in
   /// dispatch lookups.
   package func removeSubtrees(rootedAt roots: [Identity]) {
-    guard !roots.isEmpty else { return }
-    for identity in keyCommandsByScope.keys
-    where (ownersByScope[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots) {
-      keyCommandsByScope.removeValue(forKey: identity)
-      ownersByScope.removeValue(forKey: identity)
-    }
+    store.removeSubtrees(rootedAt: roots)
   }
 }

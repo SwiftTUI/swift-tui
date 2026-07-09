@@ -14,8 +14,7 @@ package final class LocalActionRegistry: Equatable {
     }
   }
 
-  private var handlers: [Identity: Registration] = [:]
-  private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  private var store = IdentityKeyedRegistryStorage<Registration>()
 
   package init() {}
 
@@ -32,8 +31,7 @@ package final class LocalActionRegistry: Equatable {
       handler: handler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
-    handlers[identity] = registration
-    ownersByIdentity[identity] = .current(identity: identity)
+    store.set(registration, for: identity, owner: .current(identity: identity))
     ViewNodeContext.current?.recordActionRegistration(
       identity: identity,
       handler: handler,
@@ -43,56 +41,39 @@ package final class LocalActionRegistry: Equatable {
 
   @discardableResult
   package func dispatch(identity: Identity) -> Bool {
-    handlers[identity]?.handler() ?? false
+    store[identity]?.handler() ?? false
   }
 
   package func followUpInvalidationIdentity(
     for identity: Identity
   ) -> Identity? {
-    handlers[identity]?.followUpInvalidationIdentity
+    store[identity]?.followUpInvalidationIdentity
   }
 
   package func hasHandler(
     identity: Identity
   ) -> Bool {
-    handlers[identity] != nil
+    store[identity] != nil
   }
 
   package func reset() {
-    handlers.removeAll(keepingCapacity: true)
-    ownersByIdentity.removeAll(keepingCapacity: true)
+    store.reset()
   }
 
   package func removeSubtrees(
     rootedAt roots: [Identity]
   ) {
-    guard !roots.isEmpty else {
-      return
-    }
-
-    for identity in handlers.keys.filter({
-      (ownersByIdentity[$0] ?? .init(identity: $0)).matchesAnySubtreeRoot(roots)
-    }) {
-      handlers.removeValue(forKey: identity)
-      ownersByIdentity.removeValue(forKey: identity)
-    }
+    store.removeSubtrees(rootedAt: roots)
   }
 
   package func snapshot() -> [Identity: Registration] {
-    handlers
+    store.values
   }
 
   package func restore(
     _ snapshot: [Identity: Registration],
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
-    guard !snapshot.isEmpty else {
-      return
-    }
-
-    for (identity, registration) in snapshot {
-      handlers[identity] = registration
-      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
-    }
+    store.restore(snapshot, ownersByIdentity: ownersByIdentity)
   }
 }
