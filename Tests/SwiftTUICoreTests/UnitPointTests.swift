@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("UnitPoint named constants match unit-coordinate specification")
 func unitPointNamedConstants() {

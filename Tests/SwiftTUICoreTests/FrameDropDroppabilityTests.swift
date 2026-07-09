@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 struct FrameDropDroppabilityTests {
   @Test("Retained-baseline blockers are never inserted only to be subtracted")

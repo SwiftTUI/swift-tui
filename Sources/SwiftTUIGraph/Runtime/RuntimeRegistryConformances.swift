@@ -11,7 +11,7 @@
 extension LocalActionRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .action }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 
@@ -48,7 +48,7 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
 
   // Key-press handlers are deliberately absent from this check at parity with
   // the pre-unification fan-out; see `frameDropEligibilityBlockers()` history.
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty && snapshotPasteHandlers().isEmpty
       ? nil
       : .handlerInstallations
@@ -101,7 +101,7 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
 extension LocalTerminationRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .termination }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 
@@ -136,7 +136,7 @@ extension LocalTerminationRegistry: RuntimeRegistry {
 extension LocalPointerHandlerRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .pointerHandler }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty && snapshotHover().isEmpty
       ? nil
       : .handlerInstallations
@@ -191,7 +191,7 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
 extension LocalGestureRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .gesture }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 
@@ -229,7 +229,7 @@ extension LocalGestureRegistry: RuntimeRegistry {
 extension LocalGestureStateRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .gestureState }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 
@@ -267,7 +267,7 @@ extension LocalGestureStateRegistry: RuntimeRegistry {
 extension LocalDefaultFocusRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .defaultFocus }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot() == DefaultFocusRegistrationSnapshot() ? nil : .focusBindingSync
   }
 
@@ -303,7 +303,7 @@ extension LocalDefaultFocusRegistry: RuntimeRegistry {
 extension LocalFocusBindingRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .focusBinding }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .focusBindingSync
   }
 
@@ -338,7 +338,7 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
 extension LocalFocusedValuesRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .focusedValues }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .focusedValueSync
   }
 
@@ -370,7 +370,7 @@ extension LocalFocusedValuesRegistry: RuntimeRegistry {
 extension LocalScrollPositionRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .scrollPosition }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .scrollSync
   }
 
@@ -406,7 +406,7 @@ extension LocalLifecycleRegistry: RuntimeRegistry {
     true
   }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .lifecycleChange
   }
 
@@ -449,7 +449,7 @@ extension LocalTaskRegistry: RuntimeRegistry {
     true
   }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .taskStart
   }
 
@@ -488,7 +488,7 @@ extension LocalPreferenceObservationRegistry: RuntimeRegistry {
     true
   }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .preferenceObservationDelta
   }
 
@@ -523,7 +523,7 @@ extension LocalPreferenceObservationRegistry: RuntimeRegistry {
 extension CommandRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .command }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 
@@ -555,7 +555,7 @@ extension CommandRegistry: RuntimeRegistry {
 extension DropDestinationRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .dropDestination }
 
-  package var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? {
+  package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
     snapshot().isEmpty ? nil : .handlerInstallations
   }
 

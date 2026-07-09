@@ -32,8 +32,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 32 | 181 |
-| `SwiftTUICore` | 90 | 592 |
+| `SwiftTUICore` | 39 | 267 |
 | `SwiftTUIPrimitives` | 166 | 1423 |
+| `SwiftTUIGraph` | 51 | 325 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -574,28 +575,13 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (90)
+### Canonical surface (39)
 
 - `AccessibilityAnnouncement` — struct — 3 members
-- `AccessibilityNode` — struct — 10 members
-- `AccessibilityPoliteness` — enum — 4 members
-- `AccessibilityRole` — enum — 39 members
-- `ActionScope` — protocol
-- `Anchor` — struct
-- `AnchorSource` — struct — 10 members
-- `AnyGestureRecognizer` — class — 4 members
-- `AnyGestureStateBinding` — class — 4 members
 - `CanvasPixelGridDrawing` — struct — 6 members
 - `CanvasPixelGridMode` — enum — 3 members
 - `DrawCommand` — enum — 14 members
-- `DropContext` — struct — 4 members
-- `DroppedPath` — struct — 6 members
-- `EnvironmentSnapshot` — struct — 5 members
-- `EventModifiers` — struct — 5 members
-- `FocusedValueKey` — protocol — 1 member
-- `FocusedValues` — struct — 3 members
 - `FocusPresentation` — struct — 11 members
-- `FocusRegion` — struct — 4 members
 - `FocusTracker` — class — 10 members
 - `FrameContext` — struct — 7 members
 - `FrameDiagnosticCounts` — struct — 9 members
@@ -610,29 +596,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FrameMainActorTimings` — struct — 3 members
 - `FramePhaseTimings` — struct — 9 members
 - `FrameRenderGenerations` — struct — 6 members
-- `FrameScheduler` — class — 10 members
-- `FrameScheduling` — protocol — 8 members
 - `FrameWorkerTimings` — struct — 6 members
-- `GestureRecognizerBuildContext` — struct — 2 members
-- `GestureRecognizerEventDisposition` — enum — 3 members
-- `GestureRecognizerPhase` — enum — 7 members
 - `InteractionRegion` — struct — 8 members
-- `Invalidating` — protocol — 1 member
-- `KeyEvent` — enum — 17 members
-- `KeyPress` — struct — 3 members
-- `KeyPressResult` — enum — 2 members
 - `layoutText(for:options:)` — func
 - `layoutText(for:width:lineLimit:truncationMode:wrappingStrategy:)` — func
-- `LifecycleMetadata` — struct — 6 members
-- `MatchedGeometryConfig` — struct — 3 members
-- `MatchedGeometryKey` — struct — 4 members
-- `MatchedGeometryNamespace` — struct — 3 members
 - `MeasurementCacheMetrics` — struct — 8 members
 - `NavigationRoute` — struct — 2 members
-- `NodeLifecycleInfo` — struct — 3 members
-- `NodeSemanticInfo` — struct — 2 members
-- `parseDroppedPaths(_:)` — func
-- `PreferenceKey` — protocol — 3 members
 - `PreformattedTextLine` — struct — 3 members
 - `PreformattedTextRun` — struct — 3 members
 - `PresentationDamage` — struct — 11 members
@@ -641,31 +610,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `RasterSurface` — struct — 10 members
 - `RenderGeneration` — struct — 4 members
 - `ResolvedTextStyle` — extension — 3 members
-- `RouteID` — struct — 4 members
-- `RouteKind` — enum — 2 members
-- `RuntimeIssue` — struct — 7 members
-- `RuntimeIssueSeverity` — enum — 3 members
-- `RuntimeIssueSink` — struct — 2 members
-- `RuntimeRegistrationDiagnostics` — struct — 5 members
-- `ScheduledFrame` — struct — 8 members
-- `ScrollRole` — enum — 4 members
-- `ScrollRoute` — struct — 5 members
-- `SectionRole` — enum — 5 members
 - `SelectionRoute` — struct — 3 members
-- `SemanticMetadata` — struct — 19 members
 - `SemanticSnapshot` — struct — 10 members
-- `StateContainer` — class — 6 members
-- `TabItemLabel` — struct — 6 members
-- `TaskDescriptor` — struct — 3 members
-- `TaskPriority` — enum — 6 members
-- `TerminationDisposition` — enum — 2 members
-- `TerminationRequest` — enum — 3 members
 - `TextCluster` — struct — 3 members
 - `TextLayoutLine` — struct — 4 members
 - `TextLayoutOptions` — struct — 5 members
 - `TextLayoutResult` — struct — 4 members
-- `TransactionSnapshot` — struct — 2 members
-- `WakeCause` — enum — 6 members
 
 ## SwiftTUIPrimitives
 
@@ -844,6 +794,69 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 ### Package-only seams (1)
 
 - `BoxedPath` — struct
+
+## SwiftTUIGraph
+
+> `SwiftTUIGraph` is not shipped as a library product. Symbols here
+> are package-internal but carry `public` access for re-export through
+> other targets.
+
+### Canonical surface (50)
+
+- `AccessibilityNode` — struct — 10 members
+- `AccessibilityPoliteness` — enum — 4 members
+- `AccessibilityRole` — enum — 39 members
+- `ActionScope` — protocol
+- `Anchor` — struct
+- `AnchorSource` — struct — 10 members
+- `AnyGestureRecognizer` — class — 4 members
+- `AnyGestureStateBinding` — class — 4 members
+- `DropContext` — struct — 4 members
+- `DroppedPath` — struct — 6 members
+- `EnvironmentSnapshot` — struct — 5 members
+- `EventModifiers` — struct — 5 members
+- `FocusedValueKey` — protocol — 1 member
+- `FocusedValues` — struct — 3 members
+- `FocusRegion` — struct — 4 members
+- `FrameScheduler` — class — 10 members
+- `FrameScheduling` — protocol — 8 members
+- `GestureRecognizerBuildContext` — struct — 2 members
+- `GestureRecognizerEventDisposition` — enum — 3 members
+- `GestureRecognizerPhase` — enum — 7 members
+- `Invalidating` — protocol — 1 member
+- `KeyEvent` — enum — 17 members
+- `KeyPress` — struct — 3 members
+- `KeyPressResult` — enum — 2 members
+- `LifecycleMetadata` — struct — 6 members
+- `MatchedGeometryConfig` — struct — 3 members
+- `MatchedGeometryKey` — struct — 4 members
+- `MatchedGeometryNamespace` — struct — 3 members
+- `NodeLifecycleInfo` — struct — 3 members
+- `NodeSemanticInfo` — struct — 2 members
+- `PreferenceKey` — protocol — 3 members
+- `RouteID` — struct — 4 members
+- `RouteKind` — enum — 2 members
+- `RuntimeIssue` — struct — 7 members
+- `RuntimeIssueSeverity` — enum — 3 members
+- `RuntimeIssueSink` — struct — 2 members
+- `RuntimeRegistrationDiagnostics` — struct — 5 members
+- `ScheduledFrame` — struct — 8 members
+- `ScrollRole` — enum — 4 members
+- `ScrollRoute` — struct — 5 members
+- `SectionRole` — enum — 5 members
+- `SemanticMetadata` — struct — 19 members
+- `StateContainer` — class — 6 members
+- `TabItemLabel` — struct — 6 members
+- `TaskDescriptor` — struct — 3 members
+- `TaskPriority` — enum — 6 members
+- `TerminationDisposition` — enum — 2 members
+- `TerminationRequest` — enum — 3 members
+- `TransactionSnapshot` — struct — 2 members
+- `WakeCause` — enum — 6 members
+
+### Package-only seams (1)
+
+- `parseDroppedPaths(_:)` — func
 
 ## SwiftTUIPTYCPrimitives
 

@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Totality guards for the unified registry lifecycle (F17). The bulk
 /// operations on `RuntimeRegistrationSet` are loops over `allRegistries`

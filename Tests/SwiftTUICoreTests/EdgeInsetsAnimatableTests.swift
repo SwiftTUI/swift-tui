@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("EdgeInsets animatableData getter carries all four edges")
 func edgeInsetsAnimatableGetter() {

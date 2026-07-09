@@ -31,7 +31,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-layers="SwiftTUIPrimitives SwiftTUICore SwiftTUIViews"
+layers="SwiftTUIPrimitives SwiftTUIGraph SwiftTUICore SwiftTUIViews"
 scratch=".build/foundation-audit"
 
 rm -rf "$scratch"

@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 private struct StubProvider: MemoryMetricProvider {
   let value: MemoryMetricSnapshot

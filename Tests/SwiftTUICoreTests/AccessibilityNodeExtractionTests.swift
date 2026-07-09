@@ -1,6 +1,7 @@
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite
 struct AccessibilityNodeExtractionTests {

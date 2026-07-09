@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("BorderSet stores 13 string slots")
 func borderSetStoresAllSlots() {

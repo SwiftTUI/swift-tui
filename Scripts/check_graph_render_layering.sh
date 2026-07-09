@@ -9,26 +9,28 @@ fail() {
   exit 1
 }
 
-# Static deny-list scan that runs BEFORE the graph/render module split, while
-# every file still lives in SwiftTUICore.  It asserts the graph layer
-# (Resolve/, Runtime/, Pipeline/Scheduler.swift, Animation/) never names a
-# render-engine / phase-product / engine-context type as code.  See the
-# boundary manifest in the coordination root:
+# Static deny-list scan over the extracted SwiftTUIGraph engine target (Phase
+# 2b).  It asserts the graph layer (Resolve/, Runtime/, Pipeline/Scheduler.swift,
+# Animation/) never names a render-engine / phase-product / engine-context type
+# as code.  The compiler is now the authoritative backstop — SwiftTUIGraph
+# depends on SwiftTUIPrimitives only and cannot name a render-Core type — so this
+# stays as a belt-and-suspenders guard.  See the boundary manifest in the
+# coordination root:
 #   docs/plans/2026-07-08-001-graph-render-boundary-manifest.md
 # and Phase 1a (the PlacedNode viewport-lifecycle inversion).
 
 # ---- graph-side file set (relative to repo root) ----------------------------
-# Every .swift under Resolve/ and Runtime/, plus Pipeline/Scheduler.swift, plus
-# every .swift under Animation/.  These are the files that become SwiftTUIGraph.
+# Every .swift under SwiftTUIGraph's Resolve/ and Runtime/, plus
+# Pipeline/Scheduler.swift, plus every .swift under Animation/.
 graph_files=()
 while IFS= read -r f; do
   graph_files+=("$f")
 done < <(
   {
-    find Sources/SwiftTUICore/Resolve -name '*.swift' -type f
-    find Sources/SwiftTUICore/Runtime -name '*.swift' -type f
-    printf '%s\n' Sources/SwiftTUICore/Pipeline/Scheduler.swift
-    find Sources/SwiftTUICore/Animation -name '*.swift' -type f
+    find Sources/SwiftTUIGraph/Resolve -name '*.swift' -type f
+    find Sources/SwiftTUIGraph/Runtime -name '*.swift' -type f
+    printf '%s\n' Sources/SwiftTUIGraph/Pipeline/Scheduler.swift
+    find Sources/SwiftTUIGraph/Animation -name '*.swift' -type f
   } | sort -u
 )
 

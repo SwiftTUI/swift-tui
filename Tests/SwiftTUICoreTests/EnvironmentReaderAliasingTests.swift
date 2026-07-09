@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Regression for the environment-reader reverse-scan aliasing bug.
 ///

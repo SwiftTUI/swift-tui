@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Coverage for the sampled-release reconciliation soundness probe.
 ///

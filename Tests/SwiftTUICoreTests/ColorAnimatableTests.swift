@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("Color.hex throws instead of trapping on invalid caller input")
 func colorHexThrowsOnInvalidInput() {

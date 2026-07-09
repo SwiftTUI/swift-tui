@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite("Path construction, fill rules, and flattening")
 struct PathConstructionTests {

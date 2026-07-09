@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Regression for the incremental-repaint dirty-row cull dropping `.offset`
 /// descendants.

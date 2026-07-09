@@ -4,6 +4,20 @@ package struct LifecycleStateNode: Equatable, Sendable {
   var appearHandlerIDs: [String]
   var disappearHandlerIDs: [String]
   var tasks: [TaskDescriptor]
+
+  package init(
+    viewNodeID: ViewNodeID? = nil,
+    identity: Identity,
+    appearHandlerIDs: [String],
+    disappearHandlerIDs: [String],
+    tasks: [TaskDescriptor]
+  ) {
+    self.viewNodeID = viewNodeID
+    self.identity = identity
+    self.appearHandlerIDs = appearHandlerIDs
+    self.disappearHandlerIDs = disappearHandlerIDs
+    self.tasks = tasks
+  }
 }
 
 package enum ViewportLifecycleKey: Hashable, Sendable {

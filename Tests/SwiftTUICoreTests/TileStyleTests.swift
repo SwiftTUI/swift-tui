@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("TileStyle stores pattern, foreground, and optional background")
 func tileStyleStoresFields() {

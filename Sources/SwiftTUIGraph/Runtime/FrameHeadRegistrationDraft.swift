@@ -7,7 +7,7 @@ package final class FrameHeadRegistrationDraft {
     draftRegistrations = .scratch()
   }
 
-  package func draftDropEligibilityBlockers() -> Set<FrameDropEligibility.Blocker> {
+  package func draftDropEligibilityBlockers() -> Set<FrameDropBlocker> {
     draftRegistrations.frameDropEligibilityBlockers()
   }
 

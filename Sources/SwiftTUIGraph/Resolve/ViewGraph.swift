@@ -1057,9 +1057,11 @@ package final class ViewGraph {
     )
     if ReuseDenialTrace.isEnabled {
       for member in focusPresentationMembers {
-        let slots = nodeIfExists(for: member)?
+        let slots =
+          nodeIfExists(for: member)?
           .focusPresentationInertSlotIdentities ?? []
-        let valueVerifiedSlots = nodeIfExists(for: member)?
+        let valueVerifiedSlots =
+          nodeIfExists(for: member)?
           .focusPresentationValueVerifiedSlotIdentities ?? []
         ReuseDenialTrace.recordSuppressionScopeDescription(
           "member-slots(\(member.path))=\(slots.count)+vv\(valueVerifiedSlots.count)"

@@ -117,9 +117,18 @@ let package = Package(
     ),
 
     .target(
+      name: "SwiftTUIGraph",
+      dependencies: [
+        "SwiftTUIPrimitives"
+      ],
+      swiftSettings: swiftSettings()
+    ),
+
+    .target(
       name: "SwiftTUICore",
       dependencies: [
         "SwiftTUIPrimitives",
+        "SwiftTUIGraph",
         .product(name: "DequeModule", package: "swift-collections"),
         "SwiftFiglet",
         "EmbeddedFonts",
@@ -387,7 +396,12 @@ let package = Package(
     .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
-        "SwiftTUICore"
+        "SwiftTUICore",
+        // Phase 2b extracted the reconciliation engine into SwiftTUIGraph.
+        // This suite still exercises graph-engine internals via
+        // `@testable import SwiftTUIGraph` (the test-target split is deferred
+        // to Phase 3); depend on the module so testability is available.
+        "SwiftTUIGraph",
       ],
       swiftSettings: swiftSettings()
     ),

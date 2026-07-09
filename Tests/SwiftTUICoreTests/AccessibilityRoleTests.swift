@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 struct AccessibilityRoleTests {
   @Test("AccessibilityRole exposes stable descriptions")

@@ -100,7 +100,7 @@ package protocol RuntimeRegistry: AnyObject {
 
   /// The frame-drop blocker this registry raises while it holds any state a
   /// dropped frame would fail to (re)install, or nil when currently empty.
-  var activeFrameDropEligibilityBlocker: FrameDropEligibility.Blocker? { get }
+  var activeFrameDropEligibilityBlocker: FrameDropBlocker? { get }
 
   /// Whether this registry belongs to the low-volume effect subset
   /// (lifecycle/task/preference observation) that is re-published from EVERY

@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Anchors the framework's canonical border/stroke defaults so any
 /// regression in the implicit `StrokeStyle()` defaults is caught

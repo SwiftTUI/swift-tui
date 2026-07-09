@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("AnimatableArray element-wise addition with equal counts")
 func animatableArrayEqualCountAddition() {

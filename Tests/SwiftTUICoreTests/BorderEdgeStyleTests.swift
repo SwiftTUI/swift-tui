@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("BorderEdgeStyle stores per-side foreground styles")
 func borderEdgeStyleStoresColors() {

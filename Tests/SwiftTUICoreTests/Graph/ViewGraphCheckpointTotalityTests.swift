@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 // The mutable graph state lives in the value-typed field groups declared in
 // ViewGraphFieldGroups.swift. ViewGraph and ViewGraph.Checkpoint each store one
@@ -25,7 +26,7 @@ private func parsedFieldGroupMemberNames() throws -> [String] {
     try parsedStoredVarNames(
       typeKind: "struct",
       typeName: groupName,
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphFieldGroups.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphFieldGroups.swift"
     )
   }
 }
@@ -42,17 +43,17 @@ struct ViewGraphCheckpointTotalityTests {
     let viewGraphGroupFields = try parsedStoredVarNames(
       typeKind: "class",
       typeName: "ViewGraph",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraph.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraph.swift"
     )
     let viewGraphCheckpointGroupFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "Checkpoint",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphState.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphState.swift"
     )
     let viewGraphDebugFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphDebugSnapshots.swift"
     )
     let groupMemberFields = try parsedFieldGroupMemberNames()
 
@@ -93,14 +94,14 @@ struct ViewGraphCheckpointTotalityTests {
     let viewNodeFields = try parsedStoredVarNames(
       typeKind: "class",
       typeName: "ViewNode",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift"
     ).filter { field in
       field != "identity"
     }
     let viewNodeCheckpointFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "Checkpoint",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift"
     )
 
     #expect(Set(viewNodeFields).count == viewNodeFields.count)
@@ -121,7 +122,7 @@ struct ViewGraphCheckpointTotalityTests {
       try parsedStoredVarNames(
         typeKind: "struct",
         typeName: name,
-        relativePath: "Sources/SwiftTUICore/Resolve/ViewNodeFieldGroups.swift"
+        relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNodeFieldGroups.swift"
       )
     }
     // 12 FrameState + 7 EvaluationState + 3 ReuseState + 5 PersistentState
@@ -131,7 +132,7 @@ struct ViewGraphCheckpointTotalityTests {
 
     let snapshotBody = functionBodyText(
       named: "debugTotalStateSnapshot",
-      in: try sourceText(relativePath: "Sources/SwiftTUICore/Resolve/ViewNode.swift")
+      in: try sourceText(relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift")
     )
     #expect(!snapshotBody.isEmpty, "could not locate ViewNode.debugTotalStateSnapshot()")
     for field in groupMembers {
@@ -150,7 +151,7 @@ struct ViewGraphCheckpointTotalityTests {
     let debugFields = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",
-      relativePath: "Sources/SwiftTUICore/Resolve/ViewGraphDebugSnapshots.swift"
+      relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphDebugSnapshots.swift"
     )
     let expected = Set(canonicalFields)
 
@@ -265,13 +266,13 @@ struct ViewGraphCheckpointTotalityTests {
     let registries = try parsedStoredVarNames(
       typeKind: "struct",
       typeName: "RuntimeRegistrationSet",
-      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet.swift"
+      relativePath: "Sources/SwiftTUIGraph/Runtime/RuntimeRegistrationSet.swift"
     )
     .filter { $0.hasSuffix("Registry") }
     #expect(registries.count >= 15)
 
     let source = try sourceText(
-      relativePath: "Sources/SwiftTUICore/Runtime/RuntimeRegistrationSet.swift"
+      relativePath: "Sources/SwiftTUIGraph/Runtime/RuntimeRegistrationSet.swift"
     )
     guard
       let membersStart = source.range(of: "let members: [(any RuntimeRegistry)?] = ["),

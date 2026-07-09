@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Soundness guard for the scoped `.subtrees` runtime-registration restore
 /// (commit_ms Fix 2). A narrow invalidation must leave the live registry

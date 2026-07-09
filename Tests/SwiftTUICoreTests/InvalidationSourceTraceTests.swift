@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Locks the invalidation-source diagnostic that decomposes how a frame's
 /// invalidation set is assembled (raw scheduler set vs portal-translation vs

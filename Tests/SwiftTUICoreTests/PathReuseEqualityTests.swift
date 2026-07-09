@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Phase 3: the reuse fast paths key on value equality of `drawPayload`. A
 /// custom-path node carries `ShapeGeometry.path(BoxedPath, FillRule)`, where

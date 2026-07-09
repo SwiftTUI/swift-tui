@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test("RadialGradient preserves stops and radii")
 func radialGradientStoresFields() {

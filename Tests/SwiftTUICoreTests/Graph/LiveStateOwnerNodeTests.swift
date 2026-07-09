@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 // `ViewGraph.liveStateOwnerNode(registeredOwner:identity:)` re-keys
 // closure-held `@State` access across a same-identity node re-mint: the

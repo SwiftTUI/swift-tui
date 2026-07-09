@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 // Direct unit coverage for the two stateless reconciliation operators carved off
 // ViewGraph during the #10 decomposition. ViewGraph's forwarders are `private`,

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Locks the reuse-denial diagnostic's recording and file-sink behavior. The
 /// trace is the cone diagnostic the sheet/palette reuse-denial investigation

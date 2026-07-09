@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Pins the resolve-time layout-offload disqualifier aggregate (F35): the
 /// frame tail answers its offload-eligibility queries from

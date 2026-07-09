@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @MainActor
 @Suite

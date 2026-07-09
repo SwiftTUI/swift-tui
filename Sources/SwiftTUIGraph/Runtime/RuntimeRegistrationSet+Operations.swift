@@ -96,8 +96,8 @@ extension RuntimeRegistrationSet {
     )
   }
 
-  package func frameDropEligibilityBlockers() -> Set<FrameDropEligibility.Blocker> {
-    var blockers: Set<FrameDropEligibility.Blocker> = []
+  package func frameDropEligibilityBlockers() -> Set<FrameDropBlocker> {
+    var blockers: Set<FrameDropBlocker> = []
     for registry in allRegistries {
       if let blocker = registry.activeFrameDropEligibilityBlocker {
         blockers.insert(blocker)

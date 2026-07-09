@@ -134,6 +134,7 @@ const PRIMARY_MODULES = [
 const PACKAGE_ONLY_MODULES = [
   "SwiftTUICore",
   "SwiftTUIPrimitives",
+  "SwiftTUIGraph",
   "SwiftTUIPTYCPrimitives",
 ] as const;
 const ALL_MODULES = [...PRIMARY_MODULES, ...PACKAGE_ONLY_MODULES] as const;

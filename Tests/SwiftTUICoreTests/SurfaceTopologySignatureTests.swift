@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Locks the Stage-4 raster-reuse decoupling (G5): the surface topology
 /// signature carries no runtime `Identity`, so a `ViewNodeID` re-key of a

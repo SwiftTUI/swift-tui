@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Test(
   "Color.composited applies every built-in blend mode in linear sRGB",

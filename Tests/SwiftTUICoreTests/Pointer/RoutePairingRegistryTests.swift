@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite("Route pairing and registration ordering")
 struct RoutePairingRegistryTests {

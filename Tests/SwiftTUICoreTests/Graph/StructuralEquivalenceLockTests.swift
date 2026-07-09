@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 /// Locks the Stage-2 reuse win: layout/placement equivalence is gated on the
 /// *structural* path, not the runtime `Identity`. A pure `.id` change (same

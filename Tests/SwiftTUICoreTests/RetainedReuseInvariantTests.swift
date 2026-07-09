@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite("Retained reuse invariants")
 struct RetainedReuseInvariantTests {

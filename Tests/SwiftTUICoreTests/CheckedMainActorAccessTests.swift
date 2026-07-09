@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 // `withCheckedMainActorAccess` adds a release-checked `preconditionIsolated`
 // before bridging into MainActor-isolated state (supplemental item #21). The

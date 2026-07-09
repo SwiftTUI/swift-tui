@@ -2,6 +2,7 @@ import Synchronization
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite("Animation scheduler plumbing")
 struct AnimationSchedulerTests {

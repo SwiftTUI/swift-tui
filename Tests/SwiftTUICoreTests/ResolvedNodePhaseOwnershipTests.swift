@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 
 @Suite("ResolvedNode phase ownership")
 struct ResolvedNodePhaseOwnershipTests {
@@ -67,7 +68,7 @@ private let resolvedNodePhaseOwnershipManifest:
   ]
 
 private func parsedResolvedNodeStoredFields() throws -> [String] {
-  let source = try sourceText(relativePath: "Sources/SwiftTUICore/Resolve/ResolvedNode.swift")
+  let source = try sourceText(relativePath: "Sources/SwiftTUIGraph/Resolve/ResolvedNode.swift")
   let body = try topLevelBody(named: "ResolvedNode", in: source)
   let lines = body.components(separatedBy: .newlines)
   var fields: [String] = []
