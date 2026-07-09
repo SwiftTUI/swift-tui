@@ -22,25 +22,22 @@ package enum AutomaticFocusPolicy {
     .toggle,
   ]
 
+  // Focus participation is role-driven only (F99). The original
+  // string-literal view-NAME fallback ("Button", "TextField", ...) was
+  // measured dead across a fully green repo gate on 2026-07-09 — every
+  // focusable control resolves with an `accessibilityRole` — and was
+  // deleted rather than kept as a silent rename hazard. A control absent
+  // from `focusableAccessibilityRoles` opts in through its role (or an
+  // explicit `.focusable(true)`); `FocusParticipationPolicyTests` pins the
+  // per-role classification with a source-parsed totality lock.
   static func includesTopLevelFocus(
     kind: NodeKind,
     metadata: SemanticMetadata
   ) -> Bool {
-    if let accessibilityRole = metadata.accessibilityRole {
-      return focusableAccessibilityRoles.contains(accessibilityRole)
-    }
-
-    guard case .view(let name) = kind else {
+    guard let accessibilityRole = metadata.accessibilityRole else {
       return false
     }
-
-    switch name {
-    case "Button", "DisclosureGroup", "Link", "List", "Picker", "SecureField", "Slider",
-      "Stepper", "Table", "TextEditor", "TextField", "Toggle", "Menu":
-      return true
-    default:
-      return false
-    }
+    return focusableAccessibilityRoles.contains(accessibilityRole)
   }
 }
 
