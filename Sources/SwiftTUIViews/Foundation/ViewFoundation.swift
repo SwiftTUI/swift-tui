@@ -606,10 +606,18 @@ func finishMemoObservation(
   if newResolved.memoReuseEquivalent(to: observation.priorCommitted) {
     MemoSkipTrace.recordAddressableSkip()
   } else {
-    MemoSkipTrace.recordUnsoundSkip(hadReads: observation.hadReads)
-    if let field = newResolved.memoFirstDifferingField(from: observation.priorCommitted) {
-      MemoSkipTrace.recordUnsoundField(field)
-    }
+    // Content-vs-bookkeeping classification drives the memo-soundness alarm:
+    // a no-reads *content* divergence is a comparator false-equal (F90);
+    // entity-bookkeeping re-stamps only feed the histogram.
+    MemoSkipTrace.recordUnsoundSkip(
+      hadReads: observation.hadReads,
+      contentDivergenceField: newResolved.memoUnsoundContentDivergence(
+        from: observation.priorCommitted
+      ),
+      firstDifferingField: newResolved.memoFirstDifferingField(
+        from: observation.priorCommitted
+      )
+    )
   }
 }
 

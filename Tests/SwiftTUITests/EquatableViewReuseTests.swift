@@ -395,6 +395,52 @@ struct EquatableBoundaryReuseTests {
     #expect(rendered.contains("v2"))
   }
 
+  @Test("representative memo scenarios raise no memo-soundness alarm")
+  func memoScenariosRaiseNoMemoSoundnessAlarm() {
+    // The F90 alarm class — a no-reads *content* divergence on a would-skip
+    // node — must stay 0 across the population the oracle observes every
+    // frame. Renders both the Equatable-boundary fixture and a ForEach entity
+    // fixture: entity rows re-stamp occurrence ordinals between frames (the
+    // known bookkeeping-noise class), which must feed the histogram only,
+    // never the alarm.
+    struct EntityRoot: View {
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text(dynamic)
+          ForEach(Array(0..<4), id: \.self) { index in
+            Text("row-\(index)")
+          }
+        }
+      }
+    }
+
+    let prior = MemoTraceState.capture()
+    let alarmBefore = SoundnessProbeConfiguration.memoUnsoundSkipCount
+    defer {
+      prior.restore()
+      SoundnessProbeConfiguration.memoUnsoundSkipCount = alarmBefore
+    }
+    MemoSkipTrace.isEnabled = true
+    MemoSkipTrace.sampleEveryNFrames = 1
+    MemoSkipTrace.isSampledFrame = false
+    MemoSkipTrace.emitsTraceLines = false
+    MemoSkipTrace.reset()
+
+    _ = renderFrames(chrome1: "fixed", dynamic1: "v1", chrome2: "fixed", dynamic2: "v2")
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("Root")
+    _ = renderer.render(EntityRoot(dynamic: "v1"), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      EntityRoot(dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+    )
+
+    #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == alarmBefore)
+  }
+
   private struct MemoTraceState {
     let isEnabled: Bool
     let sampleEveryNFrames: Int

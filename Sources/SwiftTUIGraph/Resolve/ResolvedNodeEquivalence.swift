@@ -181,29 +181,40 @@ extension ResolvedNode {
     return true
   }
 
-  /// Stage-1 memo diagnostics: returns the first field that differs under
-  /// `==` (or nil if equal), to characterize the `no_reads` unsound class —
-  /// whether the mismatch is real content (`drawPayload`/`kind`/`children`/…,
-  /// a comparator false-equal) or per-resolve identity bookkeeping
-  /// (`entityIdentity`/`structuralPath`/…, an over-strict oracle field).
-  package func memoFirstDifferingField(from other: ResolvedNode) -> String? {
+  /// Stage-1 memo alarm classifier: returns the first **content** field on
+  /// which the two nodes diverge, or nil when every divergence is per-resolve
+  /// identity bookkeeping (`entityIdentity`/`entityStructuralPath`; plus
+  /// `structuralPath`, which ``memoReuseEquivalent(to:)`` already ignores, and
+  /// `transactionSnapshot` compared by reuse-equivalence).
+  ///
+  /// The split matters because the bookkeeping fields are re-derived on every
+  /// resolve pass (occurrence ordinals, entity re-routes), so a strict oracle
+  /// counts them as "unsound" even though serving the committed node would be
+  /// observably fine — measured at ~96% of the `no_reads` unsound class. A
+  /// content divergence with no recorded reads, by contrast, is a comparator
+  /// false-equal: the memo-soundness alarm
+  /// (``SoundnessProbeConfiguration/recordMemoUnsoundSkip(_:)``) fires only on
+  /// this class. Bookkeeping-only divergence burn-down is tracked with the
+  /// comparator field-manifest work (F96 in the org findings registry).
+  package func memoUnsoundContentDivergence(from other: ResolvedNode) -> String? {
     if identity != other.identity { return "identity" }
-    if structuralPath != other.structuralPath { return "structuralPath" }
     if structuralEdgeRole != other.structuralEdgeRole { return "structuralEdgeRole" }
-    if entityIdentity != other.entityIdentity { return "entityIdentity" }
-    if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
     if declarationOwnerEdge != other.declarationOwnerEdge { return "declarationOwnerEdge" }
     if kind != other.kind { return "kind" }
-    if children.count != other.children.count { return "children.count" }
-    for (l, r) in zip(children, other.children) {
-      if let childField = l.memoFirstDifferingField(from: r) {
-        return "child.\(childField)"
-      }
+    if !Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator) {
+      return "typeDiscriminator"
     }
     if environmentSnapshot != other.environmentSnapshot { return "environmentSnapshot" }
-    if transactionSnapshot != other.transactionSnapshot { return "transactionSnapshot" }
+    if !transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot) {
+      return "transactionSnapshot"
+    }
     if layoutBehavior != other.layoutBehavior { return "layoutBehavior" }
     if layoutMetadata != other.layoutMetadata { return "layoutMetadata" }
+    if layoutRealizedContent?.equivalenceSignature
+      != other.layoutRealizedContent?.equivalenceSignature
+    {
+      return "layoutRealizedContent"
+    }
     if drawMetadata != other.drawMetadata { return "drawMetadata" }
     if drawEffects != other.drawEffects { return "drawEffects" }
     if surfaceComposition != other.surfaceComposition { return "surfaceComposition" }
@@ -211,9 +222,43 @@ extension ResolvedNode {
     if lifecycleMetadata != other.lifecycleMetadata { return "lifecycleMetadata" }
     if drawPayload != other.drawPayload { return "drawPayload" }
     if intrinsicSize != other.intrinsicSize { return "intrinsicSize" }
+    if indexedChildSource?.measurementSignature != other.indexedChildSource?.measurementSignature {
+      return "indexedChildSource"
+    }
     if preferenceValues != other.preferenceValues { return "preferenceValues" }
     if supportsRetainedReuse != other.supportsRetainedReuse { return "supportsRetainedReuse" }
-    return self == other ? nil : "other"
+    if children.count != other.children.count { return "children.count" }
+    for (l, r) in zip(children, other.children) {
+      if let childField = l.memoUnsoundContentDivergence(from: r) {
+        return "child.\(childField)"
+      }
+    }
+    return nil
+  }
+
+  /// Stage-1 memo diagnostics: returns the first field that differs under the
+  /// oracle's own semantics (or nil if oracle-equivalent), to characterize the
+  /// `no_reads` unsound class — whether the mismatch is real content
+  /// (`drawPayload`/`kind`/`children`/…, a comparator false-equal) or
+  /// per-resolve identity bookkeeping (`entityIdentity`/…, an over-strict
+  /// oracle field). Mirrors ``memoReuseEquivalent(to:)`` exactly: it never
+  /// reports `structuralPath` (re-stamped on reuse, oracle-ignored) and
+  /// compares `transactionSnapshot` by reuse-equivalence — reporting fields
+  /// the oracle cannot fail on would misattribute the histogram. Content
+  /// fields are checked before bookkeeping fields so a content divergence is
+  /// never masked by a coincident bookkeeping diff.
+  package func memoFirstDifferingField(from other: ResolvedNode) -> String? {
+    if let contentField = memoUnsoundContentDivergence(from: other) {
+      return contentField
+    }
+    if entityIdentity != other.entityIdentity { return "entityIdentity" }
+    if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
+    for (l, r) in zip(children, other.children) {
+      if let childField = l.memoFirstDifferingField(from: r) {
+        return "child.\(childField)"
+      }
+    }
+    return memoReuseEquivalent(to: other) ? nil : "other"
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {

@@ -28,6 +28,7 @@ struct SoundnessProbeConfigurationTests {
     let rasterCount = SoundnessProbeConfiguration.rasterDamageMismatchCount
     let teardownCount = SoundnessProbeConfiguration.teardownCoherenceViolationCount
     let publicationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
+    let memoCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
@@ -38,9 +39,20 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.rasterDamageMismatchCount = rasterCount
       SoundnessProbeConfiguration.teardownCoherenceViolationCount = teardownCount
       SoundnessProbeConfiguration.registrationPublicationViolationCount = publicationCount
+      SoundnessProbeConfiguration.memoUnsoundSkipCount = memoCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     try body()
+  }
+
+  @Test("memo unsound skips are counted with detail")
+  func memoUnsoundSkipRecordsCountAndDetail() {
+    withRestoredProbeState {
+      let before = SoundnessProbeConfiguration.memoUnsoundSkipCount
+      SoundnessProbeConfiguration.recordMemoUnsoundSkip("drawPayload diverged")
+      #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == before + 1)
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "drawPayload diverged")
+    }
   }
 
   @Test("teardown coherence violations are counted with detail")

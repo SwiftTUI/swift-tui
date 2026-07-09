@@ -43,6 +43,7 @@ package enum SoundnessProbeConfiguration {
   package static var rasterDamageMismatchCount = 0
   package static var teardownCoherenceViolationCount = 0
   package static var registrationPublicationViolationCount = 0
+  package static var memoUnsoundSkipCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -108,6 +109,21 @@ package enum SoundnessProbeConfiguration {
     registrationPublicationViolationCount += 1
     lastViolationDetail = detail()
     emitTrace("registration-publication")
+  }
+
+  /// Records one caught memo-soundness violation (F90): the shadow oracle
+  /// (``MemoSkipTrace``) found a would-skip node — view value structurally
+  /// equal, reuse guards passed, **no recorded dynamic reads** — whose freshly
+  /// recomputed output diverged from the committed output on a *content* field
+  /// (``ResolvedNode/memoUnsoundContentDivergence(from:)``). That is a
+  /// comparator false-equal: had the production memo gate skipped this node it
+  /// would have served stale UI. Bookkeeping-only divergences (entity
+  /// occurrence re-stamps) stay in `MemoSkipTrace`'s histogram and do not
+  /// raise this alarm.
+  package static func recordMemoUnsoundSkip(_ detail: @autoclosure () -> String) {
+    memoUnsoundSkipCount += 1
+    lastViolationDetail = detail()
+    emitTrace("memo-unsound-skip")
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per
