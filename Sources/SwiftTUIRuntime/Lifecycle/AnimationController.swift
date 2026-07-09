@@ -1712,6 +1712,27 @@ extension AnimationController: AnimationRegistrationSink {
 }
 
 extension AnimationController: AnimationCompletionSink {
+  /// Parks the completions of batches the scheduler's latest-wins
+  /// coalescing displaced before the frame drained (F117). A superseded
+  /// batch's animations never retain it — its state writes rode the frame
+  /// under the WINNING batch's ID — so without this park nothing would ever
+  /// fire its `withAnimation` completion, and a live awaiter would hang.
+  /// Parking with an immediate deadline fires it on the next tick, matching
+  /// the semantics of a batch whose animations were superseded before they
+  /// ran.
+  package func parkSupersededBatchCompletions(
+    _ batchIDs: [AnimationBatchID],
+    at now: MonotonicInstant
+  ) {
+    for batchID in batchIDs {
+      guard completionClosures[batchID] != nil,
+        batchRefCounts[batchID] == nil,
+        pendingEmptyBatchCompletions[batchID] == nil
+      else { continue }
+      pendingEmptyBatchCompletions[batchID] = now
+    }
+  }
+
   package func registerCompletion(
     batchID: AnimationBatchID,
     closure: @escaping @Sendable () -> Void

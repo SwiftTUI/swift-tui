@@ -18,6 +18,9 @@ public struct ScheduledFrame: Equatable, Sendable {
   package var forceRootEvaluation: Bool
   package var animationRequest: AnimationRequest
   package var animationBatchID: AnimationBatchID?
+  /// Batch IDs the latest-wins coalescing displaced before this frame
+  /// drained (F117); the runtime parks their completions so they still fire.
+  package var supersededAnimationBatchIDs: [AnimationBatchID]
   /// Total number of `request*` calls (input, invalidation, signal,
   /// external, deadline) that the scheduler coalesced into this
   /// frame.  Used as a cancellation-pressure proxy for the
@@ -44,6 +47,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.forceRootEvaluation = false
     self.animationRequest = .inherit
     self.animationBatchID = nil
+    self.supersededAnimationBatchIDs = []
     self.intentRequestCount = 0
   }
 
@@ -57,6 +61,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     forceRootEvaluation: Bool = false,
     animationRequest: AnimationRequest,
     animationBatchID: AnimationBatchID? = nil,
+    supersededAnimationBatchIDs: [AnimationBatchID] = [],
     intentRequestCount: Int = 0
   ) {
     self.causes = causes
@@ -68,6 +73,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.forceRootEvaluation = forceRootEvaluation
     self.animationRequest = animationRequest
     self.animationBatchID = animationBatchID
+    self.supersededAnimationBatchIDs = supersededAnimationBatchIDs
     self.intentRequestCount = intentRequestCount
   }
 }
@@ -192,6 +198,11 @@ public final class FrameScheduler: FrameScheduling, Sendable {
     var nextDeadlineArmOrdinal: UInt64 = 0
     var pendingAnimationRequest: AnimationRequest = .inherit
     var pendingAnimationBatchID: AnimationBatchID?
+    /// Batch IDs whose slot the latest-wins coalescing rule overwrote before
+    /// a drain (F117). Carried on the produced frame so the runtime can park
+    /// their `withAnimation` completions — a superseded batch's animations
+    /// never retain it, so without this its completion would never fire.
+    var pendingSupersededBatchIDs: [AnimationBatchID] = []
     /// Tally of `request*` calls received since the last `consumeReadyFrame`.
     /// Drained into the produced `ScheduledFrame` for cancellation-pressure
     /// diagnostics; reset to 0 on consume.
@@ -360,6 +371,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
         nextDeadline: state.pendingDeadlines.first?.instant,
         animationRequest: state.pendingAnimationRequest,
         animationBatchID: state.pendingAnimationBatchID,
+        supersededAnimationBatchIDs: state.pendingSupersededBatchIDs,
         intentRequestCount: state.pendingIntentRequestCount
       )
 
@@ -369,6 +381,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.externalReasons.removeAll(keepingCapacity: true)
       state.pendingAnimationRequest = .inherit
       state.pendingAnimationBatchID = nil
+      state.pendingSupersededBatchIDs.removeAll(keepingCapacity: true)
       state.pendingIntentRequestCount = 0
 
       return scheduled
@@ -383,6 +396,7 @@ public final class FrameScheduler: FrameScheduling, Sendable {
       state.externalReasons.removeAll(keepingCapacity: true)
       state.pendingAnimationRequest = .inherit
       state.pendingAnimationBatchID = nil
+      state.pendingSupersededBatchIDs.removeAll(keepingCapacity: true)
       state.pendingIntentRequestCount = 0
       // The arm ordinal is deliberately NOT reset: a drain-pass cut captured
       // before a reset must keep excluding deadlines armed after it.
@@ -522,6 +536,12 @@ extension FrameScheduler: AnimationAwareInvalidating {
         state.pendingAnimationRequest = animation
       }
       if let batchID {
+        if let superseded = state.pendingAnimationBatchID,
+          superseded != batchID,
+          !state.pendingSupersededBatchIDs.contains(superseded)
+        {
+          state.pendingSupersededBatchIDs.append(superseded)
+        }
         state.pendingAnimationBatchID = batchID
       }
     }
@@ -552,6 +572,17 @@ extension FrameScheduler: CancelledFrameIntentReplaying {
       }
       if state.pendingAnimationBatchID == nil {
         state.pendingAnimationBatchID = frame.animationBatchID
+      } else if let dropped = frame.animationBatchID,
+        dropped != state.pendingAnimationBatchID,
+        !state.pendingSupersededBatchIDs.contains(dropped)
+      {
+        // A newer explicit batch already claimed the slot; the cancelled
+        // frame's batch is superseded, not lost (F117).
+        state.pendingSupersededBatchIDs.append(dropped)
+      }
+      for superseded in frame.supersededAnimationBatchIDs
+      where !state.pendingSupersededBatchIDs.contains(superseded) {
+        state.pendingSupersededBatchIDs.append(superseded)
       }
     }
     notifyPendingFrameRequestWaiters()

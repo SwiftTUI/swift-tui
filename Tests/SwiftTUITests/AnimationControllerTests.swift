@@ -2189,6 +2189,84 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "a superseded batch's parked completion fires on the next tick (F117)"
+  )
+  func supersededBatchParkedCompletionFires() throws {
+    let controller = AnimationController()
+    let supersededBatch = AnimationBatchID(9_101)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: supersededBatch) {
+      fireCount.increment()
+    }
+
+    // The batch never rode a frame (its slot was coalesced over), so no
+    // animation retains it; the park is the only path to its completion.
+    let t0 = MonotonicInstant.now()
+    controller.parkSupersededBatchCompletions([supersededBatch], at: t0)
+    #expect(fireCount.count == 0, "the park itself must not fire synchronously")
+
+    var frame = ResolvedNode(
+      identity: Identity(components: [.named("superseded-leaf")]),
+      kind: .view("Leaf")
+    )
+    _ = controller.applyInterpolations(to: &frame, at: t0.advanced(by: .milliseconds(1)))
+    #expect(fireCount.count == 1)
+
+    // Re-parking a fired (now unregistered) batch is a no-op.
+    controller.parkSupersededBatchCompletions(
+      [supersededBatch], at: t0.advanced(by: .milliseconds(2))
+    )
+    var frame2 = frame
+    _ = controller.applyInterpolations(to: &frame2, at: t0.advanced(by: .milliseconds(3)))
+    #expect(fireCount.count == 1)
+  }
+
+  @Test(
+    "parking a batch retained by a live animation neither fires early nor double-fires"
+  )
+  func parkingRetainedBatchDoesNotFireEarly() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(9_102)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("retained-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity, kind: .view("Leaf"), drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity, kind: .view("Leaf"), drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // A spurious park of an actively retained batch must be ignored.
+    controller.parkSupersededBatchCompletions([batchID], at: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(50))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+    #expect(fireCount.count == 0, "the park must not fire a retained batch early")
+
+    var frame3 = frame2
+    _ = controller.applyInterpolations(to: &frame3, at: t0.advanced(by: .milliseconds(200)))
+    #expect(fireCount.count == 1)
+  }
+
+  @Test(
     "withAnimation completion closure fires once the batch drains"
   )
   func completionClosureFiresOnBatchDrain() throws {

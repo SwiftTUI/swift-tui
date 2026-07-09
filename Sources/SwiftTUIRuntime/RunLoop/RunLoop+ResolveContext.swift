@@ -46,6 +46,16 @@ extension RunLoop {
     if effectiveEnvironmentValues.clipboardReadAction.isPlaceholder {
       effectiveEnvironmentValues.clipboardReadAction = runtimeClipboardReadAction()
     }
+    // Batches the scheduler's latest-wins coalescing displaced never ride a
+    // frame, so their `withAnimation` completions must be parked here or
+    // they would never fire (F117). Parked regardless of reduced motion —
+    // a superseded batch's animations were dropped either way.
+    if !scheduledFrame.supersededAnimationBatchIDs.isEmpty {
+      renderer.internalAnimationController.parkSupersededBatchCompletions(
+        scheduledFrame.supersededAnimationBatchIDs,
+        at: .now()
+      )
+    }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     if runtimeConfiguration.motion == .reduced {
       transactionSnapshot.animationRequest = .disabled
