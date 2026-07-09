@@ -822,6 +822,11 @@ run_step \
   Scripts/check_foundation_free_layers.sh
 
 run_function_step \
+  "Run SwiftTUIGraph tests" \
+  "$(swift_command_text test --filter SwiftTUIGraphTests)" \
+  run_swift test --filter SwiftTUIGraphTests
+
+run_function_step \
   "Run SwiftTUICore tests" \
   "$(swift_command_text test --filter SwiftTUICoreTests)" \
   run_swift test --filter SwiftTUICoreTests
