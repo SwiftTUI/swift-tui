@@ -192,6 +192,10 @@ package final class LocalDefaultFocusRegistry: Equatable {
   package func restore(
     _ snapshot: DefaultFocusRegistrationSnapshot
   ) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
     scopes.append(contentsOf: snapshot.scopes)
     candidates.append(contentsOf: snapshot.candidates)
   }
