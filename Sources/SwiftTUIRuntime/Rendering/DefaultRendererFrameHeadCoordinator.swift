@@ -368,14 +368,14 @@ struct DefaultRendererFrameHeadCoordinator {
         plan: DirtyEvaluationPlan?,
         diagnostics: DirtyEvaluationPlanDiagnostics?
       )
-    if RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled {
-      let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
-        invalidatedIdentities: resolveInputs.invalidatedIdentities
-      )
-      escalation = (evaluation.plan, evaluation.diagnostics)
-    } else {
-      escalation = (viewGraph.selectiveDirtyEvaluationPlan(), nil)
-    }
+    // Diagnostics are always attached so a publication-oracle violation
+    // never arrives context-free (F92); the flag gates only the expensive
+    // identity census input.
+    let escalationEvaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+      invalidatedIdentities: RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
+        ? resolveInputs.invalidatedIdentities : []
+    )
+    escalation = (escalationEvaluation.plan, escalationEvaluation.diagnostics)
     // Accumulates onto the first plan's publication roots; a nil escalation
     // plan falls back to `.all` and the full root evaluation below.
     graphDraft.recordDirtyEvaluationPlan(
@@ -474,12 +474,10 @@ struct DefaultRendererFrameHeadCoordinator {
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       // Nothing is dirty: keep the existing snapshot and leave root evaluator
       // registrations untouched for this frame.
-      let diagnostics =
-        RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
-        ? viewGraph.noDirtyWorkPlanDiagnostics(
-          invalidatedIdentities: resolveInputs.invalidatedIdentities
-        )
-        : nil
+      let diagnostics = viewGraph.noDirtyWorkPlanDiagnostics(
+        invalidatedIdentities: RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
+          ? resolveInputs.invalidatedIdentities : []
+      )
       graphDraft.recordUnchangedDirtyEvaluation(diagnostics: diagnostics)
       resolveDuration = .zero
     } else {
@@ -488,24 +486,26 @@ struct DefaultRendererFrameHeadCoordinator {
           plan: DirtyEvaluationPlan?,
           diagnostics: DirtyEvaluationPlanDiagnostics?
         )
-      if RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled {
-        if canUseSelectiveEvaluation {
-          let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
-            invalidatedIdentities: resolveInputs.invalidatedIdentities
-          )
-          dirtyEvaluation = (evaluation.plan, evaluation.diagnostics)
-        } else {
-          dirtyEvaluation = (
-            nil,
-            viewGraph.disabledSelectiveEvaluationPlanDiagnostics(
-              invalidatedIdentities: resolveInputs.invalidatedIdentities,
-              selectiveEvaluationDisabledReasons: resolveInputs
-                .diagnosticSelectiveEvaluationDisabledReasonNames
-            )
-          )
-        }
+      // Diagnostics are always attached so a publication-oracle violation
+      // never arrives context-free (F92); the flag gates only the expensive
+      // identity census input.
+      let censusIdentities =
+        RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled
+        ? resolveInputs.invalidatedIdentities : []
+      if canUseSelectiveEvaluation {
+        let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+          invalidatedIdentities: censusIdentities
+        )
+        dirtyEvaluation = (evaluation.plan, evaluation.diagnostics)
       } else {
-        dirtyEvaluation = (viewGraph.selectiveDirtyEvaluationPlan(), nil)
+        dirtyEvaluation = (
+          nil,
+          viewGraph.disabledSelectiveEvaluationPlanDiagnostics(
+            invalidatedIdentities: censusIdentities,
+            selectiveEvaluationDisabledReasons: resolveInputs
+              .diagnosticSelectiveEvaluationDisabledReasonNames
+          )
+        )
       }
       let dirtyEvaluationPlan = dirtyEvaluation.plan
       graphDraft.recordDirtyEvaluationPlan(

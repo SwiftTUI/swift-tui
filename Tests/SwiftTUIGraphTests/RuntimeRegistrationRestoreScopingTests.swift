@@ -436,6 +436,96 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  @Test("a publication violation carries plan and checkpoint context without the diagnostics flag")
+  func publicationViolationCarriesContextWithoutDiagnosticsFlag() {
+    // F92: the F04 scoped-restore oracle used to emit a context-free detail
+    // unless SWIFTTUI_PUBLICATION_DIAGNOSTICS=1 was pre-set — a second,
+    // independent opt-in. The cheap plan/checkpoint context now rides the
+    // violation itself; this trips the oracle deliberately with the
+    // diagnostics flag OFF and pins the attached context.
+    let rootIdentity = testIdentity("Root")
+    let itemIdentities = ["A", "B", "C"].map { testIdentity("Root", $0) }
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    var children: [ResolvedNode] = []
+    var itemNodes: [ViewNode] = []
+    for identity in itemIdentities {
+      let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+      node.recordActionRegistration(
+        identity: identity,
+        handler: { true },
+        followUpInvalidationIdentity: nil
+      )
+      let resolvedChild = ResolvedNode(identity: identity, kind: .view("Item"))
+      graph.finishEvaluation(node, resolved: resolvedChild, accessedStateSlots: 0)
+      children.append(resolvedChild)
+      itemNodes.append(node)
+    }
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: children),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: false
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    _ = initialDraft.commitRuntimeRegistrations(from: graph)
+
+    // Corrupt the live set OUTSIDE the frontier subtree: a phantom action no
+    // node record carries. The scoped restore keeps it (its subtree is never
+    // reset), the scratch rebuild cannot reproduce it, so the oracle fires.
+    liveRegistrations.actionRegistry?.register(
+      identity: testIdentity("Root", "Phantom"),
+      handler: { true }
+    )
+
+    let probeEnabled = SoundnessProbeConfiguration.isEnabled
+    let probeLatch = SoundnessProbeConfiguration.isSampledFrame
+    let violationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
+    let detail = SoundnessProbeConfiguration.lastViolationDetail
+    defer {
+      SoundnessProbeConfiguration.isEnabled = probeEnabled
+      SoundnessProbeConfiguration.isSampledFrame = probeLatch
+      SoundnessProbeConfiguration.registrationPublicationViolationCount = violationCount
+      SoundnessProbeConfiguration.lastViolationDetail = detail
+    }
+    SoundnessProbeConfiguration.isEnabled = true
+    SoundnessProbeConfiguration.isSampledFrame = true
+
+    let scopedDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: false
+    )
+    scopedDraft.recordDirtyEvaluationPlan(
+      DirtyEvaluationPlan(
+        frontierNodeIDs: [itemNodes[0].viewNodeID],
+        frontierIdentities: [itemIdentities[0]]
+      ),
+      diagnostics: DirtyEvaluationPlanDiagnostics(result: "formed", frontierRootCount: 1)
+    )
+    _ = scopedDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(
+      SoundnessProbeConfiguration.registrationPublicationViolationCount == violationCount + 1,
+      "the corrupted live set must trip the scoped-restore oracle"
+    )
+    let violationDetail = SoundnessProbeConfiguration.lastViolationDetail ?? ""
+    #expect(violationDetail.contains("mode=subtrees"))
+    #expect(violationDetail.contains("dirty_plan=formed"))
+    #expect(violationDetail.contains("ckpt=none"))
+    #expect(violationDetail.contains("roots=1"))
+  }
+
   @Test("in-place action refresh escalates a plan-less commit's publication")
   func inPlaceActionRefreshEscalatesPlanlessCommitPublication() {
     let rootIdentity = testIdentity("Root")

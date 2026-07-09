@@ -38,11 +38,13 @@ package final class ViewGraphFrameDraft {
     self.liveRegistrations = liveRegistrations
     self.checkpoint = checkpoint
     self.publicationDiagnosticsEnabled = publicationDiagnosticsEnabled
-    if publicationDiagnosticsEnabled {
-      publicationDiagnostics.graphCheckpointBaselineNodeCount =
-        checkpoint?.index.nodesByNodeID.count
-      publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
-    }
+    // Cheap context (O(1) reads) is captured regardless of the diagnostics
+    // flag, so a publication-oracle violation never arrives context-free
+    // (F92). The flag now gates only the expensive census metrics (subtree
+    // walks, identity censuses) and the downstream diagnostics exposure.
+    publicationDiagnostics.graphCheckpointBaselineNodeCount =
+      checkpoint?.index.nodesByNodeID.count
+    publicationDiagnostics.nonGraphCheckpointPresent = checkpoint != nil
   }
 
   package func recordDirtyEvaluationPlan(
@@ -70,18 +72,12 @@ package final class ViewGraphFrameDraft {
     _ queued: Bool,
     predicted: Bool
   ) {
-    guard publicationDiagnosticsEnabled else {
-      return
-    }
     publicationDiagnostics.presentationPortalRootQueued = queued
     publicationDiagnostics.presentationPortalRootPredicted = predicted
     publicationDiagnostics.presentationPortalEscalated = false
   }
 
   package func recordPresentationPortalEscalation() {
-    guard publicationDiagnosticsEnabled else {
-      return
-    }
     publicationDiagnostics.presentationPortalEscalated = true
   }
 
@@ -91,12 +87,14 @@ package final class ViewGraphFrameDraft {
       return
     }
     preparedCheckpoint = viewGraph.makeCheckpoint()
+    publicationDiagnostics.graphCheckpointPreparedNodeCount =
+      preparedCheckpoint?.index.nodesByNodeID.count
+    publicationDiagnostics.graphCheckpointStrategy = "gen_gated_store"
     if publicationDiagnosticsEnabled {
-      publicationDiagnostics.graphCheckpointPreparedNodeCount =
-        preparedCheckpoint?.index.nodesByNodeID.count
+      // The candidate count walks frontier subtrees — census-tier cost,
+      // opt-in only.
       publicationDiagnostics.graphCheckpointDirtySubtreeCandidateNodeCount =
         graphCheckpointDirtySubtreeCandidateNodeCount(in: viewGraph)
-      publicationDiagnostics.graphCheckpointStrategy = "gen_gated_store"
     }
   }
 
@@ -256,10 +254,21 @@ package final class ViewGraphFrameDraft {
           .sorted()
           .prefix(4)
           .map { "\($0) live=\(live[$0] ?? 0) rebuilt=\(rebuilt[$0] ?? 0)" }
+        // The forensic context rides the violation itself (F92): the cheap
+        // per-frame fields are captured regardless of the publication-
+        // diagnostics flag, so a wild violation explains which plan and
+        // checkpoint strategy produced it without a pre-set second opt-in.
+        let disabledReasons = publicationDiagnostics.selectiveEvaluationDisabledReasons
         SoundnessProbeConfiguration.recordRegistrationPublicationViolation(
           """
           registration publication: scoped restore diverged from full \
-          rebuild: \(diverged.joined(separator: ", "))
+          rebuild: \(diverged.joined(separator: ", ")) \
+          [mode=\(publicationModeName) roots=\(publicationSubtreeRootCount) \
+          dirty_plan=\(publicationDiagnostics.dirtyPlanResult) \
+          selective_off=\(disabledReasons.isEmpty ? "-" : disabledReasons.joined(separator: "|")) \
+          ckpt=\(publicationDiagnostics.graphCheckpointStrategy ?? "none") \
+          portal_queued=\(publicationDiagnostics.presentationPortalRootQueued.map(String.init(describing:)) ?? "-") \
+          portal_escalated=\(publicationDiagnostics.presentationPortalEscalated.map(String.init(describing:)) ?? "-")]
           """
         )
       }
@@ -271,12 +280,12 @@ package final class ViewGraphFrameDraft {
     }
     didCommit = true
     var diagnostics = liveRegistrations.diagnostics()
+    publicationDiagnostics.publicationMode = publicationModeName
+    publicationDiagnostics.subtreeRootCount = publicationSubtreeRootCount
+    publicationDiagnostics.graphCheckpointDeltaRestoreCount = graphCheckpointRestoreCount
+    publicationDiagnostics.graphCheckpointFallbackRestoreCount = 0
     if publicationDiagnosticsEnabled {
-      publicationDiagnostics.publicationMode = publicationModeName
-      publicationDiagnostics.subtreeRootCount = publicationSubtreeRootCount
       publicationDiagnostics.restoredNodeCount = restoredNodeCount
-      publicationDiagnostics.graphCheckpointDeltaRestoreCount = graphCheckpointRestoreCount
-      publicationDiagnostics.graphCheckpointFallbackRestoreCount = 0
       diagnostics.publication = publicationDiagnostics
     }
     return diagnostics
@@ -389,9 +398,7 @@ package final class ViewGraphFrameDraft {
   private func recordDirtyPlanDiagnostics(
     _ dirtyPlanDiagnostics: DirtyEvaluationPlanDiagnostics?
   ) {
-    guard publicationDiagnosticsEnabled,
-      let dirtyPlanDiagnostics
-    else {
+    guard let dirtyPlanDiagnostics else {
       return
     }
     publicationDiagnostics.dirtyPlanResult = dirtyPlanDiagnostics.result
