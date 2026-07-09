@@ -166,39 +166,39 @@ package final class ViewGraph {
   private var dependencyIndex: DependencyIndex
   private var frameCommit: FrameCommitState
 
-  private var nodesByNodeID: [ViewNodeID: ViewNode] {
+  var nodesByNodeID: [ViewNodeID: ViewNode] {
     get { index.nodesByNodeID }
     set { index.nodesByNodeID = newValue }
   }
-  private var nodeIDByIdentity: [Identity: ViewNodeID] {
+  var nodeIDByIdentity: [Identity: ViewNodeID] {
     get { index.nodeIDByIdentity }
     set { index.nodeIDByIdentity = newValue }
   }
-  private var identityByNodeID: [ViewNodeID: Identity] {
+  var identityByNodeID: [ViewNodeID: Identity] {
     get { index.identityByNodeID }
     set { index.identityByNodeID = newValue }
   }
-  private var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] {
+  var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] {
     get { index.nodeIDsByStructuralPath }
     set { index.nodeIDsByStructuralPath = newValue }
   }
-  private var entityRoutingTable: EntityRoutingTable {
+  var entityRoutingTable: EntityRoutingTable {
     get { index.entityRoutingTable }
     set { index.entityRoutingTable = newValue }
   }
-  private var nextViewNodeIDRawValue: UInt64 {
+  var nextViewNodeIDRawValue: UInt64 {
     get { index.nextViewNodeIDRawValue }
     set { index.nextViewNodeIDRawValue = newValue }
   }
-  private var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] {
+  var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] {
     get { index.detachedHostedSubtreeRootsByHost }
     set { index.detachedHostedSubtreeRootsByHost = newValue }
   }
-  private var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] {
+  var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] {
     get { index.detachedHostedSubtreeHostByRoot }
     set { index.detachedHostedSubtreeHostByRoot = newValue }
   }
-  private var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
+  var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
     get { index.flattenedStateOwnerNodeIDByIdentity }
     set { index.flattenedStateOwnerNodeIDByIdentity = newValue }
   }
@@ -238,15 +238,15 @@ package final class ViewGraph {
     get { eventBuffers.structuralTaskCancelEvents }
     set { eventBuffers.structuralTaskCancelEvents = newValue }
   }
-  private var structuralDisappearEvents: [LifecycleEvent] {
+  var structuralDisappearEvents: [LifecycleEvent] {
     get { eventBuffers.structuralDisappearEvents }
     set { eventBuffers.structuralDisappearEvents = newValue }
   }
-  private var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> {
+  var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> {
     get { eventBuffers.pendingEntityRoutedRemovalNodeIDs }
     set { eventBuffers.pendingEntityRoutedRemovalNodeIDs = newValue }
   }
-  private var absorbedShadowedNodeIDs: Set<ViewNodeID> {
+  var absorbedShadowedNodeIDs: Set<ViewNodeID> {
     get { eventBuffers.absorbedShadowedNodeIDs }
     set { eventBuffers.absorbedShadowedNodeIDs = newValue }
   }
@@ -254,11 +254,11 @@ package final class ViewGraph {
     get { eventBuffers.latestLifecycleEvents }
     set { eventBuffers.latestLifecycleEvents = newValue }
   }
-  private var invalidatedNodeIDs: Set<ViewNodeID> {
+  var invalidatedNodeIDs: Set<ViewNodeID> {
     get { dirtyState.invalidatedNodeIDs }
     set { dirtyState.invalidatedNodeIDs = newValue }
   }
-  private var graphLocalDirtyNodeIDs: Set<ViewNodeID> {
+  var graphLocalDirtyNodeIDs: Set<ViewNodeID> {
     get { dirtyState.graphLocalDirtyNodeIDs }
     set { dirtyState.graphLocalDirtyNodeIDs = newValue }
   }
@@ -270,19 +270,19 @@ package final class ViewGraph {
     get { dirtyState.stateMutationNodeIDsByKey }
     set { dirtyState.stateMutationNodeIDsByKey = newValue }
   }
-  private var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID] {
+  var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID] {
     get { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID }
     set { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID = newValue }
   }
-  private var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>] {
+  var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>] {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner = newValue }
   }
-  private var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>] {
+  var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>] {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner = newValue }
   }
-  private var taskDescriptorNodeSlots: [TaskDescriptorSlotKey: TaskDescriptorIdentitySlot] {
+  var taskDescriptorNodeSlots: [TaskDescriptorSlotKey: TaskDescriptorIdentitySlot] {
     get { taskDescriptors.taskDescriptorNodeSlots }
     set { taskDescriptors.taskDescriptorNodeSlots = newValue }
   }
@@ -303,15 +303,15 @@ package final class ViewGraph {
     set { dependencyIndex.observableDependents = newValue }
   }
 
-  private var currentFrameID: UInt64 {
+  var currentFrameID: UInt64 {
     get { frameCommit.currentFrameID }
     set { frameCommit.currentFrameID = newValue }
   }
-  private var liveNodeIDs: Set<ViewNodeID> {
+  var liveNodeIDs: Set<ViewNodeID> {
     get { frameCommit.liveNodeIDs }
     set { frameCommit.liveNodeIDs = newValue }
   }
-  private var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] {
+  var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] {
     get { frameCommit.resolvedNodeReuseCache }
     set { frameCommit.resolvedNodeReuseCache = newValue }
   }
@@ -386,13 +386,13 @@ package final class ViewGraph {
     }
   }
 
-  private func nodeIfExists(
+  func nodeIfExists(
     for identity: Identity
   ) -> ViewNode? {
     GraphNodeIndexQuery.node(for: identity, in: index)
   }
 
-  private func nodeIfExists(
+  func nodeIfExists(
     for viewNodeID: ViewNodeID
   ) -> ViewNode? {
     GraphNodeIndexQuery.node(for: viewNodeID, in: index)
@@ -409,7 +409,7 @@ package final class ViewGraph {
     return nodeForIdentity(for: resolved.identity)
   }
 
-  private func nodeIDsForResolvedNode(
+  func nodeIDsForResolvedNode(
     _ resolved: ResolvedNode
   ) -> Set<ViewNodeID> {
     GraphNodeIndexQuery.nodeIDs(forResolvedNode: resolved, in: index)
@@ -1827,7 +1827,7 @@ package final class ViewGraph {
   /// only later, through the teardown-coherence anchor forensics, far from
   /// the mutation that caused it. Validated at each mutation so corruption
   /// fails at its source.
-  private func assertDetachedHostedLedgerInverse() {
+  func assertDetachedHostedLedgerInverse() {
     #if DEBUG
       for (root, host) in detachedHostedSubtreeHostByRoot
       where detachedHostedSubtreeRootsByHost[host]?.contains(root) != true {
@@ -1932,104 +1932,6 @@ package final class ViewGraph {
     var preserved = resolved
     preserved.children = node.children.map { $0.snapshot() }
     return preserved
-  }
-
-  /// Reclaims nodes stranded by a transparent chain collapse this frame. A
-  /// composite resolving through an identity-extending but node-less layer (a
-  /// conditional branch) mints its own node during a cold resolve;
-  /// `normalizeResolvedElements(count == 1)` then returns its output directly
-  /// and the enclosing chain level's apply absorbs it — the inner node is
-  /// never wired as a graph child, its identity index entry is overwritten by
-  /// the absorber's reindex (`reindexIdentity` records that shadowing here),
-  /// and no structural diff, entity release, or committed-snapshot descent can
-  /// reach it again. Warm resolves land on the absorber via the identity
-  /// index, so the stranded mint is exclusively a cold-resolve artifact.
-  ///
-  /// The reclaim is deferred to the finalize barrier because a shadowing alone
-  /// does not prove abandonment mid-resolve: a duplicate-occurrence sibling
-  /// (G13) legitimately overwrites the shared identity entry while the earlier
-  /// occurrence is still awaiting its parent's apply. By the barrier, every
-  /// live node reached by the frame's walk is parented (`ViewNode.apply` wires
-  /// parent links) or is an entity's routed home — a shadowed, same-frame,
-  /// parentless, non-routed node is unreachable by construction.
-  private func pruneAbsorbedShadowedNodes() {
-    guard !absorbedShadowedNodeIDs.isEmpty else {
-      return
-    }
-    let candidates = absorbedShadowedNodeIDs
-    absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
-    for nodeID in candidates.sorted() {
-      // Two stranded shapes qualify:
-      // - a same-frame mint (`!wasPresentAtFrameStart`) — the cold-resolve
-      //   chain-collapse artifact, reclaimable even though its mint visited it;
-      // - a WARM strand (`!visitedThisFrame`) — the same absorbed interior
-      //   discovered late: the absorber re-shadows its identity entry on every
-      //   apply, so lookups land on the absorber and the interior is never
-      //   visited again. Parentless, un-routed, and index-shadowed, nothing
-      //   can reach it; without this arm it leaks until (at best) an identity
-      //   prefix sweep. A visited warm node stays: something resolved it this
-      //   frame, so it is live (a re-rooted control, a hosted detached root).
-      guard let node = nodeIfExists(for: nodeID),
-        node.viewNodeID != root?.viewNodeID,
-        !node.wasPresentAtFrameStart || !node.visitedThisFrame(currentFrameID),
-        node.parent == nil
-      else {
-        continue
-      }
-      // A flatten-shadowed state owner is reachable by construction —
-      // authoring-host resolution prefers it over its absorber — and its
-      // lifetime anchors to the absorber's hosted-detached edge. Reclaiming
-      // it here (the creation frame leaves it parentless: the absorber's
-      // apply absorbed its output) would drop the live `@State`/`@FocusState`
-      // slots it hosts and re-seed them on the absorber next pass.
-      if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
-        continue
-      }
-      // An entity's live home is never reclaimed here: adoption and the
-      // outermost-claim rule move entity homes through `nodeForIdentity`, and
-      // a routed node reached by shadowing (a re-rooted stable-`.id` control
-      // is parent-detached by design) is still the entity's binding — its
-      // lifetime belongs to the entity lifecycle (release/pending-removal).
-      // Unless the home is stale: routing alone cannot prove liveness when
-      // claims are suppressed inside a hosting boundary (`entityHosting`) —
-      // the shadow that put this node in the candidate set means the arriving
-      // tree re-resolved its identity onto a different node. A live home owns
-      // its resolved-identity index entry (its apply reindexed it); duplicate
-      // occurrences (> 0) share entries by design and stay route-governed.
-      if let entityIdentity = entityRoutingTable.entityByNodeID[nodeID],
-        entityRoutingTable.route(entityIdentity) == nodeID,
-        entityIdentity.occurrence > 0
-          || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
-      {
-        continue
-      }
-      // The interior recorded runtime registrations while evaluating the chain
-      // whose committed value the absorber now carries (the stamp fixed
-      // point). Re-home that bookkeeping to the identity's current owner
-      // before reclaiming the node — publication rebuilds walk live nodes
-      // only, so registrations left on the reclaimed interior are silently
-      // dropped and its committed tasks never start ("no task registration at
-      // commit", the F43 start-skip).
-      if node.registeredHandlers.hasRuntimeRegistrations,
-        let absorberID = nodeIDByIdentity[node.identity],
-        absorberID != node.viewNodeID,
-        let absorber = nodesByNodeID[absorberID]
-      {
-        absorber.adoptRuntimeRegistrations(from: node)
-        // The interior's task-descriptor identity slots move with the
-        // registrations: the absorber evaluates this chain on the next warm
-        // resolve, and a slot left keyed to the reclaimed node would miss,
-        // mint a fresh identity token, and plan a spurious cancel + restart
-        // of a task whose `.task(id:)` value never changed.
-        for (key, slot) in taskDescriptorNodeSlots where key.node == node.viewNodeID {
-          let adoptedKey = TaskDescriptorSlotKey(node: absorberID, ordinal: key.ordinal)
-          if taskDescriptorNodeSlots[adoptedKey] == nil {
-            taskDescriptorNodeSlots[adoptedKey] = slot
-          }
-        }
-      }
-      removeSubtree(rootedAt: node, sparingVisitedNodes: true)
-    }
   }
 
   private func pruneDetachedResolvedRootIfNeeded(
@@ -3141,7 +3043,7 @@ package final class ViewGraph {
     )
   }
 
-  private func appendTaskCancelEvent(
+  func appendTaskCancelEvent(
     identity: Identity,
     task: TaskDescriptor,
     isStructural: Bool
@@ -3344,252 +3246,6 @@ package final class ViewGraph {
     }
   }
 
-  private func nodeForIdentity(
-    for identity: Identity,
-    entityIdentity: EntityIdentity? = nil
-  ) -> ViewNode {
-    var displacedOccupant = false
-    if let entityIdentity,
-      let routedNodeID = entityRoutingTable.route(entityIdentity)
-    {
-      if let routedNode = nodeIfExists(for: routedNodeID) {
-        // Re-routing moves the node to a new `Identity`. Clear the old
-        // identity's index entry so nothing else resolving at the old
-        // (possibly aliased) identity this frame adopts the moved node — that
-        // would wire it as a child inside its own subtree (a children-graph
-        // cycle). The node's own resolved identity is spared, mirroring
-        // `reindexIdentity`: it is position-independent (an explicit-id
-        // re-root resolves the same stable identity at every position), stays
-        // correct across the move, and identity-keyed lookups (`onChange`'s
-        // previous-value owner) read it mid-resolve, before the apply would
-        // restore it.
-        if let previousIdentity = identityByNodeID[routedNodeID],
-          previousIdentity != identity,
-          previousIdentity != routedNode.resolvedIdentity,
-          nodeIDByIdentity[previousIdentity] == routedNodeID
-        {
-          nodeIDByIdentity.removeValue(forKey: previousIdentity)
-        }
-        nodeIDByIdentity[identity] = routedNodeID
-        identityByNodeID[routedNodeID] = identity
-        entityRoutingTable.bind(entityIdentity, to: routedNodeID)
-        if identity != routedNode.identity {
-          // Adopted across identities: the committed value's positional stamp
-          // pairing is unverified against whatever children this position
-          // resolves next — withdraw the fast-path claim.
-          routedNode.withdrawCommittedStampClaim()
-        }
-        return routedNode
-      }
-      entityRoutingTable.release(routedNodeID)
-    }
-
-    if let existing = nodeIfExists(for: identity) {
-      if let entityIdentity {
-        let existingEntityIdentity =
-          existing.committed.entityIdentity
-          ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
-        if existingEntityIdentity == entityIdentity {
-          entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
-          return existing
-        }
-        // A different entity (or none) occupies this `Identity` slot. A
-        // duplicate-occurrence sibling (`occurrence > 0`, e.g. the second `7`
-        // in `ForEach([7, 7])`) shares an `Identity` with the primary
-        // (`occurrence == 0`) sibling but is a *distinct* runtime lifetime: it
-        // must not adopt or evict the primary's node. Fall through to mint a
-        // fresh `ViewNodeID` so duplicate-id siblings get independent
-        // `@State`/lifecycle (G13). Cross-frame reuse of each occurrence is
-        // handled above by the entity route; this fallback only runs on first
-        // allocation, so the `nodeIDByIdentity` index landing on the
-        // last-resolved occurrence is acceptable — the node store
-        // (`nodesByNodeID`), entity routing, and parent→child teardown all
-        // track both siblings.
-        if entityIdentity.occurrence == 0 {
-          if existingEntityIdentity != nil {
-            // The displaced occupant's resolved subtree departs right here.
-            // The eviction's descent covers committed values, live children,
-            // and hosted-detached edges; the fresh node minted below carries
-            // the displacement mark so `ExactIdentityModifier`'s churn
-            // predicate (reuse suppression) fires even though the fresh node
-            // was never present at frame start.
-            removeSubtree(rootedAt: existing)
-            displacedOccupant = true
-          } else {
-            entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
-            return existing
-          }
-        }
-      } else {
-        // Single-child flattening tiebreak: the occupant is the absorber
-        // whose committed root identity is this identity, but the authored
-        // child node registered here holds the live state slots. Authoring
-        // must land on the authored node — hosting the child's body on the
-        // absorber re-seeds `@State`/`@FocusState` from authored defaults
-        // (one spurious focus flip per presentation open; writes through a
-        // superseded pass's host silently orphaned). Planning and value
-        // stitching keep resolving the identity index to the absorber.
-        if existing.identity != identity,
-          let stateOwner = flattenedStateOwnerNode(for: identity),
-          stateOwner !== existing
-        {
-          return stateOwner
-        }
-        return existing
-      }
-    }
-
-    // The identity index entry can vanish while the authored state owner
-    // lives on (the absorber stopped flattening, and its reindex removed the
-    // entry it claimed). Re-adopt the live owner rather than minting a fresh
-    // node over its state.
-    if entityIdentity == nil,
-      let stateOwner = flattenedStateOwnerNode(for: identity)
-    {
-      nodeIDByIdentity[identity] = stateOwner.viewNodeID
-      return stateOwner
-    }
-
-    nextViewNodeIDRawValue &+= 1
-    let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
-    let node = ViewNode(
-      viewNodeID: viewNodeID,
-      identity: identity
-    )
-    node.ownerGraph = self
-    nodesByNodeID[viewNodeID] = node
-    nodeIDByIdentity[identity] = viewNodeID
-    identityByNodeID[viewNodeID] = identity
-    if let entityIdentity {
-      entityRoutingTable.bind(entityIdentity, to: viewNodeID)
-    }
-    if displacedOccupant {
-      node.entityDisplacedOccupantFrameID = currentFrameID
-    }
-    return node
-  }
-
-  /// The live authored node registered as the state owner for `identity`
-  /// while a single-child flattening absorber claims its identity index
-  /// entry — see `GraphIndex.flattenedStateOwnerNodeIDByIdentity`.
-  private func flattenedStateOwnerNode(
-    for identity: Identity
-  ) -> ViewNode? {
-    guard !flattenedStateOwnerNodeIDByIdentity.isEmpty,
-      let nodeID = flattenedStateOwnerNodeIDByIdentity[identity]
-    else {
-      return nil
-    }
-    return nodeIfExists(for: nodeID)
-  }
-
-  private func bindEntityIdentity(
-    from resolved: ResolvedNode,
-    to viewNodeID: ViewNodeID
-  ) {
-    guard let entityIdentity = resolved.entityIdentity else {
-      return
-    }
-    // The outermost same-frame claim owns the entity (see
-    // `prepareEntityRoutedOwner`). The entity-carrying resolved value bubbles
-    // through every wrapper level of its chain, and each level's apply lands
-    // here — an inner level must not re-bind the entity away from the
-    // enclosing claimer still on the evaluation stack, or next frame's
-    // forwarded claim adopts the inner node cross-identity and aliases the
-    // parent's committed child pairing.
-    if let boundNodeID = entityRoutingTable.route(entityIdentity),
-      boundNodeID != viewNodeID,
-      let bound = nodeIfExists(for: boundNodeID),
-      bound.isEvaluating
-    {
-      return
-    }
-    entityRoutingTable.bind(entityIdentity, to: viewNodeID)
-  }
-
-  private func entityIdentities(
-    in resolved: ResolvedNode
-  ) -> Set<EntityIdentity> {
-    var entities: Set<EntityIdentity> = []
-    func visit(_ node: ResolvedNode) {
-      if let entityIdentity = node.entityIdentity {
-        entities.insert(entityIdentity)
-      }
-      for child in node.children {
-        visit(child)
-      }
-    }
-    visit(resolved)
-    return entities
-  }
-
-  private func releaseInactiveEntityRoutes(
-    activeEntities: Set<EntityIdentity>
-  ) {
-    entityRoutingTable.releaseEntities(notIn: activeEntities)
-    entityRoutingTable.releaseNodes(notIn: liveNodeIDs)
-  }
-
-  private func shouldDeferEntityRoutedRemoval(
-    of node: ViewNode
-  ) -> Bool {
-    guard let entityIdentity = node.committed.entityIdentity else {
-      return false
-    }
-    return entityRoutingTable.route(entityIdentity) == node.viewNodeID
-  }
-
-  private func prunePendingEntityRoutedRemovals(
-    activeEntities: Set<EntityIdentity>
-  ) {
-    // Fixed-point: removing a pending subtree can itself defer deeper
-    // entity-routed descendants back into the pending set. Each pass consumes
-    // a disjoint snapshot and either keeps or removes every node in it, so
-    // the loop strictly shrinks into the finite node store.
-    while !pendingEntityRoutedRemovalNodeIDs.isEmpty {
-      let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
-      pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
-      for viewNodeID in pendingNodeIDs {
-        guard let node = nodeIfExists(for: viewNodeID),
-          let entityIdentity = node.committed.entityIdentity,
-          // Use the frame-stamped `visitedThisFrame` signal, not the stored
-          // `wasVisitedThisFrame` bool: a genuinely-gone node is never
-          // re-prepared in the frame it disappears, so the stored bool stays
-          // stale-`true` from its last live frame and would wrongly skip the
-          // teardown — leaking the node (and, for duplicate-id siblings, the
-          // occurrence-`>0` lifetime) in `nodesByNodeID` forever (G13).
-          !node.visitedThisFrame(currentFrameID)
-        else {
-          continue
-        }
-        // Keep the node only while it is still the entity's live home: the
-        // entity must be active in the new tree AND still route here. An
-        // active entity that re-homed to another node this frame (an owner
-        // churn re-attached it to the arriving generation) leaves this node a
-        // displaced stale copy — tear it down, sparing any descendants the
-        // arriving tree already re-adopted (they are visited).
-        //
-        // Routing alone cannot prove liveness when the entity's claims are
-        // suppressed inside a hosting boundary (`entityHosting`): the arriving
-        // generation re-resolves the same re-rooted identity onto a fresh
-        // structural node without ever re-binding the route, and the stale
-        // copy would be kept as "the home" forever. The resolved-identity
-        // index is the tiebreaker — the live home's apply owns that entry; a
-        // stale copy lost it to the arriving node's reindex. Duplicate-id
-        // occurrences (> 0) are exempt: siblings share the identity entry by
-        // design, so only the entity route is authoritative for them (G13).
-        if activeEntities.contains(entityIdentity),
-          entityRoutingTable.route(entityIdentity) == node.viewNodeID,
-          entityIdentity.occurrence > 0
-            || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
-        {
-          continue
-        }
-        removeSubtree(rootedAt: node, sparingVisitedNodes: true)
-      }
-    }
-  }
-
   private func applyStructuralChildDiff(
     for node: ViewNode,
     resolved: ResolvedNode
@@ -3633,364 +3289,6 @@ package final class ViewGraph {
     }
   }
 
-  /// Per-cascade re-entrancy guard for subtree removal. One walk instance is
-  /// created at each removal root and threaded through the descent, so aliased
-  /// identity/structural-path lookups cannot re-enter a node the cascade is
-  /// already removing.
-  private final class SubtreeRemovalWalk {
-    var enteredNodeIDs: Set<ViewNodeID> = []
-  }
-
-  private func removeSubtree(
-    rootedAt node: ViewNode,
-    committedSnapshot: ResolvedNode? = nil,
-    sparingVisitedNodes: Bool = false,
-    isSubtreeDescent: Bool = false,
-    walk: SubtreeRemovalWalk? = nil
-  ) {
-    guard let current = nodesByNodeID[node.viewNodeID],
-      current === node
-    else {
-      return
-    }
-    // The descent below walks committed snapshots whose identity and
-    // structural-path lookups can alias a node already being removed higher in
-    // this same cascade (an absolute-`.id` re-root shares structural paths with
-    // its wrapper). Re-entering it re-runs the whole body with no progress —
-    // track entered nodes per removal cascade and run the node-local teardown
-    // once. A re-entry still descends its own snapshot's children: an aliased
-    // snapshot can cover departed descendants the first entry's snapshot does
-    // not, and the descent strictly shrinks into the finite resolved tree.
-    let walk = walk ?? SubtreeRemovalWalk()
-    guard walk.enteredNodeIDs.insert(node.viewNodeID).inserted else {
-      guard let committedSnapshot else {
-        return
-      }
-      // The re-entry snapshot can name an interior node DISTINCT from the
-      // re-entered absorber: a chain collapse leaves the interior's value
-      // stamped with the absorber, but the interior still owns its re-rooted
-      // identity index entry (a `.id` slot node under a hosting boundary).
-      // Enter any not-yet-entered node the snapshot maps to — the walk's
-      // entered-set makes this cycle-proof and strictly shrinking. When
-      // nothing new maps, fall back to the children-only descent.
-      var interiorNodes = nodeIDsForResolvedNode(committedSnapshot)
-        .subtracting(walk.enteredNodeIDs)
-        .compactMap { nodeIfExists(for: $0) }
-      if interiorNodes.isEmpty,
-        let interior = nodeIfExists(for: committedSnapshot.identity),
-        !walk.enteredNodeIDs.contains(interior.viewNodeID)
-      {
-        interiorNodes = [interior]
-      }
-      guard !interiorNodes.isEmpty else {
-        for child in committedSnapshot.children {
-          removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
-        }
-        return
-      }
-      interiorNodes.sort { lhs, rhs in
-        if lhs.identity == rhs.identity {
-          return lhs.viewNodeID < rhs.viewNodeID
-        }
-        return lhs.identity < rhs.identity
-      }
-      for interior in interiorNodes {
-        removeSubtree(
-          rootedAt: interior,
-          committedSnapshot: committedSnapshot,
-          sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-      return
-    }
-
-    // A departed-subtree teardown (an explicitly diffed-out child, a churn
-    // orphan) removes a root the caller has already judged gone, but the walk
-    // DOWN from that root goes through committed snapshots and identity/node
-    // lookups that can land on nodes the arriving tree re-adopted this frame
-    // (a stable-`.id` control re-rooted out of the departing generation, a
-    // reused chrome node). A visited node reached by DESCENT therefore belongs
-    // to the live tree — leave it, and its subtree, alone. The explicit root
-    // is still removed unconditionally, and callers that do not opt in keep
-    // the narrower parent-detached keep-guard below (some removals — e.g. a
-    // pruned navigation destination — legitimately tear down visited roots).
-    if sparingVisitedNodes,
-      isSubtreeDescent,
-      node.visitedThisFrame(currentFrameID)
-    {
-      return
-    }
-
-    // A node reached while tearing down a *departing* subtree (e.g. an owner
-    // whose `.id` churned) may itself be a re-rooted stable-`.id` descendant
-    // (a control under an `AnyView`/captured-subview scope) that the *arriving*
-    // subtree already re-resolved this frame at its re-rooted identity. Because
-    // its identity is re-rooted, it has no live parent link (`parent == nil`) —
-    // the same property the retained-reuse decision observes — so it only appears
-    // here through the departing owner's committed children, yet its runtime node
-    // is genuinely live now. Dropping it would mint a fresh node next frame,
-    // churning its route/registration identity and breaking same-node
-    // interactions (a click whose press/release straddle the churn stops
-    // dispatching). Keep it when it was visited this frame and is parent-detached;
-    // a genuinely departing node either was not visited (pruned normally) or is
-    // still parented under the surviving tree (e.g. an entity-routed owner being
-    // replaced), so its lifecycle/registrations are retired as before.
-    // …unless nothing can reach the node anymore: a live re-rooted node owns
-    // its identity index entry (its apply reindexed it) or is an entity's
-    // routed home, and the arriving tree finds it through one of those. A
-    // visited, parent-detached node with neither is a stranded same-frame
-    // mint whose output a chain collapse absorbed (`pruneAbsorbedShadowedNodes`)
-    // — keeping it would leak it beyond every teardown path's reach.
-    if node.parent == nil,
-      node.viewNodeID != root?.viewNodeID,
-      node.visitedThisFrame(currentFrameID),
-      nodeIDByIdentity[node.identity] == node.viewNodeID
-        || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
-        || entityRoutingTable.entityByNodeID[node.viewNodeID].map({ entity in
-          entityRoutingTable.route(entity) == node.viewNodeID
-        }) ?? false
-    {
-      return
-    }
-
-    // An entity-routed node reached by DESCENT is not necessarily departing
-    // with the subtree being torn down: its entity may reappear elsewhere this
-    // frame (a stable explicit-id control inside a churned owner, an `AnyView`
-    // payload whose entity is re-attached by the arriving generation). Defer
-    // the decision to the frame barrier (`prunePendingEntityRoutedRemovals`),
-    // where the full old-vs-new entity set is known — the Stage 6 release
-    // contract. An explicitly removed root (`isSubtreeDescent == false`, e.g.
-    // the mid-resolve different-entity eviction) is still torn down
-    // unconditionally; that eviction is load-bearing for same-frame
-    // convergence of fixed-slot explicit-id churn.
-    if isSubtreeDescent,
-      shouldDeferEntityRoutedRemoval(of: node)
-    {
-      pendingEntityRoutedRemovalNodeIDs.insert(node.viewNodeID)
-      return
-    }
-
-    node.prepareForFrame(currentFrameID)
-    let snapshot = committedSnapshot ?? node.committed
-    removeResolvedNodeReuseCaches(rootedAt: node.identity)
-    if node.resolvedIdentity != node.identity {
-      removeResolvedNodeReuseCaches(rootedAt: node.resolvedIdentity)
-    }
-    if snapshot.identity != node.identity,
-      snapshot.identity != node.resolvedIdentity
-    {
-      removeResolvedNodeReuseCaches(rootedAt: snapshot.identity)
-    }
-    if snapshot.children.isEmpty {
-      for child in node.children {
-        removeSubtree(
-          rootedAt: child,
-          sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-    } else {
-      for child in snapshot.children {
-        removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
-      }
-      // A chain collapse can absorb an interior node's output as the
-      // absorber's own resolved value: the committed value tree then names
-      // the interior's identity with the absorber's stamp, so the value
-      // descent above re-enters the absorber and never reaches the interior
-      // node itself (its structural-path and identity index entries were
-      // rewritten by the same collapse). The interior stays reachable only
-      // as a live child — descend whatever is still parented here that the
-      // value descent did not cover. A child the arriving tree re-adopted
-      // was re-parented by its apply and is skipped; a child already reached
-      // through the values is a no-op via the walk's entered-set.
-      for child in node.children where child.parent === node {
-        removeSubtree(
-          rootedAt: child,
-          sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-    }
-
-    // Hosted detached subtrees: content this node resolved but did not commit
-    // as a child (see `recordDetachedHostedSubtree`) is reachable through
-    // neither the committed values above nor the parent links — its lifetime
-    // anchors here. Visited roots (still being resolved by a live replacement)
-    // and entity-routed re-homes are kept by the descent's standard guards.
-    if let hostedRootIDs = detachedHostedSubtreeRootsByHost.removeValue(forKey: node.viewNodeID) {
-      // Two phases so the ledger is never transiently one-sided: drop every
-      // hostByRoot mirror first (the host's rootsByHost entry is already
-      // gone), THEN recurse — the recursive removals re-validate the ledger
-      // (F97) and would false-positive on a mid-loop half-removed state.
-      for hostedRootID in hostedRootIDs.sorted() {
-        detachedHostedSubtreeHostByRoot.removeValue(forKey: hostedRootID)
-      }
-      assertDetachedHostedLedgerInverse()
-      for hostedRootID in hostedRootIDs.sorted() {
-        guard let hostedRoot = nodeIfExists(for: hostedRootID) else {
-          continue
-        }
-        // Spare a visited hosted root only while something OUTSIDE this
-        // removal cascade still anchors it (a live parent or a live
-        // re-binding evaluation host): "visited this frame" alone is not
-        // liveness — a dismissing overlay entry resolves its content one
-        // last time in the frame that tears the whole entry down, and
-        // sparing on that visit strands the root with no anchor at all
-        // (unreachable until an eventual same-identity re-mint reuses it —
-        // the census leak the hosted ledger exists to prevent).
-        let anchor = hostedRoot.parent ?? hostedRoot.evaluationHost
-        let anchorSurvivesRemoval =
-          anchor.map { anchor in
-            nodeIfExists(for: anchor.viewNodeID) === anchor
-              && !walk.enteredNodeIDs.contains(anchor.viewNodeID)
-          } ?? false
-        removeSubtree(
-          rootedAt: hostedRoot,
-          sparingVisitedNodes: anchorSurvivesRemoval,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-    }
-    if let hostID = detachedHostedSubtreeHostByRoot.removeValue(forKey: node.viewNodeID) {
-      detachedHostedSubtreeRootsByHost[hostID]?.remove(node.viewNodeID)
-      if detachedHostedSubtreeRootsByHost[hostID]?.isEmpty == true {
-        detachedHostedSubtreeRootsByHost.removeValue(forKey: hostID)
-      }
-      assertDetachedHostedLedgerInverse()
-    }
-
-    let lifecycleMetadata =
-      if !node.previousLifecycleMetadata.isEmpty {
-        node.previousLifecycleMetadata
-      } else if !node.lifecycleMetadata.isEmpty {
-        node.lifecycleMetadata
-      } else {
-        snapshot.lifecycleMetadata
-      }
-
-    let emitsOwnLifecycleEvents = node.participatesInStructuralLifecycle
-
-    if emitsOwnLifecycleEvents {
-      for task in lifecycleMetadata.tasks {
-        appendTaskCancelEvent(
-          identity: snapshot.identity,
-          task: task,
-          isStructural: true
-        )
-      }
-    }
-    if emitsOwnLifecycleEvents,
-      !lifecycleMetadata.disappearHandlerIDs.isEmpty
-    {
-      structuralDisappearEvents.append(
-        .init(
-          identity: node.identity,
-          operation: .disappear(
-            handlerIDs: lifecycleMetadata.disappearHandlerIDs
-          )
-        )
-      )
-    }
-
-    node.setLifecycleState(.disappearing)
-    node.setCommittedPresence(false)
-    node.parent = nil
-    removeDependencyEdges(for: node)
-    liveNodeIDs.remove(node.viewNodeID)
-    invalidatedNodeIDs.remove(node.viewNodeID)
-    graphLocalDirtyNodeIDs.remove(node.viewNodeID)
-
-    if let owner = lifecycleEvaluationOwnersByNodeID.removeValue(forKey: node.viewNodeID) {
-      lifecycleEvaluationTargetsByOwner[owner]?.remove(node.viewNodeID)
-      if lifecycleEvaluationTargetsByOwner[owner]?.isEmpty == true {
-        lifecycleEvaluationTargetsByOwner.removeValue(forKey: owner)
-      }
-    }
-    if let targets = lifecycleEvaluationTargetsByOwner.removeValue(forKey: node.viewNodeID) {
-      for target in targets {
-        lifecycleEvaluationOwnersByNodeID.removeValue(forKey: target)
-      }
-    }
-    lifecycleEvaluationTargetsRecordedByOwner.removeValue(forKey: node.viewNodeID)
-
-    nodeIDsByStructuralPath[node.committed.structuralPath]?.remove(node.viewNodeID)
-    if nodeIDsByStructuralPath[node.committed.structuralPath]?.isEmpty == true {
-      nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
-    }
-    taskDescriptorNodeSlots = taskDescriptorNodeSlots.filter { $0.key.node != node.viewNodeID }
-    if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
-      flattenedStateOwnerNodeIDByIdentity.removeValue(forKey: node.identity)
-    }
-    if nodeIDByIdentity[node.identity] == node.viewNodeID {
-      nodeIDByIdentity.removeValue(forKey: node.identity)
-    }
-    if nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID {
-      nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
-    }
-    entityRoutingTable.release(node.viewNodeID)
-    identityByNodeID.removeValue(forKey: node.viewNodeID)
-    nodesByNodeID.removeValue(forKey: node.viewNodeID)
-  }
-
-  private func removeResolvedNodeReuseCaches(
-    rootedAt identity: Identity
-  ) {
-    resolvedNodeReuseCache = resolvedNodeReuseCache.filter { key, entry in
-      let ownerMatches = key.owner == identity || key.owner.isDescendant(of: identity)
-      let nodeMatches =
-        entry.node.identity == identity || entry.node.identity.isDescendant(of: identity)
-      return !ownerMatches && !nodeMatches
-    }
-  }
-
-  private func removeResolvedSubtree(
-    _ resolved: ResolvedNode,
-    sparingVisitedNodes: Bool = false,
-    walk: SubtreeRemovalWalk? = nil
-  ) {
-    let walk = walk ?? SubtreeRemovalWalk()
-    let nodes = nodeIDsForResolvedNode(resolved)
-      .compactMap { nodeIfExists(for: $0) }
-      .sorted { lhs, rhs in
-        if lhs.identity == rhs.identity {
-          return lhs.viewNodeID < rhs.viewNodeID
-        }
-        return lhs.identity < rhs.identity
-      }
-    if !nodes.isEmpty {
-      for node in nodes {
-        removeSubtree(
-          rootedAt: node,
-          committedSnapshot: resolved,
-          sparingVisitedNodes: sparingVisitedNodes,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-      return
-    }
-
-    if let node = nodeIfExists(for: resolved.identity) {
-      removeSubtree(
-        rootedAt: node,
-        committedSnapshot: resolved,
-        sparingVisitedNodes: sparingVisitedNodes,
-        isSubtreeDescent: true,
-        walk: walk
-      )
-      return
-    }
-
-    for child in resolved.children {
-      removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
-    }
-  }
-
   private func reindexDependencies(
     for node: ViewNode,
     previous: DependencySet
@@ -4005,7 +3303,7 @@ package final class ViewGraph {
     )
   }
 
-  private func removeDependencyEdges(
+  func removeDependencyEdges(
     for node: ViewNode
   ) {
     ViewGraphDependencyIndex.remove(
