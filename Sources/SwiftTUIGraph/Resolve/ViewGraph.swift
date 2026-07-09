@@ -1256,6 +1256,13 @@ package final class ViewGraph {
     for (key, slot) in overlay.stateSlots {
       let node = nodeIfExists(for: key.key.owner)
       guard let node else {
+        // The overlay exists to carry in-flight state writes across a
+        // discarded async frame draft; a vanished owner means the write is
+        // dropped here — the F63/F43 lost-write class. Counted (F93) so a
+        // lost-write report starts from the alarm, not from adding logging.
+        SoundnessProbeConfiguration.recordStateSlotRestorationDrop(
+          "state-slot restoration dropped: owner \(key.key.owner) ordinal \(key.key.ordinal) no longer exists"
+        )
         continue
       }
       node.restoreStateSlot(ordinal: key.key.ordinal, slot: slot)

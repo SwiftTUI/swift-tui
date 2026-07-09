@@ -56,6 +56,7 @@ package enum SoundnessProbeConfiguration {
   package static var registrationPublicationViolationCount = 0
   package static var memoUnsoundSkipCount = 0
   package static var duplicateRegistrationOverwriteCount = 0
+  package static var stateSlotRestorationDropCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -168,6 +169,18 @@ package enum SoundnessProbeConfiguration {
     duplicateRegistrationOverwriteCount += 1
     lastViolationDetail = detail()
     emitTrace("duplicate-registration")
+  }
+
+  /// Records one dropped in-flight state-slot restoration (F93): a
+  /// `StateMutationOverlay` — the carrier that preserves user state writes
+  /// across a discarded async frame draft — named an owner node that no
+  /// longer exists, so the write was silently lost (the F63/F43 incident
+  /// class). Recorded unconditionally: the path is rare and every hit is a
+  /// potential user-visible lost write.
+  package static func recordStateSlotRestorationDrop(_ detail: @autoclosure () -> String) {
+    stateSlotRestorationDropCount += 1
+    lastViolationDetail = detail()
+    emitTrace("state-slot-restoration-drop")
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per
