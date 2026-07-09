@@ -196,6 +196,15 @@ package final class LocalGestureRegistry: Equatable {
           if existing !== recognizer {
             recognizer.tearDown()
           }
+          // Triple fallback, unique in the registry family (F100): when the
+          // incoming snapshot carries no owner for an ACTIVE recognizer, keep
+          // the current live owner (with its `viewNodeID`) rather than
+          // minting an unowned key. `prune(keeping:)` force-drops any
+          // identity whose owner has `viewNodeID == nil`, so collapsing this
+          // to the family's two-term form would strand and tear down a
+          // mid-interaction recognizer on the next prune pass. Pinned by
+          // LocalGestureRegistryTests "restore with an empty owner map
+          // preserves an active recognizer's live owner across prune".
           self.ownersByIdentity[identity] =
             ownersByIdentity[identity] ?? self.ownersByIdentity[identity]
             ?? .init(identity: identity)

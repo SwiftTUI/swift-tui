@@ -72,6 +72,13 @@ extension RunLoop {
     convergence: inout FocusSyncConvergenceState
   ) throws -> FocusSyncIterationOutcome {
     latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
+    // Order is load-bearing (F101): gesture pruning first, then the pointer
+    // capture/hover paired-region pass below. The pointer registry does not
+    // participate in `prune(keeping:)` — this sequencing IS its node-liveness
+    // cleanup: a captured/hovered route whose region genuinely departed is
+    // released here, and a re-minted one is re-keyed. Reordering these (or
+    // pruning pointer state before the paired-region check) would release
+    // live captures that the re-key path exists to preserve.
     runtimeRegistrations.pruneOrphanedGestures(
       keeping: renderer.liveNodeIDSnapshot()
     )

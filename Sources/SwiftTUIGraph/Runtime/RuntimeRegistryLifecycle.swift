@@ -125,9 +125,14 @@ package protocol RuntimeRegistry: AnyObject {
   /// registries, whose restore order is not observable.
   func normalizeOrderByIdentity()
 
-  /// Drops registrations owned by nodes that are no longer live. Only the
-  /// gesture registries carry node-liveness-coupled interaction state; no-op
-  /// elsewhere.
+  /// Drops registrations owned by nodes that are no longer live. Overridden
+  /// only by the gesture registries; no-op elsewhere. NOTE (F101): the
+  /// pointer registry also carries node-liveness-coupled interaction state
+  /// (hover recency eviction, owner-paired route resolution) but deliberately
+  /// does NOT override this — its stale capture/hover routes are re-keyed or
+  /// released by `RunLoop.processFocusSyncIteration`'s paired-region pass,
+  /// which is sequenced immediately after `pruneOrphanedGestures` and must
+  /// stay there. A future `prune` override here must review that sequencing.
   func prune(keeping liveNodeIDs: Set<ViewNodeID>)
 
   /// Contributes this registry's keyed contents to the publication oracle
