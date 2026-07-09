@@ -34,7 +34,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIAndroidHost` | 32 | 181 |
 | `SwiftTUICore` | 39 | 267 |
 | `SwiftTUIPrimitives` | 166 | 1423 |
-| `SwiftTUIGraph` | 51 | 325 |
+| `SwiftTUIGraph` | 53 | 333 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -818,7 +818,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FocusedValueKey` — protocol — 1 member
 - `FocusedValues` — struct — 3 members
 - `FocusRegion` — struct — 4 members
-- `FrameScheduler` — class — 10 members
+- `FrameScheduler` — class — 12 members
 - `FrameScheduling` — protocol — 8 members
 - `GestureRecognizerBuildContext` — struct — 2 members
 - `GestureRecognizerEventDisposition` — enum — 3 members
@@ -854,8 +854,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TransactionSnapshot` — struct — 2 members
 - `WakeCause` — enum — 6 members
 
-### Package-only seams (1)
+### Package-only seams (3)
 
+- `DeadlineArmCut` — struct — 2 members
+- `DrainPassDeadlineCutting` — protocol — 2 members
 - `parseDroppedPaths(_:)` — func
 
 ## SwiftTUIPTYCPrimitives

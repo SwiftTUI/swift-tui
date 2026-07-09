@@ -274,6 +274,21 @@ private final class PerpetualSupersessionScheduler: FrameScheduling,
     inner.consumeReadyFrame(at: now)
   }
 
+  // Honest cut forwarding (F95): the wrapped FrameScheduler owns the deadline
+  // set, so its arm ordinals and cut-restricted consume are the real
+  // semantics. Before FrameScheduling required the cut, this double silently
+  // took the run loop's ungated fallback inside drain passes.
+  var deadlineArmCut: DeadlineArmCut {
+    inner.deadlineArmCut
+  }
+
+  func consumeReadyFrame(
+    at now: MonotonicInstant,
+    armedBefore cut: DeadlineArmCut
+  ) -> ScheduledFrame? {
+    inner.consumeReadyFrame(at: now, armedBefore: cut)
+  }
+
   func reset() {
     inner.reset()
   }

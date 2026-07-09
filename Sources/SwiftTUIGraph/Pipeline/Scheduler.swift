@@ -94,10 +94,10 @@ package protocol PendingFrameAwaiting: AnyObject {
 /// the next pass, never discarded. Captured by a frame driver at pass entry so
 /// one drain is bounded to the work armed before it began (see
 /// ``DrainPassDeadlineCutting``).
-package struct DeadlineArmCut: Equatable, Sendable {
-  package var rawValue: UInt64
+public struct DeadlineArmCut: Equatable, Sendable {
+  public var rawValue: UInt64
 
-  package init(rawValue: UInt64) {
+  public init(rawValue: UInt64) {
     self.rawValue = rawValue
   }
 }
@@ -113,7 +113,16 @@ package struct DeadlineArmCut: Equatable, Sendable {
 /// strictly shrinking. `hasPendingFrame`/`nextWakeInstant` deliberately keep
 /// the live view (withheld deadlines included) so the outer loop re-enters or
 /// schedules its wake promptly.
-package protocol DrainPassDeadlineCutting: AnyObject {
+///
+/// Every ``FrameScheduling`` conformer must provide the cut (F95): the drain
+/// drivers consume exclusively through it, with no ungated fallback — a
+/// scheduler without cut semantics would silently revive the F41 livelock the
+/// moment a drain outlives the deadline cadence. There is deliberately **no
+/// default implementation**: forwarding to the ungated consume would be sound
+/// only for schedulers that keep no deadline set, and silently wrong for any
+/// that do; a conformer with no deadline set should forward explicitly and
+/// say why (see `PerpetualSupersessionScheduler` in the tests).
+public protocol DrainPassDeadlineCutting: AnyObject {
   /// The cut for one drain pass: a snapshot of the arm ordering. Deadlines
   /// armed after this read are withheld from consumes that pass this cut.
   var deadlineArmCut: DeadlineArmCut { get }
@@ -126,8 +135,11 @@ package protocol DrainPassDeadlineCutting: AnyObject {
   ) -> ScheduledFrame?
 }
 
-/// Scheduler contract used by the runtime event loop.
-public protocol FrameScheduling: Invalidating {
+/// Scheduler contract used by the runtime event loop. Refines
+/// ``DrainPassDeadlineCutting`` so a scheduler that cannot bound a drain pass
+/// is unrepresentable — the type system, not a runtime cast, enforces the F41
+/// livelock fix.
+public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
   func requestInput()
   func requestSignal(named name: String)
   func requestExternalWake(reason: String)
@@ -449,12 +461,13 @@ extension FrameScheduler: WakeNotifyingFrameScheduling {
   }
 }
 
-extension FrameScheduler: DrainPassDeadlineCutting {
-  package var deadlineArmCut: DeadlineArmCut {
+// DrainPassDeadlineCutting conformance is inherited via FrameScheduling.
+extension FrameScheduler {
+  public var deadlineArmCut: DeadlineArmCut {
     DeadlineArmCut(rawValue: coalescingLock.withLock { $0.nextDeadlineArmOrdinal })
   }
 
-  package func consumeReadyFrame(
+  public func consumeReadyFrame(
     at now: MonotonicInstant,
     armedBefore cut: DeadlineArmCut
   ) -> ScheduledFrame? {

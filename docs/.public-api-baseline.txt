@@ -833,6 +833,12 @@ SwiftTUIGraph.AnyGestureStateBinding.init(valueType:setValue:reset:)
 SwiftTUIGraph.AnyGestureStateBinding.resetToSeed()
 SwiftTUIGraph.AnyGestureStateBinding.setValueErased(_:)
 SwiftTUIGraph.AnyGestureStateBinding.valueType
+SwiftTUIGraph.DeadlineArmCut
+SwiftTUIGraph.DeadlineArmCut.init(rawValue:)
+SwiftTUIGraph.DeadlineArmCut.rawValue
+SwiftTUIGraph.DrainPassDeadlineCutting
+SwiftTUIGraph.DrainPassDeadlineCutting.consumeReadyFrame(at:armedBefore:)
+SwiftTUIGraph.DrainPassDeadlineCutting.deadlineArmCut
 SwiftTUIGraph.DropContext
 SwiftTUIGraph.DropContext.init(location:pointer:modifiers:)
 SwiftTUIGraph.DropContext.location
@@ -870,6 +876,8 @@ SwiftTUIGraph.FocusedValues.init()
 SwiftTUIGraph.FocusedValues.subscript(_:)
 SwiftTUIGraph.FrameScheduler
 SwiftTUIGraph.FrameScheduler.consumeReadyFrame(at:)
+SwiftTUIGraph.FrameScheduler.consumeReadyFrame(at:armedBefore:)
+SwiftTUIGraph.FrameScheduler.deadlineArmCut
 SwiftTUIGraph.FrameScheduler.hasPendingFrame(at:)
 SwiftTUIGraph.FrameScheduler.init()
 SwiftTUIGraph.FrameScheduler.nextWakeInstant(after:)

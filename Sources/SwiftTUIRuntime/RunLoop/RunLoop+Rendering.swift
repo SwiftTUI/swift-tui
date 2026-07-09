@@ -103,20 +103,17 @@ extension RunLoop {
   /// pass for them promptly.
   private func beginDeadlineDrainPass() -> (
     scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut
-  )? {
-    guard let cuttingScheduler = scheduler as? any DrainPassDeadlineCutting else {
-      return nil
-    }
-    return (cuttingScheduler, cuttingScheduler.deadlineArmCut)
+  ) {
+    // `FrameScheduling` refines `DrainPassDeadlineCutting` (F95), so every
+    // injected scheduler carries the cut — there is no ungated consume path
+    // for a drain loop to fall back to (the pre-F41 livelock shape).
+    (scheduler, scheduler.deadlineArmCut)
   }
 
   private func consumeReadyFrame(
-    for drainPass: (scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut)?
+    for drainPass: (scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut)
   ) -> ScheduledFrame? {
-    guard let drainPass else {
-      return scheduler.consumeReadyFrame(at: frameReadinessClock())
-    }
-    return drainPass.scheduler.consumeReadyFrame(
+    drainPass.scheduler.consumeReadyFrame(
       at: frameReadinessClock(),
       armedBefore: drainPass.cut
     )
