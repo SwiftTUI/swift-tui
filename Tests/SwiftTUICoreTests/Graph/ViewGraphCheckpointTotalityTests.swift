@@ -23,7 +23,7 @@ private let viewGraphFieldGroupNames = [
 
 private func parsedFieldGroupMemberNames() throws -> [String] {
   try viewGraphFieldGroupNames.flatMap { groupName in
-    try parsedStoredVarNames(
+    try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: groupName,
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphFieldGroups.swift"
@@ -40,17 +40,17 @@ struct ViewGraphCheckpointTotalityTests {
     // parser sees the group property names (the per-field forwarding accessors
     // are computed, so they are excluded). The flattened group fields are the
     // canonical covered set.
-    let viewGraphGroupFields = try parsedStoredVarNames(
+    let viewGraphGroupFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "class",
       typeName: "ViewGraph",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraph.swift"
     )
-    let viewGraphCheckpointGroupFields = try parsedStoredVarNames(
+    let viewGraphCheckpointGroupFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "Checkpoint",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphState.swift"
     )
-    let viewGraphDebugFields = try parsedStoredVarNames(
+    let viewGraphDebugFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphDebugSnapshots.swift"
@@ -91,14 +91,14 @@ struct ViewGraphCheckpointTotalityTests {
     // for the debug-state guard.
     #expect(Set(viewGraphDebugFields) == Set(groupMemberFields + ["root"]))
 
-    let viewNodeFields = try parsedStoredVarNames(
+    let viewNodeFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "class",
       typeName: "ViewNode",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift"
     ).filter { field in
       field != "identity"
     }
-    let viewNodeCheckpointFields = try parsedStoredVarNames(
+    let viewNodeCheckpointFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "Checkpoint",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift"
@@ -119,7 +119,7 @@ struct ViewGraphCheckpointTotalityTests {
     // a group cannot silently fall out of the debug-state contract.
     let groupNames = ["FrameState", "EvaluationState", "ReuseState", "PersistentState"]
     let groupMembers = try groupNames.flatMap { name in
-      try parsedStoredVarNames(
+      try SourceParsingTestSupport.parsedStoredVarNames(
         typeKind: "struct",
         typeName: name,
         relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNodeFieldGroups.swift"
@@ -130,9 +130,9 @@ struct ViewGraphCheckpointTotalityTests {
     // the groups; see ViewNode.checkpointMutationGeneration).
     #expect(groupMembers.count == 27)
 
-    let snapshotBody = functionBodyText(
+    let snapshotBody = SourceParsingTestSupport.functionBodyText(
       named: "debugTotalStateSnapshot",
-      in: try sourceText(relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift")
+      in: try SourceParsingTestSupport.sourceText(relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift")
     )
     #expect(!snapshotBody.isEmpty, "could not locate ViewNode.debugTotalStateSnapshot()")
     for field in groupMembers {
@@ -148,7 +148,7 @@ struct ViewGraphCheckpointTotalityTests {
     // The canonical covered set is the flattened field-group members plus the
     // standalone `root`; the flat debug snapshot must mirror it exactly.
     let canonicalFields = try parsedFieldGroupMemberNames() + ["root"]
-    let debugFields = try parsedStoredVarNames(
+    let debugFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphDebugSnapshots.swift"
@@ -238,13 +238,13 @@ struct ViewGraphCheckpointTotalityTests {
     // stales after every metadata application (animation ticks reuse this path).
     // Guard it: each metadata field must be read as `metadata.<field>`.
     let path = "Sources/SwiftTUICore/Place/PlacedNode.swift"
-    let fields = try parsedStoredVarNames(
+    let fields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "PlacedNodeResolvedMetadata",
       relativePath: path
     )
     #expect(fields.count >= 14)  // the metadata mirror is non-trivial
-    let source = try sourceText(relativePath: path)
+    let source = try SourceParsingTestSupport.sourceText(relativePath: path)
     for field in fields {
       #expect(
         source.contains("metadata.\(field)"),
@@ -263,7 +263,7 @@ struct ViewGraphCheckpointTotalityTests {
     // `RuntimeRegistrationKindTotalityTests` behaviorally covers every
     // declared `RuntimeRegistrationKind`; this source guard additionally
     // catches a stored registry property that never gained a kind at all.
-    let registries = try parsedStoredVarNames(
+    let registries = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "RuntimeRegistrationSet",
       relativePath: "Sources/SwiftTUIGraph/Runtime/RuntimeRegistrationSet.swift"
@@ -271,7 +271,7 @@ struct ViewGraphCheckpointTotalityTests {
     .filter { $0.hasSuffix("Registry") }
     #expect(registries.count >= 15)
 
-    let source = try sourceText(
+    let source = try SourceParsingTestSupport.sourceText(
       relativePath: "Sources/SwiftTUIGraph/Runtime/RuntimeRegistrationSet.swift"
     )
     guard
@@ -294,167 +294,4 @@ struct ViewGraphCheckpointTotalityTests {
       )
     }
   }
-}
-
-/// Returns the source text of the first `func <name>(` and its body (balanced
-/// braces), or "" if not found.
-private func functionBodyText(named name: String, in source: String) -> String {
-  let lines = source.components(separatedBy: .newlines)
-  guard let start = lines.firstIndex(where: { $0.contains("func \(name)(") }) else {
-    return ""
-  }
-  var depth = 0
-  var started = false
-  var collected: [String] = []
-  for line in lines[start...] {
-    collected.append(line)
-    if line.contains("{") {
-      started = true
-    }
-    depth += braceDelta(in: line)
-    if started && depth <= 0 {
-      break
-    }
-  }
-  return collected.joined(separator: "\n")
-}
-
-private func parsedStoredVarNames(
-  typeKind: String,
-  typeName: String,
-  relativePath: String
-) throws -> [String] {
-  let source = try sourceText(relativePath: relativePath)
-  let body = try typeBody(kind: typeKind, name: typeName, in: source)
-  let lines = body.components(separatedBy: .newlines)
-  var fields: [String] = []
-  var depth = 0
-
-  for (index, line) in lines.enumerated() {
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    if depth == 0,
-      let field = parsedStoredPropertyName(from: trimmed),
-      isStoredPropertyDeclaration(lines: lines, startingAt: index)
-    {
-      fields.append(field)
-    }
-    depth += braceDelta(in: line)
-  }
-
-  return fields
-}
-
-private func parsedStoredPropertyName(from line: String) -> String? {
-  guard !line.hasPrefix("//") else { return nil }
-  let tokens = line.split(whereSeparator: \.isWhitespace)
-  guard
-    let declarationIndex = tokens.firstIndex(where: { token in
-      token == "var" || token == "let"
-    }),
-    tokens.indices.contains(tokens.index(after: declarationIndex))
-  else {
-    return nil
-  }
-  let nameToken = tokens[tokens.index(after: declarationIndex)]
-  return String(nameToken.prefix { $0 != ":" && $0 != "=" && $0 != "{" })
-}
-
-private func isStoredPropertyDeclaration(
-  lines: [String],
-  startingAt index: Int
-) -> Bool {
-  let line = lines[index]
-  guard line.contains("{") else {
-    return true
-  }
-  let accessorBody = propertyAccessorBody(lines: lines, startingAt: index)
-  if accessorBody.contains("didSet") || accessorBody.contains("willSet") {
-    return true
-  }
-  return false
-}
-
-private func propertyAccessorBody(
-  lines: [String],
-  startingAt index: Int
-) -> String {
-  var depth = 0
-  var collected: [String] = []
-  for line in lines[index...] {
-    collected.append(line)
-    depth += braceDelta(in: line)
-    if depth == 0 {
-      break
-    }
-  }
-  return collected.joined(separator: "\n")
-}
-
-private func braceDelta(in line: String) -> Int {
-  line.reduce(0) { partial, character in
-    switch character {
-    case "{":
-      partial + 1
-    case "}":
-      partial - 1
-    default:
-      partial
-    }
-  }
-}
-
-private func sourceText(relativePath: String) throws -> String {
-  let root = try repositoryRoot()
-  let url = root.appendingPathComponent(relativePath)
-  return try String(contentsOf: url, encoding: .utf8)
-}
-
-private func typeBody(
-  kind: String,
-  name: String,
-  in source: String
-) throws -> String {
-  guard let declaration = source.range(of: "\(kind) \(name)") else {
-    throw CheckpointTotalitySourceParseError.missingType(kind: kind, name: name)
-  }
-  guard let openingBrace = source[declaration.upperBound...].firstIndex(of: "{") else {
-    throw CheckpointTotalitySourceParseError.missingOpeningBrace(kind: kind, name: name)
-  }
-
-  var depth = 0
-  var index = openingBrace
-  while index < source.endIndex {
-    let character = source[index]
-    if character == "{" {
-      depth += 1
-    } else if character == "}" {
-      depth -= 1
-      if depth == 0 {
-        let bodyStart = source.index(after: openingBrace)
-        return String(source[bodyStart..<index])
-      }
-    }
-    index = source.index(after: index)
-  }
-  throw CheckpointTotalitySourceParseError.missingClosingBrace(kind: kind, name: name)
-}
-
-private func repositoryRoot() throws -> URL {
-  var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-  while directory.path != "/" {
-    if FileManager.default.fileExists(
-      atPath: directory.appendingPathComponent("Package.swift").path
-    ) {
-      return directory
-    }
-    directory.deleteLastPathComponent()
-  }
-  throw CheckpointTotalitySourceParseError.missingPackageRoot
-}
-
-private enum CheckpointTotalitySourceParseError: Error {
-  case missingPackageRoot
-  case missingType(kind: String, name: String)
-  case missingOpeningBrace(kind: String, name: String)
-  case missingClosingBrace(kind: String, name: String)
 }

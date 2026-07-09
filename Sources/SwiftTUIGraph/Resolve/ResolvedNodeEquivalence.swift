@@ -173,6 +173,12 @@ extension ResolvedNode {
       indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
       preferenceValues == other.preferenceValues,
       supportsRetainedReuse == other.supportsRetainedReuse,
+      // matchedGeometry is set at resolve time by .matchedGeometryEffect
+      // (F96): a config change served from memo would pair stale geometry.
+      // isTransient is a runtime-overlay product, always false at resolve —
+      // compared for totality, vacuous on the resolve path.
+      matchedGeometry == other.matchedGeometry,
+      isTransient == other.isTransient,
       children.count == other.children.count
     else { return false }
     for (l, r) in zip(children, other.children) where !l.memoReuseEquivalent(to: r) {
@@ -227,6 +233,8 @@ extension ResolvedNode {
     }
     if preferenceValues != other.preferenceValues { return "preferenceValues" }
     if supportsRetainedReuse != other.supportsRetainedReuse { return "supportsRetainedReuse" }
+    if matchedGeometry != other.matchedGeometry { return "matchedGeometry" }
+    if isTransient != other.isTransient { return "isTransient" }
     if children.count != other.children.count { return "children.count" }
     for (l, r) in zip(children, other.children) {
       if let childField = l.memoUnsoundContentDivergence(from: r) {
@@ -288,5 +296,7 @@ extension ResolvedNode {
         == rhs.indexedChildSource?.measurementSignature
       && lhs.preferenceValues == rhs.preferenceValues
       && lhs.supportsRetainedReuse == rhs.supportsRetainedReuse
+      && lhs.matchedGeometry == rhs.matchedGeometry
+      && lhs.isTransient == rhs.isTransient
   }
 }
