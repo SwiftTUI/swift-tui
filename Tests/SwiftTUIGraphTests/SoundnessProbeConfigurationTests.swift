@@ -26,6 +26,8 @@ struct SoundnessProbeConfigurationTests {
     let deltaCount = SoundnessProbeConfiguration.deltaCheckpointViolationCount
     let rasterCount = SoundnessProbeConfiguration.rasterDamageMismatchCount
     let teardownCount = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let leakCount = SoundnessProbeConfiguration.teardownCoherenceLeakCount
+    let leakCensus = SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount
     let publicationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let memoCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let duplicateCount = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
@@ -38,6 +40,8 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.deltaCheckpointViolationCount = deltaCount
       SoundnessProbeConfiguration.rasterDamageMismatchCount = rasterCount
       SoundnessProbeConfiguration.teardownCoherenceViolationCount = teardownCount
+      SoundnessProbeConfiguration.teardownCoherenceLeakCount = leakCount
+      SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount = leakCensus
       SoundnessProbeConfiguration.registrationPublicationViolationCount = publicationCount
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoCount
       SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = duplicateCount
@@ -60,9 +64,30 @@ struct SoundnessProbeConfigurationTests {
   func teardownCoherenceViolationRecordsCountAndDetail() {
     withRestoredProbeState {
       let before = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+      let leakBefore = SoundnessProbeConfiguration.teardownCoherenceLeakCount
       SoundnessProbeConfiguration.recordTeardownCoherenceViolation("orphan strand")
       #expect(SoundnessProbeConfiguration.teardownCoherenceViolationCount == before + 1)
+      #expect(
+        SoundnessProbeConfiguration.teardownCoherenceLeakCount == leakBefore,
+        "the over-removal record must not count into the leak subclass"
+      )
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "orphan strand")
+    }
+  }
+
+  @Test("teardown coherence leaks count into both the combined and leak counters")
+  func teardownCoherenceLeakRecordsBothCounters() {
+    withRestoredProbeState {
+      let before = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+      let leakBefore = SoundnessProbeConfiguration.teardownCoherenceLeakCount
+      SoundnessProbeConfiguration.recordTeardownCoherenceLeak("census orphan", unreachableCount: 3)
+      #expect(
+        SoundnessProbeConfiguration.teardownCoherenceViolationCount == before + 1,
+        "existing combined-counter delta asserts must keep covering the leak direction"
+      )
+      #expect(SoundnessProbeConfiguration.teardownCoherenceLeakCount == leakBefore + 1)
+      #expect(SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount == 3)
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "census orphan")
     }
   }
 

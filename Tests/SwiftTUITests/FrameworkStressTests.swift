@@ -1199,6 +1199,76 @@ struct FrameworkStressTests {
     harness.shutdown()
     #expect(harness.activeTaskCount == 0)
   }
+
+  @Test("List-route flip leak census stays at its pinned baseline (F91 ratchet)")
+  func listRouteFlipLeakCensusStaysAtBaseline() throws {
+    // The teardown-coherence LEAK direction (stored nodes unreachable from
+    // the committed root) is counter-only — the residual class this test
+    // pins is the List/lazy content strand under a flipped conditional
+    // branch (`…/false/content/ListItems/ListContent[0]`, observed in the
+    // KeyCommand route tests and the TermUIPerf app-shell workflow). This
+    // is a CHARACTERIZATION ratchet, not an endorsement: it alarms when the
+    // class GROWS (census creep across route cycles — the silent-growth
+    // failure F91 names). When the strand is root-fixed, the leak
+    // assertions below flip and this test should be rewritten to pin zero.
+    let leakBaseline = SoundnessProbeConfiguration.teardownCoherenceLeakCount
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ListRouteLeakRoot"),
+      size: .init(width: 72, height: 20)
+    ) {
+      ListRouteLeakCensusFixture()
+    }
+    defer { harness.shutdown() }
+
+    var censusPerCycle: [Int] = []
+    for _ in 1...3 {
+      var frame = try harness.clickText("Open")
+      #expect(frame.contains("detail"))
+      frame = try harness.clickText("Back")
+      #expect(frame.contains("Open"))
+      censusPerCycle.append(SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount)
+    }
+
+    let leakDelta = SoundnessProbeConfiguration.teardownCoherenceLeakCount - leakBaseline
+    #expect(
+      leakDelta > 0,
+      """
+      the List-route strand no longer leaks — the residual class is (at least
+      partially) fixed; ratchet this test toward zero instead of deleting it
+      """
+    )
+    let censusCeiling = try #require(censusPerCycle.first)
+    #expect(
+      censusPerCycle.allSatisfy { $0 <= censusCeiling },
+      """
+      leak census grew across route cycles (\(censusPerCycle)) — the residual
+      class is accumulating per flip instead of re-adopting the strand; this
+      is the silent-growth regression F91 exists to catch
+      """
+    )
+  }
+}
+
+private struct ListRouteLeakCensusFixture: View {
+  @State private var showingDetail = false
+  @State private var selection: Int?
+
+  var body: some View {
+    if showingDetail {
+      Panel(id: "detail") {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("detail")
+          Button("Back") { showingDetail = false }
+        }
+      }
+    } else {
+      Panel(id: "list") {
+        List(selection: $selection, onActivate: { _ in showingDetail = true }) {
+          Text("Open").tag(0)
+        }
+      }
+    }
+  }
 }
 
 private struct PortalButtonOrphanFixture: View {

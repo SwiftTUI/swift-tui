@@ -2493,13 +2493,23 @@ package final class ViewGraph {
     if SoundnessProbeConfiguration.isSampledFrame,
       let violation = teardownCoherenceViolation()
     {
-      SoundnessProbeConfiguration.recordTeardownCoherenceViolation(violation.detail)
+      if violation.isOverRemoval {
+        SoundnessProbeConfiguration.recordTeardownCoherenceViolation(violation.detail)
+      } else {
+        // The leak direction stays assert-free until its measured residual
+        // class (F91: lazy/List content strands under flipped branches —
+        // see the leak-census ratchet in `FrameworkStressTests`) is burned
+        // down; `teardownCoherenceLeakCount` watches it independently so
+        // the class cannot grow silently.
+        SoundnessProbeConfiguration.recordTeardownCoherenceLeak(
+          violation.detail,
+          unreachableCount: violation.unreachableCount
+        )
+      }
       #if DEBUG
         // The stale-alias direction measured zero across the stress suite
         // when introduced, so any hit is a regression of the deleted sweep's
-        // failure mode. The leak direction stays counter-only until its
-        // documented residual class (see ``teardownCoherenceViolation()``)
-        // is burned down.
+        // failure mode.
         if violation.isOverRemoval {
           assertionFailure(violation.detail)
         }
@@ -2542,7 +2552,9 @@ package final class ViewGraph {
   /// spares a visited root only while an anchor outside the removal cascade
   /// survives. `FrameworkStressTests` pins the zero-count
   /// ("portal overlay button chrome leaves no teardown-coherence orphans").
-  private func teardownCoherenceViolation() -> (isOverRemoval: Bool, detail: String)? {
+  private func teardownCoherenceViolation()
+    -> (isOverRemoval: Bool, detail: String, unreachableCount: Int)?
+  {
     guard let root else {
       return nil
     }
@@ -2586,7 +2598,7 @@ package final class ViewGraph {
 
     absorb(root)
     if let staleAliasDetail {
-      return (isOverRemoval: true, detail: staleAliasDetail)
+      return (isOverRemoval: true, detail: staleAliasDetail, unreachableCount: 0)
     }
 
     // Fixed point: absorb any stored node whose parent/evaluation-host anchor
@@ -2617,7 +2629,8 @@ package final class ViewGraph {
         detail: """
         teardown coherence: \(unreachableIDs.count) stored node(s) \
         unreachable from the committed root: \(samples.joined(separator: ", "))
-        """
+        """,
+        unreachableCount: unreachableIDs.count
       )
     }
     return nil

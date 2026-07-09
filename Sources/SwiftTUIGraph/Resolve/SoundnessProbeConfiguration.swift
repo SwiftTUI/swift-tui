@@ -42,6 +42,17 @@ package enum SoundnessProbeConfiguration {
   package static var checkpointStoreViolationCount = 0
   package static var rasterDamageMismatchCount = 0
   package static var teardownCoherenceViolationCount = 0
+  /// The under-removal (leak) subclass of `teardownCoherenceViolationCount`:
+  /// stored nodes unreachable from the committed root (F91). Counted
+  /// separately so the leak residual class is independently watchable — the
+  /// over-removal direction asserts in DEBUG, this one is gated by
+  /// baseline-ratchet tests until the residual burns down to zero.
+  package static var teardownCoherenceLeakCount = 0
+  /// The unreachable-node census size of the most recent leak record: the
+  /// F91 ratchet asserts this stays at its pinned baseline (a growing census
+  /// is the "residual class grows silently" failure the split exists to
+  /// catch), without parsing the human-facing detail string.
+  package static var lastTeardownLeakUnreachableCount = 0
   package static var registrationPublicationViolationCount = 0
   package static var memoUnsoundSkipCount = 0
   package static var duplicateRegistrationOverwriteCount = 0
@@ -99,6 +110,22 @@ package enum SoundnessProbeConfiguration {
     teardownCoherenceViolationCount += 1
     lastViolationDetail = detail()
     emitTrace("teardown-coherence")
+  }
+
+  /// Records one caught under-removal (leak) census violation (F91): stored
+  /// node(s) unreachable from the committed root at the finalize barrier.
+  /// Increments BOTH the combined teardown-coherence counter (so existing
+  /// scenario delta-asserts keep covering both directions) and the
+  /// leak-specific counter the F91 ratchet tests watch.
+  package static func recordTeardownCoherenceLeak(
+    _ detail: @autoclosure () -> String,
+    unreachableCount: Int
+  ) {
+    teardownCoherenceViolationCount += 1
+    teardownCoherenceLeakCount += 1
+    lastTeardownLeakUnreachableCount = unreachableCount
+    lastViolationDetail = detail()
+    emitTrace("teardown-coherence-leak")
   }
 
   /// Records one caught registration-publication divergence (F04): after a
