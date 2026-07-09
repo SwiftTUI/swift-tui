@@ -630,10 +630,16 @@ package final class ViewGraph {
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot
   ) -> ResolvedNode? {
+    // Every denial branch records a `cache-*` reason (F94) so this path is
+    // diagnosable through the same `[REUSE-TRACE]` histogram as its
+    // `reusableSnapshot` siblings; `record` self-guards on `isEnabled`.
     let key = ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)
-    guard var entry = resolvedNodeReuseCache[key],
-      entry.signature == signature
-    else {
+    guard var entry = resolvedNodeReuseCache[key] else {
+      ReuseDenialTrace.record("cache-miss")
+      return nil
+    }
+    guard entry.signature == signature else {
+      ReuseDenialTrace.record("cache-stale-signature")
       return nil
     }
 
@@ -642,12 +648,16 @@ package final class ViewGraph {
       ?? nodeIfExists(for: entry.node.identity)
     guard let node = cachedNode else {
       resolvedNodeReuseCache.removeValue(forKey: key)
+      ReuseDenialTrace.record("cache-node-departed")
       return nil
     }
 
-    guard entry.node.environmentSnapshot == environment,
-      entry.node.transactionSnapshot.isReuseEquivalent(to: transaction)
-    else {
+    guard entry.node.environmentSnapshot == environment else {
+      ReuseDenialTrace.record("cache-environment-mismatch")
+      return nil
+    }
+    guard entry.node.transactionSnapshot.isReuseEquivalent(to: transaction) else {
+      ReuseDenialTrace.record("cache-transaction-mismatch")
       return nil
     }
 
@@ -662,6 +672,17 @@ package final class ViewGraph {
         transaction: transaction
       )
     else {
+      if ReuseDenialTrace.isEnabled {
+        // Trace-only second evaluation: the production guard stays the
+        // boolean fast path; the reason lookup runs only when tracing.
+        let reason =
+          node.canReuseDenialReason(
+            frameID: currentFrameID,
+            environment: environment,
+            transaction: transaction
+          ) ?? "can-reuse-denied"
+        ReuseDenialTrace.record("cache-\(reason)")
+      }
       return nil
     }
 
