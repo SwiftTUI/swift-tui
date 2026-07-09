@@ -398,15 +398,15 @@ public struct ViewDimensions: Sendable {
     explicitVerticalGuideProvider(guide) ?? guide.defaultValue(in: self)
   }
 
-  func explicitValue(for guide: HorizontalAlignment) -> Int? {
+  package func explicitValue(for guide: HorizontalAlignment) -> Int? {
     explicitHorizontalGuideProvider(guide)
   }
 
-  func explicitValue(for guide: VerticalAlignment) -> Int? {
+  package func explicitValue(for guide: VerticalAlignment) -> Int? {
     explicitVerticalGuideProvider(guide)
   }
 
-  func overridingHorizontalGuides(
+  package func overridingHorizontalGuides(
     with provider: @escaping @Sendable (HorizontalAlignment) -> Int?
   ) -> Self {
     let currentHorizontalProvider = explicitHorizontalGuideProvider
@@ -420,7 +420,7 @@ public struct ViewDimensions: Sendable {
     )
   }
 
-  func overridingVerticalGuides(
+  package func overridingVerticalGuides(
     with provider: @escaping @Sendable (VerticalAlignment) -> Int?
   ) -> Self {
     let currentVerticalProvider = explicitVerticalGuideProvider

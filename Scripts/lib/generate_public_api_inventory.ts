@@ -131,7 +131,11 @@ const PRIMARY_MODULES = [
   "SwiftTUIWebHostCLI",
   "SwiftTUIAndroidHost",
 ] as const;
-const PACKAGE_ONLY_MODULES = ["SwiftTUICore", "SwiftTUIPTYCPrimitives"] as const;
+const PACKAGE_ONLY_MODULES = [
+  "SwiftTUICore",
+  "SwiftTUIPrimitives",
+  "SwiftTUIPTYCPrimitives",
+] as const;
 const ALL_MODULES = [...PRIMARY_MODULES, ...PACKAGE_ONLY_MODULES] as const;
 
 type ModuleName = (typeof ALL_MODULES)[number];

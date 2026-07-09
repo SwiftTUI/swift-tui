@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// Renders internal frame artifacts into readable text fixtures.
 package struct SnapshotRenderer {
   package init() {}

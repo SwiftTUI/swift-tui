@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// Grouped metadata for draw-relevant properties of a resolved node.
 package struct NodeDrawInfo: Equatable, Sendable {
   package var drawMetadata: DrawMetadata

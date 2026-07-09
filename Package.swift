@@ -109,11 +109,18 @@ let package = Package(
   dependencies: packageDependencies,
   targets: [
     .target(
+      name: "SwiftTUIPrimitives",
+      dependencies: [
+        "EmbeddedFonts"
+      ],
+      swiftSettings: swiftSettings()
+    ),
+
+    .target(
       name: "SwiftTUICore",
       dependencies: [
+        "SwiftTUIPrimitives",
         .product(name: "DequeModule", package: "swift-collections"),
-        .product(name: "OrderedCollections", package: "swift-collections"),
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         "SwiftFiglet",
         "EmbeddedFonts",
       ],

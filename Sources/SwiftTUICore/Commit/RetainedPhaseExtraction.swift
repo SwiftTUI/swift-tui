@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 package enum RetainedPhaseExtractionProof: Equatable, Sendable {
   case none
   case wholeTreeIdentical

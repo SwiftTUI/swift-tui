@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// A node produced by the resolve phase before measurement.
 ///
 /// Resolve owns the lowered tree shape, identity, environment, transaction,

@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 // Value-formatting helpers for resolved/measured/placed/draw tree snapshots.
 //
 // `SnapshotRenderer` walks each pipeline tree (see `Snapshots.swift`) and

@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
   // MARK: - CellSize computation
 

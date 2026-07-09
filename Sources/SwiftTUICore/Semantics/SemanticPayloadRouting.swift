@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension SemanticExtractor {
   func appendPayloadSemantics(
     for node: PlacedNode,

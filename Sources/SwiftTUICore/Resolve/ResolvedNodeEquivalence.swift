@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension ResolvedNode {
   package func isEquivalentForMeasurement(
     to other: Self

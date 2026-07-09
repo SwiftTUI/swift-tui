@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// Grouped metadata for layout-relevant properties of a resolved node.
 /// Used by `MeasurementCache` to compare only the fields that affect measurement,
 /// avoiding unnecessary cache misses from unrelated metadata changes.

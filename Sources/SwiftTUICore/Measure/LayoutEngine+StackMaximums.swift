@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
   /// The largest main-axis size a stack child will absorb when offered
   /// more space, or `nil` when the subtree is unbounded (Spacer, raw
@@ -130,11 +132,12 @@ extension LayoutEngine {
       }
       return nil
     case .flexibleFrame(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
-      let (axisMin, axisIdeal, axisMax): (ProposedDimension?, ProposedDimension?, ProposedDimension?) =
-        switch axis {
-        case .horizontal: (minW, idealW, maxW)
-        case .vertical: (minH, idealH, maxH)
-        }
+      let (axisMin, axisIdeal, axisMax):
+        (ProposedDimension?, ProposedDimension?, ProposedDimension?) =
+          switch axis {
+          case .horizontal: (minW, idealW, maxW)
+          case .vertical: (minH, idealH, maxH)
+          }
       if case .infinity = axisMax {
         return DirectMaximum(value: nil)
       }

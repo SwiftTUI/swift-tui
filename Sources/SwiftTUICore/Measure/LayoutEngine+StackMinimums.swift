@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
   package func minimumMainSize(
     for child: ResolvedNode,

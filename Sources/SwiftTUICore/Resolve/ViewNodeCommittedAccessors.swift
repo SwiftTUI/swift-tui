@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 // MARK: - Committed-field forwarding accessors
 //
 // These were previously ~14 stored mirror fields on ViewNode that were

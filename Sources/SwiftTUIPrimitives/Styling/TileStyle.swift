@@ -85,7 +85,7 @@ public struct TileStyle: ShapeStyle, Equatable, Sendable {
     /// Middle-dot dot pattern `·` (U+00B7).
     public static let dots = Pattern(glyph: "·")
 
-    func character(atX x: Int, y: Int) -> Character {
+    package func character(atX x: Int, y: Int) -> Character {
       let row = rows[wrappedIndex(y, count: size.height)]
       return row[wrappedIndex(x, count: size.width)]
     }
@@ -164,7 +164,7 @@ extension TileStyle.Paint {
 }
 
 extension TileStyle {
-  func applyingOpacity(_ amount: Double) -> TileStyle {
+  package func applyingOpacity(_ amount: Double) -> TileStyle {
     TileStyle(
       pattern: pattern,
       foreground: foreground.opacity(amount),

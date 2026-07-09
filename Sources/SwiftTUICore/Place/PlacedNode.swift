@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// Semantic role assigned to a placed node for extraction and rendering.
 package enum SemanticRole: String, Equatable, Sendable {
   case generic

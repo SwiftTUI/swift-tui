@@ -455,70 +455,70 @@ classifications:
     - SwiftTUICore.AccessibilityNode
     - SwiftTUICore.AccessibilityPoliteness
     - SwiftTUICore.AccessibilityRole
-    - "SwiftTUICore.adapt(_:to:method:)"
-    - SwiftTUICore.Alignment
-    - SwiftTUICore.AlignmentID
-    - SwiftTUICore.Animatable
-    - SwiftTUICore.AnimatableArray
-    - SwiftTUICore.AnimatablePair
+    - "SwiftTUIPrimitives.adapt(_:to:method:)"
+    - SwiftTUIPrimitives.Alignment
+    - SwiftTUIPrimitives.AlignmentID
+    - SwiftTUIPrimitives.Animatable
+    - SwiftTUIPrimitives.AnimatableArray
+    - SwiftTUIPrimitives.AnimatablePair
     - SwiftTUICore.AnyGestureRecognizer
     - SwiftTUICore.AnyGestureStateBinding
-    - SwiftTUICore.AnyID
-    - SwiftTUICore.AnyShapeStyle
-    - SwiftTUICore.AppearanceSource
-    - SwiftTUICore.Axis
-    - SwiftTUICore.AxisSet
-    - SwiftTUICore.BaseStyle
-    - SwiftTUICore.BlendMode
-    - SwiftTUICore.BorderBackgroundStyle
-    - SwiftTUICore.BorderBlend
-    - SwiftTUICore.BorderEdgeStyle
-    - SwiftTUICore.BorderSet
-    - SwiftTUICore.BrailleCanvas
-    - SwiftTUICore.BrailleCell
-    - SwiftTUICore.ButtonBorderShape
-    - SwiftTUICore.ButtonRole
-    - SwiftTUICore.CanvasCell
-    - SwiftTUICore.CanvasContext
-    - SwiftTUICore.CanvasDrawing
-    - SwiftTUICore.CanvasGrid
-    - SwiftTUICore.CanvasPayload
+    - SwiftTUIPrimitives.AnyID
+    - SwiftTUIPrimitives.AnyShapeStyle
+    - SwiftTUIPrimitives.AppearanceSource
+    - SwiftTUIPrimitives.Axis
+    - SwiftTUIPrimitives.AxisSet
+    - SwiftTUIPrimitives.BaseStyle
+    - SwiftTUIPrimitives.BlendMode
+    - SwiftTUIPrimitives.BorderBackgroundStyle
+    - SwiftTUIPrimitives.BorderBlend
+    - SwiftTUIPrimitives.BorderEdgeStyle
+    - SwiftTUIPrimitives.BorderSet
+    - SwiftTUIPrimitives.BrailleCanvas
+    - SwiftTUIPrimitives.BrailleCell
+    - SwiftTUIPrimitives.ButtonBorderShape
+    - SwiftTUIPrimitives.ButtonRole
+    - SwiftTUIPrimitives.CanvasCell
+    - SwiftTUIPrimitives.CanvasContext
+    - SwiftTUIPrimitives.CanvasDrawing
+    - SwiftTUIPrimitives.CanvasGrid
+    - SwiftTUIPrimitives.CanvasPayload
     - SwiftTUICore.CanvasPixelGridDrawing
     - SwiftTUICore.CanvasPixelGridMode
-    - SwiftTUICore.CellPixelMetrics
-    - SwiftTUICore.CellPoint
-    - SwiftTUICore.CellRect
-    - SwiftTUICore.CellSize
-    - SwiftTUICore.ChromaticAdaptationMethod
-    - SwiftTUICore.Chromaticity
-    - SwiftTUICore.CollectionContainerChromePresentation
-    - SwiftTUICore.CollectionStylePresentation
-    - SwiftTUICore.Color
-    - SwiftTUICore.ColorError
-    - SwiftTUICore.ColorResolutionError
-    - SwiftTUICore.ColorSchemeContrast
-    - SwiftTUICore.CompositingSpace
-    - SwiftTUICore.ContainerChrome
-    - SwiftTUICore.ControlChrome
-    - SwiftTUICore.ControlProminence
-    - SwiftTUICore.DeltaEMethod
+    - SwiftTUIPrimitives.CellPixelMetrics
+    - SwiftTUIPrimitives.CellPoint
+    - SwiftTUIPrimitives.CellRect
+    - SwiftTUIPrimitives.CellSize
+    - SwiftTUIPrimitives.ChromaticAdaptationMethod
+    - SwiftTUIPrimitives.Chromaticity
+    - SwiftTUIPrimitives.CollectionContainerChromePresentation
+    - SwiftTUIPrimitives.CollectionStylePresentation
+    - SwiftTUIPrimitives.Color
+    - SwiftTUIPrimitives.ColorError
+    - SwiftTUIPrimitives.ColorResolutionError
+    - SwiftTUIPrimitives.ColorSchemeContrast
+    - SwiftTUIPrimitives.CompositingSpace
+    - SwiftTUIPrimitives.ContainerChrome
+    - SwiftTUIPrimitives.ControlChrome
+    - SwiftTUIPrimitives.ControlProminence
+    - SwiftTUIPrimitives.DeltaEMethod
     - SwiftTUICore.DrawCommand
     - SwiftTUICore.DropContext
     - SwiftTUICore.DroppedPath
-    - SwiftTUICore.Edge
-    - SwiftTUICore.EdgeInsets
-    - SwiftTUICore.EmptyAnimatableData
+    - SwiftTUIPrimitives.Edge
+    - SwiftTUIPrimitives.EdgeInsets
+    - SwiftTUIPrimitives.EmptyAnimatableData
     - SwiftTUICore.EnvironmentSnapshot
     - SwiftTUICore.EventModifiers
-    - SwiftTUICore.FillRule
+    - SwiftTUIPrimitives.FillRule
     - SwiftTUICore.FocusedValueKey
     - SwiftTUICore.FocusedValues
-    - SwiftTUICore.FocusInteractions
+    - SwiftTUIPrimitives.FocusInteractions
     - SwiftTUICore.FocusPresentation
     - SwiftTUICore.FocusRegion
     - SwiftTUICore.FocusTracker
-    - SwiftTUICore.ForeignGrid
-    - SwiftTUICore.ForeignSurfacePayload
+    - SwiftTUIPrimitives.ForeignGrid
+    - SwiftTUIPrimitives.ForeignSurfacePayload
     - SwiftTUICore.FrameContext
     - SwiftTUICore.FrameDiagnosticCounts
     - SwiftTUICore.FrameDiagnosticDrop
@@ -528,7 +528,7 @@ classifications:
     - SwiftTUICore.FrameDiagnosticTiming
     - SwiftTUICore.FrameDiagnosticWork
     - SwiftTUICore.FrameDiagnostics
-    - SwiftTUICore.FrameDropBlocker
+    - SwiftTUIPrimitives.FrameDropBlocker
     - SwiftTUICore.FrameHeadTimings
     - SwiftTUICore.FrameMainActorTimings
     - SwiftTUICore.FramePhaseTimings
@@ -536,91 +536,91 @@ classifications:
     - SwiftTUICore.FrameScheduler
     - SwiftTUICore.FrameScheduling
     - SwiftTUICore.FrameWorkerTimings
-    - SwiftTUICore.GamutMappingPolicy
+    - SwiftTUIPrimitives.GamutMappingPolicy
     - SwiftTUICore.GestureRecognizerBuildContext
     - SwiftTUICore.GestureRecognizerEventDisposition
     - SwiftTUICore.GestureRecognizerPhase
-    - SwiftTUICore.Gradient
-    - SwiftTUICore.GridSample
-    - SwiftTUICore.GridSize
-    - SwiftTUICore.HexFormat
-    - SwiftTUICore.HexLetterCase
-    - SwiftTUICore.HorizontalAlignment
-    - SwiftTUICore.HoverPhase
-    - SwiftTUICore.HueInterpolationPath
-    - SwiftTUICore.Identity
-    - SwiftTUICore.IdentityComponent
-    - SwiftTUICore.ImageAssetReference
-    - SwiftTUICore.ImagePayload
-    - SwiftTUICore.ImageScalingMode
-    - SwiftTUICore.ImageSource
+    - SwiftTUIPrimitives.Gradient
+    - SwiftTUIPrimitives.GridSample
+    - SwiftTUIPrimitives.GridSize
+    - SwiftTUIPrimitives.HexFormat
+    - SwiftTUIPrimitives.HexLetterCase
+    - SwiftTUIPrimitives.HorizontalAlignment
+    - SwiftTUIPrimitives.HoverPhase
+    - SwiftTUIPrimitives.HueInterpolationPath
+    - SwiftTUIPrimitives.Identity
+    - SwiftTUIPrimitives.IdentityComponent
+    - SwiftTUIPrimitives.ImageAssetReference
+    - SwiftTUIPrimitives.ImagePayload
+    - SwiftTUIPrimitives.ImageScalingMode
+    - SwiftTUIPrimitives.ImageSource
     - SwiftTUICore.InteractionRegion
-    - "SwiftTUICore.interpolateHue(from:to:t:path:)"
+    - "SwiftTUIPrimitives.interpolateHue(from:to:t:path:)"
     - SwiftTUICore.Invalidating
     - SwiftTUICore.KeyEvent
     - SwiftTUICore.KeyPress
     - SwiftTUICore.KeyPressResult
-    - SwiftTUICore.LabColor
+    - SwiftTUIPrimitives.LabColor
     - "SwiftTUICore.layoutText(for:options:)"
     - "SwiftTUICore.layoutText(for:width:lineLimit:truncationMode:wrappingStrategy:)"
-    - SwiftTUICore.LChColor
+    - SwiftTUIPrimitives.LChColor
     - SwiftTUICore.LifecycleMetadata
-    - SwiftTUICore.LinearGradient
-    - SwiftTUICore.LinkDestination
-    - SwiftTUICore.ListChromeScope
-    - SwiftTUICore.ListItemPayload
-    - SwiftTUICore.ListPayload
-    - SwiftTUICore.ListSeparatorPreferences
+    - SwiftTUIPrimitives.LinearGradient
+    - SwiftTUIPrimitives.LinkDestination
+    - SwiftTUIPrimitives.ListChromeScope
+    - SwiftTUIPrimitives.ListItemPayload
+    - SwiftTUIPrimitives.ListPayload
+    - SwiftTUIPrimitives.ListSeparatorPreferences
     - SwiftTUICore.MatchedGeometryConfig
     - SwiftTUICore.MatchedGeometryKey
     - SwiftTUICore.MatchedGeometryNamespace
-    - SwiftTUICore.Matrix3x3
+    - SwiftTUIPrimitives.Matrix3x3
     - SwiftTUICore.MeasurementCacheMetrics
-    - SwiftTUICore.MixingMethod
-    - SwiftTUICore.MonotonicInstant
+    - SwiftTUIPrimitives.MixingMethod
+    - SwiftTUIPrimitives.MonotonicInstant
     - SwiftTUICore.NavigationRoute
     - SwiftTUICore.NodeLifecycleInfo
     - SwiftTUICore.NodeSemanticInfo
-    - SwiftTUICore.OklabColor
-    - SwiftTUICore.OklchColor
-    - SwiftTUICore.OutlineStylePresentation
+    - SwiftTUIPrimitives.OklabColor
+    - SwiftTUIPrimitives.OklchColor
+    - SwiftTUIPrimitives.OutlineStylePresentation
     - "SwiftTUICore.parseDroppedPaths(_:)"
-    - SwiftTUICore.Path
-    - SwiftTUICore.Phase
-    - SwiftTUICore.PixelPoint
-    - SwiftTUICore.PixelSize
-    - SwiftTUICore.Point
-    - SwiftTUICore.PointerInputCapabilities
-    - SwiftTUICore.PointerLocation
-    - SwiftTUICore.PointerPrecision
-    - SwiftTUICore.PointerPrecisionPolicy
-    - SwiftTUICore.PointerPrecisionSource
-    - "SwiftTUICore.pow(_:_:)"
+    - SwiftTUIPrimitives.Path
+    - SwiftTUIPrimitives.Phase
+    - SwiftTUIPrimitives.PixelPoint
+    - SwiftTUIPrimitives.PixelSize
+    - SwiftTUIPrimitives.Point
+    - SwiftTUIPrimitives.PointerInputCapabilities
+    - SwiftTUIPrimitives.PointerLocation
+    - SwiftTUIPrimitives.PointerPrecision
+    - SwiftTUIPrimitives.PointerPrecisionPolicy
+    - SwiftTUIPrimitives.PointerPrecisionSource
+    - "SwiftTUIPrimitives.pow(_:_:)"
     - SwiftTUICore.PreferenceKey
     - SwiftTUICore.PreformattedTextLine
     - SwiftTUICore.PreformattedTextRun
     - SwiftTUICore.PresentationDamage
     - SwiftTUICore.PresentationDamageDiagnostics
-    - SwiftTUICore.ProposedDimension
-    - SwiftTUICore.ProposedSize
-    - SwiftTUICore.RadialGradient
-    - SwiftTUICore.RasterCell
-    - SwiftTUICore.RasterImageBackdrop
-    - SwiftTUICore.RasterImageBackdropCell
-    - SwiftTUICore.RasterImageAttachment
-    - SwiftTUICore.RasterImageCompositing
+    - SwiftTUIPrimitives.ProposedDimension
+    - SwiftTUIPrimitives.ProposedSize
+    - SwiftTUIPrimitives.RadialGradient
+    - SwiftTUIPrimitives.RasterCell
+    - SwiftTUIPrimitives.RasterImageBackdrop
+    - SwiftTUIPrimitives.RasterImageBackdropCell
+    - SwiftTUIPrimitives.RasterImageAttachment
+    - SwiftTUIPrimitives.RasterImageCompositing
     - SwiftTUICore.RasterStyleRun
     - SwiftTUICore.RasterSurface
-    - SwiftTUICore.Rect
-    - SwiftTUICore.ReferenceWhite
+    - SwiftTUIPrimitives.Rect
+    - SwiftTUIPrimitives.ReferenceWhite
     - SwiftTUICore.RenderGeneration
-    - SwiftTUICore.ResolvedImageAsset
-    - SwiftTUICore.ResolvedTextStyle
-    - "SwiftTUICore.resolveStyleColorResult(style:theme:appearance:depthLimit:)"
-    - SwiftTUICore.RGBColorProfile
-    - SwiftTUICore.RGBPrimaries
-    - SwiftTUICore.RichTextPayload
-    - SwiftTUICore.RichTextRun
+    - SwiftTUIPrimitives.ResolvedImageAsset
+    - SwiftTUIPrimitives.ResolvedTextStyle
+    - "SwiftTUIPrimitives.resolveStyleColorResult(style:theme:appearance:depthLimit:)"
+    - SwiftTUIPrimitives.RGBColorProfile
+    - SwiftTUIPrimitives.RGBPrimaries
+    - SwiftTUIPrimitives.RichTextPayload
+    - SwiftTUIPrimitives.RichTextRun
     - SwiftTUICore.RouteID
     - SwiftTUICore.RouteKind
     - SwiftTUICore.RuntimeIssue
@@ -628,78 +628,78 @@ classifications:
     - SwiftTUICore.RuntimeIssueSink
     - SwiftTUICore.RuntimeRegistrationDiagnostics
     - SwiftTUICore.ScheduledFrame
-    - SwiftTUICore.ScrollIndicatorVisibility
+    - SwiftTUIPrimitives.ScrollIndicatorVisibility
     - SwiftTUICore.ScrollRole
     - SwiftTUICore.ScrollRoute
     - SwiftTUICore.SectionRole
     - SwiftTUICore.SelectionRoute
-    - SwiftTUICore.SelectionTag
+    - SwiftTUIPrimitives.SelectionTag
     - SwiftTUICore.SemanticMetadata
-    - SwiftTUICore.SemanticShapeStyle
+    - SwiftTUIPrimitives.SemanticShapeStyle
     - SwiftTUICore.SemanticSnapshot
-    - SwiftTUICore.SemanticStyleRole
-    - SwiftTUICore.ShapeFillMode
-    - SwiftTUICore.ShapeGeometry
-    - SwiftTUICore.ShapeOperation
-    - SwiftTUICore.ShapePayload
-    - SwiftTUICore.ShapeStyle
-    - SwiftTUICore.Size
-    - SwiftTUICore.Spacing
+    - SwiftTUIPrimitives.SemanticStyleRole
+    - SwiftTUIPrimitives.ShapeFillMode
+    - SwiftTUIPrimitives.ShapeGeometry
+    - SwiftTUIPrimitives.ShapeOperation
+    - SwiftTUIPrimitives.ShapePayload
+    - SwiftTUIPrimitives.ShapeStyle
+    - SwiftTUIPrimitives.Size
+    - SwiftTUIPrimitives.Spacing
     - SwiftTUICore.StateContainer
-    - SwiftTUICore.StrokeStyle
-    - SwiftTUICore.StyleEnvironmentSnapshot
+    - SwiftTUIPrimitives.StrokeStyle
+    - SwiftTUIPrimitives.StyleEnvironmentSnapshot
     - SwiftTUICore.TabItemLabel
-    - SwiftTUICore.TableBorderGlyphs
-    - SwiftTUICore.TableCellAlignment
-    - SwiftTUICore.TableCellPayload
-    - SwiftTUICore.TableColumnAlignment
-    - SwiftTUICore.TableColumnPayload
-    - SwiftTUICore.TableHeaderVisibility
-    - SwiftTUICore.TablePayload
-    - SwiftTUICore.TableRowPayload
+    - SwiftTUIPrimitives.TableBorderGlyphs
+    - SwiftTUIPrimitives.TableCellAlignment
+    - SwiftTUIPrimitives.TableCellPayload
+    - SwiftTUIPrimitives.TableColumnAlignment
+    - SwiftTUIPrimitives.TableColumnPayload
+    - SwiftTUIPrimitives.TableHeaderVisibility
+    - SwiftTUIPrimitives.TablePayload
+    - SwiftTUIPrimitives.TableRowPayload
     - SwiftTUICore.TaskDescriptor
     - SwiftTUICore.TaskPriority
-    - SwiftTUICore.TerminalAppearance
-    - SwiftTUICore.TerminalChromeStyle
-    - SwiftTUICore.TerminalEnvironmentMatch
-    - SwiftTUICore.TerminalMouseInputCompatibilityEntry
-    - SwiftTUICore.TerminalMouseInputCompatibilityEvidence
-    - SwiftTUICore.TerminalMouseInputCompatibilityMatrix
-    - SwiftTUICore.TerminalMouseInputMode
-    - SwiftTUICore.TerminalMouseInputResolution
-    - SwiftTUICore.TerminalMouseInputTrustPolicy
-    - SwiftTUICore.TerminalPalette
-    - SwiftTUICore.TerminalRenderStyle
-    - SwiftTUICore.TerminalTone
+    - SwiftTUIPrimitives.TerminalAppearance
+    - SwiftTUIPrimitives.TerminalChromeStyle
+    - SwiftTUIPrimitives.TerminalEnvironmentMatch
+    - SwiftTUIPrimitives.TerminalMouseInputCompatibilityEntry
+    - SwiftTUIPrimitives.TerminalMouseInputCompatibilityEvidence
+    - SwiftTUIPrimitives.TerminalMouseInputCompatibilityMatrix
+    - SwiftTUIPrimitives.TerminalMouseInputMode
+    - SwiftTUIPrimitives.TerminalMouseInputResolution
+    - SwiftTUIPrimitives.TerminalMouseInputTrustPolicy
+    - SwiftTUIPrimitives.TerminalPalette
+    - SwiftTUIPrimitives.TerminalRenderStyle
+    - SwiftTUIPrimitives.TerminalTone
     - SwiftTUICore.TerminationDisposition
     - SwiftTUICore.TerminationRequest
     - SwiftTUICore.TextCluster
-    - SwiftTUICore.TextFigureColorMode
-    - SwiftTUICore.TextFigureFont
-    - SwiftTUICore.TextFigurePayload
+    - SwiftTUIPrimitives.TextFigureColorMode
+    - SwiftTUIPrimitives.TextFigureFont
+    - SwiftTUIPrimitives.TextFigurePayload
     - SwiftTUICore.TextLayoutLine
     - SwiftTUICore.TextLayoutOptions
     - SwiftTUICore.TextLayoutResult
-    - SwiftTUICore.TextLineStyle
-    - SwiftTUICore.TextStyle
-    - SwiftTUICore.TextTruncationMode
-    - SwiftTUICore.TextWrappingStrategy
-    - SwiftTUICore.Theme
-    - SwiftTUICore.TileStyle
+    - SwiftTUIPrimitives.TextLineStyle
+    - SwiftTUIPrimitives.TextStyle
+    - SwiftTUIPrimitives.TextTruncationMode
+    - SwiftTUIPrimitives.TextWrappingStrategy
+    - SwiftTUIPrimitives.Theme
+    - SwiftTUIPrimitives.TileStyle
     - SwiftTUICore.TransactionSnapshot
-    - SwiftTUICore.TransferFunction
-    - SwiftTUICore.UnitPoint
-    - SwiftTUICore.UnitRect
-    - SwiftTUICore.UnitSize
-    - SwiftTUICore.Vector
-    - SwiftTUICore.Vector3
-    - SwiftTUICore.VectorArithmetic
-    - SwiftTUICore.VerticalAlignment
-    - SwiftTUICore.VerticalEdgeSet
-    - SwiftTUICore.ViewDimensions
-    - SwiftTUICore.Visibility
+    - SwiftTUIPrimitives.TransferFunction
+    - SwiftTUIPrimitives.UnitPoint
+    - SwiftTUIPrimitives.UnitRect
+    - SwiftTUIPrimitives.UnitSize
+    - SwiftTUIPrimitives.Vector
+    - SwiftTUIPrimitives.Vector3
+    - SwiftTUIPrimitives.VectorArithmetic
+    - SwiftTUIPrimitives.VerticalAlignment
+    - SwiftTUIPrimitives.VerticalEdgeSet
+    - SwiftTUIPrimitives.ViewDimensions
+    - SwiftTUIPrimitives.Visibility
     - SwiftTUICore.WakeCause
-    - SwiftTUICore.XYZColor
+    - SwiftTUIPrimitives.XYZColor
 
     # ─── External-type extensions ─────────────────────────────────────────
     # Public API a module adds to a type it does not define (a sibling module's
@@ -714,8 +714,9 @@ classifications:
     - SwiftTUIViews.Never
     - SwiftTUIViews.RadialGradient
     - SwiftTUIViews.ShapeStyle
-    - SwiftTUICore.Double
-    - SwiftTUICore.Int
+    - SwiftTUICore.ResolvedTextStyle
+    - SwiftTUIPrimitives.Double
+    - SwiftTUIPrimitives.Int
 
   package-only-seam:
     # Transitional / lowering-layer types kept package-internal but reachable
@@ -723,7 +724,7 @@ classifications:
     - SwiftTUIViews.ResolvableView
     # COW wrapper carried by ShapeGeometry.path; public only because it rides a
     # public enum case. Its members are package — authors use Shape.path(in:).
-    - SwiftTUICore.BoxedPath
+    - SwiftTUIPrimitives.BoxedPath
 
   removed:
     # Compatibility-shim types that were retired. If any of these reappears
@@ -787,6 +788,7 @@ classifications:
 # package-only-seam unless an explicit canonical override applies).
 module_defaults:
   Core: package-only-seam
+  SwiftTUIPrimitives: package-only-seam
   SwiftTUI: canonical
   SwiftTUIRuntime: canonical
   SwiftTUIArguments: canonical

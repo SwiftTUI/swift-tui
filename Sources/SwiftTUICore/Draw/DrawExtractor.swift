@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 /// Lowers placed nodes into draw commands.
 package struct DrawExtractor: Sendable {
   package init() {}

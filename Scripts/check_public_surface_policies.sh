@@ -339,7 +339,7 @@ if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/Swi
   fail "ToolbarStyle should stay a public extensible style protocol."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/SwiftTUICore/Styling/ShapeStyles.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/SwiftTUIPrimitives/Styling/ShapeStyles.swift; then
   fail "ShapeStyle should stay a public extensible style protocol."
 fi
 
