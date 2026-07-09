@@ -95,6 +95,14 @@ package final class CommandRegistry: Equatable {
     action: @escaping @MainActor @Sendable () -> Void
   ) {
     var table = keyCommandsByScope[scope] ?? [:]
+    // No duplicate-overwrite alarm here (F104): this live table carries the
+    // previous frame's entries across re-resolves (registration is eager;
+    // publication reconciles later), so `table[binding] != nil` is the
+    // NORMAL per-frame re-registration shape, not a collision — a
+    // trace-enabled gate run false-positived 91 times on exactly this. The
+    // node-record path can't see binding granularity either (it re-receives
+    // this scope's whole merged table per registration), so the command
+    // family stays unchecked.
     table[binding] = RegisteredKeyCommand(
       binding: binding,
       description: description,

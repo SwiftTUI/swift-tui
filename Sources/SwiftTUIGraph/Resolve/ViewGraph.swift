@@ -1818,6 +1818,36 @@ package final class ViewGraph {
     }
     detachedHostedSubtreeRootsByHost[hostID, default: []].insert(rootNodeID)
     detachedHostedSubtreeHostByRoot[rootNodeID] = hostID
+    assertDetachedHostedLedgerInverse()
+  }
+
+  /// DEBUG-only inverse-consistency check for the detached-hosted ledger
+  /// (F97): `rootsByHost` and `hostByRoot` are a hand-maintained
+  /// bidirectional map mutated at three sites; a desync previously surfaced
+  /// only later, through the teardown-coherence anchor forensics, far from
+  /// the mutation that caused it. Validated at each mutation so corruption
+  /// fails at its source.
+  private func assertDetachedHostedLedgerInverse() {
+    #if DEBUG
+      for (root, host) in detachedHostedSubtreeHostByRoot
+      where detachedHostedSubtreeRootsByHost[host]?.contains(root) != true {
+        assertionFailure(
+          "detached-hosted ledger desync: hostByRoot[\(root)] = \(host) has no rootsByHost mirror"
+        )
+      }
+      for (host, roots) in detachedHostedSubtreeRootsByHost {
+        if roots.isEmpty {
+          assertionFailure(
+            "detached-hosted ledger desync: empty roots entry retained for host \(host)"
+          )
+        }
+        for root in roots where detachedHostedSubtreeHostByRoot[root] != host {
+          assertionFailure(
+            "detached-hosted ledger desync: rootsByHost[\(host)] holds \(root) but hostByRoot disagrees"
+          )
+        }
+      }
+    #endif
   }
 
   package func installLayoutRealizedChildren(
@@ -3792,8 +3822,15 @@ package final class ViewGraph {
     // anchors here. Visited roots (still being resolved by a live replacement)
     // and entity-routed re-homes are kept by the descent's standard guards.
     if let hostedRootIDs = detachedHostedSubtreeRootsByHost.removeValue(forKey: node.viewNodeID) {
+      // Two phases so the ledger is never transiently one-sided: drop every
+      // hostByRoot mirror first (the host's rootsByHost entry is already
+      // gone), THEN recurse — the recursive removals re-validate the ledger
+      // (F97) and would false-positive on a mid-loop half-removed state.
       for hostedRootID in hostedRootIDs.sorted() {
         detachedHostedSubtreeHostByRoot.removeValue(forKey: hostedRootID)
+      }
+      assertDetachedHostedLedgerInverse()
+      for hostedRootID in hostedRootIDs.sorted() {
         guard let hostedRoot = nodeIfExists(for: hostedRootID) else {
           continue
         }
@@ -3824,6 +3861,7 @@ package final class ViewGraph {
       if detachedHostedSubtreeRootsByHost[hostID]?.isEmpty == true {
         detachedHostedSubtreeRootsByHost.removeValue(forKey: hostID)
       }
+      assertDetachedHostedLedgerInverse()
     }
 
     let lifecycleMetadata =

@@ -137,6 +137,19 @@ package final class LocalFocusedValuesRegistry: Equatable {
       return
     }
 
-    registrations.append(contentsOf: snapshot)
+    // Merge same-identity entries exactly like `register` does (F103): a
+    // bare append relied on callers always clearing before restoring, but
+    // focus-binding churn restores over a live same-identity entry (caught
+    // by the assert this merge replaced). Duplicates were mostly latent —
+    // the consumers merge per identity — but a stale copy would still merge
+    // its values over the churned entry's.
+    for entry in snapshot {
+      if let existingIndex = registrations.firstIndex(where: { $0.identity == entry.identity }) {
+        registrations[existingIndex].descendantIdentities.formUnion(entry.descendantIdentities)
+        registrations[existingIndex].values.merge(entry.values)
+      } else {
+        registrations.append(entry)
+      }
+    }
   }
 }

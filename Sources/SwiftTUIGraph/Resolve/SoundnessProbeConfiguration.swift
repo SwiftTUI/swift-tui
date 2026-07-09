@@ -44,6 +44,7 @@ package enum SoundnessProbeConfiguration {
   package static var teardownCoherenceViolationCount = 0
   package static var registrationPublicationViolationCount = 0
   package static var memoUnsoundSkipCount = 0
+  package static var duplicateRegistrationOverwriteCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -124,6 +125,22 @@ package enum SoundnessProbeConfiguration {
     memoUnsoundSkipCount += 1
     lastViolationDetail = detail()
     emitTrace("memo-unsound-skip")
+  }
+
+  /// Records one caught same-identity duplicate registration (F104): a
+  /// single-handler-per-identity family (action, bare key handler, drop
+  /// destination, keyCommand binding) recorded the same key twice within one
+  /// capture session, so the second write silently replaced the first.
+  /// Last-write-wins is the documented contract, but a duplicate inside one
+  /// session means two authored registrations collided on one identity —
+  /// the recurring duplicate/stale-registration bug shape, previously
+  /// invisible everywhere in the family.
+  package static func recordDuplicateRegistrationOverwrite(
+    _ detail: @autoclosure () -> String
+  ) {
+    duplicateRegistrationOverwriteCount += 1
+    lastViolationDetail = detail()
+    emitTrace("duplicate-registration")
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per

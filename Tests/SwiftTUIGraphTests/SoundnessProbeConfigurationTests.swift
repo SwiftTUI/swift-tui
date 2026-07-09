@@ -28,6 +28,7 @@ struct SoundnessProbeConfigurationTests {
     let teardownCount = SoundnessProbeConfiguration.teardownCoherenceViolationCount
     let publicationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let memoCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
+    let duplicateCount = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
@@ -39,6 +40,7 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.teardownCoherenceViolationCount = teardownCount
       SoundnessProbeConfiguration.registrationPublicationViolationCount = publicationCount
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoCount
+      SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = duplicateCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     try body()

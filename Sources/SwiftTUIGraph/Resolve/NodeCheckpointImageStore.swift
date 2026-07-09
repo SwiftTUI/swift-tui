@@ -78,6 +78,15 @@ package struct NodeCheckpointImageStore {
     images: [ViewNodeID: ViewNode.Checkpoint],
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
+    // The lockstep invariant (`capturedGenerations` shares `images`' key set)
+    // holds only because both arguments come from the same checkpoint
+    // snapshot; an incongruent caller would silently cache stale images or
+    // drop live ones — one layer below where the restore-no-op oracle looks
+    // (F98).
+    assert(
+      Set(images.keys) == Set(nodesByNodeID.keys),
+      "NodeCheckpointImageStore.adopt: images/nodesByNodeID key sets diverge"
+    )
     self.images = images
     capturedGenerations = nodesByNodeID.mapValues { node in
       node.currentCheckpointMutationGeneration

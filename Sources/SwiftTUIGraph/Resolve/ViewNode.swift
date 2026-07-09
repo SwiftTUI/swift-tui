@@ -1082,11 +1082,38 @@ package final class ViewNode {
     registrationCaptureDepth = max(0, registrationCaptureDepth - 1)
   }
 
+  /// Raises the duplicate-registration soundness alarm (F104) when a
+  /// single-slot family records `identity` twice within one **active**
+  /// capture session — the only window where the record was provably reset,
+  /// so an existing entry means two authored registrations collided and the
+  /// second silently replaced the first. Out-of-session record writes (the
+  /// F63 toolbar-refresh path writes into a dormant node's persistent
+  /// record) see the *previous frame's* entry — designed refresh, not a
+  /// collision — and are exempt.
+  private func flagDuplicateRecordIfInCaptureSession(
+    family: String,
+    identity: Identity,
+    hasExistingEntry: @autoclosure () -> Bool
+  ) {
+    guard registrationCaptureDepth > 0,
+      SoundnessProbeConfiguration.isSampledFrame,
+      hasExistingEntry()
+    else { return }
+    SoundnessProbeConfiguration.recordDuplicateRegistrationOverwrite(
+      "\(family) for '\(identity.path)' recorded twice within one capture session; last write wins (F104)"
+    )
+  }
+
   package func recordActionRegistration(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
     followUpInvalidationIdentity: Identity?
   ) {
+    flagDuplicateRecordIfInCaptureSession(
+      family: "action handler",
+      identity: identity,
+      hasExistingEntry: registeredHandlers.action.registrations[identity] != nil
+    )
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordAction(
       identity: identity,
@@ -1101,6 +1128,11 @@ package final class ViewNode {
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
+    flagDuplicateRecordIfInCaptureSession(
+      family: "action handler",
+      identity: identity,
+      hasExistingEntry: registeredHandlers.action.registrations[identity] != nil
+    )
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordAction(
       identity: identity,
@@ -1114,6 +1146,11 @@ package final class ViewNode {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.Handler
   ) {
+    flagDuplicateRecordIfInCaptureSession(
+      family: "key handler",
+      identity: identity,
+      hasExistingEntry: registeredHandlers.keyHandler.handlers[identity] != nil
+    )
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyHandler(
       identity: identity,
@@ -1314,6 +1351,13 @@ package final class ViewNode {
   package func recordDropDestinationRegistration(
     _ registration: DropDestinationRegistrySnapshot
   ) {
+    for identity in registration.handlersByScope.keys {
+      flagDuplicateRecordIfInCaptureSession(
+        family: "drop destination",
+        identity: identity,
+        hasExistingEntry: registeredHandlers.dropDestination.handlersByScope[identity] != nil
+      )
+    }
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordDropDestination(registration)
   }
