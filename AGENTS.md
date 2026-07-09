@@ -28,11 +28,21 @@ release story.
 ## Architecture (one-page summary)
 
 ```
-SwiftTUICore  ->  SwiftTUIViews  ->  SwiftTUIRuntime
+SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUIRuntime
 ```
 
-- **SwiftTUICore** — the engine: geometry, the frame pipeline, and the typed
-  phase products. Terminal-IO-free.
+- **SwiftTUIPrimitives** — leaf vocabulary: inert value types only (geometry,
+  identity, style/color values, draw/layout metadata, the `Animatable` math). No
+  engine, no render algorithms. Builds standalone; Foundation-free.
+- **SwiftTUIGraph** — the reconciliation engine (the AttributeGraph analog):
+  `ViewGraph`/`ResolvedNode`, state slots, dependency tracking, invalidation
+  planning, reuse gates, checkpoints, entity routing, the runtime registries, the
+  scheduler, and animation intent. Depends on `SwiftTUIPrimitives` **only** —
+  the compiler enforces that graph code names no render type. Foundation-free.
+- **SwiftTUICore** — the render engine: measure/place/draw/raster/commit phases
+  and their typed products, extractors, style resolution, content engine. Consumes
+  the graph's `ResolvedNode` snapshots; `@_exported`-imports Graph + Primitives so
+  `import SwiftTUICore` is unchanged. Terminal-IO-free.
 - **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
   layout, state, focus, gestures).
 - **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.

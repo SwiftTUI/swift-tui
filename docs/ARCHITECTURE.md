@@ -36,16 +36,21 @@ or terminal bytes.
 examples, and the public website may live in sibling organization repositories,
 but the public Swift products below remain in this package unless a later
 extraction explicitly promotes their package-private seams into stable public
-API. Internally it has three core targets and a set of product targets layered
-on top.
+API. Internally the engine is a layered stack of internal targets
+(`SwiftTUIPrimitives` → `SwiftTUIGraph` → `SwiftTUICore` → `SwiftTUIViews` →
+`SwiftTUIRuntime`), with a set of product targets layered on top.
 
 ```mermaid
 flowchart TD
     subgraph engine["Core targets"]
+        SwiftTUIPrimitives
+        SwiftTUIGraph
         SwiftTUICore
         SwiftTUIViews
         SwiftTUIRuntime
     end
+    SwiftTUIPrimitives --> SwiftTUIGraph
+    SwiftTUIGraph --> SwiftTUICore
     SwiftTUICore --> SwiftTUIViews
     SwiftTUIViews --> SwiftTUIRuntime
 
@@ -69,11 +74,36 @@ flowchart TD
 
 ### Core targets
 
-- **`SwiftTUICore`** — the engine. Geometry, the layout engine, the seven
-  pipeline phases and their typed products, the semantic and draw extractors,
-  the rasterizer, the commit planner, the scheduler, diagnostics, and the
-  shared data model. It is an internal target, **not** a published product; it
-  reaches consumers re-exported through `SwiftTUIRuntime`.
+The engine is factored into three internal targets with a compiler-enforced
+boundary — an AttributeGraph-shaped separation of the reconciliation engine from
+the render machinery. None is a published product; all reach consumers
+re-exported (`@_exported`) through `SwiftTUICore` and then `SwiftTUIRuntime`.
+
+- **`SwiftTUIPrimitives`** — the leaf vocabulary. Inert `Equatable`/`Sendable`
+  value types with no engine and no render-pipeline algorithms: geometry
+  (cells/points/rects, `Identity`/`StructuralPath`/`EntityIdentity`), the style
+  and color-science values, the draw/layout metadata value types (`DrawPayload`
+  and its payload cluster, `LayoutBehavior`, `LayoutMetadata`), the pointer and
+  semantic value types, and the `Animatable` math stack. Foundation-free;
+  depends on nothing but the stdlib (plus `EmbeddedFonts` for the figlet payload
+  value). It builds standalone.
+- **`SwiftTUIGraph`** — the reconciliation engine (the AttributeGraph analog).
+  The retained `ViewGraph`/`ViewNode`/`ResolvedNode` graph, state slots,
+  dependency tracking, invalidation and dirty-evaluation planning, reuse gates,
+  checkpoints, entity routing, lifecycle planning, the identity-keyed runtime
+  registries, the frame scheduler, and the animation *intent* types. It performs
+  no layout/draw/raster/commit work — it stores render values opaquely and hands
+  erased evaluator thunks up to the Views driver. Depends on `SwiftTUIPrimitives`
+  **only**; `swift build --target SwiftTUIGraph` compiling in isolation is the
+  compiler proof that graph code never names a render type. Foundation-free.
+- **`SwiftTUICore`** — the render engine. Consumes the graph's immutable
+  `ResolvedNode` snapshots and runs the render phases: measure, place, the
+  semantic and draw extractors, the rasterizer, the commit planner, the text/
+  image content engine, style *resolution*, focus tracking, and frame-drop/
+  elision policy. The one sanctioned back-edge from render to graph is the
+  layout-dependent-content realization callback (the GeometryReader analog).
+  Depends on `SwiftTUIGraph` + `SwiftTUIPrimitives` and `@_exported`-imports both
+  so downstream `import SwiftTUICore` is unchanged. Foundation-free.
 - **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
   builders, containers, controls, layout, state, focus, gestures, modifiers,
   and shapes. `View` is body-only and `@MainActor`-isolated; lowering to
@@ -130,9 +160,15 @@ Use `SwiftTUICLI` directly for a terminal-only graph.
 
 ```
 Sources/
-  SwiftTUICore/        Geometry, Measure, Place, Resolve, Semantics, Draw,
-                       Raster, Commit, Pipeline, Animation, Styling, Pointer,
-                       Runtime, Content, Support  + SwiftTUICore.docc
+  SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content
+                       (value models), Draw (payload value cluster), Measure
+                       (LayoutBehavior/LayoutMetadata), Animation (math)
+  SwiftTUIGraph/       Resolve, Runtime, Pipeline/Scheduler, Animation (intent),
+                       Semantics (regions/roles), Geometry/AnchorTypes
+  SwiftTUICore/        Measure, Place, Semantics (extractor/FocusTracker), Draw
+                       (extractor), Raster, Commit, Content (text engine),
+                       Styling (resolution), Pipeline (drop/elision/snapshots),
+                       Pointer  + SwiftTUICore.docc
   SwiftTUIViews/       Foundation, ViewBuilder, Primitives, Controls, Stacks,
                        Layout, State, Focus, Gestures, Collections, Modifiers,
                        NavigationViews, TabViews, Presentation, ScrollView, Shapes,

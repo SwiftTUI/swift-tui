@@ -41,7 +41,7 @@ import Testing
 ///
 /// Open question the experiment settles empirically: whether `Boxed`'s
 /// copy-on-write (`isKnownUniquelyReferenced` + non-atomic `_storage` store,
-/// `Sources/SwiftTUICore/Support/Boxed.swift:36-43`) actually tears across the
+/// `Sources/SwiftTUIPrimitives/Support/Boxed.swift:36-43`) actually tears across the
 /// main/worker seam, or whether the corruptor is instead the genuinely
 /// unsynchronized `assumeIsolated` dictionary writes
 /// (`ForEachIndexedChildSource.cache`, and — until F11 deleted it —

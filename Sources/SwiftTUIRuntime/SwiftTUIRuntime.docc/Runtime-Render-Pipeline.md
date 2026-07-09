@@ -72,7 +72,7 @@ Use these files as entry points when tracing the implementation:
 | How does the run loop decide a frame is needed? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop.swift`, `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`, `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift` |
 | What is the renderer entry point? | `Sources/SwiftTUIRuntime/SwiftTUI.swift` |
 | What executes the runtime stages? | `Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift` |
-| Where does resolve happen? | `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift`, `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift`, `Sources/SwiftTUICore/Resolve/ViewGraph.swift` |
+| Where does resolve happen? | `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift`, `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift`, `Sources/SwiftTUIGraph/Resolve/ViewGraph.swift` |
 | Where do measure, place, semantics, draw, and raster run? | `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`, `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer+InlineStages.swift` |
 | Where does commit decide effects and completed-frame disposition? | `Sources/SwiftTUIRuntime/Rendering/DefaultRenderer+CompletedFrameCandidates.swift` |
 | Where does a committed frame reach hosts? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift`, `Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift` |
