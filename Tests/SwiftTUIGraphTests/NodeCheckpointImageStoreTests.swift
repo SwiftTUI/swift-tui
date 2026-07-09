@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 // F29: the persistent COW node-image store behind ViewGraph.makeCheckpoint().

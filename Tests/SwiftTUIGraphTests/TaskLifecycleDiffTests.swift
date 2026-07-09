@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 @Suite("TaskLifecycleDiff policy")

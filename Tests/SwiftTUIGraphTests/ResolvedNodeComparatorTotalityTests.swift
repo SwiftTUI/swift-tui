@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 /// Field-coverage totality lock for every `ResolvedNode` comparison function

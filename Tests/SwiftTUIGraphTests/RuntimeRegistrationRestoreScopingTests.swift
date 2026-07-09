@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 /// Soundness guard for the scoped `.subtrees` runtime-registration restore

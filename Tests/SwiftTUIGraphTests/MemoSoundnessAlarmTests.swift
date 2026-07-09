@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 /// Coverage for the memo-soundness alarm (F90): the shadow oracle's unsound

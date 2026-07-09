@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 // The mutable graph state lives in the value-typed field groups declared in
@@ -132,7 +131,8 @@ struct ViewGraphCheckpointTotalityTests {
 
     let snapshotBody = SourceParsingTestSupport.functionBodyText(
       named: "debugTotalStateSnapshot",
-      in: try SourceParsingTestSupport.sourceText(relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift")
+      in: try SourceParsingTestSupport.sourceText(
+        relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNode.swift")
     )
     #expect(!snapshotBody.isEmpty, "could not locate ViewNode.debugTotalStateSnapshot()")
     for field in groupMembers {
@@ -230,6 +230,10 @@ struct ViewGraphCheckpointTotalityTests {
   // for ViewGraph also lurks in two other hand-maintained families. Generalize
   // the source-level totality guard to them.
 
+  // This guard reads a RENDER-side (SwiftTUICore) source file as text — no
+  // Core types at compile time, so it compiles in the graph-only test target.
+  // It lives here with the shared source-parsing support rather than in
+  // SwiftTUICoreTests; move it if a shared test-support target ever exists.
   @Test("every PlacedNodeResolvedMetadata field is applied on the setter path")
   func placedNodeMetadataFieldsAreAllApplied() throws {
     // PlacedNode mirrors its metadata four ways. The getter (resolvedMetadata)

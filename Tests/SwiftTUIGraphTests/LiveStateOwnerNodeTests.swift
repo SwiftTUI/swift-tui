@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 // `ViewGraph.liveStateOwnerNode(registeredOwner:identity:)` re-keys

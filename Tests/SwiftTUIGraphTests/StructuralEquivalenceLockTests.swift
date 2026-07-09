@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 /// Locks the Stage-2 reuse win: layout/placement equivalence is gated on the

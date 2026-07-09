@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 /// Covers ``LiveViewGraphRegistry`` — the scope-to-graph map that lets `@State`

@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 // F29 slice 3: checkpoint restores are generation-gated (only nodes whose live

@@ -394,13 +394,26 @@ let package = Package(
     ),
 
     .testTarget(
+      // The reconciliation-engine unit suites (F108): depends on
+      // SwiftTUIGraph ONLY, so the engine's tests build and run without the
+      // render stack — the compiler-enforced proof that the Phase 2b
+      // boundary holds. Graph tests that need render types belong in
+      // SwiftTUICoreTests (e.g. RetainedFrameStructuralIndexTests).
+      name: "SwiftTUIGraphTests",
+      dependencies: [
+        "SwiftTUIGraph"
+      ],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
       name: "SwiftTUICoreTests",
       dependencies: [
         "SwiftTUICore",
-        // Phase 2b extracted the reconciliation engine into SwiftTUIGraph.
-        // This suite still exercises graph-engine internals via
-        // `@testable import SwiftTUIGraph` (the test-target split is deferred
-        // to Phase 3); depend on the module so testability is available.
+        // A few Core suites still exercise graph-engine internals alongside
+        // render types (RetainedFrameStructuralIndexTests, the legacy
+        // source-parsing suites); depend on the module so
+        // `@testable import SwiftTUIGraph` stays available. Engine-only
+        // suites live in SwiftTUIGraphTests.
         "SwiftTUIGraph",
       ],
       swiftSettings: swiftSettings()
