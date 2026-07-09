@@ -46,51 +46,45 @@ struct AnimationScopedReuseRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount + the onAppear-triggered follow-up frame that starts the panel's
-    // removal transition. The synchronous driver keeps the removal start
-    // deterministic (see OffscreenFrameElisionRuntimeTests for the rationale).
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    let controller = runLoop.renderer.internalAnimationController
-    runLoop.renderer.enableSelectiveEvaluation()
+      // Mount + the onAppear-triggered follow-up frame that starts the panel's
+      // removal transition. The synchronous driver keeps the removal start
+      // deterministic (see OffscreenFrameElisionRuntimeTests for the rationale).
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      let controller = runLoop.renderer.internalAnimationController
+      runLoop.renderer.enableSelectiveEvaluation()
 
-    #expect(
-      !controller.debugStateSnapshot().removingIdentities.isEmpty,
-      "the removal transition must be in flight before ticking"
-    )
-
-    // Drive deadline ticks while the removal is in flight and count how many
-    // times the DISJOINT sibling's body re-evaluates. The sibling neither
-    // animates nor reads any invalidated state; with an attributable
-    // suppression scope its subtree takes retained reuse on every tick.
-    let evaluationsAfterRemovalStart = siblingCounter.evaluations
-    var ticks = 0
-    let maxTicks = 400
-    while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < maxTicks {
-      scheduler.requestDeadline(.now())
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames
+      #expect(
+        !controller.debugStateSnapshot().removingIdentities.isEmpty,
+        "the removal transition must be in flight before ticking"
       )
-      ticks += 1
-    }
-    #expect(ticks > 0, "the removal must tick at least once before draining")
-    #expect(ticks < maxTicks, "the removal transition must drain")
 
-    let tickEvaluations = siblingCounter.evaluations - evaluationsAfterRemovalStart
-    #expect(
-      tickEvaluations <= 1,
-      "disjoint sibling re-evaluated \(tickEvaluations)x across \(ticks) removal ticks — non-property animation ticks are defeating retained reuse for subtrees outside the animating cone"
-    )
+      // Drive deadline ticks while the removal is in flight and count how many
+      // times the DISJOINT sibling's body re-evaluates. The sibling neither
+      // animates nor reads any invalidated state; with an attributable
+      // suppression scope its subtree takes retained reuse on every tick.
+      let evaluationsAfterRemovalStart = siblingCounter.evaluations
+      var ticks = 0
+      let maxTicks = 400
+      while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < maxTicks {
+        scheduler.requestDeadline(.now())
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames
+        )
+        ticks += 1
+      }
+      #expect(ticks > 0, "the removal must tick at least once before draining")
+      #expect(ticks < maxTicks, "the removal transition must drain")
+
+      let tickEvaluations = siblingCounter.evaluations - evaluationsAfterRemovalStart
+      #expect(
+        tickEvaluations <= 1,
+        "disjoint sibling re-evaluated \(tickEvaluations)x across \(ticks) removal ticks — non-property animation ticks are defeating retained reuse for subtrees outside the animating cone"
+      )
+    }
   }
 }
 
@@ -135,52 +129,46 @@ extension AnimationScopedReuseRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
+    try withAnimationSinks(runLoop.renderer.internalAnimationController) {
+
+      runLoop.renderer.enableSelectiveEvaluation()
+
+      // Mount (focus adopts the panel's button) + the onAppear follow-up frame:
+      // the focused button's subtree is removed with a transition, so the SAME
+      // frame's focus-sync pass discovers the loss, adopts the surviving
+      // button, and eagerly rerenders.
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+      // Frame timeline: [0] mount, [1] removal starts (panel-gone onAppear
+      // requests survivor focus post-commit), [2] the request resolves and
+      // focus-sync relocates focus mid-frame — the frame under test. Later
+      // frames recompute fully via the tracker's root invalidation, so only
+      // frame [2] discriminates a stale frame-start suppression scope.
+      #expect(terminal.presentedFrames.count >= 3, "expected the relocation frame to present")
+      let relocationFrame = try #require(
+        terminal.presentedFrames.dropFirst(2).first,
+        "the relocation frame must present"
+      )
+      let readoutLine = try #require(
+        relocationFrame.split(separator: "\n").first(where: { $0.contains("F:") }),
+        "the focus readout line must render: \(relocationFrame)"
+      )
+      #expect(
+        readoutLine.contains("SurvivorButton"),
+        "committed relocation frame shows: \(readoutLine)"
+      )
+      #expect(
+        !readoutLine.contains("PanelButton"),
+        "the disjoint focus readout must not reuse pre-relocation content: \(readoutLine)"
+      )
+      #expect(
+        !runLoop.renderer.internalAnimationController.debugStateSnapshot()
+          .removingIdentities.isEmpty,
+        "the removal transition must still be in flight on the relocation frame"
+      )
     }
-
-    runLoop.renderer.enableSelectiveEvaluation()
-
-    // Mount (focus adopts the panel's button) + the onAppear follow-up frame:
-    // the focused button's subtree is removed with a transition, so the SAME
-    // frame's focus-sync pass discovers the loss, adopts the surviving
-    // button, and eagerly rerenders.
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-
-    // Frame timeline: [0] mount, [1] removal starts (panel-gone onAppear
-    // requests survivor focus post-commit), [2] the request resolves and
-    // focus-sync relocates focus mid-frame — the frame under test. Later
-    // frames recompute fully via the tracker's root invalidation, so only
-    // frame [2] discriminates a stale frame-start suppression scope.
-    #expect(terminal.presentedFrames.count >= 3, "expected the relocation frame to present")
-    let relocationFrame = try #require(
-      terminal.presentedFrames.dropFirst(2).first,
-      "the relocation frame must present"
-    )
-    let readoutLine = try #require(
-      relocationFrame.split(separator: "\n").first(where: { $0.contains("F:") }),
-      "the focus readout line must render: \(relocationFrame)"
-    )
-    #expect(
-      readoutLine.contains("SurvivorButton"),
-      "committed relocation frame shows: \(readoutLine)"
-    )
-    #expect(
-      !readoutLine.contains("PanelButton"),
-      "the disjoint focus readout must not reuse pre-relocation content: \(readoutLine)"
-    )
-    #expect(
-      !runLoop.renderer.internalAnimationController.debugStateSnapshot()
-        .removingIdentities.isEmpty,
-      "the removal transition must still be in flight on the relocation frame"
-    )
   }
 }
 

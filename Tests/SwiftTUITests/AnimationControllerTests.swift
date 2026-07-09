@@ -303,55 +303,53 @@ struct AnimationPipelineIntegrationTests {
 
     // Manual sink install: DefaultRenderer doesn't wire the sinks
     // (RunLoop does at startup).
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
+
+        let animation = Animation.linear(duration: .milliseconds(1_000_000))
+        controller.register(animation)
+
+        let rootIdentity = Identity(components: [.named("root")])
+
+        // Frame 1: hero sits in slot A (column 0).
+        _ = renderer.render(
+          HStack(spacing: 1) {
+            Text("hero").matchedGeometryEffect(id: "hero")
+            Text("other")
+          },
+          context: ResolveContext(identity: rootIdentity),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
+        #expect(controller.activeMatchedGeometryCount == 0)
+        #expect(
+          controller.previousMatchedGeometryKeyCount > 0,
+          "frame 1 should have recorded matched geometry bounds, got \(controller.previousMatchedGeometryKeyCount)"
+        )
+
+        // Frame 2: a different view with the SAME matched-geometry key
+        // appears in slot B (column N).  The swap is conditional — we
+        // reorder the children so the hero's identity path changes.
+        var transaction = TransactionSnapshot()
+        transaction.animationRequest = .animate(animation.animationBox)
+        _ = renderer.render(
+          HStack(spacing: 1) {
+            Text("other")
+            Text("hero").matchedGeometryEffect(id: "hero")
+          },
+          context: ResolveContext(identity: rootIdentity, transaction: transaction),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
+
+        #expect(
+          controller.activeMatchedGeometryCount > 0,
+          "matched geometry animation should be enqueued after the swap, got \(controller.activeMatchedGeometryCount)"
+        )
+        #expect(
+          controller.lastTickResult.hasPendingWork,
+          "frame 2 should report active animation"
+        )
+      }
     }
-
-    let animation = Animation.linear(duration: .milliseconds(1_000_000))
-    controller.register(animation)
-
-    let rootIdentity = Identity(components: [.named("root")])
-
-    // Frame 1: hero sits in slot A (column 0).
-    _ = renderer.render(
-      HStack(spacing: 1) {
-        Text("hero").matchedGeometryEffect(id: "hero")
-        Text("other")
-      },
-      context: ResolveContext(identity: rootIdentity),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
-    #expect(controller.activeMatchedGeometryCount == 0)
-    #expect(
-      controller.previousMatchedGeometryKeyCount > 0,
-      "frame 1 should have recorded matched geometry bounds, got \(controller.previousMatchedGeometryKeyCount)"
-    )
-
-    // Frame 2: a different view with the SAME matched-geometry key
-    // appears in slot B (column N).  The swap is conditional — we
-    // reorder the children so the hero's identity path changes.
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    _ = renderer.render(
-      HStack(spacing: 1) {
-        Text("other")
-        Text("hero").matchedGeometryEffect(id: "hero")
-      },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
-
-    #expect(
-      controller.activeMatchedGeometryCount > 0,
-      "matched geometry animation should be enqueued after the swap, got \(controller.activeMatchedGeometryCount)"
-    )
-    #expect(
-      controller.lastTickResult.hasPendingWork,
-      "frame 2 should report active animation"
-    )
   }
 
   @Test(
@@ -365,49 +363,47 @@ struct AnimationPipelineIntegrationTests {
     // match fires.
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
+
+        let animation = Animation.linear(duration: .milliseconds(1_000_000))
+        controller.register(animation)
+
+        let rootIdentity = Identity(components: [.named("root")])
+
+        // Frame 1: hero tagged isSource: false.  The controller
+        // should NOT record its bounds.
+        _ = renderer.render(
+          HStack(spacing: 1) {
+            Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
+            Text("other")
+          },
+          context: ResolveContext(identity: rootIdentity),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
+        #expect(
+          controller.previousMatchedGeometryKeyCount == 0,
+          "non-source view should not contribute bounds, got \(controller.previousMatchedGeometryKeyCount)"
+        )
+
+        // Frame 2: swap children.  No source bounds available → no
+        // match should fire.
+        var transaction = TransactionSnapshot()
+        transaction.animationRequest = .animate(animation.animationBox)
+        _ = renderer.render(
+          HStack(spacing: 1) {
+            Text("other")
+            Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
+          },
+          context: ResolveContext(identity: rootIdentity, transaction: transaction),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
+        #expect(
+          controller.activeMatchedGeometryCount == 0,
+          "non-source swap should not enqueue a match, got \(controller.activeMatchedGeometryCount)"
+        )
+      }
     }
-
-    let animation = Animation.linear(duration: .milliseconds(1_000_000))
-    controller.register(animation)
-
-    let rootIdentity = Identity(components: [.named("root")])
-
-    // Frame 1: hero tagged isSource: false.  The controller
-    // should NOT record its bounds.
-    _ = renderer.render(
-      HStack(spacing: 1) {
-        Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
-        Text("other")
-      },
-      context: ResolveContext(identity: rootIdentity),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
-    #expect(
-      controller.previousMatchedGeometryKeyCount == 0,
-      "non-source view should not contribute bounds, got \(controller.previousMatchedGeometryKeyCount)"
-    )
-
-    // Frame 2: swap children.  No source bounds available → no
-    // match should fire.
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    _ = renderer.render(
-      HStack(spacing: 1) {
-        Text("other")
-        Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
-      },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
-    #expect(
-      controller.activeMatchedGeometryCount == 0,
-      "non-source swap should not enqueue a match, got \(controller.activeMatchedGeometryCount)"
-    )
   }
 
   @Test(
@@ -430,53 +426,51 @@ struct AnimationPipelineIntegrationTests {
   func matchedGeometryRendersAtSourceAtProgressZero() throws {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-    }
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
 
-    let animation = Animation.linear(duration: .milliseconds(1_000_000))
-    controller.register(animation)
+        let animation = Animation.linear(duration: .milliseconds(1_000_000))
+        controller.register(animation)
 
-    let rootIdentity = Identity(components: [.named("root")])
+        let rootIdentity = Identity(components: [.named("root")])
 
-    // Frame 1: hero at slot 0.
-    _ = renderer.render(
-      HStack(spacing: 1) {
-        Text("hero").matchedGeometryEffect(id: "hero")
-        Text("other")
-      },
-      context: ResolveContext(identity: rootIdentity),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
+        // Frame 1: hero at slot 0.
+        _ = renderer.render(
+          HStack(spacing: 1) {
+            Text("hero").matchedGeometryEffect(id: "hero")
+            Text("other")
+          },
+          context: ResolveContext(identity: rootIdentity),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
 
-    // Frame 2: hero at slot 1 (children swapped), under animate intent.
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    let frame2 = renderer.render(
-      HStack(spacing: 1) {
-        Text("other")
-        Text("hero").matchedGeometryEffect(id: "hero")
-      },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction),
-      proposal: ProposedSize(width: .finite(40), height: .finite(3))
-    )
+        // Frame 2: hero at slot 1 (children swapped), under animate intent.
+        var transaction = TransactionSnapshot()
+        transaction.animationRequest = .animate(animation.animationBox)
+        let frame2 = renderer.render(
+          HStack(spacing: 1) {
+            Text("other")
+            Text("hero").matchedGeometryEffect(id: "hero")
+          },
+          context: ResolveContext(identity: rootIdentity, transaction: transaction),
+          proposal: ProposedSize(width: .finite(40), height: .finite(3))
+        )
 
-    // Find any node tagged with the hero matched-geometry key in
-    // the post-overlay placed tree.  At progress ~0 the hero
-    // translation should carry it back to slot 0 (the source).
-    let heroBounds = Self.findBoundsForMatchedKey(frame2.placedTree, keyID: "hero")
-    #expect(heroBounds != nil)
-    if let heroBounds {
-      // Slot 0 is column 0, slot 1 is roughly column 6+ (after
-      // "other" and the 1-cell spacing).  At progress 0 the hero's
-      // bounds should be near column 0, not near column 6.
-      #expect(
-        heroBounds.origin.x < 5,
-        "at progress 0 hero should appear at its previous slot (column 0), got x=\(heroBounds.origin.x)"
-      )
+        // Find any node tagged with the hero matched-geometry key in
+        // the post-overlay placed tree.  At progress ~0 the hero
+        // translation should carry it back to slot 0 (the source).
+        let heroBounds = Self.findBoundsForMatchedKey(frame2.placedTree, keyID: "hero")
+        #expect(heroBounds != nil)
+        if let heroBounds {
+          // Slot 0 is column 0, slot 1 is roughly column 6+ (after
+          // "other" and the 1-cell spacing).  At progress 0 the hero's
+          // bounds should be near column 0, not near column 6.
+          #expect(
+            heroBounds.origin.x < 5,
+            "at progress 0 hero should appear at its previous slot (column 0), got x=\(heroBounds.origin.x)"
+          )
+        }
+      }
     }
   }
 
@@ -737,88 +731,86 @@ struct AnimationPipelineIntegrationTests {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
 
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
+
+        let surfaceSize = CellSize(width: 40, height: 5)
+        let proposal = ProposedSize(
+          width: .finite(surfaceSize.width),
+          height: .finite(surfaceSize.height)
+        )
+
+        // Very long duration so consecutive renderer.render calls at
+        // microsecond-apart real time produce different delta values.
+        let animation = Animation.linear(duration: .milliseconds(1_000_000))
+        controller.register(animation)
+
+        let rootIdentity = Identity(components: [.named("root")])
+
+        // Frame 1: slide not shown.
+        _ = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+          },
+          context: ResolveContext(identity: rootIdentity),
+          proposal: proposal
+        )
+
+        // Frame 2: slide appears under animate intent.  Insertion animation
+        // should be enqueued.
+        var transaction = TransactionSnapshot()
+        transaction.animationRequest = .animate(animation.animationBox)
+        let frame2 = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+            Text("hello").transition(.slide)
+          },
+          context: ResolveContext(identity: rootIdentity, transaction: transaction),
+          proposal: proposal
+        )
+
+        let frame2TextBounds = Self.findTextBounds(frame2.placedTree, text: "hello")
+        #expect(
+          frame2TextBounds?.origin.x == -surfaceSize.width,
+          "slide insertion should start a full surface width offscreen, got \(String(describing: frame2TextBounds?.origin.x))"
+        )
+
+        // Verify the insertion animation was enqueued on frame 2.
+        let frame2Count = controller.activeInsertionOffsetCount
+        #expect(
+          frame2Count > 0,
+          "insertion offset animation should be enqueued after frame 2, got \(frame2Count)"
+        )
+
+        // Frame 3: same tree, no state change — this is a tick frame.
+        // The insertion animation state should persist.
+        let frame3 = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+            Text("hello").transition(.slide)
+          },
+          context: ResolveContext(identity: rootIdentity),
+          proposal: proposal
+        )
+        let frame3Count = controller.activeInsertionOffsetCount
+        #expect(
+          frame3Count > 0,
+          "insertion offset animation should still be in flight after frame 3, got \(frame3Count)"
+        )
+        // Even with insertion-offset entries populated in the unified
+        // activeAnimations map, the controller must report hasPendingWork
+        // via lastTickResult on tick frames — otherwise the run loop
+        // stops scheduling deadlines and the animation hitches partway
+        // through.
+        #expect(
+          controller.lastTickResult.hasPendingWork,
+          "frame 3 tick should report hasPendingWork=true while the insertion is still in flight"
+        )
+        #expect(
+          controller.lastTickResult.nextDeadline != nil,
+          "frame 3 tick should carry a nextDeadline for the in-flight insertion"
+        )
+        _ = frame2
+        _ = frame3
+      }
     }
-
-    let surfaceSize = CellSize(width: 40, height: 5)
-    let proposal = ProposedSize(
-      width: .finite(surfaceSize.width),
-      height: .finite(surfaceSize.height)
-    )
-
-    // Very long duration so consecutive renderer.render calls at
-    // microsecond-apart real time produce different delta values.
-    let animation = Animation.linear(duration: .milliseconds(1_000_000))
-    controller.register(animation)
-
-    let rootIdentity = Identity(components: [.named("root")])
-
-    // Frame 1: slide not shown.
-    _ = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-      },
-      context: ResolveContext(identity: rootIdentity),
-      proposal: proposal
-    )
-
-    // Frame 2: slide appears under animate intent.  Insertion animation
-    // should be enqueued.
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    let frame2 = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-        Text("hello").transition(.slide)
-      },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction),
-      proposal: proposal
-    )
-
-    let frame2TextBounds = Self.findTextBounds(frame2.placedTree, text: "hello")
-    #expect(
-      frame2TextBounds?.origin.x == -surfaceSize.width,
-      "slide insertion should start a full surface width offscreen, got \(String(describing: frame2TextBounds?.origin.x))"
-    )
-
-    // Verify the insertion animation was enqueued on frame 2.
-    let frame2Count = controller.activeInsertionOffsetCount
-    #expect(
-      frame2Count > 0,
-      "insertion offset animation should be enqueued after frame 2, got \(frame2Count)"
-    )
-
-    // Frame 3: same tree, no state change — this is a tick frame.
-    // The insertion animation state should persist.
-    let frame3 = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-        Text("hello").transition(.slide)
-      },
-      context: ResolveContext(identity: rootIdentity),
-      proposal: proposal
-    )
-    let frame3Count = controller.activeInsertionOffsetCount
-    #expect(
-      frame3Count > 0,
-      "insertion offset animation should still be in flight after frame 3, got \(frame3Count)"
-    )
-    // Even with insertion-offset entries populated in the unified
-    // activeAnimations map, the controller must report hasPendingWork
-    // via lastTickResult on tick frames — otherwise the run loop
-    // stops scheduling deadlines and the animation hitches partway
-    // through.
-    #expect(
-      controller.lastTickResult.hasPendingWork,
-      "frame 3 tick should report hasPendingWork=true while the insertion is still in flight"
-    )
-    #expect(
-      controller.lastTickResult.nextDeadline != nil,
-      "frame 3 tick should carry a nextDeadline for the in-flight insertion"
-    )
-    _ = frame2
-    _ = frame3
   }
 
   @Test(
@@ -846,74 +838,72 @@ struct AnimationPipelineIntegrationTests {
 
     // Manually install the sinks that RunLoop would install at
     // startup — DefaultRenderer.render alone does not wire them.
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
+
+        let animation = Animation.linear(duration: .milliseconds(2000))
+        controller.register(animation)
+
+        let rootIdentity = Identity(components: [.named("root")])
+
+        // Frame 1: show a single Text child with .transition(.opacity).
+        _ = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+            Text("hello").transition(.opacity)
+          },
+          context: ResolveContext(identity: rootIdentity)
+        )
+
+        // Frame 2: remove the child under an animate transaction.
+        var transaction = TransactionSnapshot()
+        transaction.animationRequest = .animate(animation.animationBox)
+        let frame2 = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+            // empty — Text removed
+          },
+          context: ResolveContext(identity: rootIdentity, transaction: transaction)
+        )
+        let frame2TransientCount = Self.countTransientNodes(frame2.placedTree)
+
+        // If the controller didn't capture any removal, skip the rest
+        // of the test — this suite's scope is just the retained-reuse
+        // accumulation bug, not transition registration reliability.
+        guard frame2TransientCount > 0 else {
+          Issue.record(
+            "removal detection did not produce a transient overlay; transition registration flow is not exercising this test case"
+          )
+          return
+        }
+
+        // Frame 3: same view tree (tick frame).  Without the fix, the
+        // retained cache contains frame 2's placed tree (including the
+        // transient overlay) and applyPlacedOverlays injects another
+        // overlay on top → transient count >= 2.
+        let frame3 = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+          },
+          context: ResolveContext(identity: rootIdentity)
+        )
+        let frame3TransientCount = Self.countTransientNodes(frame3.placedTree)
+
+        // Frame 4: another tick — any accumulation bug compounds.
+        let frame4 = renderer.render(
+          VStack(alignment: .leading, spacing: 0) {
+          },
+          context: ResolveContext(identity: rootIdentity)
+        )
+        let frame4TransientCount = Self.countTransientNodes(frame4.placedTree)
+
+        #expect(
+          frame2TransientCount == frame3TransientCount,
+          "tick frame 3 should have the same transient count as frame 2, got \(frame3TransientCount) vs \(frame2TransientCount)"
+        )
+        #expect(
+          frame3TransientCount == frame4TransientCount,
+          "tick frame 4 should have the same transient count as frame 3, got \(frame4TransientCount) vs \(frame3TransientCount)"
+        )
+      }
     }
-
-    let animation = Animation.linear(duration: .milliseconds(2000))
-    controller.register(animation)
-
-    let rootIdentity = Identity(components: [.named("root")])
-
-    // Frame 1: show a single Text child with .transition(.opacity).
-    _ = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-        Text("hello").transition(.opacity)
-      },
-      context: ResolveContext(identity: rootIdentity)
-    )
-
-    // Frame 2: remove the child under an animate transaction.
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    let frame2 = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-        // empty — Text removed
-      },
-      context: ResolveContext(identity: rootIdentity, transaction: transaction)
-    )
-    let frame2TransientCount = Self.countTransientNodes(frame2.placedTree)
-
-    // If the controller didn't capture any removal, skip the rest
-    // of the test — this suite's scope is just the retained-reuse
-    // accumulation bug, not transition registration reliability.
-    guard frame2TransientCount > 0 else {
-      Issue.record(
-        "removal detection did not produce a transient overlay; transition registration flow is not exercising this test case"
-      )
-      return
-    }
-
-    // Frame 3: same view tree (tick frame).  Without the fix, the
-    // retained cache contains frame 2's placed tree (including the
-    // transient overlay) and applyPlacedOverlays injects another
-    // overlay on top → transient count >= 2.
-    let frame3 = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-      },
-      context: ResolveContext(identity: rootIdentity)
-    )
-    let frame3TransientCount = Self.countTransientNodes(frame3.placedTree)
-
-    // Frame 4: another tick — any accumulation bug compounds.
-    let frame4 = renderer.render(
-      VStack(alignment: .leading, spacing: 0) {
-      },
-      context: ResolveContext(identity: rootIdentity)
-    )
-    let frame4TransientCount = Self.countTransientNodes(frame4.placedTree)
-
-    #expect(
-      frame2TransientCount == frame3TransientCount,
-      "tick frame 3 should have the same transient count as frame 2, got \(frame3TransientCount) vs \(frame2TransientCount)"
-    )
-    #expect(
-      frame3TransientCount == frame4TransientCount,
-      "tick frame 4 should have the same transient count as frame 3, got \(frame4TransientCount) vs \(frame3TransientCount)"
-    )
   }
 
   private static func countTransientNodes(_ node: PlacedNode) -> Int {

@@ -131,118 +131,116 @@ struct AnimationRepeatForeverGrowthTests {
   func animatedBorderWithCanvasLeafDoesNotChurnMeasurement(tickCount: Int) throws {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
-    AnimationRegistrationStorage.currentSink = controller
-    TransitionRegistrationStorage.currentSink = controller
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-    }
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
 
-    let animation = Animation.linear(duration: .milliseconds(3000))
-      .repeatForever(autoreverses: false)
-    controller.register(animation)
+        let animation = Animation.linear(duration: .milliseconds(3000))
+          .repeatForever(autoreverses: false)
+        controller.register(animation)
 
-    let blend = BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red])
-    let rootIdentity = Identity(components: [.named("ChasingLightCanvasRepro")])
+        let blend = BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red])
+        let rootIdentity = Identity(components: [.named("ChasingLightCanvasRepro")])
 
-    @MainActor
-    func body(phase: Double) -> some View {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("chasing light")
-          .padding(1)
-          .frame(width: 30, height: 3)
-          .border(
-            blend: blend,
-            set: .rounded,
-            phase: phase
+        @MainActor
+        func body(phase: Double) -> some View {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("chasing light")
+              .padding(1)
+              .frame(width: 30, height: 3)
+              .border(
+                blend: blend,
+                set: .rounded,
+                phase: phase
+              )
+            // The Canvas leaf is what surfaced bug #2 in the gallery: every
+            // animation tick invalidated its measurement cache via the
+            // missing `.canvas` case in DrawPayload.isEquivalentForMeasurement,
+            // which cascaded up the ancestor spine.  Pin it here too so any
+            // future regression in the canvas equivalence walk fires this
+            // test, not just the gallery smoke test.
+            Canvas(ProbeCanvasDrawing(value: 7))
+              .frame(width: 30, height: 4)
+          }
+        }
+
+        // Frame 1: seed render at phase 0, no animation intent.
+        _ = renderer.render(
+          body(phase: 0),
+          context: ResolveContext(identity: rootIdentity),
+          proposal: ProposedSize(width: .finite(40), height: .finite(20))
+        )
+
+        // Mirror the run loop's "after first frame" switch into selective
+        // dirty evaluation, so subsequent renders take the same code paths
+        // a real tick frame would take.
+        renderer.enableSelectiveEvaluation()
+
+        // Frame 2: explicit animate transaction starts the chasing-light
+        // animation.  This is the equivalent of the run loop committing
+        // `.onAppear { withAnimation(...) { gradientPhase = 1.0 } }`.
+        var animateTransaction = TransactionSnapshot()
+        animateTransaction.animationRequest = .animate(animation.animationBox)
+        _ = renderer.render(
+          body(phase: 1.0),
+          context: ResolveContext(
+            identity: rootIdentity,
+            transaction: animateTransaction
+          ),
+          proposal: ProposedSize(width: .finite(40), height: .finite(20))
+        )
+
+        // Drive `tickCount` tick frames.  Each tick constructs the same
+        // view (phase unchanged at the @State level — the animation
+        // controller is what drives the per-frame interpolation) with a
+        // bare `.inherit` transaction.  Phase 4 stopped injecting the
+        // controller's "dominant active request" on tick frames — the
+        // controller's diff path correctly leaves an in-flight animation
+        // alone when the next frame's snapshot matches its target value
+        // (the early `previous == current` guard in
+        // `enqueueSlotChangeIfNeeded`), so tick frames don't need to
+        // re-announce the animation intent.
+        var measureCounts: [Int] = []
+        var activeAnimationCounts: [Int] = []
+        for _ in 0..<tickCount {
+          var tickTransaction = TransactionSnapshot()
+          tickTransaction.animationRequest = .inherit
+          let artifacts = renderer.render(
+            body(phase: 1.0),
+            context: ResolveContext(
+              identity: rootIdentity,
+              transaction: tickTransaction
+            ),
+            proposal: ProposedSize(width: .finite(40), height: .finite(20))
           )
-        // The Canvas leaf is what surfaced bug #2 in the gallery: every
-        // animation tick invalidated its measurement cache via the
-        // missing `.canvas` case in DrawPayload.isEquivalentForMeasurement,
-        // which cascaded up the ancestor spine.  Pin it here too so any
-        // future regression in the canvas equivalence walk fires this
-        // test, not just the gallery smoke test.
-        Canvas(ProbeCanvasDrawing(value: 7))
-          .frame(width: 30, height: 4)
+          measureCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
+          activeAnimationCounts.append(controller.activeAnimationCount)
+        }
+
+        let maxMeasured = measureCounts.max() ?? 0
+        #expect(
+          maxMeasured == 0,
+          """
+          tick frames must reuse 100% of the measurement cache; \
+          maxMeasuredNodesComputed=\(maxMeasured) \
+          counts@[0,1,9,49]=\
+          [\(measureCounts.first ?? -1),\
+          \(measureCounts.dropFirst().first ?? -1),\
+          \(measureCounts.dropFirst(9).first ?? -1),\
+          \(measureCounts.dropFirst(49).first ?? -1)]
+          """
+        )
+
+        let maxActive = activeAnimationCounts.max() ?? 0
+        let firstActive = activeAnimationCounts.first ?? 0
+        #expect(
+          maxActive <= firstActive,
+          """
+          activeAnimationCount must stay bounded across repeatForever ticks; \
+          first=\(firstActive) max=\(maxActive)
+          """
+        )
       }
     }
-
-    // Frame 1: seed render at phase 0, no animation intent.
-    _ = renderer.render(
-      body(phase: 0),
-      context: ResolveContext(identity: rootIdentity),
-      proposal: ProposedSize(width: .finite(40), height: .finite(20))
-    )
-
-    // Mirror the run loop's "after first frame" switch into selective
-    // dirty evaluation, so subsequent renders take the same code paths
-    // a real tick frame would take.
-    renderer.enableSelectiveEvaluation()
-
-    // Frame 2: explicit animate transaction starts the chasing-light
-    // animation.  This is the equivalent of the run loop committing
-    // `.onAppear { withAnimation(...) { gradientPhase = 1.0 } }`.
-    var animateTransaction = TransactionSnapshot()
-    animateTransaction.animationRequest = .animate(animation.animationBox)
-    _ = renderer.render(
-      body(phase: 1.0),
-      context: ResolveContext(
-        identity: rootIdentity,
-        transaction: animateTransaction
-      ),
-      proposal: ProposedSize(width: .finite(40), height: .finite(20))
-    )
-
-    // Drive `tickCount` tick frames.  Each tick constructs the same
-    // view (phase unchanged at the @State level — the animation
-    // controller is what drives the per-frame interpolation) with a
-    // bare `.inherit` transaction.  Phase 4 stopped injecting the
-    // controller's "dominant active request" on tick frames — the
-    // controller's diff path correctly leaves an in-flight animation
-    // alone when the next frame's snapshot matches its target value
-    // (the early `previous == current` guard in
-    // `enqueueSlotChangeIfNeeded`), so tick frames don't need to
-    // re-announce the animation intent.
-    var measureCounts: [Int] = []
-    var activeAnimationCounts: [Int] = []
-    for _ in 0..<tickCount {
-      var tickTransaction = TransactionSnapshot()
-      tickTransaction.animationRequest = .inherit
-      let artifacts = renderer.render(
-        body(phase: 1.0),
-        context: ResolveContext(
-          identity: rootIdentity,
-          transaction: tickTransaction
-        ),
-        proposal: ProposedSize(width: .finite(40), height: .finite(20))
-      )
-      measureCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
-      activeAnimationCounts.append(controller.activeAnimationCount)
-    }
-
-    let maxMeasured = measureCounts.max() ?? 0
-    #expect(
-      maxMeasured == 0,
-      """
-      tick frames must reuse 100% of the measurement cache; \
-      maxMeasuredNodesComputed=\(maxMeasured) \
-      counts@[0,1,9,49]=\
-      [\(measureCounts.first ?? -1),\
-      \(measureCounts.dropFirst().first ?? -1),\
-      \(measureCounts.dropFirst(9).first ?? -1),\
-      \(measureCounts.dropFirst(49).first ?? -1)]
-      """
-    )
-
-    let maxActive = activeAnimationCounts.max() ?? 0
-    let firstActive = activeAnimationCounts.first ?? 0
-    #expect(
-      maxActive <= firstActive,
-      """
-      activeAnimationCount must stay bounded across repeatForever ticks; \
-      first=\(firstActive) max=\(maxActive)
-      """
-    )
   }
 
   @Test("onAppear-started repeatForever keeps runtime bookkeeping bounded across tick frames")
@@ -276,123 +274,117 @@ struct AnimationRepeatForeverGrowthTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    scheduler.requestInvalidation(of: [rootIdentity])
+      scheduler.requestInvalidation(of: [rootIdentity])
 
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    if scheduler.hasPendingFrame(at: .now()) {
+      var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      if scheduler.hasPendingFrame(at: .now()) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      let initialActive = controller.activeAnimationCount
+      let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+      let initialAppearHandlers = initialLifecycleSnapshot.appearHandlers.count
+      let initialDisappearHandlers = initialLifecycleSnapshot.disappearHandlers.count
+
+      #expect(
+        initialActive > 0,
+        "runtime startup must actually enqueue the repeatForever animation"
+      )
+
+      var activeCounts: [Int] = [initialActive]
+      var appearHandlerCounts: [Int] = [initialAppearHandlers]
+      var disappearHandlerCounts: [Int] = [initialDisappearHandlers]
+      var resolvedNodeTotals: [Int] = []
+      var placedNodeTotals: [Int] = []
+      var measuredNodeCounts: [Int] = []
+
+      for _ in 0..<80 {
+        let frame = ScheduledFrame(
+          causes: [.deadline],
+          invalidatedIdentities: [],
+          signalNames: [],
+          externalReasons: [],
+          triggeredDeadline: nil,
+          nextDeadline: nil
+        )
+        let artifacts = runLoop.renderer.render(
+          runLoop.viewBuilder(
+            (
+              state: runLoop.stateContainer.state,
+              focusedIdentity: runLoop.focusTracker.currentFocusIdentity
+            )),
+          context: runLoop.resolveContext(for: frame),
+          proposal: runLoop.proposal()
+        )
+        runLoop.lifecycleCoordinator.applyCommittedFrame(
+          plan: artifacts.commitPlan,
+          currentLifecycleRegistry: runLoop.localLifecycleRegistry,
+          currentTaskRegistry: runLoop.localTaskRegistry
+        )
+        resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
+        placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
+        measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
+        activeCounts.append(controller.activeAnimationCount)
+        let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+        appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
+        disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+      }
+
+      #expect(
+        (activeCounts.max() ?? 0) <= initialActive,
+        """
+        active animation bookkeeping must stay bounded once the repeatForever \
+        animation is in flight; initial=\(initialActive) \
+        counts@[0,1,9,39,79]=[
+        \(activeCounts.first ?? -1),
+        \(activeCounts.dropFirst().first ?? -1),
+        \(activeCounts.dropFirst(9).first ?? -1),
+        \(activeCounts.dropFirst(39).first ?? -1),
+        \(activeCounts.dropFirst(79).first ?? -1)
+        ]
+        """
+      )
+      #expect(
+        (appearHandlerCounts.max() ?? 0) <= initialAppearHandlers,
+        """
+        .onAppear registrations must not accumulate across animation ticks; \
+        initial=\(initialAppearHandlers) max=\(appearHandlerCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (disappearHandlerCounts.max() ?? 0) <= initialDisappearHandlers,
+        """
+        .onDisappear registrations must not accumulate across animation ticks; \
+        initial=\(initialDisappearHandlers) max=\(disappearHandlerCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (measuredNodeCounts.max() ?? 0) == 0,
+        """
+        synthetic tick frames should reuse the measurement cache completely; \
+        maxMeasured=\(measuredNodeCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
+        """
+        resolved tree size must stay constant across synthetic ticks; \
+        min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
+        """
+      )
+      #expect(
+        (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
+        """
+        placed tree size must stay constant across synthetic ticks; \
+        min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
+        """
+      )
     }
-
-    let controller = runLoop.renderer.internalAnimationController
-    let initialActive = controller.activeAnimationCount
-    let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-    let initialAppearHandlers = initialLifecycleSnapshot.appearHandlers.count
-    let initialDisappearHandlers = initialLifecycleSnapshot.disappearHandlers.count
-
-    #expect(
-      initialActive > 0,
-      "runtime startup must actually enqueue the repeatForever animation"
-    )
-
-    var activeCounts: [Int] = [initialActive]
-    var appearHandlerCounts: [Int] = [initialAppearHandlers]
-    var disappearHandlerCounts: [Int] = [initialDisappearHandlers]
-    var resolvedNodeTotals: [Int] = []
-    var placedNodeTotals: [Int] = []
-    var measuredNodeCounts: [Int] = []
-
-    for _ in 0..<80 {
-      let frame = ScheduledFrame(
-        causes: [.deadline],
-        invalidatedIdentities: [],
-        signalNames: [],
-        externalReasons: [],
-        triggeredDeadline: nil,
-        nextDeadline: nil
-      )
-      let artifacts = runLoop.renderer.render(
-        runLoop.viewBuilder(
-          (
-            state: runLoop.stateContainer.state,
-            focusedIdentity: runLoop.focusTracker.currentFocusIdentity
-          )),
-        context: runLoop.resolveContext(for: frame),
-        proposal: runLoop.proposal()
-      )
-      runLoop.lifecycleCoordinator.applyCommittedFrame(
-        plan: artifacts.commitPlan,
-        currentLifecycleRegistry: runLoop.localLifecycleRegistry,
-        currentTaskRegistry: runLoop.localTaskRegistry
-      )
-      resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
-      placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
-      measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
-      activeCounts.append(controller.activeAnimationCount)
-      let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-      appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
-      disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
-    }
-
-    #expect(
-      (activeCounts.max() ?? 0) <= initialActive,
-      """
-      active animation bookkeeping must stay bounded once the repeatForever \
-      animation is in flight; initial=\(initialActive) \
-      counts@[0,1,9,39,79]=[
-      \(activeCounts.first ?? -1),
-      \(activeCounts.dropFirst().first ?? -1),
-      \(activeCounts.dropFirst(9).first ?? -1),
-      \(activeCounts.dropFirst(39).first ?? -1),
-      \(activeCounts.dropFirst(79).first ?? -1)
-      ]
-      """
-    )
-    #expect(
-      (appearHandlerCounts.max() ?? 0) <= initialAppearHandlers,
-      """
-      .onAppear registrations must not accumulate across animation ticks; \
-      initial=\(initialAppearHandlers) max=\(appearHandlerCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (disappearHandlerCounts.max() ?? 0) <= initialDisappearHandlers,
-      """
-      .onDisappear registrations must not accumulate across animation ticks; \
-      initial=\(initialDisappearHandlers) max=\(disappearHandlerCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (measuredNodeCounts.max() ?? 0) == 0,
-      """
-      synthetic tick frames should reuse the measurement cache completely; \
-      maxMeasured=\(measuredNodeCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
-      """
-      resolved tree size must stay constant across synthetic ticks; \
-      min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
-      """
-    )
-    #expect(
-      (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
-      """
-      placed tree size must stay constant across synthetic ticks; \
-      min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
-      """
-    )
   }
 
   @Test("tab-hosted repeatForever keeps runtime bookkeeping bounded across tick frames")
@@ -426,124 +418,118 @@ struct AnimationRepeatForeverGrowthTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    scheduler.requestInvalidation(of: [rootIdentity])
+      scheduler.requestInvalidation(of: [rootIdentity])
 
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    if scheduler.hasPendingFrame(at: .now()) {
+      var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      if scheduler.hasPendingFrame(at: .now()) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      let initialActive = controller.activeAnimationCount
+      let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+
+      #expect(
+        initialActive > 0,
+        "tab-hosted runtime startup must actually enqueue the repeatForever animation"
+      )
+
+      var activeCounts: [Int] = [initialActive]
+      var appearHandlerCounts: [Int] = [initialLifecycleSnapshot.appearHandlers.count]
+      var disappearHandlerCounts: [Int] = [initialLifecycleSnapshot.disappearHandlers.count]
+      var resolvedNodeTotals: [Int] = []
+      var placedNodeTotals: [Int] = []
+      var resolvedNodeCounts: [Int] = []
+      var measuredNodeCounts: [Int] = []
+
+      for _ in 0..<80 {
+        let frame = ScheduledFrame(
+          causes: [.deadline],
+          invalidatedIdentities: [],
+          signalNames: [],
+          externalReasons: [],
+          triggeredDeadline: nil,
+          nextDeadline: nil
+        )
+        let artifacts = runLoop.renderer.render(
+          runLoop.viewBuilder(
+            (
+              state: runLoop.stateContainer.state,
+              focusedIdentity: runLoop.focusTracker.currentFocusIdentity
+            )),
+          context: runLoop.resolveContext(for: frame),
+          proposal: runLoop.proposal()
+        )
+        runLoop.lifecycleCoordinator.applyCommittedFrame(
+          plan: artifacts.commitPlan,
+          currentLifecycleRegistry: runLoop.localLifecycleRegistry,
+          currentTaskRegistry: runLoop.localTaskRegistry
+        )
+        resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
+        placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
+        resolvedNodeCounts.append(artifacts.diagnostics.work.resolvedNodesComputed)
+        measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
+        activeCounts.append(controller.activeAnimationCount)
+        let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+        appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
+        disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+      }
+
+      #expect(
+        (activeCounts.max() ?? 0) <= initialActive,
+        """
+        active animation bookkeeping must stay bounded for the tab-hosted \
+        repeatForever probe; initial=\(initialActive) \
+        max=\(activeCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (appearHandlerCounts.max() ?? 0) <= appearHandlerCounts[0],
+        """
+        tab-hosted .onAppear registrations must not accumulate across ticks; \
+        initial=\(appearHandlerCounts[0]) max=\(appearHandlerCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (disappearHandlerCounts.max() ?? 0) <= disappearHandlerCounts[0],
+        """
+        tab-hosted .onDisappear registrations must not accumulate across ticks; \
+        initial=\(disappearHandlerCounts[0]) max=\(disappearHandlerCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (resolvedNodeCounts.max() ?? 0) == 0,
+        """
+        synthetic tick frames should not re-resolve the tab-hosted probe; \
+        maxResolved=\(resolvedNodeCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (measuredNodeCounts.max() ?? 0) == 0,
+        """
+        synthetic tick frames should reuse the measurement cache for the \
+        tab-hosted probe; maxMeasured=\(measuredNodeCounts.max() ?? -1)
+        """
+      )
+      #expect(
+        (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
+        """
+        tab-hosted resolved tree size must stay constant across synthetic ticks; \
+        min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
+        """
+      )
+      #expect(
+        (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
+        """
+        tab-hosted placed tree size must stay constant across synthetic ticks; \
+        min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
+        """
+      )
     }
-
-    let controller = runLoop.renderer.internalAnimationController
-    let initialActive = controller.activeAnimationCount
-    let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-
-    #expect(
-      initialActive > 0,
-      "tab-hosted runtime startup must actually enqueue the repeatForever animation"
-    )
-
-    var activeCounts: [Int] = [initialActive]
-    var appearHandlerCounts: [Int] = [initialLifecycleSnapshot.appearHandlers.count]
-    var disappearHandlerCounts: [Int] = [initialLifecycleSnapshot.disappearHandlers.count]
-    var resolvedNodeTotals: [Int] = []
-    var placedNodeTotals: [Int] = []
-    var resolvedNodeCounts: [Int] = []
-    var measuredNodeCounts: [Int] = []
-
-    for _ in 0..<80 {
-      let frame = ScheduledFrame(
-        causes: [.deadline],
-        invalidatedIdentities: [],
-        signalNames: [],
-        externalReasons: [],
-        triggeredDeadline: nil,
-        nextDeadline: nil
-      )
-      let artifacts = runLoop.renderer.render(
-        runLoop.viewBuilder(
-          (
-            state: runLoop.stateContainer.state,
-            focusedIdentity: runLoop.focusTracker.currentFocusIdentity
-          )),
-        context: runLoop.resolveContext(for: frame),
-        proposal: runLoop.proposal()
-      )
-      runLoop.lifecycleCoordinator.applyCommittedFrame(
-        plan: artifacts.commitPlan,
-        currentLifecycleRegistry: runLoop.localLifecycleRegistry,
-        currentTaskRegistry: runLoop.localTaskRegistry
-      )
-      resolvedNodeTotals.append(artifacts.diagnostics.counts.resolvedNodes)
-      placedNodeTotals.append(artifacts.diagnostics.counts.placedNodes)
-      resolvedNodeCounts.append(artifacts.diagnostics.work.resolvedNodesComputed)
-      measuredNodeCounts.append(artifacts.diagnostics.work.measuredNodesComputed)
-      activeCounts.append(controller.activeAnimationCount)
-      let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
-      appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
-      disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
-    }
-
-    #expect(
-      (activeCounts.max() ?? 0) <= initialActive,
-      """
-      active animation bookkeeping must stay bounded for the tab-hosted \
-      repeatForever probe; initial=\(initialActive) \
-      max=\(activeCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (appearHandlerCounts.max() ?? 0) <= appearHandlerCounts[0],
-      """
-      tab-hosted .onAppear registrations must not accumulate across ticks; \
-      initial=\(appearHandlerCounts[0]) max=\(appearHandlerCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (disappearHandlerCounts.max() ?? 0) <= disappearHandlerCounts[0],
-      """
-      tab-hosted .onDisappear registrations must not accumulate across ticks; \
-      initial=\(disappearHandlerCounts[0]) max=\(disappearHandlerCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (resolvedNodeCounts.max() ?? 0) == 0,
-      """
-      synthetic tick frames should not re-resolve the tab-hosted probe; \
-      maxResolved=\(resolvedNodeCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (measuredNodeCounts.max() ?? 0) == 0,
-      """
-      synthetic tick frames should reuse the measurement cache for the \
-      tab-hosted probe; maxMeasured=\(measuredNodeCounts.max() ?? -1)
-      """
-    )
-    #expect(
-      (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
-      """
-      tab-hosted resolved tree size must stay constant across synthetic ticks; \
-      min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
-      """
-    )
-    #expect(
-      (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
-      """
-      tab-hosted placed tree size must stay constant across synthetic ticks; \
-      min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
-      """
-    )
   }
 
   @Test("nested child-owned onAppear repeatForever enqueues the initial animation")
@@ -577,31 +563,25 @@ struct AnimationRepeatForeverGrowthTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
+    try withAnimationSinks(runLoop.renderer.internalAnimationController) {
+
+      scheduler.requestInvalidation(of: [rootIdentity])
+
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+      #expect(
+        renderedFrames >= 2,
+        "expected initial mount plus the onAppear-triggered follow-up frame"
+      )
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        """
+        nested child-owned repeatForever should enqueue an active animation after \
+        the onAppear-triggered follow-up frame
+        """
+      )
     }
-
-    scheduler.requestInvalidation(of: [rootIdentity])
-
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-
-    #expect(
-      renderedFrames >= 2,
-      "expected initial mount plus the onAppear-triggered follow-up frame"
-    )
-    #expect(
-      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
-      """
-      nested child-owned repeatForever should enqueue an active animation after \
-      the onAppear-triggered follow-up frame
-      """
-    )
   }
 
   @MainActor

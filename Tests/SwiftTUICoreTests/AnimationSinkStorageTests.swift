@@ -6,22 +6,24 @@ import Testing
 @MainActor
 @Suite("Animation sink storage")
 struct AnimationSinkStorageTests {
-  @Test("task-local animation registration sink overrides static fallback")
-  func taskLocalRegistrationSinkOverridesStaticFallback() async throws {
-    let fallback = RecordingAnimationSink()
+  @Test("the registration sink is task-local only: bound inside withSink, nil outside")
+  func registrationSinkIsTaskLocalOnly() async throws {
+    // F116: the `static weak var` fallback (assigned only from tests — the
+    // last-bound-global anti-pattern) is deleted; outside a binding there is
+    // deliberately NO sink.
     let taskLocal = RecordingAnimationSink()
-
-    AnimationRegistrationStorage.currentSink = fallback
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-    }
 
     let observedInside = await AnimationRegistrationStorage.withSink(taskLocal) {
       sinkID(AnimationRegistrationStorage.effectiveSink)
     }
 
     #expect(observedInside == ObjectIdentifier(taskLocal))
-    #expect(sinkID(AnimationRegistrationStorage.effectiveSink) == ObjectIdentifier(fallback))
+    #expect(AnimationRegistrationStorage.effectiveSink == nil)
+
+    let observedSync = AnimationRegistrationStorage.withSink(taskLocal) {
+      sinkID(AnimationRegistrationStorage.effectiveSink)
+    }
+    #expect(observedSync == ObjectIdentifier(taskLocal))
   }
 
   @Test("task-local animation registration sinks are isolated across concurrent tasks")
@@ -48,17 +50,9 @@ struct AnimationSinkStorageTests {
     #expect(secondID == ObjectIdentifier(second))
   }
 
-  @Test("task-local completion and transition sinks override static fallbacks")
-  func taskLocalCompletionAndTransitionSinksOverrideStaticFallbacks() async throws {
-    let fallback = RecordingAnimationSink()
+  @Test("completion and transition sinks are task-local only")
+  func completionAndTransitionSinksAreTaskLocalOnly() async throws {
     let taskLocal = RecordingAnimationSink()
-
-    AnimationCompletionStorage.currentSink = fallback
-    TransitionRegistrationStorage.currentSink = fallback
-    defer {
-      AnimationCompletionStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-    }
 
     let observedCompletion = await AnimationCompletionStorage.withSink(taskLocal) {
       sinkID(AnimationCompletionStorage.effectiveSink)
@@ -69,8 +63,8 @@ struct AnimationSinkStorageTests {
 
     #expect(observedCompletion == ObjectIdentifier(taskLocal))
     #expect(observedTransition == ObjectIdentifier(taskLocal))
-    #expect(sinkID(AnimationCompletionStorage.effectiveSink) == ObjectIdentifier(fallback))
-    #expect(sinkID(TransitionRegistrationStorage.effectiveSink) == ObjectIdentifier(fallback))
+    #expect(AnimationCompletionStorage.effectiveSink == nil)
+    #expect(TransitionRegistrationStorage.effectiveSink == nil)
   }
 }
 

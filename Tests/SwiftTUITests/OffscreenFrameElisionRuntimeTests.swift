@@ -595,93 +595,87 @@ struct OffscreenFrameElisionRuntimeTests {
     )
     runLoop.frameReadinessClock = { frozenNow }
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount the tree (and run the onAppear-triggered follow-up) so the
-    // repeatForever animation is in flight and the off-screen border has been
-    // committed once (clipped, so it is absent from previousDrawnIdentities).
-    //
-    // The mount + onAppear-follow-up settle MUST use the SYNCHRONOUS driver. The
-    // async driver suspends at `acquireFrameArtifactsAsync` and can drop a
-    // committed frame's tail under heavy parallel MainActor contention; if the
-    // onAppear-follow-up frame (the one whose resolve registers the
-    // `repeatForever` animation) is dropped, `activeAnimationCount` stays 0 and
-    // this test flakes. `renderPendingFrames` shares the exact same
-    // `applyAcquiredFrame` body but renders straight-line with no suspension and
-    // no drop arm, so the registration is deterministic. The elision path under
-    // test is still exercised by the ASYNC deadline tick below. See
-    // docs/KNOWN-TEST-FLAKES.md.
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    while scheduler.hasPendingFrame(at: frozenNow) {
+      // Mount the tree (and run the onAppear-triggered follow-up) so the
+      // repeatForever animation is in flight and the off-screen border has been
+      // committed once (clipped, so it is absent from previousDrawnIdentities).
+      //
+      // The mount + onAppear-follow-up settle MUST use the SYNCHRONOUS driver. The
+      // async driver suspends at `acquireFrameArtifactsAsync` and can drop a
+      // committed frame's tail under heavy parallel MainActor contention; if the
+      // onAppear-follow-up frame (the one whose resolve registers the
+      // `repeatForever` animation) is dropped, `activeAnimationCount` stays 0 and
+      // this test flakes. `renderPendingFrames` shares the exact same
+      // `applyAcquiredFrame` body but renders straight-line with no suspension and
+      // no drop arm, so the registration is deterministic. The elision path under
+      // test is still exercised by the ASYNC deadline tick below. See
+      // docs/KNOWN-TEST-FLAKES.md.
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: frozenNow) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        "the off-screen repeatForever animation must be in flight before the deadline tick"
+      )
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      let presentsBefore = terminal.presentCount
+
+      // Drive a pure animation-deadline frame: this is the case the gate elides.
+      // Consumed at the frozen instant, so ONLY this deadline is ready — the
+      // animation's own (real-future) rescheduled deadline stays invisible.
+      scheduler.requestDeadline(frozenNow)
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+
+      // Invariant 1: the deadline-only tick elided (no present), and the gate
+      // fired (elided counter advanced).
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBefore,
+        "an off-screen deadline-only tick must elide; elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)"
+      )
+      #expect(
+        terminal.presentCount == presentsBefore,
+        "an elided frame must not present; presentsBefore=\(presentsBefore) after=\(terminal.presentCount)"
+      )
+
+      // Invariant 2 (no-restart trap): the loop is not frozen — eliding still
+      // scheduled the next animation deadline. Assert a future wake exists rather
+      // than probing the real clock at a fixed offset (the original
+      // `hasPendingFrame(at: .now() + 100ms)` was the load-flaky part): the
+      // rescheduled deadline lands at some real instant `> frozenNow`, so
+      // `nextWakeInstant(after:)` returns it regardless of how far real time has
+      // drifted under load.
+      #expect(
+        scheduler.nextWakeInstant(after: frozenNow) != nil,
+        "eliding must still reschedule the next animation deadline so the loop keeps ticking"
+      )
+
+      // Invariant 3: a subsequent on-screen invalidation renders normally. Its
+      // causes include `.invalidation`, so the gate cannot fire (causes != [.deadline]).
+      let presentsBeforeInvalidation = terminal.presentCount
+      let elidedBeforeInvalidation = runLoop.renderer.elidedFrameCount
+      scheduler.requestInvalidation(of: [rootIdentity])
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+      #expect(
+        terminal.presentCount > presentsBeforeInvalidation,
+        "an on-screen invalidation must render and present a frame"
+      )
+      #expect(
+        runLoop.renderer.elidedFrameCount == elidedBeforeInvalidation,
+        "an invalidation-caused frame must not elide"
+      )
     }
-
-    #expect(
-      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
-      "the off-screen repeatForever animation must be in flight before the deadline tick"
-    )
-    let elidedBefore = runLoop.renderer.elidedFrameCount
-    let presentsBefore = terminal.presentCount
-
-    // Drive a pure animation-deadline frame: this is the case the gate elides.
-    // Consumed at the frozen instant, so ONLY this deadline is ready — the
-    // animation's own (real-future) rescheduled deadline stays invisible.
-    scheduler.requestDeadline(frozenNow)
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-
-    // Invariant 1: the deadline-only tick elided (no present), and the gate
-    // fired (elided counter advanced).
-    #expect(
-      runLoop.renderer.elidedFrameCount > elidedBefore,
-      "an off-screen deadline-only tick must elide; elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)"
-    )
-    #expect(
-      terminal.presentCount == presentsBefore,
-      "an elided frame must not present; presentsBefore=\(presentsBefore) after=\(terminal.presentCount)"
-    )
-
-    // Invariant 2 (no-restart trap): the loop is not frozen — eliding still
-    // scheduled the next animation deadline. Assert a future wake exists rather
-    // than probing the real clock at a fixed offset (the original
-    // `hasPendingFrame(at: .now() + 100ms)` was the load-flaky part): the
-    // rescheduled deadline lands at some real instant `> frozenNow`, so
-    // `nextWakeInstant(after:)` returns it regardless of how far real time has
-    // drifted under load.
-    #expect(
-      scheduler.nextWakeInstant(after: frozenNow) != nil,
-      "eliding must still reschedule the next animation deadline so the loop keeps ticking"
-    )
-
-    // Invariant 3: a subsequent on-screen invalidation renders normally. Its
-    // causes include `.invalidation`, so the gate cannot fire (causes != [.deadline]).
-    let presentsBeforeInvalidation = terminal.presentCount
-    let elidedBeforeInvalidation = runLoop.renderer.elidedFrameCount
-    scheduler.requestInvalidation(of: [rootIdentity])
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-    #expect(
-      terminal.presentCount > presentsBeforeInvalidation,
-      "an on-screen invalidation must render and present a frame"
-    )
-    #expect(
-      runLoop.renderer.elidedFrameCount == elidedBeforeInvalidation,
-      "an invalidation-caused frame must not elide"
-    )
   }
 
   // MARK: - End-to-end completion timing (Task 8.1)
@@ -731,85 +725,79 @@ struct OffscreenFrameElisionRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount + run the onAppear follow-up so the finite off-screen animation is
-    // in flight and the clipped border has committed once (absent from
-    // previousDrawnIdentities).
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
-    // and can drop the onAppear-follow-up frame's tail under heavy parallel
-    // MainActor contention, leaving the animation unregistered
-    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
-    // shares the exact same `applyAcquiredFrame` body but renders straight-line
-    // with no suspension and no drop arm, so registration is deterministic; the
-    // elision path under test is still driven via the ASYNC ticks below. See
-    // docs/KNOWN-TEST-FLAKES.md.
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    while scheduler.hasPendingFrame(at: .now()) {
+      // Mount + run the onAppear follow-up so the finite off-screen animation is
+      // in flight and the clipped border has committed once (absent from
+      // previousDrawnIdentities).
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+      // and can drop the onAppear-follow-up frame's tail under heavy parallel
+      // MainActor contention, leaving the animation unregistered
+      // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+      // shares the exact same `applyAcquiredFrame` body but renders straight-line
+      // with no suspension and no drop arm, so registration is deterministic; the
+      // elision path under test is still driven via the ASYNC ticks below. See
+      // docs/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    }
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: .now()) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
 
-    #expect(
-      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
-      "the off-screen finite animation must be in flight before its completion drains"
-    )
-    #expect(
-      completion.count == 0,
-      "the finite animation must not have completed during the mount frames"
-    )
-
-    let elidedBefore = runLoop.renderer.elidedFrameCount
-    let presentsBefore = terminal.presentCount
-
-    // Drive deadline-only tick frames until the finite animation's real-time
-    // schedule elapses and the completion fires. The injection stamps every
-    // frame with MonotonicInstant.now(), so the curve returns nil once the
-    // 80 ms duration has passed; the carrier tick is off-screen-only, so it
-    // elides instead of presenting. Bounded by an iteration cap — never a
-    // wall-clock sleep — so a hung completion fails the test fast.
-    var ticks = 0
-    let maxTicks = 400
-    while completion.count == 0 && ticks < maxTicks {
-      scheduler.requestDeadline(.now())
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        "the off-screen finite animation must be in flight before its completion drains"
       )
-      ticks += 1
-    }
+      #expect(
+        completion.count == 0,
+        "the finite animation must not have completed during the mount frames"
+      )
 
-    // INVARIANT A: the completion fired even though no carrier frame presented.
-    #expect(
-      completion.count == 1,
-      "the off-screen withAnimation completion must fire on real-time schedule; ticks=\(ticks)"
-    )
-    // INVARIANT B: at least one deadline-only carrier frame actually elided —
-    // proving the completion rode through the reduced-commit path, not a render.
-    #expect(
-      runLoop.renderer.elidedFrameCount > elidedBefore,
-      """
-      at least one deadline-only tick carrying the completion must have elided; \
-      elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
-      """
-    )
-    // INVARIANT C: no off-screen carrier tick presented a frame.
-    #expect(
-      terminal.presentCount == presentsBefore,
-      """
-      off-screen deadline ticks (including the one that fired the completion) \
-      must not present; presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
-      """
-    )
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      let presentsBefore = terminal.presentCount
+
+      // Drive deadline-only tick frames until the finite animation's real-time
+      // schedule elapses and the completion fires. The injection stamps every
+      // frame with MonotonicInstant.now(), so the curve returns nil once the
+      // 80 ms duration has passed; the carrier tick is off-screen-only, so it
+      // elides instead of presenting. Bounded by an iteration cap — never a
+      // wall-clock sleep — so a hung completion fails the test fast.
+      var ticks = 0
+      let maxTicks = 400
+      while completion.count == 0 && ticks < maxTicks {
+        scheduler.requestDeadline(.now())
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+        ticks += 1
+      }
+
+      // INVARIANT A: the completion fired even though no carrier frame presented.
+      #expect(
+        completion.count == 1,
+        "the off-screen withAnimation completion must fire on real-time schedule; ticks=\(ticks)"
+      )
+      // INVARIANT B: at least one deadline-only carrier frame actually elided —
+      // proving the completion rode through the reduced-commit path, not a render.
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBefore,
+        """
+        at least one deadline-only tick carrying the completion must have elided; \
+        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+      // INVARIANT C: no off-screen carrier tick presented a frame.
+      #expect(
+        terminal.presentCount == presentsBefore,
+        """
+        off-screen deadline ticks (including the one that fired the completion) \
+        must not present; presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
+        """
+      )
+    }
   }
 
   // MARK: - Oracle soundness (Task 8.2)
@@ -886,62 +874,56 @@ struct OffscreenFrameElisionRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
-    // and can drop the onAppear-follow-up frame's tail under heavy parallel
-    // MainActor contention, leaving the animation unregistered
-    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
-    // shares the exact same `applyAcquiredFrame` body but renders straight-line
-    // with no suspension and no drop arm, so registration is deterministic; the
-    // elision path under test is still driven via the ASYNC ticks below. See
-    // docs/KNOWN-TEST-FLAKES.md.
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    while scheduler.hasPendingFrame(at: .now()) {
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+      // and can drop the onAppear-follow-up frame's tail under heavy parallel
+      // MainActor contention, leaving the animation unregistered
+      // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+      // shares the exact same `applyAcquiredFrame` body but renders straight-line
+      // with no suspension and no drop arm, so registration is deterministic; the
+      // elision path under test is still driven via the ASYNC ticks below. See
+      // docs/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: .now()) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        "the on-screen repeatForever animation must be in flight before the deadline tick"
+      )
+
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      let presentsBefore = terminal.presentCount
+
+      // Drive a pure animation-deadline frame. The animated border is INSIDE the
+      // viewport, so the tick's redrawIdentities overlap drawnIdentities; the gate
+      // must therefore NOT fire.
+      scheduler.requestDeadline(.now())
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+
+      #expect(
+        runLoop.renderer.elidedFrameCount == elidedBefore,
+        """
+        a visible deadline-only tick whose redraw overlaps drawnIdentities must \
+        NOT elide; elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+      #expect(
+        terminal.presentCount > presentsBefore,
+        """
+        a visible deadline-only tick must render and present a frame; \
+        presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
+        """
+      )
     }
-
-    #expect(
-      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
-      "the on-screen repeatForever animation must be in flight before the deadline tick"
-    )
-
-    let elidedBefore = runLoop.renderer.elidedFrameCount
-    let presentsBefore = terminal.presentCount
-
-    // Drive a pure animation-deadline frame. The animated border is INSIDE the
-    // viewport, so the tick's redrawIdentities overlap drawnIdentities; the gate
-    // must therefore NOT fire.
-    scheduler.requestDeadline(.now())
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-
-    #expect(
-      runLoop.renderer.elidedFrameCount == elidedBefore,
-      """
-      a visible deadline-only tick whose redraw overlaps drawnIdentities must \
-      NOT elide; elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
-      """
-    )
-    #expect(
-      terminal.presentCount > presentsBefore,
-      """
-      a visible deadline-only tick must render and present a frame; \
-      presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
-      """
-    )
   }
 
   // MARK: - Off-screen LAYOUT animation soundness
@@ -1013,100 +995,94 @@ struct OffscreenFrameElisionRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount + run the onAppear-triggered follow-up so the frameHeight animation
-    // is in flight and the clipped subtree has committed once (absent from
-    // previousDrawnIdentities because it is below the 2-row viewport).
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
-    // and can drop the onAppear-follow-up frame's tail under heavy parallel
-    // MainActor contention, leaving the animation unregistered
-    // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
-    // shares the exact same `applyAcquiredFrame` body but renders straight-line
-    // with no suspension and no drop arm, so registration is deterministic; the
-    // elision path under test is still driven via the ASYNC ticks below. See
-    // docs/KNOWN-TEST-FLAKES.md.
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    while scheduler.hasPendingFrame(at: .now()) {
+      // Mount + run the onAppear-triggered follow-up so the frameHeight animation
+      // is in flight and the clipped subtree has committed once (absent from
+      // previousDrawnIdentities because it is below the 2-row viewport).
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      // Synchronous setup: the async driver suspends at `acquireFrameArtifactsAsync`
+      // and can drop the onAppear-follow-up frame's tail under heavy parallel
+      // MainActor contention, leaving the animation unregistered
+      // (activeAnimationCount == 0) and flaking this test. `renderPendingFrames`
+      // shares the exact same `applyAcquiredFrame` body but renders straight-line
+      // with no suspension and no drop arm, so registration is deterministic; the
+      // elision path under test is still driven via the ASYNC ticks below. See
+      // docs/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: .now()) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      #expect(
+        controller.activeAnimationCount > 0,
+        "the off-screen frameHeight animation must be in flight before the deadline tick"
+      )
+
+      // Self-check: the in-flight animation must genuinely be a LAYOUT animation
+      // (the `.frameHeight` property slot), not a vacuous paint or no-op
+      // animation. If this ever regresses to a non-layout scope the test would
+      // silently stop covering the interesting boundary.
+      let activeScopes = controller.debugStateSnapshot().activeAnimationKeys.map(\.scope)
+      #expect(
+        activeScopes.contains(.property(.frameHeight)),
+        "the active animation must be the frameHeight layout slot; scopes=\(activeScopes)"
+      )
+
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      let presentsBefore = terminal.presentCount
+
+      // Drive a pure animation-deadline frame for the off-screen LAYOUT
+      // animation: this is the case the gate must elide.
+      scheduler.requestDeadline(.now())
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+
+      // ASSERTION 1 — the clipped layout-animated identity stays OUT of
+      // drawnIdentities. The deadline tick just ran, so the controller's
+      // lastTickResult names the frameHeight-animated identity in its
+      // redrawIdentities. That set must be non-empty (the layout animation IS
+      // ticking) and DISJOINT from the committed drawnIdentities — i.e. the
+      // animated child, clipped below the 2-row viewport, was never recorded as
+      // painted. This is the paint-visibility predicate elision soundness rests
+      // on, exercised by a LAYOUT animation rather than the paint-only blend
+      // phase.
+      let redraw = controller.lastTickResult.redrawIdentities
+      let drawn = runLoop.renderer.frameTailRenderer.previousDrawnIdentities
+      #expect(
+        !redraw.isEmpty,
+        "the off-screen frameHeight tick must name its animated identity in redrawIdentities"
+      )
+      #expect(
+        redraw.isDisjoint(with: drawn),
+        """
+        a layout-animated identity clipped below the viewport must NOT be recorded \
+        in drawnIdentities; redraw=\(redraw) drawn∩redraw=\(redraw.intersection(drawn))
+        """
+      )
+
+      // ASSERTION 2 — the off-screen LAYOUT deadline tick elided (gate fired) and
+      // presented nothing.
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBefore,
+        """
+        an off-screen LAYOUT (frameHeight) deadline-only tick must elide; \
+        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+      #expect(
+        terminal.presentCount == presentsBefore,
+        """
+        an elided off-screen LAYOUT tick must not present; \
+        presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
+        """
+      )
     }
-
-    let controller = runLoop.renderer.internalAnimationController
-    #expect(
-      controller.activeAnimationCount > 0,
-      "the off-screen frameHeight animation must be in flight before the deadline tick"
-    )
-
-    // Self-check: the in-flight animation must genuinely be a LAYOUT animation
-    // (the `.frameHeight` property slot), not a vacuous paint or no-op
-    // animation. If this ever regresses to a non-layout scope the test would
-    // silently stop covering the interesting boundary.
-    let activeScopes = controller.debugStateSnapshot().activeAnimationKeys.map(\.scope)
-    #expect(
-      activeScopes.contains(.property(.frameHeight)),
-      "the active animation must be the frameHeight layout slot; scopes=\(activeScopes)"
-    )
-
-    let elidedBefore = runLoop.renderer.elidedFrameCount
-    let presentsBefore = terminal.presentCount
-
-    // Drive a pure animation-deadline frame for the off-screen LAYOUT
-    // animation: this is the case the gate must elide.
-    scheduler.requestDeadline(.now())
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-
-    // ASSERTION 1 — the clipped layout-animated identity stays OUT of
-    // drawnIdentities. The deadline tick just ran, so the controller's
-    // lastTickResult names the frameHeight-animated identity in its
-    // redrawIdentities. That set must be non-empty (the layout animation IS
-    // ticking) and DISJOINT from the committed drawnIdentities — i.e. the
-    // animated child, clipped below the 2-row viewport, was never recorded as
-    // painted. This is the paint-visibility predicate elision soundness rests
-    // on, exercised by a LAYOUT animation rather than the paint-only blend
-    // phase.
-    let redraw = controller.lastTickResult.redrawIdentities
-    let drawn = runLoop.renderer.frameTailRenderer.previousDrawnIdentities
-    #expect(
-      !redraw.isEmpty,
-      "the off-screen frameHeight tick must name its animated identity in redrawIdentities"
-    )
-    #expect(
-      redraw.isDisjoint(with: drawn),
-      """
-      a layout-animated identity clipped below the viewport must NOT be recorded \
-      in drawnIdentities; redraw=\(redraw) drawn∩redraw=\(redraw.intersection(drawn))
-      """
-    )
-
-    // ASSERTION 2 — the off-screen LAYOUT deadline tick elided (gate fired) and
-    // presented nothing.
-    #expect(
-      runLoop.renderer.elidedFrameCount > elidedBefore,
-      """
-      an off-screen LAYOUT (frameHeight) deadline-only tick must elide; \
-      elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
-      """
-    )
-    #expect(
-      terminal.presentCount == presentsBefore,
-      """
-      an elided off-screen LAYOUT tick must not present; \
-      presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
-      """
-    )
   }
 
   // MARK: - Removal transition interleaved with elision (Task 8.3)
@@ -1153,111 +1129,105 @@ struct OffscreenFrameElisionRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount + the onAppear-triggered follow-up frame: the panel's removal
-    // transition starts. The off-screen border has not yet appeared (it is
-    // gated behind `!showPanel`), so the only animation in flight is the
-    // unambiguous finite removal.
-    //
-    // This setup MUST use the SYNCHRONOUS driver. The async driver suspends at
-    // `acquireFrameArtifactsAsync` and can drop a committed frame's tail under
-    // heavy parallel MainActor contention; if the onAppear-follow-up frame (the
-    // one whose resolve starts the removal transition) is dropped, the removal
-    // never registers and `removingIdentities` is empty here. `renderPendingFrames`
-    // shares the exact same `applyAcquiredFrame` body but renders straight-line
-    // with no suspension and no drop arm, so the removal start is deterministic.
-    // The elision path under test is still exercised by the ASYNC deadline ticks
-    // in Phase 1/2 below. See docs/KNOWN-TEST-FLAKES.md.
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    let controller = runLoop.renderer.internalAnimationController
-    runLoop.renderer.enableSelectiveEvaluation()
-
-    #expect(
-      !controller.debugStateSnapshot().removingIdentities.isEmpty,
-      "the on-screen removal transition must be in flight before the interleaving"
-    )
-
-    // Phase 1: drive deadline ticks until the removal transition has fully
-    // drained (its overlay purged). While the removal is in flight its identity
-    // is on-screen and in the tick's redrawIdentities, so those frames render
-    // and present — they do NOT elide. Bounded by an iteration cap so a stuck
-    // removal fails fast rather than hanging.
-    var ticks = 0
-    let maxTicks = 400
-    while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < maxTicks {
-      scheduler.requestDeadline(.now())
-      _ = try await runLoop.renderPendingFramesAsync(
-        renderedFrames: &renderedFrames,
-        eventPump: nil
-      )
-      ticks += 1
-    }
-
-    // The removal must have drained — no crash, overlay purged.
-    #expect(
-      controller.debugStateSnapshot().removingIdentities.isEmpty,
-      "the removal overlay must drain to completion; ticks=\(ticks)"
-    )
-
-    // The off-screen border now appears (it was gated behind `!showPanel`); run
-    // any pending follow-up frames so its onAppear starts the repeatForever
-    // animation on a frame distinct from the removal. Synchronous driver again:
-    // the async path could drop the border's onAppear-follow-up frame under
-    // contention, leaving its repeatForever unregistered. The elided ticks under
-    // test are driven via the ASYNC path in Phase 2 below.
-    while scheduler.hasPendingFrame(at: .now()) && ticks < maxTicks {
+      // Mount + the onAppear-triggered follow-up frame: the panel's removal
+      // transition starts. The off-screen border has not yet appeared (it is
+      // gated behind `!showPanel`), so the only animation in flight is the
+      // unambiguous finite removal.
+      //
+      // This setup MUST use the SYNCHRONOUS driver. The async driver suspends at
+      // `acquireFrameArtifactsAsync` and can drop a committed frame's tail under
+      // heavy parallel MainActor contention; if the onAppear-follow-up frame (the
+      // one whose resolve starts the removal transition) is dropped, the removal
+      // never registers and `removingIdentities` is empty here. `renderPendingFrames`
+      // shares the exact same `applyAcquiredFrame` body but renders straight-line
+      // with no suspension and no drop arm, so the removal start is deterministic.
+      // The elision path under test is still exercised by the ASYNC deadline ticks
+      // in Phase 1/2 below. See docs/KNOWN-TEST-FLAKES.md.
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-      ticks += 1
-    }
-    #expect(
-      controller.activeAnimationCount > 0,
-      "the off-screen repeatForever border must be in flight after the removal drains"
-    )
+      let controller = runLoop.renderer.internalAnimationController
+      runLoop.renderer.enableSelectiveEvaluation()
 
-    // Phase 2: now that the removal has drained on the surviving graph, the
-    // off-screen border's deadline ticks must elide — proving the reduced-commit
-    // path (capturePlacedTree skipped) left the post-removal placed-tree
-    // bookkeeping intact.
-    let elidedBefore = runLoop.renderer.elidedFrameCount
-    while runLoop.renderer.elidedFrameCount == elidedBefore && ticks < maxTicks {
-      scheduler.requestDeadline(.now())
+      #expect(
+        !controller.debugStateSnapshot().removingIdentities.isEmpty,
+        "the on-screen removal transition must be in flight before the interleaving"
+      )
+
+      // Phase 1: drive deadline ticks until the removal transition has fully
+      // drained (its overlay purged). While the removal is in flight its identity
+      // is on-screen and in the tick's redrawIdentities, so those frames render
+      // and present — they do NOT elide. Bounded by an iteration cap so a stuck
+      // removal fails fast rather than hanging.
+      var ticks = 0
+      let maxTicks = 400
+      while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < maxTicks {
+        scheduler.requestDeadline(.now())
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+        ticks += 1
+      }
+
+      // The removal must have drained — no crash, overlay purged.
+      #expect(
+        controller.debugStateSnapshot().removingIdentities.isEmpty,
+        "the removal overlay must drain to completion; ticks=\(ticks)"
+      )
+
+      // The off-screen border now appears (it was gated behind `!showPanel`); run
+      // any pending follow-up frames so its onAppear starts the repeatForever
+      // animation on a frame distinct from the removal. Synchronous driver again:
+      // the async path could drop the border's onAppear-follow-up frame under
+      // contention, leaving its repeatForever unregistered. The elided ticks under
+      // test are driven via the ASYNC path in Phase 2 below.
+      while scheduler.hasPendingFrame(at: .now()) && ticks < maxTicks {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+        ticks += 1
+      }
+      #expect(
+        controller.activeAnimationCount > 0,
+        "the off-screen repeatForever border must be in flight after the removal drains"
+      )
+
+      // Phase 2: now that the removal has drained on the surviving graph, the
+      // off-screen border's deadline ticks must elide — proving the reduced-commit
+      // path (capturePlacedTree skipped) left the post-removal placed-tree
+      // bookkeeping intact.
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      while runLoop.renderer.elidedFrameCount == elidedBefore && ticks < maxTicks {
+        scheduler.requestDeadline(.now())
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+        ticks += 1
+      }
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBefore,
+        """
+        off-screen ticks must elide on the post-removal graph; \
+        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount) ticks=\(ticks)
+        """
+      )
+
+      // The loop must remain healthy: a final on-screen invalidation renders
+      // correctly, confirming the committed graph survived the interleaving. Its
+      // causes include `.invalidation`, so it cannot elide.
+      let presentsBeforeFinal = terminal.presentCount
+      scheduler.requestInvalidation(of: [rootIdentity])
       _ = try await runLoop.renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: nil
       )
-      ticks += 1
+      #expect(
+        terminal.presentCount > presentsBeforeFinal,
+        "a post-removal on-screen invalidation must still render and present"
+      )
     }
-    #expect(
-      runLoop.renderer.elidedFrameCount > elidedBefore,
-      """
-      off-screen ticks must elide on the post-removal graph; \
-      elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount) ticks=\(ticks)
-      """
-    )
-
-    // The loop must remain healthy: a final on-screen invalidation renders
-    // correctly, confirming the committed graph survived the interleaving. Its
-    // causes include `.invalidation`, so it cannot elide.
-    let presentsBeforeFinal = terminal.presentCount
-    scheduler.requestInvalidation(of: [rootIdentity])
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-    #expect(
-      terminal.presentCount > presentsBeforeFinal,
-      "a post-removal on-screen invalidation must still render and present"
-    )
   }
 
   // MARK: - Slow-machine drain termination (F41 reland guard)
@@ -1311,60 +1281,54 @@ struct OffscreenFrameElisionRuntimeTests {
       }
     )
 
-    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
-    }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-    // Mount + settle the onAppear follow-up on the real clock so the
-    // repeatForever registration is deterministic (synchronous driver — same
-    // rationale as the tests above; see docs/KNOWN-TEST-FLAKES.md).
-    scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    var settleFrames = 0
-    while scheduler.hasPendingFrame(at: .now()) && settleFrames < 400 {
+      // Mount + settle the onAppear follow-up on the real clock so the
+      // repeatForever registration is deterministic (synchronous driver — same
+      // rationale as the tests above; see docs/KNOWN-TEST-FLAKES.md).
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-      settleFrames += 1
+      runLoop.renderer.enableSelectiveEvaluation()
+      var settleFrames = 0
+      while scheduler.hasPendingFrame(at: .now()) && settleFrames < 400 {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+        settleFrames += 1
+      }
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        "the repeatForever animation must be in flight before the slow drain"
+      )
+
+      // The seed deadline is armed AT the clock's start instant so the pass's
+      // first consume (which reads exactly `drainStart`) sees it due — armed
+      // any later it would sit in the first read's future and the drain would
+      // return vacuously, never establishing the re-arm chain under test.
+      let drainStart = MonotonicInstant.now()
+      let clock = SteppingReadinessClock(start: drainStart, step: .milliseconds(40))
+      runLoop.frameReadinessClock = { [clock] in clock.nextReading() }
+
+      // One drain pass on the simulated slow machine. RETURNING is the
+      // regression assertion: without the drain-pass deadline cut this awaits
+      // forever (caught here by the time limit rather than a CI step watchdog).
+      scheduler.requestDeadline(drainStart)
+      let framesBeforeDrain = renderedFrames
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+      #expect(
+        renderedFrames > framesBeforeDrain,
+        "the seed deadline must have driven at least one frame (elided or committed)"
+      )
+
+      // The cut withholds in-pass re-arms; it must not LOSE them — the
+      // animation pump stays alive for the next pass.
+      #expect(
+        scheduler.hasPendingFrame(at: .now().advanced(by: .seconds(60))),
+        "the in-pass animation re-arm must stay pending for the next drain pass"
+      )
     }
-    #expect(
-      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
-      "the repeatForever animation must be in flight before the slow drain"
-    )
-
-    // The seed deadline is armed AT the clock's start instant so the pass's
-    // first consume (which reads exactly `drainStart`) sees it due — armed
-    // any later it would sit in the first read's future and the drain would
-    // return vacuously, never establishing the re-arm chain under test.
-    let drainStart = MonotonicInstant.now()
-    let clock = SteppingReadinessClock(start: drainStart, step: .milliseconds(40))
-    runLoop.frameReadinessClock = { [clock] in clock.nextReading() }
-
-    // One drain pass on the simulated slow machine. RETURNING is the
-    // regression assertion: without the drain-pass deadline cut this awaits
-    // forever (caught here by the time limit rather than a CI step watchdog).
-    scheduler.requestDeadline(drainStart)
-    let framesBeforeDrain = renderedFrames
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &renderedFrames,
-      eventPump: nil
-    )
-    #expect(
-      renderedFrames > framesBeforeDrain,
-      "the seed deadline must have driven at least one frame (elided or committed)"
-    )
-
-    // The cut withholds in-pass re-arms; it must not LOSE them — the
-    // animation pump stays alive for the next pass.
-    #expect(
-      scheduler.hasPendingFrame(at: .now().advanced(by: .seconds(60))),
-      "the in-pass animation re-arm must stay pending for the next drain pass"
-    )
   }
 
   /// Builds a minimal one-shot `FrameHeadTransaction` (no abort checkpoints)

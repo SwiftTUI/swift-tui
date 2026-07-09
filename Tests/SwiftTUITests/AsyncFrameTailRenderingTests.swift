@@ -1966,9 +1966,6 @@ struct AsyncFrameTailRenderingTests {
     let renderer = DefaultRenderer()
     defer {
       workerGate.release()
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
     }
 
     let inputReader = InjectedTerminalInputReader()
@@ -1999,83 +1996,82 @@ struct AsyncFrameTailRenderingTests {
     #expect(runLoop.frameSink != nil)
 
     let animationController = renderer.internalAnimationController
-    AnimationRegistrationStorage.currentSink = animationController
-    TransitionRegistrationStorage.currentSink = animationController
-    AnimationCompletionStorage.currentSink = animationController
+    try await withAnimationSinks(animationController) {
 
-    let runTask = Task {
-      try await runLoop.run()
-    }
-
-    try await waitUntil {
-      terminal.frames.contains { $0.contains("value 0") }
-    }
-
-    let workerBlockTask = Task {
-      await renderer.runFrameTailLayoutWorkerJobForCancellationTesting {
-        workerGate.beforeRaster()
+      let runTask = Task {
+        try await runLoop.run()
       }
-    }
-    await workerGate.waitUntilBlocked()
 
-    withAnimation(.linear(duration: .milliseconds(400))) {
-      stateContainer.replace(with: 1)
-    }
-    try await waitUntil {
-      runLoop.renderSuspensionDiagnostics.isSuspended
-    }
-    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+      try await waitUntil {
+        terminal.frames.contains { $0.contains("value 0") }
+      }
 
-    stateContainer.replace(with: 2)
-    try await waitUntil {
-      runLoop.cancelledRenderCount >= 1
-    }
-    workerGate.release()
-
-    try await waitUntil {
-      terminal.frames.last?.contains("value 2") == true
-    }
-    inputReader.send(.key(.character("d"), modifiers: .ctrl))
-    inputReader.finish()
-
-    let result = try await valueWithTimeout {
-      try await runTask.value
-    }
-    await workerBlockTask.value
-
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
-    #expect(result.finalState == 2)
-    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
-    #expect(terminal.frames.last?.contains("value 2") == true)
-
-    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
-    let rows = diagnosticRows(diagnostics)
-    let cancelledAnimationIndex = rows.firstIndex { row in
-      row["tail_job_state"] == "cancelled_before_start"
-        && row["tail_cancel_reason"] == "newer_render_intent"
-        && row["stale_frame_policy"] == "cancel_pending_before_start"
-        && row["scheduled_animation_request"] == "animate"
-    }
-    #expect(
-      cancelledAnimationIndex != nil,
-      "expected the cancelled pre-start frame to carry explicit animation intent; rows=\(rows)"
-    )
-    if let cancelledAnimationIndex {
-      let replayedCommit = rows.suffix(from: rows.index(after: cancelledAnimationIndex))
-        .contains { row in
-          row["tail_job_state"] == "completed"
-            && row["stale_frame_policy"] == "commit_ordered"
-            && row["scheduled_animation_request"] == "animate"
-            && (row["drop_blockers"] ?? "").contains("animationTransaction")
-            && (Int(row["animation_controller_active_animations"] ?? "") ?? 0) > 0
+      let workerBlockTask = Task {
+        await renderer.runFrameTailLayoutWorkerJobForCancellationTesting {
+          workerGate.beforeRaster()
         }
+      }
+      await workerGate.waitUntilBlocked()
+
+      withAnimation(.linear(duration: .milliseconds(400))) {
+        stateContainer.replace(with: 1)
+      }
+      try await waitUntil {
+        runLoop.renderSuspensionDiagnostics.isSuspended
+      }
+      #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+
+      stateContainer.replace(with: 2)
+      try await waitUntil {
+        runLoop.cancelledRenderCount >= 1
+      }
+      workerGate.release()
+
+      try await waitUntil {
+        terminal.frames.last?.contains("value 2") == true
+      }
+      inputReader.send(.key(.character("d"), modifiers: .ctrl))
+      inputReader.finish()
+
+      let result = try await valueWithTimeout {
+        try await runTask.value
+      }
+      await workerBlockTask.value
+
+      #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+      #expect(result.finalState == 2)
+      #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+      #expect(terminal.frames.last?.contains("value 2") == true)
+
+      let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+      let rows = diagnosticRows(diagnostics)
+      let cancelledAnimationIndex = rows.firstIndex { row in
+        row["tail_job_state"] == "cancelled_before_start"
+          && row["tail_cancel_reason"] == "newer_render_intent"
+          && row["stale_frame_policy"] == "cancel_pending_before_start"
+          && row["scheduled_animation_request"] == "animate"
+      }
       #expect(
-        replayedCommit,
-        """
-        expected the replacement frame after cancellation to commit with the \
-        cancelled frame's animation intent replayed; rows=\(rows)
-        """
+        cancelledAnimationIndex != nil,
+        "expected the cancelled pre-start frame to carry explicit animation intent; rows=\(rows)"
       )
+      if let cancelledAnimationIndex {
+        let replayedCommit = rows.suffix(from: rows.index(after: cancelledAnimationIndex))
+          .contains { row in
+            row["tail_job_state"] == "completed"
+              && row["stale_frame_policy"] == "commit_ordered"
+              && row["scheduled_animation_request"] == "animate"
+              && (row["drop_blockers"] ?? "").contains("animationTransaction")
+              && (Int(row["animation_controller_active_animations"] ?? "") ?? 0) > 0
+          }
+        #expect(
+          replayedCommit,
+          """
+          expected the replacement frame after cancellation to commit with the \
+          cancelled frame's animation intent replayed; rows=\(rows)
+          """
+        )
+      }
     }
   }
 

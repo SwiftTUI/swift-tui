@@ -28,10 +28,14 @@ package protocol AnimationCompletionSink: AnyObject, Sendable {
 @MainActor
 package enum AnimationCompletionStorage {
   @TaskLocal package static var currentTaskSink: (any AnimationCompletionSink)?
-  package static weak var currentSink: (any AnimationCompletionSink)?
 
+  /// The task-local sink, exclusively (F116): the `static weak var` fallback
+  /// this used to fall through to was assigned only from tests — the
+  /// "last-bound global" anti-pattern, and a cross-test interference hazard
+  /// once suites toggled it across suspension points — and was deleted.
+  /// Bind sinks with `withSink`.
   package static var effectiveSink: (any AnimationCompletionSink)? {
-    currentTaskSink ?? currentSink
+    currentTaskSink
   }
 
   package static func withSink<Result>(
@@ -40,6 +44,15 @@ package enum AnimationCompletionStorage {
   ) async rethrows -> Result {
     try await $currentTaskSink.withValue(sink) {
       try await operation()
+    }
+  }
+
+  package static func withSink<Result>(
+    _ sink: any AnimationCompletionSink,
+    operation: () throws -> Result
+  ) rethrows -> Result {
+    try $currentTaskSink.withValue(sink) {
+      try operation()
     }
   }
 }
@@ -58,10 +71,14 @@ package protocol AnimationRegistrationSink: AnyObject, Sendable {
 @MainActor
 package enum AnimationRegistrationStorage {
   @TaskLocal package static var currentTaskSink: (any AnimationRegistrationSink)?
-  package static weak var currentSink: (any AnimationRegistrationSink)?
 
+  /// The task-local sink, exclusively (F116): the `static weak var` fallback
+  /// this used to fall through to was assigned only from tests — the
+  /// "last-bound global" anti-pattern, and a cross-test interference hazard
+  /// once suites toggled it across suspension points — and was deleted.
+  /// Bind sinks with `withSink`.
   package static var effectiveSink: (any AnimationRegistrationSink)? {
-    currentTaskSink ?? currentSink
+    currentTaskSink
   }
 
   package static func withSink<Result>(
@@ -70,6 +87,15 @@ package enum AnimationRegistrationStorage {
   ) async rethrows -> Result {
     try await $currentTaskSink.withValue(sink) {
       try await operation()
+    }
+  }
+
+  package static func withSink<Result>(
+    _ sink: any AnimationRegistrationSink,
+    operation: () throws -> Result
+  ) rethrows -> Result {
+    try $currentTaskSink.withValue(sink) {
+      try operation()
     }
   }
 }
@@ -99,10 +125,14 @@ extension TransitionRegistrationSink {
 @MainActor
 package enum TransitionRegistrationStorage {
   @TaskLocal package static var currentTaskSink: (any TransitionRegistrationSink)?
-  package static weak var currentSink: (any TransitionRegistrationSink)?
 
+  /// The task-local sink, exclusively (F116): the `static weak var` fallback
+  /// this used to fall through to was assigned only from tests — the
+  /// "last-bound global" anti-pattern, and a cross-test interference hazard
+  /// once suites toggled it across suspension points — and was deleted.
+  /// Bind sinks with `withSink`.
   package static var effectiveSink: (any TransitionRegistrationSink)? {
-    currentTaskSink ?? currentSink
+    currentTaskSink
   }
 
   package static func withSink<Result>(
@@ -111,6 +141,15 @@ package enum TransitionRegistrationStorage {
   ) async rethrows -> Result {
     try await $currentTaskSink.withValue(sink) {
       try await operation()
+    }
+  }
+
+  package static func withSink<Result>(
+    _ sink: any TransitionRegistrationSink,
+    operation: () throws -> Result
+  ) rethrows -> Result {
+    try $currentTaskSink.withValue(sink) {
+      try operation()
     }
   }
 }
