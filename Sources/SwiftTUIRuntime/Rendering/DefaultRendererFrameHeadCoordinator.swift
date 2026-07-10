@@ -61,9 +61,17 @@ struct DefaultRendererFrameHeadCoordinator {
       checkpoint: graphCheckpoint
     )
     let animationDraft = animationController.makeFrameDraft()
+    // Imperative scroll commands must keep reaching the pre-draft registry —
+    // the one `updateCommittedScrollGeometry` publishes into — even from
+    // stored evaluator contexts replayed frames later. Stash it before the
+    // draft replacement hides it (see `ResolveContext.liveScrollPositionRegistry`).
+    let preDraftScrollPositionRegistry = resolveContext.localScrollPositionRegistry
     resolveContext = resolveContext.replacingRuntimeRegistrations(
       registrationDraft.draftRegistrations
     )
+    if resolveContext.liveScrollPositionRegistry == nil {
+      resolveContext.liveScrollPositionRegistry = preDraftScrollPositionRegistry
+    }
     resolveContext.imageAssetResolver = imageRepository.resolver()
 
     let baselineCheckpoints = baselineCheckpoints(for: mode)

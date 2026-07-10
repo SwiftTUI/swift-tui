@@ -84,7 +84,7 @@ public struct ScrollViewReader<Content: View>: PrimitiveView, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let contentContext = context.child(component: .named("ScrollViewReaderContent"))
     bridge.configure(
-      registry: context.localScrollPositionRegistry,
+      registry: context.scrollCommandRegistry,
       scopeIdentity: context.identity,
       invalidationIdentity: contentContext.identity,
       invalidator: context.invalidationProxy?.invalidator

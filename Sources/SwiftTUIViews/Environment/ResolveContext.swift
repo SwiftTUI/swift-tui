@@ -102,6 +102,25 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.localScrollPositionRegistry }
     set { propagated.localScrollPositionRegistry = newValue }
   }
+  /// The registry that receives committed scroll geometry and published
+  /// registrations — the pre-draft ("live") instance, surviving the frame
+  /// head's draft-registry replacement the way `invalidationProxy` does.
+  ///
+  /// Imperative scroll *commands* (`ScrollViewReader` proxies, the scroll
+  /// key handlers) must bind this instance: a resolve may run under a stored
+  /// evaluator context whose draft registries belong to a long-dead frame,
+  /// and a command bound to such a draft consults geometry that is never
+  /// updated again. Registration *writes* stay on
+  /// ``localScrollPositionRegistry`` so a discarded frame cannot mutate live
+  /// state; the record/publish machinery re-homes them at commit.
+  package var liveScrollPositionRegistry: LocalScrollPositionRegistry? {
+    get { propagated.liveScrollPositionRegistry }
+    set { propagated.liveScrollPositionRegistry = newValue }
+  }
+  /// The registry imperative scroll commands should consult.
+  package var scrollCommandRegistry: LocalScrollPositionRegistry? {
+    liveScrollPositionRegistry ?? localScrollPositionRegistry
+  }
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry? {
     get { propagated.localPreferenceObservationRegistry }
     set { propagated.localPreferenceObservationRegistry = newValue }
@@ -549,6 +568,10 @@ extension ResolveContext {
     package var localFocusBindingRegistry: LocalFocusBindingRegistry?
     package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
     package var localScrollPositionRegistry: LocalScrollPositionRegistry?
+    /// See ``ResolveContext/liveScrollPositionRegistry``. Deliberately NOT a
+    /// member of ``RuntimeRegistrationSet``: `replacingRuntimeRegistrations`
+    /// must leave it untouched so it survives frame-draft replacement.
+    package var liveScrollPositionRegistry: LocalScrollPositionRegistry?
     package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
     package var commandRegistry: CommandRegistry?
     package var dropDestinationRegistry: DropDestinationRegistry?
@@ -743,6 +766,7 @@ extension ResolveContext {
       && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
       && lhs.localScrollPositionRegistry == rhs.localScrollPositionRegistry
+      && lhs.liveScrollPositionRegistry == rhs.liveScrollPositionRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry

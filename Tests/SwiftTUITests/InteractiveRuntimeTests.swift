@@ -3743,6 +3743,156 @@ struct InteractiveRuntimeTests {
     #expect(!rendered.contains("Row 0"))
   }
 
+  /// Regression: entering a tab via a tab-strip *click* re-resolves the tab's
+  /// content through a stored evaluation context whose frame-draft registries
+  /// are long dead. `ScrollViewReader`'s bridge bound that context's scroll
+  /// registry instance, so every proxy command consulted a registry that never
+  /// receives committed scroll geometry — commands returned `false` and the
+  /// pane never moved (gallery Scroll Control tab). Proxy commands must reach
+  /// the live registry regardless of which frame's context resolved the reader.
+  /// Scene-hosted on purpose: the extra hosting layers keep the strip write's
+  /// re-resolve below the root, on the stored-context selective path.
+  @MainActor
+  @Test("ScrollViewReader proxy commands survive strip-click tab entry")
+  func scrollViewReaderProxyCommandsSurviveStripClickTabEntry() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let terminalSize = CellSize(width: 40, height: 14)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let buttonIdentity = testIdentity("ReaderStripEntryJump")
+    let positionBox = LockedBox(ScrollPosition.zero)
+    let scene = WindowGroup("Reader Strip Entry") {
+      TabStripEntryScrollReaderFixture(
+        buttonIdentity: buttonIdentity,
+        positionBox: positionBox
+      )
+    }
+    let rootIdentity = Identity(components: ["App", "Reader-Strip-Entry"])
+
+    func hostView(
+      initialTab: TabStripEntryScrollReaderFixture.StripEntryTab
+    ) -> some View {
+      WindowHostView(
+        content: ScopedBuilder {
+          TabStripEntryScrollReaderFixture(
+            initialTab: initialTab,
+            buttonIdentity: buttonIdentity,
+            positionBox: positionBox
+          )
+        }
+      )
+    }
+
+    let readerStripRect = try #require(
+      renderedInteractionRect(
+        matchingLastComponent: "TabItem[1]",
+        in: hostView(initialTab: .info),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let infoStripRect = try #require(
+      renderedInteractionRect(
+        matchingLastComponent: "TabItem[0]",
+        in: hostView(initialTab: .info),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let jumpRect = try #require(
+      renderedInteractionRect(
+        matchingLastComponent: buttonIdentity.lastComponent ?? "",
+        in: hostView(initialTab: .reader),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let inputReader = InputReader(fileDescriptor: readDescriptor)
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.ReaderStripEntry",
+        presentationSurface: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Info body")
+    }
+
+    // Enter the reader tab by clicking its strip item — the pointer path,
+    // not a selection-binding write, is what re-resolves the tab content
+    // through a stored evaluation context. Leave and re-enter so the second
+    // entry rides the settled selective path.
+    try writeAllBytes(
+      sgrPrimaryClick(at: centerPoint(of: readerStripRect)), to: writeDescriptor)
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Row 0")
+    }
+
+    try writeAllBytes(
+      sgrPrimaryClick(at: centerPoint(of: infoStripRect)), to: writeDescriptor)
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Info body")
+    }
+
+    try writeAllBytes(
+      sgrPrimaryClick(at: centerPoint(of: readerStripRect)), to: writeDescriptor)
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Row 0")
+    }
+
+    try writeAllBytes(
+      sgrPrimaryClick(at: centerPoint(of: jumpRect)), to: writeDescriptor)
+    // The button records its own outcome, so this wait terminates whether or
+    // not the proxy command found live scroll geometry; the asserts below
+    // then distinguish the two.
+    await terminal.frameSignal.wait {
+      let frame = terminal.visibleFrames.last ?? ""
+      return frame.contains("moved") || frame.contains("no-move")
+    }
+    await terminal.frameSignal.wait {
+      !(terminal.visibleFrames.last ?? "Row 0").contains("Row 0")
+        || (terminal.visibleFrames.last ?? "").contains("no-move")
+    }
+
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let result = try await runTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    let finalFrame = terminal.visibleFrames.last ?? ""
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(positionBox.value == .init(x: 0, y: 2))
+    #expect(finalFrame.contains("moved"))
+    #expect(finalFrame.contains("Row 2"))
+    #expect(!finalFrame.contains("Row 0"))
+  }
+
   @MainActor
   @Test("handled pointer scrolling repaints ScrollView wrapping a List before follow-up input")
   func handledPointerScrollingRepaintsScrollViewWrappingListBeforeFollowUpInput() throws {
@@ -5607,6 +5757,30 @@ private func renderedInteractionRect<V: View>(
 }
 
 @MainActor
+private func renderedInteractionRect<V: View>(
+  matchingLastComponent lastComponent: String,
+  in view: V,
+  rootIdentity: Identity,
+  terminalSize: CellSize
+) -> CellRect? {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(
+      identity: rootIdentity,
+      environmentValues: environmentValues
+    ),
+    proposal: .init(width: terminalSize.width, height: terminalSize.height)
+  )
+
+  return artifacts.semanticSnapshot.interactionRegions.first { region in
+    region.identity.lastComponent == lastComponent
+  }?.rect
+}
+
+@MainActor
 private func renderedFirstScrollViewportRect<V: View>(
   in view: V,
   rootIdentity: Identity,
@@ -5910,6 +6084,89 @@ private struct TabHostedTallExternalBindingScrollFixture: View {
           scrollIdentity: scrollIdentity,
           positionBox: positionBox
         )
+      }
+    }
+  }
+}
+
+private struct TabStripEntryScrollReaderFixture: View {
+  enum StripEntryTab: Hashable {
+    case info
+    case reader
+  }
+
+  var initialTab: StripEntryTab = .info
+  let buttonIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    // The tab host is a non-root child on purpose: the strip click's
+    // selection write must dirty a NON-root node so the re-resolve rides
+    // selective evaluation's stored-context replay (the gallery shape)
+    // instead of a fresh root descent.
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Fixture chrome")
+
+      TabStripEntryTabHost(
+        initialTab: initialTab,
+        buttonIdentity: buttonIdentity,
+        positionBox: positionBox
+      )
+    }
+  }
+}
+
+private struct TabStripEntryTabHost: View {
+  typealias StripEntryTab = TabStripEntryScrollReaderFixture.StripEntryTab
+
+  let buttonIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+  @State private var selection: StripEntryTab
+  @State private var lastCommand = "ready"
+
+  init(
+    initialTab: StripEntryTab,
+    buttonIdentity: Identity,
+    positionBox: LockedBox<ScrollPosition>
+  ) {
+    self.buttonIdentity = buttonIdentity
+    self.positionBox = positionBox
+    _selection = State(initialValue: initialTab)
+  }
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Info", value: StripEntryTab.info) {
+        Text("Info body")
+      }
+
+      Tab("Reader", value: StripEntryTab.reader) {
+        ScrollViewReader { proxy in
+          VStack(alignment: .leading, spacing: 0) {
+            Button("Jump") {
+              lastCommand = proxy.scrollBy(y: 2) ? "moved" : "no-move"
+            }
+            .id(buttonIdentity)
+
+            ScrollView(
+              .vertical,
+              showsIndicators: false,
+              position: Binding(
+                get: { positionBox.value },
+                set: { positionBox.value = $0 }
+              )
+            ) {
+              VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<10) { index in
+                  Text("Row \(index)")
+                }
+              }
+            }
+            .frame(width: 8, height: 3, alignment: .topLeading)
+
+            Text(lastCommand)
+          }
+        }
       }
     }
   }

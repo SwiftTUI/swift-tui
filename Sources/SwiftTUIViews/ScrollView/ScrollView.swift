@@ -99,10 +99,11 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
           }
         )
+        let scrollCommandRegistry = context.scrollCommandRegistry
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
           intake.registerKeyHandler(identity: identity) { event in
             if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
-              return context.localScrollPositionRegistry?.scrollToEdge(
+              return scrollCommandRegistry?.scrollToEdge(
                 edge,
                 scopeIdentity: context.identity
               ) ?? false

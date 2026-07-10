@@ -88,6 +88,7 @@ extension RunLoop {
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localScrollPositionRegistry = localScrollPositionRegistry
+    context.liveScrollPositionRegistry = localScrollPositionRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.commandRegistry = commandRegistry
     context.dropDestinationRegistry = dropDestinationRegistry
