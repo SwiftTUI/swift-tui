@@ -204,8 +204,15 @@ extension RunLoop {
     let focusedIdentity =
       hitTarget?.focusIdentity
       ?? focusIdentity(for: region.identity)
+    // Both resolutions are location-constrained: a pointer release may only
+    // activate a handler physically under the cursor. The walk-up would
+    // otherwise reach actions registered at identities whose subtree spans
+    // more screen than the control itself (the TabView strip action parents
+    // the whole tab page — see containingActivationIdentity(for:underPointerAt:)).
     let actionIdentity =
-      hitTarget.flatMap { containingActivationIdentity(for: $0.region.identity) }
+      hitTarget.flatMap {
+        containingActivationIdentity(for: $0.region.identity, underPointerAt: location)
+      }
       ?? focusedIdentity.flatMap { activationIdentity(for: $0, underPointerAt: location) }
 
     if let actionIdentity {

@@ -668,6 +668,140 @@ struct AppRuntimeTests {
     )
   }
 
+  /// Framework reduction of the gallery "clicking the page background drops
+  /// down the tab strip's arrow/more menu" regression (Navigation &
+  /// Collections / Focus Context tabs). The selected tab lives in the
+  /// overflow set and its page hosts a focusable region that declines the
+  /// press (a non-overflowing `ScrollView` — the gallery shape at a large
+  /// terminal), so the release falls through to the action-registry walk.
+  /// That walk must not reach the `TabView` root action: it is registered at
+  /// the control identity that also spans the whole page, but it is
+  /// keyboard-only by contract (`tabViewSemanticMetadata` pins the root's
+  /// interaction rect to zero so no pointer location is ever inside it).
+  @Test("clicking the tab page background does not drop down the overflow menu")
+  func tabPageBackgroundClickDoesNotDropDownOverflowMenu() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikeOverflowBackgroundClick")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikeOverflowNavigationWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    func click(_ point: Point) throws -> String {
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: point)))
+        ) == nil
+      )
+      _ = try render()
+      #expect(
+        runLoop.handle(
+          RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))
+        ) == nil
+      )
+      return try render()
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let initialFrame = try render()
+    #expect(initialFrame.contains("Navigation content"))
+    #expect(
+      initialFrame.contains("▼"),
+      "the selected tab must sit in the overflow set; frame:\n\(initialFrame)"
+    )
+    #expect(!initialFrame.contains("Popovers"))
+
+    // Click empty page background: below the strip, inside the page's
+    // full-width scroll region but right of its list and text content.
+    let afterBackground = try click(Point(CellPoint(x: 60, y: 8)))
+    #expect(
+      !afterBackground.contains("Popovers") && !afterBackground.contains("▲"),
+      "a background click dropped down the overflow menu; frame:\n\(afterBackground)"
+    )
+    #expect(afterBackground.contains("Navigation content"))
+
+    // The trigger itself must keep opening the menu on a real click.
+    let triggerPoint = try #require(terminal.centerOfText("▼"))
+    let opened = try click(triggerPoint)
+    #expect(
+      opened.contains("▲") && opened.contains("Popovers"),
+      "the overflow trigger stopped opening the menu; frame:\n\(opened)"
+    )
+  }
+
+  /// Companion guard for the background-click regression test above: the
+  /// `TabView` root action stays keyboard-reachable. Enter on the focused
+  /// strip expands the overflow menu when the resolved tab sits in the
+  /// overflow set — constraining *pointer* activation must not sever this.
+  @Test("Enter on the focused strip still drops down the overflow menu")
+  func tabStripEnterStillDropsDownOverflowMenu() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikeOverflowStripEnter")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikeOverflowNavigationWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let initialFrame = try render()
+    #expect(initialFrame.contains("▼"))
+    #expect(!initialFrame.contains("Popovers"))
+
+    // Tab reaches the strip (the window's first focusable control); Enter
+    // activates the root action, which expands the menu because the
+    // resolved focused tab is the selected overflow tab.
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+    _ = try render()
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let expanded = try render()
+    #expect(
+      expanded.contains("▲") && expanded.contains("Popovers"),
+      "Enter on the focused strip must still expand the overflow menu; frame:\n\(expanded)"
+    )
+  }
+
   @MainActor
   @Test("dismissing a sheet restores focus to the previously focused base control")
   func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {
@@ -1288,6 +1422,115 @@ private struct GalleryLikePresentationLabTab: View {
         }
       }
       .padding(1)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+/// Gallery-shaped overflow strip: the tab list is wide enough that the
+/// literal-tabs style folds the tail — including the selected "Navigation &
+/// Collections" tab — into the arrow/more menu at an 80-column terminal.
+private struct GalleryLikeOverflowNavigationWindow: View {
+  @State private var selection = "navigation"
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Logo", value: "logo") {
+        Text("Logo content")
+      }
+
+      Tab("Counter", value: "counter") {
+        Text("Counter content")
+      }
+
+      Tab("Life", value: "life") {
+        Text("Life content")
+      }
+
+      Tab("Todo", value: "todo") {
+        Text("Todo content")
+      }
+
+      Tab("Forms & Containers", value: "forms") {
+        Text("Forms content")
+      }
+
+      Tab("Text Input", value: "text-input") {
+        Text("Text Input content")
+      }
+
+      Tab("Scroll Control", value: "scroll-control") {
+        Text("Scroll Control content")
+      }
+
+      Tab("Calculator", value: "calculator") {
+        Text("Calculator content")
+      }
+
+      Tab("Borders & Shapes", value: "borders") {
+        Text("Borders content")
+      }
+
+      Tab("Presentation Lab", value: "presentation") {
+        Text("Presentation content")
+      }
+
+      Tab("Navigation & Collections", value: "navigation") {
+        GalleryLikeNavigationCollectionsTab()
+      }
+
+      Tab("Images", value: "images") {
+        Text("Images content")
+      }
+
+      Tab("Animations", value: "animations") {
+        Text("Animations content")
+      }
+
+      Tab("File Drop", value: "file-drop") {
+        Text("File Drop content")
+      }
+
+      Tab("Popovers", value: "popovers") {
+        Text("Popovers content")
+      }
+
+      Tab("Focus Context", value: "focus-context") {
+        Text("Focus Context content")
+      }
+
+      Tab("Progress", value: "progress") {
+        Text("Progress content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+  }
+}
+
+/// The Navigation & Collections page shape that reproduces the background
+/// click: a `NavigationStack`-hosted scroll container fills the page but its
+/// content does not overflow the viewport (a large terminal), so the scroll
+/// pointer handler declines the press and the click falls through to the
+/// action-registry walk — while still minting the full-page focusable region
+/// that lets the press arm at all.
+private struct GalleryLikeNavigationCollectionsTab: View {
+  @State private var selectedDoc = "overview"
+
+  var body: some View {
+    NavigationStack(id: "gallery-like-navigation-collections") {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Navigation content")
+          List(selection: $selectedDoc) {
+            Text("Overview").tag("overview")
+            Text("Build lanes").tag("build-lanes")
+          }
+          .frame(width: 24, height: 4)
+          Button("Open selected detail") {}
+          Spacer(minLength: 0)
+        }
+        .padding(1)
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }

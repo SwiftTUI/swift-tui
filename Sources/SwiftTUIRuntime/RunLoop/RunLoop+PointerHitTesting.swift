@@ -225,6 +225,37 @@ extension RunLoop {
     return nil
   }
 
+  /// Pointer-safe variant of `containingActivationIdentity(for:)`: an ancestor
+  /// handler whose interaction regions exist in the snapshot but do not contain
+  /// `location` is skipped instead of activated. A control can register its
+  /// action at an identity whose *subtree* spans far more screen than the
+  /// control itself — `TabView` registers its strip action at the control
+  /// identity that also parents the whole tab page, and deliberately pins the
+  /// root's interaction rect to zero (`tabViewSemanticMetadata`) so no pointer
+  /// location is ever inside it. The unconstrained walk-up turned a click on
+  /// unclaimed page background into a strip activation, dropping down the
+  /// overflow menu whenever the selected tab sat in the overflow set. A handler
+  /// identity that mints no region at all keeps the location-free behavior —
+  /// there is no geometric evidence to veto it. Keyboard activation keeps using
+  /// the location-free walk: Enter/Space legitimately activates the focused
+  /// scope's action.
+  package func containingActivationIdentity(
+    for identity: Identity,
+    underPointerAt location: PointerLocation
+  ) -> Identity? {
+    var current: Identity? = identity
+    while let candidate = current {
+      if localActionRegistry.hasHandler(identity: candidate),
+        handlerRegionPermitsPointerActivation(candidate, at: location)
+      {
+        return candidate
+      }
+      assertNoInfiniteIdentityLoop(candidate)
+      current = candidate.parent
+    }
+    return nil
+  }
+
   /// Pointer-safe activation resolution. Like `activationIdentity(for:)` but the
   /// descendant fallback is constrained to handlers whose interaction region
   /// actually contains `location`. A pointer click must only activate a control
@@ -239,7 +270,10 @@ extension RunLoop {
     for identity: Identity,
     underPointerAt location: PointerLocation
   ) -> Identity? {
-    if let containingIdentity = containingActivationIdentity(for: identity) {
+    if let containingIdentity = containingActivationIdentity(
+      for: identity,
+      underPointerAt: location
+    ) {
       return containingIdentity
     }
 
@@ -265,6 +299,23 @@ extension RunLoop {
     latestSemanticSnapshot.interactionRegions.contains { region in
       region.identity == identity && region.contains(location)
     }
+  }
+
+  /// A pointer activation candidate is vetoed only by geometric evidence:
+  /// regions minted for the candidate identity that all exclude `location`.
+  private func handlerRegionPermitsPointerActivation(
+    _ identity: Identity,
+    at location: PointerLocation
+  ) -> Bool {
+    var mintsRegion = false
+    for region in latestSemanticSnapshot.interactionRegions
+    where region.identity == identity {
+      if region.contains(location) {
+        return true
+      }
+      mintsRegion = true
+    }
+    return !mintsRegion
   }
 
   private func identityDepth(_ identity: Identity) -> Int {
