@@ -3893,6 +3893,129 @@ struct InteractiveRuntimeTests {
     #expect(!finalFrame.contains("Row 0"))
   }
 
+  /// Gallery Navigation & Collections regression (2026-07-10): entering the
+  /// tab via a tab-strip *click* and then pushing the `navigationDestination`
+  /// stranded the entire root page while the destination stayed presented.
+  /// The push frame's structural child diff tore down the departed root-page
+  /// node unconditionally while sparing its visited descendants, and erased
+  /// the hosted-detached ledger anchor `NavigationStack` had just recorded —
+  /// decapitating the subtree beyond every teardown path (and beyond
+  /// `recordDetachedHostedSubtree`'s stored-node guard, so the anchor could
+  /// never re-form) until the pop re-committed it. Scene-hosted through the
+  /// LIVE session run on purpose: neither the root-hosted RunLoop harness nor
+  /// a `WindowHostView`-wrapped RunLoop harness reproduces the strand — only
+  /// the live scene session's input-driven frame path does.
+  ///
+  /// The census assertion samples the soundness probe's last-detail register
+  /// for THIS session's identity marker instead of diffing the process-global
+  /// counters: parallel suites' violations name their own identities, so a
+  /// marker match is attributable to this session alone, and a counter diff
+  /// would false-red on unrelated suites' deliberate oracle violations.
+  @MainActor
+  @Test("navigation push after strip-click tab entry leaves no teardown-coherence strand")
+  func navigationPushAfterStripClickTabEntryLeavesNoStrand() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let terminalSize = CellSize(width: 76, height: 40)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scene = WindowGroup("Nav Push Strand") {
+      NavigationPushStrandFixture()
+    }
+
+    let inputReader = InputReader(fileDescriptor: readDescriptor)
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.NavPushStrand",
+        presentationSurface: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("plain-pane")
+    }
+
+    // Enter the collections tab by clicking its strip item — the pointer
+    // path re-resolves the tab content through stored evaluation contexts
+    // (selective replay), the gallery entry shape.
+    let stripPoint = try #require(
+      textCenter(of: "NavLab", in: terminal.visibleFrames.last ?? ""),
+      "strip item not found in frame:\n\(terminal.visibleFrames.last ?? "")"
+    )
+    try writeAllBytes(sgrPrimaryClick(at: stripPoint), to: writeDescriptor)
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Lazy row 0")
+    }
+
+    // Push the navigation destination directly after entry, with no
+    // intervening interactions — the gallery reproduction sequence.
+    let pushPoint = try #require(
+      textCenter(of: "Open selected detail", in: terminal.visibleFrames.last ?? ""),
+      "push button not found in frame:\n\(terminal.visibleFrames.last ?? "")"
+    )
+    try writeAllBytes(sgrPrimaryClick(at: pushPoint), to: writeDescriptor)
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("detail-pane")
+    }
+
+    // The strand (when present) re-records a leak naming this session's
+    // identity in the census detail on every presented frame. Render several
+    // presented idle frames — a Tab keypress reliably schedules a focus
+    // frame — sampling the last-detail register after each; the fix keeps a
+    // marker match from ever appearing.
+    var strandDetail: String?
+    for _ in 0..<4 {
+      let framesBeforePresentedIdle = terminal.visibleFrames.count
+      try writeAllBytes([0x09], to: writeDescriptor)
+      await terminal.frameSignal.wait {
+        terminal.visibleFrames.count > framesBeforePresentedIdle
+      }
+      if let detail = SoundnessProbeConfiguration.lastViolationDetail,
+        detail.contains("Nav-Push-Strand")
+      {
+        strandDetail = detail
+        break
+      }
+    }
+    #expect(
+      strandDetail == nil,
+      """
+      presenting the navigation destination stranded stored node(s): \
+      \(strandDetail ?? "")
+      """
+    )
+
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let result = try await runTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+  }
+
   @MainActor
   @Test("handled pointer scrolling repaints ScrollView wrapping a List before follow-up input")
   func handledPointerScrollingRepaintsScrollViewWrappingListBeforeFollowUpInput() throws {
@@ -6170,6 +6293,153 @@ private struct TabStripEntryTabHost: View {
       }
     }
   }
+}
+
+private struct NavigationPushStrandFixture: View {
+  var body: some View {
+    // The tab host is a non-root child on purpose: the strip click's
+    // selection write must dirty a NON-root node so tab entry rides
+    // selective evaluation's stored-context replay (the gallery shape).
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Fixture chrome")
+
+      NavigationPushStrandTabHost()
+    }
+  }
+}
+
+private struct NavigationPushStrandTabHost: View {
+  @State private var selection = 0
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("PlainTab", value: 0) {
+        Text("plain-pane")
+      }
+
+      Tab("NavLab", value: 1) {
+        NavigationPushStrandPane()
+      }
+    }
+  }
+}
+
+private struct NavigationPushStrandPane: View {
+  @State private var selectedDoc = "overview"
+  @State private var selectedTableRow = "queued"
+  @State private var showingDetail = false
+
+  var body: some View {
+    NavigationStack(id: "nav-push-strand") {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Navigation lab")
+          Divider()
+          HStack(alignment: .top, spacing: 2) {
+            GroupBox("List selection") {
+              List(selection: $selectedDoc) {
+                Text("Overview").tag("overview")
+                Text("Build lanes").tag("build-lanes")
+              }
+              .frame(width: 20, height: 4)
+            }
+            GroupBox("OutlineGroup") {
+              OutlineGroup(Self.outlineNodes, children: \.children) { node in
+                Text(node.title)
+              }
+              .frame(width: 24, height: 5, alignment: .topLeading)
+            }
+          }
+          GroupBox("Lazy stacks") {
+            VStack(alignment: .leading, spacing: 1) {
+              LazyHStack(spacing: 1) {
+                ForEach(0..<6, id: \.self) { index in
+                  Text("H\(index)")
+                }
+              }
+              LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<3, id: \.self) { index in
+                  Text("Lazy row \(index)")
+                }
+              }
+            }
+          }
+          GroupBox("Table selection") {
+            Table(
+              selection: $selectedTableRow,
+              columns: [
+                TableColumn("State", width: 10),
+                TableColumn("Count", width: 5, alignment: .trailing),
+              ]
+            ) {
+              TableRow {
+                Text("Queued")
+                Text("3")
+              }
+              .tag("queued")
+              TableRow {
+                Text("Done")
+                Text("8")
+              }
+              .tag("done")
+            }
+            .frame(height: 5)
+          }
+          Button("Open selected detail") {
+            showingDetail = true
+          }
+          Spacer(minLength: 0)
+        }
+        .padding(1)
+        .navigationDestination(isPresented: $showingDetail) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("detail-pane")
+            Button("Done") {
+              showingDetail = false
+            }
+          }
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private static let outlineNodes: [NavigationPushStrandOutlineNode] = [
+    .init(
+      title: "Examples",
+      children: [
+        .init(title: "Terminal"),
+        .init(title: "Web"),
+      ]
+    ),
+    .init(title: "Coverage", children: [.init(title: "Build lanes")]),
+  ]
+}
+
+private struct NavigationPushStrandOutlineNode: Identifiable, Sendable {
+  let id: String
+  let title: String
+  let children: [NavigationPushStrandOutlineNode]?
+
+  init(title: String, children: [NavigationPushStrandOutlineNode]? = nil) {
+    id = title
+    self.title = title
+    self.children = children
+  }
+}
+
+/// Center of `target`'s first occurrence in `frame`, in surface cell
+/// coordinates — locates click targets by rendered text so fixtures need no
+/// explicit `.id` identities (which would perturb the identity shapes under
+/// test).
+private func textCenter(of target: String, in frame: String) -> Point? {
+  for (row, line) in frame.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+    let text = String(line)
+    guard let range = text.range(of: target) else { continue }
+    let column = text.distance(from: text.startIndex, to: range.lowerBound)
+    return Point(CellPoint(x: column + target.count / 2, y: row))
+  }
+  return nil
 }
 
 private struct TabHostedGalleryShapedAnimatingScrollFixture: View {

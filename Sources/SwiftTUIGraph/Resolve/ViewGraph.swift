@@ -3321,6 +3321,25 @@ package final class ViewGraph {
       guard !retainedChildNodeIDs.contains(removedNode.viewNodeID) else {
         continue
       }
+      // A removed child that resolution VISITED this frame and that carries a
+      // live hosted-detached ledger anchor is departing the committed
+      // children but not the graph (a navigation stack's root page in the
+      // frame that presents a destination): its resolution re-declared
+      // detached ownership this frame, so the ledger edge — not this diff —
+      // owns its teardown from here. Removing it would decapitate the
+      // subtree: the explicit removal root dies while its visited
+      // descendants are spared, stranding them beyond every teardown path —
+      // and beyond `recordDetachedHostedSubtree`'s stored-node guard, so the
+      // anchor could never re-form. A genuinely departing anchored mint (a
+      // list row whose item left the data, an evicted lazy element) is not
+      // re-resolved in its departure frame, so the visited stamp keeps this
+      // spare from reaching it.
+      if removedNode.visitedThisFrame(currentFrameID),
+        let hostID = detachedHostedSubtreeHostByRoot[removedNode.viewNodeID],
+        nodeIfExists(for: hostID) != nil
+      {
+        continue
+      }
       if shouldDeferEntityRoutedRemoval(of: removedNode) {
         pendingEntityRoutedRemovalNodeIDs.insert(removedNode.viewNodeID)
         continue
