@@ -17,6 +17,11 @@
 /// When the probe is off the per-frame cost is a single `Bool` store in
 /// ``beginFrame(frameID:)`` and a single `Bool` read at each oracle call site —
 /// no allocation, no oracle work. Mirrors ``MemoReuseConfiguration``.
+/// Process-global by design (F119): this subsystem's state is `@MainActor`
+/// statics keyed by per-`ViewGraph` frame IDs, so two live graphs in one
+/// process would interleave counters and misattribute trace lines. Note-only
+/// until multi-scene hosting is real; the fix shape is scoping to the
+/// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum SoundnessProbeConfiguration {
   package static let environmentVariableName = FeatureGate.soundnessProbe.environmentVariableName

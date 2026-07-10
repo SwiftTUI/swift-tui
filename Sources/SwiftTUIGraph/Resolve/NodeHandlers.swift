@@ -8,6 +8,15 @@
 // construction once its field joins that list —
 // `RuntimeRegistrationKindTotalityTests` pins the coverage.
 
+/// The single merge direction every family's `absorbAdopted` uses (F121):
+/// on a key collision the ADOPTING record keeps its own entry — the
+/// departing record only fills gaps. One named function instead of 14
+/// re-encoded closures, so an inverted copy-paste cannot slip past the
+/// totality suites (which pin coverage, not direction).
+package func mergeKeepingCurrent<Value>(_ current: Value, _ departing: Value) -> Value {
+  current
+}
+
 package struct ActionNodeRecord: RuntimeNodeRecord {
   package var registrations: [Identity: LocalActionRegistry.Registration] = [:]
   package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
@@ -19,8 +28,8 @@ package struct ActionNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: ActionNodeRecord) {
-    registrations.merge(departing.registrations) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    registrations.merge(departing.registrations, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -53,9 +62,9 @@ package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: Self) {
-    handlers.merge(departing.handlers) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
-    ordinals.merge(departing.ordinals) { current, _ in current }
+    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
+    ordinals.merge(departing.ordinals, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -83,8 +92,8 @@ package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: KeyHandlerNodeRecord) {
-    handlers.merge(departing.handlers) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
     keyPress.absorbAdopted(departing.keyPress)
     paste.absorbAdopted(departing.paste)
   }
@@ -110,8 +119,8 @@ package struct TerminationNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: TerminationNodeRecord) {
-    handlers.merge(departing.handlers) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -137,10 +146,10 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: PointerNodeRecord) {
-    handlers.merge(departing.handlers) { current, _ in current }
-    handlerOwners.merge(departing.handlerOwners) { current, _ in current }
-    hoverHandlers.merge(departing.hoverHandlers) { current, _ in current }
-    hoverOwners.merge(departing.hoverOwners) { current, _ in current }
+    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
+    handlerOwners.merge(departing.handlerOwners, uniquingKeysWith: mergeKeepingCurrent)
+    hoverHandlers.merge(departing.hoverHandlers, uniquingKeysWith: mergeKeepingCurrent)
+    hoverOwners.merge(departing.hoverOwners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -173,8 +182,8 @@ package struct GestureNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: GestureNodeRecord) {
-    recognizers.merge(departing.recognizers) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    recognizers.merge(departing.recognizers, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -198,8 +207,8 @@ package struct GestureStateNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: GestureStateNodeRecord) {
-    bindings.merge(departing.bindings) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    bindings.merge(departing.bindings, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -295,8 +304,8 @@ package struct TaskNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: TaskNodeRecord) {
-    registrations.merge(departing.registrations) { current, _ in current }
-    owners.merge(departing.owners) { current, _ in current }
+    registrations.merge(departing.registrations, uniquingKeysWith: mergeKeepingCurrent)
+    owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -381,8 +390,8 @@ extension CommandRegistrySnapshot: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: CommandRegistrySnapshot) {
-    keyCommandsByScope.merge(departing.keyCommandsByScope) { current, _ in current }
-    ownersByScope.merge(departing.ownersByScope) { current, _ in current }
+    keyCommandsByScope.merge(departing.keyCommandsByScope, uniquingKeysWith: mergeKeepingCurrent)
+    ownersByScope.merge(departing.ownersByScope, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
@@ -401,8 +410,8 @@ extension DropDestinationRegistrySnapshot: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: DropDestinationRegistrySnapshot) {
-    handlersByScope.merge(departing.handlersByScope) { current, _ in current }
-    ownersByScope.merge(departing.ownersByScope) { current, _ in current }
+    handlersByScope.merge(departing.handlersByScope, uniquingKeysWith: mergeKeepingCurrent)
+    ownersByScope.merge(departing.ownersByScope, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor

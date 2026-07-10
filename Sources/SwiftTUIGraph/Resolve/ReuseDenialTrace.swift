@@ -19,6 +19,11 @@
 /// dumps and resets the per-frame histogram to stderr at `beginFrame`, so the
 /// stream shows one `[REUSE-TRACE]` line per frame. Used to find what re-resolves
 /// the background on sheet/palette open.
+/// Process-global by design (F119): this subsystem's state is `@MainActor`
+/// statics keyed by per-`ViewGraph` frame IDs, so two live graphs in one
+/// process would interleave counters and misattribute trace lines. Note-only
+/// until multi-scene hosting is real; the fix shape is scoping to the
+/// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum ReuseDenialTrace {
   package static let environmentVariableName = "SWIFTTUI_REUSE_TRACE"

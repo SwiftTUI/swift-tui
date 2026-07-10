@@ -617,9 +617,19 @@ package final class ViewNode {
   /// default and treated the unchanged runtime value as a change.
   @MainActor
   package enum RuntimeStateFlipProbe {
+    // Test instrumentation only (F118): the per-flip increment compiles out
+    // of release, so the probe costs nothing where no test reads it.
     package private(set) static var count = 0
-    package static func record() { count += 1 }
-    package static func reset() { count = 0 }
+    package static func record() {
+      #if DEBUG
+        count += 1
+      #endif
+    }
+    package static func reset() {
+      #if DEBUG
+        count = 0
+      #endif
+    }
   }
 
   /// Reader-attributed invalidation for a runtime-applied state-slot change
@@ -1363,6 +1373,7 @@ package final class ViewNode {
   }
 
   private func recordRuntimeRegistrationMutation() {
+    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     runtimeRegistrationMutationGeneration &+= 1
   }
 

@@ -1,4 +1,9 @@
 /// A focusable region extracted from the placed tree.
+/// Equality deliberately includes `package`-level bookkeeping fields (F120):
+/// these types are the frame pipeline's change-detection currency, so two
+/// externally identical values may compare `!=` when internal routing or
+/// bookkeeping differs. Public consumers must not treat `==` as
+/// visible-field equality.
 public struct FocusRegion: Equatable, Sendable {
   public var identity: Identity
   public var rect: CellRect
@@ -40,6 +45,11 @@ public struct FocusRegion: Equatable, Sendable {
 }
 
 /// Scroll metadata extracted for a scrollable node.
+/// Equality deliberately includes `package`-level bookkeeping fields (F120):
+/// these types are the frame pipeline's change-detection currency, so two
+/// externally identical values may compare `!=` when internal routing or
+/// bookkeeping differs. Public consumers must not treat `==` as
+/// visible-field equality.
 public struct ScrollRoute: Equatable, Sendable {
   public var identity: Identity
   package var viewNodeID: ViewNodeID?
@@ -118,6 +128,11 @@ package struct ScrollTargetQuery: Equatable, Sendable {
 }
 
 /// Accessibility metadata extracted for assistive-technology consumers.
+/// Equality deliberately includes `package`-level bookkeeping fields (F120):
+/// these types are the frame pipeline's change-detection currency, so two
+/// externally identical values may compare `!=` when internal routing or
+/// bookkeeping differs. Public consumers must not treat `==` as
+/// visible-field equality.
 public struct AccessibilityNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
   public var identity: Identity

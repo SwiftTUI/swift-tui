@@ -114,6 +114,7 @@ extension ViewGraph {
       return stateOwner
     }
 
+    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     nextViewNodeIDRawValue &+= 1
     let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
     let node = ViewNode(

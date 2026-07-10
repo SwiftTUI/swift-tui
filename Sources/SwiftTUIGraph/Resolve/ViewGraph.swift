@@ -1409,6 +1409,7 @@ package final class ViewGraph {
       return slot.label
     }
 
+    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     nextTaskDescriptorIdentityToken &+= 1
     let label = "id:\(nextTaskDescriptorIdentityToken)"
     taskDescriptorNodeSlots[key] = TaskDescriptorIdentitySlot(
@@ -1564,6 +1565,7 @@ package final class ViewGraph {
     // Diagnostic: flush the just-finished frame's memoization histogram.
     // In release this is opt-in and sampled by `MemoSkipTrace.beginFrame`.
     MemoSkipTrace.dumpAndReset(frameID: currentFrameID)
+    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     currentFrameID &+= 1
     MemoSkipTrace.beginFrame(frameID: currentFrameID)
     // Latch this frame's reconciliation-soundness sampling decision from the

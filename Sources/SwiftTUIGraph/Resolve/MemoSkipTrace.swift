@@ -34,6 +34,11 @@
 ///
 /// `ViewGraph.beginFrame` dumps and resets the histogram, so the stream shows one
 /// `[MEMO-TRACE]` line per frame. Mirrors ``ReuseDenialTrace``.
+/// Process-global by design (F119): this subsystem's state is `@MainActor`
+/// statics keyed by per-`ViewGraph` frame IDs, so two live graphs in one
+/// process would interleave counters and misattribute trace lines. Note-only
+/// until multi-scene hosting is real; the fix shape is scoping to the
+/// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
 @MainActor
 package enum MemoSkipTrace {
   package static let environmentVariableName = "SWIFTTUI_MEMO_TRACE"
