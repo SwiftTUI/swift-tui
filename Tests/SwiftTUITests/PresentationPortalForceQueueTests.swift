@@ -326,7 +326,12 @@ struct PresentationPortalForceQueueTests {
     // the wrapper's resolved root); the flatten-shadowed state-owner
     // tiebreak (`ViewGraph.flattenedStateOwnerNodeIDByIdentity`) keeps the
     // authored child node hosting the slots across every later pass.
-    #expect(ViewNode.RuntimeStateFlipProbe.count == 1)
+    // DEBUG-only: the probe's increment compiles out of release (F118), so
+    // the release soundness lane sees a permanent 0 — the flip-count oracle
+    // only exists in DEBUG builds.
+    #if DEBUG
+      #expect(ViewNode.RuntimeStateFlipProbe.count == 1)
+    #endif
   }
 
   @Test("imperative presentation still opens without the portal force-queue")
