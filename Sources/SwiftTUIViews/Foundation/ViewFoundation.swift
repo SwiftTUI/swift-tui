@@ -59,11 +59,34 @@ package func appendDeclaredChildNodes<V: View>(
     if resolvedNode.identity == childContext.identity,
       resolvedNode.kind == .view("EmptyView")
     {
+      // The value is dropped, but `resolveView` already minted/visited a
+      // stored node for it (a `_ = state` Void expression or an explicit
+      // `EmptyView` element — TimelineView's `timelineBody` is the shipped
+      // shape). That node lives in no children array, so an enclosing
+      // subtree teardown can never reach it: without an anchor it strands
+      // alive in the store once its weak `evaluationHost` dies (the F04/F91
+      // teardown-coherence leak). Anchor its lifetime to the evaluating
+      // host with a hosted-detached edge; re-resolves re-home the edge to
+      // the currently live host, and the host's teardown retires the node
+      // (cancelling any lifecycle tasks it carries) through the standard
+      // cascade guards.
+      context.viewGraph?.recordDetachedHostedSubtree(
+        resolvedNode,
+        hostedBy: ViewNodeContext.current
+      )
       return
     }
     if resolvedNode.identity == childContext.identity,
       resolvedNode.kind == .view("Group")
     {
+      // Same stranding shape as the dropped `EmptyView` above: the spliced
+      // group's children are re-parented by the enclosing apply, but the
+      // group's own minted node keeps living in no children slot. Anchor it
+      // before splicing so the host's teardown reclaims it.
+      context.viewGraph?.recordDetachedHostedSubtree(
+        resolvedNode,
+        hostedBy: ViewNodeContext.current
+      )
       resolved.append(contentsOf: resolvedNode.children)
       return
     }

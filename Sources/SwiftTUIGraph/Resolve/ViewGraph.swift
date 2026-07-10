@@ -2666,6 +2666,16 @@ package final class ViewGraph {
     return nil
   }
 
+  /// Instance-scoped census read for tests: the process-global probe
+  /// counters (`SoundnessProbeConfiguration`) interleave across parallel
+  /// test suites, so a per-graph zero-strand assertion must run the census
+  /// against THIS graph directly instead of diffing the globals.
+  package func debugTeardownCoherenceViolation()
+    -> (isOverRemoval: Bool, detail: String, unreachableCount: Int)?
+  {
+    teardownCoherenceViolation()
+  }
+
   /// Anchor forensics for one census orphan: which lifetime anchor broke.
   /// Cheap to build and only reached on a violation, where the detail is the
   /// entire diagnostic surface.
