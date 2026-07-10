@@ -205,6 +205,18 @@ extension List {
       in: context,
       kindName: "ListContent"
     )
+    // The row content is value-collapsed into the list draw payload below, so
+    // these minted subtrees join no children array — without an anchor the
+    // list's departure can never reach them and they strand alive in the
+    // store (the F04/F91 teardown-coherence leak; the gallery collections-tab
+    // warning). Anchor each mint to the evaluating host so its teardown
+    // retires them through the standard cascade.
+    for node in nodes {
+      context.viewGraph?.recordDetachedHostedSubtree(
+        node,
+        hostedBy: ViewNodeContext.current
+      )
+    }
 
     var items: [ListItemPayload] = []
     var rows: [RowSelection] = []

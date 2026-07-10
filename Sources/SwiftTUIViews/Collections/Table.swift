@@ -213,6 +213,15 @@ extension Table {
       in: context,
       kindName: "TableContent"
     )
+    // The row content is value-collapsed into the table draw payload below —
+    // same stranding shape as `List.resolvedItems`; see the anchor comment
+    // there.
+    for node in nodes {
+      context.viewGraph?.recordDetachedHostedSubtree(
+        node,
+        hostedBy: ViewNodeContext.current
+      )
+    }
     var rows: [TableRowPayload] = []
     collectTableRows(from: nodes, into: &rows)
     return rows

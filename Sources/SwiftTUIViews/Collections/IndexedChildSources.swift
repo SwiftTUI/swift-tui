@@ -1,4 +1,5 @@
 package import SwiftTUICore
+package import SwiftTUIGraph
 
 @MainActor
 package protocol IndexedChildSourceView {
@@ -20,6 +21,13 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   private let content: @MainActor (Data.Element) -> Content
   private let childContext: ResolveContext
   private let authoringScope: AuthoringContext?
+  /// The node mid-evaluation when the lazy container declared this source.
+  /// Realization runs later, from layout, where `ViewNodeContext.current` is
+  /// nil — so element mints anchor to this captured host instead (weak: a
+  /// departed host means the container is already tearing down). Typed via
+  /// the graph module directly — the authoring layer's `ViewNode` protocol
+  /// shadows the graph's node class.
+  private weak var mintHost: SwiftTUIGraph.ViewNode?
   private var cache: [Int: ResolvedNode] = [:]
 
   package init(
@@ -38,6 +46,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       scope: childContext.structuralPath
     )
     authoringScope = currentAuthoringContext()
+    mintHost = ViewNodeContext.current
     identityRootStorage = childContext.identity
     countStorage = data.count
     measurementSignatureStorage = data.map {
@@ -111,6 +120,17 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         at: elementContext.structuralPath
       )
       childContext.viewGraph?.refreshResolvedMetadata(for: normalized)
+      // The realized element joins no children array — the container's
+      // resolved node keeps its lazy source instead of child nodes — so the
+      // mint would strand alive in the store when the container departs (the
+      // F04/F91 teardown-coherence leak; the gallery collections-tab
+      // warning). Anchor it to the host captured at declaration so that
+      // host's teardown retires realized elements through the standard
+      // cascade.
+      childContext.viewGraph?.recordDetachedHostedSubtree(
+        normalized,
+        hostedBy: mintHost
+      )
       cache[index] = normalized
       return normalized
     }

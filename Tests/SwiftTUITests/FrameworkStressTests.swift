@@ -1200,18 +1200,17 @@ struct FrameworkStressTests {
     #expect(harness.activeTaskCount == 0)
   }
 
-  @Test("List-route flip leak census stays at its pinned baseline (F91 ratchet)")
+  @Test("List-route flips leave no teardown-coherence leak (F91, pinned at zero)")
   func listRouteFlipLeakCensusStaysAtBaseline() throws {
     // The teardown-coherence LEAK direction (stored nodes unreachable from
-    // the committed root) is counter-only — the residual class this test
-    // pins is the List/lazy content strand under a flipped conditional
-    // branch (`…/false/content/ListItems/ListContent[0]`, observed in the
-    // KeyCommand route tests and the TermUIPerf app-shell workflow). This
-    // is a CHARACTERIZATION ratchet, not an endorsement: it alarms when the
-    // class GROWS (census creep across route cycles — the silent-growth
-    // failure F91 names). When the strand is root-fixed, the leak
-    // assertions below flip and this test should be rewritten to pin zero.
-    let leakBaseline = SoundnessProbeConfiguration.teardownCoherenceLeakCount
+    // the committed root) for the List/lazy content strand under a flipped
+    // conditional branch (`…/false/content/ListItems/ListContent[0]`). The
+    // strand was ROOT-FIXED by anchoring `List`/`Table` row mints and lazy
+    // indexed-source element mints in the hosted-detached ledger — this test
+    // began life as a characterization ratchet of the pre-fix leak and now
+    // pins the class at zero, exactly as its original ratchet demanded. The
+    // census is instance-scoped (process-global probe counters race parallel
+    // suites).
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("ListRouteLeakRoot"),
       size: .init(width: 72, height: 20)
@@ -1220,32 +1219,20 @@ struct FrameworkStressTests {
     }
     defer { harness.shutdown() }
 
-    var censusPerCycle: [Int] = []
-    for _ in 1...3 {
+    for cycle in 1...3 {
       var frame = try harness.clickText("Open")
       #expect(frame.contains("detail"))
       frame = try harness.clickText("Back")
       #expect(frame.contains("Open"))
-      censusPerCycle.append(SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount)
+      let violation = harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()
+      #expect(
+        violation == nil,
+        """
+        the List-route flip stranded stored node(s) again on cycle \(cycle) \
+        (\(violation?.detail ?? "")) — the anchored-mint fix regressed
+        """
+      )
     }
-
-    let leakDelta = SoundnessProbeConfiguration.teardownCoherenceLeakCount - leakBaseline
-    #expect(
-      leakDelta > 0,
-      """
-      the List-route strand no longer leaks — the residual class is (at least
-      partially) fixed; ratchet this test toward zero instead of deleting it
-      """
-    )
-    let censusCeiling = try #require(censusPerCycle.first)
-    #expect(
-      censusPerCycle.allSatisfy { $0 <= censusCeiling },
-      """
-      leak census grew across route cycles (\(censusPerCycle)) — the residual
-      class is accumulating per flip instead of re-adopting the strand; this
-      is the silent-growth regression F91 exists to catch
-      """
-    )
   }
 }
 
