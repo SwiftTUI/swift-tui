@@ -71,4 +71,89 @@ struct StateSlotTests {
       "a dropped sibling entry must not disturb the live owner's restoration"
     )
   }
+
+  @Test("overlay application unions the dirty and invalidation bookkeeping")
+  @MainActor
+  func overlayApplicationUnionsBookkeeping() {
+    // F112 (pairs with the F93 drop-alarm test): the overlay's whole point
+    // is carrying in-flight invalidation intent across a discarded draft —
+    // the slot restore without the set unions would restore values that
+    // nothing re-evaluates.
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let identity = testIdentity("Root", "Owner")
+    let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+    let key = StateSlotKey(owner: node.viewNodeID, ordinal: 0)
+
+    graph.applyStateMutationOverlay(
+      ViewGraph.StateMutationOverlay(
+        stateSlots: [:],
+        invalidatedNodeIDs: [node.viewNodeID],
+        graphLocalDirtyNodeIDs: [node.viewNodeID],
+        stateMutationKeys: [key],
+        stateMutationNodeIDsByKey: [key: [node.viewNodeID]]
+      )
+    )
+
+    #expect(graph.invalidatedNodeIDs.contains(node.viewNodeID))
+    #expect(graph.graphLocalDirtyNodeIDs.contains(node.viewNodeID))
+    #expect(graph.stateMutationKeys.contains(key))
+    #expect(graph.stateMutationNodeIDsByKey[key]?.contains(node.viewNodeID) == true)
+  }
+}
+
+/// Pins the `.task(id:)` identity-slot contract (F112): the slot's stable
+/// label is what keeps an unchanged `.task(id:)` from being cancelled and
+/// restarted every pass — the stale-seed `.task` regression family.
+@MainActor
+@Suite("Task descriptor identity slots")
+struct TaskDescriptorIdentitySlotTests {
+  @Test("an unchanged id value keeps its stable label across passes")
+  func unchangedValueKeepsLabel() {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
+
+    let first = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 42)
+    let second = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 42)
+    #expect(first == second, "an unchanged id must not plan a cancel + restart")
+  }
+
+  @Test("a changed id value mints a new label")
+  func changedValueMintsNewLabel() {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
+
+    let first = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 1)
+    let second = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 2)
+    #expect(first != second)
+  }
+
+  @Test("a same-looking value of a different type mints a new label")
+  func typeConfusionMintsNewLabel() {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
+
+    let intLabel = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 1)
+    let stringLabel = graph.taskDescriptorIdentityLabel(
+      for: node.viewNodeID, ordinal: 0, value: "1"
+    )
+    #expect(intLabel != stringLabel, "the slot's type-erased equality must not cross types")
+  }
+
+  @Test("ordinals on one node hold independent slots")
+  func ordinalsAreIndependent() {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: testIdentity("Root", "Tasker"), invalidator: nil)
+
+    let zero = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 7)
+    let one = graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 1, value: 7)
+    #expect(zero != one, "two .task(id:) modifiers on one node must not share a slot")
+    // Both remain stable on re-query.
+    #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 7) == zero)
+    #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 1, value: 7) == one)
+  }
 }

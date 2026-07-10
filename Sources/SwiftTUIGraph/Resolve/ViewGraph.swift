@@ -262,11 +262,11 @@ package final class ViewGraph {
     get { dirtyState.graphLocalDirtyNodeIDs }
     set { dirtyState.graphLocalDirtyNodeIDs = newValue }
   }
-  private var stateMutationKeys: Set<StateSlotKey> {
+  var stateMutationKeys: Set<StateSlotKey> {
     get { dirtyState.stateMutationKeys }
     set { dirtyState.stateMutationKeys = newValue }
   }
-  private var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] {
+  var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] {
     get { dirtyState.stateMutationNodeIDsByKey }
     set { dirtyState.stateMutationNodeIDsByKey = newValue }
   }
