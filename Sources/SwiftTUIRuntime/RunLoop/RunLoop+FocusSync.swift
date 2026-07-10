@@ -2,6 +2,68 @@ import SwiftTUICore
 import SwiftTUIViews
 
 extension RunLoop {
+  /// A keyboard focus traversal (Tab / Shift+Tab / arrow move) recorded when
+  /// it lands, together with the region list it traversed. Held until the
+  /// next input event so the runtime can recognize a landing region that
+  /// vanishes as a consequence of the traversal itself and continue in the
+  /// traversal direction. See ``RunLoop/pendingFocusTraversal``.
+  package struct PendingFocusTraversal {
+    /// Document-order direction of the traversal: `+1` forward, `-1` backward.
+    var step: Int
+    /// The focus region identity the traversal landed on.
+    var landedIdentity: Identity
+    /// The tracker's region list at the moment of the traversal — the only
+    /// record of the vanished region's document-order neighbors.
+    var regionsAtTraversal: [FocusRegion]
+  }
+
+  /// Runs `move` (a `FocusTracker` traversal) and records it as the pending
+  /// focus traversal, replacing any previous record.
+  package func performFocusTraversal(
+    step: Int,
+    _ move: () -> Identity?
+  ) {
+    let regionsAtTraversal = focusTracker.focusRegions
+    let previousFocus = focusTracker.currentFocusIdentity
+    guard let landedIdentity = move(), landedIdentity != previousFocus else {
+      // A traversal that did not move focus needs no continuation record.
+      pendingFocusTraversal = nil
+      return
+    }
+    pendingFocusTraversal = PendingFocusTraversal(
+      step: step,
+      landedIdentity: landedIdentity,
+      regionsAtTraversal: regionsAtTraversal
+    )
+  }
+
+  /// Resolves where a traversal whose landing region vanished should continue:
+  /// the first region after (or before, for a backward step) the vanished one
+  /// in the traversed list's document order that still exists in `regions`.
+  private func focusTraversalContinuationIdentity(
+    for pending: PendingFocusTraversal,
+    in regions: [FocusRegion]
+  ) -> Identity? {
+    let traversed = pending.regionsAtTraversal
+    guard
+      let vanishedIndex = traversed.firstIndex(where: {
+        $0.identity == pending.landedIdentity
+      })
+    else {
+      return nil
+    }
+    let count = traversed.count
+    var candidate = vanishedIndex
+    for _ in 1..<count {
+      candidate = (candidate + pending.step + count) % count
+      let identity = traversed[candidate].identity
+      if regions.contains(where: { $0.identity == identity }) {
+        return identity
+      }
+    }
+    return nil
+  }
+
   /// Accumulated focus/scroll convergence state threaded through single-pass
   /// focus-sync (the at-most-one eager re-render) and into the shared
   /// post-acquisition body.
@@ -120,8 +182,29 @@ extension RunLoop {
       focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
       || (nextModalFocusScopePath != nil && nextModalFocusScopePath != previousModalFocusScopePath)
     let hadFocusBeforeRegionUpdate = focusTracker.currentFocusIdentity != nil
-    let focusChanged = focusTracker.updateRegions(
+    var focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
+    // A traversal's landing region vanished before any further input: the
+    // control revoked its own focusability as a consequence of receiving
+    // focus (e.g. `.disabled` reading a `@FocusedValue` that the traversal
+    // un-published). The tracker's scope-replacement re-seat points backward
+    // and would trap the Tab cycle, so continue the traversal instead: focus
+    // the vanished region's next surviving document-order neighbor in the
+    // traversal direction. Consumed one-shot; any explicit focus request
+    // below still overrides.
+    if let pending = pendingFocusTraversal,
+      !renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+        $0.identity == pending.landedIdentity
+      })
+    {
+      pendingFocusTraversal = nil
+      if let continuation = focusTraversalContinuationIdentity(
+        for: pending,
+        in: renderedArtifacts.semanticSnapshot.focusRegions
+      ) {
+        focusChanged = focusTracker.setFocus(to: continuation) || focusChanged
+      }
+    }
     // Initial focus auto-adoption (nil → a control) is deliberately *not* flagged
     // as a change by `updateRegions` (it avoids forcing a second frame in the
     // legacy loop). It is still a focus-location establishment: in single-pass

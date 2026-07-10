@@ -789,16 +789,171 @@ struct AppRuntimeTests {
     #expect(initialFrame.contains("▼"))
     #expect(!initialFrame.contains("Popovers"))
 
-    // Tab reaches the strip (the window's first focusable control); Enter
-    // activates the root action, which expands the menu because the
-    // resolved focused tab is the selected overflow tab.
-    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
-    _ = try render()
+    // The strip (the TabView control identity == this window's root) adopts
+    // initial focus; Enter activates the root action, which expands the menu
+    // because the resolved focused tab is the selected overflow tab. (An
+    // earlier version of this test pressed Tab first — which moved focus off
+    // the auto-focused strip INTO the page, and only passed because the
+    // unconstrained ancestor walk misrouted the page's Enter back to the
+    // strip action: the very bug under test.)
+    #expect(focusTracker.currentFocusIdentity == rootIdentity)
     #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
     let expanded = try render()
     #expect(
       expanded.contains("▲") && expanded.contains("Popovers"),
       "Enter on the focused strip must still expand the overflow menu; frame:\n\(expanded)"
+    )
+  }
+
+  /// Keyboard twin of the background-click regression above (gallery Focus
+  /// Context tab): Enter while a page *text field* is focused must not
+  /// activate the `TabView` root action. That action is registered at the
+  /// control identity that parents the whole tab page, so the location-free
+  /// ancestor walk from any focused page control reaches it — and expands the
+  /// overflow menu whenever the selected tab sits in the overflow set. The
+  /// walk must stop at the first ancestor that is itself an independently
+  /// focusable control: focus-driven activation belongs to the focused
+  /// control alone.
+  @Test("Enter in a focused page text field does not drop down the overflow menu")
+  func tabPageFieldEnterDoesNotDropDownOverflowMenu() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikeFocusContextFieldEnter")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikeFocusContextWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let initialFrame = try render()
+    #expect(initialFrame.contains("Focus Context header"))
+    #expect(
+      initialFrame.contains("▼"),
+      "the selected tab must sit in the overflow set; frame:\n\(initialFrame)"
+    )
+    #expect(!initialFrame.contains("Popovers"))
+
+    // Tab moves focus from the strip into the first text field.
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+    _ = try render()
+    let fieldIdentity = try #require(focusTracker.currentFocusIdentity)
+    let fieldRegion = try #require(
+      runLoop.latestSemanticSnapshot.focusRegions.first { $0.identity == fieldIdentity }
+    )
+    #expect(fieldRegion.focusInteractions == .edit)
+
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let afterEnter = try render()
+    #expect(
+      !afterEnter.contains("▲") && !afterEnter.contains("Popovers"),
+      "Enter in a focused page text field dropped down the overflow menu; frame:\n\(afterEnter)"
+    )
+    #expect(
+      focusTracker.currentFocusIdentity == fieldIdentity,
+      "Enter in a text field must not move focus"
+    )
+  }
+
+  /// The gallery Focus Context tab's second symptom: its consumer button is
+  /// disabled whenever no field is focused, so *receiving* focus disables it
+  /// and its focus region vanishes on the next frame. The tracker used to
+  /// re-seat focus backward into the page scope, trapping the Tab cycle
+  /// between the two fields forever — the strip could never be reached again.
+  /// A traversal whose landing region vanishes must continue in the traversal
+  /// direction instead.
+  @Test("Tab traversal escapes a control that disables itself on focus and reaches the strip")
+  func tabTraversalEscapesSelfDisablingControlAndReachesStrip() throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 80, height: 24))
+    let rootIdentity = testIdentity("GalleryLikeFocusContextTabCycle")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [KeyPress]()),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        GalleryLikeFocusContextWindow()
+      }
+    )
+    focusTracker.invalidator = scheduler
+
+    func render() throws -> String {
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+      return try #require(terminal.frames.last)
+    }
+
+    func pressTab() throws {
+      #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.tab)))) == nil)
+      _ = try render()
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try render()
+    // The strip (the TabView control identity == this window's root) adopts
+    // initial focus.
+    #expect(focusTracker.currentFocusIdentity == rootIdentity)
+
+    try pressTab()
+    let firstField = try #require(focusTracker.currentFocusIdentity)
+    try pressTab()
+    let secondField = try #require(focusTracker.currentFocusIdentity)
+    #expect(secondField != firstField)
+
+    // Third Tab lands on the consumer button, which disables itself by
+    // taking focus (the field's published focused value goes nil). Focus
+    // must continue forward to the toolbar item — not bounce back into the
+    // fields.
+    try pressTab()
+    let afterButton = try #require(focusTracker.currentFocusIdentity)
+    #expect(
+      afterButton != firstField && afterButton != secondField,
+      "the Tab cycle bounced back into the page fields: \(afterButton)"
+    )
+
+    // Fourth Tab wraps around to the strip.
+    try pressTab()
+    #expect(
+      focusTracker.currentFocusIdentity == rootIdentity,
+      "the Tab cycle never reaches the strip; focus: \(String(describing: focusTracker.currentFocusIdentity))"
+    )
+
+    // Functional proof the strip is genuinely focused: Enter now operates
+    // the strip and drops down the overflow menu (the selected Focus
+    // Context tab sits in the overflow set).
+    #expect(runLoop.handle(RuntimeEvent.input(InputEvent.key(KeyPress(.return)))) == nil)
+    let expanded = try render()
+    #expect(
+      expanded.contains("▲") && expanded.contains("Popovers"),
+      "Enter on the strip reached via Tab must expand the overflow menu; frame:\n\(expanded)"
     )
   }
 
@@ -1533,6 +1688,83 @@ private struct GalleryLikeNavigationCollectionsTab: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct GalleryLikeFocusedTitleKey: FocusedValueKey {
+  typealias Value = Binding<String>
+}
+
+extension FocusedValues {
+  fileprivate var galleryLikeFocusedTitle: Binding<String>? {
+    get { self[GalleryLikeFocusedTitleKey.self] }
+    set { self[GalleryLikeFocusedTitleKey.self] = newValue }
+  }
+}
+
+/// The Focus Context page shape from the gallery: text fields publishing a
+/// focused-value binding, plus a consumer `Button` that is *disabled whenever
+/// no field is focused* — so the button disables itself as a consequence of
+/// receiving focus (moving focus onto it un-focuses the publishing field).
+private struct GalleryLikeFocusContextTab: View {
+  @State private var firstTitle = "Coverage matrix"
+  @State private var secondTitle = "Focused test lane"
+  @FocusedBinding(\.galleryLikeFocusedTitle) private var focusedTitle
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Focus Context header")
+      GroupBox("Fields") {
+        VStack(alignment: .leading, spacing: 1) {
+          TextField("First title", text: $firstTitle)
+            .focusedValue(\.galleryLikeFocusedTitle, $firstTitle)
+          TextField("Second title", text: $secondTitle)
+            .focusedValue(\.galleryLikeFocusedTitle, $secondTitle)
+        }
+      }
+      GroupBox("Consumer") {
+        Button("Mark focused reviewed") {
+          guard let binding = $focusedTitle else { return }
+          binding.wrappedValue = "\(binding.wrappedValue) reviewed"
+        }
+        .disabled($focusedTitle == nil)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(2)
+    .toolbarItem(.init(title: "Mark Focused", action: {}))
+    .panel(id: "gallery-like-focus-context")
+    .toolbar(style: .defaultBottom)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+/// Same 17-tab overflow strip as ``GalleryLikeOverflowNavigationWindow`` but
+/// with the gallery's Focus Context page selected (also in the overflow set).
+private struct GalleryLikeFocusContextWindow: View {
+  @State private var selection = "focus-context"
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Logo", value: "logo") { Text("Logo content") }
+      Tab("Counter", value: "counter") { Text("Counter content") }
+      Tab("Life", value: "life") { Text("Life content") }
+      Tab("Todo", value: "todo") { Text("Todo content") }
+      Tab("Forms & Containers", value: "forms") { Text("Forms content") }
+      Tab("Text Input", value: "text-input") { Text("Text Input content") }
+      Tab("Scroll Control", value: "scroll-control") { Text("Scroll content") }
+      Tab("Calculator", value: "calculator") { Text("Calculator content") }
+      Tab("Borders & Shapes", value: "borders") { Text("Borders content") }
+      Tab("Presentation Lab", value: "presentation") { Text("Presentation content") }
+      Tab("Navigation & Collections", value: "navigation") { Text("Navigation content") }
+      Tab("Images", value: "images") { Text("Images content") }
+      Tab("Animations", value: "animations") { Text("Animations content") }
+      Tab("File Drop", value: "file-drop") { Text("File Drop content") }
+      Tab("Popovers", value: "popovers") { Text("Popovers content") }
+      Tab("Focus Context", value: "focus-context") { GalleryLikeFocusContextTab() }
+      Tab("Progress", value: "progress") { Text("Progress content") }
+    }
+    .tabViewStyle(.literalTabs)
   }
 }
 

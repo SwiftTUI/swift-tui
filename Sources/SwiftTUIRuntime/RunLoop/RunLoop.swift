@@ -47,6 +47,15 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
 
   package var latestSemanticSnapshot = SemanticSnapshot()
+  /// The most recent keyboard focus traversal, kept until the next input
+  /// event. If the region the traversal landed on vanishes from the semantic
+  /// snapshot before any further input — a control that disables itself as a
+  /// consequence of receiving focus (e.g. a button whose enablement reads a
+  /// `@FocusedValue` published by the field that just lost focus) — focus
+  /// continues in the traversal direction instead of being re-seated
+  /// backward into the scope, which would trap the Tab cycle. See
+  /// ``processFocusSyncIteration(_:convergence:)``.
+  package var pendingFocusTraversal: PendingFocusTraversal?
   package var currentFocusPresentation: FocusPresentation = .none
   package var currentFocusedValues = FocusedValues()
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []

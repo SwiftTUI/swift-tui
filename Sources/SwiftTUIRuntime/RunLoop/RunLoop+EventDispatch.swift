@@ -43,6 +43,12 @@ extension RunLoop {
   package func handleKeyPress(
     _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
+    // Every key press invalidates the pending traversal record; the focus
+    // traversal branches below re-record it. The record must only ever
+    // describe the *latest* input, so a landing region that vanishes later
+    // for unrelated reasons (a navigation push, a tab switch) keeps the
+    // tracker's ordinary re-seat behavior.
+    pendingFocusTraversal = nil
     // Scope-based keyCommand dispatch for modifier-bearing keys (plus
     // bare function keys, which never produce text and so are safe to
     // dispatch unmodified — this runs before edit-focus absorption, so
@@ -141,10 +147,10 @@ extension RunLoop {
     if focusedInteractions == .edit {
       switch keyPress {
       case KeyPress(.tab, modifiers: .shift):
-        focusTracker.focusPrevious()
+        performFocusTraversal(step: -1) { focusTracker.focusPrevious() }
         return nil
       case KeyPress(.tab, modifiers: []):
-        focusTracker.focusNext()
+        performFocusTraversal(step: 1) { focusTracker.focusNext() }
         return nil
       case let keyPress where keyPress.modifiers.isEmpty:
         switch keyPress.key {
@@ -179,22 +185,22 @@ extension RunLoop {
 
     switch keyPress {
     case KeyPress(.tab, modifiers: .shift):
-      focusTracker.focusPrevious()
+      performFocusTraversal(step: -1) { focusTracker.focusPrevious() }
       return nil
     case KeyPress(.tab, modifiers: []):
-      focusTracker.focusNext()
+      performFocusTraversal(step: 1) { focusTracker.focusNext() }
       return nil
     case KeyPress(.arrowRight, modifiers: []):
-      focusTracker.moveFocus(.right)
+      performFocusTraversal(step: 1) { focusTracker.moveFocus(.right) }
       return nil
     case KeyPress(.arrowDown, modifiers: []):
-      focusTracker.moveFocus(.down)
+      performFocusTraversal(step: 1) { focusTracker.moveFocus(.down) }
       return nil
     case KeyPress(.arrowLeft, modifiers: []):
-      focusTracker.moveFocus(.left)
+      performFocusTraversal(step: -1) { focusTracker.moveFocus(.left) }
       return nil
     case KeyPress(.arrowUp, modifiers: []):
-      focusTracker.moveFocus(.up)
+      performFocusTraversal(step: -1) { focusTracker.moveFocus(.up) }
       return nil
     case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)

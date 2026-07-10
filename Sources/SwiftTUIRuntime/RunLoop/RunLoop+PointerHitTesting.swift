@@ -211,11 +211,26 @@ extension RunLoop {
       }
   }
 
+  /// Focus-driven activation resolution: walks up from the focused identity
+  /// to the action of the control that *owns* it, stopping at the first
+  /// ancestor that is itself an independently focusable control (it mints its
+  /// own focus region). Crossing such a boundary would let Enter/Space on a
+  /// focused control activate a *different* control the user never focused —
+  /// `TabView` registers its strip action at the control identity that also
+  /// parents the whole tab page, so the unbounded walk turned Enter in any
+  /// focused page control (e.g. a text field) into a strip activation,
+  /// dropping down the overflow menu whenever the selected tab sat in the
+  /// overflow set. Intermediate wrapper identities that mint no focus region
+  /// are still walked through, so an action registered above its control's
+  /// focus region keeps resolving.
   package func containingActivationIdentity(
     for identity: Identity
   ) -> Identity? {
     var current: Identity? = identity
     while let candidate = current {
+      if candidate != identity, mintsFocusRegion(candidate) {
+        return nil
+      }
       if localActionRegistry.hasHandler(identity: candidate) {
         return candidate
       }
@@ -223,6 +238,10 @@ extension RunLoop {
       current = candidate.parent
     }
     return nil
+  }
+
+  private func mintsFocusRegion(_ identity: Identity) -> Bool {
+    latestSemanticSnapshot.focusRegions.contains { $0.identity == identity }
   }
 
   /// Pointer-safe variant of `containingActivationIdentity(for:)`: an ancestor

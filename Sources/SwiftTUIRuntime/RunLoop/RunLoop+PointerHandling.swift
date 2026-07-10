@@ -5,6 +5,15 @@ extension RunLoop {
   package func handleMouseEvent(
     _ mouseEvent: MouseEvent
   ) {
+    // Deliberate pointer actions supersede the pending keyboard traversal
+    // record (passive hover moves do not — they can race the frame that
+    // resolves the traversal's landing).
+    switch mouseEvent.kind {
+    case .down, .up, .dragged, .scrolled:
+      pendingFocusTraversal = nil
+    case .moved:
+      break
+    }
     switch mouseEvent.kind {
     case .down(let button):
       handleMouseDown(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
