@@ -997,3 +997,53 @@ private struct StressLL016Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 017: popover tracks moving source
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 017 open popover follows current source frame")
+  func stress017OpenPopoverFollowsCurrentSourceFrame() throws {
+    // Hypothesis: the portal GeometryReader may resolve a retained placed-frame
+    // table and leave an open popover attached to the source's old position.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL017", "Root"),
+      size: .init(width: 76, height: 12)
+    ) {
+      StressLL017Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Moving Popover")
+    var previousX = try #require(harness.point(forText: "Move Popover Source")).x
+    for offset in stride(from: 2, through: 12, by: 2) {
+      let frame = try harness.clickText("Move Popover Source", chooseLast: true)
+      let currentX = try #require(harness.point(forText: "Move Popover Source")).x
+      withKnownIssue("An open popover retains its opening geometry and content closure") {
+        #expect(currentX > previousX)
+        #expect(frame.contains("popover source offset \(offset)"))
+      }
+      previousX = currentX
+    }
+  }
+}
+
+@MainActor
+private struct StressLL017Fixture: View {
+  @State private var isPresented = false
+  @State private var sourceOffset = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("moving popover base")
+      Button("Open Moving Popover") { isPresented = true }
+        .offset(x: sourceOffset)
+        .popover(isPresented: $isPresented, arrowEdge: .trailing) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("popover source offset \(sourceOffset)")
+            Button("Move Popover Source") { sourceOffset += 2 }
+            Button("Close Moving Popover") { isPresented = false }
+          }
+        }
+    }
+  }
+}
