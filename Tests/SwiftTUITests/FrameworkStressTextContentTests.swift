@@ -428,3 +428,33 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 013: keycap variation-selector replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 013 keycap replacement updates width and wrapping")
+  func textContent013KeycapReplacementUpdatesWidthAndWrapping() {
+    // Hypothesis: retained text width can ignore VS16 and enclosing-keycap scalars when the base
+    // digit is unchanged, preserving the plain digit's one-cell wrapping geometry.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent013")
+
+    for generation in 0..<20 {
+      let keycap = generation.isMultiple(of: 2) ? "1️⃣" : "1"
+      let expectedWidth = generation.isMultiple(of: 2) ? 2 : 1
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 4, height: nil),
+        content: Text("A\(keycap)BC")
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.joined().contains(keycap))
+      #expect(keycap.first.map { cellWidth(of: $0) } == expectedWidth)
+      #expect(frames.retained.measuredTree.measuredSize.height == (expectedWidth == 2 ? 2 : 1))
+    }
+  }
+}
