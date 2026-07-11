@@ -104,4 +104,19 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 007 cancelled waiter does not consume transition")
+  func cancellationState007CancelledWaiterDoesNotConsumeTransition() async {
+    // Hypothesis: removing one cancelled waiter can steal another waiter's continuation.
+    let token = FrameTailJobCancellationToken()
+    let cancelled = Task { await token.waitUntilLeavesQueue().rawValue }
+    let survivor = Task { await token.waitUntilLeavesQueue().rawValue }
+    await Task.yield()
+    cancelled.cancel()
+    _ = await cancelled.value
+    #expect(token.markStarted())
+    #expect(await survivor.value == "started")
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
