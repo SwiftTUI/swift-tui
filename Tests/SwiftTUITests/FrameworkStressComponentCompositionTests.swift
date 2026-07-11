@@ -276,4 +276,35 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 007: ControlGroup label freshness
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 007 labeled ControlGroup refreshes label and controls")
+  func componentComposition007LabeledControlGroupRefreshesLabelAndControls() {
+    // Hypothesis: the label branch can be memo-reused independently of live control payloads.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ControlGroup {
+          Button("control-\(generation)") {}
+        } label: {
+          Text("group-\(generation)")
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition007")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("group-\(generation)"))
+      #expect(text.contains("control-\(generation)"))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
