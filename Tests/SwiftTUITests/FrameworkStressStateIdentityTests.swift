@@ -1,4 +1,5 @@
 import Observation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -263,6 +264,126 @@ extension FrameworkStressStateIdentityTests {
         .id(testIdentity("StateIdentity005", "owner", "\(generation)"))
       }
     }
+  }
+}
+
+// MARK: - Attempt 006: Persistent task writes through a re-minted owner
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 006 persistent task writes the live state owner")
+  func stateIdentity006PersistentTaskWritesLiveOwner() async throws {
+    // Hypothesis: task churn suppression preserves the original closure while outer identity
+    // replacement retires the state node that closure first captured.
+    let clock = StateIdentity006Clock()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity006"),
+      size: .init(width: 54, height: 10)
+    ) {
+      StateIdentity006Root(clock: clock)
+    }
+    defer {
+      clock.finish()
+      harness.shutdown()
+    }
+
+    var taskStayedLive = true
+    #expect(harness.activeTaskCount == 1)
+    for generation in 0..<4 {
+      clock.send(1)
+      let processed = await clock.waitUntilProcessedOrStopped(generation + 1)
+      let frame = try harness.render()
+      taskStayedLive =
+        taskStayedLive
+        && processed
+        && frame.contains("006 Ticks \(generation + 1)")
+
+      let churnedFrame = try harness.clickText("Churn 006")
+      #expect(churnedFrame.contains("006 Generation \(generation + 1)"))
+      #expect(harness.activeTaskCount == 1)
+    }
+
+    withKnownIssue("A persistent task loses its live state owner across outer identity churn") {
+      #expect(taskStayedLive)
+    }
+  }
+
+  private struct StateIdentity006Root: View {
+    let clock: StateIdentity006Clock
+    @State private var generation = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("006 Generation \(generation)")
+        Button("Churn 006") { generation += 1 }
+        StateIdentity006Owner(clock: clock)
+          .id("state-identity-006-owner-\(generation)")
+      }
+    }
+  }
+
+  private struct StateIdentity006Owner: View {
+    let clock: StateIdentity006Clock
+
+    var body: some View {
+      StateIdentity006Worker(clock: clock)
+        .id(testIdentity("StateIdentity006", "worker"))
+    }
+  }
+
+  private struct StateIdentity006Worker: View {
+    let clock: StateIdentity006Clock
+    @State private var ticks = 0
+
+    var body: some View {
+      Text("006 Ticks \(ticks)")
+        .task(id: "state-identity-006-task") {
+          defer { clock.recordTaskStopped() }
+          for await delta in clock.stream {
+            ticks += delta
+            clock.recordProcessedTick()
+          }
+        }
+    }
+  }
+}
+
+@MainActor
+private final class StateIdentity006Clock {
+  let stream: AsyncStream<Int>
+  private var continuation: AsyncStream<Int>.Continuation!
+  private let processedSignal = MainActorConditionSignal()
+  private(set) var processedCount = 0
+  private var taskStopped = false
+
+  init() {
+    var capturedContinuation: AsyncStream<Int>.Continuation?
+    stream = AsyncStream { capturedContinuation = $0 }
+    continuation = capturedContinuation
+  }
+
+  func send(_ value: Int) {
+    continuation.yield(value)
+  }
+
+  func recordProcessedTick() {
+    processedCount += 1
+    processedSignal.notify()
+  }
+
+  func recordTaskStopped() {
+    taskStopped = true
+    processedSignal.notify()
+  }
+
+  func waitUntilProcessedOrStopped(_ expectedCount: Int) async -> Bool {
+    await processedSignal.wait { [self] in
+      processedCount >= expectedCount || taskStopped
+    }
+    return processedCount >= expectedCount
+  }
+
+  func finish() {
+    continuation.finish()
   }
 }
 
