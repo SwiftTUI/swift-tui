@@ -561,3 +561,59 @@ private struct ObservationEffects009View: View {
     .environment(\.observationEffectsString, "base-\(generation)")
   }
 }
+
+// MARK: - Attempt 010: stacked environment-writer order churn
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 010 stacked writers preserve closest-modifier precedence")
+  func observationEffects010StackedWritersPreserveClosestPrecedence() throws {
+    // Hypothesis: retained environment snapshots can ignore modifier-order
+    // changes when the same key is written twice on one stable reader.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects010"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects010View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Flip Writer Order 010")
+      let expected = generation.isMultiple(of: 2) ? "first" : "second"
+      #expect(frame.contains("010 value \(expected)-\(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects010Reader: View {
+  @Environment(\.observationEffectsString) private var value
+
+  var body: some View {
+    Text("010 value \(value)")
+  }
+}
+
+private struct ObservationEffects010View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Flip Writer Order 010") { generation += 1 }
+      target
+    }
+  }
+
+  @ViewBuilder private var target: some View {
+    if generation.isMultiple(of: 2) {
+      ObservationEffects010Reader()
+        .environment(\.observationEffectsString, "first-\(generation)")
+        .environment(\.observationEffectsString, "second-\(generation)")
+        .id("observation-effects-010-reader")
+    } else {
+      ObservationEffects010Reader()
+        .environment(\.observationEffectsString, "second-\(generation)")
+        .environment(\.observationEffectsString, "first-\(generation)")
+        .id("observation-effects-010-reader")
+    }
+  }
+}
