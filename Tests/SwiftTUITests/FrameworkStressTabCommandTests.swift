@@ -673,3 +673,72 @@ private struct StressTC012Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 013: toolbar contribution retracts into descendant
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 013 added inner toolbar retracts its item exactly once")
+  func stressTabCommand013AddedInnerToolbarRetractsItemExactlyOnce() throws {
+    // Hypothesis: installing a nearer late-preference consumer may render the
+    // new inner strip without removing the old contribution from the ancestor.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC013", "Root"),
+      size: .init(width: 72, height: 13)
+    ) {
+      StressTC013Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.clickText("Add inner host")
+    let firstTitle = try #require(frame.firstRange(of: "Retracting tool"))
+    #expect(!frame[firstTitle.upperBound...].contains("Retracting tool"))
+
+    _ = try harness.clickText("Retracting tool")
+    #expect(probe.events == ["retracted"])
+  }
+}
+
+@MainActor
+private struct StressTC013Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var innerHosted = false
+
+  var body: some View {
+    Panel(id: "stress-tc-013-outer") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Add inner host") {
+          innerHosted = true
+        }
+        innerPanel
+        Text("Outer source")
+          .toolbarItem(.init(title: "Outer tool") {})
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 70, height: 11, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var innerPanel: some View {
+    if innerHosted {
+      Panel(id: "stress-tc-013-inner") {
+        retractingSource
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+    } else {
+      Panel(id: "stress-tc-013-inner") {
+        retractingSource
+      }
+    }
+  }
+
+  private var retractingSource: some View {
+    Text("Inner source")
+      .toolbarItem(
+        .init(title: "Retracting tool") {
+          probe.events.append("retracted")
+        }
+      )
+  }
+}
