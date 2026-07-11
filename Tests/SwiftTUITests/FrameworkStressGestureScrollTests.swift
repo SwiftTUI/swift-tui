@@ -66,3 +66,46 @@ private struct GestureScroll001Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 002: live gesture-mask installation
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 002 enabling a gesture mask installs its route once")
+  func gestureScroll002EnablingGestureMaskInstallsRouteOnce() throws {
+    // Hypothesis: a cacheable attachment first resolved with `.none` may never
+    // publish its recognizer when the same node later changes to `.all`.
+    let taps = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll002Root"),
+      size: .init(width: 42, height: 7)
+    ) {
+      GestureScroll002Fixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Dormant target")
+    _ = try harness.clickText("Enable gesture")
+    _ = try harness.clickText("Dormant target")
+    _ = try harness.clickText("Dormant target")
+
+    #expect(taps.value == 2)
+    #expect(harness.gestureRecognizerCount == 1)
+  }
+}
+
+private struct GestureScroll002Fixture: View {
+  let taps: GestureScrollBox<Int>
+  @State private var enabled = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Enable gesture") { enabled = true }
+      Text("Dormant target")
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          TapGesture().onEnded { taps.value += 1 },
+          including: enabled ? .all : .none
+        )
+    }
+  }
+}
