@@ -94,6 +94,49 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 009: safe-area inset alignment replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 009 inset alignment follows every replacement")
+  func safeAreaGeometry009InsetAlignmentFollowsEveryReplacement() {
+    // Hypothesis: inset placement can retain a prior alignment guide when edge, content size, and
+    // consumed amount remain constant across generations.
+    struct Root: View {
+      let generation: Int
+      let alignment: Alignment
+
+      var body: some View {
+        Text("009 base g\(generation)")
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+          .safeAreaInset(edge: .top, alignment: alignment) {
+            Text("009 inset g\(generation)")
+              .frame(width: 20, height: 1, alignment: .center)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry009")
+    let alignments: [Alignment] = [.topLeading, .top, .topTrailing, .top]
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, alignment: alignments[generation % alignments.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 52, height: 12),
+        safeAreaInsets: .init(top: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("009 inset g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 008: safe-area inset edge replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
