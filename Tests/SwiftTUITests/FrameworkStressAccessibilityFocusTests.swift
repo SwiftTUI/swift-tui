@@ -214,3 +214,61 @@ private struct StressAF004Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 005: hidden ownership under semantic reorder
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 005 hidden state follows reordered semantic owner")
+  func stress005HiddenStateFollowsReorderedSemanticOwner() throws {
+    // Hypothesis: ordinal semantic reuse can attach accessibilityHidden to the old row when two
+    // stable rows reverse order while the hidden owner changes in the same transaction.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF005", "Root"),
+      size: .init(width: 52, height: 8)
+    ) {
+      StressAF005Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<9 {
+      _ = try harness.clickText("Reorder hidden owner")
+    }
+
+    let labels = accessibilityFocusNodes(in: harness).compactMap(\.label)
+    #expect(labels.contains("Semantic owner A generation 9"))
+    #expect(!labels.contains("Semantic owner B generation 9"))
+    #expect(!labels.contains { $0.contains("generation 8") })
+  }
+}
+
+private struct StressAF005Row: Identifiable {
+  let id: String
+}
+
+@MainActor
+private struct StressAF005Fixture: View {
+  @State private var generation = 0
+
+  private var rows: [StressAF005Row] {
+    let values = [StressAF005Row(id: "a"), StressAF005Row(id: "b")]
+    return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+  }
+
+  private var hiddenID: String {
+    generation.isMultiple(of: 2) ? "a" : "b"
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder hidden owner") {
+        generation += 1
+      }
+      ForEach(rows) { row in
+        Text("Visible row \(row.id)")
+          .accessibilityRole(.status)
+          .accessibilityLabel("Semantic owner \(row.id.uppercased()) generation \(generation)")
+          .accessibilityHidden(row.id == hiddenID)
+      }
+    }
+  }
+}
