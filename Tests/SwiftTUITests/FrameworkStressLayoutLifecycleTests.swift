@@ -1047,3 +1047,75 @@ private struct StressLL017Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 018: logical tab focus across reorder
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 018 reordered tabs preserve logical focused tag")
+  func stress018ReorderedTabsPreserveLogicalFocusedTag() throws {
+    // Hypothesis: TabView stores strip focus as a raw index, so reordering
+    // stable tags can silently retarget activation to another tab.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL018", "Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      StressLL018Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressLL018Fixture.tabIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    for generation in 1...6 {
+      _ = try harness.clickText("Reverse Tabs")
+      _ = try harness.focus(StressLL018Fixture.tabIdentity)
+      let frame = try harness.pressKey(KeyPress(.return))
+      if generation.isMultiple(of: 2) {
+        #expect(frame.contains("selected tag C"))
+        #expect(frame.contains("content C"))
+      } else {
+        withKnownIssue("Reordered tabs retarget the stored logical focus to a different tag") {
+          #expect(frame.contains("selected tag C"))
+          #expect(frame.contains("content C"))
+        }
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL018Fixture: View {
+  static let tabIdentity = testIdentity("StressLL018", "Tabs")
+
+  @State private var selection = "A"
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse Tabs") { reversed.toggle() }
+      Text("selected tag \(selection)")
+      TabView(selection: $selection) {
+        if reversed {
+          tab("C")
+          tab("B")
+          tab("A")
+        } else {
+          tab("A")
+          tab("B")
+          tab("C")
+        }
+      }
+      .tabViewStyle(.literalTabs)
+      .id(Self.tabIdentity)
+      .frame(width: 48, height: 6, alignment: .topLeading)
+    }
+  }
+
+  private func tab(_ value: String) -> some View {
+    Tab("Tab \(value)", value: value) {
+      Text("content \(value)")
+    }
+    .id(value)
+  }
+}
