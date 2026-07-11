@@ -214,3 +214,55 @@ private struct ControlStress004Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 005: toggle binding retarget across disabled teardown
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 005 reenabled toggle writes its retargeted binding")
+  func stressControlBinding005ReenabledToggleWritesRetargetedBinding() throws {
+    // Hypothesis: a Toggle action removed while disabled can be restored with the pre-disable
+    // binding even when the same control identity is retargeted before it is enabled again.
+    let first = ControlStressProbe(false)
+    let second = ControlStressProbe(false)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress005", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      ControlStress005Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget and disable 005")
+    _ = try harness.clickText("Reenable toggle 005")
+    _ = try harness.clickText("Retargeted toggle 005")
+
+    #expect(first.value == false)
+    #expect(first.writes.isEmpty)
+    #expect(second.value == true)
+    #expect(second.writes == [true])
+  }
+}
+
+@MainActor
+private struct ControlStress005Fixture: View {
+  let first: ControlStressProbe<Bool>
+  let second: ControlStressProbe<Bool>
+  @State private var usesSecond = false
+  @State private var isEnabled = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget and disable 005") {
+        usesSecond = true
+        isEnabled = false
+      }
+      Button("Reenable toggle 005") { isEnabled = true }
+      Toggle(
+        "Retargeted toggle 005",
+        isOn: usesSecond ? second.binding() : first.binding()
+      )
+      .id("retargeted-toggle-005")
+      .disabled(!isEnabled)
+    }
+  }
+}
