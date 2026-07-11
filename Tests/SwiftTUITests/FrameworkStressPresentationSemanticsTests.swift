@@ -506,6 +506,53 @@ private struct StressPS011Fixture: View {
   }
 }
 
+// MARK: - Attempt 012: active menu picker payload refresh
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 012 a focused menu picker refreshes every option label")
+  func stress012FocusedMenuPickerRefreshesOptionLabels() throws {
+    // Hypothesis: the active-navigation branch may retain its initially
+    // collected labels while the stable Picker's authored payload changes.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS012", "Root"),
+      size: .init(width: 50, height: 12)
+    ) {
+      StressPS012Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Alpha 0")
+    let frame = try harness.pressKey(KeyPress(.arrowDown))
+
+    #expect(frame.contains("Alpha 1"))
+    #expect(frame.contains("Beta 1"))
+    #expect(!frame.contains("Beta 0"))
+  }
+}
+
+@MainActor
+private struct StressPS012Fixture: View {
+  @State private var generation = 0
+  @State private var selection = "a"
+
+  var body: some View {
+    Picker(
+      "Mode",
+      selection: Binding(
+        get: { selection },
+        set: {
+          selection = $0
+          generation += 1
+        }
+      )
+    ) {
+      Text("Alpha \(generation)").tag("a")
+      Text("Beta \(generation)").tag("b")
+    }
+    .pickerStyle(.menu)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
