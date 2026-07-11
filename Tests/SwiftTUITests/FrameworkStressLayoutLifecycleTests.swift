@@ -1844,3 +1844,60 @@ private struct StressLL030Sheet: View {
     }
   }
 }
+
+// MARK: - Attempt 031: stacked value-animation bookkeeping
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 031 stacked value animations keep independent baselines")
+  func stress031StackedValueAnimationsKeepIndependentBaselines() throws {
+    // Hypothesis: multiple value-gated animation modifiers on one view may
+    // alias the same retained previous-value slot and manufacture a change on
+    // every otherwise identical resolve.
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("StressLL031", "Root")
+    let proposal = ProposedSize(width: 32, height: 4)
+
+    _ = renderer.render(
+      stressLL031Fixture(),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    for _ in 1...8 {
+      let artifacts = renderer.render(
+        stressLL031Fixture(),
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      let textNode = try #require(
+        artifacts.resolvedTree.stressLLDescendant(withText: "stacked value animation probe")
+      )
+      withKnownIssue("Stacked value-animation modifiers alias one retained baseline slot") {
+        #expect(textNode.transactionSnapshot.animationRequest == .inherit)
+      }
+    }
+  }
+}
+
+@MainActor
+private func stressLL031Fixture() -> some View {
+  Text("stacked value animation probe")
+    .animation(.linear(duration: .milliseconds(120)), value: 1)
+    .animation(.easeInOut(duration: .milliseconds(240)), value: 2)
+}
+
+extension ResolvedNode {
+  fileprivate func stressLLDescendant(withText text: String) -> ResolvedNode? {
+    if case .text(let value) = drawPayload, value == text {
+      return self
+    }
+
+    for child in children {
+      if let match = child.stressLLDescendant(withText: text) {
+        return match
+      }
+    }
+
+    return nil
+  }
+}
