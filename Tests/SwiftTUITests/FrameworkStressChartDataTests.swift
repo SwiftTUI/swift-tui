@@ -105,6 +105,62 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 023: calendar range and chrome topology replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 023 calendar range week start and chrome topology replace")
+  func chartData023CalendarRangeWeekStartAndChromeTopologyReplace() {
+    // Hypothesis: changing week origin and week-column count alongside optional
+    // chrome can retain an old bucket shape or mismatched weekday labels.
+    struct Root: View {
+      let generation: Int
+
+      var showsMonthHeader: Bool { !generation.isMultiple(of: 3) }
+      var showsDayLabels: Bool { generation.isMultiple(of: 2) }
+      var showsLegend: Bool { generation % 4 < 2 }
+
+      var range: ClosedRange<Date> {
+        generation.isMultiple(of: 2)
+          ? chartDataDate(day: 0)...chartDataDate(day: 6)
+          : chartDataDate(day: -14)...chartDataDate(day: 34)
+      }
+
+      var body: some View {
+        CalendarHeatmap(
+          "Weeks \(generation)",
+          days: [
+            .init(chartDataDate(day: 0), value: Double(generation + 1)),
+            .init(chartDataDate(day: 5), value: Double(generation + 4)),
+            .init(chartDataDate(day: 27), value: Double(generation + 8)),
+          ],
+          range: range,
+          weekStart: generation.isMultiple(of: 2) ? .sunday : .monday,
+          calendar: chartDataUTCGregorian,
+          cellWidth: 2,
+          showsMonthHeader: showsMonthHeader,
+          showsDayLabels: showsDayLabels,
+          showsScaleLegend: true
+        )
+        .chartLegend(showsLegend ? .bottom : .hidden)
+      }
+    }
+
+    chartDataExercise(attempt: "023", proposal: .init(width: 64, height: 14)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Weeks \(generation)"))
+      #expect(text.contains("3 days"))
+      #expect(text.contains("Mon") == root.showsDayLabels)
+      #expect(text.contains("Less") == root.showsLegend)
+      if root.showsMonthHeader {
+        #expect(text.contains("Ja"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 022: calendar duplicate aggregation and input order
 
 extension FrameworkStressChartDataTests {
