@@ -776,3 +776,72 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+private struct TableOutlineNode: Identifiable {
+  let id: String
+  let title: String
+  let children: [TableOutlineNode]?
+
+  init(
+    id: String,
+    title: String,
+    children: [TableOutlineNode]? = nil
+  ) {
+    self.id = id
+    self.title = title
+    self.children = children
+  }
+}
+
+// MARK: - Attempt 014: outline child reorder
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 014 outline child reorder follows current preorder")
+  func tableOutline014OutlineChildReorderFollowsCurrentPreorder() {
+    // Hypothesis: OutlineTree can reuse a prior recursive child traversal when
+    // stable child IDs reorder while their visible payloads also change.
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+
+      var body: some View {
+        OutlineGroup(nodes, children: \.children) { node in
+          Text(node.title)
+        }
+        .outlineStyle(.plain)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline014")
+    for generation in 0..<20 {
+      let children = [
+        TableOutlineNode(id: "a", title: "A-\(generation)"),
+        TableOutlineNode(id: "b", title: "B-\(generation)"),
+        TableOutlineNode(id: "c", title: "C-\(generation)"),
+      ]
+      let ordered = generation.isMultiple(of: 2) ? children : [children[2], children[0], children[1]]
+      let root = Root(
+        nodes: [
+          .init(id: "root", title: "Root-\(generation)", children: ordered)
+        ]
+      )
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 24, height: 10)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 24, height: 10)
+      )
+      let expected = ["Root-\(generation)"] + ordered.map(\.title)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(tableOutlineContainsInOrder(expected, in: tableOutlineText(retained)))
+    }
+  }
+}
