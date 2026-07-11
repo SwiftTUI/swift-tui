@@ -1404,3 +1404,43 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 026: reminted transition registry boundedness
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 026 transition registry stays bounded through owner churn")
+  func animationTemporal026TransitionRegistryStaysBoundedThroughOwnerChurn() throws {
+    // Hypothesis: current and previous transition maps can accumulate reminted
+    // node IDs after each old owner leaves the live tree.
+    let controller = AnimationController()
+    let rootID = testIdentity("AnimationTemporal026", "Root")
+    let start = MonotonicInstant(offset: .seconds(140))
+
+    for generation in 1...24 {
+      let leafID = testIdentity("AnimationTemporal026", "Leaf", "\(generation)")
+      let nodeID = ViewNodeID(rawValue: UInt64(2_600 + generation))
+      controller.beginTransitionCollection()
+      controller.registerTransition(
+        for: leafID, viewNodeID: nodeID, transition: AnyTransition.opacity)
+      controller.finishTransitionCollection()
+      let tree = animationTemporalRoot(
+        identity: rootID,
+        children: [animationTemporalNode(identity: leafID, viewNodeID: nodeID)]
+      )
+      controller.processResolvedTree(
+        tree,
+        transaction: .init(),
+        timestamp: start.advanced(by: .milliseconds(generation * 10))
+      )
+      var tickTree = tree
+      _ = controller.applyInterpolations(
+        to: &tickTree,
+        at: start.advanced(by: .milliseconds(generation * 10 + 1))
+      )
+      let snapshot = controller.debugStateSnapshot()
+      #expect(snapshot.transitionNodeIDs.count <= 1)
+      #expect(snapshot.previousTransitionNodeIDs.count <= 1)
+      #expect(snapshot.pendingTransitionNodeIDs.count <= 1)
+    }
+  }
+}
+
