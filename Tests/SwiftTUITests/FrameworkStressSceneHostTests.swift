@@ -133,3 +133,44 @@ private func sceneHost003Scene(generation: Int) -> some Scene {
     WindowGroup("First", id: "shared") { Text("first") }
   }
 }
+
+// MARK: - Attempt 004: retained scene content builder capture
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 004 repeated root construction preserves one authored capture")
+  func sceneHost004RepeatedRootConstructionPreservesOneAuthoredCapture() {
+    // Hypothesis: repeated host calls to makeScopedRootView can reexecute a
+    // WindowGroup content closure and multiply its authoring-time side effects.
+    let model = SceneHost004Model()
+    let group = WindowGroup("Captured", id: "captured") {
+      let build = model.nextBuild()
+      Text("scene build \(build)")
+    }
+    let configuration = group.windowSceneConfiguration()
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+
+    for current in 0..<24 {
+      let frame = renderer.render(
+        WindowHostView(content: configuration.makeScopedRootView()),
+        context: .init(
+          identity: configuration.rootIdentity,
+          invalidatedIdentities: current == 0 ? [] : [configuration.rootIdentity]
+        ),
+        proposal: .init(width: 32, height: 4)
+      )
+
+      #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("scene build 1"))
+      #expect(model.buildCount == 1)
+    }
+  }
+}
+
+@MainActor
+private final class SceneHost004Model {
+  private(set) var buildCount = 0
+
+  func nextBuild() -> Int {
+    buildCount += 1
+    return buildCount
+  }
+}
