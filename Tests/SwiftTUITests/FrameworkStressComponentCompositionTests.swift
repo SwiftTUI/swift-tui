@@ -338,4 +338,33 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 009: ControlGroup enablement churn
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 009 ControlGroup enablement refreshes focus regions")
+  func componentComposition009ControlGroupEnablementRefreshesFocusRegions() {
+    // Hypothesis: disabling the group can leave one synthesized child focusable.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ControlGroup {
+          Button("first") {}
+          Button("second") {}
+        }
+        .disabled(!generation.isMultiple(of: 2))
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition009")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
