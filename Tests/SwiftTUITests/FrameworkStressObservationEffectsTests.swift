@@ -1586,3 +1586,45 @@ private struct ObservationEffects027View: View {
     }
   }
 }
+
+// MARK: - Attempt 028: task priority replacement
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 028 changing only task priority replaces the live descriptor")
+  func observationEffects028TaskPriorityChangeReplacesLiveDescriptor() throws {
+    // Hypothesis: task registrations replace by descriptor ID while lifecycle
+    // diffing compares priority too, allowing the old-priority task to survive.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects028"),
+      size: .init(width: 72, height: 7)
+    ) {
+      ObservationEffects028View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      _ = try harness.clickText("Toggle Task Priority 028")
+      let descriptors =
+        harness.runLoop.lifecycleCoordinator.activeTaskDescriptors.values.flatMap { $0 }
+      #expect(descriptors.count == 1)
+      #expect(descriptors.first?.priority == (generation.isMultiple(of: 2) ? .high : .low))
+      #expect(harness.runLoop.lifecycleCoordinator.taskStartSkipCount == 0)
+    }
+  }
+}
+
+private struct ObservationEffects028View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Task Priority 028") { generation += 1 }
+      Text("028 generation \(generation)")
+        .task(priority: generation.isMultiple(of: 2) ? .high : .low) {
+          while !Task.isCancelled {
+            await Task.yield()
+          }
+        }
+    }
+  }
+}
