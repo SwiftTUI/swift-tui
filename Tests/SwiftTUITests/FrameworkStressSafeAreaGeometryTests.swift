@@ -109,6 +109,72 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+private struct SafeAreaGeometry024Entry: Identifiable {
+  let id: String
+  let height: Int
+}
+
+// MARK: - Attempt 024: duplicate named-space reorder
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 024 duplicate named space follows last owner")
+  func safeAreaGeometry024DuplicateNamedSpaceFollowsLastOwner() {
+    // Hypothesis: duplicate-name resolution can keep the first committed owner after stable
+    // entities reorder, instead of applying the documented current last-writer-wins rule.
+    struct Root: View {
+      let generation: Int
+
+      private var entries: [SafeAreaGeometry024Entry] {
+        let entries = [
+          SafeAreaGeometry024Entry(id: "A", height: 1),
+          SafeAreaGeometry024Entry(id: "B", height: 3),
+        ]
+        return generation.isMultiple(of: 2) ? entries : Array(entries.reversed())
+      }
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(entries) { entry in
+            Text("024 owner \(entry.id) g\(generation)")
+              .frame(width: 22, height: entry.height, alignment: .topLeading)
+              .coordinateSpace(name: "duplicate-024")
+          }
+          GeometryReader { proxy in
+            let frame = proxy.frame(in: .named("duplicate-024"))
+            Text(
+              "024 g\(generation) frame \(Int(frame.origin.y))x\(Int(frame.size.height))"
+            )
+          }
+          .frame(width: 36, height: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry024")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 14),
+        safeAreaInsets: .init(top: 1)
+      )
+
+      let diagnostics = frames.retained.diagnostics.geometryResolutionDiagnostics
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        safeAreaGeometryMeasurementsMatch(frames.retained.measuredTree, frames.fresh.measuredTree)
+      )
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("024 g\(generation) frame"))
+      #expect(diagnostics.duplicateNamedCoordinateSpaceCount == 1)
+    }
+  }
+}
+
 // MARK: - Attempt 023: named coordinate-space replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
