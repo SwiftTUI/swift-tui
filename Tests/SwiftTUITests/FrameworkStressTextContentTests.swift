@@ -920,3 +920,68 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+@MainActor
+private final class TextContentBox<Value> {
+  var value: Value
+  var writeCount = 0
+
+  init(_ value: Value) {
+    self.value = value
+  }
+
+  func binding() -> Binding<Value> {
+    Binding(
+      get: { self.value },
+      set: {
+        self.value = $0
+        self.writeCount += 1
+      }
+    )
+  }
+}
+
+// MARK: - Attempt 026: same-binding external replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 026 focused field edits live external replacement")
+  func textContent026FocusedFieldEditsLiveExternalReplacement() throws {
+    // Hypothesis: a focused TextField can keep editing its internal pre-replacement string after
+    // the same binding receives equal-length external content at a retained identity.
+    let text = TextContentBox("abcd")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent026Root"),
+      size: .init(width: 32, height: 4)
+    ) {
+      TextContent026Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent026Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.clickText("Replace same length")
+    _ = try harness.focus(TextContent026Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.value == "WX!YZ")
+    #expect(text.writeCount == 1)
+    #expect(harness.frame.contains("WX!YZ"))
+  }
+}
+
+@MainActor
+private struct TextContent026Fixture: View {
+  static let fieldIdentity = testIdentity("TextContent026", "Field")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace same length") { text.value = "WXYZ" }
+      TextField("Value", text: text.binding())
+        .id(Self.fieldIdentity)
+        .textFieldStyle(.plain)
+    }
+  }
+}
