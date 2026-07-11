@@ -1947,3 +1947,99 @@ private struct CollectionLayout030Root: View {
     }
   }
 }
+
+// MARK: - Attempt 031: custom cache proposal revisit
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 031 custom cache follows revisited proposals")
+  func collectionLayout031CustomCacheFollowsRevisitedProposals() {
+    // Hypothesis: proposal-keyed pass cache entries or retained measurement
+    // reuse may feed placement the width recorded for another proposal.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout031")
+    let widths = [6, 11, 8, 14, 9, 6, 14, 8, 11, 9]
+
+    for generation in 0..<30 {
+      let width = widths[generation % widths.count]
+      let root = CollectionLayout031Root()
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: width, height: 1)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: width, height: 1)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == .init(width: width, height: 1))
+      #expect(retained.rasterSurface.lines.first?.last == "X")
+    }
+  }
+}
+
+private struct CollectionLayout031Cache: Sendable {
+  var measuredWidth = 0
+}
+
+private struct CollectionLayout031ProposalLayout: Layout {
+  var measurementReuseSignature: String? { "CollectionLayout031.measure" }
+  var placementReuseSignature: String? { "CollectionLayout031.place" }
+
+  func makeCache(subviews _: LayoutSubviews) -> CollectionLayout031Cache {
+    .init()
+  }
+
+  func updateCache(
+    _ cache: inout CollectionLayout031Cache,
+    subviews _: LayoutSubviews
+  ) {
+    cache.measuredWidth = 0
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews _: LayoutSubviews,
+    cache: inout CollectionLayout031Cache
+  ) -> LayoutSize {
+    let width: Int
+    switch proposal.width {
+    case .finite(let value):
+      width = value
+    case .unspecified, .infinity:
+      width = 1
+    }
+    cache.measuredWidth = width
+    return .init(width: width, height: 1)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout CollectionLayout031Cache
+  ) {
+    guard let child = subviews.first else {
+      return
+    }
+    child.place(
+      at: .init(x: bounds.origin.x + max(0, cache.measuredWidth - 1), y: bounds.origin.y),
+      anchor: .topLeading,
+      proposal: .init(width: 1, height: 1)
+    )
+  }
+}
+
+@MainActor
+private struct CollectionLayout031Root: View {
+  var body: some View {
+    CollectionLayout031ProposalLayout() {
+      Text("X")
+    }
+  }
+}
