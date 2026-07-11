@@ -34,4 +34,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 004 adjacent full chunks do not exchange bits")
+  func styleTransport004AdjacentFullChunksDoNotExchangeBits() {
+    // Hypothesis: index advancement can leak low bits across three-byte chunk boundaries.
+    let bytes: [UInt8] = [0x00, 0x01, 0x02, 0xFD, 0xFE, 0xFF]
+    #expect(StyleTransportBase64.decode(StyleTransportBase64.encode(bytes)) == bytes)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
