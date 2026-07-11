@@ -509,3 +509,47 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 010: stroke background-style churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 010 shape stroke carries its current background style")
+  func visualEffects010ShapeStrokeCarriesCurrentBackgroundStyle() {
+    // Hypothesis: the optional BorderBackgroundStyle can lag behind the foreground stroke payload,
+    // pairing current outline glyphs with a background color captured by an earlier generation.
+    struct Root: View {
+      let generation: Int
+
+      var background: Color {
+        switch generation % 4 {
+        case 0: .red.opacity(0.25)
+        case 1: .blue.opacity(0.5)
+        case 2: .green.opacity(0.75)
+        default: .magenta.opacity(0.4)
+        }
+      }
+
+      var body: some View {
+        Capsule()
+          .stroke(Color.white, style: .double, background: background)
+          .frame(width: 24, height: 9)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects010")
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
