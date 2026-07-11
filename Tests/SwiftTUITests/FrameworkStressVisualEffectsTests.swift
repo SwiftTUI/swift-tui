@@ -981,3 +981,60 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 018: translucent blend-mode churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 018 overlapping translucent fill uses current blend mode")
+  func visualEffects018OverlappingTranslucentFillUsesCurrentBlendMode() {
+    // Hypothesis: retained DrawEffects can preserve a previous BlendMode even while the overlaid
+    // translucent shape and its destination backdrop both re-rasterize at stable identities.
+    struct Root: View {
+      let generation: Int
+
+      var mode: BlendMode {
+        switch generation % 6 {
+        case 0: .normal
+        case 1: .multiply
+        case 2: .screen
+        case 3: .overlay
+        case 4: .darken
+        default: .lighten
+        }
+      }
+
+      var body: some View {
+        Rectangle()
+          .fill(Color.blue.opacity(0.8))
+          .frame(width: 24, height: 9)
+          .overlay {
+            RoundedRectangle(cornerRadius: 2)
+              .fill(Color.red.opacity(0.65))
+              .frame(width: 16, height: 7)
+              .blendMode(mode)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects018")
+
+    for generation in 0..<30 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(
+        retained.rasterSurface.presentationLayers.contains {
+          $0.effects.contains(.blendMode(root.mode))
+        }
+      )
+    }
+  }
+}
