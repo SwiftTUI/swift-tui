@@ -95,6 +95,50 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 003: column cardinality shrink and regrow
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 003 column cardinality shrink and regrow rebuilds indexed cells")
+  func chartData003ColumnCardinalityShrinkAndRegrowRebuildsIndexedCells() {
+    // Hypothesis: ColumnChart's nested index-keyed rows can preserve departed
+    // columns or fail to materialize regrown columns after repeated cardinality churn.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let count = generation.isMultiple(of: 3) ? 1 : 4
+        let entries = (0..<count).map { index in
+          BarChartEntry(
+            "\(index)\(generation % 10)",
+            value: Double((index + 1) * (generation + 2)),
+            tone: index.isMultiple(of: 2) ? .success : .warning
+          )
+        }
+        ColumnChart(
+          "Columns \(generation)",
+          entries: entries,
+          chartHeight: 3 + (generation % 4),
+          columnWidth: 2
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "003", proposal: .init(width: 48, height: 12)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      let count = generation.isMultiple(of: 3) ? 1 : 4
+      #expect(text.contains("Columns \(generation)"))
+      for index in 0..<count {
+        #expect(text.contains("\(index)\(generation % 10)"))
+      }
+      if count == 1 {
+        #expect(!text.contains("3\(generation % 10)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 002: bar signed-domain replacement
 
 extension FrameworkStressChartDataTests {
