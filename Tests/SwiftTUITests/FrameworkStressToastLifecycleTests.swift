@@ -510,3 +510,49 @@ private struct ToastLifecycle009Root: View {
     )
   }
 }
+
+// MARK: - Attempt 010: shorter replacement deadline
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 010 shorter duration replaces the active deadline")
+  func toastLifecycle010ShorterDurationReplacesTheActiveDeadline() async throws {
+    // Hypothesis: changing duration does not change the task descriptor, so a one-second timer can
+    // survive after the active toast requests a near-immediate replacement deadline.
+    let presented = ToastLifecycleBox(true)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle010"),
+      size: .init(width: 64, height: 10)
+    ) {
+      ToastLifecycle010Root(presented: presented)
+    }
+    defer { harness.shutdown() }
+
+    let shortened = try harness.clickText("Shorten Toast Timer 010")
+    #expect(shortened.contains("timer shortened true"))
+    await AsyncEvent.firing(after: .milliseconds(140)).wait()
+    _ = try harness.render()
+    let dismissed = !presented.value
+
+    withKnownIssue("Shorter duration does not replace the toast's active long deadline") {
+      #expect(dismissed && toastLifecycleEntryCount(in: harness) == 0)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle010Root: View {
+  let presented: ToastLifecycleBox<Bool>
+  @State private var timerShortened = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Shorten Toast Timer 010") { timerShortened = true }
+      Text("timer shortened \(timerShortened)")
+    }
+    .toast(
+      "long to short toast",
+      isPresented: presented.binding(),
+      duration: timerShortened ? 0.04 : 1.0
+    )
+  }
+}
