@@ -55,3 +55,43 @@ private func sceneHost001Scene(generation: Int) -> some Scene {
     }
   }
 }
+
+// MARK: - Attempt 002: erased scene order through empty prefixes
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 002 nested scene erasure preserves current descriptor order")
+  func sceneHost002NestedSceneErasurePreservesCurrentDescriptorOrder() {
+    // Hypothesis: nested AnyScene boxes can snapshot a variadic child's first
+    // traversal and replay that order after empty-prefix and reversal churn.
+    for generation in 0..<24 {
+      let scene = AnyScene(AnyScene(sceneHost002Scene(generation: generation)))
+      let descriptors = collectWindowSceneDescriptors(from: scene)
+      let expected =
+        generation.isMultiple(of: 2)
+        ? ["alpha", "beta", "gamma"]
+        : ["gamma", "beta", "alpha"]
+
+      #expect(descriptors.map(\.id.rawValue) == expected)
+      #expect(descriptors.map(\.isDefault) == [true, false, false])
+    }
+  }
+}
+
+@MainActor
+@SceneBuilder
+private func sceneHost002Scene(generation: Int) -> some Scene {
+  if generation.isMultiple(of: 3) {
+    ()
+  }
+
+  for id in generation.isMultiple(of: 2)
+    ? ["alpha", "beta", "gamma"]
+    : ["gamma", "beta", "alpha"]
+  {
+    AnyScene(
+      WindowGroup(id: WindowIdentifier(id)) {
+        Text(id)
+      }
+    )
+  }
+}
