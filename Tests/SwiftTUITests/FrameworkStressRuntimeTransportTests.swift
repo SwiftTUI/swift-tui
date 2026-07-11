@@ -35,3 +35,24 @@ extension FrameworkStressRuntimeTransportTests {
     )
   }
 }
+
+// MARK: - Attempt 002: zero-sum scroll coalescing
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 002 opposing scroll deltas retain one ordered event")
+  func runtimeTransport002OpposingScrollDeltasRetainOneOrderedEvent() {
+    // Hypothesis: opposite deltas at one cell can cancel by dropping the event
+    // entirely, allowing later batches to cross what should remain a boundary.
+    let location = Point(x: 4, y: 2)
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .scrolled(deltaX: 3, deltaY: -4), location: location)),
+      .mouse(.init(kind: .scrolled(deltaX: -3, deltaY: 4), location: location)),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 0), location: location))
+      ]
+    )
+  }
+}
