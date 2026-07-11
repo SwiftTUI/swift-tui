@@ -1338,4 +1338,47 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 032: Accessibility role churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 032 stable payload publishes its current semantic role")
+  func renderReconciliation032StablePayloadPublishesCurrentSemanticRole() throws {
+    // Hypothesis: retained phase signatures mirror SemanticMetadata, but partial proof generation
+    // may still classify a stable draw payload as reusable across accessibility-role changes.
+    struct Root: View {
+      let role: AccessibilityRole
+
+      var body: some View {
+        Text("Semantic payload")
+          .accessibilityRole(role)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation032")
+    let roles: [AccessibilityRole] = [.button, .image, .heading(level: 2), .status]
+
+    for generation in 0..<20 {
+      let role = roles[generation % roles.count]
+      let root = Root(role: role)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(try #require(retained.semanticSnapshot.accessibilityNodes.first).role == role)
+      #expect(
+        retained.semanticSnapshot
+          == DefaultRenderer().render(
+            root,
+            context: .init(identity: rootIdentity)
+          ).semanticSnapshot
+      )
+    }
+  }
+}
+
 // MARK: - End
