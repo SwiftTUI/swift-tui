@@ -1017,3 +1017,54 @@ private struct ControlStress021Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 022: disclosure external expansion while disabled
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 022 reenabled disclosure collapses external expansion")
+  func stressControlBinding022ReenabledDisclosureCollapsesExternalExpansion() throws {
+    // Hypothesis: a DisclosureGroup disabled while its binding changes externally can restore an
+    // action that toggles a cached pre-disable value instead of the current expanded binding.
+    let expansion = ControlStressProbe(false)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress022", "Root"),
+      size: .init(width: 56, height: 10)
+    ) {
+      ControlStress022Fixture(expansion: expansion)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable and expand 022")
+    var frame = try harness.clickText("Reenable disclosure 022")
+    #expect(frame.contains("Externally expanded body 022"))
+    frame = try harness.clickText("External disclosure 022")
+
+    #expect(expansion.value == false)
+    #expect(expansion.writes == [false])
+    #expect(!frame.contains("Externally expanded body 022"))
+  }
+}
+
+@MainActor
+private struct ControlStress022Fixture: View {
+  let expansion: ControlStressProbe<Bool>
+  @State private var isEnabled = true
+  @State private var externalRevision = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Disable and expand 022") {
+        isEnabled = false
+        expansion.value = true
+        externalRevision += 1
+      }
+      Button("Reenable disclosure 022") { isEnabled = true }
+      DisclosureGroup("External disclosure 022", isExpanded: expansion.binding()) {
+        Text("Externally expanded body 022")
+      }
+      .id("external-disclosure-022")
+      .disabled(!isEnabled)
+      Text("Disclosure external revision 022 \(externalRevision)")
+    }
+  }
+}
