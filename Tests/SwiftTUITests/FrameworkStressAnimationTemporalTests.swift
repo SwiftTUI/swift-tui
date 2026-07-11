@@ -726,3 +726,43 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 014: independent custom state per property slot
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 014 custom state stays isolated across property slots")
+  func animationTemporal014CustomStateStaysIsolatedAcrossPropertySlots() throws {
+    // Hypothesis: two property records sharing one AnimationBox can also share
+    // one mutable AnimationState and advance each other's custom bookkeeping.
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "014", probe: probe))
+    let controller = AnimationController()
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal014", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(60))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0, padding: .zero),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    var target = animationTemporalNode(
+      identity: identity,
+      opacity: 1,
+      padding: EdgeInsets(all: 8)
+    )
+    controller.processResolvedTree(target, transaction: transaction, timestamp: start)
+    _ = controller.applyInterpolations(
+      to: &target,
+      at: start.advanced(by: .milliseconds(100))
+    )
+    #expect(Array(probe.observations.suffix(2)).sorted() == [0, 0])
+
+    _ = controller.applyInterpolations(
+      to: &target,
+      at: start.advanced(by: .milliseconds(200))
+    )
+    #expect(Array(probe.observations.suffix(2)).sorted() == [1, 1])
+  }
+}
+
