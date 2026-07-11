@@ -36,6 +36,32 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 005: paste boundary inside pointer traffic
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 005 paste keeps surrounding scroll bursts ordered")
+  func runtimeTransport005PasteKeepsSurroundingScrollBurstsOrdered() {
+    // Hypothesis: paste delivery can flush only one side of a coalesced pointer
+    // burst, allowing scroll deltas to cross the non-pointer event.
+    let location = Point(x: 5, y: 4)
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: location)),
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 2), location: location)),
+      .paste(.init(content: "payload")),
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 4), location: location)),
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 8), location: location)),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: location)),
+        .paste(.init(content: "payload")),
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 12), location: location)),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 004: dragged-button transition
 
 extension FrameworkStressRuntimeTransportTests {
