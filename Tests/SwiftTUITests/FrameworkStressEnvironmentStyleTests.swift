@@ -36,6 +36,19 @@ private enum EnvironmentStyleActionKey: EnvironmentKey {
   static let defaultValue = EnvironmentStyleAction {}
 }
 
+private enum EnvironmentStyleIntPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+@MainActor
+private final class EnvironmentStyleEventProbe {
+  var events: [String] = []
+}
+
 extension EnvironmentValues {
   fileprivate var environmentStyleOptional: String? {
     get { self[EnvironmentStyleOptionalKey.self] }
@@ -932,6 +945,74 @@ private struct EnvironmentStyle019Root: View {
       Text("Modifier Target 019")
         .modifier(EnvironmentStyle019Modifier())
         .environment(\.environmentStyleString, "modifier-env-\(generation)")
+    }
+  }
+}
+
+// MARK: - Attempt 020: keyed preference-observer reorder
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 020 preference observers follow keyed owners through reorder")
+  func environmentStyle020PreferenceObserversFollowKeyedOwnersThroughReorder() throws {
+    // Hypothesis: same-key observer registrations can follow structural ordinals when keyed owners
+    // move, dispatching a row's new value through another row's closure.
+    let probe = EnvironmentStyleEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle020"),
+      size: .init(width: 78, height: 9)
+    ) {
+      EnvironmentStyle020Root(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...14 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Reorder Preference Owners 020")
+      #expect(probe.events.isEmpty)
+
+      _ = try harness.clickText("Advance Preferences 020")
+      #expect(Set(probe.events) == Set(["A:\(generation)", "B:\(generation)"]))
+      #expect(probe.events.count == 2)
+      #expect(harness.preferenceObservationRegistrationCount == 2)
+    }
+  }
+}
+
+private struct EnvironmentStyle020Item: Identifiable {
+  let id: String
+}
+
+private struct EnvironmentStyle020Source: View {
+  let item: EnvironmentStyle020Item
+  let generation: Int
+  let probe: EnvironmentStyleEventProbe
+
+  var body: some View {
+    Text("020 source \(item.id) \(generation)")
+      .preference(key: EnvironmentStyleIntPreferenceKey.self, value: generation)
+      .onPreferenceChange(EnvironmentStyleIntPreferenceKey.self) { value in
+        probe.events.append("\(item.id):\(value)")
+      }
+  }
+}
+
+private struct EnvironmentStyle020Root: View {
+  let probe: EnvironmentStyleEventProbe
+  @State private var generation = 0
+  @State private var reversed = false
+
+  private var items: [EnvironmentStyle020Item] {
+    let source = [EnvironmentStyle020Item(id: "A"), EnvironmentStyle020Item(id: "B")]
+    return reversed ? Array(source.reversed()) : source
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Preference Owners 020") { reversed.toggle() }
+      Button("Advance Preferences 020") { generation += 1 }
+      ForEach(items) { item in
+        EnvironmentStyle020Source(item: item, generation: generation, probe: probe)
+      }
     }
   }
 }
