@@ -663,3 +663,62 @@ private struct GestureScroll013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: nested drop-destination removal
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 014 removed inner drop destination bubbles only to outer")
+  func gestureScroll014RemovedInnerDropDestinationBubblesOnlyToOuter() throws {
+    // Hypothesis: removing one nested destination may leave its snapshot entry
+    // on the spatial scope path ahead of the still-live outer destination.
+    let destinations = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll014Root"),
+      size: .init(width: 54, height: 11)
+    ) {
+      GestureScroll014Fixture(destinations: destinations)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Remove inner destination")
+    let point = try #require(harness.point(forText: "Nested drop leaf"))
+    _ = try harness.drop(
+      paths: [DroppedPath("/tmp/gesture-scroll-014")],
+      context: DropContext(location: point)
+    )
+
+    #expect(destinations.value == ["outer"])
+    #expect(harness.dropDestinationRegistrationCount == 1)
+  }
+}
+
+private struct GestureScroll014Fixture: View {
+  let destinations: GestureScrollBox<[String]>
+  @State private var includesInner = true
+
+  var body: some View {
+    Panel(id: "gesture-scroll-014-outer") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Remove inner destination") { includesInner = false }
+        if includesInner {
+          Panel(id: "gesture-scroll-014-inner") {
+            Text("Nested drop leaf").focusable()
+          }
+          .dropDestination { _ in
+            destinations.value.append("retired-inner")
+            return true
+          }
+        } else {
+          Panel(id: "gesture-scroll-014-inner") {
+            Text("Nested drop leaf").focusable()
+          }
+        }
+      }
+    }
+    .dropDestination { _ in
+      destinations.value.append("outer")
+      return true
+    }
+    .frame(width: 38, height: 7)
+  }
+}
