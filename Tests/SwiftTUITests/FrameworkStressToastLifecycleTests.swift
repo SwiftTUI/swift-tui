@@ -113,3 +113,48 @@ private struct ToastLifecycle002Root: View {
     }
   }
 }
+
+// MARK: - Attempt 003: erased style family replacement
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 003 active toast adopts each replacement style family")
+  func toastLifecycle003ActiveToastAdoptsEachReplacementStyleFamily() throws {
+    // Hypothesis: AnyToastStyle can retain its first concrete box while the active item keeps the
+    // same ID, leaving the toast icon and semantic chrome on the previous style family.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle003"),
+      size: .init(width: 56, height: 10)
+    ) {
+      ToastLifecycle003Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Replace Toast Style 003")
+      if generation.isMultiple(of: 2) {
+        #expect(frame.contains("ℹ"))
+        #expect(!frame.contains("✓"))
+      } else {
+        #expect(frame.contains("✓"))
+        #expect(!frame.contains("ℹ"))
+      }
+      #expect(frame.contains("style family generation \(generation)"))
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle003Root: View {
+  @State private var generation = 0
+  @State private var isPresented = true
+
+  var body: some View {
+    Button("Replace Toast Style 003") { generation += 1 }
+      .toast(
+        "style family generation \(generation)",
+        isPresented: $isPresented,
+        style: generation.isMultiple(of: 2) ? .info : .success,
+        duration: nil
+      )
+  }
+}
