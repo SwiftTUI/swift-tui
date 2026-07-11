@@ -1810,3 +1810,62 @@ private struct ObservationEffects031View: View {
     }
   }
 }
+
+// MARK: - Attempt 032: transaction modifier closure freshness
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 032 transaction modifier applies its current closure")
+  func observationEffects032TransactionModifierAppliesCurrentClosure() throws {
+    // Hypothesis: retained modifier resolution can keep the initial transaction
+    // closure while the stable child's authored payload continues updating.
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("ObservationEffects032")
+    let proposal = ProposedSize(width: 54, height: 4)
+
+    _ = renderer.render(
+      ObservationEffects032View(generation: 0),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    for generation in 1...16 {
+      let artifacts = renderer.render(
+        ObservationEffects032View(generation: generation),
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      let node = try #require(
+        artifacts.resolvedTree.observationEffectsDescendant(
+          withText: "032 transaction \(generation)"
+        )
+      )
+      let expected: AnimationRequest = generation.isMultiple(of: 2) ? .disabled : .inherit
+      #expect(node.transactionSnapshot.animationRequest == expected)
+    }
+  }
+}
+
+private struct ObservationEffects032View: View {
+  let generation: Int
+
+  var body: some View {
+    Text("032 transaction \(generation)")
+      .transaction { transaction in
+        transaction.disablesAnimations = generation.isMultiple(of: 2)
+      }
+  }
+}
+
+extension ResolvedNode {
+  fileprivate func observationEffectsDescendant(withText text: String) -> ResolvedNode? {
+    if case .text(let value) = drawPayload, value == text {
+      return self
+    }
+    for child in children {
+      if let match = child.observationEffectsDescendant(withText: text) {
+        return match
+      }
+    }
+    return nil
+  }
+}
