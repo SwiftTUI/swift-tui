@@ -158,3 +158,59 @@ private struct ToastLifecycle003Root: View {
       )
   }
 }
+
+// MARK: - Attempt 004: same-type style payload refresh
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 004 active toast refreshes same-type style payload")
+  func toastLifecycle004ActiveToastRefreshesSameTypeStylePayload() throws {
+    // Hypothesis: type-erased style storage can compare only its concrete type and leave an active
+    // toast using the first same-type icon and geometry payload.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle004"),
+      size: .init(width: 58, height: 10)
+    ) {
+      ToastLifecycle004Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      let frame = try harness.clickText("Refresh Toast Chrome 004")
+      let currentIcon = generation.isMultiple(of: 2) ? "E" : "O"
+      let staleIcon = generation.isMultiple(of: 2) ? "O" : "E"
+      #expect(frame.contains("\(currentIcon) chrome generation \(generation)"))
+      #expect(!frame.contains("\(staleIcon) chrome generation \(generation)"))
+    }
+  }
+}
+
+private struct ToastLifecycle004Style: ToastStyle {
+  let generation: Int
+
+  var snapshotLabel: String { "ToastLifecycle004Style" }
+
+  func resolvePresentation(for _: ToastStyleConfiguration) -> ToastStylePresentation {
+    ToastStylePresentation(
+      icon: generation.isMultiple(of: 2) ? "E" : "O",
+      contentPadding: .init(all: 1),
+      minWidth: 18,
+      maxWidth: 48
+    )
+  }
+}
+
+@MainActor
+private struct ToastLifecycle004Root: View {
+  @State private var generation = 0
+  @State private var isPresented = true
+
+  var body: some View {
+    Button("Refresh Toast Chrome 004") { generation += 1 }
+      .toast(
+        "chrome generation \(generation)",
+        isPresented: $isPresented,
+        style: ToastLifecycle004Style(generation: generation),
+        duration: nil
+      )
+  }
+}
