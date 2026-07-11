@@ -1706,3 +1706,72 @@ private struct CollectionLayout027Root: View {
     }
   }
 }
+
+// MARK: - Attempt 028: collection layout priority allocation
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 028 scarce width follows reordered row priorities")
+  func collectionLayout028ScarceWidthFollowsReorderedRowPriorities() {
+    // Hypothesis: stack allocation may reuse priority-sorted child indices
+    // from before ForEach entities reorder and their priorities change.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout028")
+
+    for generation in 0..<24 {
+      let alternate = !generation.isMultiple(of: 2)
+      let root = CollectionLayout028Root(alternate: alternate)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 9, height: 1)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 9, height: 1)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.rasterSurface.lines.first == fresh.rasterSurface.lines.first)
+    }
+  }
+}
+
+private struct CollectionLayout028Row: Identifiable {
+  let id: Int
+  let label: String
+  let priority: Double
+}
+
+@MainActor
+private struct CollectionLayout028Root: View {
+  let alternate: Bool
+
+  private var rows: [CollectionLayout028Row] {
+    alternate
+      ? [
+        .init(id: 3, label: "THREE", priority: 3),
+        .init(id: 1, label: "ONEEE", priority: 1),
+        .init(id: 2, label: "TWOOO", priority: 2),
+      ]
+      : [
+        .init(id: 1, label: "ONEEE", priority: 3),
+        .init(id: 2, label: "TWOOO", priority: 1),
+        .init(id: 3, label: "THREE", priority: 2),
+      ]
+  }
+
+  var body: some View {
+    HStack(spacing: 0) {
+      ForEach(rows) { row in
+        Text(row.label)
+          .layoutPriority(row.priority)
+      }
+    }
+    .frame(width: 9, height: 1, alignment: .leading)
+  }
+}
