@@ -1137,7 +1137,8 @@ extension FrameworkStressCollectionLayoutTests {
     let rootIdentity = testIdentity("CollectionLayout019")
 
     for generation in 0..<24 {
-      let values = generation.isMultiple(of: 2)
+      let values =
+        generation.isMultiple(of: 2)
         ? ["A", "B", "C", "D", "E", "F"]
         : ["F", "E", "D", "C", "B", "A"]
       let root = CollectionLayout019Root(values: values, position: position)
@@ -1849,7 +1850,7 @@ private struct CollectionLayout029Root: View {
   let values: [Int]
 
   var body: some View {
-    CollectionLayout029LinearLayout() {
+    CollectionLayout029LinearLayout {
       ForEach(values, id: \.self) { value in
         Text("29\(value)")
       }
@@ -1940,7 +1941,7 @@ private struct CollectionLayout030Root: View {
   let count: Int
 
   var body: some View {
-    CollectionLayout030CachedLayout() {
+    CollectionLayout030CachedLayout {
       ForEach(0..<count) { value in
         Text("\(value)").frame(width: 3, alignment: .leading)
       }
@@ -2038,7 +2039,7 @@ private struct CollectionLayout031ProposalLayout: Layout {
 @MainActor
 private struct CollectionLayout031Root: View {
   var body: some View {
-    CollectionLayout031ProposalLayout() {
+    CollectionLayout031ProposalLayout {
       Text("X")
     }
   }
@@ -2087,12 +2088,114 @@ private struct CollectionLayout032Root: View {
   let horizontal: Bool
 
   var body: some View {
-    let layout = horizontal
+    let layout =
+      horizontal
       ? AnyLayout(HStackLayout(alignment: .top, spacing: 1))
       : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
     layout {
       ForEach(["A", "B", "C"], id: \.self) { value in
         Text("32\(value)")
+      }
+    }
+  }
+}
+
+// MARK: - Attempt 033: layout-value metadata across entity reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 033 reordered entities carry current layout values")
+  func collectionLayout033ReorderedEntitiesCarryCurrentLayoutValues() {
+    // Hypothesis: custom-layout subviews may retain layoutValue metadata by
+    // structural index after ForEach entities reorder and change columns.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout033")
+
+    for generation in 0..<24 {
+      let alternate = !generation.isMultiple(of: 2)
+      let root = CollectionLayout033Root(alternate: alternate)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 3)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 3)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
+private enum CollectionLayout033ColumnKey: LayoutValueKey {
+  static let defaultValue = 0
+}
+
+private struct CollectionLayout033Layout: Layout {
+  var measurementReuseSignature: String? { "CollectionLayout033.measure" }
+  var placementReuseSignature: String? { "CollectionLayout033.place" }
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    .init(width: 16, height: subviews.count)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    for index in subviews.indices {
+      let column = subviews[index][CollectionLayout033ColumnKey.self]
+      let size = subviews[index].sizeThatFits(.unspecified)
+      subviews[index].place(
+        at: .init(x: bounds.origin.x + column * 5, y: bounds.origin.y + index),
+        anchor: .topLeading,
+        proposal: .init(width: size.width, height: size.height)
+      )
+    }
+  }
+}
+
+private struct CollectionLayout033Row: Identifiable {
+  let id: Int
+  let label: String
+  let column: Int
+}
+
+@MainActor
+private struct CollectionLayout033Root: View {
+  let alternate: Bool
+
+  private var rows: [CollectionLayout033Row] {
+    alternate
+      ? [
+        .init(id: 3, label: "C", column: 0),
+        .init(id: 1, label: "A", column: 2),
+        .init(id: 2, label: "B", column: 1),
+      ]
+      : [
+        .init(id: 1, label: "A", column: 0),
+        .init(id: 2, label: "B", column: 1),
+        .init(id: 3, label: "C", column: 2),
+      ]
+  }
+
+  var body: some View {
+    CollectionLayout033Layout {
+      ForEach(rows) { row in
+        Text("33\(row.label)")
+          .layoutValue(key: CollectionLayout033ColumnKey.self, value: row.column)
       }
     }
   }
