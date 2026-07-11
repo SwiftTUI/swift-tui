@@ -820,3 +820,59 @@ private func animationTemporal015View(show: Bool) -> some View {
   }
 }
 
+// MARK: - Attempt 016: removal-overlay custom sampling cadence
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 016 removal custom curve samples once per frame")
+  func animationTemporal016RemovalCustomCurveSamplesOncePerFrame() throws {
+    // Hypothesis: a placed removal is sampled once while producing resolved
+    // tick state and again while producing its placed overlay in the same frame.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "016", probe: probe))
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal016", "Root")
+    let proposal = ProposedSize(width: 40, height: 6)
+
+    withAnimationSinks(controller) {
+      _ = renderer.render(
+        animationTemporal016View(show: true),
+        context: .init(identity: identity),
+        proposal: proposal
+      )
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      let removed = renderer.render(
+        animationTemporal016View(show: false),
+        context: .init(identity: identity, transaction: transaction),
+        proposal: proposal
+      )
+      #expect(controller.debugStateSnapshot().removingIdentities.count == 1)
+      let callsBefore = probe.observations.count
+      let sampleTime = MonotonicInstant.now()
+      var resolved = removed.resolvedTree
+      _ = controller.applyInterpolations(to: &resolved, at: sampleTime)
+      _ = controller.placedAnimationOverlaySnapshot(
+        for: removed.placedTree,
+        at: sampleTime,
+        surfaceSize: .init(width: 40, height: 6)
+      )
+      withKnownIssue("Placed removal CustomAnimation is evaluated twice per frame") {
+        #expect(probe.observations.count - callsBefore == 1)
+      }
+    }
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func animationTemporal016View(show: Bool) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    if show {
+      Text("animation temporal 016")
+        .transition(.opacity.combined(with: .offset(x: 8)))
+    }
+  }
+}
+
