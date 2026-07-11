@@ -556,3 +556,56 @@ private struct ToastLifecycle010Root: View {
     )
   }
 }
+
+// MARK: - Attempt 011: longer replacement deadline
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 011 longer duration retires the earlier deadline")
+  func toastLifecycle011LongerDurationRetiresTheEarlierDeadline() async throws {
+    // Hypothesis: extending an active toast can update the item payload without cancelling the
+    // short timer that was started by its activation generation.
+    let presented = ToastLifecycleBox(true)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle011"),
+      size: .init(width: 64, height: 10)
+    ) {
+      ToastLifecycle011Root(presented: presented)
+    }
+    defer { harness.shutdown() }
+
+    let extended = try harness.clickText("Extend Toast Timer 011")
+    #expect(extended.contains("timer extended true"))
+    await AsyncEvent.firing(after: .milliseconds(150)).wait()
+    let frame = try harness.render()
+
+    // Under a contended executor the stale short task can be scheduled after this probe, so the
+    // defect is observable but not guaranteed to reproduce in every parallel suite run.
+    withKnownIssue(
+      "Longer duration does not retire the toast's active short deadline",
+      isIntermittent: true
+    ) {
+      #expect(
+        presented.value && frame.contains("short to long toast")
+          && toastLifecycleEntryCount(in: harness) == 1
+      )
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle011Root: View {
+  let presented: ToastLifecycleBox<Bool>
+  @State private var timerExtended = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Extend Toast Timer 011") { timerExtended = true }
+      Text("timer extended \(timerExtended)")
+    }
+    .toast(
+      "short to long toast",
+      isPresented: presented.binding(),
+      duration: timerExtended ? 1.0 : 0.08
+    )
+  }
+}
