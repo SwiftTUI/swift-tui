@@ -153,4 +153,19 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 009 either budget dimension drains enough victims")
+  func cacheState009EitherBudgetDimensionDrainsEnoughVictims() {
+    // Hypothesis: satisfying the entry cap can stop eviction while bytes still exceed policy.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 3, bytes: 12)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(6), policy: policy)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(6), policy: policy)
+    cache.upsert("c", value: 3, cost: stressCacheEntry(6), policy: policy)
+    #expect(cache.count == 2)
+    #expect(cache.totalCost.bytes == 12)
+    #expect(cache.peek("a") == nil)
+  }
+}
+
 // NEXT CACHE STRESS TEST
