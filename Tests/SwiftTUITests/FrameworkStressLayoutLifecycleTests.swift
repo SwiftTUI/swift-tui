@@ -119,3 +119,62 @@ private struct StressLL002Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 003: lazy rows inserted before the viewport
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 003 lazy viewport keeps stable row after prefix insertion")
+  func stress003LazyViewportKeepsStableRowAfterPrefixInsertion() throws {
+    // Hypothesis: indexed lazy placement may make a stable offscreen row
+    // undiscoverable after new siblings are inserted ahead of the viewport.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL003", "Root"),
+      size: .init(width: 38, height: 10)
+    ) {
+      StressLL003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Prepend Row")
+      let frame = try harness.clickText("Reveal Stable")
+      withKnownIssue("ScrollViewReader cannot reveal an unplaced stable row in a LazyVStack") {
+        #expect(frame.contains("stable row 10 first \(-generation)"))
+      }
+      #expect(harness.scrollPositionRegistrationCount == 1)
+      #expect(harness.lifecycleRegistrationCount <= 2)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL003Fixture: View {
+  @State private var firstRow = 0
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Prepend Row") { firstRow -= 1 }
+          Button("Reveal Stable") { _ = proxy.scrollTo(10, anchor: .center) }
+        }
+        ScrollView(.vertical, showsIndicators: true) {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(firstRow...24), id: \.self) { row in
+              if row == 10 {
+                Text("stable row 10 first \(firstRow)")
+                  .id(row)
+                  .onAppear {}
+                  .onDisappear {}
+              } else {
+                Text("row \(row)")
+                  .id(row)
+              }
+            }
+          }
+        }
+        .frame(width: 36, height: 6, alignment: .topLeading)
+      }
+    }
+  }
+}
