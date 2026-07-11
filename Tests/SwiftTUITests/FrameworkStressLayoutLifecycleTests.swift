@@ -1433,3 +1433,58 @@ private struct StressLL023Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 024: onAppear removes its owner
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 024 onAppear self removal pairs disappear and task cancel")
+  func stress024OnAppearSelfRemovalPairsDisappearAndTaskCancel() throws {
+    // Hypothesis: post-commit invalidation from onAppear can skip the matching
+    // disappearance or leave the just-started task alive.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL024", "Root"),
+      size: .init(width: 42, height: 8)
+    ) {
+      StressLL024Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...8 {
+      let frame = try harness.clickText("Show Self Removing Branch")
+      #expect(!frame.contains("self removing branch"))
+      #expect(probe.events.count == cycle * 2)
+      #expect(probe.events[cycle * 2 - 2] == "appear")
+      #expect(probe.events[cycle * 2 - 1] == "disappear")
+      #expect(harness.activeTaskCount == 0)
+      #expect(harness.lifecycleRegistrationCount == 0)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL024Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var isVisible = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Show Self Removing Branch") { isVisible = true }
+      if isVisible {
+        Text("self removing branch")
+          .task(id: "self-removing-task") {
+            while !Task.isCancelled {
+              await Task.yield()
+            }
+          }
+          .onAppear {
+            probe.events.append("appear")
+            isVisible = false
+          }
+          .onDisappear {
+            probe.events.append("disappear")
+          }
+      }
+    }
+  }
+}
