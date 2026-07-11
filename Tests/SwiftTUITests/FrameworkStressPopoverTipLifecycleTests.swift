@@ -964,6 +964,69 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 025: mixed registration and teardown bounds
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 025 mixed churn keeps registrations bounded")
+  func popoverTip025MixedChurnKeepsRegistrationsBounded() throws {
+    // Hypothesis: combining source remints, eligibility, presentation binding,
+    // tip IDs, and action cardinality can leak portal or input registrations.
+    let baselineViolations = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let rootIdentity = testIdentity("PopoverTipStress025", "Root")
+    let model = PopoverTipStressModel()
+    model.message = nil
+    model.icon = nil
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...50 {
+      model.generation = generation
+      model.sourceVisible = !generation.isMultiple(of: 5)
+      model.hasTip = !generation.isMultiple(of: 7)
+      model.isEligible = !generation.isMultiple(of: 4)
+      model.primaryPresented = !generation.isMultiple(of: 3)
+      model.sourceIdentity = generation % 6
+      model.tipID = "mixed-tip-\(generation % 4)"
+      model.title = "Mixed tip generation \(generation)"
+      switch generation % 3 {
+      case 0:
+        model.actions = []
+      case 1:
+        model.actions = [.init(id: "one", title: "Mixed one")]
+      default:
+        model.actions = [
+          .init(id: "one", title: "Mixed one"),
+          .init(id: "two", title: "Mixed two"),
+          .init(id: "three", title: "Mixed three"),
+        ]
+      }
+
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let expectsEntry =
+        model.sourceVisible && model.hasTip && model.isEligible && model.primaryPresented
+      #expect(popoverTipStressEntryCount(in: harness) == (expectsEntry ? 1 : 0))
+      #expect(frame.contains(model.title) == expectsEntry)
+      #expect(harness.actionRegistrationCount <= 4)
+      #expect(harness.focusRegionCount <= 3)
+    }
+
+    model.sourceVisible = false
+    model.hasTip = false
+    model.primaryPresented = false
+    _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+    #expect(popoverTipStressEntryCount(in: harness) == 0)
+    #expect(harness.actionRegistrationCount <= 1)
+    #expect(harness.focusRegionCount <= 1)
+    #expect(
+      SoundnessProbeConfiguration.teardownCoherenceViolationCount == baselineViolations,
+      "\(SoundnessProbeConfiguration.lastViolationDetail ?? "no violation detail")"
+    )
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
