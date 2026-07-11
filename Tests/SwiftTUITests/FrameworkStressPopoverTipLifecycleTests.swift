@@ -146,6 +146,41 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 005: stable action title replacement
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 005 stable action id renders its current title")
+  func popoverTip005StableActionIDRendersCurrentTitle() throws {
+    // Hypothesis: ForEach may reuse the action button by ID while preserving
+    // the prior label payload and its hit region.
+    let rootIdentity = testIdentity("PopoverTipStress005", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "action-title"
+    model.title = "Action title tip"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.generation = generation
+      model.primaryPresented = true
+      let title = "Current action title \(generation)"
+      model.actions = [.init(id: "stable", title: title)]
+      let refreshed = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      #expect(refreshed.contains(title))
+      #expect(!refreshed.contains("Current action title \(generation - 1)"))
+      _ = try harness.clickText(title, chooseLast: true)
+      #expect(model.actionLog.last == "stable@\(generation)")
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
