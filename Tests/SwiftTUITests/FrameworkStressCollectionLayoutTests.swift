@@ -1856,3 +1856,94 @@ private struct CollectionLayout029Root: View {
     }
   }
 }
+
+// MARK: - Attempt 030: custom-layout cache cardinality
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 030 custom cache tracks subview cardinality")
+  func collectionLayout030CustomCacheTracksSubviewCardinality() {
+    // Hypothesis: pass-local custom-layout cache storage may survive a
+    // structural update and report the previous ForEach subview count.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout030")
+    let counts = [1, 5, 2, 4, 0, 3]
+
+    for generation in 0..<24 {
+      let count = counts[generation % counts.count]
+      let root = CollectionLayout030Root(count: count)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 24, height: 2)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 24, height: 2)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.measuredTree.measuredSize.width == count * 3)
+    }
+  }
+}
+
+private struct CollectionLayout030Cache: Sendable {
+  var count: Int
+}
+
+private struct CollectionLayout030CachedLayout: Layout {
+  var measurementReuseSignature: String? { "CollectionLayout030.measure" }
+  var placementReuseSignature: String? { "CollectionLayout030.place" }
+
+  func makeCache(subviews: LayoutSubviews) -> CollectionLayout030Cache {
+    .init(count: subviews.count)
+  }
+
+  func updateCache(
+    _ cache: inout CollectionLayout030Cache,
+    subviews: LayoutSubviews
+  ) {
+    cache.count = subviews.count
+  }
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews _: LayoutSubviews,
+    cache: inout CollectionLayout030Cache
+  ) -> LayoutSize {
+    .init(width: cache.count * 3, height: cache.count == 0 ? 0 : 1)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout CollectionLayout030Cache
+  ) {
+    for index in subviews.indices {
+      subviews[index].place(
+        at: .init(x: bounds.origin.x + index * 3, y: bounds.origin.y),
+        anchor: .topLeading,
+        proposal: .init(width: 3, height: 1)
+      )
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout030Root: View {
+  let count: Int
+
+  var body: some View {
+    CollectionLayout030CachedLayout() {
+      ForEach(0..<count) { value in
+        Text("\(value)").frame(width: 3, alignment: .leading)
+      }
+    }
+  }
+}
