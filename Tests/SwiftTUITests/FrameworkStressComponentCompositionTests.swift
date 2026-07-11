@@ -607,4 +607,31 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 018: ProgressView suppression policy
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 018 ProgressView suppression removes and restores ornament")
+  func componentComposition018ProgressViewSuppressionRemovesAndRestoresOrnament() {
+    // Hypothesis: toggling no-progress policy can strand the decorated track or static summary.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ProgressView("job-\(generation)", value: Double(generation), total: 20, barWidth: 12)
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition018")
+    for generation in 0..<18 {
+      var environment = EnvironmentValues()
+      environment.suppressesProgress = !generation.isMultiple(of: 2)
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation, environmentValues: environment
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
