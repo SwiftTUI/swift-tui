@@ -890,3 +890,42 @@ extension FrameworkStressInputRoutingTests {
     #expect(harness.keyPressHandlerCount == 0)
   }
 }
+
+// MARK: - Attempt 016: TextField forward-delete routing
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Delete removes the character after the focused TextField caret")
+  func stressInputRouting016DeletePerformsForwardDeletion() throws {
+    // Hypothesis: the parser emits KeyEvent.delete but the text-input command
+    // mapper may omit the forward-delete command already supported by reducer.
+    let text = StressInputBox("abcd")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput016Root"),
+      size: .init(width: 32, height: 6)
+    ) {
+      StressInput016Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("abcd")
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.delete))
+
+    withKnownIssue("Delete has no forward-deletion mapping for focused text input") {
+      #expect(text.value == "abd")
+    }
+  }
+}
+
+private struct StressInput016Fixture: View {
+  static let fieldIdentity = testIdentity("StressInput016", "Field")
+
+  let text: StressInputBox<String>
+
+  var body: some View {
+    TextField("Forward delete", text: text.binding())
+      .id(Self.fieldIdentity)
+      .textFieldStyle(.plain)
+  }
+}
