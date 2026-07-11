@@ -1205,3 +1205,50 @@ private struct TextContent031Fixture: View {
       .frame(width: 7, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 032: multiline external replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 032 editor edits live shortened multiline binding")
+  func textContent032EditorEditsLiveShortenedMultilineBinding() throws {
+    // Hypothesis: TextEditor can retain its old multiline buffer and moved caret after an external
+    // shortening, causing the next edit to resurrect departed lines or write past the live value.
+    let text = TextContentBox("alpha\nbravo\ncharlie")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent032Root"),
+      size: .init(width: 34, height: 8)
+    ) {
+      TextContent032Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent032Fixture.editorIdentity)
+    _ = try harness.pressKey(KeyPress(.home))
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.clickText("Replace editor text")
+    _ = try harness.focus(TextContent032Fixture.editorIdentity)
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.value == "one\ntwo!")
+    #expect(text.writeCount == 1)
+    #expect(harness.frame.contains("two!"))
+    #expect(!harness.frame.contains("charlie"))
+  }
+}
+
+@MainActor
+private struct TextContent032Fixture: View {
+  static let editorIdentity = testIdentity("TextContent032", "Editor")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace editor text") { text.value = "one\ntwo" }
+      TextEditor(text: text.binding())
+        .id(Self.editorIdentity)
+        .frame(width: 18, height: 5, alignment: .topLeading)
+    }
+  }
+}
