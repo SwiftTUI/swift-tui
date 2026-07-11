@@ -1110,3 +1110,59 @@ private struct StressTC019Fixture: View {
     .frame(width: 70, height: 13, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 020: palette source-scope replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 020 open palette follows replacement source scope")
+  func stressTabCommand020OpenPaletteFollowsReplacementSourceScope() throws {
+    // Hypothesis: replacing the contributing Panel identity under an open
+    // palette may leave the stable command row bound to the departed graph scope.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC020", "Root"),
+      size: .init(width: 72, height: 15)
+    ) {
+      StressTC020Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open scoped palette")
+    _ = try harness.clickText("Replace palette scope")
+    _ = try harness.clickText("Scoped palette action")
+
+    #expect(probe.events == ["scope-1"])
+  }
+}
+
+@MainActor
+private struct StressTC020Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var generation = 0
+  @State private var showsPalette = false
+
+  var body: some View {
+    Panel(id: "stress-tc-020-source-\(generation)") {
+      Button("Open scoped palette") {
+        showsPalette = true
+      }
+    }
+    .paletteCommand(name: "Scoped palette action") {
+      probe.events.append("scope-\(generation)")
+    }
+    .panel(id: "stress-tc-020-host")
+    .paletteSheet("Scoped palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Replace palette scope") {
+          generation += 1
+        }
+        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
+          Button(entry.element.name) {
+            entry.element.action()
+          }
+        }
+      }
+    }
+    .frame(width: 70, height: 13, alignment: .topLeading)
+  }
+}
