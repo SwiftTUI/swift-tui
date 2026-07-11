@@ -1229,6 +1229,59 @@ private struct StressPS027Fixture: View {
   }
 }
 
+// MARK: - Attempt 028: stable identity semantic-role replacement
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test(
+    "stress presentation semantics 028 replacing button with toggle refreshes its semantic role")
+  func stress028ReplacingButtonWithToggleRefreshesSemanticRole() throws {
+    // Hypothesis: same-identity retained semantics may keep the departed
+    // control role and interaction product after the concrete control changes.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS028", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressPS028Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace control role")
+    let target = try #require(
+      stressAccessibilityNodes(in: harness).first { $0.label == "Role target" }
+    )
+
+    #expect(target.role == .toggle)
+    #expect(
+      !stressAccessibilityNodes(in: harness).contains {
+        $0.label == "Role target" && $0.role == .button
+      }
+    )
+  }
+}
+
+@MainActor
+private struct StressPS028Fixture: View {
+  @State private var usesToggle = false
+  @State private var isOn = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace control role") {
+        usesToggle = true
+      }
+      if usesToggle {
+        Toggle("Role target", isOn: $isOn)
+          .id("stable-role-target")
+          .accessibilityLabel("Role target")
+      } else {
+        Button("Role target") {}
+          .id("stable-role-target")
+          .accessibilityLabel("Role target")
+      }
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
