@@ -121,3 +121,44 @@ private final class ObservationEffects002Child {
     usesFirst ? first : second
   }
 }
+
+// MARK: - Attempt 003: duplicate observable readers
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 003 duplicate readers both receive each observed mutation")
+  func observationEffects003DuplicateReadersBothReceiveObservedMutation() throws {
+    // Hypothesis: two ViewNodeIDs reading the same registrar property may be
+    // collapsed by identity-keyed observation bookkeeping.
+    let model = ObservationEffects003Model()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects003"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects003View(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      model.value = generation
+      let frame = try harness.render()
+      #expect(frame.contains("003 first \(generation)"))
+      #expect(frame.contains("003 second \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects003View: View {
+  let model: ObservationEffects003Model
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("003 first \(model.value)").id("observation-effects-003-first")
+      Text("003 second \(model.value)").id("observation-effects-003-second")
+    }
+  }
+}
+
+@Observable
+private final class ObservationEffects003Model {
+  var value = 0
+}
