@@ -1628,3 +1628,56 @@ private struct ObservationEffects028View: View {
     }
   }
 }
+
+// MARK: - Attempt 029: task ID concrete-type replacement
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 029 task ID type replacement publishes the current closure")
+  func observationEffects029TaskIDTypeReplacementPublishesCurrentClosure() async throws {
+    // Hypothesis: task identity memo slots may compare unlike concrete ID
+    // types by reflection and retain the registration from the prior branch.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects029"),
+      size: .init(width: 72, height: 7)
+    ) {
+      ObservationEffects029View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      _ = try harness.clickText("Replace Task ID Type 029")
+      let registrations = harness.runLoop.localTaskRegistry.snapshot().values.flatMap { $0 }
+      let registration = try #require(registrations.first)
+      #expect(registrations.count == 1)
+      probe.events.removeAll(keepingCapacity: true)
+      await registration.run()
+      #expect(probe.events.last == "run:\(generation)")
+      #expect(harness.runLoop.lifecycleCoordinator.taskStartSkipCount == 0)
+    }
+  }
+}
+
+private struct ObservationEffects029View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Task ID Type 029") { generation += 1 }
+      taskOwner
+    }
+  }
+
+  @ViewBuilder private var taskOwner: some View {
+    if generation.isMultiple(of: 2) {
+      Text("029 Int ID \(generation)")
+        .task(id: generation) { probe.events.append("run:\(generation)") }
+        .id("observation-effects-029-owner")
+    } else {
+      Text("029 String ID \(generation)")
+        .task(id: "task-\(generation)") { probe.events.append("run:\(generation)") }
+        .id("observation-effects-029-owner")
+    }
+  }
+}
