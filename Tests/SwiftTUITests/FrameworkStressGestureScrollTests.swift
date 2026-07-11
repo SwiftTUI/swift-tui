@@ -1041,3 +1041,67 @@ private struct GestureScroll020Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 021: target removal and restoration
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 021 removed scroll target is not served from stale geometry")
+  func gestureScroll021RemovedScrollTargetIsNotServedFromStaleGeometry() throws {
+    // Hypothesis: the target registry may retain a removed explicit ID, then
+    // either scroll to stale geometry or shadow the later restored target.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll021Root"),
+      size: .init(width: 54, height: 10)
+    ) {
+      GestureScroll021Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reveal optional target")
+    #expect(position.value.y == 5)
+    _ = try harness.clickText("Remove optional target")
+    position.value = .zero
+    _ = try harness.clickText("Reveal optional target")
+    #expect(position.value == .zero)
+    _ = try harness.clickText("Restore optional target")
+    _ = try harness.clickText("Optional target to top")
+    #expect(position.value.y == 8)
+  }
+}
+
+private struct GestureScroll021Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+  @State private var includesTarget = true
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Remove optional target") { includesTarget = false }
+          Button("Restore optional target") { includesTarget = true }
+        }
+        HStack(spacing: 1) {
+          Button("Reveal optional target") {
+            _ = proxy.scrollTo("optional-target", anchor: .bottom)
+          }
+          Button("Optional target to top") {
+            _ = proxy.scrollTo("optional-target", anchor: .top)
+          }
+        }
+        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in
+              if row == 8, includesTarget {
+                Text("Optional row \(row)").id("optional-target")
+              } else {
+                Text("Optional row \(row)")
+              }
+            }
+          }
+        }
+        .frame(width: 30, height: 4, alignment: .topLeading)
+      }
+    }
+  }
+}
