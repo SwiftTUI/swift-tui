@@ -1226,3 +1226,67 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 023: duplicate identity occurrence removal
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 023 duplicate identity removal tracks departed occurrence")
+  func animationTemporal023DuplicateIdentityRemovalTracksDepartedOccurrence() throws {
+    // Hypothesis: set-based identity diffing collapses duplicate occurrences
+    // and cannot discover that exactly one registered node departed.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal023", "Root")
+    let duplicateID = testIdentity("AnimationTemporal023", "Duplicate")
+    let firstNodeID = ViewNodeID(rawValue: 231)
+    let secondNodeID = ViewNodeID(rawValue: 232)
+    let start = MonotonicInstant(offset: .seconds(110))
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: duplicateID,
+      viewNodeID: firstNodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.registerTransition(
+      for: duplicateID,
+      viewNodeID: secondNodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [
+          animationTemporalNode(identity: duplicateID, viewNodeID: firstNodeID),
+          animationTemporalNode(identity: duplicateID, viewNodeID: secondNodeID),
+        ]
+      ),
+      transaction: .init(),
+      timestamp: start
+    )
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: duplicateID,
+      viewNodeID: firstNodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [animationTemporalNode(identity: duplicateID, viewNodeID: firstNodeID)]
+      ),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+
+    withKnownIssue("Duplicate Identity diffing misses a departed ViewNodeID occurrence") {
+      #expect(controller.debugStateSnapshot().removingNodeIDs.count == 1)
+    }
+  }
+}
+
