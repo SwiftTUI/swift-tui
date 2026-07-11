@@ -95,6 +95,48 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 011: heat-strip normalization and order churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 011 heat strip maximum migration retargets cells and labels")
+  func chartData011HeatStripMaximumMigrationRetargetsCellsAndLabels() {
+    // Hypothesis: HeatStrip can retain an old maximum owner or tone at an index
+    // when entries reorder while cell width and normalization both change.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let maximumIndex = generation % 4
+        let entries = (0..<4).map { index in
+          BarChartEntry(
+            "\(index)\(generation % 10)",
+            value: index == maximumIndex
+              ? -Double(50 + generation)
+              : Double((index + 1) * (generation % 5 + 1)),
+            tone: index == maximumIndex ? .critical : .info
+          )
+        }
+        HeatStrip(
+          "Heat \(generation)",
+          entries: generation.isMultiple(of: 2) ? entries : Array(entries.reversed()),
+          cellWidth: generation.isMultiple(of: 3) ? 2 : 3
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "011", proposal: .init(width: 52, height: 6)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Heat \(generation)"))
+      #expect(text.contains("hi \(50 + generation)"))
+      for index in 0..<4 {
+        #expect(text.contains("\(index)\(generation % 10)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 010: sparkline empty and constant-domain churn
 
 extension FrameworkStressChartDataTests {
