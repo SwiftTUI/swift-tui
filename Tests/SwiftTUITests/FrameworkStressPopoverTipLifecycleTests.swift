@@ -269,6 +269,66 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 008: action insertion changes modal policy
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 008 inserting an action gates the base immediately")
+  func popoverTip008InsertingActionGatesBaseImmediately() throws {
+    // Hypothesis: a tip that begins read-only can keep its nonmodal interaction
+    // policy after an action is inserted into the same portal entry.
+    let rootIdentity = testIdentity("PopoverTipStress008", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "action-insertion"
+    model.title = "Action insertion tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = []
+    model.hasTip = false
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    var readOnlyTipPreservedBaseInteraction = true
+    for generation in 1...8 {
+      model.primaryPresented = true
+      model.hasTip = false
+      model.actions = []
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let controlPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+      #expect(controlPaths.contains(popoverTipStressBaseIdentity.path))
+      let controlCount = model.baseActionCount
+      _ = try harness.clickText("Base action")
+      #expect(model.baseActionCount == controlCount + 1)
+
+      model.hasTip = true
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let nonmodalPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+      let nonmodalCount = model.baseActionCount
+      _ = try harness.clickText("Base action")
+      readOnlyTipPreservedBaseInteraction =
+        readOnlyTipPreservedBaseInteraction
+        && nonmodalPaths.contains(popoverTipStressBaseIdentity.path)
+        && model.baseActionCount == nonmodalCount + 1
+
+      model.generation = generation
+      model.actions = [.init(id: "modal", title: "Inserted modal action")]
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let modalPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+      #expect(!modalPaths.contains(popoverTipStressBaseIdentity.path))
+
+      _ = try harness.clickText("Inserted modal action", chooseLast: true)
+      #expect(model.actionLog.last == "modal@\(generation)")
+    }
+
+    withKnownIssue("Read-only popover tips suppress base focus and interaction in the runtime") {
+      #expect(readOnlyTipPreservedBaseInteraction)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
