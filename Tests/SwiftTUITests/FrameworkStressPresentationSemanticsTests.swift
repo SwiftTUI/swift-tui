@@ -1089,6 +1089,53 @@ private struct StressPS024Fixture: View {
   }
 }
 
+// MARK: - Attempt 025: stepper binding retarget
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 025 a stable stepper writes only its current binding")
+  func stress025StableStepperWritesCurrentBinding() throws {
+    // Hypothesis: the Stepper's multiple key, action, and pointer handlers may
+    // disagree about which binding owns a same-identity control after retargeting.
+    let probe = StressPresentationProbe()
+    probe.firstInt = 8
+    probe.secondInt = 1
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS025", "Root"),
+      size: .init(width: 50, height: 9)
+    ) {
+      StressPS025Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget stepper")
+    _ = try harness.focusText("Stable stepper")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(probe.firstInt == 8)
+    #expect(probe.secondInt == 2)
+  }
+}
+
+@MainActor
+private struct StressPS025Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget stepper") {
+        usesSecond = true
+      }
+      Stepper(
+        "Stable stepper",
+        value: usesSecond ? probe.secondIntBinding() : probe.firstIntBinding(),
+        in: 0...10
+      )
+      .id("stable-stepper")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
