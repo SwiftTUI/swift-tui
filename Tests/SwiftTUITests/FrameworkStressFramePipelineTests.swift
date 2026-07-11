@@ -571,3 +571,55 @@ extension FrameworkStressFramePipelineTests {
     #expect(state.previousDrawnIdentities == [thirdIdentity])
   }
 }
+
+// MARK: - Attempt 010: completed candidate cannot become retained baseline
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 010 uncommitted candidate leaves committed baseline isolated")
+  func framePipeline010UncommittedCandidateLeavesCommittedBaselineIsolated() async {
+    // Hypothesis: rendering and previewing a completed candidate can publish
+    // its raster or layout baseline before ordered commit chooses its outcome.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline010", "Root")
+    let proposal = ProposedSize(width: 36, height: 4)
+    let committed = renderer.render(
+      FramePipelineSiblingView(first: "committed-a", second: "committed-b"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    let committedInput = renderer.frameTailRenderer.retainedInput(invalidatedIdentities: [])
+    let committedDrawn = renderer.frameTailRenderer.previousDrawnIdentities
+    let committedMetric = renderer.frameTailRenderer.memoryMetricSnapshot
+
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      FramePipelineSiblingView(
+        first: "candidate-is-much-wider-than-committed",
+        second: "candidate-b"
+      ),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    _ = await renderer.previewCompletedFrameCandidateForTesting(draft)
+
+    let whileUncommitted = renderer.frameTailRenderer.retainedInput(invalidatedIdentities: [])
+    #expect(whileUncommitted.previousRasterSurface == committed.rasterSurface)
+    #expect(whileUncommitted.previousRasterSurface == committedInput.previousRasterSurface)
+    #expect(renderer.frameTailRenderer.previousDrawnIdentities == committedDrawn)
+    #expect(renderer.frameTailRenderer.memoryMetricSnapshot == committedMetric)
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    let afterAbort = renderer.frameTailRenderer.retainedInput(invalidatedIdentities: [])
+    #expect(afterAbort.previousRasterSurface == committed.rasterSurface)
+    #expect(renderer.frameTailRenderer.previousDrawnIdentities == committedDrawn)
+
+    let rerendered = renderer.render(
+      FramePipelineSiblingView(first: "committed-a", second: "committed-b"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    #expect(rerendered.rasterSurface == committed.rasterSurface)
+  }
+}
