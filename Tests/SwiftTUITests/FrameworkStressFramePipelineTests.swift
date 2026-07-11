@@ -1383,3 +1383,39 @@ extension FrameworkStressFramePipelineTests {
     #expect(scheduler.consumeReadyFrame() == nil)
   }
 }
+
+// MARK: - Attempt 024: reset does not reopen an old deadline cut
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 024 pre-reset cut withholds post-reset deadline set")
+  func framePipeline024PreResetCutWithholdsPostResetDeadlineSet() throws {
+    // Hypothesis: resetting scheduler storage can reuse arm ordinals so an old
+    // drain cut consumes newly armed due deadlines along with an invalidation.
+    let scheduler = FrameScheduler()
+    let base = MonotonicInstant(offset: .seconds(70_024))
+    scheduler.requestDeadline(base)
+    let cutBeforeReset = scheduler.deadlineArmCut
+    scheduler.reset()
+
+    let firstDeadline = base.advanced(by: .milliseconds(1))
+    let secondDeadline = base.advanced(by: .milliseconds(2))
+    scheduler.requestDeadline(firstDeadline)
+    scheduler.requestDeadline(secondDeadline)
+    scheduler.requestInvalidation(of: [testIdentity("FramePipeline024", "Dirty")])
+    let now = base.advanced(by: .milliseconds(3))
+
+    let invalidationOnly = try #require(
+      scheduler.consumeReadyFrame(at: now, armedBefore: cutBeforeReset)
+    )
+    #expect(invalidationOnly.causes == [.invalidation])
+    #expect(invalidationOnly.triggeredDeadline == nil)
+    #expect(invalidationOnly.nextDeadline == firstDeadline)
+
+    let deadlineFrame = try #require(
+      scheduler.consumeReadyFrame(at: now, armedBefore: scheduler.deadlineArmCut)
+    )
+    #expect(deadlineFrame.causes == [.deadline])
+    #expect(deadlineFrame.triggeredDeadline == secondDeadline)
+    #expect(deadlineFrame.nextDeadline == nil)
+  }
+}
