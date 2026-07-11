@@ -462,3 +462,51 @@ private struct ToastLifecycle008Root: View {
     )
   }
 }
+
+// MARK: - Attempt 009: finite-to-nil duration cancellation
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 009 nil duration cancels the active deadline")
+  func toastLifecycle009NilDurationCancelsTheActiveDeadline() async throws {
+    // Hypothesis: replacing a finite duration with nil can update the item without cancelling the
+    // already-running task, allowing a retired deadline to dismiss the still-active toast.
+    let presented = ToastLifecycleBox(true)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle009"),
+      size: .init(width: 62, height: 10)
+    ) {
+      ToastLifecycle009Root(presented: presented)
+    }
+    defer { harness.shutdown() }
+
+    let disabled = try harness.clickText("Disable Toast Timer 009")
+    #expect(disabled.contains("timer disabled true"))
+    await AsyncEvent.firing(after: .milliseconds(140)).wait()
+    let frame = try harness.render()
+
+    withKnownIssue("Nil duration does not cancel the toast's active finite deadline") {
+      #expect(
+        presented.value && frame.contains("finite to nil toast")
+          && toastLifecycleEntryCount(in: harness) == 1
+      )
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle009Root: View {
+  let presented: ToastLifecycleBox<Bool>
+  @State private var timerDisabled = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Disable Toast Timer 009") { timerDisabled = true }
+      Text("timer disabled \(timerDisabled)")
+    }
+    .toast(
+      "finite to nil toast",
+      isPresented: presented.binding(),
+      duration: timerDisabled ? nil : 0.08
+    )
+  }
+}
