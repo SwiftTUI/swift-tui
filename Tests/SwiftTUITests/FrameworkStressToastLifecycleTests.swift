@@ -1285,3 +1285,80 @@ private struct ToastLifecycle024Root: View {
     }
   }
 }
+
+// MARK: - Attempt 025: mixed topology teardown bounds
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 025 mixed remint and cardinality churn stays bounded")
+  func toastLifecycle025MixedRemintAndCardinalityChurnStaysBounded() throws {
+    // Hypothesis: alternating source remint with one-to-two toast cardinality can strand portal
+    // timers or lifecycle registrations that survive the family's final teardown.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle025"),
+      size: .init(width: 70, height: 16)
+    ) {
+      ToastLifecycle025Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Churn Toast Topology 025")
+      let expectedItems = generation.isMultiple(of: 2) ? 1 : 2
+      #expect(frame.contains("primary churn toast \(generation)"))
+      #expect(
+        frame.contains("secondary churn toast \(generation)") == !generation.isMultiple(of: 2)
+      )
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+      #expect(harness.activeTaskCount == expectedItems)
+      #expect(harness.activeTaskDescriptorCount == expectedItems)
+      #expect(harness.lifecycleRegistrationCount == expectedItems * 2)
+    }
+
+    let closed = try harness.clickText("Close All Toasts 025")
+    #expect(!closed.contains("churn toast"))
+    #expect(toastLifecycleEntryCount(in: harness) == 0)
+    #expect(harness.activeTaskCount == 0)
+    #expect(harness.activeTaskDescriptorCount == 0)
+    #expect(harness.lifecycleRegistrationCount == 0)
+  }
+}
+
+@MainActor
+private struct ToastLifecycle025Content: View {
+  let label: String
+
+  var body: some View {
+    Text(label)
+      .onAppear {}
+      .onDisappear {}
+  }
+}
+
+@MainActor
+private struct ToastLifecycle025Root: View {
+  @State private var generation = 0
+  @State private var primary = true
+  @State private var secondary = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Churn Toast Topology 025") {
+        generation += 1
+        secondary.toggle()
+      }
+      Button("Close All Toasts 025") {
+        primary = false
+        secondary = false
+      }
+      Text("primary source \(generation)")
+        .id("toast-lifecycle-025-primary-\(generation % 2)")
+        .toast(isPresented: $primary, duration: 10.0) {
+          ToastLifecycle025Content(label: "primary churn toast \(generation)")
+        }
+      Text("secondary source \(generation)")
+        .toast(isPresented: $secondary, duration: 10.0) {
+          ToastLifecycle025Content(label: "secondary churn toast \(generation)")
+        }
+    }
+  }
+}
