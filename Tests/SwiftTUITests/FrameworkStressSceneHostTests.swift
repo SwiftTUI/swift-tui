@@ -1233,3 +1233,61 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 027: terminal capability override churn
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 027 terminal overrides preserve unrelated host capabilities")
+  func sceneHost027TerminalOverridesPreserveUnrelatedHostCapabilities() {
+    // Hypothesis: repeated color and glyph overrides can reconstruct a profile
+    // from presets and silently drop detected hyperlink, mouse, or sync support.
+    let base = TerminalCapabilityProfile(
+      glyphLevel: .unicode,
+      colorLevel: .trueColor,
+      emitsStyleEscapeSequences: true,
+      supportsHyperlinks: true,
+      supportsMouseReporting: true,
+      supportsSynchronizedOutput: true
+    )
+
+    for generation in 0..<24 {
+      let configuration: RuntimeConfiguration
+      let expectedGlyph: TerminalCapabilityProfile.GlyphLevel
+      let expectedColor: TerminalCapabilityProfile.ColorLevel
+      let expectedStyles: Bool
+      if generation.isMultiple(of: 2) {
+        configuration = .init(
+          color: .never,
+          glyphs: .ascii,
+          motion: .reduced,
+          output: .accessible,
+          noProgress: true,
+          linear: true
+        )
+        expectedGlyph = .ascii
+        expectedColor = .none
+        expectedStyles = false
+      } else {
+        configuration = .init(
+          color: .always,
+          glyphs: .unicode,
+          output: .json,
+          debug: true
+        )
+        expectedGlyph = .unicode
+        expectedColor = .trueColor
+        expectedStyles = true
+      }
+      let applied = base.applying(configuration)
+
+      #expect(applied.glyphLevel == expectedGlyph)
+      #expect(applied.colorLevel == expectedColor)
+      #expect(applied.emitsStyleEscapeSequences == expectedStyles)
+      #expect(applied.supportsHyperlinks)
+      #expect(applied.supportsMouseReporting)
+      #expect(applied.supportsSynchronizedOutput)
+      #expect(base.colorLevel == .trueColor)
+      #expect(base.glyphLevel == .unicode)
+    }
+  }
+}
