@@ -402,6 +402,66 @@ private struct StressPS009Fixture: View {
   }
 }
 
+// MARK: - Attempt 010: mixed-family dismiss stack ordering
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 010 Escape unwinds sheet popover and menu newest first")
+  func stress010EscapeUnwindsMixedPresentationsNewestFirst() throws {
+    // Hypothesis: composing three independently coordinated presentation
+    // families may leave the committed dismiss stack in family order instead
+    // of activation order after each two-to-one transition.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS010", "Root"),
+      size: .init(width: 72, height: 18)
+    ) {
+      StressPS010Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Layer menu")
+    _ = try harness.clickText("Open popover layer")
+    _ = try harness.clickText("Open sheet layer")
+    #expect(stressPresentationEntryCount(in: harness) == 3)
+
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(stressPresentationEntryCount(in: harness) == 2)
+    withKnownIssue("A three-to-two overlay transition leaves the dismissed sheet visible") {
+      #expect(!harness.frame.contains("Sheet layer body"))
+    }
+
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(stressPresentationEntryCount(in: harness) == 1)
+    #expect(!harness.frame.contains("Open sheet layer"))
+
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(stressPresentationEntryCount(in: harness) == 0)
+    #expect(!harness.frame.contains("Open popover layer"))
+  }
+}
+
+@MainActor
+private struct StressPS010Fixture: View {
+  @State private var showsPopover = false
+  @State private var showsSheet = false
+
+  var body: some View {
+    Menu("Layer menu") {
+      Button("Open popover layer") {
+        showsPopover = true
+      }
+    }
+    .popover(isPresented: $showsPopover) {
+      Button("Open sheet layer") {
+        showsSheet = true
+      }
+    }
+    .sheet("Layer sheet", isPresented: $showsSheet) {
+      Text("Sheet layer body")
+    }
+    .frame(width: 70, height: 16, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
