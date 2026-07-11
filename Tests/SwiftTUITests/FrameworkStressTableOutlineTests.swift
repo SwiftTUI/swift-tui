@@ -1018,3 +1018,63 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 018: outline child identity replacement
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 018 replaced outline child removes departed identity")
+  func tableOutline018ReplacedOutlineChildRemovesDepartedIdentity() {
+    // Hypothesis: a constant-cardinality recursive slot can reuse the departed
+    // child's resolved node after its entity ID and visible payload both change.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        OutlineGroup(
+          [
+            TableOutlineNode(
+              id: "root",
+              title: "root-g\(generation)",
+              children: [
+                .init(
+                  id: generation.isMultiple(of: 2) ? "child-a" : "child-b",
+                  title: "child-\(generation.isMultiple(of: 2) ? "a" : "b")-g\(generation)"
+                )
+              ]
+            )
+          ],
+          children: \.children
+        ) { Text($0.title) }
+        .outlineStyle(.plain)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline018")
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 26, height: 10)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 26, height: 10)
+      )
+      let rendered = tableOutlineText(retained)
+      let currentKind = generation.isMultiple(of: 2) ? "a" : "b"
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(rendered.contains("child-\(currentKind)-g\(generation)"))
+      if generation > 0 {
+        #expect(!rendered.contains("g\(generation - 1)"))
+      }
+    }
+  }
+}
