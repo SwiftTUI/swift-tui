@@ -57,6 +57,16 @@ private func chartDataAccessibilityLabels(_ snapshot: RenderSnapshot) -> [String
   snapshot.semanticSnapshot.accessibilityNodes.compactMap(\.label)
 }
 
+private let chartDataUTCGregorian: Calendar = {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+  return calendar
+}()
+
+private func chartDataDate(day: Int, hour: Int = 12) -> Date {
+  Date(timeIntervalSinceReferenceDate: Double(day * 86_400 + hour * 3_600))
+}
+
 // MARK: - Attempt 001: bar data reorder and live extrema
 
 extension FrameworkStressChartDataTests {
@@ -91,6 +101,57 @@ extension FrameworkStressChartDataTests {
       #expect(text.contains("B\(generation)"))
       #expect(
         chartDataAccessibilityLabels(snapshot).contains { $0.contains("Bars \(generation):") })
+    }
+  }
+}
+
+// MARK: - Attempt 022: calendar duplicate aggregation and input order
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 022 calendar duplicate days aggregate after reorder")
+  func chartData022CalendarDuplicateDaysAggregateAfterReorder() {
+    // Hypothesis: CalendarHeatmap can retain pre-aggregation cell intensity when
+    // duplicate dates reorder and their summed value changes inside a fixed range.
+    struct Root: View {
+      let generation: Int
+
+      var days: [DateValue] {
+        let duplicateDay = generation % 12
+        let values = [
+          DateValue(chartDataDate(day: duplicateDay), value: Double(3 + generation)),
+          DateValue(chartDataDate(day: duplicateDay, hour: 20), value: Double(7 + generation)),
+          DateValue(chartDataDate(day: (duplicateDay + 5) % 20), value: -Double(20 + generation)),
+          DateValue(chartDataDate(day: 24), value: Double(2 + generation)),
+          DateValue(chartDataDate(day: 40), value: 999),
+        ]
+        return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+      }
+
+      var body: some View {
+        CalendarHeatmap(
+          "Calendar \(generation)",
+          days: days,
+          range: chartDataDate(day: 0)...chartDataDate(day: 27),
+          weekStart: .sunday,
+          calendar: chartDataUTCGregorian,
+          cellWidth: generation.isMultiple(of: 3) ? 1 : 2,
+          showsMonthHeader: true,
+          showsDayLabels: true,
+          showsScaleLegend: true,
+          tone: generation.isMultiple(of: 2) ? .success : .warning
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "022", proposal: .init(width: 62, height: 14)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Calendar \(generation)"))
+      #expect(text.contains("5 days"))
+      #expect(text.contains(generation.isMultiple(of: 3) ? "J" : "Ja"))
+      #expect(text.contains("Less"))
+      #expect(chartDataAccessibilityLabels(snapshot).contains("Calendar \(generation): 5 days"))
     }
   }
 }
