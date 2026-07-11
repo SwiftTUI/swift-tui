@@ -1,3 +1,4 @@
+import Foundation
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
@@ -222,5 +223,36 @@ private struct SceneHostExitBindingsVisitor: WindowSceneConfigurationVisitor {
     configuration: WindowSceneConfiguration<Content>
   ) -> WindowSceneConfigurationVisitResult<ExitKeyBindings> {
     .finish(configuration.exitKeyBindings)
+  }
+}
+
+// MARK: - Attempt 006: manifest JSON replacement and escaping
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 006 manifest JSON stays current through escaped metadata churn")
+  func sceneHost006ManifestJSONStaysCurrentThroughEscapedMetadataChurn() throws {
+    // Hypothesis: repeated hand-rolled manifest serialization can retain an
+    // earlier escaped title or default identifier when metadata shapes match.
+    for generation in 0..<24 {
+      let title = "Title \"\(generation)\"\npath\\tail"
+      let identifier = WindowIdentifier(" scene/\(generation) \"quoted\" ")
+      let descriptors = collectWindowSceneDescriptors(
+        from: WindowGroup(title, id: identifier) {
+          Text("generation \(generation)")
+        }
+      )
+      let manifest = sceneManifest(from: descriptors)
+      let object = try #require(
+        JSONSerialization.jsonObject(with: Data(manifest.jsonString.utf8))
+          as? [String: Any]
+      )
+      let scenes = try #require(object["scenes"] as? [[String: Any]])
+      let first = try #require(scenes.first)
+
+      #expect(object["defaultSceneID"] as? String == identifier.rawValue)
+      #expect(first["id"] as? String == identifier.rawValue)
+      #expect(first["title"] as? String == title)
+      #expect(first["isDefault"] as? Bool == true)
+    }
   }
 }
