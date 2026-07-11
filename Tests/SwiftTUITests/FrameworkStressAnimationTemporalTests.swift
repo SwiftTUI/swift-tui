@@ -876,3 +876,24 @@ private func animationTemporal016View(show: Bool) -> some View {
   }
 }
 
+// MARK: - Attempt 017: reset versus in-flight frame draft
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 017 reset dominates an older frame draft commit")
+  func animationTemporal017ResetDominatesOlderFrameDraftCommit() throws {
+    // Hypothesis: reset has no generation barrier, so an already-created draft
+    // can commit afterward and resurrect the controller's pre-reset ledger.
+    let controller = AnimationController()
+    controller.register(.linear(duration: .seconds(3)))
+    let draft = controller.makeFrameDraft()
+
+    controller.reset()
+    #expect(controller.debugStateSnapshot().registeredAnimationCount == 0)
+    draft.commit()
+
+    withKnownIssue("An in-flight AnimationFrameDraft commit resurrects state after reset") {
+      #expect(controller.debugStateSnapshot().registeredAnimationCount == 0)
+    }
+  }
+}
+
