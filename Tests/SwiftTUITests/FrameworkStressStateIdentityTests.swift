@@ -2156,6 +2156,98 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 032: Observable environment object replacement
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 032 retired environment model stops driving reader")
+  func stateIdentity032RetiredEnvironmentModelStopsDrivingReader() throws {
+    // Hypothesis: replacing an observable environment object can leave the reader indexed under
+    // both object tokens, allowing a retired model mutation to reapply stale content.
+    let first = StateIdentity032Model(name: "First")
+    let second = StateIdentity032Model(name: "Second")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity032"),
+      size: .init(width: 68, height: 11)
+    ) {
+      StateIdentity032Root(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...4 {
+      var frame = try harness.clickText("Mutate First 032")
+      #expect(frame.contains("032 Reader First \(cycle * 2 - 1)"))
+      frame = try harness.clickText("Swap Model 032")
+      #expect(frame.contains("032 Reader Second \(cycle - 1)"))
+
+      frame = try harness.clickText("Mutate First 032")
+      #expect(frame.contains("032 Reader Second \(cycle - 1)"))
+      frame = try harness.clickText("Mutate Second 032")
+      #expect(frame.contains("032 Reader Second \(cycle)"))
+
+      frame = try harness.clickText("Swap Model 032")
+      #expect(frame.contains("032 Reader First \(cycle * 2)"))
+    }
+  }
+
+  private struct StateIdentity032Root: View {
+    let first: StateIdentity032Model
+    let second: StateIdentity032Model
+    @State private var usesFirst = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Swap Model 032") { usesFirst.toggle() }
+        Button("Mutate First 032") { first.value += 1 }
+        Button("Mutate Second 032") { second.value += 1 }
+        StateIdentity032Reader()
+          .id("state-identity-032-reader")
+      }
+      .environment(\.stress032Model, usesFirst ? first : second)
+    }
+  }
+
+  private struct StateIdentity032Reader: View {
+    @Environment(\.stress032Model) private var model
+
+    var body: some View {
+      Text("032 Reader \(model.name) \(model.value)")
+    }
+  }
+}
+
+private final class StateIdentity032Model: Observable, Sendable {
+  let name: String
+  private let observationRegistrar = ObservationRegistrar()
+  private let valueStorage = LockedBox(0)
+
+  init(name: String) {
+    self.name = name
+  }
+
+  var value: Int {
+    get {
+      observationRegistrar.access(self, keyPath: \.value)
+      return valueStorage.value
+    }
+    set {
+      observationRegistrar.withMutation(of: self, keyPath: \.value) {
+        valueStorage.value = newValue
+      }
+    }
+  }
+}
+
+private enum Stress032ModelKey: EnvironmentKey {
+  static let defaultValue = StateIdentity032Model(name: "Default")
+}
+
+extension EnvironmentValues {
+  fileprivate var stress032Model: StateIdentity032Model {
+    get { self[Stress032ModelKey.self] }
+    set { self[Stress032ModelKey.self] = newValue }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
