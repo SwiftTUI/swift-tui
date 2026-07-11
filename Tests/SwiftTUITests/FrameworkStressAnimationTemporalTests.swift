@@ -1608,3 +1608,150 @@ extension FrameworkStressAnimationTemporalTests {
     #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
   }
 }
+
+private struct AnimationTemporalTimelineEvent: Equatable, Sendable {
+  let token: Int
+  let mode: TimelineScheduleMode
+}
+
+private final class AnimationTemporalTimelineProbe: Sendable {
+  private let storage = Mutex<[AnimationTemporalTimelineEvent]>([])
+
+  var events: [AnimationTemporalTimelineEvent] {
+    storage.withLock { $0 }
+  }
+
+  func record(token: Int, mode: TimelineScheduleMode) {
+    storage.withLock { $0.append(.init(token: token, mode: mode)) }
+  }
+}
+
+private struct AnimationTemporalNonHashableSchedule: TimelineSchedule {
+  let token: Int
+  let probe: AnimationTemporalTimelineProbe
+
+  func entries(
+    from startInstant: MonotonicInstant,
+    mode: TimelineScheduleMode
+  ) -> [MonotonicInstant] {
+    probe.record(token: token, mode: mode)
+    return [startInstant.advanced(by: .seconds(60))]
+  }
+}
+
+private struct AnimationTemporalCollidingSchedule: TimelineSchedule, Hashable {
+  let token: Int
+  let probe: AnimationTemporalTimelineProbe
+
+  static func == (
+    lhs: AnimationTemporalCollidingSchedule,
+    rhs: AnimationTemporalCollidingSchedule
+  ) -> Bool {
+    lhs.token == rhs.token
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(0)
+  }
+
+  func entries(
+    from startInstant: MonotonicInstant,
+    mode: TimelineScheduleMode
+  ) -> [MonotonicInstant] {
+    probe.record(token: token, mode: mode)
+    return [startInstant.advanced(by: .seconds(60))]
+  }
+}
+
+private struct AnimationTemporalStableSchedule: TimelineSchedule, Hashable {
+  let token: Int
+  let probe: AnimationTemporalTimelineProbe
+
+  static func == (
+    lhs: AnimationTemporalStableSchedule,
+    rhs: AnimationTemporalStableSchedule
+  ) -> Bool {
+    lhs.token == rhs.token
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(token)
+  }
+
+  func entries(
+    from startInstant: MonotonicInstant,
+    mode: TimelineScheduleMode
+  ) -> [MonotonicInstant] {
+    probe.record(token: token, mode: mode)
+    return [startInstant.advanced(by: .seconds(60))]
+  }
+}
+
+@MainActor
+private func animationTemporalWaitUntil(
+  _ description: String,
+  condition: () -> Bool
+) async throws {
+  for _ in 0..<1_000 {
+    if condition() {
+      return
+    }
+    await Task.yield()
+  }
+  try #require(condition(), Comment(rawValue: description))
+}
+
+@MainActor
+private func animationTemporalDrainTasks() async {
+  for _ in 0..<100 {
+    await Task.yield()
+  }
+}
+
+// MARK: - Attempt 030: non-Hashable timeline schedule replacement
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 030 non-Hashable schedule replacement restarts timeline")
+  func animationTemporal030NonHashableScheduleReplacementRestartsTimeline() async throws {
+    // Hypothesis: TimelineView keys a non-Hashable schedule only by its type,
+    // leaving the original driver task alive when a distinct value replaces it.
+    let probe = AnimationTemporalTimelineProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal030", "Root"),
+      size: .init(width: 64, height: 8)
+    ) {
+      AnimationTemporal030Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    try await animationTemporalWaitUntil("initial timeline schedule did not start") {
+      probe.events.last?.token == 0
+    }
+    #expect(harness.activeTaskCount == 1)
+
+    _ = try harness.clickText("Replace NonHashable Schedule")
+    await animationTemporalDrainTasks()
+
+    withKnownIssue("A non-Hashable TimelineSchedule replacement keeps the original task") {
+      #expect(probe.events.last?.token == 1)
+    }
+    #expect(harness.activeTaskCount == 1)
+    #expect(harness.activeTaskDescriptorCount == 1)
+  }
+}
+
+@MainActor
+private struct AnimationTemporal030Fixture: View {
+  let probe: AnimationTemporalTimelineProbe
+  @State private var token = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace NonHashable Schedule") { token += 1 }
+      TimelineView(AnimationTemporalNonHashableSchedule(token: token, probe: probe)) { context in
+        Text("030 token \(token) mode \(context.cadence == .normal ? "normal" : "low")")
+      }
+    }
+  }
+}
+
