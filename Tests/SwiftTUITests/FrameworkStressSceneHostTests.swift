@@ -1552,3 +1552,45 @@ private struct SceneHostAnnouncementApp: App {
     }
   }
 }
+
+// MARK: - Attempt 032: imperative announcement drain lifetime
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 032 imperative announcements drain before unrelated host refreshes")
+  func sceneHost032ImperativeAnnouncementsDrainBeforeUnrelatedHostRefreshes() async throws {
+    // Hypothesis: pending imperative announcements can survive their commit and
+    // be republished by later resize-style host refresh frames.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 24, height: 4),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+    let session = try HostedSceneSession(
+      for: SceneHostAnnouncementApp(),
+      sceneID: "primary",
+      surface: surface
+    )
+    let runTask = Task { try await session.start() }
+    _ = await surface.waitForFrame()
+
+    session.send(.key(KeyPress(.return)))
+    _ = await surface.waitForFrames { frames in
+      frames.contains { !$0.semantics.accessibilityAnnouncements.isEmpty }
+    }
+
+    for generation in 0..<8 {
+      let baselineCount = await surface.waitForFrames { _ in true }.count
+      surface.updateSurfaceSize(.init(width: 24 + generation, height: 4))
+      session.requestSurfaceRefresh()
+      let refreshed = await surface.waitForFrames { $0.count > baselineCount }
+      let newFrames = refreshed.dropFirst(baselineCount)
+
+      #expect(!newFrames.isEmpty)
+      #expect(newFrames.allSatisfy { $0.semantics.accessibilityAnnouncements.isEmpty })
+    }
+
+    _ = try await session.stopAndWait()
+    _ = try await runTask.value
+  }
+}
