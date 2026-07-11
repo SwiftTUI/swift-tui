@@ -1488,3 +1488,67 @@ private struct StressLL024Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 025: lazy viewport lifecycle churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 025 lazy rows pair lifecycle while crossing viewport")
+  func stress025LazyRowsPairLifecycleWhileCrossingViewport() throws {
+    // Hypothesis: viewport lifecycle keys may accumulate or skip events when
+    // the same indexed rows repeatedly leave and re-enter placement.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL025", "Root"),
+      size: .init(width: 42, height: 10)
+    ) {
+      StressLL025Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...8 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Scroll Lazy Bottom")
+      #expect(probe.events.filter { $0 == "row0 disappear" }.count == 1)
+      _ = try harness.clickText("Scroll Lazy Top")
+      #expect(probe.events.filter { $0 == "row0 appear" }.count == 1)
+      #expect(harness.activeTaskCount <= 8)
+      #expect(harness.scrollPositionRegistrationCount == 1)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL025Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Scroll Lazy Bottom") { _ = proxy.scrollTo(edge: .bottom) }
+          Button("Scroll Lazy Top") { _ = proxy.scrollTo(edge: .top) }
+        }
+        ScrollView(.vertical, showsIndicators: true) {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<20, id: \.self) { row in
+              Text("lazy lifecycle row \(row)")
+                .id(row)
+                .onAppear {
+                  if row == 0 { probe.events.append("row0 appear") }
+                }
+                .onDisappear {
+                  if row == 0 { probe.events.append("row0 disappear") }
+                }
+                .task(id: row) {
+                  while !Task.isCancelled {
+                    await Task.yield()
+                  }
+                }
+            }
+          }
+        }
+        .frame(width: 40, height: 6, alignment: .topLeading)
+      }
+    }
+  }
+}
