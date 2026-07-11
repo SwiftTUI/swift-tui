@@ -307,4 +307,35 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 008: ControlGroup entity reorder
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 008 ControlGroup reorders stable controls by entity")
+  func componentComposition008ControlGroupReordersStableControlsByEntity() {
+    // Hypothesis: the compact HStack can retain occurrence order after stable controls reverse.
+    struct Entry: Identifiable { let id: String }
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        let base = [Entry(id: "one"), Entry(id: "two"), Entry(id: "three")]
+        ControlGroup {
+          ForEach(generation.isMultiple(of: 2) ? base : Array(base.reversed())) { entry in
+            Button("\(entry.id)-\(generation)") {}
+          }
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition008")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
