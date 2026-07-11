@@ -311,6 +311,54 @@ private struct StressPS007Fixture: View {
   }
 }
 
+// MARK: - Attempt 008: disabling an active menu
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 008 disabling an open menu disables its overlay actions")
+  func stress008DisablingOpenMenuDisablesOverlayActions() throws {
+    // Hypothesis: portal content may retain the opening environment and keep
+    // its buttons actionable after the source menu becomes disabled.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS008", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS008Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable-aware menu")
+    _ = try harness.clickText("Disable menu")
+    _ = try harness.clickText("Disabled overlay action")
+
+    withKnownIssue("Open menu content retains the enabled environment from activation") {
+      #expect(probe.markers.isEmpty)
+    }
+  }
+}
+
+@MainActor
+private struct StressPS008Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var isDisabled = false
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Menu("Disable-aware menu") {
+        Button("Disabled overlay action") {
+          probe.markers.append("fired")
+        }
+      }
+      .disabled(isDisabled)
+      Spacer().frame(width: 24)
+      Button("Disable menu") {
+        isDisabled = true
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
