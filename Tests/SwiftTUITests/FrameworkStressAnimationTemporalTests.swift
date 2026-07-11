@@ -1857,3 +1857,59 @@ private struct AnimationTemporal032Fixture: View {
   }
 }
 
+// MARK: - Attempt 033: sibling timeline task cardinality
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 033 sibling timeline removal keeps exact task cardinality")
+  func animationTemporal033SiblingTimelineRemovalKeepsExactTaskCardinality() async throws {
+    // Hypothesis: cancelling one of two same-type timeline drivers can cancel
+    // its sibling or retain a stale descriptor when the removed view returns.
+    let probe = AnimationTemporalTimelineProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal033", "Root"),
+      size: .init(width: 64, height: 10)
+    ) {
+      AnimationTemporal033Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    try await animationTemporalWaitUntil("both timeline schedules did not start") {
+      Set(probe.events.map(\.token)) == [331, 332]
+    }
+    #expect(harness.activeTaskCount == 2)
+    #expect(harness.activeTaskDescriptorCount == 2)
+
+    for _ in 1...8 {
+      _ = try harness.clickText("Remove Second Timeline")
+      #expect(harness.activeTaskCount == 1)
+      #expect(harness.activeTaskDescriptorCount == 1)
+
+      _ = try harness.clickText("Restore Second Timeline")
+      #expect(harness.activeTaskCount == 2)
+      #expect(harness.activeTaskDescriptorCount == 2)
+    }
+  }
+}
+
+@MainActor
+private struct AnimationTemporal033Fixture: View {
+  let probe: AnimationTemporalTimelineProbe
+  @State private var showsSecond = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button(showsSecond ? "Remove Second Timeline" : "Restore Second Timeline") {
+        showsSecond.toggle()
+      }
+      TimelineView(AnimationTemporalStableSchedule(token: 331, probe: probe)) { _ in
+        Text("033 first")
+      }
+      if showsSecond {
+        TimelineView(AnimationTemporalStableSchedule(token: 332, probe: probe)) { _ in
+          Text("033 second")
+        }
+      }
+    }
+  }
+}
+
