@@ -990,3 +990,54 @@ private struct GestureScroll019Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 020: nested reader command isolation
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 020 inner reader edge command does not move outer scroll")
+  func gestureScroll020InnerReaderEdgeCommandDoesNotMoveOuterScroll() throws {
+    // Hypothesis: first-route selection may escape the inner reader scope and
+    // apply an edge command to its containing ScrollView instead.
+    let outer = GestureScrollBox(ScrollPosition.zero)
+    let inner = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll020Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      GestureScroll020Fixture(outer: outer, inner: inner)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Inner to bottom")
+
+    #expect(outer.value == .zero)
+    #expect(inner.value.y == 7)
+  }
+}
+
+private struct GestureScroll020Fixture: View {
+  let outer: GestureScrollBox<ScrollPosition>
+  let inner: GestureScrollBox<ScrollPosition>
+
+  var body: some View {
+    ScrollViewReader { _ in
+      ScrollView(.vertical, showsIndicators: false, position: outer.binding()) {
+        VStack(alignment: .leading, spacing: 0) {
+          ScrollViewReader { innerProxy in
+            VStack(alignment: .leading, spacing: 0) {
+              Button("Inner to bottom") { _ = innerProxy.scrollTo(edge: .bottom) }
+              ScrollView(.vertical, showsIndicators: false, position: inner.binding()) {
+                VStack(alignment: .leading, spacing: 0) {
+                  ForEach(0..<10) { row in Text("Inner reader row \(row)") }
+                }
+              }
+              .frame(width: 30, height: 3, alignment: .topLeading)
+            }
+          }
+          ForEach(0..<8) { row in Text("Outer reader tail \(row)") }
+        }
+      }
+      .frame(width: 34, height: 6, alignment: .topLeading)
+    }
+  }
+}
