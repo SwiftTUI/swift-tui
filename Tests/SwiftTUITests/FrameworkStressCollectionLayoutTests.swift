@@ -60,3 +60,77 @@ private struct CollectionLayout001Root: View {
     .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 002: same-entity lazy payload measurement
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 002 lazy row payload remeasures downstream offsets")
+  func collectionLayout002LazyRowPayloadRemeasuresDownstreamOffsets() {
+    // Hypothesis: the indexed source's ID-only measurement signature may
+    // preserve a short row allocation when that same entity starts wrapping.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout002")
+
+    for generation in 0..<20 {
+      let root = CollectionLayout002Root(expanded: !generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 12, height: 8)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 12, height: 8)
+      )
+
+      let matchesFreshGeometry =
+        retained.rasterSurface == fresh.rasterSurface
+        && retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize
+        && collectionLayoutText(retained).contains("002 tail")
+      if root.expanded {
+        withKnownIssue(
+          "Lazy indexed allocation reuses the prior same-ID row measurement after payload growth"
+        ) {
+          #expect(matchesFreshGeometry)
+        }
+      } else {
+        #expect(matchesFreshGeometry)
+      }
+    }
+  }
+}
+
+private struct CollectionLayout002Row: Identifiable {
+  let id: Int
+  let label: String
+}
+
+@MainActor
+private struct CollectionLayout002Root: View {
+  let expanded: Bool
+
+  private var rows: [CollectionLayout002Row] {
+    [
+      .init(
+        id: 1,
+        label: expanded ? "one payload wraps across several terminal rows" : "one"
+      ),
+      .init(id: 2, label: "tail"),
+    ]
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(rows) { row in
+          Text("002 \(row.label)")
+        }
+      }
+    }
+    .frame(width: 12, height: 8, alignment: .topLeading)
+  }
+}
