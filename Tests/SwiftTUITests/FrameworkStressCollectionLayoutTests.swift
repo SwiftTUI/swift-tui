@@ -1775,3 +1775,84 @@ private struct CollectionLayout028Root: View {
     .frame(width: 9, height: 1, alignment: .leading)
   }
 }
+
+// MARK: - Attempt 029: custom-layout ForEach flattening
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 029 custom Layout receives every ForEach child")
+  func collectionLayout029CustomLayoutReceivesEveryForEachChild() {
+    // Hypothesis: LayoutContainer may collapse a ForEach into one Group proxy,
+    // hiding current element order and cardinality from the custom algorithm.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout029")
+    let variants = [[1, 2, 3], [4, 2], [3, 1, 4, 2], [2]]
+
+    for generation in 0..<24 {
+      let values = variants[generation % variants.count]
+      let root = CollectionLayout029Root(values: values)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 24, height: 2)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 24, height: 2)
+      )
+      let expected = values.map { "29\($0)" }.joined(separator: " ")
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.rasterSurface.lines.first == expected)
+    }
+  }
+}
+
+private struct CollectionLayout029LinearLayout: Layout {
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    return .init(
+      width: sizes.reduce(0) { $0 + $1.width } + max(0, sizes.count - 1),
+      height: sizes.map(\.height).max() ?? 0
+    )
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    var x = bounds.origin.x
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      subview.place(
+        at: .init(x: x, y: bounds.origin.y),
+        anchor: .topLeading,
+        proposal: .init(width: size.width, height: size.height)
+      )
+      x += size.width + 1
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout029Root: View {
+  let values: [Int]
+
+  var body: some View {
+    CollectionLayout029LinearLayout() {
+      ForEach(values, id: \.self) { value in
+        Text("29\(value)")
+      }
+    }
+  }
+}
