@@ -45,7 +45,8 @@ package struct OverlayStackEntry: Sendable {
 package func composeOverlayStackTree(
   baseNode: ResolvedNode,
   entries: [OverlayStackEntry],
-  in context: ResolveContext
+  in context: ResolveContext,
+  forceEntryRefresh: Bool = false
 ) -> ResolvedNode {
   guard !entries.isEmpty else {
     return baseNode
@@ -74,7 +75,13 @@ package func composeOverlayStackTree(
   let desiredEntryIdentities = sortedEntries.map { entry in
     overlayContext.identity.child("entry:\(entry.id)")
   }
-  if let committedOverlayHost = context.viewGraph?.nodeForIdentity(overlayContext.identity),
+  // `forceEntryRefresh` covers the same-entry-list staleness the identity
+  // compare cannot see: a reconcile that re-synced a *re-built* declaration
+  // (fresh payload closures for an already-open presentation) leaves the
+  // entry identities unchanged while every entry's content is new.
+  if forceEntryRefresh {
+    overlayContext.withinChurnedSubtree = true
+  } else if let committedOverlayHost = context.viewGraph?.nodeForIdentity(overlayContext.identity),
     committedOverlayHost.children.map(\.identity) != desiredEntryIdentities
   {
     overlayContext.withinChurnedSubtree = true

@@ -190,6 +190,7 @@ package final class PresentationCoordinatorRegistry {
     fileprivate var popover: PresentationCoordinatorBox<PopoverPresentationCoordinator>.Checkpoint
     fileprivate var menu: PresentationCoordinatorBox<MenuPresentationCoordinator>.Checkpoint
     fileprivate var toast: PresentationCoordinatorBox<ToastPresentationCoordinator>.Checkpoint
+    fileprivate var reconciledDeclarationGenerations: [Identity: UInt64]
   }
 
   package let alert = PresentationCoordinatorBox<AlertPresentationCoordinator>()
@@ -209,6 +210,13 @@ package final class PresentationCoordinatorRegistry {
     AnyPresentationCoordinatorBox(toast),
   ]
 
+  /// The declaration mint generations observed by the most recent
+  /// `reconcile`, per source. A reconcile whose incoming generations differ
+  /// carries *re-built* declarations (fresh payload closures), which is the
+  /// signal the overlay composition uses to refresh entry subtrees whose
+  /// entry list is otherwise unchanged.
+  private var reconciledDeclarationGenerations: [Identity: UInt64] = [:]
+
   package init() {}
 
   package func makeCheckpoint() -> Checkpoint {
@@ -218,7 +226,8 @@ package final class PresentationCoordinatorRegistry {
       sheet: sheet.makeCheckpoint(),
       popover: popover.makeCheckpoint(),
       menu: menu.makeCheckpoint(),
-      toast: toast.makeCheckpoint()
+      toast: toast.makeCheckpoint(),
+      reconciledDeclarationGenerations: reconciledDeclarationGenerations
     )
   }
 
@@ -229,6 +238,7 @@ package final class PresentationCoordinatorRegistry {
     popover.restoreCheckpoint(checkpoint.popover)
     menu.restoreCheckpoint(checkpoint.menu)
     toast.restoreCheckpoint(checkpoint.toast)
+    reconciledDeclarationGenerations = checkpoint.reconciledDeclarationGenerations
   }
 
   package func setImperativeInvalidationTarget(
@@ -241,9 +251,14 @@ package final class PresentationCoordinatorRegistry {
     toast.setImperativeInvalidationTarget(identity: identity, invalidator: invalidator)
   }
 
+  /// Applies the frame's declarations and reports whether any of them was
+  /// re-built since the previous reconcile (by mint generation). `true`
+  /// means at least one source's payload closures are fresh, so composition
+  /// must refresh overlay-entry subtrees even when the entry list matches.
+  @discardableResult
   package func reconcile(
     _ declarations: [PresentationCoordinatorDeclaration]
-  ) {
+  ) -> Bool {
     for box in allBoxes {
       box.beginSynchronizing()
     }
@@ -255,6 +270,16 @@ package final class PresentationCoordinatorRegistry {
     for box in allBoxes {
       box.endSynchronizing()
     }
+
+    let generations = declarations.reduce(into: [Identity: UInt64]()) { map, declaration in
+      map[declaration.sourceIdentity] = max(
+        map[declaration.sourceIdentity] ?? 0,
+        declaration.mintGeneration
+      )
+    }
+    let refreshed = generations != reconciledDeclarationGenerations
+    reconciledDeclarationGenerations = generations
+    return refreshed
   }
 
   package func overlayEntries() -> [OverlayStackEntry] {

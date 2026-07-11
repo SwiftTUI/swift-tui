@@ -122,7 +122,17 @@ func resolvePresentationModifier<Base: View>(
   var background = content.resolve(in: context.child(component: .named("base")))
   prepareBackground(&background)
   let resolvedBackground = background
-  let triggerContext = context.child(component: .named("__presentationTrigger"))
+  var triggerContext = context.child(component: .named("__presentationTrigger"))
+  // Reaching this resolve means the presentation wrapper recomputed — the
+  // background (and therefore the declaration this leaf carries) may have
+  // changed while the presentation is open. The leaf is the portal's only
+  // declaration emitter and has no descendants, so re-resolving it here is
+  // O(1); a spared leaf would keep its committed preference (the payload
+  // captured at activation) and record no observation, so the frame head
+  // would never re-reconcile an open presentation whose source content,
+  // cardinality, or environment changed. Activation-only frames still spare
+  // the background — its Layer-A reuse is what makes sheet-open O(overlay).
+  triggerContext.withinChurnedSubtree = true
   let triggerIdentity = triggerContext.identity
   let trigger = PresentationTriggerLeaf(
     sourceIdentity: resolvedBackground.identity,

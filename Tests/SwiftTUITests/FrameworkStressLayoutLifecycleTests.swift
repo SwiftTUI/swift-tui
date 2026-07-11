@@ -910,9 +910,7 @@ extension FrameworkStressLayoutLifecycleTests {
     for generation in 1...8 {
       _ = try harness.clickText("Increment Sheet Local", chooseLast: true)
       let frame = try harness.clickText("Refresh Sheet Payload", chooseLast: true)
-      withKnownIssue("An active sheet retains the payload captured one render earlier") {
-        #expect(frame.contains("sheet version \(generation) local \(generation)"))
-      }
+      #expect(frame.contains("sheet version \(generation) local \(generation)"))
       #expect(harness.actionRegistrationCount <= 4)
     }
   }

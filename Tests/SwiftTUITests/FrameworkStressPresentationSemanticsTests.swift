@@ -192,10 +192,8 @@ extension FrameworkStressPresentationSemanticsTests {
     _ = try harness.clickText("Payload menu")
     let frame = try harness.clickText("Advance payload")
 
-    withKnownIssue("An open menu retains the payload captured when it was activated") {
-      #expect(frame.contains("Payload generation 1"))
-      #expect(!frame.contains("Payload generation 0"))
-    }
+    #expect(frame.contains("Payload generation 1"))
+    #expect(!frame.contains("Payload generation 0"))
     #expect(stressPresentationEntryCount(in: harness) == 1)
   }
 }
@@ -236,7 +234,9 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.clickText("Action menu")
     _ = try harness.clickText("Advance action")
-    _ = try harness.clickText("Run generation 0")
+    // The open menu re-renders its live payload, so the item now carries the
+    // advanced generation in its label as well as its action closure.
+    _ = try harness.clickText("Run generation 1")
 
     #expect(probe.markers == ["generation-1"])
   }
@@ -281,13 +281,13 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.clickText("Cardinality menu")
     let frame = try harness.clickText("Add menu items")
-    _ = try harness.clickText("Stable item 0")
+    // The open menu re-renders its live payload: the stable item's label
+    // reflects the expanded state and the extra siblings are present.
+    _ = try harness.clickText("Stable item 1")
 
-    withKnownIssue("An open menu retains its one-item activation payload and action") {
-      #expect(frame.contains("Extra item A"))
-      #expect(frame.contains("Extra item B"))
-      #expect(probe.markers == ["stable-1"])
-    }
+    #expect(frame.contains("Extra item A"))
+    #expect(frame.contains("Extra item B"))
+    #expect(probe.markers == ["stable-1"])
   }
 }
 
@@ -1444,14 +1444,9 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.clickText("Open palette sheet")
     let frame = try harness.clickText("Advance palette source")
-    let currentCommandIsVisible = frame.contains("Palette command 1")
-    _ = try harness.clickText(
-      currentCommandIsVisible ? "Palette command 1" : "Palette command 0"
-    )
+    #expect(frame.contains("Palette command 1"))
+    _ = try harness.clickText("Palette command 1")
 
-    withKnownIssue("An open palette sheet retains its activation command payload") {
-      #expect(currentCommandIsVisible)
-    }
     #expect(probe.markers == ["palette-1"])
   }
 }

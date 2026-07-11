@@ -148,9 +148,10 @@ package final class PresentationPortalState {
     )
   }
 
+  @discardableResult
   package func reconcile(
     _ declarations: [PresentationCoordinatorDeclaration]
-  ) {
+  ) -> Bool {
     registry.reconcile(declarations)
   }
 
@@ -198,11 +199,12 @@ package final class PresentationPortalDraft {
     )
   }
 
+  @discardableResult
   package func reconcile(
     _ declarations: [PresentationCoordinatorDeclaration]
-  ) {
+  ) -> Bool {
     precondition(!didCommit && !didDiscard)
-    registry.reconcile(declarations)
+    return registry.reconcile(declarations)
   }
 
   package func overlayEntries() -> [OverlayStackEntry] {

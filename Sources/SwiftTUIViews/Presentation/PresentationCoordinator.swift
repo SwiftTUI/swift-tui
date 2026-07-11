@@ -186,9 +186,26 @@ extension EnvironmentValues {
 
 // MARK: - Declarative Reconciliation Preferences
 
+/// Monotonic mint for declaration freshness. A presentation declaration is
+/// value-carried (its payload is closures), so the portal cannot compare two
+/// declarations' content — but it can tell a *re-built* declaration from a
+/// committed one carried forward by a spared trigger leaf: every construction
+/// mints a new generation.
+@MainActor
+package enum PresentationDeclarationGenerationMint {
+  private static var nextGeneration: UInt64 = 0
+
+  package static func next() -> UInt64 {
+    nextGeneration &+= 1
+    return nextGeneration
+  }
+}
+
 @MainActor
 package struct PresentationCoordinatorDeclaration: Sendable {
   package var sourceIdentity: Identity
+  /// Construction-time mint — see ``PresentationDeclarationGenerationMint``.
+  package var mintGeneration: UInt64
   package var apply: @MainActor @Sendable (PresentationCoordinatorRegistry) -> Void
 
   package init(
@@ -196,6 +213,7 @@ package struct PresentationCoordinatorDeclaration: Sendable {
     apply: @escaping @MainActor @Sendable (PresentationCoordinatorRegistry) -> Void
   ) {
     self.sourceIdentity = sourceIdentity
+    mintGeneration = PresentationDeclarationGenerationMint.next()
     self.apply = apply
   }
 }
@@ -278,10 +296,10 @@ package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableV
 private func reconcilePresentationDeclarations(
   from baseNode: ResolvedNode,
   into portalState: PresentationPortalDraft
-) {
+) -> Bool {
   let declarations = baseNode.preferenceValues[
     PresentationCoordinatorDeclarationPreferenceKey.self]
-  portalState.reconcile(declarations.declarations)
+  return portalState.reconcile(declarations.declarations)
 }
 
 @MainActor
@@ -293,7 +311,7 @@ package func composePresentationPortalTree(
   // The portal root is a graph-owned wrapper. Reconcile from the
   // current base snapshot before choosing the wrapper children so stale
   // declarations are removed through ordinary structural child diffing.
-  reconcilePresentationDeclarations(
+  let declarationsRefreshed = reconcilePresentationDeclarations(
     from: baseNode,
     into: portalState
   )
@@ -319,6 +337,7 @@ package func composePresentationPortalTree(
   return composeOverlayStackTree(
     baseNode: baseNode,
     entries: overlayEntries,
-    in: context
+    in: context,
+    forceEntryRefresh: declarationsRefreshed
   )
 }
