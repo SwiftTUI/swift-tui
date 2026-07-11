@@ -36,6 +36,29 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 004: dragged-button transition
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 004 drag button changes preserve separate runs")
+  func runtimeTransport004DragButtonChangesPreserveSeparateRuns() {
+    // Hypothesis: high-rate drag compression can merge primary and secondary
+    // button ownership and deliver the later route to the earlier recognizer.
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .dragged(.primary), location: .init(x: 1, y: 2))),
+      .mouse(.init(kind: .dragged(.primary), location: .init(x: 3, y: 2))),
+      .mouse(.init(kind: .dragged(.secondary), location: .init(x: 4, y: 2))),
+      .mouse(.init(kind: .dragged(.secondary), location: .init(x: 6, y: 2))),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .dragged(.primary), location: .init(x: 3, y: 2))),
+        .mouse(.init(kind: .dragged(.secondary), location: .init(x: 6, y: 2))),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 003: pointer modifier boundary
 
 extension FrameworkStressRuntimeTransportTests {
