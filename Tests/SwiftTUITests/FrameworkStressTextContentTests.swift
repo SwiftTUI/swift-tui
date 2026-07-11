@@ -370,3 +370,32 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 011: family emoji replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 011 family emoji replacement keeps two-cell geometry")
+  func textContent011FamilyEmojiReplacementKeepsTwoCellGeometry() {
+    // Hypothesis: retained cell-width metadata can key a multi-scalar ZWJ family by its first
+    // emoji scalar and replay the previous grapheme after an equal-width family replacement.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent011")
+
+    for generation in 0..<20 {
+      let emoji = generation.isMultiple(of: 2) ? "👨‍👩‍👧‍👦" : "👩‍👩‍👦‍👦"
+      let width = generation.isMultiple(of: 3) ? 4 : 5
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text("A\(emoji)B C")
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.joined().contains(emoji))
+      #expect(emoji.first.map { cellWidth(of: $0) } == 2)
+    }
+  }
+}
