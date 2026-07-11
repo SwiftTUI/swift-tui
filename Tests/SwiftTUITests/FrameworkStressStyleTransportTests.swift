@@ -43,4 +43,14 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 005 every byte value survives one payload")
+  func styleTransport005EveryByteValueSurvivesOnePayload() {
+    // Hypothesis: signed or scalar conversion can corrupt bytes above ASCII.
+    let bytes = (0...255).map(UInt8.init)
+    let encoded = StyleTransportBase64.encode(bytes)
+    #expect(StyleTransportBase64.decode(encoded) == bytes)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
