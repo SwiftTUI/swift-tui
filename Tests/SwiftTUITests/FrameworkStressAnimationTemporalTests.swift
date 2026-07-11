@@ -1755,3 +1755,49 @@ private struct AnimationTemporal030Fixture: View {
   }
 }
 
+// MARK: - Attempt 031: colliding Hashable timeline schedules
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 031 colliding schedule values restart timeline")
+  func animationTemporal031CollidingScheduleValuesRestartTimeline() async throws {
+    // Hypothesis: reducing a Hashable schedule value to Hasher.finalize() lets
+    // unequal values with deliberate collisions share one lifecycle task ID.
+    let probe = AnimationTemporalTimelineProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal031", "Root"),
+      size: .init(width: 64, height: 8)
+    ) {
+      AnimationTemporal031Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    try await animationTemporalWaitUntil("initial colliding schedule did not start") {
+      probe.events.last?.token == 0
+    }
+
+    _ = try harness.clickText("Replace Colliding Schedule")
+    await animationTemporalDrainTasks()
+
+    withKnownIssue("Unequal TimelineSchedule values with one hash keep the original task") {
+      #expect(probe.events.last?.token == 1)
+    }
+    #expect(harness.activeTaskCount == 1)
+    #expect(harness.activeTaskDescriptorCount == 1)
+  }
+}
+
+@MainActor
+private struct AnimationTemporal031Fixture: View {
+  let probe: AnimationTemporalTimelineProbe
+  @State private var token = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Colliding Schedule") { token += 1 }
+      TimelineView(AnimationTemporalCollidingSchedule(token: token, probe: probe)) { _ in
+        Text("031 token \(token)")
+      }
+    }
+  }
+}
+
