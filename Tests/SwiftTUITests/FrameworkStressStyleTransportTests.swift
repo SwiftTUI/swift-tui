@@ -22,4 +22,16 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 003 two-byte payload preserves single padding")
+  func styleTransport003TwoBytePayloadPreservesSinglePadding() {
+    // Hypothesis: the final two-byte chunk can lose its low eight bits.
+    let bytes: [UInt8] = [0x12, 0xFE]
+    let encoded = StyleTransportBase64.encode(bytes)
+    #expect(encoded.hasSuffix("="))
+    #expect(!encoded.hasSuffix("=="))
+    #expect(StyleTransportBase64.decode(encoded) == bytes)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
