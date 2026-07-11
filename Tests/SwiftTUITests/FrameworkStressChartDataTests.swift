@@ -95,6 +95,57 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 016: legend cardinality and order churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 016 legend cardinality reorder and spacing replace item contracts")
+  func chartData016LegendCardinalityReorderAndSpacingReplaceItemContracts() {
+    // Hypothesis: Legend's index-keyed item views can preserve a departed label,
+    // tone, or inter-item spacing after empty/shrink/regrow transitions.
+    struct Root: View {
+      let generation: Int
+
+      var items: [LegendItem] {
+        let count: Int
+        switch generation % 3 {
+        case 0: count = 0
+        case 1: count = 1
+        default: count = 5
+        }
+        let values = (0..<count).map { index in
+          LegendItem(
+            "L\(index)-\(generation)",
+            tone: (index + generation).isMultiple(of: 2) ? .success : .critical
+          )
+        }
+        return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+      }
+
+      var body: some View {
+        Legend(
+          "Legend \(generation)",
+          items: items,
+          itemSpacing: [0, 1, 4][generation % 3]
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "016", proposal: .init(width: 72, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Legend \(generation)"))
+      for item in root.items {
+        #expect(text.contains(item.label))
+      }
+      if root.items.isEmpty {
+        #expect(!text.contains("L0-\(generation)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 015: timeline order and detail topology
 
 extension FrameworkStressChartDataTests {
