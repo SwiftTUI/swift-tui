@@ -134,3 +134,67 @@ private struct CollectionLayout002Root: View {
     .frame(width: 12, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 003: heterogeneous lazy-row reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 003 lazy reorder rebuilds heterogeneous row offsets")
+  func collectionLayout003LazyReorderRebuildsHeterogeneousRowOffsets() {
+    // Hypothesis: a reordered indexed source may reuse the prior allocation
+    // vector by child index, assigning each entity another row's height.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout003")
+
+    for generation in 0..<24 {
+      let root = CollectionLayout003Root(rotated: !generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 14, height: 8)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 14, height: 8)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+    }
+  }
+}
+
+private struct CollectionLayout003Row: Identifiable {
+  let id: Int
+  let height: Int
+}
+
+@MainActor
+private struct CollectionLayout003Root: View {
+  let rotated: Bool
+
+  private var rows: [CollectionLayout003Row] {
+    let base = [
+      CollectionLayout003Row(id: 1, height: 1),
+      CollectionLayout003Row(id: 2, height: 3),
+      CollectionLayout003Row(id: 3, height: 2),
+    ]
+    return rotated ? [base[2], base[0], base[1]] : base
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(rows) { row in
+          Text("003 row \(row.id) h\(row.height)")
+            .frame(height: row.height, alignment: .topLeading)
+        }
+      }
+    }
+    .frame(width: 14, height: 6, alignment: .topLeading)
+  }
+}
