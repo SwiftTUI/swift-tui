@@ -1075,3 +1075,51 @@ private struct TextContent028Fixture: View {
       .textFieldStyle(.plain)
   }
 }
+
+// MARK: - Attempt 029: secure external replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 029 secure field remasks external replacement")
+  func textContent029SecureFieldRemasksExternalReplacement() throws {
+    // Hypothesis: a focused SecureField can preserve old mask length or stale plaintext/caret state
+    // when its bound value is externally replaced at the same retained identity.
+    let text = TextContentBox("secret")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent029Root"),
+      size: .init(width: 34, height: 4)
+    ) {
+      TextContent029Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent029Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.clickText("Replace secure value")
+    _ = try harness.focus(TextContent029Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.value == "alph!abet")
+    #expect(text.writeCount == 1)
+    #expect(harness.frame.contains(String(repeating: "•", count: text.value.count)))
+    #expect(!harness.frame.contains("secret"))
+    #expect(!harness.frame.contains("alphabet"))
+    #expect(!harness.frame.contains("alph!abet"))
+  }
+}
+
+@MainActor
+private struct TextContent029Fixture: View {
+  static let fieldIdentity = testIdentity("TextContent029", "Field")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace secure value") { text.value = "alphabet" }
+      SecureField("Secret", text: text.binding())
+        .id(Self.fieldIdentity)
+        .textFieldStyle(.plain)
+    }
+  }
+}
