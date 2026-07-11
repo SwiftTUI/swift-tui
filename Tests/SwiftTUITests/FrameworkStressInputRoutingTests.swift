@@ -1570,3 +1570,65 @@ private struct StressInput028Fixture: View {
     .frame(width: 24, height: 4, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 029: nested wheel scroll chaining
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Wheel input chains to the outer scroll view when the inner view is at bottom")
+  func stressInputRouting029NestedWheelChainsAtInnerBoundary() throws {
+    // Hypothesis: spatial target selection may pick only the leaf scroll route;
+    // when its handler reports an edge, dispatch never retries the ancestor.
+    let outer = StressInputBox(ScrollPosition.zero)
+    let inner = StressInputBox(ScrollPosition(x: 0, y: 5))
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput029Root"),
+      size: .init(width: 40, height: 10)
+    ) {
+      StressInput029Fixture(outer: outer, inner: inner)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Inner 6"))
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+
+    #expect(inner.value.y == 5)
+    withKnownIssue("Nested wheel routing does not chain to the outer view at the inner edge") {
+      #expect(outer.value.y == 1)
+    }
+  }
+}
+
+private struct StressInput029Fixture: View {
+  let outer: StressInputBox<ScrollPosition>
+  let inner: StressInputBox<ScrollPosition>
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: outer.binding()
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Outer header")
+        ScrollView(
+          .vertical,
+          showsIndicators: false,
+          position: inner.binding()
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<8) { row in
+              Text("Inner \(row)")
+            }
+          }
+        }
+        .id(testIdentity("StressInput029", "Inner"))
+        .frame(width: 24, height: 3, alignment: .topLeading)
+        ForEach(0..<10) { row in
+          Text("Outer tail \(row)")
+        }
+      }
+    }
+    .id(testIdentity("StressInput029", "Outer"))
+    .frame(width: 28, height: 6, alignment: .topLeading)
+  }
+}
