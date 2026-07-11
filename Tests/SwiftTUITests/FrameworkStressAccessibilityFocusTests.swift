@@ -499,3 +499,46 @@ private struct StressAF009Fixture: View {
       .accessibilityLabel("Duplicate owner \(owner) \(generation)")
   }
 }
+
+// MARK: - Attempt 010: inferred accessibility label refresh
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 010 inferred heading label tracks draw payload churn")
+  func stress010InferredHeadingLabelTracksDrawPayloadChurn() throws {
+    // Hypothesis: accessibility label inference can read a retained heading's earlier draw payload
+    // when only text content invalidates across many same-size generations.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF010", "Root"),
+      size: .init(width: 52, height: 7)
+    ) {
+      StressAF010Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<15 {
+      _ = try harness.clickText("Advance inferred heading")
+    }
+
+    let headings = accessibilityFocusNodes(in: harness).filter {
+      $0.role == .heading(level: 3)
+    }
+    #expect(headings.map(\.label) == ["Heading payload 15"])
+    #expect(!headings.contains { $0.label == "Heading payload 0" })
+  }
+}
+
+@MainActor
+private struct StressAF010Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance inferred heading") {
+        generation += 1
+      }
+      Text("Heading payload \(generation)")
+        .id("stress-af-010-heading")
+        .accessibilityRole(.heading(level: 3))
+    }
+  }
+}
