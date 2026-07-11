@@ -243,4 +243,20 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 016 newest buffering retains exact suffix")
+  func cancellationState016NewestBufferingRetainsExactSuffix() async {
+    // Hypothesis: finish can flush an evicted prefix back into a newest-only buffer.
+    let stream = makeManagedAsyncStream(bufferingPolicy: .bufferingNewest(2)) {
+      (continuation: AsyncStream<Int>.Continuation) in
+      for value in 0..<10 { continuation.yield(value) }
+      continuation.finish()
+      return { _ in }
+    }
+    var values: [Int] = []
+    for await value in stream { values.append(value) }
+    #expect(values == [8, 9])
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
