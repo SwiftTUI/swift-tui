@@ -40,4 +40,17 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 003 completion before start is inert")
+  func cancellationState003CompletionBeforeStartIsInert() {
+    // Hypothesis: a premature completion can skip the queued/start arbitration entirely.
+    let token = FrameTailJobCancellationToken()
+    token.markCompleted()
+    #expect(token.currentState.rawValue == "queued")
+    #expect(token.markStarted())
+    token.markCompleted()
+    #expect(token.currentState.rawValue == "completed")
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
