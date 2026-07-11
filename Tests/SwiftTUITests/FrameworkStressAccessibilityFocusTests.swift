@@ -165,3 +165,52 @@ private struct StressAF003Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 004: accessibility metadata tuple coherence
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 004 label hint and role update atomically")
+  func stress004LabelHintAndRoleUpdateAtomically() throws {
+    // Hypothesis: retained semantic synchronization can mix fields from adjacent generations
+    // when label, hint, and role all change without an identity or geometry change.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF004", "Root"),
+      size: .init(width: 52, height: 7)
+    ) {
+      StressAF004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<11 {
+      _ = try harness.clickText("Advance metadata tuple")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Control 11" }
+    )
+    #expect(target.hint == "Hint 11")
+    #expect(target.role == .link)
+    #expect(
+      !accessibilityFocusNodes(in: harness).contains {
+        $0.label?.hasPrefix("Control ") == true && $0.label != "Control 11"
+      })
+  }
+}
+
+@MainActor
+private struct StressAF004Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance metadata tuple") {
+        generation += 1
+      }
+      Text("Stable target")
+        .id("stress-af-004-target")
+        .accessibilityRole(generation.isMultiple(of: 2) ? .button : .link)
+        .accessibilityLabel("Control \(generation)")
+        .accessibilityHint("Hint \(generation)")
+    }
+  }
+}
