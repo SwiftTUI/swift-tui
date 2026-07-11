@@ -985,3 +985,48 @@ private struct TextContent026Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 027: shorter external replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 027 focused field clamps caret after shortening")
+  func textContent027FocusedFieldClampsCaretAfterShortening() throws {
+    // Hypothesis: a retained TextField can preserve an out-of-range caret after external
+    // shortening and then insert into stale content or at the old offset.
+    let text = TextContentBox("abcdefgh")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent027Root"),
+      size: .init(width: 32, height: 4)
+    ) {
+      TextContent027Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent027Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.clickText("Replace with short text")
+    _ = try harness.focus(TextContent027Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.value == "xy!")
+    #expect(text.writeCount == 1)
+    #expect(harness.frame.contains("xy!"))
+  }
+}
+
+@MainActor
+private struct TextContent027Fixture: View {
+  static let fieldIdentity = testIdentity("TextContent027", "Field")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace with short text") { text.value = "xy" }
+      TextField("Value", text: text.binding())
+        .id(Self.fieldIdentity)
+        .textFieldStyle(.plain)
+    }
+  }
+}
