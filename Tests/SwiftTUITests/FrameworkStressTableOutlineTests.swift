@@ -655,3 +655,63 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 012: selectable-row topology churn
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 012 table navigation skips the currently untagged row")
+  func tableOutline012TableNavigationSkipsCurrentlyUntaggedRow() {
+    // Hypothesis: Table can retain a departed selection tag when a stable
+    // middle row alternates between tagged and read-only forms.
+    final class SelectionBox { var value = 1 }
+    struct Root: View {
+      let middleSelectable: Bool
+      let box: SelectionBox
+      let tableIdentity: Identity
+
+      var body: some View {
+        Table(
+          selection: Binding(get: { box.value }, set: { box.value = $0 }),
+          columns: [.init("Rows", width: 10)]
+        ) {
+          TableRow { Text("first") }.tag(1)
+          if middleSelectable {
+            TableRow { Text("middle-tagged") }.tag(2)
+          } else {
+            TableRow { Text("middle-read-only") }
+          }
+          TableRow { Text("last") }.tag(3)
+        }
+        .id(tableIdentity)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline012")
+    let tableIdentity = testIdentity("TableOutline012", "Table")
+    let box = SelectionBox()
+
+    for generation in 0..<18 {
+      let middleSelectable = generation.isMultiple(of: 2)
+      box.value = 1
+      let registry = LocalKeyHandlerRegistry()
+      _ = renderer.render(
+        Root(
+          middleSelectable: middleSelectable,
+          box: box,
+          tableIdentity: tableIdentity
+        ),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          localKeyHandlerRegistry: registry,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 18, height: 10)
+      )
+
+      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(box.value == (middleSelectable ? 2 : 3))
+    }
+  }
+}
