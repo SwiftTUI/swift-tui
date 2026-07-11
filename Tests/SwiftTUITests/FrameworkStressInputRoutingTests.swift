@@ -228,3 +228,63 @@ private struct StressInput003Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 004: passive pointer mutation after keyboard traversal
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Hover-driven removal does not inherit a stale keyboard traversal direction")
+  func stressInputRouting004HoverMutationDoesNotResumeKeyboardTraversal() throws {
+    // Hypothesis: a pending Tab record may survive a passive pointer move and
+    // incorrectly advance focus when hover-driven state removes the focused B.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput004Root"),
+      size: .init(width: 48, height: 10)
+    ) {
+      StressInput004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Hover focus A")
+    _ = try harness.pressKey(KeyPress(.tab))
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity
+        == (try harness.focusIdentity(forText: "Hover focus B"))
+    )
+
+    let hoverPoint = try #require(harness.point(forText: "Hover mutation"))
+    _ = try harness.movePointer(to: hoverPoint)
+
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity
+        == (try harness.focusIdentity(forText: "Hover focus A"))
+    )
+  }
+}
+
+private struct StressInput004Fixture: View {
+  static let aIdentity = testIdentity("StressInput004", "A")
+  static let bIdentity = testIdentity("StressInput004", "B")
+  static let cIdentity = testIdentity("StressInput004", "C")
+
+  @State private var removesB = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Hover focus A") {}
+        .id(Self.aIdentity)
+      if !removesB {
+        Button("Hover focus B") {}
+          .id(Self.bIdentity)
+      }
+      Button("Hover focus C") {}
+        .id(Self.cIdentity)
+      Text("Hover mutation")
+        .frame(width: 20, height: 1, alignment: .leading)
+        .onPointerHover { phase in
+          if case .entered = phase {
+            removesB = true
+          }
+        }
+    }
+  }
+}
