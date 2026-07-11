@@ -1466,3 +1466,62 @@ private struct CollectionLayout023Root: View {
     .frame(width: 20, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 024: List presentation geometry churn
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 024 List style and indicators replace geometry")
+  func collectionLayout024ListStyleAndIndicatorsReplaceGeometry() {
+    // Hypothesis: retained List measurement may ignore style or indicator
+    // presentation fields and replay an obsolete viewport/chrome inset.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout024")
+
+    for generation in 0..<24 {
+      let grouped = generation % 4 >= 2
+      let showsIndicators = generation % 2 == 0
+      let root = CollectionLayout024Root(
+        grouped: grouped,
+        showsIndicators: showsIndicators
+      )
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 20, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 20, height: 6)
+      )
+      let rendered = collectionLayoutText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(rendered.contains("↓") == showsIndicators)
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout024Root: View {
+  let grouped: Bool
+  let showsIndicators: Bool
+
+  var body: some View {
+    List(selection: .constant(2)) {
+      Section("024 section") {
+        ForEach(0..<8) { value in
+          Text("024 row \(value)").tag(value)
+        }
+      }
+    }
+    .listStyle(grouped ? AnyListStyle.insetGrouped : .plain)
+    .scrollIndicators(showsIndicators ? .visible : .hidden)
+    .frame(width: 20, height: 6, alignment: .topLeading)
+  }
+}
