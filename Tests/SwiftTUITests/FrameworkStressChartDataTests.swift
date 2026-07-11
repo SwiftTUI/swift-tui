@@ -95,6 +95,46 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 005: stacked largest-remainder reorder
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 005 stacked allocation follows reordered weighted segments")
+  func chartData005StackedAllocationFollowsReorderedWeightedSegments() {
+    // Hypothesis: largest-remainder widths or segment styles can remain keyed to
+    // an earlier index after weighted segments reorder at a fixed topology.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let entries = [
+          BarChartEntry("A", value: Double(generation + 1), tone: .success),
+          BarChartEntry("B", value: 2, tone: .warning),
+          BarChartEntry("C", value: 3, tone: .info),
+        ]
+        StackedBarChart(
+          "Stack \(generation)",
+          entries: generation.isMultiple(of: 2) ? entries : Array(entries.reversed()),
+          barWidth: generation.isMultiple(of: 3) ? 10 : 11
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "005", proposal: .init(width: 44, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let expectedTotal = generation + 6
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Stack \(generation)"))
+      #expect(text.contains("sum \(expectedTotal)"))
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains(
+          "Stack \(generation): sum \(expectedTotal)"
+        )
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 004: column maximum-owner migration
 
 extension FrameworkStressChartDataTests {
