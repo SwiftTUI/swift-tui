@@ -333,4 +333,58 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 008: Stable-ID Canvas and Text payload swap
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 008 stable identity replaces canvas and text draw payloads")
+  func renderReconciliation008StableIdentityReplacesCanvasAndTextPayloads() {
+    // Hypothesis: the retained draw map has a runtime-identity fallback after its ViewNodeID
+    // lookup, so a stable explicit ID may resurrect an incompatible Canvas DrawNode for Text.
+    struct Marker: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setCell(at: .zero, character: "K", foreground: .green)
+      }
+    }
+
+    struct Root: View {
+      let showCanvas: Bool
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Header")
+          if showCanvas {
+            Canvas(Marker())
+              .frame(width: 12, height: 1)
+              .id("render-reconciliation-008-payload")
+          } else {
+            Text("Text payload")
+              .frame(width: 12, height: 1, alignment: .leading)
+              .id("render-reconciliation-008-payload")
+          }
+          Text("Footer")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation008")
+
+    for generation in 0..<16 {
+      let showCanvas = generation.isMultiple(of: 2)
+      let root = Root(showCanvas: showCanvas)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained).contains(showCanvas ? "K" : "Text payload"))
+    }
+  }
+}
+
 // MARK: - End
