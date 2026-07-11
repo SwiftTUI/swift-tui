@@ -1958,6 +1958,83 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 029: State write targets a branch removed by the same action
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 029 departing branch mutation does not stale the replacement")
+  func stateIdentity029DepartingBranchMutationDoesNotStaleReplacement() throws {
+    // Hypothesis: one callback queues local dirty work and removes that node before commit, so
+    // invalidation remapping can stitch a stale departed snapshot over the arriving branch.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity029"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity029Root()
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...4 {
+      var frame = try harness.clickText("Switch from A 029")
+      #expect(frame.contains("029 Branch B Count 0"))
+      #expect(frame.contains("029 Switches \(cycle * 2 - 1)"))
+      frame = try harness.clickText("Switch from B 029")
+      #expect(frame.contains("029 Branch A Count 0"))
+      #expect(frame.contains("029 Switches \(cycle * 2)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity029Root: View {
+    @State private var showsA = true
+    @State private var switchCount = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("029 Switches \(switchCount)")
+        if showsA {
+          StateIdentity029A(showsA: $showsA, switchCount: $switchCount)
+        } else {
+          StateIdentity029B(showsA: $showsA, switchCount: $switchCount)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity029A: View {
+    @Binding var showsA: Bool
+    @Binding var switchCount: Int
+    @State private var localCount = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("029 Branch A Count \(localCount)")
+        Button("Switch from A 029") {
+          localCount += 1
+          switchCount += 1
+          showsA = false
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity029B: View {
+    @Binding var showsA: Bool
+    @Binding var switchCount: Int
+    @State private var localCount = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("029 Branch B Count \(localCount)")
+        Button("Switch from B 029") {
+          localCount += 1
+          switchCount += 1
+          showsA = true
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
