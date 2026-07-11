@@ -611,6 +611,57 @@ private struct EnvironmentStyle013Root: View {
   }
 }
 
+// MARK: - Attempt 014: same-type erased text-field-style replacement
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 014 erased text field style refreshes payload and content")
+  func environmentStyle014ErasedTextFieldStyleRefreshesPayloadAndContent() throws {
+    // Hypothesis: AnyTextFieldStyle can preserve the first concrete style value while the field's
+    // separately resolved display content continues to update, producing split-generation chrome.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle014"),
+      size: .init(width: 78, height: 7)
+    ) {
+      EnvironmentStyle014Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...14 {
+      let frame = try harness.clickText("Advance Field Style 014")
+      #expect(frame.contains("field-style-\(generation)"))
+      #expect(frame.contains("value-\(generation)"))
+      #expect(!frame.contains("field-style-\(generation - 1)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle014TextFieldStyle: TextFieldStyle {
+  let marker: String
+
+  func makeBody(configuration: TextFieldStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      Text(marker)
+      configuration.fieldContent
+    }
+  }
+}
+
+private struct EnvironmentStyle014Root: View {
+  @State private var generation = 0
+  @State private var value = "value-0"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Field Style 014") {
+        generation += 1
+        value = "value-\(generation)"
+      }
+      TextField("Field 014", text: $value)
+        .textFieldStyle(EnvironmentStyle014TextFieldStyle(marker: "field-style-\(generation)"))
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
