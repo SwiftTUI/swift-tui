@@ -1224,6 +1224,68 @@ private struct EnvironmentStyle023Root: View {
   }
 }
 
+// MARK: - Attempt 024: stacked transaction modifier order churn
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 024 stacked transaction order follows current branch")
+  func environmentStyle024StackedTransactionOrderFollowsCurrentBranch() throws {
+    // Hypothesis: structurally stable TransactionModifier nodes can reuse closures by ordinal when
+    // two opposing transforms reverse authored order, preserving the prior winner.
+    struct Root: View {
+      let generation: Int
+
+      @ViewBuilder var body: some View {
+        if generation.isMultiple(of: 2) {
+          Text("024 transaction \(generation)")
+            .transaction { $0.disablesAnimations = true }
+            .transaction { $0.disablesAnimations = false }
+        } else {
+          Text("024 transaction \(generation)")
+            .transaction { $0.disablesAnimations = false }
+            .transaction { $0.disablesAnimations = true }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("EnvironmentStyle024")
+    for generation in 0..<20 {
+      let retained = renderer.render(
+        Root(generation: generation),
+        context: .init(identity: identity, invalidatedIdentities: [identity])
+      )
+      let fresh = DefaultRenderer().render(
+        Root(generation: generation),
+        context: .init(identity: identity)
+      )
+      let retainedNode = try #require(
+        environmentStyleDescendant(
+          retained.resolvedTree,
+          text: "024 transaction \(generation)"
+        )
+      )
+      let freshNode = try #require(
+        environmentStyleDescendant(fresh.resolvedTree, text: "024 transaction \(generation)")
+      )
+      let expected: AnimationRequest = generation.isMultiple(of: 2) ? .disabled : .inherit
+      #expect(retainedNode.transactionSnapshot.animationRequest == expected)
+      #expect(retainedNode.transactionSnapshot == freshNode.transactionSnapshot)
+    }
+  }
+}
+
+private func environmentStyleDescendant(_ node: ResolvedNode, text: String) -> ResolvedNode? {
+  if case .text(let value) = node.drawPayload, value == text {
+    return node
+  }
+  for child in node.children {
+    if let match = environmentStyleDescendant(child, text: text) {
+      return match
+    }
+  }
+  return nil
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
