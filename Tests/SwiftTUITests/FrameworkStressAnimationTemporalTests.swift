@@ -1491,3 +1491,63 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 028: rapid matched-geometry swaps
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 028 rapid matched swaps keep one current animation")
+  func animationTemporal028RapidMatchedSwapsKeepOneCurrentAnimation() throws {
+    // Hypothesis: each key-to-identity swap can leave the prior target's match
+    // scope alive beside the replacement during rapid temporal churn.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(3))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal028", "Root")
+    let key = MatchedGeometryKey(id: "animation-temporal-028")
+    let start = MonotonicInstant(offset: .seconds(160))
+    let identities = [
+      testIdentity("AnimationTemporal028", "A"),
+      testIdentity("AnimationTemporal028", "B"),
+      testIdentity("AnimationTemporal028", "C"),
+    ]
+
+    let first = animationTemporalMatchedNode(identity: identities[0], nodeID: 281, key: key)
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [first]),
+      transaction: .init(),
+      timestamp: start
+    )
+    controller.capturePlacedTree(
+      animationTemporalPlacedRoot(
+        identity: rootID,
+        children: [animationTemporalPlacedMatchedNode(identity: identities[0], key: key, x: 0)]
+      )
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+
+    for generation in 1...18 {
+      let index = generation % identities.count
+      let identity = identities[index]
+      let node = animationTemporalMatchedNode(
+        identity: identity,
+        nodeID: UInt64(281 + index),
+        key: key
+      )
+      controller.processResolvedTree(
+        animationTemporalRoot(identity: rootID, children: [node]),
+        transaction: transaction,
+        timestamp: start.advanced(by: .milliseconds(generation * 20))
+      )
+      #expect(controller.activeMatchedGeometryCount == 1)
+      controller.capturePlacedTree(
+        animationTemporalPlacedRoot(
+          identity: rootID,
+          children: [
+            animationTemporalPlacedMatchedNode(identity: identity, key: key, x: index * 10)
+          ]
+        )
+      )
+    }
+  }
+}
+
