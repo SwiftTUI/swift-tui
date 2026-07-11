@@ -794,3 +794,43 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 023: inline-link explicit-line movement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 023 inline-link semantics follow explicit newlines")
+  func textContent023InlineLinkSemanticsFollowExplicitNewlines() {
+    // Hypothesis: retained rich-text semantics can keep an inline link on its former explicit line
+    // when the same payload moves above or below a newline without changing width.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent023")
+    let destination = "https://line.example"
+
+    for generation in 0..<20 {
+      let linkOnSecondLine = generation.isMultiple(of: 2)
+      let link = Link("LINK", destination: .init(destination))
+      let content = linkOnSecondLine ? Text("A\n\(link)") : Text("\(link)\nA")
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 4, height: 2),
+        content: content
+      )
+      let expectedY = linkOnSecondLine ? 1 : 0
+      let focusRegion = frames.retained.semanticSnapshot.focusRegions.first
+      let interactionRegion = frames.retained.semanticSnapshot.interactionRegions.first
+      let hyperlinkCells = frames.retained.rasterSurface.cells.flatMap { row in
+        row.filter { $0.hyperlink == destination }
+      }
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(focusRegion?.rect.origin == .init(x: 0, y: expectedY))
+      #expect(interactionRegion?.rect.origin == .init(x: 0, y: expectedY))
+      #expect(hyperlinkCells.count == 4)
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains(destination))
+    }
+  }
+}
