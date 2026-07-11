@@ -959,4 +959,41 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 023: Frame alignment churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 023 frame alignment relocates stable child")
+  func renderReconciliation023FrameAlignmentRelocatesStableChild() {
+    // Hypothesis: retained placement equivalence can preserve frame geometry while overlooking
+    // the alignment value that changes only the stable child's origin inside that frame.
+    struct Root: View {
+      let alignment: Alignment
+
+      var body: some View {
+        Text("X")
+          .frame(width: 9, height: 5, alignment: alignment)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation023")
+    let alignments: [Alignment] = [.topLeading, .bottomTrailing, .center, .top, .leading]
+
+    for generation in 0..<25 {
+      let root = Root(alignment: alignments[generation % alignments.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.placedTree == fresh.placedTree)
+    }
+  }
+}
+
 // MARK: - End
