@@ -1488,6 +1488,64 @@ private struct StressPS032Fixture: View {
   }
 }
 
+// MARK: - Attempt 033: live nested drop-consumption policy
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 033 nested drop routing uses the current consume policy")
+  func stress033NestedDropRoutingUsesCurrentConsumePolicy() throws {
+    // Hypothesis: a retained inner ActionScope may keep the first handler's
+    // consume result, incorrectly bubbling or swallowing later drops.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS033", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      StressPS033Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Drop focus target")
+    _ = try harness.drop(paths: [DroppedPath("/tmp/first.txt")])
+    #expect(probe.markers == ["inner-false", "outer"])
+
+    _ = try harness.clickText("Inner consumes drops")
+    _ = try harness.focusText("Drop focus target")
+    _ = try harness.drop(paths: [DroppedPath("/tmp/second.txt")])
+    withKnownIssue("A retained drop destination keeps its first consume-policy closure") {
+      #expect(probe.markers == ["inner-false", "outer", "inner-true"])
+    }
+    #expect(harness.dropDestinationRegistrationCount == 2)
+  }
+}
+
+@MainActor
+private struct StressPS033Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var innerConsumes = false
+
+  var body: some View {
+    Panel(id: "outer-drop-scope") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Inner consumes drops") {
+          innerConsumes = true
+        }
+        Panel(id: "inner-drop-scope") {
+          Text("Drop focus target")
+            .focusable()
+        }
+        .dropDestination { _ in
+          probe.markers.append("inner-\(innerConsumes)")
+          return innerConsumes
+        }
+      }
+    }
+    .dropDestination { _ in
+      probe.markers.append("outer")
+      return true
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
