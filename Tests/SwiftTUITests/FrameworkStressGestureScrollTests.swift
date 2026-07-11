@@ -1157,3 +1157,55 @@ private struct GestureScroll022Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 023: two-axis anchored command
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 023 center anchor updates both scroll axes")
+  func gestureScroll023CenterAnchorUpdatesBothScrollAxes() throws {
+    // Hypothesis: a two-axis route may apply only the dominant target delta or
+    // overwrite one component while clamping the other.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll023Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      GestureScroll023Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Center grid target")
+
+    #expect(position.value == ScrollPosition(x: 8, y: 6))
+  }
+}
+
+private struct GestureScroll023Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Center grid target") { _ = proxy.scrollTo("grid-target", anchor: .center) }
+        ScrollView(
+          [.horizontal, .vertical],
+          showsIndicators: false,
+          position: position.binding()
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in
+              HStack(spacing: 0) {
+                ForEach(0..<6) { column in
+                  Text("\(row),\(column)")
+                    .frame(width: 4, height: 1, alignment: .leading)
+                    .id(row == 8 && column == 3 ? "grid-target" : "grid-\(row)-\(column)")
+                }
+              }
+            }
+          }
+        }
+        .frame(width: 12, height: 4, alignment: .topLeading)
+      }
+    }
+  }
+}
