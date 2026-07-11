@@ -779,6 +779,51 @@ private struct EnvironmentStyle016Root: View {
   }
 }
 
+// MARK: - Attempt 017: Equatable boundary environment invalidation
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 017 equatable reader invalidates for environment changes")
+  func environmentStyle017EquatableReaderInvalidatesForEnvironmentChanges() {
+    // Hypothesis: an Equatable fast-path match can reuse a reader before its recorded environment
+    // dependency is compared, serving stale output despite a changed custom key.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        EnvironmentStyle017Reader(stableToken: 1)
+          .environment(\.environmentStyleString, "environment-\(generation)")
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("EnvironmentStyle017")
+    for generation in 0..<20 {
+      let frame = renderer.render(
+        Root(generation: generation),
+        context: .init(identity: identity, invalidatedIdentities: [identity])
+      )
+      #expect(
+        environmentStyleText(frame).contains("017 token 1 value environment-\(generation)")
+      )
+    }
+  }
+}
+
+private struct EnvironmentStyle017Reader: View {
+  let stableToken: Int
+  @Environment(\.environmentStyleString) private var value
+
+  var body: some View {
+    Text("017 token \(stableToken) value \(value)")
+  }
+}
+
+extension EnvironmentStyle017Reader: @MainActor Equatable {
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.stableToken == rhs.stableToken
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
