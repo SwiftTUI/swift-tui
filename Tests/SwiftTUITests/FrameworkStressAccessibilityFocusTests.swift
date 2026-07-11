@@ -112,3 +112,56 @@ private struct StressAF002Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 003: explicit accessibility role removal
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 003 removed role does not survive branch churn")
+  func stress003RemovedRoleDoesNotSurviveBranchChurn() throws {
+    // Hypothesis: stable explicit identity can cause retained semantic metadata to preserve a
+    // departed heading role when a conditional branch returns to label-only group semantics.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF003", "Root"),
+      size: .init(width: 48, height: 7)
+    ) {
+      StressAF003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<9 {
+      _ = try harness.clickText("Toggle target role")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Role target" }
+    )
+    #expect(target.role == .group)
+    #expect(
+      !accessibilityFocusNodes(in: harness).contains {
+        $0.label == "Role target" && $0.role == .heading(level: 2)
+      })
+  }
+}
+
+@MainActor
+private struct StressAF003Fixture: View {
+  @State private var usesHeading = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle target role") {
+        usesHeading.toggle()
+      }
+      if usesHeading {
+        Text("Stable visible text")
+          .id("stress-af-003-target")
+          .accessibilityRole(.heading(level: 2))
+          .accessibilityLabel("Role target")
+      } else {
+        Text("Stable visible text")
+          .id("stress-af-003-target")
+          .accessibilityLabel("Role target")
+      }
+    }
+  }
+}
