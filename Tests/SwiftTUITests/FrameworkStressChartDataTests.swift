@@ -95,6 +95,51 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 012: meter total-sign boundary churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 012 meter crosses zero total and width boundaries")
+  func chartData012MeterCrossesZeroTotalAndWidthBoundaries() {
+    // Hypothesis: Meter's nonpositive-total fast path can leave a stale filled
+    // count or percentage after returning to a positive fractional domain.
+    struct Root: View {
+      let generation: Int
+
+      var valueAndTotal: (value: Double, total: Double, percentage: Int) {
+        switch generation % 4 {
+        case 0: (0, 0, 0)
+        case 1: (5, 0, 100)
+        case 2: (-5, -2, 0)
+        default: (Double(generation + 1), Double((generation + 1) * 2), 50)
+        }
+      }
+
+      var body: some View {
+        let pair = valueAndTotal
+        Meter(
+          "Meter \(generation)",
+          value: pair.value,
+          total: pair.total,
+          tone: generation.isMultiple(of: 2) ? .success : .critical,
+          barWidth: [1, 7, 13, 19][generation % 4]
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "012", proposal: .init(width: 50, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let percentage = Root(generation: generation).valueAndTotal.percentage
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Meter \(generation)"))
+      #expect(text.contains("\(percentage)%"))
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains("Meter \(generation): \(percentage)%")
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 011: heat-strip normalization and order churn
 
 extension FrameworkStressChartDataTests {
