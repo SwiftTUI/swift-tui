@@ -890,3 +890,61 @@ private struct StressLL014Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 015: active sheet payload refresh
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 015 active sheet refreshes payload without losing local state")
+  func stress015ActiveSheetRefreshesPayloadWithoutLosingLocalState() throws {
+    // Hypothesis: a stable portal entry may reuse its first payload when the
+    // source state changes, or remint the hosted state owner unnecessarily.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL015", "Root"),
+      size: .init(width: 52, height: 11)
+    ) {
+      StressLL015Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Refreshing Sheet")
+    for generation in 1...8 {
+      _ = try harness.clickText("Increment Sheet Local", chooseLast: true)
+      let frame = try harness.clickText("Refresh Sheet Payload", chooseLast: true)
+      withKnownIssue("An active sheet retains the payload captured one render earlier") {
+        #expect(frame.contains("sheet version \(generation) local \(generation)"))
+      }
+      #expect(harness.actionRegistrationCount <= 4)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL015Fixture: View {
+  @State private var isPresented = false
+  @State private var generation = 0
+
+  var body: some View {
+    Button("Open Refreshing Sheet") { isPresented = true }
+      .sheet("Refreshing", isPresented: $isPresented) {
+        StressLL015Sheet(
+          generation: generation,
+          generationBinding: $generation
+        )
+      }
+  }
+}
+
+@MainActor
+private struct StressLL015Sheet: View {
+  let generation: Int
+  @Binding var generationBinding: Int
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("sheet version \(generation) local \(local)")
+      Button("Increment Sheet Local") { local += 1 }
+      Button("Refresh Sheet Payload") { generationBinding += 1 }
+    }
+  }
+}
