@@ -95,6 +95,49 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 009: sparkline migrating extrema
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 009 sparkline extrema migration renormalizes every sample")
+  func chartData009SparklineExtremaMigrationRenormalizesEverySample() {
+    // Hypothesis: Sparkline can retain normalized glyphs by array position when
+    // the minimum and maximum migrate while sample cardinality stays constant.
+    struct Root: View {
+      let generation: Int
+
+      var values: [Double] {
+        let minimumIndex = generation % 8
+        let maximumIndex = (minimumIndex + 3) % 8
+        var result = (0..<8).map { Double(generation + $0) }
+        result[minimumIndex] = -Double(20 + generation)
+        result[maximumIndex] = Double(40 + generation)
+        return result
+      }
+
+      var body: some View {
+        Sparkline(
+          "Spark \(generation)",
+          values: values,
+          tone: generation.isMultiple(of: 2) ? .success : .warning
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "009", proposal: .init(width: 52, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Spark \(generation)"))
+      #expect(text.contains("lo -\(20 + generation) hi \(40 + generation)"))
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains(
+          "Spark \(generation): lo -\(20 + generation) hi \(40 + generation)"
+        )
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 008: comparison cardinality and trend-tone churn
 
 extension FrameworkStressChartDataTests {
