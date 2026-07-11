@@ -382,3 +382,56 @@ private struct StressTC007Fixture: View {
     .frame(width: 24, height: 11, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 008: selected-tab departure fallback
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 008 selected tab departure resolves the first live payload")
+  func stressTabCommand008SelectedTabDepartureResolvesFirstLivePayload() throws {
+    // Hypothesis: when the selected tag disappears, lazy payload indexing may
+    // keep the departed content or choose the first declaration before filtering.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC008", "Root"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StressTC008Fixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("B live payload"))
+    let frame = try harness.pressKey(KeyPress(.character("x"), modifiers: .ctrl))
+
+    #expect(frame.contains("includes B false"))
+    withKnownIssue("A departed selected tab keeps its stale declaration and active payload") {
+      #expect(frame.contains("A live payload"))
+      #expect(!frame.contains("B live payload"))
+    }
+    #expect(!frame.contains("C live payload"))
+  }
+}
+
+@MainActor
+private struct StressTC008Fixture: View {
+  @State private var includesB = true
+  @State private var selection = "b"
+
+  var body: some View {
+    Panel(id: "stress-tc-008-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("includes B \(includesB)")
+        TabView(selection: $selection) {
+          Tab("A", value: "a") { Text("A live payload") }
+          if includesB {
+            Tab("B", value: "b") { Text("B live payload") }
+          }
+          Tab("C", value: "c") { Text("C live payload") }
+        }
+        .id(testIdentity("StressTC008", "Tabs"))
+      }
+    }
+    .keyCommand("Remove selected", key: .character("x"), modifiers: .ctrl) {
+      includesB = false
+    }
+    .frame(width: 56, height: 8, alignment: .topLeading)
+  }
+}
