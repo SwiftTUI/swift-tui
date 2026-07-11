@@ -1089,3 +1089,58 @@ private struct StressNP016Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 017: menu dismissal before navigation pop
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 017 menu dismisses before destination pop")
+  func stress017MenuDismissesBeforeDestinationPop() throws {
+    // Hypothesis: a nonmodal menu rooted in a detached destination can lose
+    // ordering against that destination's pop action after repeated cycles.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP017", "Root"),
+      size: .init(width: 54, height: 11)
+    ) {
+      StressNP017Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...6 {
+      _ = try harness.clickText("Push Menu Destination")
+      _ = try harness.focusText("Destination Actions")
+      _ = try harness.clickText("Destination Actions")
+      _ = try harness.focusText("Menu Overlay Target")
+      #expect(stressNPPresentationEntryCount(in: harness) == 1)
+
+      var frame = try harness.pressKey(KeyPress(.escape))
+      let menuTriggerFocus = try harness.focusIdentity(forText: "Destination Actions")
+      #expect(frame.contains("menu destination body"))
+      #expect(!frame.contains("Menu Overlay Target"))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == menuTriggerFocus)
+
+      frame = try harness.pressKey(KeyPress(.escape))
+      #expect(frame.contains("Push Menu Destination"))
+      #expect(!frame.contains("menu destination body"))
+      #expect(stressNPPresentationEntryCount(in: harness) == 0)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP017Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-017-stack") {
+      Button("Push Menu Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("menu destination body")
+            Menu("Destination Actions") {
+              Button("Menu Overlay Target") {}
+            }
+          }
+        }
+    }
+  }
+}
