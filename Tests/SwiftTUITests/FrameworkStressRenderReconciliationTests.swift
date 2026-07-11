@@ -56,7 +56,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 002: Recreated closure canvas capture
 
 extension FrameworkStressRenderReconciliationTests {
@@ -106,7 +105,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 003: Canvas grid churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -149,7 +147,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 004: Canvas geometry churn
 
@@ -197,7 +194,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 005: Direct-cell Canvas style churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -237,7 +233,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 006: Canvas inherited foreground churn
 
@@ -281,7 +276,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 007: Canvas reinsertion beside retained content
 
@@ -332,7 +326,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 008: Stable-ID Canvas and Text payload swap
 
@@ -387,7 +380,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 009: Line-limit cache churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -429,7 +421,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 010: Truncation-mode cache churn
 
@@ -474,7 +465,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 011: Measurement-cache proposal LRU revisit
 
 extension FrameworkStressRenderReconciliationTests {
@@ -508,7 +498,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 012: Equal-scalar wide-glyph churn
 
@@ -553,7 +542,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 013: Combining and precomposed scalar churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -595,7 +583,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 014: Explicit-newline topology churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -631,7 +618,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 015: Rich and plain text payload swap
 
@@ -672,7 +658,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 016: Equal-width draw-only text churn
 
@@ -719,7 +704,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 017: Foreground-style retained draw churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -754,7 +738,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 018: Opacity retained draw churn
 
@@ -791,7 +774,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 019: Border set and side churn
 
@@ -835,7 +817,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 020: Clip enable and disable churn
 
@@ -881,7 +862,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 021: Background alignment churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -919,7 +899,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 022: Overlay alignment churn
 
@@ -959,7 +938,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 023: Frame alignment churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -995,7 +973,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 024: Padding edge and amount churn
 
@@ -1037,7 +1014,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 025: Layout-priority allocation churn
 
@@ -1081,7 +1057,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 026: Alignment-guide closure capture churn
 
@@ -1131,7 +1106,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 027: Accessibility copy churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -1176,7 +1150,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 028: Accessibility-hidden subtree churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -1216,7 +1189,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 029: Hit-testing availability churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -1255,7 +1227,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 030: Focusable metadata churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -1292,7 +1263,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 031: Content-shape geometry churn
 
@@ -1338,7 +1308,6 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
-
 // MARK: - Attempt 032: Accessibility role churn
 
 extension FrameworkStressRenderReconciliationTests {
@@ -1380,7 +1349,6 @@ extension FrameworkStressRenderReconciliationTests {
     }
   }
 }
-
 
 // MARK: - Attempt 033: Routed sibling draw reorder
 
@@ -1424,6 +1392,91 @@ extension FrameworkStressRenderReconciliationTests {
       let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
       #expect(retained.rasterSurface == fresh.rasterSurface)
       #expect(renderStressText(retained) == root.rows.joined(separator: "\n"))
+    }
+  }
+}
+
+// MARK: - Attempt 034: Duplicate routed identity draw and semantic churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 034 duplicate identities keep occurrence draw and semantics")
+  func renderReconciliation034DuplicateIdentitiesKeepOccurrenceDrawAndSemantics() {
+    // Hypothesis: retained draw falls back from ViewNodeID to runtime Identity, while semantics
+    // also exposes runtime identities; duplicate entity occurrences may therefore exchange the
+    // first occurrence's glyphs, style, or accessibility role after removal and reorder.
+    struct Row: Hashable, Sendable {
+      let id: Int
+      let label: String
+      let accent: Bool
+    }
+
+    struct Root: View {
+      let rows: [Row]
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(rows, id: \.id) { row in
+            Text(row.label)
+              .foregroundStyle(row.accent ? Color.red : Color.green)
+              .accessibilityRole(row.accent ? .button : .heading(level: 2))
+          }
+        }
+      }
+    }
+
+    let variants: [[Row]] = [
+      [
+        Row(id: 1, label: "first-A", accent: true),
+        Row(id: 1, label: "first-B", accent: false),
+        Row(id: 2, label: "stable-C", accent: true),
+      ],
+      [
+        Row(id: 1, label: "second-B", accent: true),
+        Row(id: 2, label: "stable-C", accent: false),
+        Row(id: 1, label: "second-A", accent: false),
+      ],
+      [
+        Row(id: 2, label: "stable-C", accent: true),
+        Row(id: 1, label: "third-A", accent: false),
+      ],
+      [
+        Row(id: 1, label: "fourth-A", accent: true),
+        Row(id: 1, label: "fourth-B", accent: false),
+        Row(id: 2, label: "stable-C", accent: false),
+      ],
+    ]
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation034")
+
+    func accessibilityProjection(_ snapshot: SemanticSnapshot) -> [String] {
+      snapshot.accessibilityNodes.map { node in
+        "\(node.identity.path)|\(node.rect)|\(node.role)|\(node.label ?? "")"
+      }
+    }
+
+    func interactionProjection(_ snapshot: SemanticSnapshot) -> [String] {
+      snapshot.interactionRegions.map { region in
+        "\(region.identity.path)|\(region.rect)|\(region.hitTestOrder)"
+      }
+    }
+
+    for generation in 0..<20 {
+      let root = Root(rows: variants[generation % variants.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(
+        accessibilityProjection(retained.semanticSnapshot)
+          == accessibilityProjection(fresh.semanticSnapshot))
+      #expect(
+        interactionProjection(retained.semanticSnapshot)
+          == interactionProjection(fresh.semanticSnapshot))
     }
   }
 }
