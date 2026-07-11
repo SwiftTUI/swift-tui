@@ -139,4 +139,18 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 008 alternating touches select the true victim")
+  func cacheState008AlternatingTouchesSelectTheTrueVictim() {
+    // Hypothesis: repeated nonadjacent promotions can duplicate links and evict the wrong key.
+    var cache = BoundedLRUCache<Int, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 4, bytes: .max)
+    for key in 0..<4 { cache.upsert(key, value: key, cost: stressCacheEntry(1), policy: policy) }
+    for key in [0, 2, 1, 0, 3, 2] { cache.recordAccess(key) }
+    cache.upsert(4, value: 4, cost: stressCacheEntry(1), policy: policy)
+    #expect(cache.peek(1) == nil)
+    #expect([0, 2, 3, 4].allSatisfy { cache.peek($0) == $0 })
+  }
+}
+
 // NEXT CACHE STRESS TEST
