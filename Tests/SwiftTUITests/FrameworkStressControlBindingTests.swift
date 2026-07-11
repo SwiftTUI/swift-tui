@@ -164,3 +164,53 @@ private struct ControlStress003Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 004: button role branch replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 004 role replacement refreshes button action")
+  func stressControlBinding004RoleReplacementRefreshesButtonAction() throws {
+    // Hypothesis: replacing a same-identity Button across role-specialized conditional branches
+    // can restore the old action registration while rendering the new role and payload.
+    let probe = ControlStressProbe<[Int]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress004", "Root"),
+      size: .init(width: 52, height: 8)
+    ) {
+      ControlStress004Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace role 004")
+    _ = try harness.clickText("Role target 004 generation 1")
+
+    #expect(probe.value == [1])
+  }
+}
+
+@MainActor
+private struct ControlStress004Fixture: View {
+  let probe: ControlStressProbe<[Int]>
+  @State private var generation = 0
+  @State private var isDestructive = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace role 004") {
+        generation = 1
+        isDestructive = true
+      }
+      if isDestructive {
+        Button("Role target 004 generation \(generation)", role: .destructive) {
+          probe.value.append(generation)
+        }
+        .id("role-target-004")
+      } else {
+        Button("Role target 004 generation \(generation)") {
+          probe.value.append(generation)
+        }
+        .id("role-target-004")
+      }
+    }
+  }
+}
