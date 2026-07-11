@@ -36,6 +36,26 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 017: false paste-end prefix
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 017 false paste end prefix survives split terminator")
+  func runtimeTransport017FalsePasteEndPrefixSurvivesSplitTerminator() {
+    // Hypothesis: a payload suffix resembling the end marker can be truncated
+    // when the real terminator is completed by a later read.
+    var parser = TerminalInputParser()
+    let first = "\u{001B}[200~alpha \u{001B}[20"
+    let second = "x omega\u{001B}[201~"
+
+    #expect(parser.feed(Array(first.utf8)).isEmpty)
+    #expect(
+      parser.feed(Array(second.utf8)) == [
+        .paste(.init(content: "alpha \u{001B}[20x omega"))
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 016: split pixel mouse envelope
 
 extension FrameworkStressRuntimeTransportTests {
