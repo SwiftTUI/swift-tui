@@ -109,6 +109,73 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 020: GeometryReader pointer-capability churn
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 020 geometry adopts every pointer capability")
+  func safeAreaGeometry020GeometryAdoptsEveryPointerCapability() {
+    // Hypothesis: pointer capability metadata can remain captured by the first GeometryReader
+    // realization even as a host switches precision, hover, and precise-scroll support.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "020 g\(generation) sub\(proxy.pointerInputCapabilities.supportsSubCellLocation) "
+              + "hover\(proxy.pointerInputCapabilities.supportsHover) "
+              + "scroll\(proxy.pointerInputCapabilities.supportsPreciseScroll)"
+          )
+        }
+      }
+    }
+
+    let reported = CellPixelMetrics(width: 10, height: 20, source: .reported)
+    let capabilities = [
+      PointerInputCapabilities.cellOnly,
+      PointerInputCapabilities(
+        precision: .subCell(source: .nativePixels, metrics: reported),
+        supportsHover: true,
+        supportsPreciseScroll: false
+      ),
+      PointerInputCapabilities(
+        precision: .subCell(source: .webPixels, metrics: reported),
+        supportsHover: false,
+        supportsPreciseScroll: true
+      ),
+      PointerInputCapabilities(
+        precision: .cell,
+        supportsHover: true,
+        supportsPreciseScroll: true
+      ),
+    ]
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry020")
+
+    for generation in 0..<20 {
+      let capability = capabilities[generation % capabilities.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        pointerInputCapabilities: capability
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(
+        text.contains(
+          "020 g\(generation) sub\(capability.supportsSubCellLocation) "
+            + "hover\(capability.supportsHover) scroll\(capability.supportsPreciseScroll)"
+        )
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 019: GeometryReader cell-pixel metric churn
 
 extension FrameworkStressSafeAreaGeometryTests {
