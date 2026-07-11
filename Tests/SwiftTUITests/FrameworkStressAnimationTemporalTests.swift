@@ -53,3 +53,52 @@ private func animationTemporal001View(opacity: Double, watchedValue: Int) -> som
     .opacity(opacity)
     .animation(.easeInOut(duration: .milliseconds(80)), value: watchedValue)
 }
+
+// MARK: - Attempt 002: nil value-animation suppression lifetime
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 002 nil value animation suppresses only its watched change")
+  func animationTemporal002NilAnimationSuppressesOnlyWatchedChange() throws {
+    // Hypothesis: a `.animation(nil,value:)` change can leave `.disabled` in
+    // retained transaction state and suppress later unrelated outer animations.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let outerAnimation = Animation.linear(duration: .seconds(4))
+    controller.register(outerAnimation)
+    let identity = testIdentity("AnimationTemporal002", "Root")
+    let proposal = ProposedSize(width: 36, height: 4)
+
+    _ = renderer.render(
+      animationTemporal002View(opacity: 0.1, watchedValue: 0),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(outerAnimation.animationBox)
+
+    _ = renderer.render(
+      animationTemporal002View(opacity: 0.5, watchedValue: 1),
+      context: .init(identity: identity, transaction: transaction),
+      proposal: proposal
+    )
+    withKnownIssue(
+      "`.animation(nil,value:)` does not suppress an inherited animation when its value changes"
+    ) {
+      #expect(controller.activeAnimationCount == 0)
+    }
+
+    _ = renderer.render(
+      animationTemporal002View(opacity: 0.9, watchedValue: 1),
+      context: .init(identity: identity, transaction: transaction),
+      proposal: proposal
+    )
+    #expect(controller.activeAnimationCount == 1)
+  }
+}
+
+@MainActor
+private func animationTemporal002View(opacity: Double, watchedValue: Int) -> some View {
+  Text("animation temporal 002")
+    .opacity(opacity)
+    .animation(nil, value: watchedValue)
+}
