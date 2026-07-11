@@ -945,3 +945,69 @@ private struct StressNP014Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 015: nested navigation focus restoration chain
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 015 nested pops restore each focus level")
+  func stress015NestedPopsRestoreEachFocusLevel() throws {
+    // Hypothesis: the first pop can discard or overwrite the focus identity
+    // needed by the next ancestor when a nested destination chain unwinds.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP015", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      StressNP015Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Push Outer Focus Level")
+    _ = try harness.clickText("Push Outer Focus Level")
+    _ = try harness.focusText("Push Inner Focus Level")
+    _ = try harness.clickText("Push Inner Focus Level")
+    _ = try harness.focusText("Innermost Focus Level")
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    let outerFocus = try harness.focusIdentity(forText: "Push Inner Focus Level")
+    #expect(frame.contains("outer focus level"))
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == outerFocus)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    let rootFocus = try harness.focusIdentity(forText: "Push Outer Focus Level")
+    #expect(frame.contains("root focus level"))
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == rootFocus)
+    #expect(harness.focusRegionCount == 1)
+  }
+}
+
+@MainActor
+private struct StressNP015Fixture: View {
+  @State private var outer = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-015-stack") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("root focus level")
+        Button("Push Outer Focus Level") { outer = true }
+      }
+      .navigationDestination(isPresented: $outer) {
+        StressNP015OuterDestination()
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP015OuterDestination: View {
+  @State private var inner = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("outer focus level")
+      Button("Push Inner Focus Level") { inner = true }
+    }
+    .navigationDestination(isPresented: $inner) {
+      Button("Innermost Focus Level") {}
+    }
+  }
+}
