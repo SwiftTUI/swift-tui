@@ -1320,6 +1320,67 @@ private struct StressPS029Fixture: View {
   }
 }
 
+// MARK: - Attempt 030: duplicate-title toolbar reorder
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 030 reordered duplicate toolbar items keep current owners")
+  func stress030ReorderedDuplicateToolbarItemsKeepCurrentOwners() throws {
+    // Hypothesis: the late-preference toolbar strip may reconcile duplicate
+    // titles by ordinal and leave the first visual button bound to its old source.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS030", "Root"),
+      size: .init(width: 56, height: 10)
+    ) {
+      StressPS030Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reverse toolbar owners")
+    _ = try harness.clickText("Duplicate tool")
+
+    #expect(probe.markers == ["owner-b"])
+  }
+}
+
+@MainActor
+private struct StressPS030Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var reversed = false
+
+  var body: some View {
+    Panel(id: "toolbar-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reverse toolbar owners") {
+          reversed.toggle()
+        }
+        if reversed {
+          HStack {
+            source("B", marker: "owner-b")
+            source("A", marker: "owner-a")
+          }
+        } else {
+          HStack {
+            source("A", marker: "owner-a")
+            source("B", marker: "owner-b")
+          }
+        }
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 54, height: 8, alignment: .topLeading)
+  }
+
+  private func source(_ label: String, marker: String) -> some View {
+    Text("Source \(label)")
+      .toolbarItem(
+        .init(title: "Duplicate tool") {
+          probe.markers.append(marker)
+        }
+      )
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
