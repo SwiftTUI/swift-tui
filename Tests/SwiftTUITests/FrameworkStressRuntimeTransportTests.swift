@@ -74,6 +74,69 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 024: targeted graphics replay selection
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 024 text damage replays only intersecting kitty image")
+  func runtimeTransport024TextDamageReplaysOnlyIntersectingKittyImage() {
+    // Hypothesis: a narrow text edit can replay every unchanged kitty image,
+    // or select an image from a different row band because bounds are stale.
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode,
+      graphicsCapabilities: .init(
+        supportedProtocols: [.kitty],
+        preferredProtocol: .kitty
+      )
+    )
+    let topImage = RasterImageAttachment(
+      identity: testIdentity("TopImage"),
+      bounds: .init(
+        origin: .init(x: 0, y: 0),
+        size: .init(width: 2, height: 2)
+      ),
+      source: .path("top.png"),
+      resolvedReference: .filePath("/tmp/top.png"),
+      pixelSize: .init(width: 16, height: 32)
+    )
+    let bottomImage = RasterImageAttachment(
+      identity: testIdentity("BottomImage"),
+      bounds: .init(
+        origin: .init(x: 5, y: 3),
+        size: .init(width: 2, height: 2)
+      ),
+      source: .path("bottom.png"),
+      resolvedReference: .filePath("/tmp/bottom.png"),
+      pixelSize: .init(width: 16, height: 32)
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 5),
+      lines: ["aaaaaaaa", "bbbbbbbb", "cccccccc", "dddddddd", "eeeeeeee"],
+      imageAttachments: [topImage, bottomImage]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 5),
+      lines: ["aaaaaaaa", "bbbbbbbb", "cccccccc", "dddddddd", "eeeeXeee"],
+      imageAttachments: [topImage, bottomImage]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: .init(
+        textRows: [.init(row: 4, columnRanges: [4..<5])]
+      )
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.graphicsReplay
+        == .init(scope: .targeted, attachmentsToReplay: [bottomImage])
+    )
+    #expect(plan.spanUpdates == [.init(row: 4, column: 4, renderedSpan: "X", cellsChanged: 1)])
+    #expect(plan.cellsChanged == 1)
+  }
+}
+
 // MARK: - Attempt 022: stale damage on equal surfaces
 
 extension FrameworkStressRuntimeTransportTests {
