@@ -407,3 +407,72 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 008: duplicate table tags under reorder
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 008 duplicate table tags select the current first occurrence")
+  func tableOutline008DuplicateTableTagsSelectCurrentFirstOccurrence() {
+    // Hypothesis: selectedRowIndex can remain attached to the former first
+    // matching tag when duplicate-tagged rows reorder or one occurrence departs.
+    struct Row: Identifiable {
+      let id: Int
+      let tag: Int
+      let label: String
+    }
+    struct Root: View {
+      let rows: [Row]
+      let tableIdentity: Identity
+
+      var body: some View {
+        Table(selection: .constant(7), columns: [.init("Rows", width: 12)]) {
+          ForEach(rows) { row in
+            TableRow { Text(row.label) }.tag(row.tag)
+          }
+        }
+        .id(tableIdentity)
+      }
+    }
+
+    let a = Row(id: 1, tag: 7, label: "duplicate-A")
+    let b = Row(id: 2, tag: 7, label: "duplicate-B")
+    let c = Row(id: 3, tag: 8, label: "other-C")
+    let variants = [[a, b, c], [b, c, a], [c, a], [a, c, b]]
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline008")
+    let tableIdentity = testIdentity("TableOutline008", "Table")
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = tableIdentity
+
+    for generation in 0..<20 {
+      let rows = variants[generation % variants.count]
+      let root = Root(rows: rows, tableIdentity: tableIdentity)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 20, height: 9)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 20, height: 9)
+      )
+      guard case .table(let payload) = retained.resolvedTree.drawPayload else {
+        Issue.record("expected retained table payload")
+        return
+      }
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(payload.selectedRowIndex == rows.firstIndex { $0.tag == 7 })
+    }
+  }
+}
