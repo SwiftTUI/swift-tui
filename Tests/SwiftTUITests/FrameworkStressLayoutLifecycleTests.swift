@@ -373,3 +373,74 @@ private struct StressLL006Fixture: View {
       .preference(key: StressLL006PreferenceKey.self, value: value)
   }
 }
+
+// MARK: - Attempt 007: preference observer ordinal contraction
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 007 surviving preference observer keeps its own baseline")
+  func stress007SurvivingPreferenceObserverKeepsItsOwnBaseline() throws {
+    // Hypothesis: when observer A disappears, observer B may inherit A's
+    // ordinal and previous-value snapshot instead of its own registration.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL007", "Root"),
+      size: .init(width: 42, height: 8)
+    ) {
+      StressLL007Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      _ = try harness.clickText("Churn Observers")
+      #expect(probe.events.filter { $0.hasPrefix("B:") }.count == generation)
+      #expect(probe.events.contains("B:\(generation)"))
+      #expect(
+        probe.events.contains("A:\(generation)") == generation.isMultiple(of: 2)
+      )
+      #expect(harness.preferenceObservationRegistrationCount <= 2)
+    }
+  }
+}
+
+private enum StressLL007PreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+@MainActor
+private struct StressLL007Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Churn Observers") { generation += 1 }
+      observedSource
+    }
+  }
+
+  @ViewBuilder private var observedSource: some View {
+    if generation.isMultiple(of: 2) {
+      source
+        .onPreferenceChange(StressLL007PreferenceKey.self) { value in
+          probe.events.append("A:\(value)")
+        }
+        .onPreferenceChange(StressLL007PreferenceKey.self) { value in
+          probe.events.append("B:\(value)")
+        }
+    } else {
+      source
+        .onPreferenceChange(StressLL007PreferenceKey.self) { value in
+          probe.events.append("B:\(value)")
+        }
+    }
+  }
+
+  private var source: some View {
+    Text("observer generation \(generation)")
+      .preference(key: StressLL007PreferenceKey.self, value: generation)
+  }
+}
