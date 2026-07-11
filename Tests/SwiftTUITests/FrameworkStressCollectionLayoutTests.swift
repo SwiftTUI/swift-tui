@@ -2043,3 +2043,57 @@ private struct CollectionLayout031Root: View {
     }
   }
 }
+
+// MARK: - Attempt 032: AnyLayout axis replacement
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 032 AnyLayout replaces stack axis contracts")
+  func collectionLayout032AnyLayoutReplacesStackAxisContracts() {
+    // Hypothesis: a stable AnyLayout container may retain HStack measurement
+    // or placement after its erased algorithm becomes a VStack.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout032")
+
+    for generation in 0..<24 {
+      let horizontal = generation.isMultiple(of: 2)
+      let root = CollectionLayout032Root(horizontal: horizontal)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 12, height: 4)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 12, height: 4)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      if horizontal {
+        #expect(retained.rasterSurface.lines.first == "32A 32B 32C")
+      } else {
+        #expect(Array(retained.rasterSurface.lines.prefix(3)) == ["32A", "32B", "32C"])
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout032Root: View {
+  let horizontal: Bool
+
+  var body: some View {
+    let layout = horizontal
+      ? AnyLayout(HStackLayout(alignment: .top, spacing: 1))
+      : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+    layout {
+      ForEach(["A", "B", "C"], id: \.self) { value in
+        Text("32\(value)")
+      }
+    }
+  }
+}
