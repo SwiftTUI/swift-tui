@@ -185,6 +185,50 @@ private struct StressInput007Fixture: View {
   }
 }
 
+// MARK: - Attempt 008: pending resetFocus namespace teardown
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Registry reset discards resetFocus requests owned by the departed namespace")
+  func stressInputRouting008DefaultFocusResetRequestDiesWithNamespace() throws {
+    // Hypothesis: LocalDefaultFocusRegistry.reset clears registrations but
+    // leaves pendingResetNamespace armed, allowing a later namespace reuse to
+    // receive a reset request issued by a departed scope.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput008Root"),
+      size: .init(width: 20, height: 4)
+    ) {
+      EmptyView()
+    }
+    defer { harness.shutdown() }
+
+    let namespace = MatchedGeometryNamespace(8)
+    let candidate = testIdentity("StressInput008", "Candidate")
+    let registry = harness.runLoop.localDefaultFocusRegistry
+    registry.requestReset(in: namespace)
+    registry.reset()
+    registry.registerCandidate(namespace: namespace, identity: candidate)
+    let region = FocusRegion(
+      identity: candidate,
+      rect: CellRect(
+        origin: CellPoint(x: 0, y: 0),
+        size: CellSize(width: 1, height: 1)
+      ),
+      focusInteractions: .automatic,
+      scopePath: [],
+      sectionIdentity: nil
+    )
+
+    withKnownIssue("A reset default-focus namespace request survives registry reset") {
+      #expect(
+        registry.desiredFocusRequest(
+          focusRegions: [region],
+          shouldApplyInitialDefault: false
+        ) == .none
+      )
+    }
+  }
+}
+
 private enum StressInput001Field: Hashable {
   case a
   case b
