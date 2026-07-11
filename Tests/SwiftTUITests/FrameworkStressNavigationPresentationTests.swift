@@ -1011,3 +1011,81 @@ private struct StressNP015OuterDestination: View {
     }
   }
 }
+
+@MainActor
+private func stressNPPresentationEntryCount<Content: View>(
+  in harness: StressRuntimeHarness<Content>
+) -> Int {
+  harness.runLoop.renderer.debugRuntimeSubsystemSnapshot().presentationPortalState.overlayEntries
+    .count
+}
+
+// MARK: - Attempt 016: sheet focus over repeated navigation activation
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 016 sheet and destination restore focus in order")
+  func stress016SheetAndDestinationRestoreFocusInOrder() throws {
+    // Hypothesis: alternating modal restoration and navigation pop can leave a
+    // sheet focus identity on the stack or skip the destination focus owner.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP016", "Root"),
+      size: .init(width: 56, height: 12)
+    ) {
+      StressNP016Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...6 {
+      _ = try harness.focusText("Push Sheet Destination")
+      _ = try harness.clickText("Push Sheet Destination")
+      _ = try harness.focusText("Open Destination Sheet")
+      _ = try harness.clickText("Open Destination Sheet")
+      _ = try harness.focusText("Sheet Focus Target")
+      #expect(stressNPPresentationEntryCount(in: harness) == 1)
+
+      var frame = try harness.pressKey(KeyPress(.escape))
+      let destinationFocus = try harness.focusIdentity(forText: "Open Destination Sheet")
+      #expect(frame.contains("sheet destination body"))
+      #expect(!frame.contains("Sheet Focus Target"))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == destinationFocus)
+
+      frame = try harness.pressKey(KeyPress(.escape))
+      let rootFocus = try harness.focusIdentity(forText: "Push Sheet Destination")
+      #expect(frame.contains("sheet navigation root"))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == rootFocus)
+      #expect(harness.focusModalRestorationStackCount == 0)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP016Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-016-stack") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("sheet navigation root")
+        Button("Push Sheet Destination") { destination = true }
+      }
+      .navigationDestination(isPresented: $destination) {
+        StressNP016Destination()
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP016Destination: View {
+  @State private var sheet = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("sheet destination body")
+      Button("Open Destination Sheet") { sheet = true }
+    }
+    .sheet("Destination Sheet", isPresented: $sheet) {
+      Button("Sheet Focus Target") {}
+    }
+  }
+}
