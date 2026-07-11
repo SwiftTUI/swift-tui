@@ -489,3 +489,61 @@ private struct CollectionLayout008Root: View {
     .frame(width: 15, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 009: nested indexed collections
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 009 nested ForEach expands every lazy child")
+  func collectionLayout009NestedForEachExpandsEveryLazyChild() {
+    // Hypothesis: a nested ForEach resolves as one Group-valued indexed row,
+    // overlapping its inner elements instead of contributing stack children.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout009")
+
+    for generation in 0..<16 {
+      let reversed = !generation.isMultiple(of: 2)
+      let outer = reversed ? [2, 1] : [1, 2]
+      let inner = reversed ? [3, 2, 1] : [1, 2, 3]
+      let root = CollectionLayout009Root(outer: outer, inner: inner)
+      let snapshot = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let expected = outer.flatMap { outerValue in
+        inner.map { "009 \(outerValue).\($0)" }
+      }
+      let expandedEveryNestedChild =
+        Array(snapshot.rasterSurface.lines.prefix(6)) == expected
+        && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == 6
+
+      withKnownIssue(
+        "Indexed LazyVStack overlaps each inner ForEach as one Group-valued outer row"
+      ) {
+        #expect(expandedEveryNestedChild)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout009Root: View {
+  let outer: [Int]
+  let inner: [Int]
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(outer, id: \.self) { outerValue in
+          ForEach(inner, id: \.self) { innerValue in
+            Text("009 \(outerValue).\(innerValue)")
+          }
+        }
+      }
+    }
+    .frame(width: 18, height: 6, alignment: .topLeading)
+  }
+}
