@@ -485,3 +485,65 @@ private struct GestureScroll010Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 011: hover callback rebinding
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 011 hover continuation uses the reauthored callback")
+  func gestureScroll011HoverContinuationUsesReauthoredCallback() throws {
+    // Hypothesis: replacing a hover callback at a stable identity may either
+    // retain the old closure or fabricate a second enter instead of continuing.
+    let events = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll011Root"),
+      size: .init(width: 48, height: 7)
+    ) {
+      GestureScroll011Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Rebound hover"))
+    _ = try harness.movePointer(to: point)
+    _ = try harness.movePointer(to: Point(x: point.x + 1, y: point.y))
+
+    withKnownIssue("Replacing a hovered callback fabricates a second enter") {
+      #expect(events.value == ["old-enter", "new-move"])
+    }
+    #expect(harness.pointerHoverHandlerCount == 1)
+  }
+}
+
+private struct GestureScroll011Fixture: View {
+  static let identity = testIdentity("GestureScroll011", "Target")
+
+  let events: GestureScrollBox<[String]>
+  @State private var generation = 0
+
+  var body: some View {
+    if generation == 0 {
+      Text("Rebound hover")
+        .id(Self.identity)
+        .frame(width: 26, height: 1, alignment: .leading)
+        .onPointerHover { phase in
+          if case .entered = phase {
+            events.value.append("old-enter")
+            generation = 1
+          }
+        }
+    } else {
+      Text("Rebound hover")
+        .id(Self.identity)
+        .frame(width: 26, height: 1, alignment: .leading)
+        .onPointerHover { phase in
+          switch phase {
+          case .entered:
+            events.value.append("new-enter")
+          case .moved:
+            events.value.append("new-move")
+          case .exited:
+            events.value.append("new-exit")
+          }
+        }
+    }
+  }
+}
