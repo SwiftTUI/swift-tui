@@ -1251,3 +1251,40 @@ private struct StressInput022Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 023: allowsHitTesting(false) under an outer gesture
+
+extension FrameworkStressInputRoutingTests {
+  @Test("An outer gesture does not re-enable hit testing disabled by its content")
+  func stressInputRouting023OuterGesturePreservesDisabledHitTesting() throws {
+    // Hypothesis: GestureViewModifier's semantic merge may overwrite an inner
+    // allowsHitTesting(false) value with its own participation metadata.
+    let taps = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput023Root"),
+      size: .init(width: 40, height: 6)
+    ) {
+      StressInput023Fixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("No hit testing")
+
+    #expect(taps.value == 0)
+  }
+}
+
+private struct StressInput023Fixture: View {
+  let taps: StressInputBox<Int>
+
+  var body: some View {
+    Text("No hit testing")
+      .frame(width: 24, height: 1, alignment: .leading)
+      .allowsHitTesting(false)
+      .gesture(
+        TapGesture().onEnded {
+          taps.value += 1
+        }
+      )
+  }
+}
