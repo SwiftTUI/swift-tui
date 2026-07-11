@@ -382,3 +382,44 @@ private func sceneHostRaster(marker: String, size: CellSize = .init(width: 8, he
 {
   RasterSurface(size: size, lines: [String(marker.prefix(max(0, size.width)))])
 }
+
+// MARK: - Attempt 010: asynchronous host callback ordering
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 010 rapid asynchronous delivery preserves submission order")
+  func sceneHost010RapidAsynchronousDeliveryPreservesSubmissionOrder() async throws {
+    // Hypothesis: one Task hop per frame can let asynchronous host callbacks
+    // overtake each other even though surface history records submission order.
+    let recorder = SceneHostFrameRecorder()
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 8, height: 1),
+      appearance: .fallback,
+      onFrame: { frame in recorder.record(frame) }
+    )
+
+    for sequence in 0..<64 {
+      _ = try surface.present(
+        SemanticHostFrame(
+          sequence: UInt64(sequence),
+          raster: sceneHostRaster(marker: "frame \(sequence)"),
+          semantics: .init(),
+          focusedIdentity: nil
+        )
+      )
+    }
+
+    await recorder.updates.wait { recorder.frames.count == 64 }
+    #expect(recorder.frames.map(\.sequence) == (0..<64).map(UInt64.init))
+  }
+}
+
+@MainActor
+private final class SceneHostFrameRecorder {
+  private(set) var frames: [SemanticHostFrame] = []
+  let updates = MainActorConditionSignal()
+
+  func record(_ frame: SemanticHostFrame) {
+    frames.append(frame)
+    updates.notify()
+  }
+}
