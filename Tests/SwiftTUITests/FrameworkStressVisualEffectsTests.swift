@@ -1220,3 +1220,51 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 022: per-edge border-style reorder churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 022 per-edge border colors follow current rotation")
+  func visualEffects022PerEdgeBorderColorsFollowCurrentRotation() {
+    // Hypothesis: retained border commands can keep the first top/right/bottom/left association
+    // after the same four styles rotate among edges, a case set-like equality would miss.
+    struct Root: View {
+      let generation: Int
+
+      var style: BorderEdgeStyle {
+        switch generation % 4 {
+        case 0:
+          BorderEdgeStyle(top: Color.red, right: Color.green, bottom: Color.blue, left: Color.yellow)
+        case 1:
+          BorderEdgeStyle(top: Color.yellow, right: Color.red, bottom: Color.green, left: Color.blue)
+        case 2:
+          BorderEdgeStyle(top: Color.blue, right: Color.yellow, bottom: Color.red, left: Color.green)
+        default:
+          BorderEdgeStyle(top: Color.green, right: Color.blue, bottom: Color.yellow, left: Color.red)
+        }
+      }
+
+      var body: some View {
+        Text("edge rotation")
+          .frame(width: 24, height: 7)
+          .border(style, set: .double)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects022")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
