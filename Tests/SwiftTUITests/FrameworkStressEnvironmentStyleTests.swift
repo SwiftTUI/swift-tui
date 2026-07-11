@@ -274,6 +274,52 @@ private struct EnvironmentStyle006Root: View {
   }
 }
 
+// MARK: - Attempt 007: same-type erased button-style replacement
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 007 erased button style refreshes same-type payload")
+  func environmentStyle007ErasedButtonStyleRefreshesSameTypePayload() throws {
+    // Hypothesis: AnyButtonStyle replacement can compare only the concrete style type or snapshot
+    // label, retaining the first style body's stored payload across same-type value churn.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle007"),
+      size: .init(width: 72, height: 7)
+    ) {
+      EnvironmentStyle007Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...14 {
+      let frame = try harness.clickText("Advance Style 007")
+      #expect(frame.contains("style-\(generation) Styled Action 007"))
+      #expect(!frame.contains("style-\(generation - 1) Styled Action 007"))
+    }
+  }
+}
+
+private struct EnvironmentStyle007ButtonStyle: ButtonStyle {
+  let marker: String
+
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      Text(marker)
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle007Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Style 007") { generation += 1 }
+      Button("Styled Action 007") {}
+        .buttonStyle(EnvironmentStyle007ButtonStyle(marker: "style-\(generation)"))
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
