@@ -749,3 +749,112 @@ extension FrameworkStressFramePipelineTests {
     #expect(steadyA.lifecycle.isEmpty)
   }
 }
+
+// MARK: - Attempt 013: viewport visibility lifecycle round trip
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 013 visible offscreen visible restarts lifecycle")
+  func framePipeline013VisibleOffscreenVisibleRestartsLifecycle() {
+    // Hypothesis: viewport lifecycle state can retain the offscreen generation
+    // and omit appear/task-start when the same resolved owner becomes visible.
+    let graph = ViewGraph()
+    let task = TaskDescriptor(id: "viewport-task", priority: .medium)
+    let resolved = framePipelineIndexedLifecycleResolved(prefix: "FramePipeline013")
+    let visible = framePipelineIndexedLifecyclePlaced(
+      prefix: "FramePipeline013",
+      includesLeaf: true,
+      task: task
+    )
+    let hidden = framePipelineIndexedLifecyclePlaced(
+      prefix: "FramePipeline013",
+      includesLeaf: false,
+      task: task
+    )
+
+    let firstVisible = framePipelinePlan(graph: graph, resolved: resolved, placed: visible)
+    let offscreen = framePipelinePlan(graph: graph, resolved: resolved, placed: hidden)
+    let visibleAgain = framePipelinePlan(graph: graph, resolved: resolved, placed: visible)
+
+    #expect(
+      firstVisible.lifecycle.map(\.operation) == [
+        .appear(handlerIDs: ["appear"]),
+        .taskStart(task),
+      ]
+    )
+    #expect(
+      offscreen.lifecycle.map(\.operation) == [
+        .taskCancel(task),
+        .disappear(handlerIDs: ["disappear"]),
+      ]
+    )
+    #expect(
+      visibleAgain.lifecycle.map(\.operation) == [
+        .appear(handlerIDs: ["appear"]),
+        .taskStart(task),
+      ]
+    )
+  }
+}
+
+private func framePipelineIndexedLifecycleResolved(prefix: String) -> ResolvedNode {
+  let lazyIdentity = testIdentity(prefix, "Root", "Lazy")
+  return ResolvedNode(
+    identity: testIdentity(prefix, "Root"),
+    kind: .root,
+    children: [
+      ResolvedNode(
+        identity: lazyIdentity,
+        kind: .view("LazyVStack"),
+        layoutBehavior: .lazyStack(
+          axis: .vertical,
+          spacing: 0,
+          horizontalAlignment: .leading,
+          verticalAlignment: .center
+        ),
+        indexedChildSource: FramePipelineEmptyIndexedChildSource(identityRoot: lazyIdentity)
+      )
+    ]
+  )
+}
+
+private func framePipelineIndexedLifecyclePlaced(
+  prefix: String,
+  includesLeaf: Bool,
+  task: TaskDescriptor
+) -> PlacedNode {
+  let lazyIdentity = testIdentity(prefix, "Root", "Lazy")
+  let leaf = PlacedNode(
+    identity: testIdentity(prefix, "Root", "Lazy", "ID[0]"),
+    bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+    lifecycleMetadata: .init(
+      appearHandlerIDs: ["appear"],
+      disappearHandlerIDs: ["disappear"],
+      tasks: [task]
+    )
+  )
+  return PlacedNode(
+    identity: testIdentity(prefix, "Root"),
+    kind: .root,
+    bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+    children: [
+      PlacedNode(
+        identity: lazyIdentity,
+        kind: .view("LazyVStack"),
+        bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+        children: includesLeaf ? [leaf] : [],
+        semanticRole: .container
+      )
+    ],
+    semanticRole: .container
+  )
+}
+
+private struct FramePipelineEmptyIndexedChildSource: IndexedChildSource {
+  let count = 0
+  let identityRoot: Identity
+  let measurementSignature = "frame-pipeline-empty"
+
+  func child(at _: Int) -> ResolvedNode {
+    preconditionFailure("No indexed children should be materialized.")
+  }
+}
