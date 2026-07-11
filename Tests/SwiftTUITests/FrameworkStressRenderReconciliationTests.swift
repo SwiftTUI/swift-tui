@@ -996,4 +996,46 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 024: Padding edge and amount churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 024 asymmetric padding replaces retained insets")
+  func renderReconciliation024AsymmetricPaddingReplacesRetainedInsets() {
+    // Hypothesis: inset behavior equivalence or measurement caching may coalesce different
+    // asymmetric EdgeInsets with the same total size, retaining the previous content origin.
+    struct Root: View {
+      let insets: EdgeInsets
+
+      var body: some View {
+        Text("P")
+          .padding(insets)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation024")
+    let variants = [
+      EdgeInsets(top: 0, leading: 3, bottom: 2, trailing: 0),
+      EdgeInsets(top: 2, leading: 0, bottom: 0, trailing: 3),
+      EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 1),
+      EdgeInsets(top: 1, leading: 1, bottom: 1, trailing: 2),
+    ]
+
+    for generation in 0..<24 {
+      let root = Root(insets: variants[generation % variants.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.placedTree == fresh.placedTree)
+    }
+  }
+}
+
 // MARK: - End
