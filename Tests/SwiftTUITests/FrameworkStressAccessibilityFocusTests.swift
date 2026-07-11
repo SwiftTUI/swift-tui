@@ -648,3 +648,57 @@ private struct StressAF012Fixture: View {
       .accessibilityLabel("Optional live status")
   }
 }
+
+// MARK: - Attempt 013: live-region duplicate identity isolation
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 013 live announcer isolates duplicate exact identities")
+  func stress013LiveAnnouncerIsolatesDuplicateExactIdentities() throws {
+    // Hypothesis: live-region baselines keyed only by public Identity can collapse two live status
+    // nodes with the same exact identity and suppress or misattribute one owner's update.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF013", "Root"),
+      size: .init(width: 54, height: 8)
+    ) {
+      StressAF013Fixture()
+    }
+    defer { harness.shutdown() }
+
+    var announcer = LiveRegionAnnouncer()
+    #expect(announcer.announcements(for: harness.runLoop.latestSemanticSnapshot).isEmpty)
+
+    var latest: [LiveRegionAnnouncement] = []
+    for _ in 0..<8 {
+      _ = try harness.clickText("Advance duplicate live regions")
+      latest = announcer.announcements(for: harness.runLoop.latestSemanticSnapshot)
+    }
+
+    #expect(latest.map(\.label) == ["Duplicate assertive 8", "Duplicate polite 8"])
+    #expect(latest.map(\.politeness) == [.assertive, .polite])
+  }
+}
+
+@MainActor
+private struct StressAF013Fixture: View {
+  static let duplicateIdentity = testIdentity("StressAF013", "DuplicateStatus")
+
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance duplicate live regions") {
+        generation += 1
+      }
+      Text("Polite visible \(generation)")
+        .id(Self.duplicateIdentity)
+        .accessibilityRole(.status)
+        .accessibilityLabel("Duplicate polite \(generation)")
+        .accessibilityLiveRegion(.polite)
+      Text("Assertive visible \(generation)")
+        .id(Self.duplicateIdentity)
+        .accessibilityRole(.status)
+        .accessibilityLabel("Duplicate assertive \(generation)")
+        .accessibilityLiveRegion(.assertive)
+    }
+  }
+}
