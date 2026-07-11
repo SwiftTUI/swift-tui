@@ -920,4 +920,43 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 022: Overlay alignment churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 022 overlay follows current alignment")
+  func renderReconciliation022OverlayFollowsCurrentAlignment() {
+    // Hypothesis: an overlay's hosted identity stays stable across placement-only changes, so
+    // retained placement may preserve its previous origin while the base remains unchanged.
+    struct Root: View {
+      let alignment: Alignment
+
+      var body: some View {
+        Text("BASE")
+          .frame(width: 8, height: 4, alignment: .center)
+          .overlay(alignment: alignment) {
+            Text("O")
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation022")
+    let alignments: [Alignment] = [.topLeading, .bottomTrailing, .center, .bottomLeading]
+
+    for generation in 0..<20 {
+      let root = Root(alignment: alignments[generation % alignments.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - End
