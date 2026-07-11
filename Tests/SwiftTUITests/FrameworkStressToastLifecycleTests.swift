@@ -803,3 +803,44 @@ private struct ToastLifecycle015Root: View {
     }
   }
 }
+
+// MARK: - Attempt 016: partial stack dismissal
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 016 dismissing the older toast preserves the newer item")
+  func toastLifecycle016DismissingOlderToastPreservesNewerItem() throws {
+    // Hypothesis: syncing one source to an empty item set can clear the whole family store instead
+    // of removing only that source's tracked toast.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle016"),
+      size: .init(width: 64, height: 14)
+    ) {
+      ToastLifecycle016Root()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("older removable toast"))
+    #expect(harness.frame.contains("newer surviving toast"))
+    let frame = try harness.clickText("Dismiss Older Toast 016")
+
+    #expect(!frame.contains("older removable toast"))
+    #expect(frame.contains("newer surviving toast"))
+    #expect(toastLifecycleEntryCount(in: harness) == 1)
+  }
+}
+
+@MainActor
+private struct ToastLifecycle016Root: View {
+  @State private var older = true
+  @State private var newer = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Dismiss Older Toast 016") { older = false }
+      Text("older source")
+        .toast("older removable toast", isPresented: $older, duration: nil)
+      Text("newer source")
+        .toast("newer surviving toast", isPresented: $newer, duration: nil)
+    }
+  }
+}
