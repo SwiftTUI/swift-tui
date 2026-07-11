@@ -163,4 +163,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 017 lone low surrogates reject the document")
+  func styleTransport017LoneLowSurrogatesRejectTheDocument() {
+    // Hypothesis: a low surrogate without a high half can slip through Unicode.Scalar creation.
+    var parser = StyleTransportJSONParser(#"{"v":"\uDE80"}"#)
+    #expect(parser.parse() == nil)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
