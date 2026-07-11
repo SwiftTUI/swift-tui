@@ -164,3 +164,34 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 005: apostrophe token churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 005 apostrophe tokens keep current continuation topology")
+  func textContent005ApostropheTokensKeepCurrentContinuationTopology() {
+    // Hypothesis: apostrophe-special-cased word classification can reuse an ASCII token's cached
+    // clusters when a curly apostrophe replacement follows the same continuation topology.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent005")
+
+    for generation in 0..<20 {
+      let usesCurly = !generation.isMultiple(of: 2)
+      let apostrophe = usesCurly ? "’" : "'"
+      let content = usesCurly ? "O’BRIENVALUE" : "O'BRIENVALUE"
+      let width = generation.isMultiple(of: 3) ? 4 : 5
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text(content).textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.joined().contains(apostrophe))
+      #expect(frames.retained.rasterSurface.lines.joined().contains("–"))
+    }
+  }
+}
