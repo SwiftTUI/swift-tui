@@ -694,4 +694,39 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 021: Spinner stage replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 021 Spinner stages publish their current terminal glyph")
+  func componentComposition021SpinnerStagesPublishCurrentTerminalGlyph() {
+    // Hypothesis: Spinner's State-backed body can preserve an active frame after stage changes.
+    struct Root: View {
+      let generation: Int
+      var stage: Spinner.Stage {
+        switch generation % 3 {
+        case 0: .inactive
+        case 1: .active
+        default: .finished
+        }
+      }
+      var body: some View {
+        Spinner(.init(head: "H", "A", "B", tail: "T"), stage: stage)
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition021")
+    for generation in 0..<18 {
+      var environment = EnvironmentValues()
+      environment.accessibilityReduceMotion = true
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation, environmentValues: environment
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let expected = ["H", "A", "T"][generation % 3]
+      #expect(componentCompositionText(frames.retained).contains(expected))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
