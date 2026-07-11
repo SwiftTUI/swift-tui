@@ -434,3 +434,52 @@ private struct FramePipelineCanvasDots: CanvasDrawing, Equatable {
     context.setSample(GridSample(x: 0, y: 0))
   }
 }
+
+// MARK: - Attempt 007: overlay mismatch is one-generation state
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 007 clean commit restores phase products after overlay")
+  func framePipeline007CleanCommitRestoresPhaseProductsAfterOverlay() {
+    // Hypothesis: once an animation overlay makes effective placement differ
+    // from its baseline, the phase-product store can remain disabled forever.
+    let state = FrameTailRetainedState()
+    let proposal = ProposedSize(width: 12, height: 2)
+    let baselineRoot = framePipelineArtifactTree(prefix: "FramePipeline007", childCount: 2)
+    let baseline = framePipelineArtifacts(root: baselineRoot, rasterLine: "baseline")
+    var overlayRoot = baselineRoot
+    overlayRoot.children[1].bounds.origin.x = 3
+    let overlay = framePipelineArtifacts(root: overlayRoot, rasterLine: "overlay")
+
+    for _ in 1...10 {
+      state.storeCommittedFrame(
+        overlay,
+        baselinePlacedTree: baseline.placedTree,
+        proposal: proposal
+      )
+      let disabled = state.input(invalidatedIdentities: [])
+      #expect(disabled.previousPhaseProducts == nil)
+      #expect(
+        disabled.phaseExtractionProof(
+          for: proposal,
+          placed: overlay.placedTree,
+          animationOverlaySnapshot: .init()
+        ) == .none
+      )
+
+      state.storeCommittedFrame(
+        baseline,
+        baselinePlacedTree: baseline.placedTree,
+        proposal: proposal
+      )
+      let restored = state.input(invalidatedIdentities: [])
+      #expect(restored.previousPhaseProducts != nil)
+      #expect(
+        restored.phaseExtractionProof(
+          for: proposal,
+          placed: baseline.placedTree,
+          animationOverlaySnapshot: .init()
+        ) == .wholeTreeIdentical
+      )
+    }
+  }
+}
