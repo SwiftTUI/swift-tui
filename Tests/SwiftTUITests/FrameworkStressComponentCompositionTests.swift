@@ -124,3 +124,37 @@ extension FrameworkStressComponentCompositionTests {
     }
   }
 }
+
+// MARK: - Attempt 003: LabeledContent width remeasurement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 003 LabeledContent remeasures both changing columns")
+  func componentComposition003LabeledContentRemeasuresBothChangingColumns() {
+    // Hypothesis: the synthesized Spacer allocation can retain an earlier
+    // label width and overlap a replacement trailing value.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        LabeledContent(
+          generation.isMultiple(of: 2) ? "short" : "a much longer label",
+          value: generation.isMultiple(of: 3) ? "tiny" : "value-\(generation)-expanded"
+        )
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition003")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+    }
+  }
+}
