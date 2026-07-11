@@ -893,6 +893,61 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 014: Spliced Group row state across reorder
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 014 spliced group row state follows entity")
+  func stateIdentity014SplicedGroupRowStateFollowsEntity() throws {
+    // Hypothesis: a multi-element ForEach row is spliced out of the committed tree, leaving
+    // its stateful descendants dependent on entity stamping plus a detached host anchor.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity014"),
+      size: .init(width: 60, height: 14)
+    ) {
+      StateIdentity014Root()
+    }
+    defer { harness.shutdown() }
+
+    for expected in 1...4 {
+      var frame = try harness.clickText("Increment Group Row 1 014")
+      #expect(frame.contains("Group Row 1 Count \(expected)"))
+      frame = try harness.clickText("Reverse Group Rows 014")
+      #expect(frame.contains("Group Row 1 Count \(expected)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity014Root: View {
+    @State private var isReversed = false
+
+    private var values: [Int] {
+      isReversed ? [3, 2, 1] : [1, 2, 3]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reverse Group Rows 014") { isReversed.toggle() }
+        ForEach(values, id: \.self) { value in
+          Text("Group Row Label \(value)")
+          StateIdentity014Counter(value: value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity014Counter: View {
+    let value: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Group Row \(value) Count \(count)")
+        Button("Increment Group Row \(value) 014") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
