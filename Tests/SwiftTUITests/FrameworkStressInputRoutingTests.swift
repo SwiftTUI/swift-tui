@@ -929,3 +929,44 @@ private struct StressInput016Fixture: View {
       .textFieldStyle(.plain)
   }
 }
+
+// MARK: - Attempt 017: fallback paste preserves grapheme clusters
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Fallback paste emits one key event per extended grapheme cluster")
+  func stressInputRouting017FallbackPastePreservesExtendedGraphemes() throws {
+    // Hypothesis: scalar-wise fallback dispatch may split a composed emoji into
+    // several independently handled character events.
+    let keys = StressInputBox<[KeyEvent]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput017Root"),
+      size: .init(width: 36, height: 6)
+    ) {
+      StressInput017Fixture(keys: keys)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Grapheme paste target")
+    _ = try harness.paste("👩‍💻")
+
+    withKnownIssue("Fallback paste splits extended graphemes into Unicode scalars") {
+      #expect(keys.value == [.character("👩‍💻")])
+    }
+  }
+}
+
+private struct StressInput017Fixture: View {
+  static let focusIdentity = testIdentity("StressInput017", "Focus")
+
+  let keys: StressInputBox<[KeyEvent]>
+
+  var body: some View {
+    Text("Grapheme paste target")
+      .id(Self.focusIdentity)
+      .focusable()
+      .onKeyPress(.any) { keyPress in
+        keys.value.append(keyPress.key)
+        return .handled
+      }
+  }
+}
