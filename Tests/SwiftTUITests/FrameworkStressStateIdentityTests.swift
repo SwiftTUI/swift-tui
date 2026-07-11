@@ -2248,6 +2248,61 @@ extension EnvironmentValues {
   }
 }
 
+// MARK: - Attempt 033: Imperative callback environment after owner re-mint
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 033 action reads latest registration environment")
+  func stateIdentity033ActionReadsLatestRegistrationEnvironment() throws {
+    // Hypothesis: a stable inner action can be restored from a previous owner generation with
+    // that generation's registration-time EnvironmentValues snapshot.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity033"),
+      size: .init(width: 62, height: 10)
+    ) {
+      StateIdentity033Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 0..<4 {
+      var frame = try harness.clickText("Record Environment 033")
+      #expect(frame.contains("033 Recorded Env-\(generation)"))
+      frame = try harness.clickText("Churn Environment Owner 033")
+      #expect(frame.contains("033 Generation \(generation + 1)"))
+      #expect(frame.contains("033 Current Env-\(generation + 1)"))
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+
+  private struct StateIdentity033Root: View {
+    @State private var generation = 0
+    @State private var recorded = "none"
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("033 Generation \(generation)")
+        Text("033 Recorded \(recorded)")
+        Button("Churn Environment Owner 033") { generation += 1 }
+        StateIdentity033Owner(recorded: $recorded)
+          .environment(\.stress030Value, "Env-\(generation)")
+          .id("state-identity-033-owner-\(generation)")
+      }
+    }
+  }
+
+  private struct StateIdentity033Owner: View {
+    @Binding var recorded: String
+    @Environment(\.stress030Value) private var environmentValue
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("033 Current \(environmentValue)")
+        Button("Record Environment 033") { recorded = environmentValue }
+          .id(testIdentity("StateIdentity033", "action"))
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
