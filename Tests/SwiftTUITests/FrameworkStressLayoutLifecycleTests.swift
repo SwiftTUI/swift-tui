@@ -1600,3 +1600,76 @@ private struct StressLL026Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 027: reordered multiple task modifiers
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 027 reordered task modifiers publish current closures")
+  func stress027ReorderedTaskModifiersPublishCurrentClosures() async throws {
+    // Hypothesis: ordinal-keyed task registrations may keep a prior semantic
+    // task's closure after two modifiers exchange order.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL027", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressLL027Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Reorder Task Modifiers")
+      let registrations = harness.runLoop.localTaskRegistry.snapshot().values.flatMap { $0 }
+      #expect(registrations.count == 2)
+      probe.events.removeAll(keepingCapacity: true)
+      for registration in registrations {
+        await registration.run()
+      }
+      #expect(probe.events.contains("A:\(generation)"))
+      #expect(probe.events.contains("B:\(generation)"))
+    }
+  }
+}
+
+private struct StressLL027TaskID: Equatable, Sendable {
+  var slot: String
+  var generation: Int
+}
+
+@MainActor
+private struct StressLL027Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Task Modifiers") { generation += 1 }
+      taskOwner
+    }
+  }
+
+  @ViewBuilder private var taskOwner: some View {
+    if generation.isMultiple(of: 2) {
+      source
+        .task(id: StressLL027TaskID(slot: "A", generation: generation)) {
+          probe.events.append("A:\(generation)")
+        }
+        .task(id: StressLL027TaskID(slot: "B", generation: generation)) {
+          probe.events.append("B:\(generation)")
+        }
+    } else {
+      source
+        .task(id: StressLL027TaskID(slot: "B", generation: generation)) {
+          probe.events.append("B:\(generation)")
+        }
+        .task(id: StressLL027TaskID(slot: "A", generation: generation)) {
+          probe.events.append("A:\(generation)")
+        }
+    }
+  }
+
+  private var source: some View {
+    Text("task modifier generation \(generation)")
+      .id("reordered-task-owner")
+  }
+}
