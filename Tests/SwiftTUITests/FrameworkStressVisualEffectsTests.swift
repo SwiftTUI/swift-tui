@@ -1530,3 +1530,61 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 028: intrinsic image-dimension churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 028 intrinsic image size remeasures every replacement")
+  func visualEffects028IntrinsicImageSizeRemeasuresEveryReplacement() throws {
+    // Hypothesis: a retained Image node can publish a current resolved reference while layout keeps
+    // the first asset's intrinsicCellSize after repeated pixel-dimension replacements.
+    struct Fixture {
+      let bytes: [UInt8]
+      let pixels: PixelSize
+      let cells: CellSize
+    }
+
+    func fixture(width: Int, height: Int, color: (UInt8, UInt8, UInt8)) throws -> Fixture {
+      Fixture(
+        bytes: try makePNGBytes(
+          width: width,
+          height: height,
+          pixels: Array(
+            repeating: rgbaPixel(red: color.0, green: color.1, blue: color.2),
+            count: width * height
+          )
+        ),
+        pixels: PixelSize(width: width, height: height),
+        cells: CellSize(width: width / 8, height: height / 16)
+      )
+    }
+
+    let fixtures = try [
+      fixture(width: 8, height: 16, color: (255, 0, 0)),
+      fixture(width: 32, height: 16, color: (0, 255, 0)),
+      fixture(width: 16, height: 48, color: (0, 0, 255)),
+      fixture(width: 40, height: 32, color: (255, 255, 0)),
+    ]
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects028")
+
+    for generation in 0..<24 {
+      let fixture = fixtures[generation % fixtures.count]
+      let root = Image(data: fixture.bytes)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(attachment.pixelSize == fixture.pixels)
+      #expect(attachment.bounds.size == fixture.cells)
+      #expect(retained.rasterSurface.size == fixture.cells)
+    }
+  }
+}
