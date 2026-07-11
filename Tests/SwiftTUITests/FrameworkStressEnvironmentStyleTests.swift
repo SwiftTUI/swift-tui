@@ -711,6 +711,74 @@ private struct EnvironmentStyle015Root: View {
   }
 }
 
+// MARK: - Attempt 016: nested tint removal through style configuration
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 016 removing inner tint reveals current outer tint")
+  func environmentStyle016RemovingInnerTintRevealsCurrentOuterTint() throws {
+    // Hypothesis: StyleEnvironmentSnapshot can retain a departed nearest tint while other style
+    // configuration fields refresh, masking a changed outer tint in custom controls.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle016"),
+      size: .init(width: 76, height: 8)
+    ) {
+      EnvironmentStyle016Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      _ = try harness.clickText("Advance Tint 016")
+      var frame = try harness.clickText("Toggle Inner Tint 016")
+      let outer = generation.isMultiple(of: 2) ? "red" : "green"
+      #expect(frame.contains("tint-\(outer) Tint Target 016"))
+
+      frame = try harness.clickText("Toggle Inner Tint 016")
+      #expect(frame.contains("tint-blue Tint Target 016"))
+    }
+  }
+}
+
+private struct EnvironmentStyle016ButtonStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    let marker: String
+    if configuration.styleEnvironment.tintStyle == AnyShapeStyle(Color.red) {
+      marker = "red"
+    } else if configuration.styleEnvironment.tintStyle == AnyShapeStyle(Color.green) {
+      marker = "green"
+    } else if configuration.styleEnvironment.tintStyle == AnyShapeStyle(Color.blue) {
+      marker = "blue"
+    } else {
+      marker = "none"
+    }
+    return HStack(spacing: 1) {
+      Text("tint-\(marker)")
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle016Root: View {
+  @State private var generation = 0
+  @State private var usesInner = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Tint 016") { generation += 1 }
+      Button("Toggle Inner Tint 016") { usesInner.toggle() }
+      Group {
+        if usesInner {
+          Button("Tint Target 016") {}
+            .tint(Color.blue)
+        } else {
+          Button("Tint Target 016") {}
+        }
+      }
+      .buttonStyle(EnvironmentStyle016ButtonStyle())
+      .tint(generation.isMultiple(of: 2) ? Color.red : Color.green)
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
