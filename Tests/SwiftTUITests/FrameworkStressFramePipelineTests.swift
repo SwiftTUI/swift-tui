@@ -905,3 +905,72 @@ extension FrameworkStressFramePipelineTests {
     )
   }
 }
+
+// MARK: - Attempt 015: preview and commit after lifecycle churn
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 015 preview plan matches commit after many generations")
+  func framePipeline015PreviewPlanMatchesCommitAfterManyGenerations() async {
+    // Hypothesis: candidate preview can be computed from an older lifecycle
+    // baseline after repeated prior commits and diverge from ordered commit.
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("FramePipeline015", "Root")
+    let proposal = ProposedSize(width: 32, height: 5)
+
+    _ = renderer.render(
+      FramePipelineCommitPlanView(generation: 0, showsExtra: false),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    for generation in 1...8 {
+      _ = renderer.render(
+        FramePipelineCommitPlanView(
+          generation: generation,
+          showsExtra: generation.isMultiple(of: 2)
+        ),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [rootIdentity]
+        ),
+        proposal: proposal
+      )
+    }
+
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      FramePipelineCommitPlanView(generation: 9, showsExtra: true),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let comparison = await renderer.commitCompletedFrameCandidateForTesting(draft)
+
+    #expect(comparison.previewCommit == comparison.committedCommit)
+    #expect(comparison.committedArtifacts.commitPlan == comparison.committedCommit)
+    #expect(
+      comparison.committedCommit.lifecycle.contains {
+        if case .taskStart = $0.operation { true } else { false }
+      }
+    )
+    #expect(comparison.committedArtifacts.rasterSurface.lines.contains("generation 9"))
+  }
+}
+
+@MainActor
+private struct FramePipelineCommitPlanView: View {
+  let generation: Int
+  let showsExtra: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("generation \(generation)")
+        .task(id: generation) {}
+      if showsExtra {
+        Text("extra \(generation)")
+          .onAppear {}
+          .onDisappear {}
+      }
+    }
+  }
+}
