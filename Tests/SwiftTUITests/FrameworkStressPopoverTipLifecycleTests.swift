@@ -222,6 +222,53 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 007: action removal route pruning
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 007 removed actions leave no live routes")
+  func popoverTip007RemovedActionsLeaveNoLiveRoutes() throws {
+    // Hypothesis: shrinking the action array can leave departed Button routes
+    // registered in the detached portal subtree.
+    let rootIdentity = testIdentity("PopoverTipStress007", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "action-removal"
+    model.title = "Action removal tip"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      model.generation = generation
+      model.primaryPresented = true
+      let removedA = "OldA\(generation)"
+      let removedB = "OldB\(generation)"
+      let survivor = "Keep\(generation)"
+      model.actions = [
+        .init(id: "old-a", title: removedA),
+        .init(id: "keep", title: survivor),
+        .init(id: "old-b", title: removedB),
+      ]
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      model.actions = [.init(id: "keep", title: survivor)]
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(!frame.contains(removedA))
+      #expect(!frame.contains(removedB))
+      #expect(harness.point(forText: removedA) == nil)
+      #expect(harness.point(forText: removedB) == nil)
+
+      _ = try harness.clickText(survivor, chooseLast: true)
+      #expect(model.actionLog.last == "keep@\(generation)")
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
