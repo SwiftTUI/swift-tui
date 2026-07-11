@@ -1596,3 +1596,52 @@ private struct CollectionLayout025Root: View {
     .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 026: VStack spacing across collection reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 026 VStack spacing follows reordered children")
+  func collectionLayout026VStackSpacingFollowsReorderedChildren() {
+    // Hypothesis: retained stack spacing vectors may remain indexed to the
+    // previous ForEach order when both spacing and entity order change.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout026")
+
+    for generation in 0..<24 {
+      let spaced = !generation.isMultiple(of: 2)
+      let values = spaced ? [3, 1, 2] : [1, 2, 3]
+      let root = CollectionLayout026Root(values: values, spacing: spaced ? 2 : 0)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 8)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 8)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.rasterSurface.lines.first == "026 row \(values[0])")
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout026Root: View {
+  let values: [Int]
+  let spacing: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: spacing) {
+      ForEach(values, id: \.self) { value in
+        Text("026 row \(value)")
+      }
+    }
+  }
+}
