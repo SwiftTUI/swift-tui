@@ -1955,3 +1955,74 @@ private struct StressLL032Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 033: repeat-forever sheet teardown
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 033 dismissing a sheet reclaims its repeat forever animation")
+  func stress033DismissingSheetReclaimsRepeatForeverAnimation() throws {
+    // Hypothesis: a portal subtree may disappear outside the ordinary child
+    // diff and strand repeat-forever entries owned by its departed identities.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL033", "Root"),
+      size: .init(width: 48, height: 14)
+    ) {
+      StressLL033Fixture()
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+
+    try withAnimationSinks(controller) {
+      for _ in 1...8 {
+        let shownFrame = try harness.clickText("Open Forever Sheet")
+        #expect(shownFrame.contains("sheet repeat forever probe"))
+        #expect(controller.activeAnimationCount > 0)
+
+        let dismissedFrame = try harness.clickText("Close Forever Sheet", chooseLast: true)
+        #expect(!dismissedFrame.contains("sheet repeat forever probe"))
+        #expect(controller.activeAnimationCount == 0)
+        #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL033Fixture: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    Button("Open Forever Sheet") { isPresented = true }
+      .sheet("Forever", isPresented: $isPresented) {
+        StressLL033Sheet(isPresented: $isPresented)
+      }
+  }
+}
+
+@MainActor
+private struct StressLL033Sheet: View {
+  @Binding var isPresented: Bool
+  @State private var phase: Double = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("sheet repeat forever probe")
+        .padding(1)
+        .frame(width: 32, height: 3)
+        .border(
+          blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
+          set: .rounded,
+          phase: phase
+        )
+        .onAppear {
+          withAnimation(
+            .linear(duration: .milliseconds(3000))
+              .repeatForever(autoreverses: false)
+          ) {
+            phase = 1
+          }
+        }
+      Button("Close Forever Sheet") { isPresented = false }
+    }
+  }
+}
