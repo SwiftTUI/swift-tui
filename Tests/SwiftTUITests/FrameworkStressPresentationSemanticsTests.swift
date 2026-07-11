@@ -258,6 +258,59 @@ private struct StressPS006Fixture: View {
   }
 }
 
+// MARK: - Attempt 007: open menu cardinality churn
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 007 menu cardinality churn preserves its stable item")
+  func stress007MenuCardinalityChurnPreservesStableItem() throws {
+    // Hypothesis: one-to-many overlay payload reconciliation may drop or stale
+    // the stable first menu item when additional siblings arrive.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS007", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS007Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Cardinality menu")
+    let frame = try harness.clickText("Add menu items")
+    _ = try harness.clickText("Stable item 0")
+
+    withKnownIssue("An open menu retains its one-item activation payload and action") {
+      #expect(frame.contains("Extra item A"))
+      #expect(frame.contains("Extra item B"))
+      #expect(probe.markers == ["stable-1"])
+    }
+  }
+}
+
+@MainActor
+private struct StressPS007Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var expandedPayload = false
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Menu("Cardinality menu") {
+        Button("Stable item \(expandedPayload ? 1 : 0)") {
+          probe.markers.append("stable-\(expandedPayload ? 1 : 0)")
+        }
+        if expandedPayload {
+          Button("Extra item A") {}
+          Button("Extra item B") {}
+        }
+      }
+      Spacer().frame(width: 27)
+      Button("Add menu items") {
+        expandedPayload = true
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
