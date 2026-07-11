@@ -858,3 +858,50 @@ private struct FramePipelineEmptyIndexedChildSource: IndexedChildSource {
     preconditionFailure("No indexed children should be materialized.")
   }
 }
+
+// MARK: - Attempt 014: survivor restart around sibling departure
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 014 sibling removal orders survivor task restart safely")
+  func framePipeline014SiblingRemovalOrdersSurvivorTaskRestartSafely() {
+    // Hypothesis: combining a departed owner with a stable sibling's task
+    // replacement can start the sibling before all old-generation work cancels.
+    let graph = ViewGraph()
+    let departedTask = TaskDescriptor(id: "departed", priority: .low)
+    let survivorOldTask = TaskDescriptor(id: "survivor-old", priority: .medium)
+    let survivorNewTask = TaskDescriptor(id: "survivor-new", priority: .high)
+    let previous = framePipelineLifecycleTree(
+      prefix: "FramePipeline014",
+      includesLeaf: true,
+      task: departedTask,
+      siblingTask: survivorOldTask
+    )
+    let next = framePipelineLifecycleTree(
+      prefix: "FramePipeline014",
+      includesLeaf: false,
+      siblingTask: survivorNewTask
+    )
+    _ = graph.applySnapshot(previous)
+
+    let plan = framePipelinePlan(graph: graph, resolved: next)
+    let leafIdentity = testIdentity("FramePipeline014", "Root", "Leaf")
+    let siblingIdentity = testIdentity("FramePipeline014", "Root", "Sibling")
+
+    #expect(
+      plan.lifecycle.map(\.operation) == [
+        .taskCancel(survivorOldTask),
+        .taskCancel(departedTask),
+        .disappear(handlerIDs: ["disappear"]),
+        .taskStart(survivorNewTask),
+      ]
+    )
+    #expect(
+      plan.lifecycle.map(\.identity) == [
+        siblingIdentity,
+        leafIdentity,
+        leafIdentity,
+        siblingIdentity,
+      ]
+    )
+  }
+}
