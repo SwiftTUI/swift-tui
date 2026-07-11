@@ -729,4 +729,39 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 022: Spinner set replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 022 Spinner adopts each replacement glyph set")
+  func componentComposition022SpinnerAdoptsEachReplacementGlyphSet() {
+    // Hypothesis: a stable Spinner state slot can retain iteration from an earlier set and
+    // index or render the wrong replacement body's first glyph.
+    struct Root: View {
+      let generation: Int
+      var set: Spinner.SpinnerSet {
+        generation.isMultiple(of: 2)
+          ? .init(head: "x", "A", "B", tail: "X")
+          : .init(head: "y", "C", "D", "E", tail: "Y")
+      }
+      var body: some View { Spinner(set, stage: .active) }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition022")
+    for generation in 0..<18 {
+      var environment = EnvironmentValues()
+      environment.accessibilityReduceMotion = true
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation, environmentValues: environment
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        componentCompositionText(frames.retained).contains(
+          generation.isMultiple(of: 2) ? "A" : "C"
+        )
+      )
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
