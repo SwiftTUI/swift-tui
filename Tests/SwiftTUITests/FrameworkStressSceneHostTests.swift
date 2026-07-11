@@ -552,3 +552,38 @@ private struct SceneHostSessionApp: App {
     }
   }
 }
+
+// MARK: - Attempt 014: concurrent HostedSceneSession start callers
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 014 concurrent start callers share one session result")
+  func sceneHost014ConcurrentStartCallersShareOneSessionResult() async throws {
+    // Hypothesis: callers entering start before the first run completes can
+    // launch duplicate run loops over one input reader and split the exit event.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 20, height: 4),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+    let session = try HostedSceneSession(
+      for: SceneHostSessionApp(),
+      sceneID: "primary",
+      surface: surface
+    )
+    let callers = (0..<8).map { _ in
+      Task { try await session.start() }
+    }
+
+    _ = await surface.waitForFrame()
+    session.send(.key(KeyPress(.character("d"), modifiers: .ctrl)))
+
+    var results: [RunLoopExitReason] = []
+    for caller in callers {
+      results.append(try await caller.value)
+    }
+    #expect(results.count == 8)
+    let expected = RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
+    #expect(results.allSatisfy { $0 == expected })
+  }
+}
