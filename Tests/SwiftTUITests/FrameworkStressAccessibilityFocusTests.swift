@@ -967,3 +967,67 @@ private struct StressAF018Fixture: View {
       .focusable()
   }
 }
+
+// MARK: - Attempt 019: focused target removal continuation
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 019 repeated focused removal chooses live continuation")
+  func stress019RepeatedFocusedRemovalChoosesLiveContinuation() throws {
+    // Hypothesis: focus tracker index repair can retain the removed middle target or drift to a
+    // different ordinal after repeated focus-remove-reinsert cycles in one scope.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF019", "Root"),
+      size: .init(width: 42, height: 8)
+    ) {
+      StressAF019Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<10 {
+      _ = try harness.focus(StressAF019Fixture.middleIdentity)
+      _ = try harness.pressKey(KeyPress(.character("r")))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == StressAF019Fixture.firstIdentity)
+      _ = try harness.pressKey(KeyPress(.character("a")))
+    }
+
+    #expect(
+      harness.runLoop.latestSemanticSnapshot.focusRegions.map(\.identity) == [
+        StressAF019Fixture.firstIdentity,
+        StressAF019Fixture.middleIdentity,
+        StressAF019Fixture.lastIdentity,
+      ])
+  }
+}
+
+@MainActor
+private struct StressAF019Fixture: View {
+  static let firstIdentity = testIdentity("StressAF019", "First")
+  static let middleIdentity = testIdentity("StressAF019", "Middle")
+  static let lastIdentity = testIdentity("StressAF019", "Last")
+
+  @State private var showsMiddle = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("First continuation")
+        .id(Self.firstIdentity)
+        .focusable()
+        .onKeyPress(.character("a")) { _ in
+          showsMiddle = true
+          return .handled
+        }
+      if showsMiddle {
+        Text("Removable middle")
+          .id(Self.middleIdentity)
+          .focusable()
+          .onKeyPress(.character("r")) { _ in
+            showsMiddle = false
+            return .handled
+          }
+      }
+      Text("Last continuation")
+        .id(Self.lastIdentity)
+        .focusable()
+    }
+  }
+}
