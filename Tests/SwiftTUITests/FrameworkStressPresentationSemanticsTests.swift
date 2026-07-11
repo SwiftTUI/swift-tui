@@ -359,6 +359,49 @@ private struct StressPS008Fixture: View {
   }
 }
 
+// MARK: - Attempt 009: open menu explicit-identity replacement
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 009 replacing an open menu identity drops its old entry")
+  func stress009ReplacingOpenMenuIdentityDropsOldEntry() throws {
+    // Hypothesis: the coordinator may merge the new declaration with the old
+    // active item even though the menu's explicit identity lifetime changed.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS009", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS009Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Identity menu 0")
+    let frame = try harness.clickText("Remint menu")
+
+    #expect(frame.contains("Identity menu 1"))
+    #expect(!frame.contains("Old identity overlay"))
+    #expect(stressPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private struct StressPS009Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Menu("Identity menu \(generation)") {
+        Button("Old identity overlay") {}
+      }
+      .id(generation)
+      Spacer().frame(width: 28)
+      Button("Remint menu") {
+        generation += 1
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
