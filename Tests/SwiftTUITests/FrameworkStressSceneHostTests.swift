@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Testing) import SwiftTUITestSupport
+import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -1592,5 +1593,132 @@ extension FrameworkStressSceneHostTests {
 
     _ = try await session.stopAndWait()
     _ = try await runTask.value
+  }
+}
+
+// MARK: - Attempt 033: live-region baseline across scene-session replacement
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 033 replacement sessions reset live region state")
+  func sceneHost033ReplacementSessionsResetLiveRegionState() async throws {
+    // Hypothesis: one selected scene can retain live-region @State across
+    // replacement SceneSession run loops instead of rebuilding initial state.
+    let surface = SceneHostAccessibleSurface()
+    let selection = try #require(
+      collectWindowSceneSelections(from: SceneHostLiveRegionApp().body).first
+    )
+    var initialStates: [Int] = []
+
+    for generation in 0..<8 {
+      let baselineCount = surface.writes.count
+      let input = InjectedTerminalInputReader()
+      let resources = SceneSessionResources(
+        presentationSurface: surface,
+        terminalInputReader: input,
+        surfaceName: "accessible-host",
+        runtimeConfiguration: .init(output: .accessible)
+      )
+      let runTask = Task {
+        try await selection.run(
+          sessionName: "live-region-\(generation)",
+          resources: resources,
+          stateContainer: StateContainer(
+            initialState: SceneSessionState(),
+            invalidationIdentities: [selection.rootIdentity]
+          ),
+          focusTracker: FocusTracker(invalidationIdentities: [selection.rootIdentity])
+        )
+      }
+      await surface.updates.wait { surface.writes.count > baselineCount }
+
+      let initialWriteCount = surface.writes.count
+      input.send(.key(KeyPress(.character("i"), modifiers: .ctrl)))
+      await surface.updates.wait { surface.writes.count > initialWriteCount }
+      input.send(.key(KeyPress(.character("d"), modifiers: .ctrl)))
+      #expect(
+        try await runTask.value.exitReason
+          == .userExit(KeyPress(.character("d"), modifiers: .ctrl))
+      )
+
+      let sessionOutput = surface.writes.dropFirst(baselineCount).joined()
+      let statusStates = sceneHost033States(in: sessionOutput, prefix: "status: State ")
+      let politeStates = sceneHost033States(in: sessionOutput, prefix: "polite: State ")
+      let initialState = try #require(statusStates.first)
+      let advancedState = try #require(statusStates.last)
+
+      #expect(statusStates.count == 2)
+      #expect(advancedState == initialState + 1)
+      #expect(!politeStates.contains(initialState))
+      #expect(politeStates == [advancedState])
+      initialStates.append(initialState)
+    }
+
+    withKnownIssue("Replacement SceneSession run loops retain live-region @State") {
+      #expect(initialStates == Array(repeating: 0, count: 8))
+    }
+  }
+}
+
+private func sceneHost033States(
+  in output: String,
+  prefix: String
+) -> [Int] {
+  output.split(separator: "\n").compactMap { rawLine in
+    let line = rawLine.trimmingCharacters(in: .whitespaces)
+    guard line.hasPrefix(prefix) else {
+      return nil
+    }
+    return Int(String(line.dropFirst(prefix.count)))
+  }
+}
+
+private struct SceneHostLiveRegionApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      SceneHostLiveRegionView()
+    }
+  }
+}
+
+private struct SceneHostLiveRegionView: View {
+  @State private var state = 0
+
+  var body: some View {
+    Panel(id: "live-region") {
+      Text("State \(state)")
+        .focusable(true)
+        .accessibilityRole(.status)
+        .accessibilityLabel("State \(state)")
+        .accessibilityLiveRegion(.polite)
+    }
+    .keyCommand("Advance", key: .character("i"), modifiers: .ctrl) {
+      state += 1
+    }
+  }
+}
+
+private final class SceneHostAccessibleSurface: PresentationSurface, Sendable {
+  let surfaceSize = CellSize(width: 40, height: 8)
+  let capabilityProfile = TerminalCapabilityProfile.previewUnicode
+  let appearance = TerminalAppearance.fallback
+  let updates = ConditionSignal()
+  private let recordedWrites = Mutex<[String]>([])
+
+  var writes: [String] {
+    recordedWrites.withLock { $0 }
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  func write(_ output: String) throws {
+    recordedWrites.withLock { $0.append(output) }
+    updates.notify()
+  }
+
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    .rasterHostMetrics(for: surface, damage: nil)
   }
 }
