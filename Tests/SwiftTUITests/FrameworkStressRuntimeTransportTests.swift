@@ -36,6 +36,33 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 007: click boundary inside motion traffic
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 007 click edges prevent motion merging across activation")
+  func runtimeTransport007ClickEdgesPreventMotionMergingAcrossActivation() {
+    // Hypothesis: noncoalescible down/up events can flush without resetting the
+    // pending move, letting the post-click position replace the pre-click one.
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .moved, location: .init(x: 1, y: 0))),
+      .mouse(.init(kind: .moved, location: .init(x: 2, y: 0))),
+      .mouse(.init(kind: .down(.primary), location: .init(x: 2, y: 0))),
+      .mouse(.init(kind: .up(.primary), location: .init(x: 2, y: 0))),
+      .mouse(.init(kind: .moved, location: .init(x: 9, y: 0))),
+      .mouse(.init(kind: .moved, location: .init(x: 10, y: 0))),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .moved, location: .init(x: 2, y: 0))),
+        .mouse(.init(kind: .down(.primary), location: .init(x: 2, y: 0))),
+        .mouse(.init(kind: .up(.primary), location: .init(x: 2, y: 0))),
+        .mouse(.init(kind: .moved, location: .init(x: 10, y: 0))),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 006: drop boundary inside hover traffic
 
 extension FrameworkStressRuntimeTransportTests {
