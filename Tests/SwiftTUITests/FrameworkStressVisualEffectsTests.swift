@@ -1098,3 +1098,70 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 020: blend and group effect-order churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 020 blend and compositing group preserve authored order")
+  func visualEffects020BlendAndCompositingGroupPreserveAuthoredOrder() {
+    // Hypothesis: retained DrawEffects may compare as a set or stop at the group marker, making
+    // blend-before-group and blend-after-group collapse to one stale compositing interpretation.
+    struct Root: View {
+      let generation: Int
+
+      var layeredContent: some View {
+        Rectangle()
+          .fill(Color.green.opacity(0.75))
+          .frame(width: 22, height: 8)
+          .overlay {
+            RoundedRectangle(cornerRadius: 2)
+              .fill(Color.magenta.opacity(0.55))
+              .frame(width: 15, height: 6)
+          }
+      }
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            AnyView(layeredContent.blendMode(.multiply).compositingGroup())
+          } else {
+            AnyView(layeredContent.compositingGroup().blendMode(.multiply))
+          }
+        }
+        .background(Color.blue.opacity(0.7))
+      }
+    }
+
+    func authoredEffects(in node: PlacedNode) -> [DrawEffect]? {
+      if node.drawEffects.ordered.count == 2 {
+        return node.drawEffects.ordered
+      }
+      for child in node.children {
+        if let effects = authoredEffects(in: child) {
+          return effects
+        }
+      }
+      return nil
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects020")
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let expected: [DrawEffect] = generation.isMultiple(of: 2)
+        ? [.blendMode(.multiply), .compositingGroup]
+        : [.compositingGroup, .blendMode(.multiply)]
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(authoredEffects(in: retained.placedTree) == expected)
+    }
+  }
+}
