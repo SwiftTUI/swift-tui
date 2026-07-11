@@ -782,6 +782,49 @@ private struct StressPS017Fixture: View {
   }
 }
 
+// MARK: - Attempt 018: toggle binding retarget
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 018 a stable toggle writes only its current binding")
+  func stress018StableToggleWritesCurrentBinding() throws {
+    // Hypothesis: retained Toggle action registration may keep the binding
+    // captured before a same-identity control was retargeted.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS018", "Root"),
+      size: .init(width: 42, height: 8)
+    ) {
+      StressPS018Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget toggle")
+    _ = try harness.clickText("Stable toggle")
+
+    #expect(probe.firstBool == false)
+    #expect(probe.secondBool == true)
+  }
+}
+
+@MainActor
+private struct StressPS018Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget toggle") {
+        usesSecond = true
+      }
+      Toggle(
+        "Stable toggle",
+        isOn: usesSecond ? probe.secondBoolBinding() : probe.firstBoolBinding()
+      )
+      .id("stable-toggle")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
