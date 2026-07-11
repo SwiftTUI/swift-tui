@@ -399,3 +399,32 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 012: regional-indicator replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 012 flag replacement keeps two-cell geometry")
+  func textContent012FlagReplacementKeepsTwoCellGeometry() {
+    // Hypothesis: a retained regional-indicator pair can be mistaken for two scalar cells or can
+    // preserve the prior flag payload when another two-cell flag occupies the same slot.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent012")
+
+    for generation in 0..<20 {
+      let flag = generation.isMultiple(of: 2) ? "🇺🇸" : "🇯🇵"
+      let width = generation.isMultiple(of: 3) ? 4 : 5
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text("A\(flag)BC D")
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.joined().contains(flag))
+      #expect(flag.first.map { cellWidth(of: $0) } == 2)
+    }
+  }
+}
