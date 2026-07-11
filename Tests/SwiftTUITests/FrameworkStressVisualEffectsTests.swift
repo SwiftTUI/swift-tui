@@ -107,6 +107,66 @@ extension FrameworkStressVisualEffectsTests {
   }
 }
 
+// MARK: - Attempt 003: custom-path fill-rule churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 003 custom path follows current winding rule")
+  func visualEffects003CustomPathFollowsCurrentWindingRule() {
+    // Hypothesis: retained shape equivalence can overlook the FillRule associated with an equal
+    // boxed path, leaving the pentagram center filled after switching to even-odd (or vice versa).
+    func pentagram() -> Path {
+      let points = [
+        Point(x: 0.5, y: 0.04), Point(x: 0.94, y: 0.36),
+        Point(x: 0.77, y: 0.88), Point(x: 0.23, y: 0.88),
+        Point(x: 0.06, y: 0.36),
+      ]
+      var path = Path()
+      path.move(to: points[0])
+      path.addLine(to: points[2])
+      path.addLine(to: points[4])
+      path.addLine(to: points[1])
+      path.addLine(to: points[3])
+      path.close()
+      return path
+    }
+
+    struct Root: View {
+      let path: Path
+      let generation: Int
+
+      var body: some View {
+        VisualEffectsPathShape(
+          pathValue: path,
+          rule: generation.isMultiple(of: 2) ? .nonZero : .evenOdd
+        )
+        .fill(Color.yellow)
+        .frame(width: 20, height: 10)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects003")
+    var previous: RasterSurface?
+
+    for generation in 0..<20 {
+      let root = Root(path: pentagram(), generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      if let previous {
+        #expect(retained.rasterSurface != previous)
+      }
+      previous = retained.rasterSurface
+    }
+  }
+}
+
 // MARK: - Attempt 002: custom-path control-point churn
 
 extension FrameworkStressVisualEffectsTests {
