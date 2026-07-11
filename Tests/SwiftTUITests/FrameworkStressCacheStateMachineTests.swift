@@ -355,4 +355,22 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 022 hot hits stay bounded beside cold misses")
+  func cacheState022HotHitsStayBoundedBesideColdMisses() {
+    // Hypothesis: cold admission logging can prevent compaction of the hot-entry access log.
+    let cache = TextLayoutCache(capacity: 4)
+    let options = TextLayoutOptions(width: nil)
+    for label in ["hot-a", "hot-b", "hot-c", "hot-d"] {
+      _ = cache.layout(for: label, options: options)
+    }
+    for generation in 0..<2_000 {
+      _ = cache.layout(for: generation.isMultiple(of: 2) ? "hot-a" : "hot-b", options: options)
+      _ = cache.layout(for: "cold-\(generation)", options: options)
+    }
+    #expect(cache.metrics.entries == 4)
+    #expect(cache.accessLogDepth <= 16)
+  }
+}
+
 // NEXT CACHE STRESS TEST
