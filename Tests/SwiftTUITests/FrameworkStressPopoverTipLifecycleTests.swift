@@ -329,6 +329,43 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 009: eligibility teardown
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 009 ineligible transition prunes the active entry")
+  func popoverTip009IneligibleTransitionPrunesActiveEntry() throws {
+    // Hypothesis: the early eligibility guard can skip publishing a new
+    // declaration without retiring the prior active portal entry and routes.
+    let rootIdentity = testIdentity("PopoverTipStress009", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "eligibility-teardown"
+    model.title = "Eligibility teardown tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "eligible", title: "Eligible action")]
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for _ in 1...12 {
+      model.isEligible = true
+      var frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(frame.contains("Eligibility teardown tip"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+
+      model.isEligible = false
+      frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(!frame.contains("Eligibility teardown tip"))
+      #expect(!frame.contains("Eligible action"))
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+      #expect(harness.actionRegistrationCount <= 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
