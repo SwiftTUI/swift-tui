@@ -402,4 +402,35 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 011: GroupBox label freshness
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 011 GroupBox publishes current label and content")
+  func componentComposition011GroupBoxPublishesCurrentLabelAndContent() {
+    // Hypothesis: GroupBox's environment-reader wrappers can freeze its authored builders.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        GroupBox {
+          Text("content-\(generation)")
+        } label: {
+          Text("label-\(generation)")
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition011")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("label-\(generation)"))
+      #expect(text.contains("content-\(generation)"))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
