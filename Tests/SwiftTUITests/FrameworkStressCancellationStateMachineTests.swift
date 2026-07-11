@@ -275,4 +275,20 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 018 zero buffering finishes without phantom value")
+  func cancellationState018ZeroBufferingFinishesWithoutPhantomValue() async {
+    // Hypothesis: a zero-capacity stream can retain the last rejected element at finish.
+    let stream = makeManagedAsyncStream(bufferingPolicy: .bufferingNewest(0)) {
+      (continuation: AsyncStream<Int>.Continuation) in
+      for value in 0..<20 { continuation.yield(value) }
+      continuation.finish()
+      return { _ in }
+    }
+    var values: [Int] = []
+    for await value in stream { values.append(value) }
+    #expect(values.isEmpty)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
