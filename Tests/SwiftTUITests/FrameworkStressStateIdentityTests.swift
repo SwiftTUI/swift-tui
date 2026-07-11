@@ -1060,6 +1060,62 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 017: In-place entity ID mutation
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 017 changed row id resets only that lifetime")
+  func stateIdentity017ChangedRowIDResetsOnlyThatLifetime() throws {
+    // Hypothesis: replacing an entity in an occupied structural slot can either adopt the
+    // departing state or over-remove the stable neighboring entity during displacement.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity017"),
+      size: .init(width: 64, height: 12)
+    ) {
+      StateIdentity017Root()
+    }
+    defer { harness.shutdown() }
+
+    var changingID = 1
+    for stableCount in 1...4 {
+      var frame = try harness.clickText("Increment Row \(changingID) 017")
+      #expect(frame.contains("017 Row \(changingID) Count 1"))
+      frame = try harness.clickText("Increment Row 100 017")
+      #expect(frame.contains("017 Row 100 Count \(stableCount)"))
+
+      frame = try harness.clickText("Mutate Row ID 017")
+      changingID += 1
+      #expect(frame.contains("017 Row \(changingID) Count 0"))
+      #expect(frame.contains("017 Row 100 Count \(stableCount)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity017Root: View {
+    @State private var changingID = 1
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Mutate Row ID 017") { changingID += 1 }
+        ForEach([changingID, 100], id: \.self) { value in
+          StateIdentity017Row(value: value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity017Row: View {
+    let value: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("017 Row \(value) Count \(count)")
+        Button("Increment Row \(value) 017") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
