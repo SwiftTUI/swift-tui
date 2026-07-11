@@ -547,3 +547,58 @@ private struct GestureScroll011Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 012: drop delivery inside an active hover
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 012 drop preserves hover continuity")
+  func gestureScroll012DropPreservesHoverContinuity() throws {
+    // Hypothesis: spatial drop routing may clear or re-key the active pointer
+    // hover even though the pointer never left its hit region.
+    let phases = GestureScrollBox<[String]>([])
+    let drops = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll012Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      GestureScroll012Fixture(phases: phases, drops: drops)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Hover drop target"))
+    _ = try harness.movePointer(to: point)
+    _ = try harness.drop(
+      paths: [DroppedPath("/tmp/gesture-scroll-012")],
+      context: DropContext(location: point)
+    )
+    _ = try harness.movePointer(to: Point(x: point.x + 1, y: point.y))
+
+    #expect(drops.value == 1)
+    #expect(phases.value == ["entered", "moved"])
+  }
+}
+
+private struct GestureScroll012Fixture: View {
+  let phases: GestureScrollBox<[String]>
+  let drops: GestureScrollBox<Int>
+
+  var body: some View {
+    Panel(id: "gesture-scroll-012-panel") {
+      Text("Hover drop target")
+        .frame(width: 26, height: 1, alignment: .leading)
+        .focusable()
+        .onPointerHover { phase in
+          switch phase {
+          case .entered: phases.value.append("entered")
+          case .moved: phases.value.append("moved")
+          case .exited: phases.value.append("exited")
+          }
+        }
+    }
+    .dropDestination { _ in
+      drops.value += 1
+      return true
+    }
+    .frame(width: 30, height: 4)
+  }
+}
