@@ -38,11 +38,7 @@ extension FrameworkStressStateIdentityTests {
     }
     defer { second.shutdown() }
 
-    withKnownIssue(
-      "A reused stateful view value seeds a fresh graph from the retired graph's mutation"
-    ) {
-      #expect(second.frame.contains("001 Count 0"))
-    }
+    #expect(second.frame.contains("001 Count 0"))
   }
 }
 
@@ -70,9 +66,7 @@ extension FrameworkStressStateIdentityTests {
       replacementFrames.append(frame)
     }
 
-    withKnownIssue("A reused StateBox carries its mutation across explicit-ID replacement") {
-      #expect(replacementFrames.allSatisfy { $0.contains("002 Count 0") })
-    }
+    #expect(replacementFrames.allSatisfy { $0.contains("002 Count 0") })
   }
 
   private struct StateIdentity002Root: View {
@@ -114,9 +108,7 @@ extension FrameworkStressStateIdentityTests {
       reinsertionFrames.append(frame)
     }
 
-    withKnownIssue("A reused StateBox resurrects its mutation after committed removal") {
-      #expect(reinsertionFrames.allSatisfy { $0.contains("003 Count 0") })
-    }
+    #expect(reinsertionFrames.allSatisfy { $0.contains("003 Count 0") })
   }
 
   private struct StateIdentity003Root: View {

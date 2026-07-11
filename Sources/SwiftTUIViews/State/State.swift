@@ -380,8 +380,11 @@ public struct State<Value> {
     invalidationIdentity: Identity
   ) -> DynamicStateLocation<Value> {
     let ordinal = box.currentOrdinal
-    let retainedSeed =
-      box.retainedValue(for: storageOwner) ?? box.currentSeedValue()
+    // Fresh slots always seed from the authored initial value. A retained
+    // per-owner value serves only the node-gone read fallback below — seeding
+    // a new slot from carried mutation would resurrect state across committed
+    // removal and leak writes into replacement identities.
+    let authoredSeed = box.currentSeedValue()
     // Access-time re-resolution is identity-aware: if the registration-time
     // node was displaced by a fresh mint at the same identity (a lazy-tab
     // revisit, a mid-frame eviction), the closures follow the identity to the
@@ -392,7 +395,7 @@ public struct State<Value> {
           if let retainedValue = box?.retainedValue(for: storageOwner) {
             return retainedValue
           }
-          return retainedSeed
+          return authoredSeed
         }
         let liveViewNode =
           viewNode.ownerGraph?.liveStateOwnerNode(
@@ -401,10 +404,18 @@ public struct State<Value> {
           ) ?? viewNode
         return liveViewNode.stateSlot(
           ordinal: ordinal,
-          seed: retainedSeed
+          seed: authoredSeed
         )
       },
       setValue: { [weak viewNode, weak box] newValue in
+        // Graph-backed writes stay owner-scoped: the slot holds the mutation
+        // and the per-owner retained value backs the node-gone read fallback.
+        // Live (invalidator-backed) graphs never mirror writes into the
+        // box-global seed — that leaked one owner's mutation into every
+        // future owner seeded from the same box. No-invalidator snapshot
+        // graphs (one-shot `DefaultRenderer` renders) keep the same-instance
+        // seed fallback so an imperative write feeds a later snapshot of the
+        // same view value.
         if let viewNode {
           let liveViewNode =
             viewNode.ownerGraph?.liveStateOwnerNode(
@@ -416,10 +427,11 @@ public struct State<Value> {
             value: newValue,
             invalidationIdentity: invalidationIdentity
           )
-          box?.updateSeedValue(newValue)
+          if liveViewNode.invalidator == nil {
+            box?.updateSeedValue(newValue)
+          }
           box?.storeRetainedValue(newValue, for: storageOwner)
         } else {
-          box?.updateSeedValue(newValue)
           box?.storeRetainedValue(newValue, for: storageOwner)
         }
       }
