@@ -76,3 +76,61 @@ private struct FramePipelineSiblingView: View {
     }
   }
 }
+
+// MARK: - Attempt 002: descendant dirtiness remains narrow
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 002 descendant dirtiness never promotes to root")
+  func framePipeline002DescendantDirtinessNeverPromotesToRoot() {
+    // Hypothesis: repeated descendant-only invalidations can be retained as a
+    // coarse root invalidation, defeating selective frame-head evaluation.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline002", "Root")
+    let dirtyIdentity = testIdentity("FramePipeline002", "DirtyLeaf")
+    let proposal = ProposedSize(width: 48, height: 6)
+
+    _ = renderer.render(
+      FramePipelineNestedView(generation: 0, dirtyIdentity: dirtyIdentity),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    for generation in 1...18 {
+      let retained = renderer.render(
+        FramePipelineNestedView(generation: generation, dirtyIdentity: dirtyIdentity),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [dirtyIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache())).render(
+        FramePipelineNestedView(generation: generation, dirtyIdentity: dirtyIdentity),
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.diagnostics.input.invalidatedIdentities == [dirtyIdentity])
+      #expect(!retained.diagnostics.input.invalidatedIdentities.contains(rootIdentity))
+      #expect(retained.diagnostics.work.resolvedNodesReused >= 2)
+    }
+  }
+}
+
+@MainActor
+private struct FramePipelineNestedView: View {
+  let generation: Int
+  let dirtyIdentity: Identity
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(spacing: 1) {
+        Text("stable-left")
+        Text("dirty-\(generation)")
+          .id(dirtyIdentity)
+      }
+      Text("stable-bottom")
+    }
+  }
+}
