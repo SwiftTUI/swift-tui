@@ -623,3 +623,62 @@ private struct StressInput010Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 011: removed TextField interceptor
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A removed custom TextField interceptor stops consuming typed input")
+  func stressInputRouting011RemovedTextFieldInterceptorStopsIntercepting() throws {
+    // Hypothesis: a stale outer key-handler bucket may outlive its modifier and
+    // keep intercepting text before the TextField's built-in editor handler.
+    let text = StressInputBox("")
+    let intercepted = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput011Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressInput011Fixture(text: text, intercepted: intercepted)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput011Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("q")))
+    #expect(text.value.isEmpty)
+    #expect(intercepted.value == 1)
+
+    _ = try harness.clickText("Remove field interceptor")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput011Fixture.fieldIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("q")))
+
+    #expect(text.value == "q")
+    #expect(intercepted.value == 1)
+  }
+}
+
+private struct StressInput011Fixture: View {
+  static let fieldIdentity = testIdentity("StressInput011", "Field")
+
+  let text: StressInputBox<String>
+  let intercepted: StressInputBox<Int>
+  @State private var intercepts = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove field interceptor") { intercepts = false }
+      if intercepts {
+        TextField("Value", text: text.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+          .onKeyPress(.character("q")) { _ in
+            intercepted.value += 1
+            return .handled
+          }
+      } else {
+        TextField("Value", text: text.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+      }
+    }
+  }
+}
