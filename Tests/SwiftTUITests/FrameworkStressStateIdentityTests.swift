@@ -622,6 +622,86 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 010: Navigation activation state under modifier ordinal shifts
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 010 surviving destination keeps activation state")
+  func stateIdentity010SurvivingDestinationKeepsActivationState() throws {
+    // Hypothesis: removing an earlier navigationDestination shifts the surviving modifier's
+    // ordinal and lets it inherit a different destination's activation record.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity010"),
+      size: .init(width: 62, height: 11)
+    ) {
+      StateIdentity010Root()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Open Second 010")
+      #expect(frame.contains("Second Destination 010"))
+      #expect(!frame.contains("First Destination 010"))
+      frame = try harness.clickText("Back Second 010")
+      #expect(frame.contains("010 Root"))
+
+      frame = try harness.clickText("Remove First Destination 010")
+      #expect(frame.contains("010 First modifier absent"))
+      frame = try harness.clickText("Open Second 010")
+      #expect(frame.contains("Second Destination 010"))
+      #expect(!frame.contains("First Destination 010"))
+      frame = try harness.clickText("Back Second 010")
+      #expect(frame.contains("010 Root"))
+
+      frame = try harness.clickText("Add First Destination 010")
+      #expect(frame.contains("010 First modifier present"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity010Root: View {
+    @State private var includesFirst = true
+    @State private var presentsFirst = false
+    @State private var presentsSecond = false
+
+    var body: some View {
+      NavigationStack(id: "state-identity-010-stack") {
+        if includesFirst {
+          rootContent
+            .navigationDestination(isPresented: $presentsFirst) {
+              Text("First Destination 010")
+            }
+            .navigationDestination(isPresented: $presentsSecond) {
+              secondDestination
+            }
+        } else {
+          rootContent
+            .navigationDestination(isPresented: $presentsSecond) {
+              secondDestination
+            }
+        }
+      }
+    }
+
+    private var rootContent: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("010 Root")
+        Text(includesFirst ? "010 First modifier present" : "010 First modifier absent")
+        Button("Open Second 010") { presentsSecond = true }
+        Button(includesFirst ? "Remove First Destination 010" : "Add First Destination 010") {
+          includesFirst.toggle()
+        }
+      }
+    }
+
+    private var secondDestination: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Second Destination 010")
+        Button("Back Second 010") { presentsSecond = false }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
