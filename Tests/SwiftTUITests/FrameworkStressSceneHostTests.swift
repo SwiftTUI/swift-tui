@@ -341,3 +341,44 @@ private struct SceneHost008DynamicScene: Scene {
     }
   }
 }
+
+// MARK: - Attempt 009: explicit and generated host-frame sequence interleave
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 009 mixed surface submissions preserve generated sequence monotonicity")
+  func sceneHost009MixedSurfaceSubmissionsPreserveGeneratedSequenceMonotonicity() throws {
+    // Hypothesis: an explicit semantic-frame submission can advance frame
+    // history without advancing the sequence used by later raster submissions.
+    var observedSequences: [UInt64] = []
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 8, height: 1),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { frame in observedSequences.append(frame.sequence) }
+    )
+
+    _ = try surface.present(sceneHostRaster(marker: "initial"))
+    #expect(observedSequences == [0])
+
+    for generation in 0..<16 {
+      let explicitSequence = UInt64(100 + generation * 3)
+      _ = try surface.present(
+        SemanticHostFrame(
+          sequence: explicitSequence,
+          raster: sceneHostRaster(marker: "explicit \(generation)"),
+          semantics: .init(),
+          focusedIdentity: nil
+        )
+      )
+      _ = try surface.present(sceneHostRaster(marker: "generated \(generation)"))
+
+      #expect(observedSequences.suffix(2) == [explicitSequence, explicitSequence + 1])
+    }
+  }
+}
+
+private func sceneHostRaster(marker: String, size: CellSize = .init(width: 8, height: 1))
+  -> RasterSurface
+{
+  RasterSurface(size: size, lines: [String(marker.prefix(max(0, size.width)))])
+}
