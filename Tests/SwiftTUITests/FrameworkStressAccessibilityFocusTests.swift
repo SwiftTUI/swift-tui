@@ -384,3 +384,62 @@ private struct StressAF007Fixture: View {
     .accessibilityLabel("Container \(name)")
   }
 }
+
+// MARK: - Attempt 008: accessibility reading order rotation
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 008 semantic reading order follows rotated collection")
+  func stress008SemanticReadingOrderFollowsRotatedCollection() throws {
+    // Hypothesis: retained ForEach placement can publish the previous accessibility reading order
+    // after stable semantic owners rotate without changing their individual content geometry.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF008", "Root"),
+      size: .init(width: 50, height: 9)
+    ) {
+      StressAF008Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<10 {
+      _ = try harness.clickText("Rotate semantic rows")
+    }
+
+    let readingOrder = accessibilityFocusNodes(in: harness).compactMap(\.label).filter {
+      $0.hasPrefix("Reading row")
+    }
+    #expect(readingOrder == ["Reading row B", "Reading row C", "Reading row A"])
+  }
+}
+
+private struct StressAF008Row: Identifiable {
+  let id: String
+}
+
+@MainActor
+private struct StressAF008Fixture: View {
+  @State private var generation = 0
+
+  private var rows: [StressAF008Row] {
+    switch generation % 3 {
+    case 0:
+      [StressAF008Row(id: "A"), StressAF008Row(id: "B"), StressAF008Row(id: "C")]
+    case 1:
+      [StressAF008Row(id: "B"), StressAF008Row(id: "C"), StressAF008Row(id: "A")]
+    default:
+      [StressAF008Row(id: "C"), StressAF008Row(id: "A"), StressAF008Row(id: "B")]
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rotate semantic rows") {
+        generation += 1
+      }
+      ForEach(rows) { row in
+        Text("Stable row \(row.id)")
+          .accessibilityRole(.cell)
+          .accessibilityLabel("Reading row \(row.id)")
+      }
+    }
+  }
+}
