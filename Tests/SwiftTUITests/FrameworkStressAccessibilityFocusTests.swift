@@ -1107,3 +1107,72 @@ private struct StressAF020Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 021: preferred default focus does not reseed
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 021 default candidate does not steal user focus")
+  func stress021DefaultCandidateDoesNotStealUserFocus() throws {
+    // Hypothesis: repeated reevaluation of a preferred-default registration can reseed its
+    // FocusState value and steal focus back from a user-selected peer in the same scope.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF021", "Root"),
+      size: .init(width: 46, height: 8)
+    ) {
+      StressAF021Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressAF021Fixture.peerIdentity)
+    for _ in 0..<12 {
+      _ = try harness.pressKey(KeyPress(.character("u")))
+    }
+
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == StressAF021Fixture.peerIdentity)
+    #expect(harness.frame.contains("Default focus state peer 12"))
+    #expect(harness.defaultFocusRegistrationCount == 2)
+  }
+}
+
+private enum StressAF021Field: Hashable {
+  case preferred
+  case peer
+}
+
+@MainActor
+private struct StressAF021Fixture: View {
+  static let preferredIdentity = testIdentity("StressAF021", "Preferred")
+  static let peerIdentity = testIdentity("StressAF021", "Peer")
+
+  @Namespace private var namespace
+  @FocusState private var focusedField: StressAF021Field?
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Default focus state \(focusLabel) \(generation)")
+      Text("Preferred default target")
+        .id(Self.preferredIdentity)
+        .focusable()
+        .focused($focusedField, equals: .preferred)
+        .prefersDefaultFocus(in: namespace)
+      Text("User-selected peer")
+        .id(Self.peerIdentity)
+        .focusable()
+        .focused($focusedField, equals: .peer)
+        .onKeyPress(.character("u")) { _ in
+          generation += 1
+          return .handled
+        }
+    }
+    .focusScope(namespace)
+  }
+
+  private var focusLabel: String {
+    switch focusedField {
+    case .preferred: "preferred"
+    case .peer: "peer"
+    case nil: "none"
+    }
+  }
+}
