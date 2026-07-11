@@ -890,6 +890,52 @@ private struct EnvironmentStyle018Root: View {
   }
 }
 
+// MARK: - Attempt 019: composed ViewModifier environment dependency
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 019 composed modifier tracks environment dependency")
+  func environmentStyle019ComposedModifierTracksEnvironmentDependency() throws {
+    // Hypothesis: @Environment reads performed inside a composed ViewModifier body can be
+    // attributed to its content node incorrectly, allowing the stable modifier node to be reused.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle019"),
+      size: .init(width: 76, height: 7)
+    ) {
+      EnvironmentStyle019Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...18 {
+      let frame = try harness.clickText("Advance Modifier Environment 019")
+      #expect(frame.contains("modifier-env-\(generation) Modifier Target 019"))
+    }
+  }
+}
+
+private struct EnvironmentStyle019Modifier: ViewModifier {
+  @Environment(\.environmentStyleString) private var value
+
+  func body(content: Content) -> some View {
+    HStack(spacing: 1) {
+      Text(value)
+      content
+    }
+  }
+}
+
+private struct EnvironmentStyle019Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Modifier Environment 019") { generation += 1 }
+      Text("Modifier Target 019")
+        .modifier(EnvironmentStyle019Modifier())
+        .environment(\.environmentStyleString, "modifier-env-\(generation)")
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
