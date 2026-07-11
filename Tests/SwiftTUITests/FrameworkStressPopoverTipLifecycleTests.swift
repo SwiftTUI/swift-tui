@@ -74,6 +74,43 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 003: optional tip icon topology freshness
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 003 optional icon follows every replacement")
+  func popoverTip003OptionalIconFollowsEveryReplacement() throws {
+    // Hypothesis: the tip header's optional icon branch can reuse a departed
+    // Text payload or fail to rebuild after repeated nil transitions.
+    let rootIdentity = testIdentity("PopoverTipStress003", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "optional-icon"
+    model.title = "Optional icon tip"
+    model.message = nil
+    model.actions = []
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let priorIcon = model.icon
+      model.generation = generation
+      model.icon = generation.isMultiple(of: 3) ? nil : "I\(generation)"
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      if let icon = model.icon {
+        #expect(frame.contains(icon))
+      }
+      if let priorIcon, priorIcon != model.icon {
+        #expect(!frame.contains(priorIcon))
+      }
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
