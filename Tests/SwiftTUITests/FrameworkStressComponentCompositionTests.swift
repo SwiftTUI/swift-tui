@@ -433,4 +433,35 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 012: GroupBox content cardinality
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 012 GroupBox removes conditional content rows")
+  func componentComposition012GroupBoxRemovesConditionalContentRows() {
+    // Hypothesis: the nested content VStack can preserve a departed row behind stable chrome.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        GroupBox("box") {
+          Text("always-\(generation)")
+          if generation.isMultiple(of: 2) {
+            Text("optional-\(generation)")
+          }
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition012")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("optional-\(generation)") == generation.isMultiple(of: 2))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
