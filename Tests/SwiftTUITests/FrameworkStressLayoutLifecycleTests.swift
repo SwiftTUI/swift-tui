@@ -574,3 +574,66 @@ private struct StressLL009Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 010: same-ID navigation payload refresh
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 010 active navigation item refreshes same ID payload")
+  func stress010ActiveNavigationItemRefreshesSameIDPayload() throws {
+    // Hypothesis: a stable activation identity may retain the first item
+    // payload and action closure when only the item's non-ID fields change.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL010", "Root"),
+      size: .init(width: 46, height: 10)
+    ) {
+      StressLL010Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Item Destination")
+    for version in 1...8 {
+      _ = try harness.clickText("Increment Destination Local")
+      let frame = try harness.clickText("Refresh Item Payload")
+      #expect(frame.contains("item version \(version) local \(version)"))
+      #expect(harness.actionRegistrationCount <= 3)
+    }
+  }
+}
+
+private struct StressLL010Item: Identifiable, Sendable {
+  let id = 1
+  var version: Int
+}
+
+@MainActor
+private struct StressLL010Fixture: View {
+  @State private var item: StressLL010Item?
+
+  var body: some View {
+    NavigationStack(id: "stress-010-navigation") {
+      Button("Open Item Destination") {
+        item = StressLL010Item(version: 0)
+      }
+      .navigationDestination(item: $item) { item in
+        StressLL010Destination(item: item, activeItem: $item)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL010Destination: View {
+  let item: StressLL010Item
+  @Binding var activeItem: StressLL010Item?
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("item version \(item.version) local \(local)")
+      Button("Increment Destination Local") { local += 1 }
+      Button("Refresh Item Payload") {
+        activeItem = StressLL010Item(version: item.version + 1)
+      }
+    }
+  }
+}
