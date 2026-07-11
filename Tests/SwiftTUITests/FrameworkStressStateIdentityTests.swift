@@ -1362,6 +1362,72 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 021: AnyView payload type returns after teardown
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 021 anyview type cycle does not resurrect state")
+  func stateIdentity021AnyViewTypeCycleDoesNotResurrectState() throws {
+    // Hypothesis: A -> B teardown can leave A's payload route or cached node reachable, so a
+    // later A payload reuses state from a lifetime that was supposed to be destroyed.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity021"),
+      size: .init(width: 56, height: 10)
+    ) {
+      StateIdentity021Root()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Increment A 021")
+      #expect(frame.contains("021 A Count 1"))
+      frame = try harness.clickText("Swap Type 021")
+      #expect(frame.contains("021 B Count 0"))
+      frame = try harness.clickText("Increment B 021")
+      #expect(frame.contains("021 B Count 1"))
+      frame = try harness.clickText("Swap Type 021")
+      #expect(frame.contains("021 A Count 0"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity021Root: View {
+    @State private var showsA = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Swap Type 021") { showsA.toggle() }
+        if showsA {
+          AnyView(StateIdentity021A())
+        } else {
+          AnyView(StateIdentity021B())
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity021A: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("021 A Count \(count)")
+        Button("Increment A 021") { count += 1 }
+      }
+    }
+  }
+
+  private struct StateIdentity021B: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("021 B Count \(count)")
+        Button("Increment B 021") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
