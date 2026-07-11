@@ -312,3 +312,64 @@ private struct StressLL005Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 006: noncommutative preference reordering
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 006 preference reduction follows current sibling order")
+  func stress006PreferenceReductionFollowsCurrentSiblingOrder() throws {
+    // Hypothesis: retained sibling snapshots may replay preferences in their
+    // original order after stable-ID children move.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL006", "Root"),
+      size: .init(width: 38, height: 8)
+    ) {
+      StressLL006Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      let frame = try harness.clickText("Reverse Writers")
+      let expected = generation.isMultiple(of: 2) ? "AB" : "BA"
+      #expect(frame.contains("reduced \(expected) generation \(generation)"))
+    }
+  }
+}
+
+private enum StressLL006PreferenceKey: PreferenceKey {
+  static let defaultValue = ""
+
+  static func reduce(value: inout String, nextValue: () -> String) {
+    value += nextValue()
+  }
+}
+
+@MainActor
+private struct StressLL006Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse Writers") { generation += 1 }
+      VStack(alignment: .leading, spacing: 0) {
+        if generation.isMultiple(of: 2) {
+          writer("A")
+          writer("B")
+        } else {
+          writer("B")
+          writer("A")
+        }
+      }
+      .frame(width: 36, height: 4, alignment: .topLeading)
+      .overlayPreferenceValue(StressLL006PreferenceKey.self, alignment: .bottomLeading) { value in
+        Text("reduced \(value) generation \(generation)")
+      }
+    }
+  }
+
+  private func writer(_ value: String) -> some View {
+    Text("writer \(value)")
+      .id(value)
+      .preference(key: StressLL006PreferenceKey.self, value: value)
+  }
+}
