@@ -174,3 +174,52 @@ private struct StressTC003Fixture: View {
     .frame(width: 60, height: 9, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 004: removed-prefix pointer routes
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 004 removed prefix retargets every tab pointer route")
+  func stressTabCommand004RemovedPrefixRetargetsPointerRoutes() throws {
+    // Hypothesis: removing the leading declaration may leave a trailing route
+    // keyed to its old index, selecting no tab or the wrong surviving tag.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC004", "Root"),
+      size: .init(width: 62, height: 11)
+    ) {
+      StressTC004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Remove prefix")
+    let frame = try harness.clickText("C")
+
+    withKnownIssue("Removing a leading tab leaves the visible C route inert") {
+      #expect(frame.contains("C current content"))
+    }
+    #expect(!frame.contains("B current content"))
+  }
+}
+
+@MainActor
+private struct StressTC004Fixture: View {
+  @State private var hasPrefix = true
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove prefix") {
+        hasPrefix = false
+      }
+      TabView(selection: $selection) {
+        if hasPrefix {
+          Tab("Prefix", value: "prefix") { Text("Prefix current content") }
+        }
+        Tab("A", value: "a") { Text("A current content") }
+        Tab("B", value: "b") { Text("B current content") }
+        Tab("C", value: "c") { Text("C current content") }
+      }
+      .id(testIdentity("StressTC004", "Tabs"))
+    }
+    .frame(width: 60, height: 9, alignment: .topLeading)
+  }
+}
