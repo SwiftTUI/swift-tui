@@ -417,3 +417,56 @@ private struct ObservationEffects007Secondary: View {
     Text("007 live \(model.secondary)")
   }
 }
+
+// MARK: - Attempt 008: conditional observation teardown pruning
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 008 removed readers leave no observation-pass orphan")
+  func observationEffects008RemovedReadersLeaveNoObservationPassOrphan() throws {
+    // Hypothesis: ViewNodeID pruning may miss an observed conditional child
+    // after repeated remove/reinsert cycles and grow stale pass records.
+    let model = ObservationEffects008Model()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects008"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects008View(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...20 {
+      model.isVisible = false
+      var frame = try harness.render()
+      #expect(frame.contains("008 hidden"))
+      #expect(harness.runLoop.observationBridge.makeCheckpoint().observedPasses.count <= 1)
+
+      model.value = generation
+      frame = try harness.render()
+      #expect(frame.contains("008 hidden"))
+
+      model.isVisible = true
+      frame = try harness.render()
+      #expect(frame.contains("008 visible \(generation)"))
+      #expect(harness.runLoop.observationBridge.makeCheckpoint().observedPasses.count <= 2)
+    }
+  }
+}
+
+private struct ObservationEffects008View: View {
+  let model: ObservationEffects008Model
+
+  var body: some View {
+    if model.isVisible {
+      Text("008 visible \(model.value)")
+        .id("observation-effects-008-reader")
+    } else {
+      Text("008 hidden")
+    }
+  }
+}
+
+@Observable
+private final class ObservationEffects008Model {
+  var isVisible = true
+  var value = 0
+}
