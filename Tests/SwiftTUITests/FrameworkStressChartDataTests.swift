@@ -95,6 +95,57 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 017: line point order and domain migration
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 017 line point reorder rebuilds the combined numeric domain")
+  func chartData017LinePointReorderRebuildsCombinedNumericDomain() {
+    // Hypothesis: LineChart can retain a composed grid or domain from an earlier
+    // point order when both X and Y extrema move but the series identity stays fixed.
+    struct Root: View {
+      let generation: Int
+
+      var points: [LineChartPoint] {
+        let values = [
+          LineChartPoint(x: -Double(100 + generation), y: Double(generation - 20)),
+          LineChartPoint(x: Double(generation), y: Double(40 + generation)),
+          LineChartPoint(x: Double(100 + generation * 2), y: -Double(30 + generation)),
+        ]
+        return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+      }
+
+      var body: some View {
+        LineChart(
+          "Line \(generation)",
+          series: [
+            .init(
+              "Series \(generation)",
+              points: points,
+              style: .line,
+              tone: generation.isMultiple(of: 2) ? .success : .warning
+            )
+          ],
+          height: 7,
+          width: 42
+        )
+        .chartXAxis(.values(count: 4))
+        .chartYAxis(.values(count: 4))
+        .chartLegend(.bottom)
+      }
+    }
+
+    chartDataExercise(attempt: "017", proposal: .init(width: 62, height: 14)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Line \(generation)"))
+      #expect(text.contains("Series \(generation)"))
+      #expect(text.contains("1 series"))
+      #expect(chartDataAccessibilityLabels(snapshot).contains("Line \(generation): 1 series"))
+    }
+  }
+}
+
 // MARK: - Attempt 016: legend cardinality and order churn
 
 extension FrameworkStressChartDataTests {
