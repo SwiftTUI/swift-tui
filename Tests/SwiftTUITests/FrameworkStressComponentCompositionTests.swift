@@ -764,4 +764,47 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 023: ForeignSurface same-size payload replacement
+
+private struct ComponentCompositionForeignPayload: ForeignSurfacePayload {
+  let grid: ForeignGrid
+}
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 023 ForeignSurface publishes same-size payload changes")
+  func componentComposition023ForeignSurfacePublishesSameSizePayloadChanges() {
+    // Hypothesis: retained draw equivalence can key a foreign payload only by type and size.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        let first = Character(String(generation % 10))
+        let second = Character(String((generation + 1) % 10))
+        ForeignSurface(
+          payload: ComponentCompositionForeignPayload(
+            grid: .init(
+              size: .init(width: 2, height: 1),
+              cells: [[RasterCell(character: first), RasterCell(character: second)]]
+            )
+          )
+        )
+        .frame(width: 2, height: 1)
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition023")
+    withKnownIssue("ForeignSurface retains its first same-size payload across invalidations") {
+      for generation in 0..<18 {
+        let frames = componentCompositionFrames(
+          Root(generation: generation), renderer: renderer, identity: identity,
+          generation: generation
+        )
+        #expect(
+          frames.retained.rasterSurface == frames.fresh.rasterSurface
+            && componentCompositionText(frames.retained).contains(String(generation % 10))
+        )
+      }
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
