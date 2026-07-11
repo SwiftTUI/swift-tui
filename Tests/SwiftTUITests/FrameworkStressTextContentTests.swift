@@ -296,3 +296,44 @@ extension FrameworkStressTextContentTests {
     #expect(observedLines.count == modes.count)
   }
 }
+
+// MARK: - Attempt 009: hot-key admission pressure
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 009 hot unicode layout survives admission churn")
+  func textContent009HotUnicodeLayoutSurvivesAdmissionChurn() {
+    // Hypothesis: one-shot admission records can evict or alias a repeatedly accessed Unicode
+    // layout key while the retained renderer continues revisiting its cell geometry.
+    let cache = TextLayoutCache(capacity: 4)
+    let options = TextLayoutOptions(width: 5, lineLimit: 2, truncationMode: .middle)
+    let hotContent = "界HOTVALUE🙂"
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent009")
+
+    for generation in 0..<32 {
+      let cached = cache.layout(for: hotContent, options: options)
+      let uncached = uncachedTextLayout(for: hotContent, options: options)
+      #expect(cached == uncached)
+
+      _ = cache.layout(
+        for: "cold-\(generation)-\(generation.isMultiple(of: 2) ? "界" : "🙂")",
+        options: .init(width: 3 + generation % 4, lineLimit: 2)
+      )
+
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 5, height: nil),
+        content: Text(hotContent).lineLimit(2).truncationMode(.middle)
+      )
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(cache.metrics.entries <= 4)
+      #expect(cache.accessLogDepth <= 8)
+    }
+
+    #expect(cache.metrics.hits >= 31)
+    #expect(cache.metrics.bypassedStores > 0)
+  }
+}
