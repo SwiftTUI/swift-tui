@@ -456,3 +456,43 @@ extension FrameworkStressSceneHostTests {
     #expect(frames.map(\.sequence) == (44..<300).map(UInt64.init))
   }
 }
+
+// MARK: - Attempt 012: concurrent late observers of retained frames
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 012 late observers recover disjoint retained frames")
+  func sceneHost012LateObserversRecoverDisjointRetainedFrames() async throws {
+    // Hypothesis: concurrent late observers can disagree about retained history
+    // or recover a neighboring frame after the bounded window has rolled over.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 8, height: 1),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+
+    for sequence in 0..<300 {
+      _ = try surface.present(
+        SemanticHostFrame(
+          sequence: UInt64(sequence),
+          raster: sceneHostRaster(marker: "frame \(sequence)"),
+          semantics: .init(),
+          focusedIdentity: nil
+        )
+      )
+    }
+
+    let retained = await surface.waitForFrames { $0.count == 256 }
+    let targets: [UInt64] = [44, 45, 63, 127, 191, 255, 298, 299]
+    #expect(targets.allSatisfy { target in retained.contains { $0.sequence == target } })
+
+    let observers = targets.map { target in
+      Task { await surface.waitForFrame { $0.sequence == target } }
+    }
+    var resumed: [UInt64] = []
+    for observer in observers {
+      resumed.append(await observer.value.sequence)
+    }
+    #expect(resumed == targets)
+  }
+}
