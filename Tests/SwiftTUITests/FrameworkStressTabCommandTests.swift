@@ -844,3 +844,71 @@ private struct StressTC015Fixture: View {
     .frame(width: 64, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 016: open-palette command insertion
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 016 open palette inserts commands without retargeting survivors")
+  func stressTabCommand016OpenPaletteInsertsCommandsWithoutRetargetingSurvivors() throws {
+    // Hypothesis: inserting a command ahead of an open sheet's captured list
+    // may redraw C at a new ordinal while keeping the prior button action.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC016", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressTC016Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open insert palette")
+    _ = try harness.clickText("Insert palette prefix")
+    _ = try harness.clickText("C palette command")
+
+    #expect(probe.events == ["c"])
+  }
+}
+
+@MainActor
+private struct StressTC016Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var hasPrefix = false
+  @State private var showsPalette = false
+
+  var body: some View {
+    Panel(id: "stress-tc-016-source") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Open insert palette") {
+          showsPalette = true
+        }
+        if hasPrefix {
+          commandSource("Prefix palette command", marker: "prefix")
+        }
+        commandSource("B palette command", marker: "b")
+        commandSource("C palette command", marker: "c")
+      }
+    }
+    .panel(id: "stress-tc-016-host")
+    .paletteSheet("Insert palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Insert palette prefix") {
+          hasPrefix = true
+        }
+        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
+          Button(entry.element.name) {
+            entry.element.action()
+          }
+          .disabled(!entry.element.isEnabled)
+        }
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+
+  private func commandSource(_ name: String, marker: String) -> some View {
+    Panel(id: "source-\(marker)") { Text("source \(marker)") }
+      .paletteCommand(name: name) {
+        probe.events.append(marker)
+      }
+  }
+}
