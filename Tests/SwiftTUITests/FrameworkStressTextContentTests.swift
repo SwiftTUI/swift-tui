@@ -666,3 +666,41 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 020: same-label link destination replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 020 same-label link updates every hyperlink cell")
+  func textContent020SameLabelLinkUpdatesEveryHyperlinkCell() {
+    // Hypothesis: retained rich-text draw equality can key an inline link by visible label and
+    // preserve the first destination across same-label replacements.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent020")
+    let linkIdentity = testIdentity("TextContent020", "InlineLink[0]")
+
+    for generation in 0..<20 {
+      let current = generation.isMultiple(of: 2) ? "https://one.example" : "https://two.example"
+      let departed = generation.isMultiple(of: 2) ? "https://two.example" : "https://one.example"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 7, height: 1),
+        content: Text("Go \(Link("Docs", destination: .init(current)))")
+      )
+      let hyperlinkCells = frames.retained.rasterSurface.cells.flatMap { row in
+        row.filter { $0.hyperlink != nil }
+      }
+      let presented = terminalRenderer.render(frames.retained.rasterSurface)
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(hyperlinkCells.count == 4)
+      #expect(hyperlinkCells.allSatisfy { $0.hyperlink == current })
+      #expect(frames.retained.semanticSnapshot.focusRegions.map(\.identity) == [linkIdentity])
+      #expect(frames.retained.semanticSnapshot.interactionRegions.map(\.identity) == [linkIdentity])
+      #expect(presented.contains(current))
+      #expect(!presented.contains(departed))
+    }
+  }
+}
