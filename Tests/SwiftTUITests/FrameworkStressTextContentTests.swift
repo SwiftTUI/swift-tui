@@ -486,3 +486,34 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 015: bidi-control cell geometry
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 015 bidi controls consume no retained cells")
+  func textContent015BidiControlsConsumeNoRetainedCells() {
+    // Hypothesis: embedding and isolate controls can retain a positive cell span when their
+    // zero-width cluster topology changes around the same right-to-left payload.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent015")
+
+    for generation in 0..<20 {
+      let content =
+        generation.isMultiple(of: 2)
+        ? "A\u{2067}אב\u{2069}B"
+        : "A\u{202B}אב\u{202C}B"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 4, height: nil),
+        content: Text(content)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == .init(width: 4, height: 1))
+      #expect(frames.retained.rasterSurface.lines == ["AאבB"])
+    }
+  }
+}
