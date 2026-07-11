@@ -1614,3 +1614,90 @@ private struct StressNP023Destination: View {
     )
   }
 }
+
+// MARK: - Attempt 024: sheet teardown after nested stack remints
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 024 sheet teardown prunes reminted nested stack")
+  func stress024SheetTeardownPrunesRemintedNestedStack() throws {
+    // Hypothesis: reminting an active NavigationStack inside sheet content can
+    // strand destination actions or a pop entry after the sheet is dismissed.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP024", "Root"),
+      size: .init(width: 62, height: 14)
+    ) {
+      StressNP024Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Nested Sheet Destination")
+    _ = try harness.focusText("Open Nested Navigation Sheet")
+    _ = try harness.clickText("Open Nested Navigation Sheet")
+    for generation in 1...6 {
+      let frame = try harness.clickText("Remint Inner Sheet Stack")
+      #expect(frame.contains("inner sheet stack generation \(generation)"))
+      withKnownIssue("Reminted nested stack retains departed actions until sheet teardown") {
+        #expect(harness.actionRegistrationCount <= 5)
+      }
+    }
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    let destinationFocus = try harness.focusIdentity(forText: "Open Nested Navigation Sheet")
+    #expect(frame.contains("outer nested-sheet destination"))
+    #expect(!frame.contains("inner sheet stack generation"))
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == destinationFocus)
+    #expect(stressNPPresentationEntryCount(in: harness) == 0)
+    #expect(harness.actionRegistrationCount <= 2)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Push Nested Sheet Destination"))
+  }
+}
+
+@MainActor
+private struct StressNP024Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-024-outer-stack") {
+      Button("Push Nested Sheet Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP024Destination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP024Destination: View {
+  @State private var sheet = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("outer nested-sheet destination")
+      Button("Open Nested Navigation Sheet") { sheet = true }
+    }
+    .sheet("Nested Navigation Sheet", isPresented: $sheet) {
+      StressNP024Sheet()
+    }
+  }
+}
+
+@MainActor
+private struct StressNP024Sheet: View {
+  @State private var inner = true
+  @State private var generation = 0
+
+  var body: some View {
+    NavigationStack(id: "stress-np-024-inner-scope") {
+      Button("Inner Sheet Stack Root") { inner = true }
+        .navigationDestination(isPresented: $inner) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("inner sheet stack generation \(generation)")
+            Button("Remint Inner Sheet Stack") { generation += 1 }
+          }
+        }
+    }
+    .id("stress-np-024-inner-host-\(generation)")
+  }
+}
