@@ -44,6 +44,22 @@ private enum EnvironmentStyleIntPreferenceKey: PreferenceKey {
   }
 }
 
+private struct EnvironmentStyleTaggedAnchor: Sendable {
+  let tag: String
+  let anchor: Anchor<Rect>
+}
+
+private enum EnvironmentStyleAnchorListKey: PreferenceKey {
+  static let defaultValue: [EnvironmentStyleTaggedAnchor] = []
+
+  static func reduce(
+    value: inout [EnvironmentStyleTaggedAnchor],
+    nextValue: () -> [EnvironmentStyleTaggedAnchor]
+  ) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 @MainActor
 private final class EnvironmentStyleEventProbe {
   var events: [String] = []
@@ -1065,6 +1081,74 @@ private struct EnvironmentStyle021Root: View {
       Button("Advance Observed Environment 021") { generation += 1 }
       EnvironmentStyle021Observer(generation: generation, probe: probe)
         .environment(\.environmentStyleString, "observer-env-\(generation)")
+    }
+  }
+}
+
+// MARK: - Attempt 022: surviving anchor after leading-source removal
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 022 anchor reduction drops removed leading source")
+  func environmentStyle022AnchorReductionDropsRemovedLeadingSource() throws {
+    // Hypothesis: removing the first source in an anchor reduction can leave its opaque token in
+    // the reduced list or make the surviving token resolve against the departed source node.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle022"),
+      size: .init(width: 78, height: 8)
+    ) {
+      EnvironmentStyle022Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      _ = try harness.clickText("Advance Anchors 022")
+      var frame = try harness.clickText("Toggle Leading Anchor 022")
+      let expectedB = generation.isMultiple(of: 2) ? 8 : 12
+      #expect(frame.contains("022 B=\(expectedB)"))
+      #expect(!frame.contains("022 A="))
+
+      frame = try harness.clickText("Toggle Leading Anchor 022")
+      #expect(frame.contains("022 A=6"))
+      #expect(frame.contains("B=\(expectedB)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle022Root: View {
+  @State private var generation = 0
+  @State private var showsLeading = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Anchors 022") { generation += 1 }
+      Button("Toggle Leading Anchor 022") { showsLeading.toggle() }
+      Group {
+        if showsLeading {
+          Text("anchor-a")
+            .frame(width: 6, height: 1)
+            .offset(x: 2)
+            .id("environment-style-022-a")
+            .anchorPreference(key: EnvironmentStyleAnchorListKey.self, value: .bounds) {
+              [EnvironmentStyleTaggedAnchor(tag: "A", anchor: $0)]
+            }
+        }
+        Text("anchor-b")
+          .frame(width: generation.isMultiple(of: 2) ? 8 : 12, height: 1)
+          .id("environment-style-022-b")
+          .anchorPreference(key: EnvironmentStyleAnchorListKey.self, value: .bounds) {
+            [EnvironmentStyleTaggedAnchor(tag: "B", anchor: $0)]
+          }
+      }
+      .frame(width: 70, height: 3, alignment: .topLeading)
+      .overlayPreferenceValue(EnvironmentStyleAnchorListKey.self, alignment: .bottomLeading) {
+        anchors in
+        GeometryReader { proxy in
+          let markers = anchors.map { entry in
+            "\(entry.tag)=\(Int(proxy[entry.anchor].size.width))"
+          }
+          Text("022 \(markers.joined(separator: " "))")
+        }
+      }
     }
   }
 }
