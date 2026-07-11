@@ -64,4 +64,24 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 005 start resumes every queued waiter")
+  func cancellationState005StartResumesEveryQueuedWaiter() async {
+    // Hypothesis: draining the waiter dictionary can omit continuations under fanout.
+    let token = FrameTailJobCancellationToken()
+    let states = await withTaskGroup(of: String.self, returning: [String].self) { group in
+      for _ in 0..<64 {
+        group.addTask { await token.waitUntilLeavesQueue().rawValue }
+      }
+      await Task.yield()
+      #expect(token.markStarted())
+      var values: [String] = []
+      for await value in group { values.append(value) }
+      return values
+    }
+    #expect(states.count == 64)
+    #expect(states.allSatisfy { $0 == "started" })
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
