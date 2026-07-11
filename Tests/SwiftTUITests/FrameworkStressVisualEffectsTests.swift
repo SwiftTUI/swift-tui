@@ -1588,3 +1588,64 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 029: image scaling-mode churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 029 image cycles stretch fit and fill geometry")
+  func visualEffects029ImageCyclesStretchFitAndFillGeometry() throws {
+    // Hypothesis: retained image measurement can update the scalingMode attachment flag without
+    // invalidating the target-cell geometry computed for an earlier stretch, fit, or fill mode.
+    let pngBytes = try makePNGBytes(
+      width: 32,
+      height: 32,
+      pixels: Array(repeating: rgbaPixel(red: 90, green: 180, blue: 255), count: 32 * 32)
+    )
+
+    struct Root: View {
+      let bytes: [UInt8]
+      let generation: Int
+
+      var image: Image {
+        switch generation % 3 {
+        case 0: Image(data: bytes).resizable()
+        case 1: Image(data: bytes).scaledToFit()
+        default: Image(data: bytes).scaledToFill()
+        }
+      }
+
+      var body: some View {
+        image.frame(width: 6, height: 2)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects029")
+
+    for generation in 0..<24 {
+      let root = Root(bytes: pngBytes, generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+      let expectedMode: ImageScalingMode = switch generation % 3 {
+      case 0: .stretch
+      case 1: .fit
+      default: .fill
+      }
+      let expectedSize: CellSize = switch expectedMode {
+      case .stretch: CellSize(width: 6, height: 2)
+      case .fit: CellSize(width: 4, height: 2)
+      case .fill: CellSize(width: 6, height: 3)
+      }
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(attachment.scalingMode == expectedMode)
+      #expect(attachment.bounds.size == expectedSize)
+    }
+  }
+}
