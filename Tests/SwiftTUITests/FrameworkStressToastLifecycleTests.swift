@@ -657,3 +657,49 @@ private struct ToastLifecycle012Root: View {
     )
   }
 }
+
+// MARK: - Attempt 013: repeated automatic dismissal
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 013 reopening a dismissed source starts a fresh timer")
+  func toastLifecycle013ReopeningDismissedSourceStartsFreshTimer() async throws {
+    // Hypothesis: after auto-dismiss completes and removes the portal row, reopening the same
+    // declaration can reuse completed lifecycle metadata without starting another timer.
+    let bindingChanges = MainActorConditionSignal()
+    let presented = ToastLifecycleBox(false, signal: bindingChanges)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle013"),
+      size: .init(width: 64, height: 10)
+    ) {
+      ToastLifecycle013Root(presented: presented)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...3 {
+      let shown = try harness.clickText("Show Timed Toast 013")
+      #expect(shown.contains("reopen timer toast cycle \(cycle)"))
+      await bindingChanges.wait { !presented.value }
+      let dismissed = try harness.render()
+      #expect(!dismissed.contains("reopen timer toast"))
+      #expect(toastLifecycleEntryCount(in: harness) == 0)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle013Root: View {
+  let presented: ToastLifecycleBox<Bool>
+  @State private var cycle = 0
+
+  var body: some View {
+    Button("Show Timed Toast 013") {
+      cycle += 1
+      presented.value = true
+    }
+    .toast(
+      "reopen timer toast cycle \(cycle)",
+      isPresented: presented.binding(),
+      duration: 0.04
+    )
+  }
+}
