@@ -123,4 +123,20 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 007 missing removals leave cost and recency unchanged")
+  func cacheState007MissingRemovalsLeaveCostAndRecencyUnchanged() {
+    // Hypothesis: a miss on remove can accidentally advance or sever a recency anchor.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 2, bytes: 20)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(5), policy: policy)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(5), policy: policy)
+    for index in 0..<50 { cache.removeValue(forKey: "missing-\(index)") }
+    cache.upsert("c", value: 3, cost: stressCacheEntry(5), policy: policy)
+    #expect(cache.peek("a") == nil)
+    #expect(cache.peek("b") == 2)
+    #expect(cache.totalCost == .init(entries: 2, bytes: 10))
+  }
+}
+
 // NEXT CACHE STRESS TEST
