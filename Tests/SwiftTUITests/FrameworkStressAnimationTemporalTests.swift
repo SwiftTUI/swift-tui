@@ -315,3 +315,66 @@ private struct AnimationTemporal006View: View {
     }
   }
 }
+
+// MARK: - Attempt 007: nested transaction suppressor removal
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 007 removing inner suppressor restores outer transaction")
+  func animationTemporal007RemovingInnerSuppressorRestoresOuterTransaction() throws {
+    // Hypothesis: retained transaction snapshots can keep the inner disabled
+    // request after that modifier branch leaves the stable outer transaction.
+    let renderer = DefaultRenderer()
+    let animation = Animation.linear(duration: .seconds(4))
+    renderer.internalAnimationController.register(animation)
+    let identity = testIdentity("AnimationTemporal007", "Root")
+    let proposal = ProposedSize(width: 40, height: 5)
+
+    for generation in 0..<16 {
+      let suppressed = generation.isMultiple(of: 2)
+      let artifacts = renderer.render(
+        animationTemporal007View(suppressed: suppressed, animation: animation),
+        context: .init(identity: identity),
+        proposal: proposal
+      )
+      let payload = try #require(
+        animationTemporalDescendant(
+          in: artifacts.resolvedTree,
+          text: "animation temporal 007"
+        )
+      )
+      if suppressed {
+        #expect(payload.transactionSnapshot.animationRequest == .disabled)
+      } else {
+        #expect(payload.transactionSnapshot.animationRequest == .inherit)
+      }
+    }
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func animationTemporal007View(suppressed: Bool, animation: Animation) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    if suppressed {
+      Text("animation temporal 007")
+        .transaction { $0.disablesAnimations = true }
+        .id("animation-temporal-007-payload")
+    } else {
+      Text("animation temporal 007")
+        .id("animation-temporal-007-payload")
+    }
+  }
+  .transaction { $0.animation = animation }
+}
+
+private func animationTemporalDescendant(in node: ResolvedNode, text: String) -> ResolvedNode? {
+  if case .text(let value) = node.drawPayload, value == text {
+    return node
+  }
+  for child in node.children {
+    if let match = animationTemporalDescendant(in: child, text: text) {
+      return match
+    }
+  }
+  return nil
+}
