@@ -366,6 +366,45 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 010: eligibility restoration payload freshness
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 010 restored eligibility uses the current payload")
+  func popoverTip010RestoredEligibilityUsesCurrentPayload() throws {
+    // Hypothesis: while an ineligible tip emits no declaration, its retained
+    // trigger can miss payload changes and restore an older title or action.
+    let rootIdentity = testIdentity("PopoverTipStress010", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "eligibility-restoration"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.primaryPresented = true
+      model.isEligible = false
+      model.generation = generation
+      model.title = "Restored title \(generation)"
+      model.actions = [.init(id: "restore", title: "Restore action \(generation)")]
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      model.isEligible = true
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(frame.contains("Restored title \(generation)"))
+      #expect(frame.contains("Restore action \(generation)"))
+      #expect(!frame.contains("Restored title \(generation - 1)"))
+
+      _ = try harness.clickText("Restore action \(generation)", chooseLast: true)
+      #expect(model.actionLog.last == "restore@\(generation)")
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
