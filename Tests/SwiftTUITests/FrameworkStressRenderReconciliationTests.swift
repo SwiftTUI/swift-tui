@@ -1176,4 +1176,44 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 028: Accessibility-hidden subtree churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 028 accessibility hidden subtree leaves and returns")
+  func renderReconciliation028AccessibilityHiddenSubtreeLeavesAndReturns() {
+    // Hypothesis: a whole-subtree accessibilityHidden toggle can leave previously extracted
+    // descendants in retained semantics, or fail to reconstruct them when visibility returns.
+    struct Root: View {
+      let hidden: Bool
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Secret one").accessibilityRole(.button)
+          Text("Secret two").accessibilityRole(.heading(level: 2))
+        }
+        .accessibilityHidden(hidden)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation028")
+
+    for generation in 0..<18 {
+      let hidden = generation.isMultiple(of: 2)
+      let root = Root(hidden: hidden)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(retained.semanticSnapshot.accessibilityNodes.isEmpty == hidden)
+    }
+  }
+}
+
 // MARK: - End
