@@ -1538,3 +1538,27 @@ extension FrameworkStressFramePipelineTests {
     #expect(await token.waitUntilLeavesQueue() == .completed)
   }
 }
+
+// MARK: - Attempt 029: pre-cancelled observation is local
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 029 pre-cancelled observer leaves token startable")
+  func framePipeline029PreCancelledObserverLeavesTokenStartable() async {
+    // Hypothesis: a caller cancelled before observing the queued token can
+    // mutate shared state and prevent later start or terminal observation.
+    let token = FrameTailJobCancellationToken()
+    let cancelledObserver = Task { await token.waitUntilLeavesQueue() }
+
+    cancelledObserver.cancel()
+    #expect(await cancelledObserver.value == .queued)
+    #expect(token.currentState == .queued)
+
+    #expect(token.markStarted())
+    #expect(token.currentState == .started)
+    #expect(await token.waitUntilLeavesQueue() == .started)
+
+    token.markCompleted()
+    #expect(token.currentState == .completed)
+    #expect(await token.waitUntilLeavesQueue() == .completed)
+  }
+}
