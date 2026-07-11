@@ -238,4 +238,19 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 023 sparse palette overrides only supported indices")
+  func styleTransport023SparsePaletteOverridesOnlySupportedIndices() throws {
+    // Hypothesis: out-of-range palette keys can displace a valid sparse override.
+    let json =
+      ##"{"appearance":{"foregroundColor":"#112233","backgroundColor":"#445566","tintColor":"#778899","palette":{"-1":"#010101","4":"#abcdef","99":"#020202"},"colorSchemeContrast":"increased","source":"activeQuery"}}"##
+    let style = try #require(
+      TerminalRenderStyleCodec.decodeBase64(StyleTransportBase64.encode(Array(json.utf8)))
+    )
+    #expect(style.appearance.palette[4]?.hexString() == "#ABCDEF")
+    #expect(style.appearance.palette[0] == TerminalPalette.default[0])
+    #expect(style.appearance.palette[15] == TerminalPalette.default[15])
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
