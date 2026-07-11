@@ -743,6 +743,45 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 020: live source-frame relocation
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 020 tip follows its relocated source frame")
+  func popoverTip020TipFollowsRelocatedSourceFrame() throws {
+    // Hypothesis: HostedPopoverPresentation can consult a retained placed-frame
+    // table and leave the tip attached to a source's former location.
+    let rootIdentity = testIdentity("PopoverTipStress020", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "source-relocation"
+    model.title = "Relocated source tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = []
+    model.sourceWidth = 12
+    model.arrowEdge = .bottom
+    model.attachmentAnchor = .point(.center)
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for _ in 1...10 {
+      model.sourceOffset = 2
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let leftTip = try #require(harness.point(forText: "Relocated source tip"))
+
+      model.sourceOffset = 54
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let rightTip = try #require(harness.point(forText: "Relocated source tip"))
+
+      #expect(rightTip.x > leftTip.x + 30)
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
