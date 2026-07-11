@@ -354,3 +354,64 @@ private struct ToastLifecycle006Root: View {
     )
   }
 }
+
+// MARK: - Attempt 007: reminted source timer ownership
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 007 reminted source transfers timer ownership")
+  func toastLifecycle007RemintedSourceTransfersTimerOwnership() async throws {
+    // Hypothesis: replacing an active toast source with a newly identified source can leave the
+    // departed timer alive or fail to start the replacement source's dismissal task.
+    let bindingChanges = MainActorConditionSignal()
+    let first = ToastLifecycleBox(true, signal: bindingChanges)
+    let second = ToastLifecycleBox(true, signal: bindingChanges)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle007"),
+      size: .init(width: 66, height: 11)
+    ) {
+      ToastLifecycle007Root(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    let replaced = try harness.clickText("Remint Toast Source 007")
+    #expect(replaced.contains("replacement timer toast"))
+    #expect(!replaced.contains("original timer toast"))
+
+    await bindingChanges.wait {
+      !first.value || !second.value
+    }
+    _ = try harness.render()
+    #expect(first.value && !second.value)
+    #expect(toastLifecycleEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private struct ToastLifecycle007Root: View {
+  let first: ToastLifecycleBox<Bool>
+  let second: ToastLifecycleBox<Bool>
+  @State private var usesReplacement = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remint Toast Source 007") { usesReplacement = true }
+      if usesReplacement {
+        Text("replacement source")
+          .id("toast-lifecycle-007-replacement")
+          .toast(
+            "replacement timer toast",
+            isPresented: second.binding(),
+            duration: 0.06
+          )
+      } else {
+        Text("original source")
+          .id("toast-lifecycle-007-original")
+          .toast(
+            "original timer toast",
+            isPresented: first.binding(),
+            duration: 0.06
+          )
+      }
+    }
+  }
+}
