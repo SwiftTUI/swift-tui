@@ -626,3 +626,43 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 019: rich-run split and merge
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 019 rich runs publish current normalized topology")
+  func textContent019RichRunsPublishCurrentNormalizedTopology() {
+    // Hypothesis: retained rich-text extraction can preserve a prior normalized run partition when
+    // equal visible text alternates between merged and locally styled fragments.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .previewUnicode)
+    let rootIdentity = testIdentity("TextContent019")
+
+    for generation in 0..<20 {
+      let isSplit = generation.isMultiple(of: 2)
+      let content =
+        isSplit
+        ? Text("A\(Text("B").bold())C")
+        : Text("A\(Text("B"))C")
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 3, height: 1),
+        content: content
+      )
+
+      guard case .richText(let payload) = frames.retained.resolvedTree.drawPayload else {
+        Issue.record("Expected retained rich-text payload")
+        continue
+      }
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(payload.visibleText == "ABC")
+      #expect(payload.runs.count == (isSplit ? 3 : 1))
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains("ABC"))
+      #expect(frames.retained.semanticSnapshot.focusRegions.isEmpty)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.isEmpty)
+    }
+  }
+}
