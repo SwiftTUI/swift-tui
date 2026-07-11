@@ -1006,6 +1006,60 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 016: Same-ID payload changes refresh action captures
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 016 same id row action captures current payload")
+  func stateIdentity016SameIDRowActionCapturesCurrentPayload() throws {
+    // Hypothesis: entity routing preserves the row node while retained registration restore
+    // can keep the first action closure after non-identity item data changes.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity016"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity016Root()
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = 0
+    for generation in 0..<4 {
+      expectedTotal += generation + 1
+      var frame = try harness.clickText("Apply Amount 016")
+      #expect(frame.contains("016 Total \(expectedTotal)"))
+      frame = try harness.clickText("Advance Payload 016")
+      #expect(frame.contains("016 Amount \(generation + 2)"))
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+
+  private struct StateIdentity016Item: Identifiable {
+    let id: Int
+    let amount: Int
+  }
+
+  private struct StateIdentity016Root: View {
+    @State private var generation = 0
+    @State private var total = 0
+
+    private var items: [StateIdentity016Item] {
+      [.init(id: 1, amount: generation + 1)]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("016 Total \(total)")
+        Button("Advance Payload 016") { generation += 1 }
+        ForEach(items) { item in
+          VStack(alignment: .leading, spacing: 0) {
+            Text("016 Amount \(item.amount)")
+            Button("Apply Amount 016") { total += item.amount }
+          }
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
