@@ -405,6 +405,40 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 011: explicit presentation binding retarget
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 011 Escape writes the current presentation binding")
+  func popoverTip011EscapeWritesCurrentPresentationBinding() throws {
+    // Hypothesis: an active tip can retain the dismiss closure for the binding
+    // that first presented it after the stable modifier retargets.
+    let rootIdentity = testIdentity("PopoverTipStress011", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "binding-retarget"
+    model.title = "Binding retarget tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "dismiss", title: "Binding action")]
+    model.primaryPresented = true
+    model.secondaryPresented = true
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    model.usesSecondaryBinding = true
+    _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(model.primaryPresented)
+    #expect(!model.secondaryPresented)
+    #expect(!frame.contains("Binding retarget tip"))
+    #expect(popoverTipStressEntryCount(in: harness) == 0)
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
