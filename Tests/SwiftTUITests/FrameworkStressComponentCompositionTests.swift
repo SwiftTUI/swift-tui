@@ -464,4 +464,30 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 013: GroupBox prominence replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 013 GroupBox chrome follows current prominence")
+  func componentComposition013GroupBoxChromeFollowsCurrentProminence() {
+    // Hypothesis: chrome resolved inside nested EnvironmentReaders can retain the first prominence.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        GroupBox("box-\(generation)") { Text("payload") }
+          .controlProminence(generation.isMultiple(of: 2) ? .standard : .increased)
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition013")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.drawTree == frames.fresh.drawTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
