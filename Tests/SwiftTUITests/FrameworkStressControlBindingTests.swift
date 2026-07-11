@@ -266,3 +266,63 @@ private struct ControlStress005Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 006: duplicate-label toggle entity reorder
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 006 reordered duplicate toggles write by entity")
+  func stressControlBinding006ReorderedDuplicateTogglesWriteByEntity() throws {
+    // Hypothesis: Toggle action routes can follow occurrence order across a ForEach reorder and
+    // mutate the binding formerly displayed at that row rather than the current entity binding.
+    let probe = ControlStress006Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress006", "Root"),
+      size: .init(width: 50, height: 9)
+    ) {
+      ControlStress006Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reverse toggles 006")
+    _ = try harness.clickText("Duplicate toggle 006")
+    _ = try harness.clickText("Duplicate toggle 006", chooseLast: true)
+
+    #expect(probe.values == [1: true, 2: true])
+    #expect(probe.writtenIDs == [2, 1])
+  }
+}
+
+@MainActor
+private final class ControlStress006Probe {
+  var values = [1: false, 2: false]
+  var writtenIDs: [Int] = []
+
+  func binding(for id: Int) -> Binding<Bool> {
+    Binding(
+      get: { self.values[id, default: false] },
+      set: {
+        self.values[id] = $0
+        self.writtenIDs.append(id)
+      }
+    )
+  }
+}
+
+@MainActor
+private struct ControlStress006Fixture: View {
+  let probe: ControlStress006Probe
+  @State private var isReversed = false
+
+  private var values: [Int] {
+    isReversed ? [2, 1] : [1, 2]
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse toggles 006") { isReversed = true }
+      ForEach(values, id: \.self) { value in
+        Toggle("Duplicate toggle 006", isOn: probe.binding(for: value))
+      }
+    }
+  }
+}
