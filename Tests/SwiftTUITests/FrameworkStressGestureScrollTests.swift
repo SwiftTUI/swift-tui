@@ -932,3 +932,61 @@ private struct GestureScroll018Reader: View {
     }
   }
 }
+
+// MARK: - Attempt 019: reader command after position-binding replacement
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 019 reader command writes only the current binding")
+  func gestureScroll019ReaderCommandWritesOnlyCurrentBinding() throws {
+    // Hypothesis: ScrollViewReader may retain the registration closure for
+    // binding A after a stable ScrollView is re-authored against binding B.
+    let first = GestureScrollBox(ScrollPosition.zero)
+    let second = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll019Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      GestureScroll019Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Switch reader binding")
+    _ = try harness.clickText("Reader to bottom")
+
+    #expect(first.value == .zero)
+    #expect(harness.scrollPositionRegistrationCount == 1)
+    withKnownIssue("Reader commands lose the current binding after replacement") {
+      #expect(second.value.y == 9)
+    }
+  }
+}
+
+private struct GestureScroll019Fixture: View {
+  static let scrollIdentity = testIdentity("GestureScroll019", "Scroll")
+
+  let first: GestureScrollBox<ScrollPosition>
+  let second: GestureScrollBox<ScrollPosition>
+  @State private var usesSecond = false
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Switch reader binding") { usesSecond = true }
+          Button("Reader to bottom") { _ = proxy.scrollTo(edge: .bottom) }
+        }
+        ScrollView(
+          .vertical,
+          showsIndicators: false,
+          position: usesSecond ? second.binding() : first.binding()
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in Text("Reader binding row \(row)") }
+          }
+        }
+        .id(Self.scrollIdentity)
+        .frame(width: 30, height: 3, alignment: .topLeading)
+      }
+    }
+  }
+}
