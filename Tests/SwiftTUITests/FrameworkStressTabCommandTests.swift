@@ -548,3 +548,59 @@ private struct StressTC010Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 011: removed toolbar prefix ownership
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 011 removed toolbar prefix retargets trailing actions")
+  func stressTabCommand011RemovedToolbarPrefixRetargetsTrailingActions() throws {
+    // Hypothesis: removing the first preference contribution may leave C's
+    // surviving button identity bound to its former ordinal's B action.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC011", "Root"),
+      size: .init(width: 64, height: 10)
+    ) {
+      StressTC011Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Remove first tool")
+    _ = try harness.clickText("C tool")
+
+    #expect(probe.events == ["c"])
+    #expect(!harness.frame.contains("Prefix tool"))
+  }
+}
+
+@MainActor
+private struct StressTC011Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var hasPrefix = true
+
+  var body: some View {
+    Panel(id: "stress-tc-011-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Remove first tool") {
+          hasPrefix = false
+        }
+        if hasPrefix {
+          source("Prefix", marker: "prefix")
+        }
+        source("B", marker: "b")
+        source("C", marker: "c")
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 62, height: 8, alignment: .topLeading)
+  }
+
+  private func source(_ name: String, marker: String) -> some View {
+    Text("\(name) source")
+      .toolbarItem(
+        .init(title: "\(name) tool") {
+          probe.events.append(marker)
+        }
+      )
+  }
+}
