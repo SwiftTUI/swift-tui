@@ -682,3 +682,59 @@ private struct StressInput011Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 012: keyCommand isEnabled rebinding
+
+extension FrameworkStressInputRoutingTests {
+  @Test("keyCommand dispatch observes the current isEnabled value after churn")
+  func stressInputRouting012KeyCommandEnabledStateRebinds() throws {
+    // Hypothesis: the command table may restore a disabled descriptor over the
+    // freshly enabled registration for the same scope and binding.
+    let fired = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput012Root"),
+      size: .init(width: 48, height: 10)
+    ) {
+      StressInput012Fixture(fired: fired)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput012Fixture.focusIdentity)
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    #expect(fired.value == 0)
+
+    _ = try harness.clickText("Toggle command enabled")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput012Fixture.focusIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    #expect(fired.value == 1)
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+private struct StressInput012Fixture: View {
+  static let focusIdentity = testIdentity("StressInput012", "Focus")
+
+  let fired: StressInputBox<Int>
+  @State private var commandEnabled = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle command enabled") { commandEnabled.toggle() }
+      Panel(id: "stress-input-012-panel") {
+        Text("Command focus")
+          .id(Self.focusIdentity)
+          .focusable()
+      }
+      .keyCommand(
+        "Stress save",
+        key: .character("s"),
+        modifiers: .ctrl,
+        isEnabled: commandEnabled
+      ) {
+        fired.value += 1
+      }
+    }
+  }
+}
