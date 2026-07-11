@@ -1211,3 +1211,51 @@ private struct ObservationEffects020View: View {
       .id("observation-effects-020-source")
   }
 }
+
+// MARK: - Attempt 021: different preference-key observers on one owner
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 021 different preference keys keep independent registrations")
+  func observationEffects021DifferentPreferenceKeysKeepIndependentRegistrations() throws {
+    // Hypothesis: observer ordinal assignment can alias two key types attached
+    // to the same owner when both update during every committed frame.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects021"),
+      size: .init(width: 68, height: 7)
+    ) {
+      ObservationEffects021View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Two Preferences 021")
+      #expect(
+        probe.events.sorted()
+          == ["primary:\(generation)", "aux:\(100 + generation)"].sorted()
+      )
+      #expect(harness.preferenceObservationRegistrationCount == 2)
+    }
+  }
+}
+
+private struct ObservationEffects021View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Two Preferences 021") { generation += 1 }
+      Text("021 source \(generation)")
+        .preference(key: ObservationEffectsIntPreferenceKey.self, value: generation)
+        .preference(key: ObservationEffectsAuxIntPreferenceKey.self, value: 100 + generation)
+        .onPreferenceChange(ObservationEffectsIntPreferenceKey.self) { value in
+          probe.events.append("primary:\(value)")
+        }
+        .onPreferenceChange(ObservationEffectsAuxIntPreferenceKey.self) { value in
+          probe.events.append("aux:\(value)")
+        }
+    }
+  }
+}
