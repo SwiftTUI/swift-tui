@@ -1038,4 +1038,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 025: Layout-priority allocation churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 025 layout priority swaps scarce width allocation")
+  func renderReconciliation025LayoutPrioritySwapsScarceWidthAllocation() {
+    // Hypothesis: layoutPriority is a retained measurement input, but equal aggregate intrinsic
+    // sizes may let the HStack preserve its earlier per-child allocation after priorities swap.
+    struct Root: View {
+      let favorLeft: Bool
+
+      var body: some View {
+        HStack(spacing: 0) {
+          Text("LEFT").layoutPriority(favorLeft ? 1 : 0)
+          Text("RIGHT").layoutPriority(favorLeft ? 0 : 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation025")
+    let proposal = ProposedSize(width: 7, height: 1)
+
+    for generation in 0..<20 {
+      let root = Root(favorLeft: generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.placedTree == fresh.placedTree)
+    }
+  }
+}
+
 // MARK: - End
