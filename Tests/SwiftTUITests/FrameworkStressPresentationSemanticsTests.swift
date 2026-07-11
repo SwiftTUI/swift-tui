@@ -1136,6 +1136,46 @@ private struct StressPS025Fixture: View {
   }
 }
 
+// MARK: - Attempt 026: retained accessibility label refresh
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test(
+    "stress presentation semantics 026 a retained button publishes its current accessibility label")
+  func stress026RetainedButtonPublishesCurrentAccessibilityLabel() throws {
+    // Hypothesis: retained semantic extraction may preserve accessibility
+    // metadata from the committed node after only its explicit label changes.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS026", "Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      StressPS026Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Advance semantic label")
+    let labels = stressAccessibilityNodes(in: harness).compactMap(\.label)
+
+    #expect(labels.contains("Current semantic label 1"))
+    #expect(!labels.contains("Current semantic label 0"))
+  }
+}
+
+@MainActor
+private struct StressPS026Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance semantic label") {
+        generation += 1
+      }
+      Button("Visible target") {}
+        .id("semantic-target")
+        .accessibilityLabel("Current semantic label \(generation)")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
