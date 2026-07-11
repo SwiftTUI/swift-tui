@@ -1365,3 +1365,100 @@ private struct StressAF024Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 025: accessibility announcement capability churn
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 025 capability churn gates each announcement generation")
+  func stress025CapabilityChurnGatesEachAnnouncementGeneration() throws {
+    // Hypothesis: announcements suppressed while a host capability is absent can remain queued and
+    // replay after the capability returns, or a newly enabled generation can be dropped.
+    let surface = StressAF025Surface()
+    let rootIdentity = testIdentity("StressAF025", "Root")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: surface,
+      inputReader: StressAF025EmptyKeyReader(),
+      signalReader: StressAF025EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: focusTracker,
+      proposal: .init(width: 48, height: 7),
+      viewBuilder: { _, _ in StressAF025Fixture() }
+    )
+    focusTracker.invalidator = scheduler
+    AccessibilityAnnouncementStorage.currentSink = runLoop
+    defer {
+      AccessibilityAnnouncementStorage.currentSink = nil
+      runLoop.lifecycleCoordinator.shutdown()
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    for generation in 1...12 {
+      surface.semanticHostFrameCapabilities =
+        generation.isMultiple(of: 2) ? [.accessibilityAnnouncements] : []
+      let firstNewFrame = surface.frames.count
+      #expect(runLoop.handleKeyPress(KeyPress(.return)) == nil)
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+      let messages = surface.frames[firstNewFrame...].flatMap {
+        $0.semantics.accessibilityAnnouncements.map(\.message)
+      }
+      if generation.isMultiple(of: 2) {
+        #expect(messages == ["Capability message \(generation)"])
+      } else {
+        #expect(messages.isEmpty)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressAF025Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    Button("Publish capability announcement") {
+      generation += 1
+      AccessibilityAnnouncer.announce(
+        "Capability message \(generation)",
+        politeness: .assertive
+      )
+    }
+    .id(testIdentity("StressAF025", "Button"))
+  }
+}
+
+private final class StressAF025Surface: SemanticHostFramePresentationSurface {
+  let surfaceSize = CellSize(width: 48, height: 7)
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  var semanticHostFrameCapabilities: SemanticHostFrameCapabilities = []
+  private(set) var frames: [SemanticHostFrame] = []
+
+  @discardableResult
+  func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
+    frames.append(frame)
+    return PresentationMetrics(
+      linesTouched: frame.raster.size.height,
+      cellsChanged: frame.raster.size.width * frame.raster.size.height
+    )
+  }
+}
+
+private final class StressAF025EmptyKeyReader: InputReading {
+  func events() -> AsyncStream<KeyPress> {
+    AsyncStream { $0.finish() }
+  }
+}
+
+private final class StressAF025EmptySignalReader: SignalReading {
+  func events() -> AsyncStream<String> {
+    AsyncStream { $0.finish() }
+  }
+}
