@@ -105,6 +105,62 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 024: calendar timezone and identifier replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 024 calendar timezone replacement rebuckets boundary instants")
+  func chartData024CalendarTimezoneReplacementRebucketsBoundaryInstants() {
+    // Hypothesis: CalendarHeatmap can retain day positions derived from an old
+    // Calendar value when identical absolute instants cross local-day boundaries.
+    struct Root: View {
+      let generation: Int
+
+      var calendar: Calendar {
+        var result = Calendar(identifier: generation % 3 == 2 ? .iso8601 : .gregorian)
+        let identifier: String
+        switch generation % 3 {
+        case 0: identifier = "UTC"
+        case 1: identifier = "America/Los_Angeles"
+        default: identifier = "Asia/Tokyo"
+        }
+        result.timeZone = TimeZone(identifier: identifier)!
+        return result
+      }
+
+      var body: some View {
+        CalendarHeatmap(
+          "Timezone \(generation)",
+          days: [
+            .init(chartDataDate(day: 3, hour: 0), value: 3),
+            .init(chartDataDate(day: 3, hour: 23), value: 5),
+            .init(chartDataDate(day: 9, hour: 1), value: Double(7 + generation)),
+            .init(chartDataDate(day: 9, hour: 22), value: Double(11 + generation)),
+          ],
+          range: chartDataDate(day: 0)...chartDataDate(day: 20, hour: 23),
+          weekStart: generation.isMultiple(of: 2) ? .sunday : .monday,
+          calendar: calendar,
+          cellWidth: 2,
+          showsMonthHeader: false,
+          showsDayLabels: true,
+          showsScaleLegend: true,
+          tone: .info
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "024", proposal: .init(width: 58, height: 13)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Timezone \(generation)"))
+      #expect(text.contains("4 days"))
+      #expect(text.contains("Mon"))
+      #expect(text.contains("Less"))
+      #expect(chartDataAccessibilityLabels(snapshot).contains("Timezone \(generation): 4 days"))
+    }
+  }
+}
+
 // MARK: - Attempt 023: calendar range and chrome topology replacement
 
 extension FrameworkStressChartDataTests {
