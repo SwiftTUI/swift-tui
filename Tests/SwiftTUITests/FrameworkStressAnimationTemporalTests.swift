@@ -897,3 +897,60 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 018: partial multi-slot batch supersession
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 018 completion waits for surviving slot after supersession")
+  func animationTemporal018CompletionWaitsForSurvivingSlotAfterSupersession() throws {
+    // Hypothesis: superseding one record can release the shared batch as if all
+    // of its independently animated property slots had drained.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal018", "Leaf")
+    let batch = AnimationBatchID(18)
+    let fired = Atomic<Int>(0)
+    controller.registerCompletion(batchID: batch) {
+      fired.wrappingAdd(1, ordering: .relaxed)
+    }
+    let start = MonotonicInstant(offset: .seconds(70))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0, padding: .zero),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batch
+    let target = animationTemporalNode(
+      identity: identity,
+      opacity: 1,
+      padding: EdgeInsets(all: 6)
+    )
+    controller.processResolvedTree(target, transaction: transaction, timestamp: start)
+    #expect(controller.activeAnimationCount == 2)
+
+    let superseding = animationTemporalNode(
+      identity: identity,
+      opacity: 0.4,
+      padding: EdgeInsets(all: 6)
+    )
+    var disabled = TransactionSnapshot()
+    disabled.animationRequest = .disabled
+    controller.processResolvedTree(
+      superseding,
+      transaction: disabled,
+      timestamp: start.advanced(by: .milliseconds(100))
+    )
+    #expect(fired.load(ordering: .relaxed) == 0)
+    #expect(controller.activeAnimationCount == 1)
+
+    var finalTree = superseding
+    _ = controller.applyInterpolations(
+      to: &finalTree,
+      at: start.advanced(by: .seconds(1))
+    )
+    #expect(fired.load(ordering: .relaxed) == 1)
+    #expect(controller.activeAnimationCount == 0)
+  }
+}
