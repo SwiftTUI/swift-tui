@@ -820,3 +820,55 @@ private struct GestureScroll016Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 017: target relocation between commands
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 017 relocated target replaces its old scroll rect")
+  func gestureScroll017RelocatedTargetReplacesOldScrollRect() throws {
+    // Hypothesis: a stable explicit target ID may retain its old placement
+    // after moving earlier in the collection, sending the next command downward.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll017Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      GestureScroll017Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reveal moving target")
+    #expect(position.value.y == 6)
+    _ = try harness.clickText("Move target earlier")
+    _ = try harness.clickText("Reveal moving target")
+
+    #expect(position.value.y == 0)
+  }
+}
+
+private struct GestureScroll017Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+  @State private var targetRow = 9
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Move target earlier") { targetRow = 2 }
+          Button("Reveal moving target") {
+            _ = proxy.scrollTo("moving-target", anchor: .bottom)
+          }
+        }
+        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in
+              Text("Moving target row \(row)")
+                .id(row == targetRow ? "moving-target" : "moving-row-\(row)")
+            }
+          }
+        }
+        .frame(width: 30, height: 4, alignment: .topLeading)
+      }
+    }
+  }
+}
