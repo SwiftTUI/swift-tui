@@ -1259,3 +1259,58 @@ private struct ObservationEffects021View: View {
     }
   }
 }
+
+// MARK: - Attempt 022: collection preference reduction after reorder
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 022 collection preference reduction follows entity reorder")
+  func observationEffects022CollectionPreferenceReductionFollowsEntityReorder() throws {
+    // Hypothesis: retained ForEach nodes can be traversed in their prior order
+    // while reducing fresh preferences from a reordered entity collection.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects022"),
+      size: .init(width: 68, height: 9)
+    ) {
+      ObservationEffects022View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Reorder Preference Rows 022")
+      let expected = generation.isMultiple(of: 2) ? "[1, 2, 3]" : "[3, 2, 1]"
+      #expect(frame.contains("022 reduced \(expected)"))
+    }
+  }
+}
+
+private struct ObservationEffects022Item: Identifiable {
+  let id: Int
+}
+
+private struct ObservationEffects022View: View {
+  @State private var generation = 0
+
+  private var items: [ObservationEffects022Item] {
+    let ids = generation.isMultiple(of: 2) ? [1, 2, 3] : [3, 2, 1]
+    return ids.map(ObservationEffects022Item.init(id:))
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Preference Rows 022") { generation += 1 }
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(items) { item in
+          Text("row \(item.id)")
+            .preference(key: ObservationEffectsListPreferenceKey.self, value: [item.id])
+        }
+      }
+      .frame(width: 64, height: 4, alignment: .topLeading)
+      .overlayPreferenceValue(
+        ObservationEffectsListPreferenceKey.self,
+        alignment: .bottomLeading
+      ) { value in
+        Text("022 reduced \(value)")
+      }
+    }
+  }
+}
