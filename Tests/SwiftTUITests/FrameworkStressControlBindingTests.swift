@@ -1115,3 +1115,54 @@ private struct ControlStress023Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 024: standalone link destination replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 024 standalone link opens its replacement destination")
+  func stressControlBinding024StandaloneLinkOpensReplacementDestination() throws {
+    // Hypothesis: a same-label standalone Link can redraw hyperlink cells for a new destination
+    // while its stable activation registration continues opening the original destination.
+    let opened = ControlStressProbe<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress024", "Root"),
+      size: .init(width: 58, height: 8)
+    ) {
+      ControlStress024Fixture(opened: opened)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace link destination 024")
+    _ = try harness.clickText("Stable standalone link 024")
+
+    #expect(opened.value == ["https://replacement.example/024"])
+  }
+}
+
+@MainActor
+private struct ControlStress024Fixture: View {
+  let opened: ControlStressProbe<[String]>
+  @State private var usesReplacement = false
+
+  private var destination: LinkDestination {
+    LinkDestination(
+      usesReplacement
+        ? "https://replacement.example/024"
+        : "https://original.example/024"
+    )
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace link destination 024") { usesReplacement = true }
+      Link("Stable standalone link 024", destination: destination)
+        .id("stable-link-024")
+    }
+    .openLinkAction(
+      OpenLinkAction { destination in
+        opened.value.append(destination.rawValue)
+        return true
+      }
+    )
+  }
+}
