@@ -1591,6 +1591,70 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 024: ForEach entity routes through AnyView hosting
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 024 anyview foreach reorder preserves row state")
+  func stateIdentity024AnyViewForEachReorderPreservesRowState() throws {
+    // Hypothesis: AnyView suppresses host-escaping entity claims at its payload boundary, so
+    // moving ForEach rows beneath it can lose the route that carries row-local state.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity024"),
+      size: .init(width: 60, height: 12)
+    ) {
+      StateIdentity024Root()
+    }
+    defer { harness.shutdown() }
+
+    for expected in 1...4 {
+      var frame = try harness.clickText("Increment Any Row 1 024")
+      #expect(frame.contains("024 Any Row 1 Count \(expected)"))
+      frame = try harness.clickText("Reverse Any Rows 024")
+      #expect(frame.contains("024 Any Row 1 Count \(expected)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity024Root: View {
+    @State private var isReversed = false
+
+    private var values: [Int] {
+      isReversed ? [3, 2, 1] : [1, 2, 3]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reverse Any Rows 024") { isReversed.toggle() }
+        AnyView(StateIdentity024Rows(values: values))
+      }
+    }
+  }
+
+  private struct StateIdentity024Rows: View {
+    let values: [Int]
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(values, id: \.self) { value in
+          StateIdentity024Row(value: value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity024Row: View {
+    let value: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("024 Any Row \(value) Count \(count)")
+        Button("Increment Any Row \(value) 024") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
