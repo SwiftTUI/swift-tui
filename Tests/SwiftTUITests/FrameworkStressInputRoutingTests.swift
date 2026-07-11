@@ -94,3 +94,66 @@ private struct StressInput001Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 002: reverse traversal through a self-disabling target
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Shift-Tab continues backward when its landing target disables itself")
+  func stressInputRouting002ReverseTraversalContinuesPastDisabledTarget() throws {
+    // Hypothesis: reverse traversal may be re-seated forward when the region
+    // reached by Shift-Tab removes itself during focus synchronization.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput002Root"),
+      size: .init(width: 36, height: 10)
+    ) {
+      StressInput002Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput002Fixture.dIdentity)
+    _ = try harness.pressKey(KeyPress(.tab, modifiers: .shift))
+
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == StressInput002Fixture.aIdentity)
+  }
+}
+
+private enum StressInput002Field: Hashable {
+  case a
+  case b
+  case c
+  case d
+}
+
+private struct StressInput002Fixture: View {
+  static let aIdentity = testIdentity("StressInput002", "A")
+  static let bIdentity = testIdentity("StressInput002", "B")
+  static let cIdentity = testIdentity("StressInput002", "C")
+  static let dIdentity = testIdentity("StressInput002", "D")
+
+  @FocusState private var focusedField: StressInput002Field?
+  @State private var disablesMiddlePair = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse A") {}
+        .id(Self.aIdentity)
+        .focused($focusedField, equals: .a)
+      Button("Reverse B") {}
+        .id(Self.bIdentity)
+        .focused($focusedField, equals: .b)
+        .disabled(disablesMiddlePair)
+      Button("Reverse C") {}
+        .id(Self.cIdentity)
+        .focused($focusedField, equals: .c)
+        .disabled(disablesMiddlePair)
+      Button("Reverse D") {}
+        .id(Self.dIdentity)
+        .focused($focusedField, equals: .d)
+    }
+    .onChange(of: focusedField) { _, next in
+      if next == .c {
+        disablesMiddlePair = true
+      }
+    }
+  }
+}
