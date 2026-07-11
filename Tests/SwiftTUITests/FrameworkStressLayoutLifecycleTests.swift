@@ -692,3 +692,91 @@ private struct StressLL011Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 012: navigation declaration order churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 012 reordered active destinations keep last-wins pop routing")
+  func stress012ReorderedActiveDestinationsKeepLastWinsPopRouting() throws {
+    // Hypothesis: retained destination preferences may preserve the old
+    // declaration order or pop closure after stable sources reorder.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL012", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressLL012Fixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("visible destination B"))
+    for generation in 1...6 {
+      let frame = try harness.clickText("Reverse Destination Order")
+      let expected = generation.isMultiple(of: 2) ? "B" : "A"
+      #expect(frame.contains("visible destination \(expected)"))
+    }
+
+    let popped = try harness.clickText("Close B")
+    #expect(popped.contains("visible destination A"))
+    #expect(!popped.contains("visible destination B"))
+  }
+}
+
+@MainActor
+private struct StressLL012Fixture: View {
+  @State private var firstActive = true
+  @State private var secondActive = true
+  @State private var reversed = false
+
+  var body: some View {
+    NavigationStack(id: "stress-012-navigation") {
+      VStack(alignment: .leading, spacing: 0) {
+        if reversed {
+          secondSource
+          firstSource
+        } else {
+          firstSource
+          secondSource
+        }
+      }
+    }
+  }
+
+  private var firstSource: some View {
+    Text("source A")
+      .id("source-a")
+      .navigationDestination(isPresented: $firstActive) {
+        StressLL012Destination(
+          label: "A",
+          reversed: $reversed,
+          isPresented: $firstActive
+        )
+      }
+  }
+
+  private var secondSource: some View {
+    Text("source B")
+      .id("source-b")
+      .navigationDestination(isPresented: $secondActive) {
+        StressLL012Destination(
+          label: "B",
+          reversed: $reversed,
+          isPresented: $secondActive
+        )
+      }
+  }
+}
+
+@MainActor
+private struct StressLL012Destination: View {
+  let label: String
+  @Binding var reversed: Bool
+  @Binding var isPresented: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("visible destination \(label)")
+      Button("Reverse Destination Order") { reversed.toggle() }
+      Button("Close \(label)") { isPresented = false }
+    }
+  }
+}
