@@ -673,4 +673,50 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 016: Equal-width draw-only text churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 016 equal width text updates amid retained siblings")
+  func renderReconciliation016EqualWidthTextUpdatesAmidRetainedSiblings() {
+    // Hypothesis: measurement-equivalent text payloads intentionally reuse geometry, but retained
+    // DrawNode substitution may then preserve the first glyphs under a current resolved payload.
+    struct Root: View {
+      let value: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Stable header").id("render-reconciliation-016-header")
+          Text(value).id("render-reconciliation-016-value")
+          Text("Stable footer").id("render-reconciliation-016-footer")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation016")
+    let values = ["ALPHA", "BRAVO", "CHARL", "DELTA"]
+
+    for generation in 0..<24 {
+      let value = values[generation % values.count]
+      let root = Root(value: value)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(renderStressText(retained).contains(value))
+      #expect(
+        retained.rasterSurface
+          == DefaultRenderer().render(
+            root,
+            context: .init(identity: rootIdentity)
+          ).rasterSurface
+      )
+    }
+  }
+}
+
 // MARK: - End
