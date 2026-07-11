@@ -617,3 +617,48 @@ private struct ObservationEffects010View: View {
     }
   }
 }
+
+// MARK: - Attempt 011: transformEnvironment closure freshness
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 011 transformEnvironment applies its current captured payload")
+  func observationEffects011TransformEnvironmentAppliesCurrentPayload() throws {
+    // Hypothesis: retained modifier resolution can reuse the first transform
+    // closure even as the captured generation changes on a stable owner.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects011"),
+      size: .init(width: 62, height: 6)
+    ) {
+      ObservationEffects011View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Advance Transform 011")
+      #expect(frame.contains("011 value base|transform-\(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects011Reader: View {
+  @Environment(\.observationEffectsString) private var value
+
+  var body: some View {
+    Text("011 value \(value)")
+  }
+}
+
+private struct ObservationEffects011View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Transform 011") { generation += 1 }
+      ObservationEffects011Reader()
+        .transformEnvironment(\.observationEffectsString) { value in
+          value += "|transform-\(generation)"
+        }
+    }
+    .environment(\.observationEffectsString, "base")
+  }
+}
