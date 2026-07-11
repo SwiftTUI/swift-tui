@@ -923,3 +923,69 @@ private struct CollectionLayout015Root: View {
     .frame(width: 20, height: 4, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 016: scroll offset after lazy shrink
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 016 lazy shrink clamps retained scroll offset")
+  func collectionLayout016LazyShrinkClampsRetainedScrollOffset() {
+    // Hypothesis: ScrollViewLayout may reuse the large collection's content
+    // bounds and place a shrunken lazy source at an unreachable stale offset.
+    let position = CollectionLayout016ScrollBox()
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout016")
+
+    for generation in 0..<20 {
+      let count = generation.isMultiple(of: 2) ? 20 : 4
+      position.value = .init(x: 0, y: 14)
+      let root = CollectionLayout016Root(count: count, position: position)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 4)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 4)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      let expectedFirst = count == 4 ? "016 row 0" : "016 row 14"
+      #expect(retained.rasterSurface.lines.first == expectedFirst)
+    }
+  }
+}
+
+@MainActor
+private final class CollectionLayout016ScrollBox {
+  var value = ScrollPosition.zero
+}
+
+@MainActor
+private struct CollectionLayout016Root: View {
+  let count: Int
+  let position: CollectionLayout016ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { position.value },
+        set: { position.value = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<count) { value in
+          Text("016 row \(value)")
+        }
+      }
+    }
+    .frame(width: 16, height: 4, alignment: .topLeading)
+  }
+}
