@@ -1176,6 +1176,59 @@ private struct StressPS026Fixture: View {
   }
 }
 
+// MARK: - Attempt 027: accessibility-hidden subtree churn
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test(
+    "stress presentation semantics 027 accessibility hidden prunes and restores current semantics")
+  func stress027AccessibilityHiddenPrunesAndRestoresCurrentSemantics() throws {
+    // Hypothesis: the retained semantic snapshot may either leak descendants
+    // while hidden or restore their pre-hidden metadata when they return.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS027", "Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      StressPS027Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Hide semantic subtree")
+    var labels = stressAccessibilityNodes(in: harness).compactMap(\.label)
+    #expect(!labels.contains("Hidden subtree label 0"))
+
+    _ = try harness.clickText("Advance hidden payload")
+    _ = try harness.clickText("Show semantic subtree")
+    labels = stressAccessibilityNodes(in: harness).compactMap(\.label)
+    #expect(labels.contains("Hidden subtree label 1"))
+    #expect(!labels.contains("Hidden subtree label 0"))
+  }
+}
+
+@MainActor
+private struct StressPS027Fixture: View {
+  @State private var isHidden = false
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Hide semantic subtree") {
+          isHidden = true
+        }
+        Button("Advance hidden payload") {
+          generation += 1
+        }
+        Button("Show semantic subtree") {
+          isHidden = false
+        }
+      }
+      Button("Semantic child") {}
+        .accessibilityLabel("Hidden subtree label \(generation)")
+        .accessibilityHidden(isHidden)
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
