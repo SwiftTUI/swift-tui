@@ -1290,3 +1290,53 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 024: simultaneous sibling removal overlays
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 024 sibling removal overlays drain independently")
+  func animationTemporal024SiblingRemovalOverlaysDrainIndependently() throws {
+    // Hypothesis: two removals sharing one surviving parent can overwrite one
+    // another in the removal map or injection partition.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal024", "Root")
+    let firstID = testIdentity("AnimationTemporal024", "First")
+    let secondID = testIdentity("AnimationTemporal024", "Second")
+    let firstNodeID = ViewNodeID(rawValue: 241)
+    let secondNodeID = ViewNodeID(rawValue: 242)
+    let start = MonotonicInstant(offset: .seconds(120))
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: firstID, viewNodeID: firstNodeID, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: secondID, viewNodeID: secondNodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [
+          animationTemporalNode(identity: firstID, viewNodeID: firstNodeID),
+          animationTemporalNode(identity: secondID, viewNodeID: secondNodeID),
+        ]
+      ),
+      transaction: .init(),
+      timestamp: start
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    var removed = animationTemporalRoot(identity: rootID)
+    controller.processResolvedTree(removed, transaction: transaction, timestamp: start)
+    #expect(controller.debugStateSnapshot().removingNodeIDs.count == 2)
+
+    _ = controller.applyInterpolations(
+      to: &removed,
+      at: start.advanced(by: .seconds(1))
+    )
+    #expect(controller.debugStateSnapshot().removingNodeIDs.isEmpty)
+  }
+}
+
