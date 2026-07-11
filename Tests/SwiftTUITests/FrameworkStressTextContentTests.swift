@@ -230,3 +230,33 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 007: blank-line truncation target
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 007 blank lines truncate the current visible line")
+  func textContent007BlankLinesTruncateCurrentVisibleLine() {
+    // Hypothesis: explicit empty lines can shift the retained line-limit truncation indicator onto
+    // a formerly visible nonempty line after newline topology churn.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent007")
+
+    for generation in 0..<20 {
+      let content = generation.isMultiple(of: 2) ? "AA\n\nCC DD" : "AA BB\n\nCC"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 4, height: nil),
+        content: Text(content)
+          .lineLimit(2)
+          .textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.count == 2)
+      #expect(frames.retained.rasterSurface.lines[1].contains("…"))
+    }
+  }
+}
