@@ -1156,7 +1156,8 @@ extension FrameworkStressVisualEffectsTests {
         generation: generation
       )
       let fresh = visualEffectsFreshFrame(root, identity: identity)
-      let expected: [DrawEffect] = generation.isMultiple(of: 2)
+      let expected: [DrawEffect] =
+        generation.isMultiple(of: 2)
         ? [.blendMode(.multiply), .compositingGroup]
         : [.compositingGroup, .blendMode(.multiply)]
 
@@ -1234,13 +1235,17 @@ extension FrameworkStressVisualEffectsTests {
       var style: BorderEdgeStyle {
         switch generation % 4 {
         case 0:
-          BorderEdgeStyle(top: Color.red, right: Color.green, bottom: Color.blue, left: Color.yellow)
+          BorderEdgeStyle(
+            top: Color.red, right: Color.green, bottom: Color.blue, left: Color.yellow)
         case 1:
-          BorderEdgeStyle(top: Color.yellow, right: Color.red, bottom: Color.green, left: Color.blue)
+          BorderEdgeStyle(
+            top: Color.yellow, right: Color.red, bottom: Color.green, left: Color.blue)
         case 2:
-          BorderEdgeStyle(top: Color.blue, right: Color.yellow, bottom: Color.red, left: Color.green)
+          BorderEdgeStyle(
+            top: Color.blue, right: Color.yellow, bottom: Color.red, left: Color.green)
         default:
-          BorderEdgeStyle(top: Color.green, right: Color.blue, bottom: Color.yellow, left: Color.red)
+          BorderEdgeStyle(
+            top: Color.green, right: Color.blue, bottom: Color.yellow, left: Color.red)
         }
       }
 
@@ -1632,16 +1637,18 @@ extension FrameworkStressVisualEffectsTests {
       )
       let fresh = visualEffectsFreshFrame(root, identity: identity)
       let attachment = try #require(retained.rasterSurface.imageAttachments.first)
-      let expectedMode: ImageScalingMode = switch generation % 3 {
-      case 0: .stretch
-      case 1: .fit
-      default: .fill
-      }
-      let expectedSize: CellSize = switch expectedMode {
-      case .stretch: CellSize(width: 6, height: 2)
-      case .fit: CellSize(width: 4, height: 2)
-      case .fill: CellSize(width: 6, height: 3)
-      }
+      let expectedMode: ImageScalingMode =
+        switch generation % 3 {
+        case 0: .stretch
+        case 1: .fit
+        default: .fill
+        }
+      let expectedSize: CellSize =
+        switch expectedMode {
+        case .stretch: CellSize(width: 6, height: 2)
+        case .fit: CellSize(width: 4, height: 2)
+        case .fill: CellSize(width: 6, height: 3)
+        }
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
       #expect(attachment.scalingMode == expectedMode)
@@ -1853,6 +1860,92 @@ extension FrameworkStressVisualEffectsTests {
       }
       previousSurface = retained.rasterSurface
       previousAttachment = currentAttachment
+    }
+  }
+}
+
+// MARK: - Attempt 033: compositing-effect topology damage
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 033 effect topology damages old and current layers")
+  func visualEffects033EffectTopologyDamagesOldAndCurrentLayers() throws {
+    // Hypothesis: RasterSurfaceDamageDiff can compare collapsed cells as equal enough to miss a
+    // changed presentation-layer BlendMode, failing to replay old and current composited bounds.
+    struct Root: View {
+      let generation: Int
+
+      var mode: BlendMode {
+        switch generation % 3 {
+        case 0: .multiply
+        case 1: .screen
+        default: .overlay
+        }
+      }
+
+      var body: some View {
+        Rectangle()
+          .fill(Color.blue.opacity(0.7))
+          .frame(width: 20, height: 8)
+          .overlay {
+            RoundedRectangle(cornerRadius: 2)
+              .fill(Color.red.opacity(0.55))
+              .frame(width: 13, height: 6)
+              .blendMode(mode)
+          }
+      }
+    }
+
+    func damage(_ damage: PresentationDamage, covers rect: CellRect) -> Bool {
+      guard rect.size.width > 0, rect.size.height > 0 else {
+        return true
+      }
+      for row in rect.origin.y..<(rect.origin.y + rect.size.height) {
+        guard let ranges = damage.columnRanges(for: row) else {
+          return false
+        }
+        if ranges.isEmpty {
+          continue
+        }
+        for column in rect.origin.x..<(rect.origin.x + rect.size.width) {
+          if !ranges.contains(where: { $0.contains(column) }) {
+            return false
+          }
+        }
+      }
+      return true
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects033")
+    var previousSurface: RasterSurface?
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      if let previousSurface {
+        let diff = try #require(
+          RasterSurfaceDamageDiff.diff(
+            previous: previousSurface,
+            current: retained.rasterSurface
+          )
+        )
+        let affectedLayers =
+          previousSurface.presentationLayers.filter { !$0.effects.isEmpty }
+          + retained.rasterSurface.presentationLayers.filter { !$0.effects.isEmpty }
+        #expect(!affectedLayers.isEmpty)
+        for layer in affectedLayers {
+          #expect(damage(diff, covers: layer.bounds))
+        }
+      }
+      previousSurface = retained.rasterSurface
     }
   }
 }
