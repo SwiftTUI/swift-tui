@@ -284,4 +284,19 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 017 three truncation modes retain independent entries")
+  func cacheState017ThreeTruncationModesRetainIndependentEntries() {
+    // Hypothesis: revisiting a mode after two siblings can return the last computed truncation.
+    let cache = TextLayoutCache(capacity: 4)
+    let content = "abcdefghijk"
+    let head = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head))
+    let middle = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .middle))
+    let tail = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .tail))
+    #expect(Set([head.lines[0].text, middle.lines[0].text, tail.lines[0].text]).count == 3)
+    #expect(cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head)) == head)
+    #expect(cache.metrics.entries == 3)
+  }
+}
+
 // NEXT CACHE STRESS TEST
