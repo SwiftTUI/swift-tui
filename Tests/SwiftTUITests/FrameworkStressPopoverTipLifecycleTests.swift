@@ -665,6 +665,45 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 018: attachment-point replacement
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 018 attachment point follows current source geometry")
+  func popoverTip018AttachmentPointFollowsCurrentSourceGeometry() throws {
+    // Hypothesis: a stable popover item can retain the first attachment anchor
+    // even though the current source frame and preferred edge are unchanged.
+    let rootIdentity = testIdentity("PopoverTipStress018", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "attachment-point"
+    model.title = "Attachment point tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = []
+    model.sourceOffset = 10
+    model.sourceWidth = 40
+    model.arrowEdge = .bottom
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for _ in 1...10 {
+      model.attachmentAnchor = .point(.leading)
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let leading = try #require(harness.point(forText: "Attachment point tip"))
+
+      model.attachmentAnchor = .point(.trailing)
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let trailing = try #require(harness.point(forText: "Attachment point tip"))
+
+      #expect(trailing.x > leading.x)
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
