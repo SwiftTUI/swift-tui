@@ -1114,3 +1114,61 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 025: environment resolver output-mode churn
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 025 conflicting environment modes never inherit prior implications")
+  func sceneHost025ConflictingEnvironmentModesNeverInheritPriorImplications() {
+    // Hypothesis: repeated resolution can carry accessible-mode implications
+    // into later JSON, plain, or explicitly re-enabled TUI configurations.
+    let base = ["TERM": "xterm-256color", "LANG": "en_US.UTF-8"]
+
+    for generation in 0..<24 {
+      let environment: [String: String]
+      let expected: RuntimeConfiguration
+      switch generation % 4 {
+      case 0:
+        environment = base.merging([
+          "SWIFTTUI_ACCESSIBLE": "1",
+          "SWIFTTUI_JSON": "1",
+          "SWIFTTUI_PLAIN": "1",
+          "SWIFTTUI_REDUCE_MOTION": "0",
+          "SWIFTTUI_NO_PROGRESS": "0",
+        ]) { _, new in new }
+        expected = .init(
+          color: .never,
+          glyphs: .ascii,
+          motion: .reduced,
+          output: .json
+        )
+      case 1:
+        environment = base.merging([
+          "SWIFTTUI_ACCESSIBLE": "1",
+          "SWIFTTUI_REDUCE_MOTION": "0",
+          "SWIFTTUI_NO_PROGRESS": "0",
+        ]) { _, new in new }
+        expected = .init(
+          color: .auto,
+          glyphs: .ascii,
+          motion: .reduced,
+          output: .accessible,
+          noProgress: true,
+          linear: true
+        )
+      case 2:
+        environment = base.merging([
+          "CI": "true",
+          "SWIFTTUI_REDUCE_MOTION": "0",
+          "SWIFTTUI_NO_PROGRESS": "0",
+        ]) { _, new in new }
+        expected = .default
+      default:
+        environment = base.merging(["SWIFTTUI_PLAIN": "1"]) { _, new in new }
+        expected = .init(color: .never, glyphs: .ascii, motion: .reduced)
+      }
+
+      #expect(RuntimeConfiguration.detect(environment: environment, isStdoutTTY: true) == expected)
+    }
+  }
+}
