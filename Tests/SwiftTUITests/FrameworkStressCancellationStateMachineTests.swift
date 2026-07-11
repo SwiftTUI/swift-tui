@@ -259,4 +259,20 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 017 oldest buffering retains exact prefix")
+  func cancellationState017OldestBufferingRetainsExactPrefix() async {
+    // Hypothesis: finish can replace retained oldest values with later rejected yields.
+    let stream = makeManagedAsyncStream(bufferingPolicy: .bufferingOldest(3)) {
+      (continuation: AsyncStream<Int>.Continuation) in
+      for value in 0..<10 { continuation.yield(value) }
+      continuation.finish()
+      return { _ in }
+    }
+    var values: [Int] = []
+    for await value in stream { values.append(value) }
+    #expect(values == [0, 1, 2])
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
