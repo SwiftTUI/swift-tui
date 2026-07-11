@@ -470,3 +470,94 @@ private final class ObservationEffects008Model {
   var isVisible = true
   var value = 0
 }
+
+// MARK: - Attempt 009: targeted environment-writer insertion and removal
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 009 a conditional writer stays isolated to its reader")
+  func observationEffects009ConditionalWriterStaysIsolatedToReader() throws {
+    // Hypothesis: inserting a writer around one stable reader can contaminate
+    // a sibling snapshot or leave the override behind after removal.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects009"),
+      size: .init(width: 62, height: 8)
+    ) {
+      ObservationEffects009View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      var frame = try harness.clickText("Toggle Writer 009")
+      #expect(frame.contains("009 targeted override-\(generation - 1)"))
+      #expect(frame.contains("009 sibling base-\(generation - 1)"))
+
+      frame = try harness.clickText("Advance Environment 009")
+      #expect(frame.contains("009 targeted override-\(generation)"))
+      #expect(frame.contains("009 sibling base-\(generation)"))
+
+      frame = try harness.clickText("Toggle Writer 009")
+      #expect(frame.contains("009 targeted base-\(generation)"))
+      #expect(frame.contains("009 sibling base-\(generation)"))
+    }
+  }
+}
+
+private enum ObservationEffectsStringEnvironmentKey: EnvironmentKey {
+  static let defaultValue = "default"
+}
+
+private enum ObservationEffectsIntEnvironmentKey: EnvironmentKey {
+  static let defaultValue = -1
+}
+
+private enum ObservationEffectsAuxEnvironmentKey: EnvironmentKey {
+  static let defaultValue = "aux-default"
+}
+
+extension EnvironmentValues {
+  fileprivate var observationEffectsString: String {
+    get { self[ObservationEffectsStringEnvironmentKey.self] }
+    set { self[ObservationEffectsStringEnvironmentKey.self] = newValue }
+  }
+
+  fileprivate var observationEffectsInt: Int {
+    get { self[ObservationEffectsIntEnvironmentKey.self] }
+    set { self[ObservationEffectsIntEnvironmentKey.self] = newValue }
+  }
+
+  fileprivate var observationEffectsAux: String {
+    get { self[ObservationEffectsAuxEnvironmentKey.self] }
+    set { self[ObservationEffectsAuxEnvironmentKey.self] = newValue }
+  }
+}
+
+private struct ObservationEffects009Reader: View {
+  let label: String
+  @Environment(\.observationEffectsString) private var value
+
+  var body: some View {
+    Text("009 \(label) \(value)")
+  }
+}
+
+private struct ObservationEffects009View: View {
+  @State private var generation = 0
+  @State private var usesWriter = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Writer 009") { usesWriter.toggle() }
+      Button("Advance Environment 009") { generation += 1 }
+      if usesWriter {
+        ObservationEffects009Reader(label: "targeted")
+          .environment(\.observationEffectsString, "override-\(generation)")
+          .id("observation-effects-009-target")
+      } else {
+        ObservationEffects009Reader(label: "targeted")
+          .id("observation-effects-009-target")
+      }
+      ObservationEffects009Reader(label: "sibling")
+    }
+    .environment(\.observationEffectsString, "base-\(generation)")
+  }
+}
