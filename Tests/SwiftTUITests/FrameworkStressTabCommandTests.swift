@@ -328,3 +328,57 @@ private struct StressTC006Fixture: View {
     .frame(width: 24, height: 10, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 007: expanded overflow reorder
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 007 expanded overflow routes follow hidden reorder")
+  func stressTabCommand007ExpandedOverflowRoutesFollowHiddenReorder() throws {
+    // Hypothesis: expanded-menu pointer routes may retain their pre-reorder
+    // option closures while the menu labels redraw in the new hidden order.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC007", "Root"),
+      size: .init(width: 24, height: 11)
+    ) {
+      StressTC007Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("▾")
+    _ = try harness.pressKey(KeyPress(.character("r"), modifiers: .ctrl))
+    let frame = try harness.clickText("Four")
+
+    withKnownIssue("Reordered overflow label Four remains bound to the old Three route") {
+      #expect(frame.contains("Four active content"))
+      #expect(!frame.contains("Three active content"))
+    }
+  }
+}
+
+@MainActor
+private struct StressTC007Fixture: View {
+  @State private var reversed = false
+  @State private var selection = "one"
+
+  var body: some View {
+    Panel(id: "stress-tc-007-panel") {
+      TabView(selection: $selection) {
+        Tab("One", value: "one") { Text("One active content") }
+        Tab("Two", value: "two") { Text("Two active content") }
+        if reversed {
+          Tab("Four", value: "four") { Text("Four active content") }
+          Tab("Three", value: "three") { Text("Three active content") }
+        } else {
+          Tab("Three", value: "three") { Text("Three active content") }
+          Tab("Four", value: "four") { Text("Four active content") }
+        }
+      }
+      .tabViewStyle(.literalTabs)
+      .id(testIdentity("StressTC007", "Tabs"))
+    }
+    .keyCommand("Reverse hidden tabs", key: .character("r"), modifiers: .ctrl) {
+      reversed = true
+    }
+    .frame(width: 24, height: 11, alignment: .topLeading)
+  }
+}
