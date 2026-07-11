@@ -404,3 +404,48 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 008: shape-stroke glyph-set churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 008 shape stroke uses its current border glyph set")
+  func visualEffects008ShapeStrokeUsesCurrentBorderGlyphSet() {
+    // Hypothesis: ShapeOperation equality can refresh the stroke color while retaining the first
+    // StrokeStyle.borderSet, causing a rectangle to keep old edge and corner glyphs after churn.
+    struct Root: View {
+      let generation: Int
+
+      var style: StrokeStyle {
+        switch generation % 5 {
+        case 0: .single
+        case 1: .double
+        case 2: .heavy
+        case 3: .ascii
+        default: .rounded
+        }
+      }
+
+      var body: some View {
+        Rectangle()
+          .stroke(Color.cyan, style: style)
+          .frame(width: 18, height: 7)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects008")
+
+    for generation in 0..<25 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
