@@ -1702,3 +1702,72 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 031: image compositing-backdrop churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 031 blended image captures current destination backdrop")
+  func visualEffects031BlendedImageCapturesCurrentDestinationBackdrop() throws {
+    // Hypothesis: a stable image attachment can retain its previous RasterImageBackdrop or
+    // backdropSignature when only the destination fill and blend mode change beneath it.
+    let pngBytes = try makePNGBytes(
+      width: 16,
+      height: 16,
+      pixels: Array(
+        repeating: rgbaPixel(red: 255, green: 80, blue: 80, alpha: 150),
+        count: 16 * 16
+      )
+    )
+
+    struct Root: View {
+      let bytes: [UInt8]
+      let generation: Int
+
+      var background: Color {
+        switch generation % 4 {
+        case 0: .blue
+        case 1: .green
+        case 2: .yellow
+        default: .magenta
+        }
+      }
+
+      var mode: BlendMode {
+        generation.isMultiple(of: 2) ? .multiply : .screen
+      }
+
+      var body: some View {
+        Rectangle()
+          .fill(background)
+          .frame(width: 8, height: 4)
+          .overlay {
+            Image(data: bytes)
+              .resizable()
+              .frame(width: 8, height: 4)
+              .blendMode(mode)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects031")
+
+    for generation in 0..<28 {
+      let root = Root(bytes: pngBytes, generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+      let compositing = try #require(attachment.compositing)
+      let firstBackdropCell = try #require(compositing.destinationBackdrop.cells.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(compositing.blendMode == root.mode)
+      #expect(firstBackdropCell.backgroundColor == root.background)
+    }
+  }
+}
