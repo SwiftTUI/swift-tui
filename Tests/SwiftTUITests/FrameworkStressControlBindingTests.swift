@@ -770,3 +770,49 @@ private struct ControlStress016Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 017: stepper increment route binding retarget
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 017 stepper increment writes only its current binding")
+  func stressControlBinding017StepperIncrementWritesOnlyCurrentBinding() throws {
+    // Hypothesis: Stepper's child increment pointer route can retain the first binding after the
+    // stable root control retargets, diverging from its root activation and keyboard handlers.
+    let first = ControlStressProbe(8)
+    let second = ControlStressProbe(1)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress017", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      ControlStress017Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget stepper increment 017")
+    _ = try harness.clickText("▶")
+
+    #expect(first.value == 8)
+    #expect(first.writes.isEmpty)
+    #expect(second.value == 2)
+    #expect(second.writes == [2])
+  }
+}
+
+@MainActor
+private struct ControlStress017Fixture: View {
+  let first: ControlStressProbe<Int>
+  let second: ControlStressProbe<Int>
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget stepper increment 017") { usesSecond = true }
+      Stepper(
+        "Pointer stepper 017",
+        value: usesSecond ? second.binding() : first.binding(),
+        in: 0...10
+      )
+      .id("pointer-stepper-017")
+    }
+  }
+}
