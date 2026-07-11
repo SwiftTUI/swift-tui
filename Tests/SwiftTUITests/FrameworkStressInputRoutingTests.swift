@@ -1067,3 +1067,70 @@ private struct StressInput019Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 020: active drag retargeted during the gesture
+
+extension FrameworkStressInputRoutingTests {
+  @Test("An active drag writes the newly targeted binding after its first change")
+  func stressInputRouting020ActiveDragDoesNotKeepStaleBinding() throws {
+    // Hypothesis: preserving the active recognizer across re-resolution may
+    // also preserve its old mutation closure after the view retargets to B.
+    let firstChanges = StressInputBox(0)
+    let secondChanges = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput020Root"),
+      size: .init(width: 44, height: 6)
+    ) {
+      StressInput020Fixture(firstChanges: firstChanges, secondChanges: secondChanges)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Retarget drag"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 3, y: start.y)
+    )
+    _ = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 6, y: start.y)
+    )
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 6, y: start.y))
+
+    #expect(firstChanges.value == 1)
+    withKnownIssue("An active drag keeps writing the binding captured before retargeting") {
+      #expect(secondChanges.value == 1)
+    }
+  }
+}
+
+private struct StressInput020Fixture: View {
+  static let dragIdentity = testIdentity("StressInput020", "Drag")
+
+  let firstChanges: StressInputBox<Int>
+  let secondChanges: StressInputBox<Int>
+  @State private var targetsSecond = false
+
+  var body: some View {
+    if targetsSecond {
+      Text("Retarget drag")
+        .id(Self.dragIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture().onChanged { _ in
+            secondChanges.value += 1
+          }
+        )
+    } else {
+      Text("Retarget drag")
+        .id(Self.dragIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture().onChanged { _ in
+            firstChanges.value += 1
+            targetsSecond = true
+          }
+        )
+    }
+  }
+}
