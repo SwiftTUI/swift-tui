@@ -95,6 +95,56 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 006: stacked optional total replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 006 stacked optional total replacement refreshes filler and summary")
+  func chartData006StackedOptionalTotalReplacementRefreshesFillerAndSummary() {
+    // Hypothesis: toggling the optional authored total can leave either the old
+    // filler width or the old synthesized accessibility summary on a retained chart.
+    struct Root: View {
+      let generation: Int
+
+      var total: Double? {
+        switch generation % 3 {
+        case 1: Double(40 + generation)
+        case 2: 4
+        default: nil
+        }
+      }
+
+      var expectedTotal: Int {
+        switch generation % 3 {
+        case 1: 40 + generation
+        case 2: 4
+        default: 12 + generation
+        }
+      }
+
+      var body: some View {
+        StackedBarChart(
+          "Capacity \(generation)",
+          entries: [
+            .init("live", value: Double(5 + generation), tone: .success),
+            .init("queued", value: 7, tone: .warning),
+          ],
+          total: total,
+          barWidth: 18
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "006", proposal: .init(width: 48, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let expectedTotal = Root(generation: generation).expectedTotal
+      let expectedLabel = "Capacity \(generation): sum \(expectedTotal)"
+      #expect(chartDataText(snapshot).contains("sum \(expectedTotal)"))
+      #expect(chartDataAccessibilityLabels(snapshot).contains(expectedLabel))
+    }
+  }
+}
+
 // MARK: - Attempt 005: stacked largest-remainder reorder
 
 extension FrameworkStressChartDataTests {
