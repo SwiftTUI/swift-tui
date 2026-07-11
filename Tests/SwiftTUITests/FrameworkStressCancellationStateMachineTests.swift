@@ -341,4 +341,14 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 022 restored registrations win collisions")
+  func cancellationState022RestoredRegistrationsWinCollisions() {
+    // Hypothesis: reapply can overwrite a draft-owned value after several carried keys.
+    var target = ["a": 100, "b": 200]
+    ConcurrentRegistrationCarry.reapply(["x": 1, "a": 2, "y": 3, "b": 4], into: &target)
+    #expect(target == ["a": 100, "b": 200, "x": 1, "y": 3])
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
