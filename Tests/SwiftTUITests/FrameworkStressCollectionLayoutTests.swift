@@ -378,3 +378,61 @@ private struct CollectionLayout006Root: View {
     .frame(width: 16, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 007: conditional indexed-source replacement
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 007 conditional lazy source follows the live branch")
+  func collectionLayout007ConditionalLazySourceFollowsLiveBranch() {
+    // Hypothesis: ConditionalContent may retain the prior branch's indexed
+    // source cache even though the child context and row geometry changed.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout007")
+
+    for generation in 0..<20 {
+      let alternate = !generation.isMultiple(of: 2)
+      let root = CollectionLayout007Root(alternate: alternate)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 18, height: 6)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      let expected = alternate ? "007 alternate 30" : "007 primary 1"
+      #expect(collectionLayoutText(retained).contains(expected))
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout007Root: View {
+  let alternate: Bool
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        if alternate {
+          ForEach([30, 20, 10], id: \.self) { value in
+            Text("007 alternate \(value)")
+              .frame(height: 2, alignment: .topLeading)
+          }
+        } else {
+          ForEach([1, 2, 3], id: \.self) { value in
+            Text("007 primary \(value)")
+          }
+        }
+      }
+    }
+    .frame(width: 18, height: 6, alignment: .topLeading)
+  }
+}
