@@ -1780,3 +1780,67 @@ private struct StressLL029Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 030: live environment in active sheet
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 030 active sheet reads current root environment")
+  func stress030ActiveSheetReadsCurrentRootEnvironment() throws {
+    // Hypothesis: a portal attachment payload may resolve under the environment
+    // snapshot captured when the sheet first opened.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL030", "Root"),
+      size: .init(width: 48, height: 10)
+    ) {
+      StressLL030Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Environment Sheet")
+    for generation in 1...8 {
+      let frame = try harness.clickText("Advance Root Environment", chooseLast: true)
+      withKnownIssue("Portal-hosted sheet content loses the presenting declaration environment") {
+        #expect(frame.contains("sheet environment \(generation)"))
+      }
+      #expect(harness.actionRegistrationCount <= 3)
+    }
+  }
+}
+
+private enum StressLL030EnvironmentKey: EnvironmentKey {
+  static let defaultValue = -1
+}
+
+extension EnvironmentValues {
+  fileprivate var stressLL030Value: Int {
+    get { self[StressLL030EnvironmentKey.self] }
+    set { self[StressLL030EnvironmentKey.self] = newValue }
+  }
+}
+
+@MainActor
+private struct StressLL030Fixture: View {
+  @State private var generation = 0
+  @State private var isPresented = false
+
+  var body: some View {
+    Button("Open Environment Sheet") { isPresented = true }
+      .sheet("Environment", isPresented: $isPresented) {
+        StressLL030Sheet(generation: $generation)
+      }
+      .environment(\.stressLL030Value, generation)
+  }
+}
+
+@MainActor
+private struct StressLL030Sheet: View {
+  @Binding var generation: Int
+  @Environment(\.stressLL030Value) private var environmentValue
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("sheet environment \(environmentValue)")
+      Button("Advance Root Environment") { generation += 1 }
+    }
+  }
+}
