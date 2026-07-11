@@ -1692,10 +1692,8 @@ extension FrameworkStressInputRoutingTests {
     #expect(position.value.y == 0)
     let frame = try harness.pressKey(KeyPress(.character("m")))
 
-    withKnownIssue("A stable focused identity is not re-revealed after geometry relocation") {
-      #expect(position.value.y > 0)
-      #expect(frame.contains("Relocating focus target"))
-    }
+    #expect(position.value.y > 0)
+    #expect(frame.contains("Relocating focus target"))
     #expect(
       harness.runLoop.focusTracker.currentFocusIdentity == StressInput030Fixture.focusIdentity)
   }
