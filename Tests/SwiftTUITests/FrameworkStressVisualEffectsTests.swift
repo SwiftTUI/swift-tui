@@ -348,3 +348,59 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 007: stroke and strokeBorder replacement
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 007 stable shape replaces stroke and strokeBorder masks")
+  func visualEffects007StableShapeReplacesStrokeAndStrokeBorderMasks() {
+    // Hypothesis: the strokeBorder bit can be lost when a retained shape keeps the same geometry,
+    // style, and StrokeStyle, leaving an outside stroke where an interior-masking border is current.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            AnyView(Capsule().stroke(Color.white, style: .heavy))
+          } else {
+            AnyView(Capsule().strokeBorder(Color.white, style: .heavy))
+          }
+        }
+        .frame(width: 24, height: 9)
+        .background(Color.red.opacity(0.35))
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects007")
+
+    func strokeBorderValue(in node: ResolvedNode) -> Bool? {
+      if case .shape(let payload) = node.drawPayload,
+        case .stroke(_, _, let strokeBorder, _) = payload.operation
+      {
+        return strokeBorder
+      }
+      for child in node.children {
+        if let value = strokeBorderValue(in: child) {
+          return value
+        }
+      }
+      return nil
+    }
+
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(strokeBorderValue(in: retained.resolvedTree) == !generation.isMultiple(of: 2))
+    }
+  }
+}
