@@ -1070,3 +1070,47 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 024: host focus projection through semantic reorder
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 024 host focus projection follows the current semantic order")
+  func sceneHost024HostFocusProjectionFollowsCurrentSemanticOrder() {
+    // Hypothesis: a host projection can retain the first focus-region match
+    // across duplicate-region reorder or a generation where the match departs.
+    let focused = testIdentity("SceneHost024", "focused")
+    let other = testIdentity("SceneHost024", "other")
+
+    for generation in 0..<24 {
+      let focusRegions: [FocusRegion]
+      let expected: FocusPresentation
+      switch generation % 3 {
+      case 0:
+        focusRegions = [
+          .init(identity: focused, rect: .zero, focusInteractions: .activate),
+          .init(identity: focused, rect: .zero, focusInteractions: .edit),
+        ]
+        expected = .init(focusedIdentity: focused, semantics: .activate)
+      case 1:
+        focusRegions = [
+          .init(identity: focused, rect: .zero, focusInteractions: .edit),
+          .init(identity: focused, rect: .zero, focusInteractions: .activate),
+        ]
+        expected = .init(focusedIdentity: focused, semantics: .edit)
+      default:
+        focusRegions = [
+          .init(identity: other, rect: .zero, focusInteractions: .automatic)
+        ]
+        expected = .none
+      }
+      let frame = SemanticHostFrame(
+        sequence: UInt64(generation),
+        raster: sceneHostRaster(marker: "focus \(generation)"),
+        semantics: .init(focusRegions: focusRegions),
+        focusedIdentity: focused
+      )
+
+      #expect(frame.hostProjection.focusPresentation == expected)
+    }
+  }
+}
