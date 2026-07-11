@@ -197,4 +197,45 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 005: Direct-cell Canvas style churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 005 direct canvas cells keep current glyph and style")
+  func renderReconciliation005DirectCanvasCellsKeepCurrentGlyphAndStyle() {
+    // Hypothesis: direct-cell Canvas writes can retain a prior cell payload independently from
+    // the Braille buffer, producing a current glyph with a stale foreground or background.
+    struct StyledCell: CanvasDrawing, Equatable {
+      let generation: Int
+
+      func draw(into context: inout CanvasContext) {
+        context.setCell(
+          at: .zero,
+          character: generation.isMultiple(of: 2) ? "A" : "B",
+          foreground: generation.isMultiple(of: 3) ? .red : .green,
+          background: generation.isMultiple(of: 2) ? .blue : .white
+        )
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation005")
+
+    for generation in 0..<18 {
+      let root = Canvas(StyledCell(generation: generation)).frame(width: 1, height: 1)
+      let frame = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let cell = frame.rasterSurface.cells[0][0]
+      #expect(cell.character == (generation.isMultiple(of: 2) ? "A" : "B"))
+      #expect(cell.style?.foregroundColor == (generation.isMultiple(of: 3) ? .red : .green))
+      #expect(cell.style?.backgroundColor == (generation.isMultiple(of: 2) ? .blue : .white))
+    }
+  }
+}
+
 // MARK: - End
