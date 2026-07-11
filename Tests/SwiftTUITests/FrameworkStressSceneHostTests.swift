@@ -587,3 +587,67 @@ extension FrameworkStressSceneHostTests {
     #expect(results.allSatisfy { $0 == expected })
   }
 }
+
+// MARK: - Attempt 015: repeated hosted-session stop and teardown
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 015 repeated stops clear focus once and emit no later frame")
+  func sceneHost015RepeatedStopsClearFocusOnceAndEmitNoLaterFrame() async throws {
+    // Hypothesis: overlapping stop paths can publish duplicate focus teardown
+    // or leave a live signal path that renders again after shutdown completes.
+    let frameRecorder = SceneHostFrameRecorder()
+    let focusRecorder = SceneHostFocusRecorder()
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 20, height: 4),
+      appearance: .fallback,
+      onFrame: { frame in frameRecorder.record(frame) }
+    )
+    let session = try HostedSceneSession(
+      for: SceneHostFocusApp(),
+      sceneID: "primary",
+      surface: surface,
+      onFocusPresentationChange: { focusRecorder.record($0) }
+    )
+    let runTask = Task { try await session.start() }
+    await focusRecorder.updates.wait { focusRecorder.values.contains { $0 != .none } }
+
+    let stopWaiter = Task { try await session.stopAndWait() }
+    await Task.yield()
+    for _ in 0..<16 {
+      session.stop()
+    }
+    #expect(try await stopWaiter.value == .inputEnded)
+    #expect(try await runTask.value == .inputEnded)
+
+    let stoppedFrameCount = frameRecorder.frames.count
+    for generation in 0..<16 {
+      surface.updateSurfaceSize(.init(width: 20 + generation, height: 4))
+      session.requestSurfaceRefresh()
+    }
+    for _ in 0..<8 { await Task.yield() }
+
+    #expect(focusRecorder.values.filter { $0 == .none }.count == 1)
+    #expect(frameRecorder.frames.count == stoppedFrameCount)
+    #expect(session.currentFocusPresentation == .none)
+  }
+}
+
+private struct SceneHostFocusApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      Text("editable")
+        .focusable(true, interactions: .edit)
+    }
+  }
+}
+
+@MainActor
+private final class SceneHostFocusRecorder {
+  private(set) var values: [FocusPresentation] = []
+  let updates = MainActorConditionSignal()
+
+  func record(_ value: FocusPresentation) {
+    values.append(value)
+    updates.notify()
+  }
+}
