@@ -1254,3 +1254,52 @@ private struct GestureScroll024Fixture: View {
     .frame(width: 30, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 025: nested scroll takeover target
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 025 nested takeover pans the leaf scroll view")
+  func gestureScroll025NestedTakeoverPansLeafScrollView() throws {
+    // Hypothesis: threshold transfer may choose the first containing route and
+    // pan the outer ScrollView even while the inner route can consume the drag.
+    let outer = GestureScrollBox(ScrollPosition.zero)
+    let inner = GestureScrollBox(ScrollPosition.zero)
+    let activations = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll025Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      GestureScroll025Fixture(outer: outer, inner: inner, activations: activations)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Nested takeover button"))
+    _ = try harness.drag(from: start, to: Point(x: start.x, y: start.y - 3))
+
+    #expect(activations.value == 0)
+    #expect(outer.value == .zero)
+    #expect(inner.value.y == 3)
+  }
+}
+
+private struct GestureScroll025Fixture: View {
+  let outer: GestureScrollBox<ScrollPosition>
+  let inner: GestureScrollBox<ScrollPosition>
+  let activations: GestureScrollBox<Int>
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false, position: outer.binding()) {
+      VStack(alignment: .leading, spacing: 0) {
+        ScrollView(.vertical, showsIndicators: false, position: inner.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            Button("Nested takeover button") { activations.value += 1 }
+            ForEach(0..<10) { row in Text("Nested inner row \(row)") }
+          }
+        }
+        .frame(width: 34, height: 4, alignment: .topLeading)
+        ForEach(0..<10) { row in Text("Nested outer row \(row)") }
+      }
+    }
+    .frame(width: 38, height: 6, alignment: .topLeading)
+  }
+}
