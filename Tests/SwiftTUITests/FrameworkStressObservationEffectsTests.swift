@@ -1023,3 +1023,58 @@ private struct ObservationEffects017View: View {
     }
   }
 }
+
+// MARK: - Attempt 018: overlayPreferenceValue payload freshness
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 018 preference overlay follows erased source replacement")
+  func observationEffects018PreferenceOverlayFollowsErasedSourceReplacement() throws {
+    // Hypothesis: the overlay transform may keep the reduced payload from the
+    // prior erased source node when the source type and value change together.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects018"),
+      size: .init(width: 64, height: 8)
+    ) {
+      ObservationEffects018View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Replace Preference Source 018")
+      #expect(frame.contains("018 overlay [\(generation)]"))
+    }
+  }
+}
+
+private struct ObservationEffects018View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Preference Source 018") { generation += 1 }
+      source
+        .frame(width: 60, height: 2, alignment: .topLeading)
+        .overlayPreferenceValue(
+          ObservationEffectsListPreferenceKey.self,
+          alignment: .bottomLeading
+        ) { value in
+          Text("018 overlay \(value)")
+        }
+    }
+  }
+
+  private var source: AnyView {
+    if generation.isMultiple(of: 2) {
+      return AnyView(
+        Text("even source")
+          .preference(key: ObservationEffectsListPreferenceKey.self, value: [generation])
+      )
+    }
+    return AnyView(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("odd source")
+      }
+      .preference(key: ObservationEffectsListPreferenceKey.self, value: [generation])
+    )
+  }
+}
