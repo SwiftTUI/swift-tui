@@ -1428,6 +1428,90 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 022: Nested AnyView teardown scope
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 022 inner anyview swaps preserve outer state only")
+  func stateIdentity022InnerAnyViewSwapsPreserveOuterStateOnly() throws {
+    // Hypothesis: nested erasure boundaries can broaden teardown to the outer payload or keep
+    // an inner payload alive after its static type departs.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity022"),
+      size: .init(width: 60, height: 12)
+    ) {
+      StateIdentity022Root()
+    }
+    defer { harness.shutdown() }
+
+    for outerCount in 1...4 {
+      var frame = try harness.clickText("Increment Outer 022")
+      #expect(frame.contains("022 Outer Count \(outerCount)"))
+      frame = try harness.clickText("Increment Inner A 022")
+      #expect(frame.contains("022 Inner A Count 1"))
+
+      frame = try harness.clickText("Swap Inner 022")
+      #expect(frame.contains("022 Outer Count \(outerCount)"))
+      #expect(frame.contains("022 Inner B Count 0"))
+      frame = try harness.clickText("Increment Inner B 022")
+      #expect(frame.contains("022 Inner B Count 1"))
+
+      frame = try harness.clickText("Swap Inner 022")
+      #expect(frame.contains("022 Outer Count \(outerCount)"))
+      #expect(frame.contains("022 Inner A Count 0"))
+    }
+  }
+
+  private struct StateIdentity022Root: View {
+    @State private var showsA = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Swap Inner 022") { showsA.toggle() }
+        AnyView(StateIdentity022Outer(showsA: showsA))
+      }
+    }
+  }
+
+  private struct StateIdentity022Outer: View {
+    let showsA: Bool
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("022 Outer Count \(count)")
+        Button("Increment Outer 022") { count += 1 }
+        if showsA {
+          AnyView(StateIdentity022InnerA())
+        } else {
+          AnyView(StateIdentity022InnerB())
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity022InnerA: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("022 Inner A Count \(count)")
+        Button("Increment Inner A 022") { count += 1 }
+      }
+    }
+  }
+
+  private struct StateIdentity022InnerB: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("022 Inner B Count \(count)")
+        Button("Increment Inner B 022") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
