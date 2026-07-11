@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -1267,5 +1268,89 @@ private struct CollectionLayout020Root: View {
       }
     }
     .frame(width: 20, height: 6, alignment: .topLeading)
+  }
+}
+
+// MARK: - Attempt 021: List section reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 021 reordered List sections keep authored item order")
+  func collectionLayout021ReorderedListSectionsKeepAuthoredItemOrder() {
+    // Hypothesis: recursive List payload collection may retain the old section
+    // traversal order after stable section entities move.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout021")
+
+    for generation in 0..<20 {
+      let reversed = !generation.isMultiple(of: 2)
+      let root = CollectionLayout021Root(generation: generation, reversed: reversed)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 24, height: 12)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 24, height: 12)
+      )
+      let order = reversed ? [2, 1] : [1, 2]
+      let expectedTokens = order.flatMap { value in
+        [
+          "021 header \(value)-\(generation)",
+          "021 row \(value)-\(generation)",
+          "021 footer \(value)-\(generation)",
+        ]
+      }
+      let rendered = collectionLayoutText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(collectionLayoutContainsInOrder(expectedTokens, in: rendered))
+    }
+  }
+}
+
+private func collectionLayoutContainsInOrder(_ tokens: [String], in text: String) -> Bool {
+  var cursor = text.startIndex
+  for token in tokens {
+    guard let range = text.range(of: token, range: cursor..<text.endIndex) else {
+      return false
+    }
+    cursor = range.upperBound
+  }
+  return true
+}
+
+private struct CollectionLayout021Section: Identifiable {
+  let id: Int
+}
+
+@MainActor
+private struct CollectionLayout021Root: View {
+  let generation: Int
+  let reversed: Bool
+
+  private var sections: [CollectionLayout021Section] {
+    let values = [CollectionLayout021Section(id: 1), CollectionLayout021Section(id: 2)]
+    return reversed ? Array(values.reversed()) : values
+  }
+
+  var body: some View {
+    List(selection: .constant(1)) {
+      ForEach(sections) { section in
+        Section {
+          Text("021 row \(section.id)-\(generation)").tag(section.id)
+        } header: {
+          Text("021 header \(section.id)-\(generation)")
+        } footer: {
+          Text("021 footer \(section.id)-\(generation)")
+        }
+      }
+    }
+    .listStyle(.plain)
+    .frame(width: 24, height: 12, alignment: .topLeading)
   }
 }
