@@ -1131,4 +1131,49 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 027: Accessibility copy churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 027 accessibility label and hint stay current")
+  func renderReconciliation027AccessibilityLabelAndHintStayCurrent() throws {
+    // Hypothesis: retained semantic extraction can reuse geometry-stable accessibility nodes
+    // while overlooking changed label or hint metadata on an otherwise identical Text node.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Text("Visible")
+          .accessibilityRole(.button)
+          .accessibilityLabel("Label \(generation)")
+          .accessibilityHint("Hint \(generation)")
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation027")
+
+    for generation in 0..<18 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let node = try #require(retained.semanticSnapshot.accessibilityNodes.first)
+      #expect(node.label == "Label \(generation)")
+      #expect(node.hint == "Hint \(generation)")
+      #expect(
+        retained.semanticSnapshot
+          == DefaultRenderer().render(
+            root,
+            context: .init(identity: rootIdentity)
+          ).semanticSnapshot
+      )
+    }
+  }
+}
+
 // MARK: - End
