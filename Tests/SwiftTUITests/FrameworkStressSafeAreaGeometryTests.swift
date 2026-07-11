@@ -94,6 +94,50 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 005: ignored safe-area edge replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 005 ignored edges reclaim only current sides")
+  func safeAreaGeometry005IgnoredEdgesReclaimOnlyCurrentSides() {
+    // Hypothesis: replacing an ignore mask can retain reclaimed space from a departed edge while
+    // updating the GeometryProxy environment to report the new mask.
+    struct Root: View {
+      let generation: Int
+      let edges: Edge.Set
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "005 g\(generation) \(proxy.size.width)x\(proxy.size.height) "
+              + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading),"
+              + "\(proxy.safeAreaInsets.bottom),\(proxy.safeAreaInsets.trailing)"
+          )
+        }
+        .ignoresSafeArea(edges)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry005")
+    let masks: [Edge.Set] = [.top, .leading, .bottom, .trailing, [.top, .trailing], .all]
+
+    for generation in 0..<18 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, edges: masks[generation % masks.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: .init(top: 1, leading: 2, bottom: 3, trailing: 4)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("005 g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 004: nested safe-area padding removal
 
 extension FrameworkStressSafeAreaGeometryTests {
