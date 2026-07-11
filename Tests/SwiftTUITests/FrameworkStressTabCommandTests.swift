@@ -912,3 +912,71 @@ private struct StressTC016Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 017: open-palette command removal
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 017 open palette removes departed command and action")
+  func stressTabCommand017OpenPaletteRemovesDepartedCommandAndAction() throws {
+    // Hypothesis: an open palette may keep a departed command in its absorbed
+    // snapshot or shift the next command onto the departed action closure.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC017", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressTC017Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open removal palette")
+    let frame = try harness.clickText("Remove B command")
+    #expect(!frame.contains("B removable command"))
+
+    _ = try harness.clickText("C surviving command")
+    #expect(probe.events == ["c"])
+  }
+}
+
+@MainActor
+private struct StressTC017Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var includesB = true
+  @State private var showsPalette = false
+
+  var body: some View {
+    Panel(id: "stress-tc-017-source") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Open removal palette") {
+          showsPalette = true
+        }
+        if includesB {
+          commandSource("B removable command", marker: "b")
+        }
+        commandSource("C surviving command", marker: "c")
+      }
+    }
+    .panel(id: "stress-tc-017-host")
+    .paletteSheet("Removal palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Remove B command") {
+          includesB = false
+        }
+        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
+          Button(entry.element.name) {
+            entry.element.action()
+          }
+          .disabled(!entry.element.isEnabled)
+        }
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+
+  private func commandSource(_ name: String, marker: String) -> some View {
+    Panel(id: "source-\(marker)") { Text("source \(marker)") }
+      .paletteCommand(name: name) {
+        probe.events.append(marker)
+      }
+  }
+}
