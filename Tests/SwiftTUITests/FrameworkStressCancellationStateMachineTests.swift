@@ -119,4 +119,20 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 008 pre-cancelled wait returns promptly")
+  func cancellationState008PreCancelledWaitReturnsPromptly() async {
+    // Hypothesis: cancellation observed before waiter registration can still install a leak.
+    let token = FrameTailJobCancellationToken()
+    let task = Task {
+      unsafe withUnsafeCurrentTask { task in
+        unsafe task?.cancel()
+      }
+      return await token.waitUntilLeavesQueue().rawValue
+    }
+    #expect(await task.value == "queued")
+    #expect(token.cancelBeforeStart())
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
