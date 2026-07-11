@@ -172,4 +172,15 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 018 unescaped controls reject strings")
+  func styleTransport018UnescapedControlsRejectStrings() {
+    // Hypothesis: raw terminal control bytes can survive JSON decoding into style fields.
+    for control in ["\u{0}", "\u{1b}", "\n", "\t"] {
+      var parser = StyleTransportJSONParser("{\"v\":\"before\(control)after\"}")
+      #expect(parser.parse() == nil)
+    }
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
