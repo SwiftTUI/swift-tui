@@ -220,4 +220,22 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 022 reordered fields and unknown metadata decode identically")
+  func styleTransport022ReorderedFieldsAndUnknownMetadataDecodeIdentically() throws {
+    // Hypothesis: decoder correctness can depend on canonical encoder field order.
+    let canonical =
+      ##"{"appearance":{"foregroundColor":"#112233","backgroundColor":"#445566","tintColor":"#778899","colorSchemeContrast":"standard","source":"override"}}"##
+    let reordered =
+      ##"{"ignored":{"nested":"value"},"appearance":{"source":"override","tintColor":"#778899","unknown":null,"backgroundColor":"#445566","colorSchemeContrast":"standard","foregroundColor":"#112233"}}"##
+    let first = try #require(
+      TerminalRenderStyleCodec.decodeBase64(StyleTransportBase64.encode(Array(canonical.utf8)))
+    )
+    let second = try #require(
+      TerminalRenderStyleCodec.decodeBase64(StyleTransportBase64.encode(Array(reordered.utf8)))
+    )
+    #expect(first == second)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
