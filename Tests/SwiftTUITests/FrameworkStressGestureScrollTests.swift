@@ -1105,3 +1105,55 @@ private struct GestureScroll021Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 022: viewport resize between anchor commands
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 022 anchor command uses resized viewport")
+  func gestureScroll022AnchorCommandUsesResizedViewport() throws {
+    // Hypothesis: target geometry may refresh while its ScrollRoute keeps the
+    // previous viewport length, producing an anchor offset for the old size.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll022Root"),
+      size: .init(width: 52, height: 11)
+    ) {
+      GestureScroll022Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reveal resize target")
+    #expect(position.value.y == 6)
+    _ = try harness.clickText("Expand scroll viewport")
+    _ = try harness.clickText("Reveal resize target")
+
+    #expect(position.value.y == 4)
+  }
+}
+
+private struct GestureScroll022Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+  @State private var expanded = false
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Expand scroll viewport") { expanded = true }
+          Button("Reveal resize target") {
+            _ = proxy.scrollTo("resize-target", anchor: .bottom)
+          }
+        }
+        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in
+              Text("Viewport row \(row)")
+                .id(row == 8 ? "resize-target" : "viewport-row-\(row)")
+            }
+          }
+        }
+        .frame(width: 30, height: expanded ? 5 : 3, alignment: .topLeading)
+      }
+    }
+  }
+}
