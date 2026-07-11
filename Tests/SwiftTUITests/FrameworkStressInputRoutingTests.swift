@@ -1514,3 +1514,59 @@ private struct StressInput027Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 028: keyboard scrolling at the content edge
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Keyboard scrolling clamps its binding at the edge and reverses immediately")
+  func stressInputRouting028KeyboardScrollBindingClampsAtEdge() throws {
+    // Hypothesis: arrow-key scrolling may grow the bound offset beyond geometry,
+    // requiring many reverse keys before the visible viewport moves.
+    let position = StressInputBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput028Root"),
+      size: .init(width: 32, height: 8)
+    ) {
+      StressInput028Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Keyboard row 0")
+    let route = try #require(
+      harness.runLoop.latestSemanticSnapshot.scrollRoutes.first {
+        $0.identity == StressInput028Fixture.scrollIdentity
+      }
+    )
+    let maximumY = max(0, route.contentBounds.size.height - route.viewportRect.size.height)
+
+    for _ in 0..<30 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+    }
+    _ = try harness.pressKey(KeyPress(.arrowUp))
+    withKnownIssue("Keyboard scrolling does not clamp its bound offset at content edges") {
+      #expect(position.value.y == max(0, maximumY - 1))
+    }
+  }
+}
+
+private struct StressInput028Fixture: View {
+  static let scrollIdentity = testIdentity("StressInput028", "Scroll")
+
+  let position: StressInputBox<ScrollPosition>
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: position.binding()
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<12) { row in
+          Text("Keyboard row \(row)")
+        }
+      }
+    }
+    .id(Self.scrollIdentity)
+    .frame(width: 24, height: 4, alignment: .topLeading)
+  }
+}
