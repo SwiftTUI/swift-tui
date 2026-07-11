@@ -960,3 +960,46 @@ private struct ToastLifecycle018Root: View {
     }
   }
 }
+
+// MARK: - Attempt 019: active source remint cardinality
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 019 reminting the active source keeps one live item")
+  func toastLifecycle019RemintingActiveSourceKeepsOneLiveItem() throws {
+    // Hypothesis: a newly minted source can be synchronized before the prior source is pruned,
+    // leaving both generations visible or retaining the departed payload.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle019"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ToastLifecycle019Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Remint Active Toast 019")
+      #expect(frame.contains("reminted toast generation \(generation)"))
+      #expect(!frame.contains("reminted toast generation \(generation - 1)"))
+      #expect(frame.components(separatedBy: "reminted toast generation").count - 1 == 1)
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle019Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remint Active Toast 019") { generation += 1 }
+      Text("reminted source \(generation)")
+        .id("toast-lifecycle-019-source-\(generation)")
+        .toast(
+          "reminted toast generation \(generation)",
+          isPresented: .constant(true),
+          duration: nil
+        )
+    }
+  }
+}
