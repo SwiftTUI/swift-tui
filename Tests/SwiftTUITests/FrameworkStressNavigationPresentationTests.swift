@@ -1144,3 +1144,84 @@ private struct StressNP017Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 018: item popover identity replacement in a destination
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 018 item popover ID starts fresh lifetime")
+  func stress018ItemPopoverIDStartsFreshLifetime() throws {
+    // Hypothesis: replacing an open item popover's ID inside a detached
+    // destination can preserve the old portal subtree's state or payload.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP018", "Root"),
+      size: .init(width: 60, height: 13)
+    ) {
+      StressNP018Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Item Popover Destination")
+    _ = try harness.clickText("Open Popover Item A")
+    for version in 1...8 {
+      _ = try harness.clickText("Increment Popover Item Local")
+      let frame = try harness.clickText("Replace Popover Item ID")
+      let expectedID = version.isMultiple(of: 2) ? "a" : "b"
+      #expect(frame.contains("popover item \(expectedID) version \(version) local 0"))
+      #expect(stressNPPresentationEntryCount(in: harness) == 1)
+      #expect(harness.actionRegistrationCount <= 4)
+    }
+  }
+}
+
+private struct StressNP018Item: Identifiable, Sendable {
+  var id: String
+  var version: Int
+}
+
+@MainActor
+private struct StressNP018Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-018-stack") {
+      Button("Push Item Popover Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP018Destination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP018Destination: View {
+  @State private var item: StressNP018Item?
+
+  var body: some View {
+    Button("Open Popover Item A") {
+      item = StressNP018Item(id: "a", version: 0)
+    }
+    .popover(item: $item, arrowEdge: .trailing) { item in
+      StressNP018Popover(item: item, activeItem: $item)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP018Popover: View {
+  let item: StressNP018Item
+  @Binding var activeItem: StressNP018Item?
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("popover item \(item.id) version \(item.version) local \(local)")
+      Button("Increment Popover Item Local") { local += 1 }
+      Button("Replace Popover Item ID") {
+        activeItem = StressNP018Item(
+          id: item.id == "a" ? "b" : "a",
+          version: item.version + 1
+        )
+      }
+    }
+  }
+}
