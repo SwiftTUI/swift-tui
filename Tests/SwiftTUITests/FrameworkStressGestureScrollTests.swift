@@ -387,3 +387,55 @@ private struct GestureScroll008Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 009: departed long-press deadline ownership
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 009 removed long press cannot fire its deadline")
+  func gestureScroll009RemovedLongPressCannotFireDeadline() throws {
+    // Hypothesis: an active recognizer preserved for frame churn may remain in
+    // the deadline scan after its owning subtree is genuinely removed.
+    let fires = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll009Root"),
+      size: .init(width: 46, height: 7)
+    ) {
+      GestureScroll009Fixture(fires: fires)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Departing hold"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    let removedFrame = try harness.movePointer(to: start)
+    #expect(removedFrame.contains("Hold removed"))
+    harness.runLoop.drainGestureDeadlines(at: .now().advanced(by: .seconds(2)))
+    _ = try harness.render()
+
+    withKnownIssue("A removed active long press remains deadline-eligible") {
+      #expect(fires.value == 0)
+      #expect(harness.gestureRecognizerCount == 0)
+    }
+  }
+}
+
+private struct GestureScroll009Fixture: View {
+  let fires: GestureScrollBox<Int>
+  @State private var removed = false
+
+  var body: some View {
+    if removed {
+      Text("Hold removed")
+    } else {
+      Text("Departing hold")
+        .frame(width: 24, height: 1, alignment: .leading)
+        .onPointerHover { phase in
+          if case .entered = phase {
+            removed = true
+          }
+        }
+        .onLongPressGesture(minimumDuration: .seconds(1)) {
+          fires.value += 1
+        }
+    }
+  }
+}
