@@ -904,3 +904,50 @@ private struct ControlStress019Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 020: stepper route recovery after disabled bound reset
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 020 reenabled stepper increments externally reset value once")
+  func stressControlBinding020ReenabledStepperIncrementsExternallyResetValueOnce() throws {
+    // Hypothesis: a Stepper disabled at its upper bound can restore either no increment route or
+    // duplicate routes when its binding is externally reset before the control is reenabled.
+    let value = ControlStressProbe(10)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress020", "Root"),
+      size: .init(width: 58, height: 10)
+    ) {
+      ControlStress020Fixture(value: value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable and reset stepper 020")
+    _ = try harness.clickText("Reenable stepper 020")
+    _ = try harness.clickText("▶")
+
+    #expect(value.value == 5)
+    #expect(value.writes == [5])
+  }
+}
+
+@MainActor
+private struct ControlStress020Fixture: View {
+  let value: ControlStressProbe<Int>
+  @State private var isEnabled = true
+  @State private var externalRevision = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Disable and reset stepper 020") {
+        isEnabled = false
+        value.value = 4
+        externalRevision += 1
+      }
+      Button("Reenable stepper 020") { isEnabled = true }
+      Stepper("Recovered stepper 020", value: value.binding(), in: 0...10)
+        .id("recovered-stepper-020")
+        .disabled(!isEnabled)
+      Text("Stepper external revision 020 \(externalRevision)")
+    }
+  }
+}
