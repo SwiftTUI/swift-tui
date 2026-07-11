@@ -662,3 +662,65 @@ private struct ObservationEffects011View: View {
     .environment(\.observationEffectsString, "base")
   }
 }
+
+// MARK: - Attempt 012: environment transform/writer order
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 012 writer and transform order remains semantic after churn")
+  func observationEffects012WriterTransformOrderRemainsSemantic() throws {
+    // Hypothesis: a stable environment chain may retain its prior fold order
+    // when a writer and a transform exchange structural positions.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects012"),
+      size: .init(width: 62, height: 6)
+    ) {
+      ObservationEffects012View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Flip Transform Order 012")
+      let suffix = generation.isMultiple(of: 2) ? "" : "|T\(generation)"
+      if generation.isMultiple(of: 2) {
+        #expect(frame.contains("012 value writer-\(generation)\(suffix)"))
+      } else {
+        withKnownIssue("A reordered transformEnvironment keeps its generation-zero closure") {
+          #expect(frame.contains("012 value writer-\(generation)\(suffix)"))
+        }
+      }
+    }
+  }
+}
+
+private struct ObservationEffects012Reader: View {
+  @Environment(\.observationEffectsString) private var value
+
+  var body: some View {
+    Text("012 value \(value)")
+  }
+}
+
+private struct ObservationEffects012View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Flip Transform Order 012") { generation += 1 }
+      target
+    }
+  }
+
+  @ViewBuilder private var target: some View {
+    if generation.isMultiple(of: 2) {
+      ObservationEffects012Reader()
+        .environment(\.observationEffectsString, "writer-\(generation)")
+        .transformEnvironment(\.observationEffectsString) { $0 += "|T\(generation)" }
+        .id("observation-effects-012-reader")
+    } else {
+      ObservationEffects012Reader()
+        .transformEnvironment(\.observationEffectsString) { $0 += "|T\(generation)" }
+        .environment(\.observationEffectsString, "writer-\(generation)")
+        .id("observation-effects-012-reader")
+    }
+  }
+}
