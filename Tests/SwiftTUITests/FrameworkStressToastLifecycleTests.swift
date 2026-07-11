@@ -415,3 +415,50 @@ private struct ToastLifecycle007Root: View {
     }
   }
 }
+
+// MARK: - Attempt 008: nil-to-finite duration activation
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 008 finite duration starts after nil duration")
+  func toastLifecycle008FiniteDurationStartsAfterNilDuration() async throws {
+    // Hypothesis: a nil-duration toast's task completes while its descriptor remains committed, so
+    // changing the active item to a finite duration may never start a new timer.
+    let presented = ToastLifecycleBox(true)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle008"),
+      size: .init(width: 62, height: 10)
+    ) {
+      ToastLifecycle008Root(presented: presented)
+    }
+    defer { harness.shutdown() }
+
+    let armed = try harness.clickText("Arm Toast Timer 008")
+    #expect(armed.contains("duration armed true"))
+    #expect(armed.contains("nil to finite toast"))
+
+    await AsyncEvent.firing(after: .milliseconds(140)).wait()
+    _ = try harness.render()
+    let dismissed = !presented.value
+    withKnownIssue("Finite duration does not restart a completed nil-duration toast task") {
+      #expect(dismissed && toastLifecycleEntryCount(in: harness) == 0)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle008Root: View {
+  let presented: ToastLifecycleBox<Bool>
+  @State private var timerArmed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Arm Toast Timer 008") { timerArmed = true }
+      Text("duration armed \(timerArmed)")
+    }
+    .toast(
+      "nil to finite toast",
+      isPresented: presented.binding(),
+      duration: timerArmed ? 0.05 : nil
+    )
+  }
+}
