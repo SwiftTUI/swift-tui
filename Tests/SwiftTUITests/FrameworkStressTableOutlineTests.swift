@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -10,6 +11,17 @@ struct FrameworkStressTableOutlineTests {}
 
 private func tableOutlineText(_ snapshot: RenderSnapshot) -> String {
   snapshot.rasterSurface.lines.joined(separator: "\n")
+}
+
+private func tableOutlineContainsInOrder(_ tokens: [String], in text: String) -> Bool {
+  var cursor = text.startIndex
+  for token in tokens {
+    guard let range = text.range(of: token, range: cursor..<text.endIndex) else {
+      return false
+    }
+    cursor = range.upperBound
+  }
+  return true
 }
 
 // MARK: - Attempt 001: table column contract replacement
@@ -178,6 +190,62 @@ extension FrameworkStressTableOutlineTests {
       #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
       #expect(rendered.contains("Header-\(generation)") == generation.isMultiple(of: 2))
       #expect(rendered.contains("row-\(generation)"))
+    }
+  }
+}
+
+// MARK: - Attempt 004: table row reorder with live payloads
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 004 table row reorder keeps current cells and selection index")
+  func tableOutline004TableRowReorderKeepsCurrentCellsAndSelectionIndex() {
+    // Hypothesis: recursive table-row collapse can retain an old row index
+    // after stable entities reorder while their cell payloads also change.
+    struct Row: Identifiable {
+      let id: Int
+      let label: String
+    }
+    struct Root: View {
+      let rows: [Row]
+
+      var body: some View {
+        Table(selection: .constant(2), columns: [.init("Rows", width: 14)]) {
+          ForEach(rows) { row in
+            TableRow { Text(row.label) }.tag(row.id)
+          }
+        }
+        .frame(width: 20, height: 10, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline004")
+    for generation in 0..<20 {
+      let rows = [
+        Row(id: 1, label: "A-\(generation)"),
+        Row(id: 2, label: "B-\(generation)"),
+        Row(id: 3, label: "C-\(generation)"),
+      ]
+      let ordered = generation.isMultiple(of: 2) ? rows : [rows[2], rows[0], rows[1]]
+      let root = Root(rows: ordered)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 20, height: 10)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 20, height: 10)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.resolvedTree.drawPayload == fresh.resolvedTree.drawPayload)
+      #expect(tableOutlineContainsInOrder(ordered.map(\.label), in: rendered))
     }
   }
 }
