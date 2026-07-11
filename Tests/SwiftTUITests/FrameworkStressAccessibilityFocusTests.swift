@@ -901,3 +901,69 @@ private struct StressAF017Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 018: focused identity sibling reorder
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 018 stable focused identity survives sibling reorder")
+  func stress018StableFocusedIdentitySurvivesSiblingReorder() throws {
+    // Hypothesis: focus synchronization can preserve the old ordinal rather than the exact focused
+    // identity when that identity moves across a stable focusable sibling repeatedly.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF018", "Root"),
+      size: .init(width: 46, height: 7)
+    ) {
+      StressAF018Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressAF018Fixture.targetIdentity)
+    for _ in 0..<11 {
+      _ = try harness.pressKey(KeyPress(.character("r")))
+    }
+
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == StressAF018Fixture.targetIdentity)
+    let target = try #require(
+      harness.runLoop.latestSemanticSnapshot.focusRegions.first {
+        $0.identity == StressAF018Fixture.targetIdentity
+      }
+    )
+    #expect(target.rect.origin.y == 1)
+  }
+}
+
+@MainActor
+private struct StressAF018Fixture: View {
+  static let targetIdentity = testIdentity("StressAF018", "Target")
+  static let peerIdentity = testIdentity("StressAF018", "Peer")
+
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if reversed {
+        peer
+        target
+      } else {
+        target
+        peer
+      }
+    }
+  }
+
+  private var target: some View {
+    Text("Reordering focus target")
+      .id(Self.targetIdentity)
+      .focusable()
+      .onKeyPress(.character("r")) { _ in
+        reversed.toggle()
+        return .handled
+      }
+  }
+
+  private var peer: some View {
+    Text("Stable focus peer")
+      .id(Self.peerIdentity)
+      .focusable()
+  }
+}
