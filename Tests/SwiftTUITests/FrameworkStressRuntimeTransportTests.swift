@@ -36,6 +36,25 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 014: split CSI modifier envelope
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 014 split modified key envelope preserves trailing input")
+  func runtimeTransport014SplitModifiedKeyEnvelopePreservesTrailingInput() {
+    // Hypothesis: a CSI modifier sequence paused after its separator can consume
+    // the next key when the terminal completes the envelope in a later read.
+    var parser = TerminalInputParser()
+
+    #expect(parser.feed(Array("\u{001B}[1;".utf8)).isEmpty)
+    #expect(
+      parser.feed(Array("5Aq".utf8)) == [
+        .key(KeyPress(.arrowUp, modifiers: .ctrl)),
+        .key(.character("q")),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 013: alternating multibyte scalars
 
 extension FrameworkStressRuntimeTransportTests {
