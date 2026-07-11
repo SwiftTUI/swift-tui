@@ -1166,3 +1166,54 @@ private struct StressTC020Fixture: View {
     .frame(width: 70, height: 13, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 021: key binding replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 021 key binding replacement removes the old chord")
+  func stressTabCommand021KeyBindingReplacementRemovesOldChord() throws {
+    // Hypothesis: command-table restoration may add the replacement binding
+    // without pruning the old chord registered at the same stable scope.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC021", "Root"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StressTC021Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace key chord")
+    _ = try harness.pressKey(KeyPress(.character("a"), modifiers: .ctrl))
+    _ = try harness.pressKey(KeyPress(.character("b"), modifiers: .ctrl))
+
+    #expect(probe.events == ["b-1"])
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+@MainActor
+private struct StressTC021Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var replacement = false
+
+  var body: some View {
+    Panel(id: "stress-tc-021-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Replace key chord") {
+          replacement = true
+        }
+        Text("Command focus")
+          .focusable()
+      }
+    }
+    .keyCommand(
+      "Mutable chord",
+      key: .character(replacement ? "b" : "a"),
+      modifiers: .ctrl
+    ) {
+      probe.events.append(replacement ? "b-1" : "a-0")
+    }
+    .frame(width: 56, height: 8, alignment: .topLeading)
+  }
+}
