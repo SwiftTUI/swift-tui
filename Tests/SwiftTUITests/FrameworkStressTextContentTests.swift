@@ -337,3 +337,36 @@ extension FrameworkStressTextContentTests {
     #expect(cache.metrics.bypassedStores > 0)
   }
 }
+
+// MARK: - Attempt 010: mixed-width proposal revisit
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 010 mixed-width proposal revisits match fresh geometry")
+  func textContent010MixedWidthProposalRevisitsMatchFreshGeometry() {
+    // Hypothesis: retained measurement can reuse an ASCII-derived proposal entry when mixed CJK
+    // clusters revisit an older width after intervening wider and narrower layouts.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent010")
+    let widths = [4, 9, 6, 3, 6, 9]
+
+    for generation in 0..<30 {
+      let width = widths[generation % widths.count]
+      let content = generation.isMultiple(of: 2) ? "A界 BC界D E" : "A界B C界 DE"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text(content).textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        frames.retained.rasterSurface.lines.allSatisfy {
+          textContentVisibleWidth($0) <= width
+        }
+      )
+    }
+  }
+}
