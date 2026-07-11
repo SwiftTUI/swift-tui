@@ -327,4 +327,18 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 020 wide glyph revisits preserve cell geometry")
+  func cacheState020WideGlyphRevisitsPreserveCellGeometry() {
+    // Hypothesis: an equal character count ASCII lookup can poison a later wide-glyph hit.
+    let cache = TextLayoutCache(capacity: 4)
+    let wide = cache.layout(for: "界界", options: .init(width: 3))
+    _ = cache.layout(for: "abcd", options: .init(width: 3))
+    let revisited = cache.layout(for: "界界", options: .init(width: 3))
+    #expect(revisited == wide)
+    #expect(revisited.size == wide.size)
+    #expect(cache.metrics.hits == 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
