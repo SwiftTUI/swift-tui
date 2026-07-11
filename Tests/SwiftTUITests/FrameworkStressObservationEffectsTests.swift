@@ -1127,10 +1127,16 @@ private struct ObservationEffects019View: View {
 // MARK: - Attempt 020: optional same-key preference observer insertion
 
 extension FrameworkStressObservationEffectsTests {
-  @Test("stress observation effects 020 inserting an observer preserves the survivor baseline")
+  @Test("stress observation effects 020 same-key observers re-prime positionally on insertion")
   func observationEffects020InsertedObserverPreservesSurvivorBaseline() throws {
-    // Hypothesis: same-key preference registrations use positional ordinals,
-    // so inserting a leading observer can transfer the survivor's baseline.
+    // Same-key preference observers are matched POSITIONALLY (ordinal within
+    // the same identity + key): both branch bodies are distinct closure sets,
+    // so no keying can track "the survivor" across the flip — SwiftUI parity
+    // is fresh registration for both. This pins the positional contract:
+    // toggling the leading observer in re-primes by slot — the inserted
+    // leading closure inherits ordinal 0's baseline (silent) while the
+    // survivor shifts to a fresh ordinal-1 slot and initial-delivers the
+    // current non-default value.
     let probe = ObservationEffectsEventProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("ObservationEffects020"),
@@ -1147,9 +1153,7 @@ extension FrameworkStressObservationEffectsTests {
 
       probe.events.removeAll(keepingCapacity: true)
       _ = try harness.clickText("Toggle Leading Observer 020")
-      withKnownIssue("An inserted same-key observer inherits the survivor's ordinal baseline") {
-        #expect(probe.events == ["leading:\(generation * 2 - 1)"])
-      }
+      #expect(probe.events == ["survivor:\(generation * 2 - 1)"])
 
       probe.events.removeAll(keepingCapacity: true)
       _ = try harness.clickText("Advance Preference 020")

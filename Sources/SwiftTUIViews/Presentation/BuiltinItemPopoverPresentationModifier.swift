@@ -214,7 +214,11 @@ package struct HostedPopoverPresentation: View {
 
   package var body: some View {
     GeometryReader { proxy in
-      let sourceFrame = proxy.placedFrameTable.frame(for: item.sourceIdentity)
+      // The rendered extent, not the wrapper's own recorded frame: the
+      // popover source may sit under a descendant-translating modifier
+      // (`.offset`), whose wrapper rect never moves while the content
+      // renders translated. Anchoring must follow where the source draws.
+      let sourceFrame = proxy.placedFrameTable.renderedFrame(for: item.sourceIdentity)
       PopoverPlacementLayout(
         containerSize: proxy.size,
         sourceFrame: sourceFrame,

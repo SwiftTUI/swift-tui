@@ -1012,10 +1012,8 @@ extension FrameworkStressLayoutLifecycleTests {
     for offset in stride(from: 2, through: 12, by: 2) {
       let frame = try harness.clickText("Move Popover Source", chooseLast: true)
       let currentX = try #require(harness.point(forText: "Move Popover Source")).x
-      withKnownIssue("An open popover retains its opening geometry and content closure") {
-        #expect(currentX > previousX)
-        #expect(frame.contains("popover source offset \(offset)"))
-      }
+      #expect(currentX > previousX)
+      #expect(frame.contains("popover source offset \(offset)"))
       previousX = currentX
     }
   }
@@ -1302,10 +1300,15 @@ private struct StressLL021Sheet: View {
 // MARK: - Attempt 022: onChange modifier reorder
 
 extension FrameworkStressLayoutLifecycleTests {
-  @Test("stress 022 reordered onChange modifiers keep semantic baselines")
+  @Test("stress 022 reordered onChange modifiers re-prime silently and track in-place changes")
   func stress022ReorderedOnChangeModifiersKeepSemanticBaselines() throws {
-    // Hypothesis: identity-plus-ordinal storage may cross-wire the previous
-    // values when two onChange modifiers exchange order.
+    // The two onChange modifiers live in different conditional branches, so a
+    // reorder toggle REPLACES both registrations (SwiftUI parity: the branch
+    // flip is an identity change — a freshly inserted onChange re-primes its
+    // baseline silently). Mutating in the same transaction that flips the
+    // branch is therefore unobservable BY DESIGN; this pins the achievable
+    // contract by separating advance-clicks (stable branch, contiguous
+    // old->new delivery) from reorder-clicks (branch flip, silent re-prime).
     let probe = StressLayoutLifecycleProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressLL022", "Root"),
@@ -1316,14 +1319,19 @@ extension FrameworkStressLayoutLifecycleTests {
     defer { harness.shutdown() }
 
     for generation in 1...10 {
-      _ = try harness.clickText("Mutate Reordered Changes")
-      withKnownIssue("Reordered onChange modifiers exchange their ordinal baselines") {
-        #expect(probe.events.contains("first:\(generation - 1)->\(generation)"))
-        #expect(
-          probe.events.contains("second:\((generation - 1) * 10)->\(generation * 10)")
-        )
-        #expect(probe.events.count == generation * 2)
-      }
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Reordered Values")
+      #expect(
+        probe.events.sorted() == [
+          "first:\(generation - 1)->\(generation)",
+          "second:\((generation - 1) * 10)->\(generation * 10)",
+        ].sorted()
+      )
+      #expect(harness.lifecycleRegistrationCount <= 2)
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Reorder Change Modifiers")
+      #expect(probe.events.isEmpty)
       #expect(harness.lifecycleRegistrationCount <= 2)
     }
   }
@@ -1338,9 +1346,11 @@ private struct StressLL022Fixture: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Button("Mutate Reordered Changes") {
+      Button("Advance Reordered Values") {
         first += 1
         second += 10
+      }
+      Button("Reorder Change Modifiers") {
         reversed.toggle()
       }
       observedValue

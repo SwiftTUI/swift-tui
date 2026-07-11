@@ -247,6 +247,29 @@ package struct PlacedFrameTable: Equatable, Sendable {
     return frame
   }
 
+  /// The union of the identity's own recorded frame with every recorded
+  /// descendant frame — the subtree's rendered extent.
+  ///
+  /// A node's own recorded frame is the rect its parent assigned, which
+  /// descendant-translating modifiers (`.offset`) never move: the wrapper
+  /// stays at the un-offset rect while the child renders translated.
+  /// Anchoring consumers (an open popover following its source) must track
+  /// where the subtree actually draws, so they read the union. For a source
+  /// whose descendants all lie inside the parent-assigned rect (the common
+  /// case) the union equals `frame(for:)`.
+  package func renderedFrame(
+    for identity: Identity
+  ) -> CellRect? {
+    guard var union = frame(for: identity) else {
+      return nil
+    }
+    for (entryIdentity, rect) in framesByIdentity
+    where entryIdentity.isDescendant(of: identity) {
+      union = union.union(rect)
+    }
+    return union
+  }
+
   package func frame(
     for payload: AnchorPayload
   ) -> CellRect? {
