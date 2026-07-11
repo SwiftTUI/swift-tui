@@ -152,4 +152,15 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 016 lone high surrogates reject the document")
+  func styleTransport016LoneHighSurrogatesRejectTheDocument() {
+    // Hypothesis: a high surrogate can be emitted as a replacement scalar.
+    for json in [#"{"v":"\uD83D"}"#, #"{"v":"\uD83Dx"}"#, #"{"v":"\uD83D\u0041"}"#] {
+      var parser = StyleTransportJSONParser(json)
+      #expect(parser.parse() == nil)
+    }
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
