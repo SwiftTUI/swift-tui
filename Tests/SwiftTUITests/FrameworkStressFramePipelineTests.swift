@@ -1314,3 +1314,41 @@ private func framePipelineScheduledFrame(
     supersededAnimationBatchIDs: supersededBatchIDs
   )
 }
+
+// MARK: - Attempt 022: replay deduplicates superseded batches
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 022 duplicate replay deduplicates superseded batches")
+  func framePipeline022DuplicateReplayDeduplicatesSupersededBatches() throws {
+    // Hypothesis: retrying cancellation replay can append the same displaced
+    // batch repeatedly, firing or parking one completion more than once.
+    let scheduler = FrameScheduler()
+    let newerBatch = AnimationBatchID(220)
+    let cancelledBatch = AnimationBatchID(221)
+    let earlierSuperseded = AnimationBatchID(222)
+    scheduler.requestInvalidation(
+      of: [testIdentity("FramePipeline022", "Newer")],
+      animation: .disabled,
+      batchID: newerBatch
+    )
+    let cancelled = framePipelineScheduledFrame(
+      identities: [testIdentity("FramePipeline022", "Cancelled")],
+      animation: .disabled,
+      batchID: cancelledBatch,
+      supersededBatchIDs: [earlierSuperseded]
+    )
+
+    scheduler.replayCancelledFrameIntent(cancelled)
+    scheduler.replayCancelledFrameIntent(cancelled)
+
+    let frame = try #require(
+      scheduler.consumeReadyFrame(
+        at: MonotonicInstant(offset: .seconds(70_022)),
+        armedBefore: scheduler.deadlineArmCut
+      )
+    )
+    #expect(frame.animationBatchID == newerBatch)
+    #expect(frame.supersededAnimationBatchIDs == [cancelledBatch, earlierSuperseded])
+    #expect(Set(frame.supersededAnimationBatchIDs).count == 2)
+  }
+}
