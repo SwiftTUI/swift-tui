@@ -77,6 +77,12 @@ package final class ScrollMomentumController {
     /// dies a frame early.
     var residual: Vector
     var lastTick: MonotonicInstant
+    /// The source token of the binding registered under this route when the
+    /// fling began (nil when the producer supplies none). Registrations
+    /// rebuild every resolve pass, so replacement alone proves nothing; a
+    /// CHANGED non-nil token proves the authored binding was swapped and the
+    /// fling must retire instead of writing the replacement's binding.
+    var bindingSourceID: AnyID?
   }
 
   private let configuration: Configuration
@@ -111,7 +117,8 @@ package final class ScrollMomentumController {
     offsetVelocity: Vector,
     canScrollX: Bool,
     canScrollY: Bool,
-    now: MonotonicInstant
+    now: MonotonicInstant,
+    bindingSourceID: AnyID? = nil
   ) -> Bool {
     let velocity = Vector(
       dx: canScrollX ? clampMagnitude(offsetVelocity.dx, to: configuration.maximumVelocity) : 0,
@@ -121,8 +128,37 @@ package final class ScrollMomentumController {
       active.removeValue(forKey: identity)
       return false
     }
-    active[identity] = Momentum(velocity: velocity, residual: .zero, lastTick: now)
+    active[identity] = Momentum(
+      velocity: velocity,
+      residual: .zero,
+      lastTick: now,
+      bindingSourceID: bindingSourceID
+    )
     return true
+  }
+
+  /// The identities of every route with live momentum.
+  package var activeIdentities: [Identity] {
+    Array(active.keys)
+  }
+
+  /// Retires `identity`'s momentum when its registered binding was swapped
+  /// for a different authored binding — both the seeded and the current
+  /// token must be non-nil and differ (a nil on either side means the
+  /// producer supplies no identity, so replacement cannot be distinguished
+  /// from an ordinary re-resolve and the fling is preserved).
+  package func retireIfBindingChanged(
+    identity: Identity,
+    currentSourceID: AnyID?
+  ) {
+    guard let momentum = active[identity],
+      let seeded = momentum.bindingSourceID,
+      let currentSourceID,
+      seeded != currentSourceID
+    else {
+      return
+    }
+    active.removeValue(forKey: identity)
   }
 
   /// Cancels momentum for an exact route identity (e.g. it hit a content edge or

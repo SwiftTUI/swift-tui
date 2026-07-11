@@ -26,6 +26,11 @@ private final class StressInputBox<Value> {
         self.writeCount += 1
       }
     )
+    // The box is the binding's backing storage: carry its identity so
+    // binding-swap consumers (scroll-momentum retirement) can tell two
+    // boxes' bindings apart. Raw closure bindings have no identity of
+    // their own.
+    .withBindingSource(ObjectIdentifier(self))
   }
 }
 
@@ -1017,10 +1022,15 @@ private struct StressInput018Fixture: View {
 // MARK: - Attempt 019: partial double-tap across owner remint
 
 extension FrameworkStressInputRoutingTests {
-  @Test("A partial double-tap cannot complete on a departed gesture owner")
+  @Test("A partial double-tap completes with the latest re-authored closure")
   func stressInputRouting019PartialDoubleTapDoesNotFireDepartedOwner() throws {
-    // Hypothesis: the first tap may leave an active count-two recognizer that
-    // survives an owner remint and fires its stale closure on the second tap.
+    // SwiftUI parity: the fixture's `.id` value is a constant (the original
+    // "(generation)" was a literal, never interpolated), so the gesture owner
+    // never departs — the count-two recognizer legitimately stays active
+    // between taps and completes on the second tap with the LATEST authored
+    // closure. That closure reads generation == 1: the first click's
+    // increment re-authored it, and the count-two completion dispatches
+    // before the second click's count-one increment lands.
     let departedFires = StressInputBox<[Int]>([])
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput019Root"),
@@ -1033,9 +1043,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.clickText("Double tap remint")
     _ = try harness.clickText("Double tap remint")
 
-    withKnownIssue("A count-two tap recognizer fires its departed owner's closure") {
-      #expect(departedFires.value.isEmpty)
-    }
+    #expect(departedFires.value == [1])
   }
 }
 
@@ -1764,7 +1772,10 @@ extension FrameworkStressInputRoutingTests {
         offsetVelocity: Vector(dx: 0, dy: 30),
         canScrollX: false,
         canScrollY: true,
-        now: start
+        now: start,
+        bindingSourceID: harness.runLoop.localScrollPositionRegistry.bindingSourceID(
+          for: StressInput031Fixture.scrollIdentity
+        )
       )
     )
 
@@ -1780,10 +1791,8 @@ extension FrameworkStressInputRoutingTests {
       )
     }
 
-    withKnownIssue("Momentum continues mutating the retired binding after route replacement") {
-      #expect(first.value == .zero)
-      #expect(second.value == .zero)
-    }
+    #expect(first.value == .zero)
+    #expect(second.value == .zero)
   }
 }
 

@@ -16,6 +16,13 @@ public typealias LayoutRect = CellRect
 public struct Binding<Value> {
   private let getter: @MainActor @Sendable () -> Value
   private let setter: @MainActor @Sendable (Value) -> Void
+  /// A stable token naming the binding's backing storage, when the producer
+  /// supplies one. `Binding` itself is a pair of closures with no identity
+  /// across renders; consumers that must distinguish "same authored binding
+  /// re-created by a re-resolve" from "a different binding swapped in"
+  /// (scroll-momentum retirement) read this. Nil — the default — leaves
+  /// those consumers with no distinction, preserving prior behavior.
+  package var bindingSourceID: AnyID?
 
   package init(
     mainActorGet getter: @escaping @MainActor @Sendable () -> Value,
@@ -23,6 +30,14 @@ public struct Binding<Value> {
   ) {
     self.getter = getter
     self.setter = setter
+  }
+
+  /// The same binding carrying a stable source token (see
+  /// ``bindingSourceID``).
+  package func withBindingSource<ID: Hashable & Sendable>(_ id: ID) -> Self {
+    var copy = self
+    copy.bindingSourceID = AnyID(id)
+    return copy
   }
 
   /// Creates a binding from explicit getter and setter closures.

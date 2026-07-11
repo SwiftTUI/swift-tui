@@ -97,7 +97,8 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           },
           applyOffset: { offset in
             binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
-          }
+          },
+          bindingSourceID: binding.bindingSourceID
         )
         let scrollCommandRegistry = context.scrollCommandRegistry
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in

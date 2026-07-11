@@ -248,6 +248,9 @@ extension RunLoop {
       scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets,
       accessibilityNodes: renderedArtifacts.semanticSnapshot.accessibilityNodes
     )
+    // The frame's scroll registrations are current now — retire any fling
+    // whose route re-registered a different authored binding this frame.
+    reconcileScrollMomentumBindings()
     convergence.focusGraphChanged = convergence.focusGraphChanged || focusChanged
     convergence.focusBindingChanged =
       convergence.focusBindingChanged || appliedFocusRequest || appliedDefaultFocusRequest

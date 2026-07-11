@@ -17,15 +17,25 @@ package struct ScrollPositionRegistrationSnapshot {
   package var identity: Identity
   package var currentOffset: @MainActor () -> ScrollOffset
   package var applyOffset: @MainActor (ScrollOffset) -> Void
+  /// The authored binding's source token, when its producer supplies one.
+  /// Registrations rebuild every resolve pass, so "registration replaced"
+  /// never means "binding replaced" — this token is the only currency that
+  /// distinguishes a re-resolve of the same authored binding (token stable)
+  /// from a rebind to a different one (token changes). Consumed by scroll
+  /// momentum to retire a fling whose binding was swapped out from under
+  /// it. Nil (raw closures carry no identity) disables the distinction.
+  package var bindingSourceID: AnyID?
 
   package init(
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
-    applyOffset: @escaping @MainActor (ScrollOffset) -> Void
+    applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
+    bindingSourceID: AnyID? = nil
   ) {
     self.identity = identity
     self.currentOffset = currentOffset
     self.applyOffset = applyOffset
+    self.bindingSourceID = bindingSourceID
   }
 }
 
@@ -60,15 +70,23 @@ package final class LocalScrollPositionRegistry: Equatable {
   package func register(
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
-    applyOffset: @escaping @MainActor (ScrollOffset) -> Void
+    applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
+    bindingSourceID: AnyID? = nil
   ) {
     let registration = ScrollPositionRegistrationSnapshot(
       identity: identity,
       currentOffset: currentOffset,
-      applyOffset: applyOffset
+      applyOffset: applyOffset,
+      bindingSourceID: bindingSourceID
     )
     registrations[identity] = registration
     ViewNodeContext.current?.recordScrollPositionRegistration(registration)
+  }
+
+  /// The registered binding's source token for `identity`, when its producer
+  /// supplied one (see ``ScrollPositionRegistrationSnapshot/bindingSourceID``).
+  package func bindingSourceID(for identity: Identity) -> AnyID? {
+    registrations[identity]?.bindingSourceID
   }
 
   package func updateGeometry(

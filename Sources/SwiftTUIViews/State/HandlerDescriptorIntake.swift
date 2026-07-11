@@ -308,7 +308,8 @@ package struct HandlerDescriptorIntake {
   package func registerScrollPosition(
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
-    applyOffset: @escaping @MainActor (ScrollOffset) -> Void
+    applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
+    bindingSourceID: AnyID? = nil
   ) {
     let scope = dispatchScope
     context.localScrollPositionRegistry?.register(
@@ -318,7 +319,8 @@ package struct HandlerDescriptorIntake {
         withImperativeAuthoringContext(scope) {
           applyOffset(offset)
         }
-      }
+      },
+      bindingSourceID: bindingSourceID
     )
   }
 

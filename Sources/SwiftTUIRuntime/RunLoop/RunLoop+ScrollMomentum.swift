@@ -51,10 +51,29 @@ extension RunLoop {
       offsetVelocity: offsetVelocity,
       canScrollX: canScrollX,
       canScrollY: canScrollY,
-      now: timestamp
+      now: timestamp,
+      bindingSourceID: localScrollPositionRegistry.bindingSourceID(for: routeIdentity)
     )
     if started {
       scheduler.requestDeadline(timestamp.advanced(by: scrollMomentumFrameInterval))
+    }
+  }
+
+  /// Retires any fling whose scroll route re-registered a DIFFERENT authored
+  /// binding since the fling began (a conditional swapped the `position:`
+  /// binding under a stable route identity). Runs after focus sync, once the
+  /// frame's live registrations are current. Late-binding dispatch would
+  /// otherwise glide the fling into the replacement binding — a scroll the
+  /// new binding's owner never initiated.
+  func reconcileScrollMomentumBindings() {
+    guard scrollMomentum.hasActiveMomentum else {
+      return
+    }
+    for identity in scrollMomentum.activeIdentities {
+      scrollMomentum.retireIfBindingChanged(
+        identity: identity,
+        currentSourceID: localScrollPositionRegistry.bindingSourceID(for: identity)
+      )
     }
   }
 
