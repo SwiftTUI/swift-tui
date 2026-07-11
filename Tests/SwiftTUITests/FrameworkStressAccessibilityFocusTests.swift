@@ -1031,3 +1031,79 @@ private struct StressAF019Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 020: FocusState retarget during reorder
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 020 FocusState request follows reordered target")
+  func stress020FocusStateRequestFollowsReorderedTarget() throws {
+    // Hypothesis: a FocusState write issued in the same action as a sibling reorder can resolve
+    // against the pre-reorder binding ordinal and focus the wrong live target.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF020", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressAF020Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<9 {
+      _ = try harness.clickText("Retarget and reorder")
+    }
+
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == StressAF020Fixture.secondIdentity)
+    #expect(harness.frame.contains("FocusState value second"))
+    #expect(harness.focusBindingRegistrationCount == 2)
+  }
+}
+
+private enum StressAF020Field: Hashable {
+  case first
+  case second
+}
+
+@MainActor
+private struct StressAF020Fixture: View {
+  static let firstIdentity = testIdentity("StressAF020", "First")
+  static let secondIdentity = testIdentity("StressAF020", "Second")
+
+  @State private var reversed = false
+  @FocusState private var focusedField: StressAF020Field?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("FocusState value \(focusLabel)")
+      Button("Retarget and reorder") {
+        reversed.toggle()
+        focusedField = reversed ? .second : .first
+      }
+      if reversed {
+        second
+        first
+      } else {
+        first
+        second
+      }
+    }
+  }
+
+  private var first: some View {
+    Button("First FocusState target") {}
+      .id(Self.firstIdentity)
+      .focused($focusedField, equals: .first)
+  }
+
+  private var second: some View {
+    Button("Second FocusState target") {}
+      .id(Self.secondIdentity)
+      .focused($focusedField, equals: .second)
+  }
+
+  private var focusLabel: String {
+    switch focusedField {
+    case .first: "first"
+    case .second: "second"
+    case nil: "none"
+    }
+  }
+}
