@@ -1398,9 +1398,7 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(40))
     )
     let remaining = controller.debugStateSnapshot().removingIdentities
-    withKnownIssue("Reinsertion does not cancel only its matching removal overlay") {
-      #expect(remaining == [secondID])
-    }
+    #expect(remaining == [secondID])
   }
 }
 

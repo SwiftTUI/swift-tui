@@ -946,8 +946,8 @@ private final class TextContentBox<Value> {
 extension FrameworkStressTextContentTests {
   @Test("stress text content 026 focused field edits live external replacement")
   func textContent026FocusedFieldEditsLiveExternalReplacement() throws {
-    // Hypothesis: a focused TextField can keep editing its internal pre-replacement string after
-    // the same binding receives equal-length external content at a retained identity.
+    // Hypothesis: a focused TextField can keep editing its internal pre-replacement string instead
+    // of adopting equal-length external content and resetting its selection to that content's end.
     let text = TextContentBox("abcd")
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("TextContent026Root"),
@@ -964,9 +964,9 @@ extension FrameworkStressTextContentTests {
     _ = try harness.focus(TextContent026Fixture.fieldIdentity)
     _ = try harness.pressKey(KeyPress(.character("!")))
 
-    #expect(text.value == "WX!YZ")
+    #expect(text.value == "WXYZ!")
     #expect(text.writeCount == 1)
-    #expect(harness.frame.contains("WX!YZ"))
+    #expect(harness.frame.contains("WXYZ!"))
   }
 }
 
@@ -1081,8 +1081,8 @@ private struct TextContent028Fixture: View {
 extension FrameworkStressTextContentTests {
   @Test("stress text content 029 secure field remasks external replacement")
   func textContent029SecureFieldRemasksExternalReplacement() throws {
-    // Hypothesis: a focused SecureField can preserve old mask length or stale plaintext/caret state
-    // when its bound value is externally replaced at the same retained identity.
+    // Hypothesis: a focused SecureField can preserve stale plaintext or carry its old selection
+    // into unrelated content when its bound value is externally replaced at a retained identity.
     let text = TextContentBox("secret")
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("TextContent029Root"),
@@ -1099,7 +1099,7 @@ extension FrameworkStressTextContentTests {
     _ = try harness.focus(TextContent029Fixture.fieldIdentity)
     _ = try harness.pressKey(KeyPress(.character("!")))
 
-    #expect(text.value == "alph!abet")
+    #expect(text.value == "alphabet!")
     #expect(text.writeCount == 1)
     #expect(harness.frame.contains(String(repeating: "•", count: text.value.count)))
     #expect(!harness.frame.contains("secret"))
