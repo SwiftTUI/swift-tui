@@ -95,6 +95,73 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 020: line axis and legend topology replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 020 line axes and legend move through hidden topology")
+  func chartData020LineAxesAndLegendMoveThroughHiddenTopology() {
+    // Hypothesis: axis and legend branches can survive hidden/visible replacement,
+    // retaining obsolete chrome or dropping the newly inserted tick topology.
+    struct Root: View {
+      let generation: Int
+
+      var xAxis: LineChartXAxis {
+        switch generation % 3 {
+        case 0: .hidden
+        case 1: .values(count: 3)
+        default: .values(count: 6)
+        }
+      }
+
+      var yAxis: LineChartYAxis {
+        generation.isMultiple(of: 2) ? .hidden : .values(count: 5)
+      }
+
+      var legend: LineChartLegendConfig {
+        switch generation % 3 {
+        case 0: .hidden
+        case 1: .top
+        default: .bottom
+        }
+      }
+
+      var body: some View {
+        LineChart(
+          "Chrome \(generation)",
+          series: [
+            .init(
+              "Legend \(generation)",
+              points: [
+                .init(x: 0, y: Double(generation)),
+                .init(x: 50, y: Double(20 - generation % 7)),
+                .init(x: 100, y: Double(30 + generation)),
+              ]
+            )
+          ],
+          height: 5 + generation % 4,
+          width: 34 + generation % 7
+        )
+        .chartXAxis(xAxis)
+        .chartYAxis(yAxis)
+        .chartLegend(legend)
+      }
+    }
+
+    chartDataExercise(attempt: "020", proposal: .init(width: 66, height: 16)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Chrome \(generation)"))
+      if root.legend.position == .hidden {
+        #expect(!text.contains("Legend \(generation)"))
+      } else {
+        #expect(text.contains("Legend \(generation)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 019: line series cardinality and z-order churn
 
 extension FrameworkStressChartDataTests {
