@@ -64,3 +64,37 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 002: edge whitespace exact-fit churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 002 edge whitespace follows exact-fit proposals")
+  func textContent002EdgeWhitespaceFollowsExactFitProposals() {
+    // Hypothesis: retained wrapping can discard authored leading or trailing whitespace after an
+    // exact-fit proposal consumes the same separator run at a different line boundary.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent002")
+
+    for generation in 0..<20 {
+      let width = generation.isMultiple(of: 2) ? 6 : 5
+      let content = generation.isMultiple(of: 2) ? "  AA BB  " : "   C D "
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text(content).textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.cells[0][0].character == " ")
+      #expect(frames.retained.rasterSurface.cells[0][1].character == " ")
+      #expect(
+        frames.retained.rasterSurface.lines.allSatisfy {
+          textContentVisibleWidth($0) <= width
+        }
+      )
+    }
+  }
+}
