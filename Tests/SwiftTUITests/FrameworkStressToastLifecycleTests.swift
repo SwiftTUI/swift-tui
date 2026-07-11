@@ -1092,3 +1092,51 @@ private struct ToastLifecycle021Root: View {
     .toast("nonmodal interaction toast", isPresented: $isPresented, duration: nil)
   }
 }
+
+// MARK: - Attempt 022: repeated focus neutrality
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 022 repeated activation never steals base focus")
+  func toastLifecycle022RepeatedActivationNeverStealsBaseFocus() throws {
+    // Hypothesis: repeated nonmodal overlay insertion can still perturb focus-region ordering or
+    // push a toast attachment identity into the modal restoration path.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle022"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ToastLifecycle022Root()
+    }
+    defer { harness.shutdown() }
+
+    let expectedFocus = try harness.focusIdentity(forText: "Focus Target 022")
+    _ = try harness.focus(expectedFocus)
+    let baselineRegions = harness.focusRegionCount
+
+    for cycle in 1...12 {
+      let frame = try harness.pressKey(KeyPress(.character("t"), modifiers: .ctrl))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == expectedFocus)
+      #expect(harness.focusRegionCount == baselineRegions)
+      #expect(harness.focusModalRestorationStackCount == 0)
+      #expect(toastLifecycleEntryCount(in: harness) == (cycle.isMultiple(of: 2) ? 0 : 1))
+      #expect(frame.contains("focus neutral toast") == !cycle.isMultiple(of: 2))
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle022Root: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    Panel(id: "toast-lifecycle-022-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Focus Target 022") {}
+        Button("Toggle Focus Toast 022") { isPresented.toggle() }
+      }
+    }
+    .keyCommand("Toggle Focus Toast 022", key: .character("t"), modifiers: .ctrl) {
+      isPresented.toggle()
+    }
+    .toast("focus neutral toast", isPresented: $isPresented, duration: nil)
+  }
+}
