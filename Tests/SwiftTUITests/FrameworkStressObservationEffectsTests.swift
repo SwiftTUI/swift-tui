@@ -681,13 +681,7 @@ extension FrameworkStressObservationEffectsTests {
     for generation in 1...12 {
       let frame = try harness.clickText("Flip Transform Order 012")
       let suffix = generation.isMultiple(of: 2) ? "" : "|T\(generation)"
-      if generation.isMultiple(of: 2) {
-        #expect(frame.contains("012 value writer-\(generation)\(suffix)"))
-      } else {
-        withKnownIssue("A reordered transformEnvironment keeps its generation-zero closure") {
-          #expect(frame.contains("012 value writer-\(generation)\(suffix)"))
-        }
-      }
+      #expect(frame.contains("012 value writer-\(generation)\(suffix)"))
     }
   }
 }
@@ -902,9 +896,7 @@ extension FrameworkStressObservationEffectsTests {
 
     for generation in 1...16 {
       let frame = try harness.clickText("Advance Preference 016")
-      withKnownIssue("transformPreference retains its generation-zero closure") {
-        #expect(frame.contains("016 values [1, \(generation)]"))
-      }
+      #expect(frame.contains("016 values [1, \(generation)]"))
     }
   }
 }
@@ -981,9 +973,7 @@ extension FrameworkStressObservationEffectsTests {
         generation.isMultiple(of: 2)
         ? "[\(generation), \(100 + generation)]"
         : "[\(100 + generation), \(generation)]"
-      withKnownIssue("A reordered transformPreference retains its generation-zero closure") {
-        #expect(frame.contains("017 values \(expected)"))
-      }
+      #expect(frame.contains("017 values \(expected)"))
     }
   }
 }

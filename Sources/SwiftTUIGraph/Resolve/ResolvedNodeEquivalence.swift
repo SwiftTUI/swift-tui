@@ -10,6 +10,10 @@ extension ResolvedNode {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
+      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+      // cached measured node would carry the previous capture's guides into
+      // placement, so guide-carrying nodes never reuse cached measurements.
+      && !layoutMetadata.hasExplicitAlignmentGuides
       && layoutRealizedContent?.equivalenceSignature
         == other.layoutRealizedContent?.equivalenceSignature
       && drawPayload.isEquivalentForMeasurement(to: other.drawPayload)
@@ -35,6 +39,9 @@ extension ResolvedNode {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
+      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+      // guide-carrying node can never prove its placement inputs unchanged.
+      && !layoutMetadata.hasExplicitAlignmentGuides
       && layoutRealizedContent?.equivalenceSignature
         == other.layoutRealizedContent?.equivalenceSignature
       && drawPayload == other.drawPayload
@@ -79,6 +86,9 @@ extension ResolvedNode {
       environmentSnapshot == other.environmentSnapshot,
       layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior),
       layoutMetadata == other.layoutMetadata,
+      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+      // guide-carrying node can never prove its placement inputs unchanged.
+      !layoutMetadata.hasExplicitAlignmentGuides,
       layoutRealizedContent?.equivalenceSignature
         == other.layoutRealizedContent?.equivalenceSignature,
       drawPayload == other.drawPayload,

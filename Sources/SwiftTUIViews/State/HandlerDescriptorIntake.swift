@@ -79,6 +79,23 @@ package struct HandlerDescriptorIntake {
       .withEnvironmentValues(context.environmentValues)
   }
 
+  /// Control-family order for a site that captured its snapshot at the public
+  /// API call: the construction-time snapshot (the enclosing body that owns
+  /// the handler's dynamic properties) wins; the resolve-time ambient is the
+  /// fallback. A user closure capturing the enclosing view's `@State` must
+  /// dispatch under that body's scope — the ambient during a modifier's
+  /// resolve names the node currently evaluating, which below a child node
+  /// boundary is NOT the closure's owner (the stale-`@State` family).
+  package init(
+    context: ResolveContext,
+    preferringSnapshot snapshot: ImperativeAuthoringContextSnapshot?
+  ) {
+    self.context = context
+    dispatchScope =
+      (snapshot ?? currentImperativeAuthoringContextSnapshot())?
+      .withEnvironmentValues(context.environmentValues)
+  }
+
   /// The identity a fired handler's follow-up invalidation should target:
   /// the view that authored the registration.
   package var followUpInvalidationIdentity: Identity? {

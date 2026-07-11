@@ -117,6 +117,16 @@ package struct LayoutMetadata: Sendable {
     return copy
   }
 
+  /// True when this metadata carries any explicit alignment-guide closure.
+  /// Guide closures are invisible to `==` (`alignmentKeys` compares only
+  /// which alignments have guides, not what they compute), so equivalence
+  /// gates that reuse cached placement must treat guide-carrying nodes as
+  /// never provably unchanged — a re-authored closure with a different
+  /// capture would otherwise keep serving the first capture's placement.
+  package var hasExplicitAlignmentGuides: Bool {
+    !horizontalAlignmentGuideStorage.isEmpty || !verticalAlignmentGuideStorage.isEmpty
+  }
+
   package func hasExplicitHorizontalAlignmentGuide(
     _ alignment: HorizontalAlignment
   ) -> Bool {

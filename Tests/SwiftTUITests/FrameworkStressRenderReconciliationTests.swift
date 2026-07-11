@@ -1100,9 +1100,7 @@ extension FrameworkStressRenderReconciliationTests {
         && retained.placedTree == fresh.placedTree
     }
 
-    withKnownIssue("A stable alignmentGuide retains its first closure capture") {
-      #expect(everyFrameMatchedFreshLayout)
-    }
+    #expect(everyFrameMatchedFreshLayout)
   }
 }
 

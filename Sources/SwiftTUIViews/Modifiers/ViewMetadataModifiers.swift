@@ -467,10 +467,11 @@ public struct EnvironmentTransformModifier<Value>: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     content.resolveElements(
-      in: context.transformingEnvironment(
-        keyPath,
-        transform: transform
-      )
+      in: context.transformingEnvironment(keyPath) { value in
+        content.withAuthoredClosureScope {
+          transform(&value)
+        }
+      }
     )
   }
 }

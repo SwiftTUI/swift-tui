@@ -54,9 +54,13 @@ public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendab
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
+    // Construction-scope preference: the drop action captures the enclosing
+    // body's `@State` (a consume-policy flag read at dispatch), so it must
+    // dispatch under the scope that authored it, not whichever node this
+    // modifier happens to resolve below.
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerDropDestination(at: node.identity, handler: action)
     return [node]

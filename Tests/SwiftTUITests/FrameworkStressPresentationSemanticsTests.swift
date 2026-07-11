@@ -1511,9 +1511,7 @@ extension FrameworkStressPresentationSemanticsTests {
     _ = try harness.clickText("Inner consumes drops")
     _ = try harness.focusText("Drop focus target")
     _ = try harness.drop(paths: [DroppedPath("/tmp/second.txt")])
-    withKnownIssue("A retained drop destination keeps its first consume-policy closure") {
-      #expect(probe.markers == ["inner-false", "outer", "inner-true"])
-    }
+    #expect(probe.markers == ["inner-false", "outer", "inner-true"])
     #expect(harness.dropDestinationRegistrationCount == 2)
   }
 }

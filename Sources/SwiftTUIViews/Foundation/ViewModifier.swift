@@ -60,6 +60,28 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
+  /// Runs a user-authored closure carried by the modifier *value* under the
+  /// authoring scope captured when the modifier was constructed (the
+  /// enclosing body). Dynamic-property reads inside such closures must reach
+  /// the authoring owner's state slots: the ambient context during a
+  /// modifier's resolve names the node currently evaluating, which — below a
+  /// child node boundary, or on a selective re-resolution that never re-ran
+  /// the authoring body — is NOT the closure's owner, so an unwrapped read
+  /// would seed and then forever serve a foreign node's slot (the
+  /// stale-`@State`-binding family; `HandlerDescriptorIntake`'s
+  /// construction-scope preference is the dispatch-side twin of this seam).
+  /// A modifier with no captured scope leaves the ambient context untouched.
+  package func withAuthoredClosureScope<Result>(
+    _ body: () -> Result
+  ) -> Result {
+    guard let scope = authoringScope?.authoringContext else {
+      return body()
+    }
+    return withAuthoringContext(scope) {
+      body()
+    }
+  }
+
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     applyAuthoringContext {
       resolveView(base, in: context)

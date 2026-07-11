@@ -113,7 +113,9 @@ public struct AnchorPreferenceWritingModifier<Key: PreferenceKey, Value: Sendabl
     )
     node.preferenceValues.merge(
       Key.self,
-      value: transform(anchor)
+      value: content.withAuthoredClosureScope {
+        transform(anchor)
+      }
     )
     return [node]
   }
@@ -136,7 +138,9 @@ public struct AnchorPreferenceTransformModifier<Key: PreferenceKey, Value: Senda
       kind: source.kind
     )
     node.preferenceValues.transform(Key.self) { value in
-      transform(&value, anchor)
+      content.withAuthoredClosureScope {
+        transform(&value, anchor)
+      }
     }
     return [node]
   }
@@ -163,10 +167,11 @@ public struct PreferenceTransformModifier<Key: PreferenceKey>: PrimitiveViewModi
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    node.preferenceValues.transform(
-      Key.self,
-      transform
-    )
+    node.preferenceValues.transform(Key.self) { value in
+      content.withAuthoredClosureScope {
+        transform(&value)
+      }
+    }
     return [node]
   }
 }
@@ -219,7 +224,14 @@ public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
         transform(baseNode.preferenceValues[Key.self])
       }
     }
-    let overlayNode = overlayView.resolve(in: context.child(component: .named("overlay")))
+    // The overlay derives from the base subtree's preference fold — data the
+    // invalidation tracker does not see, so the overlay subtree is never in
+    // any invalidation cone of its own. Reaching this resolve means the
+    // wrapper recomputed and the fold may have changed; retained reuse below
+    // here would keep serving content computed from the previous fold.
+    var overlayContext = context.child(component: .named("overlay"))
+    overlayContext.withinChurnedSubtree = true
+    let overlayNode = overlayView.resolve(in: overlayContext)
     return [
       ResolvedNode(
         identity: context.identity,
@@ -259,9 +271,11 @@ public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: 
         transform(baseNode.preferenceValues[Key.self])
       }
     }
-    let backgroundNode = backgroundView.resolve(
-      in: context.child(component: .named("background"))
-    )
+    // Mirrors the overlay variant: the background derives from the fold, so
+    // reuse below here must not outlive the wrapper's recompute.
+    var backgroundContext = context.child(component: .named("background"))
+    backgroundContext.withinChurnedSubtree = true
+    let backgroundNode = backgroundView.resolve(in: backgroundContext)
     return [
       ResolvedNode(
         identity: context.identity,
