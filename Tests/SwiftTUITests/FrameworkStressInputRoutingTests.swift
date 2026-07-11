@@ -1780,3 +1780,60 @@ private struct StressInput031Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 032: stable ScrollView identity rebinds position storage
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A stable ScrollView routes wheel writes only to its current position binding")
+  func stressInputRouting032ScrollViewRebindsCurrentPositionBinding() throws {
+    // Hypothesis: restored pointer or position registrations may retain binding
+    // A after the stable ScrollView is re-authored with binding B.
+    let first = StressInputBox(ScrollPosition.zero)
+    let second = StressInputBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput032Root"),
+      size: .init(width: 40, height: 9)
+    ) {
+      StressInput032Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Rebind row 0")
+    _ = try harness.pressKey(KeyPress(.character("r")))
+    let point = try #require(harness.point(forText: "Rebind row 1"))
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+
+    withKnownIssue("A stable ScrollView retains its previous position binding") {
+      #expect(first.value == .zero)
+      #expect(second.value == ScrollPosition(x: 0, y: 1))
+    }
+  }
+}
+
+private struct StressInput032Fixture: View {
+  static let scrollIdentity = testIdentity("StressInput032", "Scroll")
+
+  let first: StressInputBox<ScrollPosition>
+  let second: StressInputBox<ScrollPosition>
+  @State private var targetsSecond = false
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: targetsSecond ? second.binding() : first.binding()
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<18) { row in
+          Text("Rebind row \(row)")
+        }
+      }
+    }
+    .id(Self.scrollIdentity)
+    .frame(width: 28, height: 5, alignment: .topLeading)
+    .onKeyPress(.character("r")) { _ in
+      targetsSecond = true
+      return .handled
+    }
+  }
+}
