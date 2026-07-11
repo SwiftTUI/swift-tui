@@ -183,4 +183,15 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 019 trailing values reject the whole document")
+  func styleTransport019TrailingValuesRejectTheWholeDocument() {
+    // Hypothesis: parse can return the first valid object and ignore a second payload.
+    for json in [#"{}{}"#, #"{}null"#, #"{"a":"b"} garbage"#] {
+      var parser = StyleTransportJSONParser(json)
+      #expect(parser.parse() == nil)
+    }
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
