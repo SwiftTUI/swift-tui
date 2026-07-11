@@ -380,3 +380,57 @@ private func framePipelineArtifacts(
     diagnostics: diagnostics
   )
 }
+
+// MARK: - Attempt 006: unsupported dirty subtree preserves sibling reuse
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 006 unsupported dirty subtree preserves clean phase reuse")
+  func framePipeline006UnsupportedDirtySubtreePreservesCleanPhaseReuse() {
+    // Hypothesis: a canvas in the dirty branch can make the nil whole-tree
+    // signature suppress retained semantic/draw extraction for clean siblings.
+    let state = FrameTailRetainedState()
+    let rootIdentity = testIdentity("FramePipeline006", "Root")
+    let cleanIdentity = testIdentity("FramePipeline006", "Root", "Clean")
+    let dirtyIdentity = testIdentity("FramePipeline006", "Root", "Canvas")
+    let clean = FramePipelineArtifactNode(
+      identity: cleanIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 8, height: 1)),
+      drawPayload: .text("clean")
+    )
+    let canvas = FramePipelineArtifactNode(
+      identity: dirtyIdentity,
+      bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 8, height: 1)),
+      drawPayload: .canvas(.init(drawing: FramePipelineCanvasDots()))
+    )
+    let root = FramePipelineArtifactNode(
+      identity: rootIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 8, height: 2)),
+      children: [clean, canvas]
+    )
+    let artifacts = framePipelineArtifacts(root: root, rasterLine: "clean")
+    let proposal = ProposedSize(width: 8, height: 2)
+
+    state.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: artifacts.placedTree,
+      proposal: proposal
+    )
+    let retained = state.input(invalidatedIdentities: [dirtyIdentity])
+    let proof = retained.phaseExtractionProof(
+      for: proposal,
+      placed: artifacts.placedTree,
+      animationOverlaySnapshot: .init()
+    )
+
+    #expect(proof == .subtreesIdentical([cleanIdentity]))
+    #expect(proof.canReuseSubtree(rootedAt: cleanIdentity))
+    #expect(!proof.canReuseSubtree(rootedAt: dirtyIdentity))
+    #expect(!proof.canReuseSubtree(rootedAt: rootIdentity))
+  }
+}
+
+private struct FramePipelineCanvasDots: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.setSample(GridSample(x: 0, y: 0))
+  }
+}
