@@ -651,3 +651,79 @@ private final class SceneHostFocusRecorder {
     updates.notify()
   }
 }
+
+// MARK: - Attempt 016: hosted environment refresh storm
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 016 host metric storms converge on the latest environment")
+  func sceneHost016HostMetricStormsConvergeOnLatestEnvironment() async throws {
+    // Hypothesis: separately locked host size, style, and capability updates can
+    // produce a retained frame that permanently mixes values from generations.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 80, height: 4),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+    let session = try HostedSceneSession(
+      for: SceneHostEnvironmentApp(),
+      sceneID: "primary",
+      surface: surface
+    )
+    let runTask = Task { try await session.start() }
+    _ = await surface.waitForFrame()
+
+    for generation in 1...16 {
+      let size = CellSize(width: 48 + generation, height: 3 + generation % 3)
+      let pixels = PixelSize(width: 6 + generation, height: 12 + generation)
+      let hover = generation.isMultiple(of: 2)
+      let appearance = TerminalAppearance(
+        foregroundColor: hover ? .green : .yellow,
+        backgroundColor: .black,
+        tintColor: .cyan,
+        source: .override
+      )
+      let expected =
+        "\(size.width)x\(size.height)|\(pixels.width)x\(pixels.height)|override|\(hover)"
+
+      surface.updateSurfaceSize(size)
+      surface.updateStyle(.init(appearance: appearance, theme: appearance.synthesizedTheme()))
+      surface.updateSurfaceCapabilities(
+        cellPixelSize: pixels,
+        pointerInputCapabilities: .init(supportsHover: hover, supportsPreciseScroll: !hover)
+      )
+      session.requestSurfaceRefresh()
+
+      let frames = await surface.waitForFrames { frames in
+        frames.contains { $0.raster.lines.joined(separator: "\n").contains(expected) }
+      }
+      #expect(frames.last { $0.raster.lines.joined(separator: "\n").contains(expected) } != nil)
+    }
+
+    _ = try await session.stopAndWait()
+    _ = try await runTask.value
+  }
+}
+
+private struct SceneHostEnvironmentApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      SceneHostEnvironmentView()
+    }
+  }
+}
+
+private struct SceneHostEnvironmentView: View {
+  @Environment(\.terminalSize) private var terminalSize
+  @Environment(\.terminalAppearance) private var appearance
+  @Environment(\.cellPixelMetrics) private var cellPixels
+  @Environment(\.pointerInputCapabilities) private var pointerCapabilities
+
+  var body: some View {
+    Text(
+      "\(terminalSize.width)x\(terminalSize.height)|"
+        + "\(cellPixels.width)x\(cellPixels.height)|"
+        + "\(appearance.source.rawValue)|\(pointerCapabilities.supportsHover)"
+    )
+  }
+}
