@@ -1018,3 +1018,55 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 023: host-frame optional projection churn
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 023 host projection clears and restores optional frame metadata")
+  func sceneHost023HostProjectionClearsAndRestoresOptionalFrameMetadata() {
+    // Hypothesis: projection values retained by an encoder can preserve a
+    // departed preferred size or damage record when the next frame uses nil.
+    var previousProjection: HostFrameProjection?
+
+    for generation in 0..<24 {
+      let preferred: CellSize? =
+        generation.isMultiple(of: 2)
+        ? .init(width: 10 + generation, height: 4 + generation % 3)
+        : nil
+      let damage: PresentationDamage? =
+        generation.isMultiple(of: 3)
+        ? .init(textRows: [.init(row: generation % 4, columnRanges: [0..<(1 + generation % 6)])])
+        : nil
+      let frame = SemanticHostFrame(
+        sequence: UInt64(generation),
+        raster: sceneHostRaster(marker: "projection \(generation)"),
+        semantics: .init(
+          accessibilityAnnouncements: [
+            .init(message: "announcement \(generation)", politeness: .polite)
+          ]
+        ),
+        focusedIdentity: nil,
+        rasterDamage: damage,
+        preferredLayoutSize: preferred
+      )
+      let projection = frame.hostProjection
+
+      #expect(projection.sequence == UInt64(generation))
+      #expect(projection.raster == frame.raster)
+      #expect(projection.preferredLayoutSize == preferred)
+      #expect(projection.rasterDamage == damage)
+      #expect(
+        projection.accessibilityAnnouncements.map(\.message) == ["announcement \(generation)"])
+      if let previousProjection {
+        #expect(previousProjection.sequence == UInt64(generation - 1))
+        #expect(
+          previousProjection.preferredLayoutSize
+            == ((generation - 1).isMultiple(of: 2)
+              ? .init(width: 9 + generation, height: 4 + (generation - 1) % 3)
+              : nil)
+        )
+      }
+      previousProjection = projection
+    }
+  }
+}
