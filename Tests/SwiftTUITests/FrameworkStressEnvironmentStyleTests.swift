@@ -23,6 +23,10 @@ private enum EnvironmentStyleOptionalKey: EnvironmentKey {
   static let defaultValue: String? = nil
 }
 
+private enum EnvironmentStyleAnimationPolicyKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
 private struct EnvironmentStyleAction: Sendable {
   let perform: @MainActor @Sendable () -> Void
 
@@ -82,6 +86,11 @@ extension EnvironmentValues {
   fileprivate var environmentStyleAction: EnvironmentStyleAction {
     get { self[EnvironmentStyleActionKey.self] }
     set { self[EnvironmentStyleActionKey.self] = newValue }
+  }
+
+  fileprivate var environmentStyleSuppressesAnimation: Bool {
+    get { self[EnvironmentStyleAnimationPolicyKey.self] }
+    set { self[EnvironmentStyleAnimationPolicyKey.self] = newValue }
   }
 }
 
@@ -1179,7 +1188,9 @@ extension FrameworkStressEnvironmentStyleTests {
     for generation in 1...12 {
       _ = try harness.clickText("Reorder Layer Sources 023")
       let frame = try harness.clickText("Advance Layer Values 023")
-      let values = generation.isMultiple(of: 2) ? "A-\(generation),B-\(generation)" : "B-\(generation),A-\(generation)"
+      let values =
+        generation.isMultiple(of: 2)
+        ? "A-\(generation),B-\(generation)" : "B-\(generation),A-\(generation)"
       #expect(frame.contains("023 overlay \(values)"))
       #expect(frame.contains("023 background \(values)"))
     }
@@ -1284,6 +1295,50 @@ private func environmentStyleDescendant(_ node: ResolvedNode, text: String) -> R
     }
   }
   return nil
+}
+
+// MARK: - Attempt 025: environment-driven transaction through AnyView
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 025 erased transaction reads current environment policy")
+  func environmentStyle025ErasedTransactionReadsCurrentEnvironmentPolicy() throws {
+    // Hypothesis: AnyView reuse can retain a transaction transform captured before an environment
+    // policy change, even while the reader's visible payload reflects the current environment.
+    struct Root: View {
+      let suppressesAnimation: Bool
+
+      var body: some View {
+        AnyView(EnvironmentStyle025Reader())
+          .environment(\.environmentStyleSuppressesAnimation, suppressesAnimation)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("EnvironmentStyle025")
+    for generation in 0..<20 {
+      let suppressesAnimation = !generation.isMultiple(of: 2)
+      let text = "025 policy \(suppressesAnimation ? "disabled" : "inherit")"
+      let retained = renderer.render(
+        Root(suppressesAnimation: suppressesAnimation),
+        context: .init(identity: identity, invalidatedIdentities: [identity])
+      )
+      let node = try #require(environmentStyleDescendant(retained.resolvedTree, text: text))
+      let expected: AnimationRequest = suppressesAnimation ? .disabled : .inherit
+      #expect(node.transactionSnapshot.animationRequest == expected)
+    }
+  }
+}
+
+private struct EnvironmentStyle025Reader: View {
+  @Environment(\.environmentStyleSuppressesAnimation) private var suppressesAnimation
+
+  var body: some View {
+    let currentPolicy = suppressesAnimation
+    Text("025 policy \(suppressesAnimation ? "disabled" : "inherit")")
+      .transaction { transaction in
+        transaction.disablesAnimations = currentPolicy
+      }
+  }
 }
 
 private struct EnvironmentStyle001Reader: View {
