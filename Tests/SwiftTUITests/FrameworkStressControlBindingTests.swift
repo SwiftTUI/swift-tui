@@ -473,3 +473,58 @@ private struct ControlStress009Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 010: picker option-order replacement while disabled
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 010 reenabled picker navigates its reordered tags")
+  func stressControlBinding010ReenabledPickerNavigatesReorderedTags() throws {
+    // Hypothesis: Picker key handlers removed during a disabled interval can be restored with the
+    // pre-disable ordered-tag snapshot after options reorder behind the inert control.
+    let selection = ControlStressProbe("b")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress010", "Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      ControlStress010Fixture(selection: selection)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable and reverse 010")
+    _ = try harness.clickText("Reenable picker 010")
+    _ = try harness.focusText("Order picker 010")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(selection.value == "a")
+    #expect(selection.writes == ["a"])
+  }
+}
+
+@MainActor
+private struct ControlStress010Fixture: View {
+  let selection: ControlStressProbe<String>
+  @State private var isEnabled = true
+  @State private var isReversed = false
+
+  private var options: [String] {
+    isReversed ? ["c", "b", "a"] : ["a", "b", "c"]
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Disable and reverse 010") {
+        isEnabled = false
+        isReversed = true
+      }
+      Button("Reenable picker 010") { isEnabled = true }
+      Picker("Order picker 010", selection: selection.binding()) {
+        ForEach(options, id: \.self) { option in
+          Text("Option 010 \(option)").tag(option)
+        }
+      }
+      .id("order-picker-010")
+      .pickerStyle(.segmented)
+      .disabled(!isEnabled)
+    }
+  }
+}
