@@ -1487,3 +1487,28 @@ extension FrameworkStressFramePipelineTests {
     )
   }
 }
+
+// MARK: - Attempt 027: terminal cancellation remains sticky for late observers
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 027 terminal cancellation survives late observer fanout")
+  func framePipeline027TerminalCancellationSurvivesLateObserverFanout() async {
+    // Hypothesis: reading a terminal cancellation can consume or reset it, so
+    // later coordinator observers may see queued state or become stranded.
+    let token = FrameTailJobCancellationToken()
+    #expect(token.cancelBeforeStart())
+    #expect(await token.waitUntilLeavesQueue() == .cancelledBeforeStart)
+
+    let lateObservers = (0..<64).map { _ in
+      Task { await token.waitUntilLeavesQueue() }
+    }
+    for observer in lateObservers {
+      #expect(await observer.value == .cancelledBeforeStart)
+    }
+
+    #expect(token.currentState == .cancelledBeforeStart)
+    #expect(await token.waitUntilLeavesQueue() == .cancelledBeforeStart)
+    #expect(!token.cancelBeforeStart())
+    #expect(!token.markStarted())
+  }
+}
