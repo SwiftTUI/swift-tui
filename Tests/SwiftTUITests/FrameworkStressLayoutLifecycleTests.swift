@@ -1673,3 +1673,53 @@ private struct StressLL027Fixture: View {
       .id("reordered-task-owner")
   }
 }
+
+// MARK: - Attempt 028: nested disappearance ordering
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 028 nested removal dispatches child disappear before parent")
+  func stress028NestedRemovalDispatchesChildDisappearBeforeParent() throws {
+    // Hypothesis: structural teardown event partitioning may reorder or
+    // duplicate parent and child disappearance handlers across recreation.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL028", "Root"),
+      size: .init(width: 42, height: 8)
+    ) {
+      StressLL028Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...8 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Nested Lifecycle")
+      #expect(probe.events == ["child disappear", "parent disappear"])
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Nested Lifecycle")
+      #expect(probe.events.filter { $0 == "child appear" }.count == 1)
+      #expect(probe.events.filter { $0 == "parent appear" }.count == 1)
+      #expect(harness.lifecycleRegistrationCount == 4)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL028Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var isVisible = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Nested Lifecycle") { isVisible.toggle() }
+      if isVisible {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("nested lifecycle child")
+            .onAppear { probe.events.append("child appear") }
+            .onDisappear { probe.events.append("child disappear") }
+        }
+        .onAppear { probe.events.append("parent appear") }
+        .onDisappear { probe.events.append("parent disappear") }
+      }
+    }
+  }
+}
