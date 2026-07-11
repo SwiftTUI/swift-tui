@@ -387,4 +387,47 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 009: Line-limit cache churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 009 line limit removal restores every current line")
+  func renderReconciliation009LineLimitRemovalRestoresEveryCurrentLine() {
+    // Hypothesis: TextLayoutCache includes lineLimit, but retained measurement may reuse a
+    // truncated MeasuredNode when the modifier repeatedly returns to the same proposal.
+    struct Root: View {
+      let lineLimit: Int?
+
+      var body: some View {
+        Text("ALPHA BETA GAMMA DELTA")
+          .lineLimit(lineLimit)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation009")
+    let proposal = ProposedSize(width: 6, height: nil)
+
+    for generation in 0..<18 {
+      let limit = generation.isMultiple(of: 2) ? 1 : nil
+      let root = Root(lineLimit: limit)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.rasterSurface.size.height == (limit == nil ? 4 : 1))
+    }
+  }
+}
+
 // MARK: - End
