@@ -36,6 +36,30 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 013: alternating multibyte scalars
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 013 bytewise unicode scalars preserve input order")
+  func runtimeTransport013BytewiseUnicodeScalarsPreserveInputOrder() {
+    // Hypothesis: completing one split UTF-8 scalar can consume the lead byte
+    // of the next scalar or reorder the following ASCII key.
+    var parser = TerminalInputParser()
+    var events: [InputEvent] = []
+
+    for byte in Array("é界q".utf8) {
+      events.append(contentsOf: parser.feed([byte]))
+    }
+
+    #expect(
+      events == [
+        .key(.character("é")),
+        .key(.character("界")),
+        .key(.character("q")),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 012: terminal-looking bytes inside paste
 
 extension FrameworkStressRuntimeTransportTests {
