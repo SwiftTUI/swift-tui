@@ -1354,3 +1354,64 @@ private struct CollectionLayout021Root: View {
     .frame(width: 24, height: 12, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 022: conditional List section breaks
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 022 conditional List section leaves no phantom break")
+  func collectionLayout022ConditionalListSectionLeavesNoPhantomBreak() {
+    // Hypothesis: List's previousSectionBottomVisibility fold may retain a
+    // section break after the middle section departs and later returns.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout022")
+
+    for generation in 0..<24 {
+      let includesMiddle = !generation.isMultiple(of: 2)
+      let root = CollectionLayout022Root(includesMiddle: includesMiddle)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 22, height: 12)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 22, height: 12)
+      )
+      let rendered = collectionLayoutText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(rendered.contains("022 middle") == includesMiddle)
+      #expect(
+        retained.rasterSurface.lines.filter { $0.contains("─") }.count
+          == fresh.rasterSurface.lines.filter { $0.contains("─") }.count
+      )
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout022Root: View {
+  let includesMiddle: Bool
+
+  var body: some View {
+    List(selection: .constant(1)) {
+      Section("022 first") {
+        Text("022 row first").tag(1)
+      }
+      if includesMiddle {
+        Section("022 middle") {
+          Text("022 row middle").tag(2)
+        }
+      }
+      Section("022 last") {
+        Text("022 row last").tag(3)
+      }
+    }
+    .listStyle(.plain)
+    .frame(width: 22, height: 12, alignment: .topLeading)
+  }
+}
