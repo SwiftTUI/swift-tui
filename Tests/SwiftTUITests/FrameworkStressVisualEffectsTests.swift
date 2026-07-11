@@ -1649,3 +1649,56 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 030: image cell-pixel-metrics churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 030 image aspect and metadata follow cell pixel metrics")
+  func visualEffects030ImageAspectAndMetadataFollowCellPixelMetrics() throws {
+    // Hypothesis: image resolution can refresh environment cell metrics in the attachment while
+    // retained fit measurement continues using the first cell-pixel aspect ratio.
+    let pngBytes = try makePNGBytes(
+      width: 48,
+      height: 48,
+      pixels: Array(repeating: rgbaPixel(red: 180, green: 100, blue: 255), count: 48 * 48)
+    )
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects030")
+
+    for generation in 0..<24 {
+      let metrics: CellPixelMetrics
+      let expectedSize: CellSize
+      switch generation % 3 {
+      case 0:
+        metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+        expectedSize = CellSize(width: 8, height: 4)
+      case 1:
+        metrics = CellPixelMetrics(width: 12, height: 12, source: .reported)
+        expectedSize = CellSize(width: 4, height: 4)
+      default:
+        metrics = CellPixelMetrics(width: 6, height: 18, source: .reported)
+        expectedSize = CellSize(width: 12, height: 4)
+      }
+      var environment = EnvironmentValues()
+      environment.cellPixelMetrics = metrics
+      let root = Image(data: pngBytes).scaledToFit().frame(width: 12, height: 4)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          environmentValues: environment,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        )
+      )
+      let fresh = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache())).render(
+        root,
+        context: .init(identity: identity, environmentValues: environment)
+      )
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(attachment.cellPixelSize == PixelSize(width: metrics.width, height: metrics.height))
+      #expect(attachment.bounds.size == expectedSize)
+    }
+  }
+}
