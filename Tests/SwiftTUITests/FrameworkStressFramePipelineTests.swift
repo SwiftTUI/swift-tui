@@ -1216,3 +1216,45 @@ extension FrameworkStressFramePipelineTests {
     #expect(decision.reconciliation.blockers == [.preferenceObservationDelta])
   }
 }
+
+// MARK: - Attempt 020: blocker product and reconciliation closure
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 020 blocker categories survive impact reconciliation")
+  func framePipeline020BlockerCategoriesSurviveImpactReconciliation() {
+    // Hypothesis: folding several effect categories into CompletedFrameImpact
+    // can overwrite a prior category and omit its blocker from reconciliation.
+    let blockers: Set<FrameDropEligibility.Blocker> = [
+      .lifecycleAppear,
+      .handlerInstallations,
+      .focusGraph,
+      .scrollSync,
+      .preferenceObservationDelta,
+      .animationCompletion,
+      .workerCustomLayoutCacheUpdate,
+      .retainedRasterBaseline,
+      .graphicsReplay,
+      .diagnosticsFullRecord,
+    ]
+    let eligibility = FrameDropEligibility(blockers: blockers)
+    let decision = CompletedFrameDropDecision.dropVisualOnly(eligibility: eligibility)
+
+    #expect(eligibility.blockers == blockers)
+    #expect(eligibility.impact.lifecycle)
+    #expect(eligibility.impact.runtimeRegistrations)
+    #expect(eligibility.impact.focus)
+    #expect(eligibility.impact.scroll)
+    #expect(eligibility.impact.preferences)
+    #expect(eligibility.impact.animation)
+    #expect(eligibility.impact.workerOrCache)
+    #expect(eligibility.impact.retainedBaselines)
+    #expect(eligibility.impact.presentationRecovery)
+    #expect(eligibility.impact.diagnostics)
+    #expect(!eligibility.impact.isVisualOnly)
+    #expect(decision.action == .blocked)
+    #expect(decision.eligibility == .mustCommit(blockers: blockers))
+    #expect(decision.reconciliation.blockers == blockers)
+    #expect(decision.reconciliation.blockReason == .dropEligibilityBlockers)
+    #expect(!decision.canSkipCompletedFrame)
+  }
+}
