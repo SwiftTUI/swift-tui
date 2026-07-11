@@ -2101,6 +2101,61 @@ extension EnvironmentValues {
   }
 }
 
+// MARK: - Attempt 031: Nested environment override insertion and removal
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 031 stable reader follows nearest environment override")
+  func stateIdentity031StableReaderFollowsNearestEnvironmentOverride() throws {
+    // Hypothesis: a stable reader identity can reuse a snapshot carrying a removed nearer
+    // override, or fail to observe a newly inserted override at the same structural position.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity031"),
+      size: .init(width: 62, height: 10)
+    ) {
+      StateIdentity031Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...4 {
+      var frame = try harness.clickText("Toggle Override 031")
+      #expect(frame.contains("031 Reader Override-\(generation - 1)"))
+      frame = try harness.clickText("Advance Base 031")
+      #expect(frame.contains("031 Reader Override-\(generation)"))
+      frame = try harness.clickText("Toggle Override 031")
+      #expect(frame.contains("031 Reader Base-\(generation)"))
+    }
+  }
+
+  private struct StateIdentity031Root: View {
+    @State private var generation = 0
+    @State private var usesOverride = false
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Advance Base 031") { generation += 1 }
+        Button("Toggle Override 031") { usesOverride.toggle() }
+        if usesOverride {
+          StateIdentity031Reader()
+            .environment(\.stress030Value, "Override-\(generation)")
+            .id("state-identity-031-reader")
+        } else {
+          StateIdentity031Reader()
+            .id("state-identity-031-reader")
+        }
+      }
+      .environment(\.stress030Value, "Base-\(generation)")
+    }
+  }
+
+  private struct StateIdentity031Reader: View {
+    @Environment(\.stress030Value) private var value
+
+    var body: some View {
+      Text("031 Reader \(value)")
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
