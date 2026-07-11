@@ -884,3 +884,78 @@ private struct ObservationEffects015View: View {
     }
   }
 }
+
+// MARK: - Attempt 016: transformPreference closure freshness
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 016 transformPreference applies its live captured payload")
+  func observationEffects016TransformPreferenceAppliesLivePayload() throws {
+    // Hypothesis: a stable transform modifier may retain the initial closure
+    // while its child preference writer continues publishing current values.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects016"),
+      size: .init(width: 62, height: 7)
+    ) {
+      ObservationEffects016View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Advance Preference 016")
+      withKnownIssue("transformPreference retains its generation-zero closure") {
+        #expect(frame.contains("016 values [1, \(generation)]"))
+      }
+    }
+  }
+}
+
+private enum ObservationEffectsListPreferenceKey: PreferenceKey {
+  static let defaultValue: [Int] = []
+
+  static func reduce(value: inout [Int], nextValue: () -> [Int]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
+private enum ObservationEffectsIntPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+private enum ObservationEffectsAuxIntPreferenceKey: PreferenceKey {
+  static let defaultValue = 0
+
+  static func reduce(value: inout Int, nextValue: () -> Int) {
+    value = nextValue()
+  }
+}
+
+@MainActor
+private final class ObservationEffectsEventProbe {
+  var events: [String] = []
+}
+
+private struct ObservationEffects016View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Preference 016") { generation += 1 }
+      Text("source")
+        .preference(key: ObservationEffectsListPreferenceKey.self, value: [1])
+        .transformPreference(ObservationEffectsListPreferenceKey.self) { value in
+          value.append(generation)
+        }
+        .frame(width: 58, height: 2, alignment: .topLeading)
+        .overlayPreferenceValue(
+          ObservationEffectsListPreferenceKey.self,
+          alignment: .bottomLeading
+        ) { value in
+          Text("016 values \(value)")
+        }
+    }
+  }
+}
