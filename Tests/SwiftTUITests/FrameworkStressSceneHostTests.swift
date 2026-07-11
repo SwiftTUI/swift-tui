@@ -891,3 +891,36 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 020: fractional host cell metric conversion
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 020 fractional cell metrics floor every probe exactly")
+  func sceneHost020FractionalCellMetricsFloorEveryProbeExactly() {
+    // Hypothesis: floating-point proposal churn can round a host axis upward,
+    // produce zero cells, or leak a prior generation's probe cardinality.
+    for generation in 0..<24 {
+      let cellSize = HostLengthSize(
+        width: 1.25 + Double(generation % 4) * 0.5,
+        height: 2.5 + Double(generation % 3) * 0.75
+      )
+      let expectedGrid = CellSize(
+        width: 1 + generation % 11,
+        height: 1 + generation % 7
+      )
+      let negotiator = HostedSurfaceSizeNegotiator(
+        cellSize: cellSize,
+        preferredGridSize: nil,
+        renderedGridSize: nil,
+        fallbackGridSize: .init(width: 80, height: 24)
+      )
+      let result = negotiator.negotiate(
+        proposedWidth: (Double(expectedGrid.width) + 0.999) * cellSize.width,
+        proposedHeight: (Double(expectedGrid.height) + 0.999) * cellSize.height
+      )
+
+      #expect(result.size == cellSize)
+      #expect(result.probeGridSize == expectedGrid)
+    }
+  }
+}
