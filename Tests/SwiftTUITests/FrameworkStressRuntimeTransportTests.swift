@@ -36,6 +36,44 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 023: disjoint damage-range ordering
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 023 disjoint damage ranges retain both ordered edits")
+  func runtimeTransport023DisjointDamageRangesRetainBothOrderedEdits() {
+    // Hypothesis: normalizing disjoint ranges supplied in reverse order can
+    // discard one edit or render the later column before the earlier column.
+    let planner = TerminalPresentationPlanner(capabilityProfile: .previewUnicode)
+    let previousSurface = RasterSurface(
+      size: .init(width: 10, height: 1),
+      lines: ["abcdefghij"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 10, height: 1),
+      lines: ["abXdefgYij"]
+    )
+    let damage = PresentationDamage(
+      textRows: [.init(row: 0, columnRanges: [7..<8, 2..<3])]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: damage
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.spanUpdates == [
+        .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
+        .init(row: 0, column: 7, renderedSpan: "Y", cellsChanged: 1),
+      ]
+    )
+    #expect(plan.linesTouched == 1)
+    #expect(plan.cellsChanged == 2)
+  }
+}
+
 // MARK: - Attempt 022: stale damage on equal surfaces
 
 extension FrameworkStressRuntimeTransportTests {
