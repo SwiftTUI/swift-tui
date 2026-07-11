@@ -205,4 +205,21 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 012 old admission candidates expire under churn")
+  func cacheState012OldAdmissionCandidatesExpireUnderChurn() {
+    // Hypothesis: candidate compaction can keep the oldest key forever and admit it too eagerly.
+    let cache = TextLayoutCache(capacity: 2)
+    let options = TextLayoutOptions(width: nil)
+    _ = cache.layout(for: "warm-a", options: options)
+    _ = cache.layout(for: "warm-b", options: options)
+    _ = cache.layout(for: "old-candidate", options: options)
+    for index in 0..<30 { _ = cache.layout(for: "one-shot-\(index)", options: options) }
+    let before = cache.metrics
+    _ = cache.layout(for: "old-candidate", options: options)
+    #expect(cache.metrics.stores == before.stores)
+    #expect(cache.metrics.bypassedStores == before.bypassedStores + 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
