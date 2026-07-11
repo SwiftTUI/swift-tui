@@ -95,6 +95,59 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 008: comparison cardinality and trend-tone churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 008 comparison cardinality churn retargets automatic trends")
+  func chartData008ComparisonCardinalityChurnRetargetsAutomaticTrends() {
+    // Hypothesis: shrinking and regrowing automatic-tone rows can restore a
+    // departed row's trend style or paired baseline at the same structural index.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let count = generation.isMultiple(of: 4) ? 1 : 3
+        let entries = (0..<count).map { index in
+          let current =
+            generation.isMultiple(of: 2)
+            ? Double(40 + generation + index)
+            : Double(10 + index)
+          let baseline =
+            generation.isMultiple(of: 2)
+            ? Double(10 + index)
+            : Double(40 + generation + index)
+          return ComparisonEntry(
+            "R\(index)-\(generation)",
+            current: current,
+            baseline: baseline,
+            tone: .automatic
+          )
+        }
+        ComparisonChart(
+          "Trends \(generation)",
+          entries: generation.isMultiple(of: 3) ? Array(entries.reversed()) : entries,
+          barWidth: 12,
+          labelWidth: 8
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "008", proposal: .init(width: 60, height: 8)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      let count = generation.isMultiple(of: 4) ? 1 : 3
+      #expect(text.contains("Trends \(generation)"))
+      for index in 0..<count {
+        #expect(text.contains("R\(index)-\(generation)"))
+      }
+      if count == 1 {
+        #expect(!text.contains("R2-\(generation)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 007: comparison per-row total replacement
 
 extension FrameworkStressChartDataTests {
