@@ -55,6 +55,15 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     self.second = second
   }
 
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? ExclusiveGestureRecognizer<V> else {
+      return false
+    }
+    let firstAdopted = first.adoptAuthoredCallbacks(from: other.first)
+    let secondAdopted = second.adoptAuthoredCallbacks(from: other.second)
+    return firstAdopted && secondAdopted
+  }
+
   var phase: GestureRecognizerPhase {
     // First wins if it ended.
     if first.phase == .ended { return .ended }

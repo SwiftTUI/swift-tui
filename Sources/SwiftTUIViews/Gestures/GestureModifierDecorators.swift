@@ -21,8 +21,8 @@ import SwiftTUICore
 final class OnEndedDecorator<V>: GestureRecognizer {
   typealias Value = V
   let inner: AnyGestureRecognizer
-  let authoringContext: ImperativeAuthoringContextSnapshot?
-  let action: @MainActor (V) -> Void
+  private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
+  private(set) var action: @MainActor (V) -> Void
   private var didFire = false
 
   init(
@@ -54,6 +54,18 @@ final class OnEndedDecorator<V>: GestureRecognizer {
 
   func tearDown() { inner.tearDown() }
 
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? OnEndedDecorator<V>,
+      inner.adoptAuthoredCallbacks(from: other.inner)
+    else {
+      return false
+    }
+    authoringContext = other.authoringContext
+    action = other.action
+    return true
+  }
+
   private func fireIfNeeded() {
     guard !didFire, inner.phase == .ended else { return }
     if let value: V = inner.currentValue(as: V.self) {
@@ -71,8 +83,8 @@ final class OnEndedDecorator<V>: GestureRecognizer {
 final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
   typealias Value = V
   let inner: AnyGestureRecognizer
-  let authoringContext: ImperativeAuthoringContextSnapshot?
-  let action: @MainActor (V) -> Void
+  private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
+  private(set) var action: @MainActor (V) -> Void
   private var lastValue: V?
 
   init(
@@ -104,6 +116,18 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
 
   func tearDown() { inner.tearDown() }
 
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? OnChangedDecorator<V>,
+      inner.adoptAuthoredCallbacks(from: other.inner)
+    else {
+      return false
+    }
+    authoringContext = other.authoringContext
+    action = other.action
+    return true
+  }
+
   private func fireIfNeeded() {
     if let value: V = inner.currentValue(as: V.self), value != lastValue {
       withImperativeAuthoringContext(authoringContext) {
@@ -120,8 +144,8 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
 final class MapDecorator<From, To>: GestureRecognizer {
   typealias Value = To
   let inner: AnyGestureRecognizer
-  let authoringContext: ImperativeAuthoringContextSnapshot?
-  let transform: @MainActor (From) -> To
+  private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
+  private(set) var transform: @MainActor (From) -> To
 
   init(
     inner: AnyGestureRecognizer,
@@ -152,6 +176,17 @@ final class MapDecorator<From, To>: GestureRecognizer {
   }
 
   func tearDown() { inner.tearDown() }
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? MapDecorator<From, To>,
+      inner.adoptAuthoredCallbacks(from: other.inner)
+    else {
+      return false
+    }
+    authoringContext = other.authoringContext
+    transform = other.transform
+    return true
+  }
 }
 
 // MARK: - .updating($gestureState)
@@ -162,8 +197,8 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
 
   let inner: AnyGestureRecognizer
   let box: GestureStateBox<S>
-  let authoringContext: ImperativeAuthoringContextSnapshot?
-  let updater: @MainActor (V, inout S, inout Transaction) -> Void
+  private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
+  private(set) var updater: @MainActor (V, inout S, inout Transaction) -> Void
 
   /// Tracks whether this decorator's updater has actually written to
   /// `box` during the gesture's lifetime. Guards `box.resetToSeed()`:
@@ -235,5 +270,16 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
       box.resetToSeed()
       didFire = false
     }
+  }
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? UpdatingDecorator<V, S>,
+      inner.adoptAuthoredCallbacks(from: other.inner)
+    else {
+      return false
+    }
+    authoringContext = other.authoringContext
+    updater = other.updater
+    return true
   }
 }

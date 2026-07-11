@@ -15,46 +15,21 @@ package final class LocalGestureRegistry: Equatable {
     lhs === rhs
   }
 
+  /// The fresh recognizers a resolve pass has authored per identity, in
+  /// authored order. `register` (the pass's first call for an identity)
+  /// resets the list; `registerStacked` appends. Reconciliation is
+  /// positional against the previous entry, so a mid-interaction recognizer
+  /// keeps its state (and adopts the fresh registration's authored
+  /// callbacks) while inactive positions are rebuilt fresh — the entry
+  /// never nests stacks across passes.
+  private var passAuthoredRecognizers: [Identity: [AnyGestureRecognizer]] = [:]
+
   package func register(
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
-    if let existing = recognizers[identity] {
-      // If the existing recognizer is mid-interaction (e.g. a
-      // DragGesture has captured `.down` but hasn't seen a `.dragged`
-      // yet), keep it and discard the incoming replacement. Without
-      // this, any view re-resolve between `.down` and the first
-      // `.dragged` — triggered by `setPressedIdentity`, a parent
-      // state change, or any other invalidation — tears down the
-      // active recognizer and destroys the state it just captured;
-      // subsequent pointer events see a fresh recognizer with no
-      // `startLocation` and are silently ignored.
-      if existing.isActive {
-        if existing !== recognizer {
-          recognizer.tearDown()
-        }
-        // The preserved mid-interaction recognizer is now hosted by the node
-        // that attempted the replacement: re-own (and re-record) it so
-        // liveness pruning against the fresh frame's nodes keeps the active
-        // gesture. A mid-gesture owner re-mint would otherwise strand it on
-        // the departed node and tear it down in flight.
-        ownersByIdentity[identity] = .current(identity: identity)
-        ViewNodeContext.current?.recordGestureRegistration(
-          identity: identity,
-          recognizer: existing
-        )
-        return
-      }
-      if existing !== recognizer {
-        existing.tearDown()
-      }
-    }
-    recognizers[identity] = recognizer
-    ownersByIdentity[identity] = .current(identity: identity)
-    ViewNodeContext.current?.recordGestureRegistration(
-      identity: identity,
-      recognizer: recognizer
-    )
+    passAuthoredRecognizers[identity] = [recognizer]
+    applyPassRegistrations(for: identity)
   }
 
   package func registerStacked(
@@ -62,35 +37,84 @@ package final class LocalGestureRegistry: Equatable {
     recognizer: AnyGestureRecognizer
   ) {
     guard
-      let currentPassRecognizer = ViewNodeContext.current?.gestureRegistration(
-        for: identity
-      )
+      ViewNodeContext.current?.gestureRegistration(for: identity) != nil,
+      var authored = passAuthoredRecognizers[identity]
     else {
       register(identity: identity, recognizer: recognizer)
       return
     }
 
-    guard !currentPassRecognizer.isActive else {
-      if currentPassRecognizer !== recognizer {
-        recognizer.tearDown()
+    authored.append(recognizer)
+    passAuthoredRecognizers[identity] = authored
+    applyPassRegistrations(for: identity)
+  }
+
+  /// Rebuilds the identity's entry from the pass's authored list,
+  /// positionally preserving mid-interaction recognizers from the previous
+  /// entry. A preserved recognizer adopts the same position's fresh
+  /// authored callbacks (so an active drag writes the re-authored binding,
+  /// not the one captured when the interaction began); the discarded fresh
+  /// recognizer is torn down. Without preservation, any re-resolve between
+  /// `.down` and the first `.dragged` — `setPressedIdentity`, a parent
+  /// state change — would destroy the state the recognizer just captured.
+  /// A gesture *added* mid-interaction lands in a fresh position and joins
+  /// the entry immediately instead of being discarded.
+  private func applyPassRegistrations(for identity: Identity) {
+    let authored = passAuthoredRecognizers[identity] ?? []
+    let previousElements = recognizers[identity].map(stackElements(of:)) ?? []
+
+    var result: [AnyGestureRecognizer] = []
+    result.reserveCapacity(authored.count)
+    for (index, incoming) in authored.enumerated() {
+      if index < previousElements.count,
+        previousElements[index].isActive,
+        previousElements[index] !== incoming
+      {
+        let preserved = previousElements[index]
+        _ = preserved.adoptAuthoredCallbacks(from: incoming)
+        incoming.tearDown()
+        result.append(preserved)
+      } else {
+        if index < previousElements.count,
+          previousElements[index] !== incoming
+        {
+          previousElements[index].tearDown()
+        }
+        result.append(incoming)
       }
-      return
+    }
+    // Previous elements beyond the authored positions: tear down the
+    // inactive ones; keep active ones attached so a gesture the pass has
+    // not (yet) re-authored cannot be cancelled mid-interaction — if the
+    // pass authors it next, positional reconciliation re-claims it.
+    for (index, element) in previousElements.enumerated()
+    where index >= authored.count {
+      if element.isActive {
+        result.append(element)
+      } else if !authored.contains(where: { $0 === element }) {
+        element.tearDown()
+      }
     }
 
-    let stacked = AnyGestureRecognizer(
-      StackedGestureRecognizer(
-        recognizers: [
-          currentPassRecognizer,
-          recognizer,
-        ]
-      )
-    )
-    recognizers[identity] = stacked
+    let entry =
+      result.count == 1
+      ? result[0]
+      : AnyGestureRecognizer(StackedGestureRecognizer(recognizers: result))
+    recognizers[identity] = entry
     ownersByIdentity[identity] = .current(identity: identity)
     ViewNodeContext.current?.recordGestureRegistration(
       identity: identity,
-      recognizer: stacked
+      recognizer: entry
     )
+  }
+
+  private func stackElements(
+    of recognizer: AnyGestureRecognizer
+  ) -> [AnyGestureRecognizer] {
+    guard let stacked = recognizer.base as? StackedGestureRecognizer else {
+      return [recognizer]
+    }
+    return stacked.recognizers
   }
 
   package func recognizer(for identity: Identity) -> AnyGestureRecognizer? {
@@ -124,6 +148,7 @@ package final class LocalGestureRegistry: Equatable {
     }
     recognizers = preserved
     ownersByIdentity = preservedOwners
+    passAuthoredRecognizers.removeAll(keepingCapacity: true)
   }
 
   package func activeIdentities(
@@ -161,6 +186,7 @@ package final class LocalGestureRegistry: Equatable {
     }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
       ownersByIdentity.removeValue(forKey: identity)
+      passAuthoredRecognizers.removeValue(forKey: identity)
     }
   }
 
@@ -230,10 +256,23 @@ package final class LocalGestureRegistry: Equatable {
 private final class StackedGestureRecognizer: GestureRecognizer {
   typealias Value = Never
 
-  private let recognizers: [AnyGestureRecognizer]
+  fileprivate let recognizers: [AnyGestureRecognizer]
 
   init(recognizers: [AnyGestureRecognizer]) {
     self.recognizers = recognizers
+  }
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? StackedGestureRecognizer,
+      other.recognizers.count == recognizers.count
+    else {
+      return false
+    }
+    var adoptedAll = true
+    for (mine, theirs) in zip(recognizers, other.recognizers) {
+      adoptedAll = mine.adoptAuthoredCallbacks(from: theirs) && adoptedAll
+    }
+    return adoptedAll
   }
 
   var phase: GestureRecognizerPhase {

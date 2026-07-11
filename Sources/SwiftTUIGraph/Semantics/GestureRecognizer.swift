@@ -94,11 +94,28 @@ package protocol GestureRecognizer: AnyObject {
   /// Releases any held runtime resources (deadline timers, GestureState
   /// bindings). Called on subtree teardown or after terminal phase.
   func tearDown()
+
+  /// Adopts the user-authored callbacks from `replacement` — a recognizer
+  /// built by a re-resolve of the same gesture declaration — while keeping
+  /// this recognizer's interaction state. The registry calls this when it
+  /// preserves a mid-interaction recognizer and discards the fresh
+  /// replacement: without adoption the preserved tree keeps firing the
+  /// closures captured when the interaction began, writing through bindings
+  /// the view has since re-authored. Returns `false` when the trees'
+  /// types/shapes diverge; the preserved recognizer then keeps its closures.
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool
 }
 
 extension GestureRecognizer {
   package var isActive: Bool {
     phase != .possible && !phase.isTerminal
+  }
+
+  package func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    // Callback-free recognizers (the primitive state machines) adopt
+    // successfully from any same-type replacement: their interaction state
+    // is theirs to keep and there are no closures to refresh.
+    replacement is Self
   }
 }
 
@@ -114,6 +131,10 @@ public final class AnyGestureRecognizer {
   /// Boxes the recognizer's currentValue() — callers cast to their
   /// expected type via `currentValue(as:)`.
   private let _currentValue: () -> Any?
+  private let _adoptAuthoredCallbacks: (AnyObject) -> Bool
+  /// The wrapped recognizer instance, exposed so a preserved recognizer can
+  /// adopt authored callbacks from a discarded replacement's base.
+  package let base: AnyObject
   public let valueType: Any.Type
 
   package init<R: GestureRecognizer>(_ recognizer: R) {
@@ -123,6 +144,8 @@ public final class AnyGestureRecognizer {
     self._handleDeadline = { recognizer.handleDeadline(at: $0) }
     self._tearDown = { recognizer.tearDown() }
     self._currentValue = { recognizer.currentValue() }
+    self._adoptAuthoredCallbacks = { recognizer.adoptAuthoredCallbacks(from: $0) }
+    self.base = recognizer
     self.valueType = R.Value.self
   }
 
@@ -149,5 +172,13 @@ public final class AnyGestureRecognizer {
   /// Returns `nil` if the inner value is nil or the type doesn't match.
   public func currentValue<T>(as type: T.Type = T.self) -> T? {
     _currentValue() as? T
+  }
+
+  /// See ``GestureRecognizer/adoptAuthoredCallbacks(from:)``.
+  package func adoptAuthoredCallbacks(from replacement: AnyGestureRecognizer) -> Bool {
+    guard base !== replacement.base else {
+      return true
+    }
+    return _adoptAuthoredCallbacks(replacement.base)
   }
 }
