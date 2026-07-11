@@ -872,3 +872,63 @@ private struct GestureScroll017Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 018: duplicate IDs in sibling reader scopes
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 018 duplicate target IDs stay reader scoped")
+  func gestureScroll018DuplicateTargetIDsStayReaderScoped() throws {
+    // Hypothesis: global target publication may let a sibling reader command
+    // select the first matching explicit ID outside the reader's identity scope.
+    let first = GestureScrollBox(ScrollPosition.zero)
+    let second = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll018Root"),
+      size: .init(width: 52, height: 13)
+    ) {
+      GestureScroll018Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reveal second duplicate")
+
+    #expect(first.value == .zero)
+    #expect(second.value.y == 6)
+  }
+}
+
+private struct GestureScroll018Fixture: View {
+  let first: GestureScrollBox<ScrollPosition>
+  let second: GestureScrollBox<ScrollPosition>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      GestureScroll018Reader(label: "first", position: first)
+      GestureScroll018Reader(label: "second", position: second)
+    }
+  }
+}
+
+private struct GestureScroll018Reader: View {
+  let label: String
+  let position: GestureScrollBox<ScrollPosition>
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reveal \(label) duplicate") {
+          _ = proxy.scrollTo("duplicate-target", anchor: .bottom)
+        }
+        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<10) { row in
+              Text("\(label) duplicate row \(row)")
+                .id(row == 8 ? "duplicate-target" : "\(label)-row-\(row)")
+            }
+          }
+        }
+        .frame(width: 30, height: 3, alignment: .topLeading)
+      }
+    }
+  }
+}
