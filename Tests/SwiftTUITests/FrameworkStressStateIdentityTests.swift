@@ -1749,6 +1749,85 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 026: Pointer press spans an AnyView payload replacement
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 026 payload swap cancels an in flight button press")
+  func stateIdentity026PayloadSwapCancelsInFlightButtonPress() throws {
+    // Hypothesis: old and new AnyView payloads can publish the same visual action route, letting
+    // a mouse-up dispatch either a departed action or a replacement that never saw mouse-down.
+    let model = StateIdentity026Model()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity026"),
+      size: .init(width: 56, height: 9)
+    ) {
+      StateIdentity026Root(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for expectedBCount in 1...4 {
+      let point = try #require(harness.point(forText: "Press Target 026"))
+      _ = try harness.sendMouse(.down(.primary), at: point)
+
+      model.showsA = false
+      var frame = try harness.render()
+      #expect(frame.contains("026 Payload B"))
+      frame = try harness.sendMouse(.up(.primary), at: point)
+      #expect(frame.contains("026 Actions A 0 B \(expectedBCount - 1)"))
+
+      frame = try harness.clickText("Press Target 026")
+      #expect(frame.contains("026 Actions A 0 B \(expectedBCount)"))
+      model.showsA = true
+      frame = try harness.render()
+      #expect(frame.contains("026 Payload A"))
+    }
+  }
+
+  private struct StateIdentity026Root: View {
+    let model: StateIdentity026Model
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("026 Actions A \(model.actionA) B \(model.actionB)")
+        if model.showsA {
+          AnyView(StateIdentity026A(model: model))
+        } else {
+          AnyView(StateIdentity026B(model: model))
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity026A: View {
+    let model: StateIdentity026Model
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("026 Payload A")
+        Button("Press Target 026") { model.actionA += 1 }
+      }
+    }
+  }
+
+  private struct StateIdentity026B: View {
+    let model: StateIdentity026Model
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("026 Payload B")
+        Button("Press Target 026") { model.actionB += 1 }
+      }
+    }
+  }
+}
+
+@Observable
+private final class StateIdentity026Model {
+  var showsA = true
+  var actionA = 0
+  var actionB = 0
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
