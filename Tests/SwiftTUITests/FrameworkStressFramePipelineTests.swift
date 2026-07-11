@@ -1512,3 +1512,29 @@ extension FrameworkStressFramePipelineTests {
     #expect(!token.markStarted())
   }
 }
+
+// MARK: - Attempt 028: late cancellation cannot rewind started work
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 028 started tail rejects late cancellation")
+  func framePipeline028StartedTailRejectsLateCancellation() async {
+    // Hypothesis: a cancel signal racing just after worker start can move the
+    // token back to cancelled-before-start and let two coordinator arms finish.
+    let token = FrameTailJobCancellationToken()
+    #expect(token.markStarted())
+    #expect(token.currentState == .started)
+
+    let observer = Task { await token.waitUntilLeavesQueue() }
+    #expect(!token.cancelBeforeStart())
+    #expect(token.currentState == .started)
+    #expect(await observer.value == .started)
+
+    #expect(token.markStarted())
+    #expect(token.currentState == .started)
+    token.markCompleted()
+    token.markCompleted()
+    #expect(token.currentState == .completed)
+    #expect(!token.cancelBeforeStart())
+    #expect(await token.waitUntilLeavesQueue() == .completed)
+  }
+}
