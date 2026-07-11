@@ -314,4 +314,17 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 019 newline and whitespace topology never alias")
+  func cacheState019NewlineAndWhitespaceTopologyNeverAlias() {
+    // Hypothesis: equal scalar counts can share a key while explicit line topology differs.
+    let cache = TextLayoutCache(capacity: 4)
+    let newline = cache.layout(for: "ab\ncd", options: .init(width: 8))
+    let spaces = cache.layout(for: "ab cd", options: .init(width: 8))
+    #expect(newline.lines.count == 2)
+    #expect(spaces.lines.count == 1)
+    #expect(cache.layout(for: "ab\ncd", options: .init(width: 8)) == newline)
+  }
+}
+
 // NEXT CACHE STRESS TEST
