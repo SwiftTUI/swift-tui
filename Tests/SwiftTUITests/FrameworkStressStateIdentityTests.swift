@@ -387,6 +387,69 @@ private final class StateIdentity006Clock {
   }
 }
 
+// MARK: - Attempt 007: Conditional co-reader dependency churn
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 007 conditional co-reader dependencies stay current")
+  func stateIdentity007ConditionalCoReaderDependenciesStayCurrent() throws {
+    // Hypothesis: removing and re-adding one reader of a shared slot can leave a stale
+    // ViewNodeID in the reverse dependency index or fail to attach the replacement reader.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity007"),
+      size: .init(width: 56, height: 11)
+    ) {
+      StateIdentity007Root()
+    }
+    defer { harness.shutdown() }
+
+    var expected = 0
+    for _ in 0..<4 {
+      expected += 1
+      var frame = try harness.clickText("Increment 007")
+      #expect(frame.contains("007 First \(expected)"))
+      #expect(frame.contains("007 Second \(expected)"))
+
+      frame = try harness.clickText("Hide Second 007")
+      #expect(!frame.contains("007 Second"))
+      expected += 1
+      frame = try harness.clickText("Increment 007")
+      #expect(frame.contains("007 First \(expected)"))
+      #expect(!frame.contains("007 Second"))
+
+      frame = try harness.clickText("Show Second 007")
+      #expect(frame.contains("007 Second \(expected)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity007Root: View {
+    @State private var value = 0
+    @State private var showsSecond = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Increment 007") { value += 1 }
+        Button(showsSecond ? "Hide Second 007" : "Show Second 007") {
+          showsSecond.toggle()
+        }
+        StateIdentity007Reader(label: "First", value: $value)
+        if showsSecond {
+          StateIdentity007Reader(label: "Second", value: $value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity007Reader: View {
+    let label: String
+    @Binding var value: Int
+
+    var body: some View {
+      Text("007 \(label) \(value)")
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
