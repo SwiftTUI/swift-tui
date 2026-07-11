@@ -476,3 +476,64 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 009: table key-binding retarget
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 009 table key handler writes only the current binding")
+  func tableOutline009TableKeyHandlerWritesOnlyCurrentBinding() {
+    // Hypothesis: Table's detached row collapse can restore a key handler whose
+    // closure still owns the selection binding from an earlier root value.
+    final class SelectionBox {
+      var value = 1
+      var writes: [Int] = []
+    }
+    struct Root: View {
+      let box: SelectionBox
+      let tableIdentity: Identity
+
+      var body: some View {
+        Table(
+          selection: Binding(
+            get: { box.value },
+            set: {
+              box.value = $0
+              box.writes.append($0)
+            }
+          ),
+          columns: [.init("Rows", width: 10)]
+        ) {
+          TableRow { Text("first") }.tag(1)
+          TableRow { Text("second") }.tag(2)
+        }
+        .id(tableIdentity)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline009")
+    let tableIdentity = testIdentity("TableOutline009", "Table")
+    var priorBoxes: [SelectionBox] = []
+
+    for generation in 0..<16 {
+      let box = SelectionBox()
+      let registry = LocalKeyHandlerRegistry()
+      _ = renderer.render(
+        Root(box: box, tableIdentity: tableIdentity),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          localKeyHandlerRegistry: registry,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 18, height: 8)
+      )
+
+      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(box.value == 2)
+      #expect(box.writes == [2])
+      #expect(priorBoxes.allSatisfy { $0.value == 2 && $0.writes == [2] })
+      priorBoxes.append(box)
+    }
+  }
+}
