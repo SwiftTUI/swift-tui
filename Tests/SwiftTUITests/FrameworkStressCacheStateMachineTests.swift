@@ -75,4 +75,21 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 004 tightening policy evicts from live recency")
+  func cacheState004TighteningPolicyEvictsFromLiveRecency() {
+    // Hypothesis: an upsert under a tighter policy can evict in insertion instead of recency order.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let wide = StressCacheCost(entries: 4, bytes: 100)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(10), policy: wide)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(10), policy: wide)
+    cache.upsert("c", value: 3, cost: stressCacheEntry(10), policy: wide)
+    cache.recordAccess("a")
+    cache.upsert("d", value: 4, cost: stressCacheEntry(10), policy: .init(entries: 2, bytes: 25))
+    #expect(cache.peek("a") == 1)
+    #expect(cache.peek("d") == 4)
+    #expect(cache.count == 2)
+  }
+}
+
 // NEXT CACHE STRESS TEST
