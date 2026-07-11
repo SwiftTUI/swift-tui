@@ -803,3 +803,63 @@ private struct StressInput013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: keyCommand capture of live FocusedValue
+
+extension FrameworkStressInputRoutingTests {
+  @Test("keyCommand reads the live FocusedValue after focus moves")
+  func stressInputRouting014KeyCommandReadsLiveFocusedValue() throws {
+    // Hypothesis: command restoration may retain the closure authored for the
+    // previous focused-value environment after focus moves within its scope.
+    let events = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput014Root"),
+      size: .init(width: 48, height: 10)
+    ) {
+      StressInput014Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Focused command A")
+    _ = try harness.pressKey(KeyPress(.character("l"), modifiers: .ctrl))
+    _ = try harness.focusText("Focused command B")
+    _ = try harness.pressKey(KeyPress(.character("l"), modifiers: .ctrl))
+
+    #expect(events.value == ["A", "B"])
+  }
+}
+
+private enum StressInput014FocusedKey: FocusedValueKey {
+  typealias Value = String
+}
+
+extension FocusedValues {
+  fileprivate var stressInput014Label: String? {
+    get { self[StressInput014FocusedKey.self] }
+    set { self[StressInput014FocusedKey.self] = newValue }
+  }
+}
+
+private struct StressInput014Fixture: View {
+  static let aIdentity = testIdentity("StressInput014", "A")
+  static let bIdentity = testIdentity("StressInput014", "B")
+
+  let events: StressInputBox<[String]>
+  @FocusedValue(\.stressInput014Label) private var focusedLabel
+
+  var body: some View {
+    Panel(id: "stress-input-014-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Focused command A") {}
+          .id(Self.aIdentity)
+          .focusedValue(\.stressInput014Label, "A")
+        Button("Focused command B") {}
+          .id(Self.bIdentity)
+          .focusedValue(\.stressInput014Label, "B")
+      }
+    }
+    .keyCommand("Read focused label", key: .character("l"), modifiers: .ctrl) {
+      events.value.append(focusedLabel ?? "nil")
+    }
+  }
+}
