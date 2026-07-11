@@ -36,6 +36,45 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 021: finish with pending mouse cluster
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 021 finish flushes one coalesced mouse cluster")
+  func runtimeTransport021FinishFlushesOneCoalescedMouseCluster() async throws {
+    // Hypothesis: finishing while a manual mouse flush is armed can close the
+    // continuation first, losing the final pointer cluster.
+    let reader = InjectedTerminalInputReader(mouseFlushScheduling: .manual)
+    let stream = reader.inputEvents()
+    let task = Task {
+      var events: [InputEvent] = []
+      for await event in stream {
+        events.append(event)
+      }
+      return events
+    }
+    let location = Point(x: 6, y: 4)
+    for delta in 1...8 {
+      reader.send(
+        .mouse(
+          .init(kind: .scrolled(deltaX: 0, deltaY: delta), location: location)
+        )
+      )
+    }
+    reader.finish()
+
+    let event = try #require(await task.value.first)
+    guard case .mouse(let mouse) = event,
+      case .scrolled(let deltaX, let deltaY) = mouse.kind
+    else {
+      Issue.record("expected the pending scroll cluster at finish")
+      return
+    }
+    #expect(deltaX == 0)
+    #expect(deltaY == 36)
+    #expect(mouse.location.cell == CellPoint(x: 6, y: 4))
+  }
+}
+
 // MARK: - Attempt 020: direct-handler handoff
 
 extension FrameworkStressRuntimeTransportTests {
