@@ -623,3 +623,85 @@ extension FrameworkStressFramePipelineTests {
     #expect(rerendered.rasterSurface == committed.rasterSurface)
   }
 }
+
+// MARK: - Attempt 011: lifecycle reappearance after steady and removal
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 011 lifecycle owner reappears after steady removal cycle")
+  func framePipeline011LifecycleOwnerReappearsAfterSteadyRemovalCycle() {
+    // Hypothesis: the commit planner can preserve the first lifetime in its
+    // lifecycle baseline and suppress appear when the same identity returns.
+    let graph = ViewGraph()
+    let empty = framePipelineLifecycleTree(prefix: "FramePipeline011", includesLeaf: false)
+    let live = framePipelineLifecycleTree(prefix: "FramePipeline011", includesLeaf: true)
+    _ = graph.applySnapshot(empty)
+
+    let firstAppear = framePipelinePlan(graph: graph, resolved: live)
+    let steady = framePipelinePlan(graph: graph, resolved: live)
+    let disappear = framePipelinePlan(graph: graph, resolved: empty)
+    let secondAppear = framePipelinePlan(graph: graph, resolved: live)
+
+    #expect(firstAppear.lifecycle.map(\.operation) == [.appear(handlerIDs: ["appear"])])
+    #expect(steady.lifecycle.isEmpty)
+    #expect(disappear.lifecycle.map(\.operation) == [.disappear(handlerIDs: ["disappear"])])
+    #expect(secondAppear.lifecycle.map(\.operation) == [.appear(handlerIDs: ["appear"])])
+  }
+}
+
+private func framePipelineLifecycleTree(
+  prefix: String,
+  includesLeaf: Bool,
+  task: TaskDescriptor? = nil,
+  siblingTask: TaskDescriptor? = nil
+) -> ResolvedNode {
+  var children: [ResolvedNode] = []
+  if includesLeaf {
+    children.append(
+      ResolvedNode(
+        identity: testIdentity(prefix, "Root", "Leaf"),
+        kind: .view("FramePipelineLifecycleLeaf"),
+        lifecycleMetadata: .init(
+          appearHandlerIDs: ["appear"],
+          disappearHandlerIDs: ["disappear"],
+          tasks: task.map { [$0] } ?? []
+        )
+      )
+    )
+  }
+  if let siblingTask {
+    children.append(
+      ResolvedNode(
+        identity: testIdentity(prefix, "Root", "Sibling"),
+        kind: .view("FramePipelineLifecycleSibling"),
+        lifecycleMetadata: .init(
+          appearHandlerIDs: ["sibling-appear"],
+          disappearHandlerIDs: ["sibling-disappear"],
+          tasks: [siblingTask]
+        )
+      )
+    )
+  }
+  return ResolvedNode(
+    identity: testIdentity(prefix, "Root"),
+    kind: .root,
+    children: children
+  )
+}
+
+@MainActor
+private func framePipelinePlan(
+  graph: ViewGraph,
+  resolved: ResolvedNode,
+  placed: PlacedNode? = nil
+) -> CommitPlan {
+  let lifecycleEvents = graph.applySnapshot(
+    resolved,
+    placed: placed?.viewportVisibilitySummary
+  )
+  return CommitPlanner().plan(
+    resolved: resolved,
+    placed: placed,
+    semantics: .init(),
+    lifecycleEvents: lifecycleEvents
+  )
+}
