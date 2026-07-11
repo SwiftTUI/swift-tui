@@ -82,4 +82,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 009 third-slot padding requires fourth-slot padding")
+  func styleTransport009ThirdSlotPaddingRequiresFourthSlotPadding() {
+    // Hypothesis: accepting AA=A can synthesize a byte from a structurally invalid chunk.
+    #expect(StyleTransportBase64.decode("AA=A") == nil)
+    #expect(StyleTransportBase64.decode("AA==") == [0])
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
