@@ -341,4 +341,18 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 021 zero and negative widths retain authored keys")
+  func cacheState021ZeroAndNegativeWidthsRetainAuthoredKeys() {
+    // Hypothesis: nonpositive widths can normalize during layout but collide in cache bookkeeping.
+    let cache = TextLayoutCache(capacity: 4)
+    let zero = cache.layout(for: "alpha", options: .init(width: 0))
+    let negative = cache.layout(for: "alpha", options: .init(width: -1))
+    #expect(cache.metrics.entries == 2)
+    #expect(cache.layout(for: "alpha", options: .init(width: 0)) == zero)
+    #expect(cache.layout(for: "alpha", options: .init(width: -1)) == negative)
+    #expect(cache.metrics.hits == 2)
+  }
+}
+
 // NEXT CACHE STRESS TEST
