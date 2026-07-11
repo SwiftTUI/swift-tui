@@ -825,6 +825,45 @@ private struct StressPS018Fixture: View {
   }
 }
 
+// MARK: - Attempt 019: expanded disclosure payload refresh
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 019 an expanded disclosure renders its current payload")
+  func stress019ExpandedDisclosureRendersCurrentPayload() throws {
+    // Hypothesis: the expanded conditional branch may be retained solely by
+    // its stable disclosure identity and keep an earlier content payload.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS019", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressPS019Fixture()
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.clickText("Advance disclosure payload")
+
+    #expect(frame.contains("Disclosure content 1"))
+    #expect(!frame.contains("Disclosure content 0"))
+  }
+}
+
+@MainActor
+private struct StressPS019Fixture: View {
+  @State private var isExpanded = true
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance disclosure payload") {
+        generation += 1
+      }
+      DisclosureGroup("Details", isExpanded: $isExpanded) {
+        Text("Disclosure content \(generation)")
+      }
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
