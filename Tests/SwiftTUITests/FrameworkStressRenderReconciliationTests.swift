@@ -792,4 +792,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 019: Border set and side churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 019 border set and sides replace retained commands")
+  func renderReconciliation019BorderSetAndSidesReplaceRetainedCommands() {
+    // Hypothesis: BorderSet and active sides live in draw metadata around stable child geometry;
+    // retained command extraction may keep corners or edges from a prior set after cycling.
+    struct Root: View {
+      let set: BorderSet
+      let sides: Edge.Set
+
+      var body: some View {
+        Text("B")
+          .frame(width: 5, height: 3)
+          .border(Color.green, set: set, placement: .inset, sides: sides)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation019")
+    let variants: [(BorderSet, Edge.Set)] = [
+      (.single, .all),
+      (.double, .horizontal),
+      (.heavy, .vertical),
+      (.rounded, [.top, .leading]),
+    ]
+
+    for generation in 0..<20 {
+      let variant = variants[generation % variants.count]
+      let root = Root(set: variant.0, sides: variant.1)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - End
