@@ -302,3 +302,42 @@ private func sceneHost007Scene(generation: Int) -> some Scene {
     )
   }
 }
+
+// MARK: - Attempt 008: dynamic custom Scene body reevaluation
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 008 custom scene body traversal follows every current branch")
+  func sceneHost008CustomSceneBodyTraversalFollowsEveryCurrentBranch() {
+    // Hypothesis: recursive traversal through a non-primitive Scene can cache
+    // its first body shape and ignore later values of the same scene type.
+    for generation in 0..<24 {
+      let descriptors = collectWindowSceneDescriptors(
+        from: SceneHost008DynamicScene(generation: generation)
+      )
+      let expectedIDs =
+        generation.isMultiple(of: 2)
+        ? ["even-primary", "even-secondary"]
+        : ["odd-only"]
+
+      #expect(descriptors.map(\.id.rawValue) == expectedIDs)
+      #expect(
+        descriptors.map(\.isDefault) == [true]
+          + Array(repeating: false, count: expectedIDs.count - 1))
+    }
+  }
+}
+
+@MainActor
+private struct SceneHost008DynamicScene: Scene {
+  let generation: Int
+
+  @SceneBuilder
+  var body: some Scene {
+    if generation.isMultiple(of: 2) {
+      WindowGroup(id: "even-primary") { Text("even primary \(generation)") }
+      WindowGroup(id: "even-secondary") { Text("even secondary \(generation)") }
+    } else {
+      WindowGroup(id: "odd-only") { Text("odd \(generation)") }
+    }
+  }
+}
