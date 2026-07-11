@@ -368,6 +368,53 @@ private struct EnvironmentStyle008Root: View {
   }
 }
 
+// MARK: - Attempt 009: nested style override removal
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 009 removing button style reveals live outer style")
+  func environmentStyle009RemovingButtonStyleRevealsLiveOuterStyle() throws {
+    // Hypothesis: removing a nested type-erased style writer can retain its style body instead of
+    // rebuilding the control from the simultaneously changing outer style environment.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle009"),
+      size: .init(width: 78, height: 8)
+    ) {
+      EnvironmentStyle009Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      _ = try harness.clickText("Advance Styles 009")
+      var frame = try harness.clickText("Toggle Inner Style 009")
+      #expect(frame.contains("outer-\(generation) Nested Styled Target 009"))
+
+      frame = try harness.clickText("Toggle Inner Style 009")
+      #expect(frame.contains("inner-\(generation) Nested Styled Target 009"))
+    }
+  }
+}
+
+private struct EnvironmentStyle009Root: View {
+  @State private var generation = 0
+  @State private var usesInner = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Styles 009") { generation += 1 }
+      Button("Toggle Inner Style 009") { usesInner.toggle() }
+      Group {
+        if usesInner {
+          Button("Nested Styled Target 009") {}
+            .buttonStyle(EnvironmentStyle007ButtonStyle(marker: "inner-\(generation)"))
+        } else {
+          Button("Nested Styled Target 009") {}
+        }
+      }
+      .buttonStyle(EnvironmentStyle007ButtonStyle(marker: "outer-\(generation)"))
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
