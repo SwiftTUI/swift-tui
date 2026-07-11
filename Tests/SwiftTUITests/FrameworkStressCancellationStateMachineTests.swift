@@ -291,4 +291,19 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 019 task-backed burst preserves order")
+  func cancellationState019TaskBackedBurstPreservesOrder() async {
+    // Hypothesis: producer completion can overtake its final buffered yields.
+    let stream = makeTaskBackedAsyncStream {
+      (continuation: AsyncStream<Int>.Continuation) in
+      for value in 0..<100 { continuation.yield(value) }
+      continuation.finish()
+    }
+    var values: [Int] = []
+    for await value in stream { values.append(value) }
+    #expect(values == Array(0..<100))
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
