@@ -521,6 +521,51 @@ private struct EnvironmentStyle011Root: View {
   }
 }
 
+// MARK: - Attempt 012: control prominence propagation
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 012 custom button style receives current prominence")
+  func environmentStyle012CustomButtonStyleReceivesCurrentProminence() throws {
+    // Hypothesis: controlProminence can update the environment snapshot without replacing the
+    // configuration captured by a stable custom ButtonStyle body.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle012"),
+      size: .init(width: 76, height: 7)
+    ) {
+      EnvironmentStyle012Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Toggle Prominence 012")
+      let marker = generation.isMultiple(of: 2) ? "standard" : "increased"
+      #expect(frame.contains("\(marker) Prominence Target 012"))
+    }
+  }
+}
+
+private struct EnvironmentStyle012ButtonStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      Text(configuration.controlProminence == .increased ? "increased" : "standard")
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle012Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Prominence 012") { generation += 1 }
+      Button("Prominence Target 012") {}
+        .buttonStyle(EnvironmentStyle012ButtonStyle())
+        .controlProminence(generation.isMultiple(of: 2) ? .standard : .increased)
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
