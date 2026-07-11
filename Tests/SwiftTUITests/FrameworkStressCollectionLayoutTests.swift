@@ -1415,3 +1415,54 @@ private struct CollectionLayout022Root: View {
     .frame(width: 22, height: 12, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 023: empty-to-scrollable List cardinality
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 023 List zero to many rebuilds viewport payload")
+  func collectionLayout023ListZeroToManyRebuildsViewportPayload() {
+    // Hypothesis: List may retain selection-marker or scroll-extent fields
+    // when its collapsed payload crosses between zero and many rows.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout023")
+
+    for generation in 0..<24 {
+      let count = generation.isMultiple(of: 2) ? 0 : 10
+      let root = CollectionLayout023Root(count: count)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 20, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 20, height: 5)
+      )
+      let rendered = collectionLayoutText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(rendered.contains("023 row") == (count > 0))
+      #expect(rendered.contains("↓") == (count > 0))
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout023Root: View {
+  let count: Int
+
+  var body: some View {
+    List(selection: .constant(2)) {
+      ForEach(0..<count) { value in
+        Text("023 row \(value)").tag(value)
+      }
+    }
+    .listStyle(.insetGrouped)
+    .frame(width: 20, height: 5, alignment: .topLeading)
+  }
+}
