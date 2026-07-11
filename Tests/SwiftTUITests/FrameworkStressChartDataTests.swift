@@ -95,6 +95,66 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 014: threshold band normalization replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 014 threshold bands reorder clamp and replace tones")
+  func chartData014ThresholdBandsReorderClampAndReplaceTones() {
+    // Hypothesis: normalized threshold bands can be retained by authored offset,
+    // leaving stale segment tones after unsorted, duplicate, or clamped bands replace them.
+    struct Root: View {
+      let generation: Int
+
+      var total: Double { Double(100 + generation) }
+      var value: Double { Double((generation * 17) % (100 + generation)) }
+
+      var bands: [ThresholdBand] {
+        switch generation % 4 {
+        case 0: []
+        case 1:
+          [
+            .init(upTo: total, tone: .critical),
+            .init(upTo: total * 0.25, tone: .success),
+            .init(upTo: total * 0.6, tone: .warning),
+          ]
+        case 2:
+          [
+            .init(upTo: total * 0.5, tone: .warning),
+            .init(upTo: total * 0.5, tone: .info),
+            .init(upTo: total * 2, tone: .critical),
+          ]
+        default:
+          [
+            .init(upTo: -20, tone: .critical),
+            .init(upTo: total * 0.8, tone: .success),
+          ]
+        }
+      }
+
+      var body: some View {
+        ThresholdGauge(
+          "Bands \(generation)",
+          value: value,
+          total: total,
+          bands: bands,
+          barWidth: 9 + generation % 6
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "014", proposal: .init(width: 56, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let summary = "\(Int(root.value))/\(Int(root.total))"
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Bands \(generation)"))
+      #expect(text.contains(summary))
+      #expect(chartDataAccessibilityLabels(snapshot).contains("Bands \(generation): \(summary)"))
+    }
+  }
+}
+
 // MARK: - Attempt 013: bullet marker and fill replacement
 
 extension FrameworkStressChartDataTests {
