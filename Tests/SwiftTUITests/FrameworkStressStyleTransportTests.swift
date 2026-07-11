@@ -194,4 +194,15 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 020 duplicate keys deterministically use the last value")
+  func styleTransport020DuplicateKeysDeterministicallyUseTheLastValue() {
+    // Hypothesis: dictionary growth or nesting can make duplicate-key precedence unstable.
+    var parser = StyleTransportJSONParser(#"{"v":"first","x":"middle","v":"last"}"#)
+    let object = parser.parse()?.objectValue
+    #expect(object?["v"]?.stringValue == "last")
+    #expect(object?["x"]?.stringValue == "middle")
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
