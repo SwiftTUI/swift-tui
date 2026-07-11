@@ -1710,3 +1710,45 @@ extension FrameworkStressFramePipelineTests {
     #expect(damage.columnRanges(for: 2) == [1..<9])
   }
 }
+
+// MARK: - Attempt 032: full-row dominance and diagnostic accounting
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 032 full row dominates partial damage metrics")
+  func framePipeline032FullRowDominatesPartialDamageMetrics() {
+    // Hypothesis: combining previous/current partial spans with a later full-row
+    // contribution can retain hidden spans and undercount diagnostic coverage.
+    let graphicsA = testIdentity("FramePipeline032", "GraphicsA")
+    let graphicsB = testIdentity("FramePipeline032", "GraphicsB")
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 2, columnRanges: [2..<5]),
+        .init(row: 1, columnRanges: [1..<4]),
+        .init(row: 3, columnRanges: [-3..<2, 2..<4, 8..<8]),
+        .init(row: 2),
+        .init(row: 1, columnRanges: [3..<8]),
+      ],
+      graphicsInvalidation: [graphicsA, graphicsB]
+    )
+    let diagnostics = PresentationDamageDiagnostics(
+      damage: damage,
+      surfaceWidth: 10
+    )
+
+    #expect(
+      damage.textRows == [
+        .init(row: 1, columnRanges: [1..<8]),
+        .init(row: 2),
+        .init(row: 3, columnRanges: [0..<4]),
+      ]
+    )
+    #expect(damage.columnRanges(for: 2) == [])
+    #expect(diagnostics.textRowCount == 3)
+    #expect(diagnostics.rangeAwareTextRowCount == 2)
+    #expect(diagnostics.textSpanCount == 3)
+    #expect(diagnostics.textCellCount == 21)
+    #expect(diagnostics.graphicsInvalidationCount == 2)
+    #expect(!diagnostics.requiresFullTextRepaint)
+    #expect(!diagnostics.requiresFullGraphicsReplay)
+  }
+}
