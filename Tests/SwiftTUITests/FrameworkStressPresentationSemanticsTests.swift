@@ -999,6 +999,51 @@ private struct StressPS022Fixture: View {
   }
 }
 
+// MARK: - Attempt 023: slider range and step churn
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 023 a slider uses its current narrowed range and step")
+  func stress023SliderUsesCurrentNarrowedRangeAndStep() throws {
+    // Hypothesis: retained Slider handlers may keep the original bounds and
+    // step even while rendering a newly narrowed control contract.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS023", "Root"),
+      size: .init(width: 54, height: 10)
+    ) {
+      StressPS023Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Narrow slider")
+    _ = try harness.focusText("Range slider")
+    let frame = try harness.pressKey(KeyPress(.arrowLeft))
+
+    #expect(frame.contains("Bound value 4"))
+  }
+}
+
+@MainActor
+private struct StressPS023Fixture: View {
+  @State private var isNarrow = false
+  @State private var value = 8
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Narrow slider") {
+        isNarrow = true
+      }
+      Slider(
+        "Range slider",
+        value: $value,
+        in: isNarrow ? 0...4 : 0...10,
+        step: isNarrow ? 2 : 1
+      )
+      .id("range-slider")
+      Text("Bound value \(value)")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
