@@ -282,4 +282,55 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 007: Canvas reinsertion beside retained content
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 007 canvas reinsertion preserves adjacent retained draw")
+  func renderReconciliation007CanvasReinsertionPreservesAdjacentRetainedDraw() {
+    // Hypothesis: removing an unsupported retained-phase subtree may shift the retained draw
+    // lookup so its former DrawNode is substituted for the stable sibling that follows it.
+    struct Marker: CanvasDrawing, Equatable {
+      let generation: Int
+
+      func draw(into context: inout CanvasContext) {
+        context.setCell(at: .zero, character: Character(String(generation % 10)))
+      }
+    }
+
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Header")
+          if generation.isMultiple(of: 2) {
+            Canvas(Marker(generation: generation))
+              .frame(width: 1, height: 1)
+          }
+          Text("Stable tail")
+            .id("render-reconciliation-007-tail")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation007")
+
+    for generation in 0..<18 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained).contains("Stable tail"))
+    }
+  }
+}
+
 // MARK: - End
