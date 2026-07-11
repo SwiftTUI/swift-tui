@@ -300,3 +300,51 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 006: fill and stroke operation replacement
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 006 stable shape replaces fill and stroke operations")
+  func visualEffects006StableShapeReplacesFillAndStrokeOperations() {
+    // Hypothesis: retained draw reuse can treat an unchanged rounded-rectangle geometry as proof
+    // that its ShapeOperation is unchanged, replaying a solid fill after the node becomes a stroke.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            AnyView(RoundedRectangle(cornerRadius: 4).fill(Color.blue))
+          } else {
+            AnyView(
+              RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.blue, style: .double)
+            )
+          }
+        }
+        .frame(width: 22, height: 10)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects006")
+    var previous: RasterSurface?
+
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      if let previous {
+        #expect(retained.rasterSurface != previous)
+      }
+      previous = retained.rasterSurface
+    }
+  }
+}
