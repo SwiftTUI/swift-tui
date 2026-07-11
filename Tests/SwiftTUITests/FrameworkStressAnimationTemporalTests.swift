@@ -1444,3 +1444,50 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 027: matched target teardown
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 027 disappearing matched target reclaims active match")
+  func animationTemporal027DisappearingMatchedTargetReclaimsActiveMatch() throws {
+    // Hypothesis: matched-geometry scope lacks a property slot and can survive
+    // after its target identity leaves before the curve completes.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal027", "Root")
+    let sourceID = testIdentity("AnimationTemporal027", "Source")
+    let targetID = testIdentity("AnimationTemporal027", "Target")
+    let key = MatchedGeometryKey(id: "animation-temporal-027")
+    let start = MonotonicInstant(offset: .seconds(150))
+    let source = animationTemporalMatchedNode(identity: sourceID, nodeID: 271, key: key)
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [source]),
+      transaction: .init(),
+      timestamp: start
+    )
+    controller.capturePlacedTree(
+      animationTemporalPlacedRoot(
+        identity: rootID,
+        children: [animationTemporalPlacedMatchedNode(identity: sourceID, key: key, x: 0)]
+      )
+    )
+
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let target = animationTemporalMatchedNode(identity: targetID, nodeID: 272, key: key)
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [target]),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(20))
+    )
+    #expect(controller.activeMatchedGeometryCount == 1)
+
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID),
+      transaction: .init(),
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+    #expect(controller.activeMatchedGeometryCount == 0)
+  }
+}
+
