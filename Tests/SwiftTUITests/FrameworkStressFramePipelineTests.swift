@@ -1562,3 +1562,76 @@ extension FrameworkStressFramePipelineTests {
     #expect(await token.waitUntilLeavesQueue() == .completed)
   }
 }
+
+// MARK: - Attempt 030: moved subtree damages old and new coverage
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 030 moved dirty subtree damages old and new ranges")
+  func framePipeline030MovedDirtySubtreeDamagesOldAndNewRanges() throws {
+    // Hypothesis: retained damage can follow only the current dirty subtree and
+    // leave glyphs painted at its previously committed rows and columns.
+    let rootIdentity = testIdentity()
+    let dirtyIdentity = testIdentity("FramePipeline030Dirty")
+    let cleanIdentity = testIdentity("FramePipeline030Clean")
+    let clean = FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: 2),
+      identity: cleanIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 5, height: 1)),
+      drawPayload: .text("clean")
+    )
+    let previousDirty = FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: 3),
+      identity: dirtyIdentity,
+      bounds: .init(origin: .init(x: 2, y: 1), size: .init(width: 4, height: 2)),
+      drawPayload: .text("old")
+    )
+    let currentDirty = FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: 3),
+      identity: dirtyIdentity,
+      bounds: .init(origin: .init(x: 7, y: 4), size: .init(width: 3, height: 2)),
+      drawPayload: .text("new")
+    )
+    let previousRoot = FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: 1),
+      identity: rootIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 12, height: 7)),
+      children: [clean, previousDirty]
+    )
+    let currentRoot = FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: 1),
+      identity: rootIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 12, height: 7)),
+      children: [clean, currentDirty]
+    )
+    let previous = framePipelineArtifacts(root: previousRoot, rasterLine: "previous")
+    let current = framePipelineArtifacts(root: currentRoot, rasterLine: "current")
+    let state = FrameTailRetainedState()
+    state.storeCommittedFrame(
+      previous,
+      baselinePlacedTree: previous.placedTree,
+      proposal: .init(width: 12, height: 7)
+    )
+    let retained = state.input(invalidatedIdentities: [dirtyIdentity])
+    let retainedIndex = try #require(retained.retainedLayout.previousFrameIndex)
+    _ = try #require(retainedIndex.resolvedNode(for: dirtyIdentity))
+    _ = try #require(retainedIndex.placedPath(to: dirtyIdentity))
+
+    let plan = FrameTailPresentationDamageResolver.resolve(
+      rootIdentity: rootIdentity,
+      placed: current.placedTree,
+      retainedLayout: retained.retainedLayout,
+      previousSurfaceTopology: retained.previousSurfaceTopology
+    )
+    let damage = try #require(plan.damage)
+
+    #expect(plan.barriers.isEmpty)
+    #expect(
+      damage.textRows == [
+        .init(row: 1, columnRanges: [2..<6]),
+        .init(row: 2, columnRanges: [2..<6]),
+        .init(row: 4, columnRanges: [7..<10]),
+        .init(row: 5, columnRanges: [7..<10]),
+      ]
+    )
+  }
+}
