@@ -94,6 +94,59 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 004: nested safe-area padding removal
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 004 nested padding removal restores outer contract")
+  func safeAreaGeometry004NestedPaddingRemovalRestoresOuterContract() {
+    // Hypothesis: removing an inner safe-area environment transform can leave its insets folded
+    // into the surviving outer padding node after repeated branch reconstruction.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            GeometryReader { proxy in
+              Text(
+                "004 g\(generation) inner \(proxy.size.width)x\(proxy.size.height) "
+                  + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+              )
+            }
+            .safeAreaPadding(.leading, 2)
+          } else {
+            GeometryReader { proxy in
+              Text(
+                "004 g\(generation) outer \(proxy.size.width)x\(proxy.size.height) "
+                  + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+              )
+            }
+          }
+        }
+        .safeAreaPadding(.top, 1)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry004")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: .init(top: 2, leading: 3, bottom: 1, trailing: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("004 g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 003: safe-area padding amount replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
