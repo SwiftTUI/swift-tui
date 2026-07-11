@@ -863,3 +863,30 @@ private struct StressInput014Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 015: arbitrarily split UTF-8 keyboard input
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Terminal input preserves a multibyte character split across reads")
+  func stressInputRouting015UTF8CharacterSurvivesArbitraryByteSplits() throws {
+    // Hypothesis: the incremental parser may discard non-ASCII lead and
+    // continuation bytes instead of retaining an incomplete UTF-8 scalar.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput015Root"),
+      size: .init(width: 20, height: 4)
+    ) {
+      EmptyView()
+    }
+    defer { harness.shutdown() }
+
+    var parser = TerminalInputParser()
+    let bytes = Array("é".utf8)
+    var events = parser.feed([bytes[0]])
+    events.append(contentsOf: parser.feed([bytes[1]]))
+
+    withKnownIssue("TerminalInputParser drops a UTF-8 scalar split across feeds") {
+      #expect(events == [.key(KeyPress(.character("é")))])
+    }
+    #expect(harness.keyPressHandlerCount == 0)
+  }
+}
