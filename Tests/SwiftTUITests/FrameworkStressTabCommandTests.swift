@@ -980,3 +980,72 @@ private struct StressTC017Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 018: duplicate-name palette reorder
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 018 duplicate palette names follow current owners")
+  func stressTabCommand018DuplicatePaletteNamesFollowCurrentOwners() throws {
+    // Hypothesis: identical command metadata may allow an open sheet to reuse
+    // the first row while preserving the action from its previous source owner.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC018", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressTC018Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open duplicate palette")
+    _ = try harness.clickText("Reverse palette owners")
+    _ = try harness.clickText("Duplicate palette action")
+
+    #expect(probe.events == ["b"])
+  }
+}
+
+@MainActor
+private struct StressTC018Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var reversed = false
+  @State private var showsPalette = false
+
+  var body: some View {
+    Panel(id: "stress-tc-018-source") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Open duplicate palette") {
+          showsPalette = true
+        }
+        if reversed {
+          commandSource(owner: "B", marker: "b")
+          commandSource(owner: "A", marker: "a")
+        } else {
+          commandSource(owner: "A", marker: "a")
+          commandSource(owner: "B", marker: "b")
+        }
+      }
+    }
+    .panel(id: "stress-tc-018-host")
+    .paletteSheet("Duplicate palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reverse palette owners") {
+          reversed = true
+        }
+        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
+          Button(entry.element.name) {
+            entry.element.action()
+          }
+        }
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+
+  private func commandSource(owner: String, marker: String) -> some View {
+    Panel(id: "palette-owner-\(marker)") { Text("owner \(owner)") }
+      .paletteCommand(name: "Duplicate palette action") {
+        probe.events.append(marker)
+      }
+  }
+}
