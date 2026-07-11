@@ -948,3 +948,52 @@ private struct StressLL015Sheet: View {
     }
   }
 }
+
+// MARK: - Attempt 016: presented source identity remint
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 016 active sheet replaces reminted declaration source")
+  func stress016ActiveSheetReplacesRemintedDeclarationSource() throws {
+    // Hypothesis: old and new declarative source entries may coexist when the
+    // presenting identity changes while its binding remains true.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL016", "Root"),
+      size: .init(width: 54, height: 11)
+    ) {
+      StressLL016Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Reminted Sheet")
+    for generation in 1...8 {
+      let frame = try harness.clickText("Remint Sheet Source", chooseLast: true)
+      #expect(frame.contains("reminted sheet generation \(generation)"))
+      #expect(
+        frame.components(separatedBy: "reminted sheet generation").count - 1 == 1
+      )
+      #expect(harness.lifecycleRegistrationCount <= 3)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL016Fixture: View {
+  @State private var isPresented = false
+  @State private var generation = 0
+
+  var body: some View {
+    Group {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("source generation \(generation)")
+        Button("Open Reminted Sheet") { isPresented = true }
+      }
+    }
+    .id("sheet-source-\(generation)")
+    .sheet("Reminted", isPresented: $isPresented) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("reminted sheet generation \(generation)")
+        Button("Remint Sheet Source") { generation += 1 }
+      }
+    }
+  }
+}
