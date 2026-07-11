@@ -255,3 +255,48 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 005: nested custom-shape inset churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 005 nested inset depth reaches the current path fill")
+  func visualEffects005NestedInsetDepthReachesCurrentPathFill() {
+    // Hypothesis: nested InsetShape wrappers can retain an earlier accumulated insetAmount even
+    // while both wrapper values change, making a current path render at a prior generation's size.
+    var diamond = Path()
+    diamond.move(to: Point(x: 0.5, y: 0))
+    diamond.addLine(to: Point(x: 1, y: 0.5))
+    diamond.addLine(to: Point(x: 0.5, y: 1))
+    diamond.addLine(to: Point(x: 0, y: 0.5))
+    diamond.close()
+
+    struct Root: View {
+      let path: Path
+      let generation: Int
+
+      var body: some View {
+        VisualEffectsPathShape(pathValue: path)
+          .inset(by: generation % 5)
+          .inset(by: (generation + 1) % 4)
+          .fill(Color.green)
+          .frame(width: 24, height: 12)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects005")
+
+    for generation in 0..<24 {
+      let root = Root(path: diamond, generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
