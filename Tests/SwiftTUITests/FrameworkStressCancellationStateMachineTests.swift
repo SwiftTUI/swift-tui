@@ -206,4 +206,22 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 014 concurrent resume swarm has one effect")
+  func cancellationState014ConcurrentResumeSwarmHasOneEffect() async {
+    // Hypothesis: lock handoff can expose the stored continuation to two resumers.
+    let gate = OneShotContinuationGate()
+    let counter = CancellationStressCounter()
+    let waiter = Task {
+      await awaitStressGate(gate)
+      counter.increment()
+    }
+    await withTaskGroup(of: Void.self) { group in
+      for _ in 0..<128 { group.addTask { gate.resume() } }
+    }
+    await waiter.value
+    #expect(counter.count == 1)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
