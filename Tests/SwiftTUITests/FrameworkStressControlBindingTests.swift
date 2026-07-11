@@ -118,3 +118,49 @@ private struct ControlStress002Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 003: button disabled during pointer press
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 003 disabling a pressed button cancels activation")
+  func stressControlBinding003DisablingPressedButtonCancelsActivation() throws {
+    // Hypothesis: pointer press capture can retain a Button action after the same control becomes
+    // disabled, allowing the later mouse-up to dispatch through a now-inert registration.
+    let probe = ControlStressProbe(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress003", "Root"),
+      size: .init(width: 46, height: 8)
+    ) {
+      ControlStress003Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    let target = try #require(harness.point(forText: "Press target 003"))
+    _ = try harness.sendMouse(.down(.primary), at: target)
+    _ = try harness.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
+    _ = try harness.sendMouse(.up(.primary), at: target)
+
+    #expect(probe.value == 0)
+  }
+}
+
+@MainActor
+private struct ControlStress003Fixture: View {
+  let probe: ControlStressProbe<Int>
+  @State private var isEnabled = true
+
+  var body: some View {
+    Panel(id: testIdentity("ControlStress003", "Panel")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(isEnabled ? "Target enabled 003" : "Target disabled 003")
+        Button("Press target 003") {
+          probe.value += 1
+        }
+        .disabled(!isEnabled)
+      }
+    }
+    .keyCommand("Disable target 003", key: .character("d"), modifiers: .ctrl) {
+      isEnabled = false
+    }
+  }
+}
