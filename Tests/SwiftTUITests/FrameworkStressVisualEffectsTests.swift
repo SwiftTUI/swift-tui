@@ -1417,3 +1417,61 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 026: clipped image visible-bounds churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 026 clipped image publishes current visible bounds")
+  func visualEffects026ClippedImagePublishesCurrentVisibleBounds() throws {
+    // Hypothesis: a retained image attachment can update its logical bounds while preserving an
+    // earlier visibleBounds intersection after the image translates behind a stable clip.
+    let pngBytes = try makePNGBytes(
+      width: 32,
+      height: 32,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 80, blue: 40), count: 32 * 32)
+    )
+
+    struct Root: View {
+      let pngBytes: [UInt8]
+      let generation: Int
+
+      var body: some View {
+        Image(data: pngBytes)
+          .resizable()
+          .frame(width: 12, height: 6)
+          .offset(x: (generation % 9) - 4, y: (generation % 5) - 2)
+          .frame(width: 7, height: 4, alignment: .topLeading)
+          .clipped()
+      }
+    }
+
+    func clippedToViewport(_ bounds: CellRect) -> CellRect {
+      let minX = max(0, bounds.origin.x)
+      let minY = max(0, bounds.origin.y)
+      let maxX = min(7, bounds.origin.x + bounds.size.width)
+      let maxY = min(4, bounds.origin.y + bounds.size.height)
+      return CellRect(
+        origin: CellPoint(x: minX, y: minY),
+        size: CellSize(width: max(0, maxX - minX), height: max(0, maxY - minY))
+      )
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects026")
+
+    for generation in 0..<27 {
+      let root = Root(pngBytes: pngBytes, generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(attachment.visibleBounds == clippedToViewport(attachment.bounds))
+    }
+  }
+}
