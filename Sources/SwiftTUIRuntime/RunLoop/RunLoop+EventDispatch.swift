@@ -256,18 +256,23 @@ extension RunLoop {
     // SecureField, REPL-style consumers) continue to see pasted
     // text. This preserves pre-bracketed-paste behavior for the
     // non-drop case.
-    for scalar in pasteEvent.content.unicodeScalars {
-      // Skip control characters except common whitespace.
-      guard scalar.value >= 0x20 || scalar == "\n" || scalar == "\t" else {
+    // Iterate grapheme clusters, not scalars: multi-scalar characters
+    // (ZWJ emoji, combining sequences) must arrive as one key event.
+    for character in pasteEvent.content {
+      // Skip control characters except common whitespace. Multi-scalar
+      // clusters are never control characters.
+      if character.unicodeScalars.count == 1,
+        let scalar = character.unicodeScalars.first,
+        scalar.value < 0x20, scalar != "\n", scalar != "\t"
+      {
         continue
       }
       let key: KeyEvent
-      switch scalar {
-      case "\n", "\r": key = .return
+      switch character {
+      case "\n", "\r", "\r\n": key = .return
       case "\t": key = .tab
       case " ": key = .space
       default:
-        let character = Character(String(scalar))
         key = .character(character)
       }
       _ = handleKeyPress(KeyPress(key, modifiers: []))

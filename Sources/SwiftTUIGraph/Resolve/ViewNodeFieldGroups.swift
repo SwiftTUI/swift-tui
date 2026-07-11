@@ -39,6 +39,7 @@ extension ViewNode {
     package var nextChangeModifierOrdinal: Int = 0
     package var nextNavigationDestinationModifierOrdinal: Int = 0
     package var nextTaskModifierOrdinal: Int = 0
+    package var nextValueAnimationModifierOrdinal: Int = 0
     // The frame in which this node was freshly minted after `nodeForIdentity`
     // evicted a different-entity occupant from its identity slot. Frame-scoped
     // by comparison against `preparedFrameID` (the `visitedFrameID` pattern)

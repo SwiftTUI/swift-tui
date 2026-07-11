@@ -86,16 +86,12 @@ package struct TextInputValue: Equatable, Sendable {
       return clampingSelection()
     }
 
-    if text.isEmpty && selection == .caret(at: TextOffset(0)) {
-      return TextInputValue(text: externalText)
-    }
-
-    let upperBound = TextOffset(externalText.count)
-    let clampedRange = selection.range.clamped(to: upperBound)
-    return TextInputValue(
-      text: externalText,
-      selection: .caret(at: clampedRange.upperBound)
-    )
+    // The external text diverged from the control's own editing state: the
+    // binding was written programmatically or retargeted to a different
+    // source. The retained caret describes an offset into the OLD text, so
+    // carrying it over lands mid-string in unrelated content — start fresh
+    // with the caret at the end, exactly as an initial bind does.
+    return TextInputValue(text: externalText)
   }
 
   package func clampingSelection() -> TextInputValue {

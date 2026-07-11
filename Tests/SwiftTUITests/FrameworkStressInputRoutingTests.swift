@@ -218,14 +218,12 @@ extension FrameworkStressInputRoutingTests {
       sectionIdentity: nil
     )
 
-    withKnownIssue("A reset default-focus namespace request survives registry reset") {
-      #expect(
-        registry.desiredFocusRequest(
-          focusRegions: [region],
-          shouldApplyInitialDefault: false
-        ) == .none
-      )
-    }
+    #expect(
+      registry.desiredFocusRequest(
+        focusRegions: [region],
+        shouldApplyInitialDefault: false
+      ) == .none
+    )
   }
 }
 
@@ -497,9 +495,7 @@ extension FrameworkStressInputRoutingTests {
       applyRuntimeFocus: { _ in false }
     )
 
-    withKnownIssue("A stale FocusState request blocks the later live request") {
-      #expect(registry.desiredFocusRequest(allowedIdentities: [live]) == .focus(live))
-    }
+    #expect(registry.desiredFocusRequest(allowedIdentities: [live]) == .focus(live))
   }
 }
 
@@ -884,9 +880,7 @@ extension FrameworkStressInputRoutingTests {
     var events = parser.feed([bytes[0]])
     events.append(contentsOf: parser.feed([bytes[1]]))
 
-    withKnownIssue("TerminalInputParser drops a UTF-8 scalar split across feeds") {
-      #expect(events == [.key(KeyPress(.character("é")))])
-    }
+    #expect(events == [.key(KeyPress(.character("é")))])
     #expect(harness.keyPressHandlerCount == 0)
   }
 }
@@ -912,9 +906,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.pressKey(KeyPress(.arrowLeft))
     _ = try harness.pressKey(KeyPress(.delete))
 
-    withKnownIssue("Delete has no forward-deletion mapping for focused text input") {
-      #expect(text.value == "abd")
-    }
+    #expect(text.value == "abd")
   }
 }
 
@@ -949,9 +941,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.focusText("Grapheme paste target")
     _ = try harness.paste("👩‍💻")
 
-    withKnownIssue("Fallback paste splits extended graphemes into Unicode scalars") {
-      #expect(keys.value == [.character("👩‍💻")])
-    }
+    #expect(keys.value == [.character("👩‍💻")])
   }
 }
 
@@ -997,9 +987,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.pressKey(KeyPress(.character("Z")))
 
     #expect(first.value == "abcd")
-    withKnownIssue("A retargeted TextField carries the prior binding's caret position") {
-      #expect(second.value == "wxyzZ")
-    }
+    #expect(second.value == "wxyzZ")
   }
 }
 
@@ -1543,9 +1531,7 @@ extension FrameworkStressInputRoutingTests {
       _ = try harness.pressKey(KeyPress(.arrowDown))
     }
     _ = try harness.pressKey(KeyPress(.arrowUp))
-    withKnownIssue("Keyboard scrolling does not clamp its bound offset at content edges") {
-      #expect(position.value.y == max(0, maximumY - 1))
-    }
+    #expect(position.value.y == max(0, maximumY - 1))
   }
 }
 

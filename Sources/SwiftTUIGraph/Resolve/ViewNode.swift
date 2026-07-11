@@ -221,6 +221,10 @@ package final class ViewNode {
     get { frameState.nextTaskModifierOrdinal }
     set { frameState.nextTaskModifierOrdinal = newValue }
   }
+  private var nextValueAnimationModifierOrdinal: Int {
+    get { frameState.nextValueAnimationModifierOrdinal }
+    set { frameState.nextValueAnimationModifierOrdinal = newValue }
+  }
   private var preparedFrameID: UInt64 {
     get { frameState.preparedFrameID }
     set { frameState.preparedFrameID = newValue }
@@ -315,6 +319,7 @@ package final class ViewNode {
     nextChangeModifierOrdinal = 0
     nextNavigationDestinationModifierOrdinal = 0
     nextTaskModifierOrdinal = 0
+    nextValueAnimationModifierOrdinal = 0
     preparedFrameID = frameID
   }
 
@@ -337,6 +342,7 @@ package final class ViewNode {
       nextChangeModifierOrdinal = 0
       nextNavigationDestinationModifierOrdinal = 0
       nextTaskModifierOrdinal = 0
+      nextValueAnimationModifierOrdinal = 0
       _ = dependencyTracker.reset()
     }
     evaluationDepth += 1
@@ -686,6 +692,13 @@ package final class ViewNode {
       nextTaskModifierOrdinal += 1
     }
     return nextTaskModifierOrdinal
+  }
+
+  package func claimValueAnimationModifierOrdinal() -> Int {
+    defer {
+      nextValueAnimationModifierOrdinal += 1
+    }
+    return nextValueAnimationModifierOrdinal
   }
 
   package func queueChangeHandler(
@@ -1780,6 +1793,7 @@ extension ViewNode {
       // this debug mirror; grouping it into FrameState surfaced the gap and the
       // totality guard now requires it here.
       nextTaskModifierOrdinal: nextTaskModifierOrdinal,
+      nextValueAnimationModifierOrdinal: nextValueAnimationModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
       entityDisplacedOccupantFrameID: entityDisplacedOccupantFrameID,

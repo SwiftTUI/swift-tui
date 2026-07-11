@@ -63,6 +63,7 @@ extension ViewNode {
     package var nextChangeModifierOrdinal: Int
     package var nextNavigationDestinationModifierOrdinal: Int
     package var nextTaskModifierOrdinal: Int
+    package var nextValueAnimationModifierOrdinal: Int
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
     package var entityDisplacedOccupantFrameID: UInt64

@@ -148,6 +148,11 @@ package func textInputCommand(
       return nil
     }
     return .deleteBackward(granularity: .character)
+  case .delete:
+    guard !isSelecting else {
+      return nil
+    }
+    return .deleteForward(granularity: .character)
   case .arrowLeft:
     return .move(.left, selecting: isSelecting)
   case .arrowRight:

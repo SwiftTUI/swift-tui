@@ -51,8 +51,10 @@ package enum StateSlotOrdinals {
     defaultFocusBase - ordinal
   }
 
-  package static var valueAnimation: Int {
-    valueAnimationOrdinal
+  package static func valueAnimation(
+    _ ordinal: Int
+  ) -> Int {
+    valueAnimationOrdinal - ordinal
   }
 
   package static var tabFocusedIndex: Int {

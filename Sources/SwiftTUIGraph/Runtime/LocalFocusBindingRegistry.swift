@@ -157,6 +157,10 @@ package final class LocalDefaultFocusRegistry: Equatable {
   package func reset() {
     scopes.removeAll(keepingCapacity: true)
     candidates.removeAll(keepingCapacity: true)
+    // A pending reset request is scoped to the registrations that armed it; a
+    // registry reset starts a new registration lifetime, so the request must
+    // not survive to fire against a later namespace reuse.
+    pendingResetNamespace = nil
   }
 
   package func removeSubtrees(
@@ -393,7 +397,9 @@ package final class LocalFocusBindingRegistry: Equatable {
         if allowedIdentities.contains(selected.identity) {
           return .focus(selected.identity)
         }
-        return .none
+        // This group's selected identity is not in the live allowed set — a
+        // stale request must not block a later group's live request.
+        continue
       }
 
       return .clear

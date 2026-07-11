@@ -428,6 +428,19 @@ package final class LocalScrollPositionRegistry: Equatable {
     return clampedOffset(next, in: route)
   }
 
+  /// Clamps `offset` against the live geometry of the route matching
+  /// `scopeIdentity`. Returns `offset` unchanged when no route is known, so
+  /// callers without published geometry keep their unclamped behavior.
+  package func clampedOffset(
+    _ offset: ScrollOffset,
+    scopeIdentity: Identity?
+  ) -> ScrollOffset {
+    guard let route = firstRoute(matching: scopeIdentity) else {
+      return offset
+    }
+    return clampedOffset(offset, in: route)
+  }
+
   private func firstRoute(
     matching scopeIdentity: Identity?
   ) -> ScrollRoute? {

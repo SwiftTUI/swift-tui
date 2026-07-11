@@ -1067,19 +1067,12 @@ extension FrameworkStressLayoutLifecycleTests {
     _ = try harness.pressKey(KeyPress(.arrowRight))
     _ = try harness.pressKey(KeyPress(.arrowRight))
 
-    for generation in 1...6 {
+    for _ in 1...6 {
       _ = try harness.clickText("Reverse Tabs")
       _ = try harness.focus(StressLL018Fixture.tabIdentity)
       let frame = try harness.pressKey(KeyPress(.return))
-      if generation.isMultiple(of: 2) {
-        #expect(frame.contains("selected tag C"))
-        #expect(frame.contains("content C"))
-      } else {
-        withKnownIssue("Reordered tabs retarget the stored logical focus to a different tag") {
-          #expect(frame.contains("selected tag C"))
-          #expect(frame.contains("content C"))
-        }
-      }
+      #expect(frame.contains("selected tag C"))
+      #expect(frame.contains("content C"))
     }
   }
 }
@@ -1213,10 +1206,8 @@ extension FrameworkStressLayoutLifecycleTests {
       frame = try harness.clickText("Toggle Overflow Tabs")
       #expect(!frame.contains("Four"))
       frame = try harness.clickText("Toggle Overflow Tabs")
-      withKnownIssue("Restoring overflow options resurrects the previously expanded menu") {
-        #expect(frame.contains("▾"))
-        #expect(!frame.contains("Four"))
-      }
+      #expect(frame.contains("▾"))
+      #expect(!frame.contains("Four"))
       #expect(harness.pointerHandlerCount <= 9)
       if frame.contains("▴") {
         frame = try harness.clickText("▴")
@@ -1872,9 +1863,7 @@ extension FrameworkStressLayoutLifecycleTests {
       let textNode = try #require(
         artifacts.resolvedTree.stressLLDescendant(withText: "stacked value animation probe")
       )
-      withKnownIssue("Stacked value-animation modifiers alias one retained baseline slot") {
-        #expect(textNode.transactionSnapshot.animationRequest == .inherit)
-      }
+      #expect(textNode.transactionSnapshot.animationRequest == .inherit)
     }
   }
 }
@@ -1927,9 +1916,7 @@ extension FrameworkStressLayoutLifecycleTests {
         let occurrences =
           frame.components(separatedBy: "transition resurrection probe").count - 1
         #expect(occurrences == 1)
-        withKnownIssue("Reinsertion does not cancel the same identity's removal overlay") {
-          #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
-        }
+        #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
         #expect(controller.activeAnimationCount <= 1)
       }
     }

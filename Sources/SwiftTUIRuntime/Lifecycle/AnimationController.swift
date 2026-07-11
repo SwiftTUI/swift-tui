@@ -833,6 +833,21 @@ package final class AnimationController: Sendable {
     let insertedIdentities = resolvedDiff.insertedIdentities
     let removedIdentities = resolvedDiff.removedIdentities
 
+    // A same-identity reinsertion supersedes that identity's in-flight
+    // removal overlay: the live node owns the visual from this frame on, so
+    // the frozen exit snapshot must not keep compositing beside it. (The
+    // diff above already treats mid-removal identities as departed, so the
+    // reinsertion still fires its own insertion transition when one is
+    // registered.)
+    if !removingNodes.isEmpty {
+      let supersededRemovals = removingNodes.filter { _, entry in
+        newIdentities.contains(entry.identity)
+      }
+      for viewNodeID in supersededRemovals.keys {
+        removingNodes.removeValue(forKey: viewNodeID)
+      }
+    }
+
     // Matched-geometry detection.  A match fires when the current
     // frame's (identity, key) mapping differs from the previous
     // frame's — regardless of whether either identity is newly

@@ -109,8 +109,23 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
               ) ?? false
             }
 
-            var next = binding.wrappedValue
+            let current = binding.wrappedValue
+            var next = current
             guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
+              return false
+            }
+            // Clamp against the route's live geometry: without this the
+            // bound offset grows past the content edge and reverse keys
+            // spin before the viewport moves. The wheel path clamps the
+            // same way via its pointer scroll context.
+            if let scrollCommandRegistry {
+              let clamped = scrollCommandRegistry.clampedOffset(
+                ScrollOffset(x: next.x, y: next.y),
+                scopeIdentity: context.identity
+              )
+              next = ScrollPosition(x: clamped.x, y: clamped.y)
+            }
+            guard next != current else {
               return false
             }
             binding.wrappedValue = next

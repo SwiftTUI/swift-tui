@@ -149,21 +149,22 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     else {
       return (nil, nil)
     }
-    // Use the last ordinal (high number) reserved for modifier bookkeeping
-    // to avoid colliding with @State ordinals.
-    let ordinal = ValueAnimationModifierSlot.reservedOrdinal
+    // Each stacked `.animation(_, value:)` on one node claims its own
+    // per-resolve ordinal (reset with the node's other modifier-ordinal
+    // counters): a shared slot would alias two stacked modifiers'
+    // baselines — each write invalidates the other's comparison, so every
+    // steady-state resolve manufactures a phantom "value changed" — and
+    // would trap on the slot's stored-type check when the watched values
+    // have different types.
+    let ordinal = StateSlotOrdinals.valueAnimation(
+      node.claimValueAnimationModifierOrdinal()
+    )
     let stored: Value = node.stateSlot(
       ordinal: ordinal,
       seed: value
     )
     return (stored, ordinal)
   }
-}
-
-enum ValueAnimationModifierSlot {
-  /// Reserved modifier-only slot used to remember the previous watched
-  /// value without colliding with authored `@State` storage.
-  static let reservedOrdinal = StateSlotOrdinals.valueAnimation
 }
 
 // MARK: - TransactionModifier

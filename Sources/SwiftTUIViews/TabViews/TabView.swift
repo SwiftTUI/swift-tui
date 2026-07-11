@@ -42,6 +42,7 @@ extension TabView {
     let isEnabled = context.environmentValues.isEnabled
     let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
     let options = resolvedOptions(in: context.child(component: .named("TabOptions")))
+    let orderedTags = options.map(\.tag)
     let selectedIndex =
       options.firstIndex { option in
         pickerSelectionMatches(option.tag, selection: selection.wrappedValue)
@@ -50,7 +51,7 @@ extension TabView {
     let focusedIndex: Int? =
       if isFocused {
         resolvedFocusedTabIndex(
-          storedIndex: storedFocusedTabIndex(in: ownerNode),
+          storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
           selectedIndex: selectedIndex,
           optionCount: options.count
         )
@@ -69,6 +70,19 @@ extension TabView {
       isOverflowMenuExpanded: storedTabOverflowMenuExpanded(in: ownerNode)
     )
     let stylePresentation = tabStyle.presentation(for: styleConfiguration)
+    if stylePresentation.overflowMenu == nil,
+      storedTabOverflowMenuExpanded(in: ownerNode)
+    {
+      // The overflow surface departed (the options now fit, or were
+      // removed): clear the expanded flag silently so a future overflow
+      // surface starts collapsed instead of resurrecting this one. Nothing
+      // rendered this frame reads the flag while no surface exists, so no
+      // invalidation is owed.
+      ownerNode?.setStateSlotSilently(
+        ordinal: tabOverflowMenuExpandedStateSlot,
+        value: false
+      )
+    }
     let activeContentPayload =
       selectedIndex.flatMap { index in
         options.indices.contains(index) ? options[index].contentPayload : nil
@@ -129,7 +143,6 @@ extension TabView {
 
     if isEnabled {
       let binding = selection
-      let orderedTags = options.map(\.tag)
       let intake = HandlerDescriptorIntake(
         context: context,
         fallbackAuthoringScope: authoringScope
@@ -152,7 +165,7 @@ extension TabView {
             moveStoredTabFocus(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               delta: -1,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
@@ -167,7 +180,7 @@ extension TabView {
             moveStoredTabFocus(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               delta: 1,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
@@ -181,13 +194,14 @@ extension TabView {
             )
             setStoredFocusedTabIndex(
               0,
+              tags: orderedTags,
               in: ownerNode,
               invalidationIdentity: context.identity,
               certifiedInvalidationIdentities: certifiedStripFocusIdentities(
                 controlIdentity: context.identity,
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
-                optionCount: options.count,
+                orderedTags: orderedTags,
                 presentation: stylePresentation,
                 nextStoredIndex: 0
               )
@@ -201,13 +215,14 @@ extension TabView {
             )
             setStoredFocusedTabIndex(
               max(0, options.count - 1),
+              tags: orderedTags,
               in: ownerNode,
               invalidationIdentity: context.identity,
               certifiedInvalidationIdentities: certifiedStripFocusIdentities(
                 controlIdentity: context.identity,
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
-                optionCount: options.count,
+                orderedTags: orderedTags,
                 presentation: stylePresentation,
                 nextStoredIndex: max(0, options.count - 1)
               )
@@ -225,7 +240,7 @@ extension TabView {
             if expandFocusedOverflowMenuIfNeeded(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
             ) {
@@ -234,7 +249,7 @@ extension TabView {
             return moveStoredOverflowMenuFocus(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               delta: 1,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
@@ -243,7 +258,7 @@ extension TabView {
             if expandFocusedOverflowMenuIfNeeded(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
             ) {
@@ -252,7 +267,7 @@ extension TabView {
             return moveStoredOverflowMenuFocus(
               ownerNode: ownerNode,
               selectedIndex: selectedIndex,
-              optionCount: options.count,
+              orderedTags: orderedTags,
               delta: -1,
               presentation: stylePresentation,
               invalidationIdentity: context.identity
@@ -265,13 +280,14 @@ extension TabView {
             )
             setStoredFocusedTabIndex(
               nil,
+              tags: orderedTags,
               in: ownerNode,
               invalidationIdentity: context.identity,
               certifiedInvalidationIdentities: certifiedStripFocusIdentities(
                 controlIdentity: context.identity,
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
-                optionCount: options.count,
+                orderedTags: orderedTags,
                 presentation: stylePresentation,
                 nextStoredIndex: nil
               )
@@ -285,7 +301,7 @@ extension TabView {
         if expandFocusedOverflowMenuIfNeeded(
           ownerNode: ownerNode,
           selectedIndex: selectedIndex,
-          optionCount: options.count,
+          orderedTags: orderedTags,
           presentation: stylePresentation,
           invalidationIdentity: context.identity
         ) {
@@ -354,6 +370,7 @@ extension TabView {
     }
 
     let binding = selection
+    let orderedTags = options.map(\.tag)
 
     // Custom styles receive every item and can place any item in either the
     // primary strip or an overflow surface. Keep the registered route family
@@ -377,6 +394,7 @@ extension TabView {
         )
         setStoredFocusedTabIndex(
           index,
+          tags: orderedTags,
           in: ownerNode,
           invalidationIdentity: context.identity
         )
@@ -405,6 +423,7 @@ extension TabView {
       if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
         setStoredFocusedTabIndex(
           focusIndex,
+          tags: orderedTags,
           in: ownerNode,
           invalidationIdentity: context.identity
         )
@@ -426,6 +445,7 @@ extension TabView {
 
         setStoredFocusedTabIndex(
           index,
+          tags: orderedTags,
           in: ownerNode,
           invalidationIdentity: context.identity
         )
@@ -541,18 +561,19 @@ private func resolvedFocusedTabIndex(
 private func moveStoredTabFocus(
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
-  optionCount: Int,
+  orderedTags: [SelectionTag],
   delta: Int,
   presentation: TabViewStylePresentation,
   invalidationIdentity: Identity? = nil
 ) {
+  let optionCount = orderedTags.count
   guard let direction = delta == 0 ? nil : delta.signum(), optionCount > 0 else {
     return
   }
 
   let currentIndex =
     resolvedFocusedTabIndex(
-      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
       selectedIndex: selectedIndex,
       optionCount: optionCount
     )
@@ -580,6 +601,7 @@ private func moveStoredTabFocus(
         }
       setStoredFocusedTabIndex(
         nextIndex,
+        tags: orderedTags,
         in: ownerNode,
         invalidationIdentity: invalidationIdentity,
         certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
@@ -597,6 +619,7 @@ private func moveStoredTabFocus(
     {
       setStoredFocusedTabIndex(
         overflowFocusIndex,
+        tags: orderedTags,
         in: ownerNode,
         invalidationIdentity: invalidationIdentity,
         certifiedInvalidationIdentities: certifiedIdentities(overflowFocusIndex)
@@ -604,6 +627,7 @@ private func moveStoredTabFocus(
     } else {
       setStoredFocusedTabIndex(
         nextIndex,
+        tags: orderedTags,
         in: ownerNode,
         invalidationIdentity: invalidationIdentity,
         certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
@@ -618,6 +642,7 @@ private func moveStoredTabFocus(
   )
   setStoredFocusedTabIndex(
     nextIndex,
+    tags: orderedTags,
     in: ownerNode,
     invalidationIdentity: invalidationIdentity,
     certifiedInvalidationIdentities: certifiedIdentities(nextIndex)
@@ -628,7 +653,7 @@ private func moveStoredTabFocus(
 private func expandFocusedOverflowMenuIfNeeded(
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
-  optionCount: Int,
+  orderedTags: [SelectionTag],
   presentation: TabViewStylePresentation,
   invalidationIdentity: Identity? = nil
 ) -> Bool {
@@ -637,9 +662,9 @@ private func expandFocusedOverflowMenuIfNeeded(
   }
   guard
     let index = resolvedFocusedTabIndex(
-      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
       selectedIndex: selectedIndex,
-      optionCount: optionCount
+      optionCount: orderedTags.count
     ),
     overflow.overflowIndices.contains(index)
   else {
@@ -653,6 +678,7 @@ private func expandFocusedOverflowMenuIfNeeded(
   )
   setStoredFocusedTabIndex(
     index,
+    tags: orderedTags,
     in: ownerNode,
     invalidationIdentity: invalidationIdentity
   )
@@ -663,7 +689,7 @@ private func expandFocusedOverflowMenuIfNeeded(
 private func moveStoredOverflowMenuFocus(
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
-  optionCount: Int,
+  orderedTags: [SelectionTag],
   delta: Int,
   presentation: TabViewStylePresentation,
   invalidationIdentity: Identity? = nil
@@ -678,9 +704,9 @@ private func moveStoredOverflowMenuFocus(
 
   let currentIndex =
     resolvedFocusedTabIndex(
-      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
       selectedIndex: selectedIndex,
-      optionCount: optionCount
+      optionCount: orderedTags.count
     )
     ?? overflow.preferredOverflowFocusIndex
     ?? overflow.overflowIndices[0]
@@ -694,6 +720,7 @@ private func moveStoredOverflowMenuFocus(
   let nextIndex = overflow.overflowIndices[nextOverflowPosition]
   setStoredFocusedTabIndex(
     nextIndex,
+    tags: orderedTags,
     in: ownerNode,
     invalidationIdentity: invalidationIdentity,
     certifiedInvalidationIdentities: invalidationIdentity.map { controlIdentity in
@@ -718,7 +745,7 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
 ) -> Bool {
   guard
     let index = resolvedFocusedTabIndex(
-      storedIndex: storedFocusedTabIndex(in: focusedIndexOwnerNode),
+      storedIndex: storedFocusedTabIndex(in: focusedIndexOwnerNode, tags: orderedTags),
       selectedIndex: selectedIndex,
       optionCount: orderedTags.count
     ),
@@ -731,6 +758,7 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
   // selection write below carries its own (broad) invalidation.
   setStoredFocusedTabIndex(
     index,
+    tags: orderedTags,
     in: focusedIndexOwnerNode,
     invalidationIdentity: invalidationIdentity,
     certifiedInvalidationIdentities: invalidationIdentity.map { controlIdentity in
@@ -747,26 +775,52 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
 private let tabFocusedIndexStateSlot = StateSlotOrdinals.tabFocusedIndex
 private let tabOverflowMenuExpandedStateSlot = StateSlotOrdinals.tabOverflowMenuExpanded
 
+/// What the strip focus remembers: the focused option's strip position plus
+/// its selection tag. The tag is authoritative when the option order changes
+/// — logical focus follows the *tab*, not the strip position — and the
+/// recorded index is the fallback when the tag has departed.
+private struct StoredTabFocus: Equatable, Sendable {
+  var index: Int
+  var tag: SelectionTag?
+}
+
 @MainActor
 private func storedFocusedTabIndex(
-  in ownerNode: SwiftTUICore.ViewNode?
+  in ownerNode: SwiftTUICore.ViewNode?,
+  tags: [SelectionTag]
 ) -> Int? {
-  ownerNode?.stateSlot(
-    ordinal: tabFocusedIndexStateSlot,
-    seed: nil as Int?
-  ) ?? nil
+  guard
+    let stored =
+      ownerNode?.stateSlot(
+        ordinal: tabFocusedIndexStateSlot,
+        seed: nil as StoredTabFocus?
+      ) ?? nil
+  else {
+    return nil
+  }
+  if let tag = stored.tag, let currentIndex = tags.firstIndex(of: tag) {
+    return currentIndex
+  }
+  return stored.index
 }
 
 @MainActor
 private func setStoredFocusedTabIndex(
   _ index: Int?,
+  tags: [SelectionTag],
   in ownerNode: SwiftTUICore.ViewNode?,
   invalidationIdentity: Identity? = nil,
   certifiedInvalidationIdentities: Set<Identity>? = nil
 ) {
+  let stored = index.map { index in
+    StoredTabFocus(
+      index: index,
+      tag: tags.indices.contains(index) ? tags[index] : nil
+    )
+  }
   ownerNode?.setStateSlot(
     ordinal: tabFocusedIndexStateSlot,
-    value: index,
+    value: stored,
     invalidationIdentity: invalidationIdentity,
     certifiedInvalidationIdentities: certifiedInvalidationIdentities
   )
@@ -780,12 +834,13 @@ private func certifiedStripFocusIdentities(
   controlIdentity: Identity,
   ownerNode: SwiftTUICore.ViewNode?,
   selectedIndex: Int?,
-  optionCount: Int,
+  orderedTags: [SelectionTag],
   presentation: TabViewStylePresentation,
   nextStoredIndex: Int?
 ) -> Set<Identity> {
+  let optionCount = orderedTags.count
   let currentIndex = resolvedFocusedTabIndex(
-    storedIndex: storedFocusedTabIndex(in: ownerNode),
+    storedIndex: storedFocusedTabIndex(in: ownerNode, tags: orderedTags),
     selectedIndex: selectedIndex,
     optionCount: optionCount
   )

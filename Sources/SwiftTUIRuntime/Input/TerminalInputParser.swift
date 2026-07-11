@@ -92,10 +92,48 @@ extension TerminalInputParser {
       bufferedBytes.removeFirst()
       let scalar = UnicodeScalar(Int(firstByte))!
       return .key(KeyPress(.character(Character(scalar))))
+    case 0x80...0xFF:
+      return parseUTF8Character()
     default:
       bufferedBytes.removeFirst()
       return nil
     }
+  }
+
+  /// Parses a multibyte UTF-8 scalar at the head of the buffer. Terminals
+  /// transmit typed non-ASCII text (IME input, dead-key composition,
+  /// unbracketed pastes) as raw UTF-8, and a read boundary can split a
+  /// sequence anywhere — a sequence whose continuation bytes have not
+  /// arrived yet stays buffered instead of being dropped byte-by-byte.
+  private mutating func parseUTF8Character() -> InputEvent? {
+    let leadByte = bufferedBytes[0]
+    let continuationCount: Int
+    switch leadByte {
+    case 0xC2...0xDF: continuationCount = 1
+    case 0xE0...0xEF: continuationCount = 2
+    case 0xF0...0xF4: continuationCount = 3
+    default:
+      // Stray continuation byte or invalid lead — drop it, keep draining.
+      bufferedBytes.removeFirst()
+      return parseNextEvent()
+    }
+    let sequenceLength = 1 + continuationCount
+    guard bufferedBytes.count >= sequenceLength else {
+      return nil  // split across reads — wait for the continuation bytes
+    }
+    let sequence = Array(bufferedBytes[0..<sequenceLength])
+    guard sequence.dropFirst().allSatisfy({ (0x80...0xBF).contains($0) }) else {
+      bufferedBytes.removeFirst()
+      return parseNextEvent()
+    }
+    bufferedBytes.removeFirst(sequenceLength)
+    let decoded = String(decoding: sequence, as: UTF8.self)
+    // Overlong/surrogate encodings decode to U+FFFD replacement characters;
+    // consume them silently rather than emitting synthetic text.
+    guard decoded.unicodeScalars.count == 1, decoded != "\u{FFFD}" else {
+      return parseNextEvent()
+    }
+    return .key(KeyPress(.character(Character(decoded))))
   }
 
   private mutating func parseEscapeSequence() -> InputEvent? {
