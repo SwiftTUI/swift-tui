@@ -367,4 +367,39 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 010: ControlGroup branch replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 010 labeled and unlabeled groups replace cleanly")
+  func componentComposition010LabeledAndUnlabeledGroupsReplaceCleanly() {
+    // Hypothesis: replacing the generic ControlGroup family under one explicit ID can retain
+    // the removed label row or shift the current control identity.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            ControlGroup("label-\(generation)") { Button("action-\(generation)") {} }
+          } else {
+            ControlGroup { Button("action-\(generation)") {} }
+          }
+        }
+        .id("stable-control-group")
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition010")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("label-\(generation)") == generation.isMultiple(of: 2))
+      #expect(text.contains("action-\(generation)"))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
