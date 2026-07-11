@@ -1681,3 +1681,77 @@ private struct ObservationEffects029View: View {
     }
   }
 }
+
+// MARK: - Attempt 030: leading task-modifier removal
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 030 removing a leading task preserves the survivor closure")
+  func observationEffects030RemovingLeadingTaskPreservesSurvivorClosure() async throws {
+    // Hypothesis: task ordinals can move the surviving semantic task onto the
+    // departed task's descriptor slot and leave the wrong operation registered.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects030"),
+      size: .init(width: 74, height: 7)
+    ) {
+      ObservationEffects030View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      _ = try harness.clickText("Toggle Leading Task 030")
+      let registrations = harness.runLoop.localTaskRegistry.snapshot().values.flatMap { $0 }
+      let expectedCount = generation.isMultiple(of: 2) ? 2 : 1
+      #expect(registrations.count == expectedCount)
+      probe.events.removeAll(keepingCapacity: true)
+      for registration in registrations {
+        await registration.run()
+      }
+      #expect(probe.events.contains("survivor:\(generation)"))
+      if generation.isMultiple(of: 2) {
+        #expect(probe.events.contains("leading:\(generation)"))
+      } else {
+        #expect(!probe.events.contains(where: { $0.hasPrefix("leading:") }))
+      }
+    }
+  }
+}
+
+private struct ObservationEffects030TaskID: Equatable, Sendable {
+  var slot: String
+  var generation: Int
+}
+
+private struct ObservationEffects030View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Leading Task 030") { generation += 1 }
+      taskOwner
+    }
+  }
+
+  @ViewBuilder private var taskOwner: some View {
+    if generation.isMultiple(of: 2) {
+      source
+        .task(id: ObservationEffects030TaskID(slot: "leading", generation: generation)) {
+          probe.events.append("leading:\(generation)")
+        }
+        .task(id: ObservationEffects030TaskID(slot: "survivor", generation: generation)) {
+          probe.events.append("survivor:\(generation)")
+        }
+    } else {
+      source
+        .task(id: ObservationEffects030TaskID(slot: "survivor", generation: generation)) {
+          probe.events.append("survivor:\(generation)")
+        }
+    }
+  }
+
+  private var source: some View {
+    Text("030 generation \(generation)")
+      .id("observation-effects-030-owner")
+  }
+}
