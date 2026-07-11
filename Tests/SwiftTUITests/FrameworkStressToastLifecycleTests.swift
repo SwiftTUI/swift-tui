@@ -609,3 +609,51 @@ private struct ToastLifecycle011Root: View {
     )
   }
 }
+
+// MARK: - Attempt 012: close before deadline then reopen
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 012 manual close cancels the retired deadline before reopen")
+  func toastLifecycle012ManualCloseCancelsRetiredDeadlineBeforeReopen() async throws {
+    // Hypothesis: closing a toast and reopening the same source can leave the first generation's
+    // short deadline alive to dismiss the replacement generation prematurely.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle012"),
+      size: .init(width: 66, height: 11)
+    ) {
+      ToastLifecycle012Root()
+    }
+    defer { harness.shutdown() }
+
+    var frame = try harness.clickText("Close Toast 012")
+    #expect(!frame.contains("close reopen toast"))
+    frame = try harness.clickText("Reopen Long Toast 012")
+    #expect(frame.contains("close reopen toast"))
+
+    await AsyncEvent.firing(after: .milliseconds(150)).wait()
+    frame = try harness.render()
+    #expect(frame.contains("close reopen toast"))
+    #expect(toastLifecycleEntryCount(in: harness) == 1)
+  }
+}
+
+@MainActor
+private struct ToastLifecycle012Root: View {
+  @State private var isPresented = true
+  @State private var usesLongDeadline = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Close Toast 012") { isPresented = false }
+      Button("Reopen Long Toast 012") {
+        usesLongDeadline = true
+        isPresented = true
+      }
+    }
+    .toast(
+      "close reopen toast",
+      isPresented: $isPresented,
+      duration: usesLongDeadline ? 1.0 : 0.08
+    )
+  }
+}
