@@ -188,3 +188,54 @@ private struct GestureScroll004Fixture: View {
     )
   }
 }
+
+// MARK: - Attempt 005: stacked gesture removal during capture
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 005 removing a stacked gesture during drag is durable")
+  func gestureScroll005RemovingStackedGestureDuringDragIsDurable() throws {
+    // Hypothesis: positional preservation of an active drag may also restore a
+    // departed sibling recognizer after the interaction terminates.
+    let taps = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll005Root"),
+      size: .init(width: 44, height: 7)
+    ) {
+      GestureScroll005Fixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Shrinking gesture stack"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.clickText("Shrinking gesture stack")
+
+    #expect(taps.value == 0)
+    #expect(harness.gestureRecognizerCount == 1)
+  }
+}
+
+private struct GestureScroll005Fixture: View {
+  static let identity = testIdentity("GestureScroll005", "Target")
+
+  let taps: GestureScrollBox<Int>
+  @State private var includesTap = true
+
+  var body: some View {
+    if includesTap {
+      Text("Shrinking gesture stack")
+        .id(Self.identity)
+        .frame(width: 28, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture().onChanged { _ in includesTap = false }
+        )
+        .onTapGesture { taps.value += 1 }
+    } else {
+      Text("Shrinking gesture stack")
+        .id(Self.identity)
+        .frame(width: 28, height: 1, alignment: .leading)
+        .gesture(DragGesture().onChanged { _ in })
+    }
+  }
+}
