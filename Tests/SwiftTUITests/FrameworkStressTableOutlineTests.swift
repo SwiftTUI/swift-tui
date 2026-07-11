@@ -845,3 +845,63 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 015: outline child cardinality churn
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 015 outline zero to many children leaves no phantom branches")
+  func tableOutline015OutlineZeroToManyChildrenLeavesNoPhantomBranches() {
+    // Hypothesis: recursive indexed sources can retain departed child rows or
+    // connector metadata when one parent crosses between leaf and branch forms.
+    struct Root: View {
+      let generation: Int
+      let childCount: Int
+
+      var body: some View {
+        OutlineGroup(
+          [
+            TableOutlineNode(
+              id: "root",
+              title: "root-\(generation)",
+              children: childCount == 0
+                ? nil
+                : (0..<childCount).map {
+                  .init(id: "leaf-\($0)", title: "leaf-\($0)-g\(generation)")
+                }
+            )
+          ],
+          children: \.children
+        ) { node in
+          Text(node.title)
+        }
+        .outlineStyle(.rounded)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline015")
+    for generation in 0..<18 {
+      let count = generation.isMultiple(of: 2) ? 0 : 7
+      let root = Root(generation: generation, childCount: count)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 26, height: 12)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 26, height: 12)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(rendered.contains("leaf-0-g\(generation)") == (count > 0))
+      #expect(rendered.contains("leaf-6-g\(generation)") == (count > 0))
+    }
+  }
+}
