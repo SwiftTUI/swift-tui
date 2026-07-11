@@ -663,3 +663,68 @@ private struct CollectionLayout011Root: View {
     .frame(width: 20, height: 2, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 012: duplicate-ID occurrence geometry
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 012 duplicate lazy IDs keep occurrence geometry")
+  func collectionLayout012DuplicateLazyIDsKeepOccurrenceGeometry() {
+    // Hypothesis: duplicate IDs produce the same measurement-signature path,
+    // so swapping occurrence payloads may preserve heights by old index.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout012")
+
+    for generation in 0..<20 {
+      let swapped = !generation.isMultiple(of: 2)
+      let root = CollectionLayout012Root(swapped: swapped)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 18, height: 6)
+      )
+      let matchesOccurrenceGeometry =
+        retained.rasterSurface == fresh.rasterSurface
+        && retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes
+
+      #expect(matchesOccurrenceGeometry)
+    }
+  }
+}
+
+private struct CollectionLayout012Row: Identifiable {
+  let id: Int
+  let label: String
+  let height: Int
+}
+
+@MainActor
+private struct CollectionLayout012Root: View {
+  let swapped: Bool
+
+  private var rows: [CollectionLayout012Row] {
+    let short = CollectionLayout012Row(id: 7, label: "A", height: 1)
+    let tall = CollectionLayout012Row(id: 7, label: "B", height: 3)
+    let tail = CollectionLayout012Row(id: 8, label: "C", height: 1)
+    return swapped ? [tall, short, tail] : [short, tall, tail]
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(rows) { row in
+          Text("012 \(row.label) h\(row.height)")
+            .frame(height: row.height, alignment: .topLeading)
+        }
+      }
+    }
+    .frame(width: 18, height: 6, alignment: .topLeading)
+  }
+}
