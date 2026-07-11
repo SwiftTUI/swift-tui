@@ -1251,3 +1251,68 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 022: outline List navigation after root reorder
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 022 outline list navigation follows current preorder")
+  func tableOutline022OutlineListNavigationFollowsCurrentPreorder() {
+    // Hypothesis: List can refresh flattened outline rows but retain the prior
+    // selectable-tag order in its key handler after root subtrees reorder.
+    final class SelectionBox { var value = "a" }
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+      let box: SelectionBox
+      let listIdentity: Identity
+
+      var body: some View {
+        List(
+          nodes,
+          selection: Binding(get: { box.value }, set: { box.value = $0 }),
+          children: \.children
+        ) { node in
+          Text(node.title)
+        }
+        .id(listIdentity)
+        .frame(width: 22, height: 10, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline022")
+    let listIdentity = testIdentity("TableOutline022", "List")
+    let box = SelectionBox()
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = listIdentity
+
+    for generation in 0..<18 {
+      let a = TableOutlineNode(
+        id: "a",
+        title: "A",
+        children: [.init(id: "a1", title: "A1")]
+      )
+      let b = TableOutlineNode(
+        id: "b",
+        title: "B",
+        children: [.init(id: "b1", title: "B1")]
+      )
+      let nodes = generation.isMultiple(of: 2) ? [a, b] : [b, a]
+      box.value = nodes[0].id
+      let registry = LocalKeyHandlerRegistry()
+      _ = renderer.render(
+        Root(nodes: nodes, box: box, listIdentity: listIdentity),
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          localKeyHandlerRegistry: registry,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 22, height: 10)
+      )
+
+      #expect(registry.dispatch(identity: listIdentity, event: .arrowDown))
+      #expect(box.value == nodes[0].children?.first?.id)
+    }
+  }
+}
