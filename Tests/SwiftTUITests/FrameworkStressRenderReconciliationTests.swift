@@ -632,4 +632,45 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 015: Rich and plain text payload swap
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 015 equal visible rich and plain text replace draw payload")
+  func renderReconciliation015EqualVisibleRichAndPlainTextReplaceDrawPayload() {
+    // Hypothesis: Text and RichText can have equal visible content but different draw payload
+    // structure; relaxed measurement reuse must not let retained draw extraction keep old runs.
+    struct Root: View {
+      let rich: Bool
+
+      var body: some View {
+        if rich {
+          Text("Same \(Text("payload").bold())")
+            .id("render-reconciliation-015-text")
+        } else {
+          Text("Same payload")
+            .id("render-reconciliation-015-text")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation015")
+
+    for generation in 0..<16 {
+      let root = Root(rich: generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained).contains("Same payload"))
+    }
+  }
+}
+
 // MARK: - End
