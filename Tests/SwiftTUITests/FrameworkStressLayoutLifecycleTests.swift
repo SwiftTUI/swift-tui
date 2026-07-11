@@ -637,3 +637,58 @@ private struct StressLL010Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 011: navigation reactivation identity
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 011 navigation reactivation starts fresh destination state")
+  func stress011NavigationReactivationStartsFreshDestinationState() throws {
+    // Hypothesis: repeated Boolean destination activation may reuse a prior
+    // activation's state slots after its route was popped.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL011", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressLL011Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...8 {
+      var frame = try harness.clickText("Open Fresh Destination")
+      #expect(frame.contains("fresh local 0"))
+      frame = try harness.clickText("Increment Fresh Local")
+      #expect(frame.contains("fresh local 1"))
+      frame = try harness.clickText("Close Fresh Destination")
+      #expect(!frame.contains("fresh local"))
+      #expect(harness.actionRegistrationCount <= 1)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL011Fixture: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    NavigationStack(id: "stress-011-navigation") {
+      Button("Open Fresh Destination") { isPresented = true }
+        .navigationDestination(isPresented: $isPresented) {
+          StressLL011Destination(isPresented: $isPresented)
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL011Destination: View {
+  @Binding var isPresented: Bool
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("fresh local \(local)")
+      Button("Increment Fresh Local") { local += 1 }
+      Button("Close Fresh Destination") { isPresented = false }
+    }
+  }
+}
