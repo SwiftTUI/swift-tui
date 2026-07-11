@@ -380,4 +380,20 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
-// NEXT CANCELLATION STRESS TEST
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 025 colliding hashes preserve distinct registrations")
+  func cancellationState025CollidingHashesPreserveDistinctRegistrations() {
+    // Hypothesis: carry-forward filtering can accidentally use hash identity instead of equality.
+    struct Key: Hashable {
+      let value: Int
+      func hash(into hasher: inout Hasher) { hasher.combine(0) }
+    }
+    let baseline = [Key(value: 0): "zero"]
+    let live = Dictionary(uniqueKeysWithValues: (0..<64).map { (Key(value: $0), "\($0)") })
+    let carried = ConcurrentRegistrationCarry.sinceBaseline(live: live, baseline: baseline)
+    #expect(carried.count == 63)
+    var target = baseline
+    ConcurrentRegistrationCarry.reapply(carried, into: &target)
+    #expect(target.count == 64)
+  }
+}
