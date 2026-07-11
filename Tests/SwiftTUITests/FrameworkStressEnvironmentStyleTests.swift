@@ -415,6 +415,67 @@ private struct EnvironmentStyle009Root: View {
   }
 }
 
+// MARK: - Attempt 010: role propagation through retained custom style
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 010 custom button style receives current role")
+  func environmentStyle010CustomButtonStyleReceivesCurrentRole() throws {
+    // Hypothesis: a retained custom style body can refresh its label while preserving the first
+    // ButtonStyleConfiguration role supplied to the erased style box.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle010"),
+      size: .init(width: 76, height: 7)
+    ) {
+      EnvironmentStyle010Root()
+    }
+    defer { harness.shutdown() }
+
+    let roles = ["cancel", "destructive", "close", "confirm"]
+    for generation in 1...16 {
+      let frame = try harness.clickText("Advance Role 010")
+      #expect(frame.contains("role-\(roles[generation % roles.count]) Role Target 010"))
+    }
+  }
+}
+
+private struct EnvironmentStyle010ButtonStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    let marker: String
+    switch configuration.role {
+    case .cancel: marker = "cancel"
+    case .destructive: marker = "destructive"
+    case .close: marker = "close"
+    case .confirm: marker = "confirm"
+    case nil: marker = "none"
+    }
+    return HStack(spacing: 1) {
+      Text("role-\(marker)")
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle010Root: View {
+  @State private var generation = 0
+
+  private var role: ButtonRole {
+    switch generation % 4 {
+    case 0: .cancel
+    case 1: .destructive
+    case 2: .close
+    default: .confirm
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Role 010") { generation += 1 }
+      Button("Role Target 010", role: role) {}
+        .buttonStyle(EnvironmentStyle010ButtonStyle())
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
