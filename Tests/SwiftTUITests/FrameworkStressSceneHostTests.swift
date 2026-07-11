@@ -423,3 +423,36 @@ private final class SceneHostFrameRecorder {
     updates.notify()
   }
 }
+
+// MARK: - Attempt 011: bounded hosted frame history
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 011 frame history retains exactly the newest bounded window")
+  func sceneHost011FrameHistoryRetainsExactlyNewestBoundedWindow() async throws {
+    // Hypothesis: repeated truncation can remove too many frames, preserve an
+    // evicted prefix, or drift beyond the documented 256-frame history bound.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 8, height: 1),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+
+    for sequence in 0..<300 {
+      _ = try surface.present(
+        SemanticHostFrame(
+          sequence: UInt64(sequence),
+          raster: sceneHostRaster(marker: "frame \(sequence)"),
+          semantics: .init(),
+          focusedIdentity: nil
+        )
+      )
+    }
+
+    let frames = await surface.waitForFrames { $0.count == 256 }
+    #expect(frames.count == 256)
+    #expect(frames.first?.sequence == 44)
+    #expect(frames.last?.sequence == 299)
+    #expect(frames.map(\.sequence) == (44..<300).map(UInt64.init))
+  }
+}
