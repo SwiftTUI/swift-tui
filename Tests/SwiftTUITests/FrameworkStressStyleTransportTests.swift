@@ -134,4 +134,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 014 BMP Unicode escapes preserve hex case")
+  func styleTransport014BMPUnicodeEscapesPreserveHexCase() {
+    // Hypothesis: mixed-case hex digits can decode through different arithmetic paths.
+    var parser = StyleTransportJSONParser(#"{"v":"\u00e9-\u03A9-\u4e16"}"#)
+    #expect(parser.parse()?.objectValue?["v"]?.stringValue == "é-Ω-世")
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
