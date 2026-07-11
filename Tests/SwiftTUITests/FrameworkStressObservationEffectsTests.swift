@@ -1369,3 +1369,65 @@ private struct ObservationEffects023View: View {
     }
   }
 }
+
+// MARK: - Attempt 024: collection-row onChange baselines
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 024 row onChange baselines follow entities through reorder")
+  func observationEffects024RowOnChangeBaselinesFollowEntities() throws {
+    // Hypothesis: row baselines or callbacks may remain attached to a prior
+    // index after ForEach moves the same entities to new positions.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects024"),
+      size: .init(width: 68, height: 10)
+    ) {
+      ObservationEffects024View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Reorder Change Rows 024")
+      #expect(probe.events.isEmpty)
+
+      _ = try harness.clickText("Bump Row Two 024")
+      #expect(probe.events == ["2:\(generation - 1)->\(generation)"])
+    }
+  }
+}
+
+private struct ObservationEffects024Item: Equatable, Identifiable {
+  let id: Int
+  var value: Int
+}
+
+private struct ObservationEffects024View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var reversed = false
+  @State private var items = [
+    ObservationEffects024Item(id: 1, value: 0),
+    ObservationEffects024Item(id: 2, value: 0),
+    ObservationEffects024Item(id: 3, value: 0),
+  ]
+
+  private var orderedItems: [ObservationEffects024Item] {
+    reversed ? Array(items.reversed()) : items
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Change Rows 024") { reversed.toggle() }
+      Button("Bump Row Two 024") {
+        let index = items.firstIndex { $0.id == 2 }!
+        items[index].value += 1
+      }
+      ForEach(orderedItems) { item in
+        Text("024 row \(item.id) value \(item.value)")
+          .onChange(of: item.value) { oldValue, newValue in
+            probe.events.append("\(item.id):\(oldValue)->\(newValue)")
+          }
+      }
+    }
+  }
+}
