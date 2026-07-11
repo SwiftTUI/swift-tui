@@ -1198,3 +1198,56 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 021: outline row-style freshness
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 021 outline row builder publishes current text style")
+  func tableOutline021OutlineRowBuilderPublishesCurrentTextStyle() {
+    // Hypothesis: the captured recursive row builder can redraw current text
+    // while retaining style metadata from an earlier same-ID node generation.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        OutlineGroup(
+          [
+            TableOutlineNode(
+              id: "root",
+              title: "root-\(generation)",
+              children: [.init(id: "leaf", title: "leaf-\(generation)")]
+            )
+          ],
+          children: \.children
+        ) { node in
+          Text(node.title)
+            .foregroundStyle(generation.isMultiple(of: 2) ? Color.red : .cyan)
+            .bold(generation % 3 == 0)
+        }
+        .outlineStyle(.plain)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline021")
+    for generation in 0..<21 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 24, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 24, height: 5)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(tableOutlineText(retained).contains("leaf-\(generation)"))
+    }
+  }
+}
