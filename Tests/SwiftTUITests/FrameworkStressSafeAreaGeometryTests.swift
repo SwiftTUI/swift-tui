@@ -109,6 +109,51 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 015: stored inset payload freshness
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 015 stable inset publishes current capture")
+  func safeAreaGeometry015StableInsetPublishesCurrentCapture() {
+    // Hypothesis: CapturedSubviewScope can keep the first safeAreaInset builder payload when every
+    // generation measures to the same size and the modifier's structural identity is unchanged.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Text("015 base")
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+          .safeAreaInset(edge: .bottom, alignment: .bottomLeading) {
+            Text("015 payload generation \(generation)")
+              .frame(width: 32, height: 1, alignment: .leading)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry015")
+
+    for generation in 0..<20 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 12),
+        safeAreaInsets: .init(bottom: 1)
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(text.contains("015 payload generation \(generation)"))
+      if generation > 0 {
+        #expect(!text.contains("015 payload generation \(generation - 1)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 014: nested inset authored-order replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
