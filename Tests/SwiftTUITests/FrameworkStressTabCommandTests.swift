@@ -125,3 +125,52 @@ private struct StressTC002Fixture: View {
     .frame(width: 54, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 003: inserted-prefix pointer routes
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 003 inserted prefix retargets every tab pointer route")
+  func stressTabCommand003InsertedPrefixRetargetsPointerRoutes() throws {
+    // Hypothesis: pointer descriptors keyed by strip ordinal may retain the
+    // pre-insertion tag and activate B when the visible C route shifts right.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC003", "Root"),
+      size: .init(width: 62, height: 11)
+    ) {
+      StressTC003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Insert prefix")
+    let frame = try harness.clickText("C")
+
+    withKnownIssue("Inserting a leading tab leaves the visible C route bound to B") {
+      #expect(frame.contains("C current content"))
+      #expect(!frame.contains("B current content"))
+    }
+  }
+}
+
+@MainActor
+private struct StressTC003Fixture: View {
+  @State private var hasPrefix = false
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Insert prefix") {
+        hasPrefix = true
+      }
+      TabView(selection: $selection) {
+        if hasPrefix {
+          Tab("Prefix", value: "prefix") { Text("Prefix current content") }
+        }
+        Tab("A", value: "a") { Text("A current content") }
+        Tab("B", value: "b") { Text("B current content") }
+        Tab("C", value: "c") { Text("C current content") }
+      }
+      .id(testIdentity("StressTC003", "Tabs"))
+    }
+    .frame(width: 60, height: 9, alignment: .topLeading)
+  }
+}
