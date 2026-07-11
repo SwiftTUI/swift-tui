@@ -95,6 +95,62 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 018: line style and baseline replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 018 line area and step topology replace at one series slot")
+  func chartData018LineAreaAndStepTopologyReplaceAtOneSeriesSlot() {
+    // Hypothesis: a retained composed-series grid can preserve area fill or step
+    // cells when the same series slot changes rasterization style and baseline.
+    struct Root: View {
+      let generation: Int
+
+      var style: LineChartSeriesStyle {
+        switch generation % 3 {
+        case 1: .area
+        case 2: .step
+        default: .line
+        }
+      }
+
+      var body: some View {
+        LineChart(
+          "Raster \(generation)",
+          series: [
+            .init(
+              "Mode \(generation)",
+              points: [
+                .init(x: 0, y: -Double(5 + generation)),
+                .init(x: 5, y: Double(15 + generation)),
+                .init(x: 10, y: Double((generation % 4) - 2)),
+              ],
+              style: style,
+              tone: .info
+            )
+          ],
+          height: 8,
+          width: 38
+        )
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.bottom)
+        .chartBaseline(generation.isMultiple(of: 2) ? .zero : .auto)
+      }
+    }
+
+    chartDataExercise(attempt: "018", proposal: .init(width: 52, height: 13)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Raster \(generation)"))
+      #expect(text.contains("Mode \(generation)"))
+      if generation % 3 == 1 {
+        #expect(text.contains("▒"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 017: line point order and domain migration
 
 extension FrameworkStressChartDataTests {
