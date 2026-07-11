@@ -1894,6 +1894,70 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 028: Single-child flattening alternates with Group output
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 028 flattening topology preserves stable child state")
+  func stateIdentity028FlatteningTopologyPreservesStableChildState() throws {
+    // Hypothesis: switching a composite body between one child and a Group moves the resolved
+    // identity between a state-owner node and an absorber, risking reseeding or orphaning.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity028"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity028Root()
+    }
+    defer { harness.shutdown() }
+
+    for expected in 1...4 {
+      var frame = try harness.clickText("Increment Flattened 028")
+      #expect(frame.contains("028 Flattened Count \(expected)"))
+      frame = try harness.clickText("Expand Topology 028")
+      #expect(frame.contains("028 Added Sibling"))
+      #expect(frame.contains("028 Flattened Count \(expected)"))
+      frame = try harness.clickText("Collapse Topology 028")
+      #expect(!frame.contains("028 Added Sibling"))
+      #expect(frame.contains("028 Flattened Count \(expected)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity028Root: View {
+    @State private var isExpanded = false
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isExpanded ? "Collapse Topology 028" : "Expand Topology 028") {
+          isExpanded.toggle()
+        }
+        StateIdentity028Topology(isExpanded: isExpanded)
+      }
+    }
+  }
+
+  private struct StateIdentity028Topology: View {
+    let isExpanded: Bool
+
+    var body: some View {
+      StateIdentity028Counter()
+      if isExpanded {
+        Text("028 Added Sibling")
+      }
+    }
+  }
+
+  private struct StateIdentity028Counter: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("028 Flattened Count \(count)")
+        Button("Increment Flattened 028") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
