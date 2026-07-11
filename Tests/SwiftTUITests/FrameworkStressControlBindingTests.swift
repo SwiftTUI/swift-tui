@@ -1068,3 +1068,50 @@ private struct ControlStress022Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 023: open menu duplicate-label action reorder
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 023 open menu reorder dispatches current entity action")
+  func stressControlBinding023OpenMenuReorderDispatchesCurrentEntityAction() throws {
+    // Hypothesis: reordering stable Menu items with duplicate labels while the portal is open can
+    // update row order without updating occurrence-indexed action registrations.
+    let probe = ControlStressProbe<[Int]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress023", "Root"),
+      size: .init(width: 58, height: 12)
+    ) {
+      ControlStress023Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Entity menu 023")
+    _ = try harness.clickText("Reverse open menu 023")
+    _ = try harness.clickText("Duplicate menu action 023")
+
+    #expect(probe.value == [2])
+  }
+}
+
+@MainActor
+private struct ControlStress023Fixture: View {
+  let probe: ControlStressProbe<[Int]>
+  @State private var isReversed = false
+
+  private var values: [Int] {
+    isReversed ? [2, 1] : [1, 2]
+  }
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 2) {
+      Menu("Entity menu 023") {
+        ForEach(values, id: \.self) { value in
+          Button("Duplicate menu action 023") {
+            probe.value.append(value)
+          }
+        }
+      }
+      Button("Reverse open menu 023") { isReversed = true }
+    }
+  }
+}
