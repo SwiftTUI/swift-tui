@@ -1258,3 +1258,59 @@ extension FrameworkStressFramePipelineTests {
     #expect(!decision.canSkipCompletedFrame)
   }
 }
+
+// MARK: - Attempt 021: cancelled replay respects newer animation
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 021 cancelled replay preserves newer animation request")
+  func framePipeline021CancelledReplayPreservesNewerAnimationRequest() throws {
+    // Hypothesis: replaying a cancelled frame after a newer explicit request
+    // can overwrite the newer animation transaction with stale intent.
+    let scheduler = FrameScheduler()
+    let newerIdentity = testIdentity("FramePipeline021", "Newer")
+    let cancelledIdentity = testIdentity("FramePipeline021", "Cancelled")
+    let newerBatch = AnimationBatchID(21)
+    scheduler.requestInvalidation(
+      of: [newerIdentity],
+      animation: .disabled,
+      batchID: newerBatch
+    )
+    scheduler.replayCancelledFrameIntent(
+      framePipelineScheduledFrame(
+        identities: [cancelledIdentity],
+        animation: .animate(AnyHashableSendable("stale-animation")),
+        batchID: nil
+      )
+    )
+
+    let frame = try #require(
+      scheduler.consumeReadyFrame(
+        at: MonotonicInstant(offset: .seconds(70_021)),
+        armedBefore: scheduler.deadlineArmCut
+      )
+    )
+    #expect(frame.animationRequest == .disabled)
+    #expect(frame.animationBatchID == newerBatch)
+    #expect(frame.invalidatedIdentities == [newerIdentity, cancelledIdentity])
+  }
+}
+
+private func framePipelineScheduledFrame(
+  causes: Set<WakeCause> = [.invalidation],
+  identities: Set<Identity> = [],
+  animation: AnimationRequest = .inherit,
+  batchID: AnimationBatchID? = nil,
+  supersededBatchIDs: [AnimationBatchID] = []
+) -> ScheduledFrame {
+  ScheduledFrame(
+    causes: causes,
+    invalidatedIdentities: identities,
+    signalNames: [],
+    externalReasons: [],
+    triggeredDeadline: nil,
+    nextDeadline: nil,
+    animationRequest: animation,
+    animationBatchID: batchID,
+    supersededAnimationBatchIDs: supersededBatchIDs
+  )
+}
