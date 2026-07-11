@@ -106,4 +106,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 003: Canvas grid churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 003 canvas grid follows every current frame")
+  func renderReconciliation003CanvasGridFollowsCurrentFrame() {
+    // Hypothesis: retained draw state may key Canvas only by drawing equality and overlook a
+    // changed packing grid, replaying Braille cells after the author switches to quadrant cells.
+    struct Dot: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setPixel(at: Point(x: 0.25, y: 0.25))
+        context.setPixel(at: Point(x: 0.75, y: 0.75))
+      }
+    }
+
+    struct Root: View {
+      let grid: CanvasGrid
+
+      var body: some View {
+        Canvas(Dot(), grid: grid)
+          .frame(width: 2, height: 1)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation003")
+    let grids: [CanvasGrid] = [.braille2x4, .quadrant2x2, .verticalHalfBlock]
+
+    for generation in 0..<18 {
+      let root = Root(grid: grids[generation % grids.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.rasterSurface.cells[0][0].character != " ")
+    }
+  }
+}
+
 // MARK: - End
