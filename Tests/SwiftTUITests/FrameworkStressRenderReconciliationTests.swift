@@ -1293,4 +1293,49 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 031: Content-shape geometry churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 031 content shape publishes its current rectangle")
+  func renderReconciliation031ContentShapePublishesCurrentRectangle() throws {
+    // Hypothesis: explicit interaction geometry is semantic metadata layered on stable placement;
+    // retained extraction may keep the old path rectangle while visible bounds stay identical.
+    struct Root: View {
+      let shape: CellRect
+
+      var body: some View {
+        Text("Target")
+          .frame(width: 10, height: 4, alignment: .topLeading)
+          .contentShape(shape)
+          .onTapGesture {}
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation031")
+    let shapes = [
+      CellRect(origin: .init(x: 0, y: 0), size: .init(width: 2, height: 1)),
+      CellRect(origin: .init(x: 5, y: 2), size: .init(width: 4, height: 2)),
+      CellRect(origin: .init(x: 1, y: 1), size: .init(width: 7, height: 1)),
+    ]
+
+    for generation in 0..<18 {
+      let root = Root(shape: shapes[generation % shapes.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      let retainedRegion = try #require(retained.semanticSnapshot.interactionRegions.first)
+      let freshRegion = try #require(fresh.semanticSnapshot.interactionRegions.first)
+      #expect(retainedRegion.rect == freshRegion.rect)
+    }
+  }
+}
+
 // MARK: - End
