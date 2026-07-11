@@ -1312,3 +1312,56 @@ private struct StressAF023Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 024: hit-testing gate semantic synchronization
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 024 hit testing churn synchronizes focus and interaction")
+  func stress024HitTestingChurnSynchronizesFocusAndInteraction() throws {
+    // Hypothesis: focus and pointer semantic products can diverge under retained extraction when
+    // allowsHitTesting repeatedly gates a stable target without changing its visible payload.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF024", "Root"),
+      size: .init(width: 50, height: 7)
+    ) {
+      StressAF024Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      _ = try harness.clickText("Toggle target hit testing")
+      let expected = generation.isMultiple(of: 2)
+      let snapshot = harness.runLoop.latestSemanticSnapshot
+      #expect(
+        snapshot.focusRegions.contains { $0.identity == StressAF024Fixture.targetIdentity }
+          == expected)
+      #expect(
+        snapshot.interactionRegions.contains { $0.identity == StressAF024Fixture.targetIdentity }
+          == expected)
+    }
+
+    #expect(
+      harness.runLoop.latestSemanticSnapshot.interactionRegions.filter {
+        $0.identity == StressAF024Fixture.targetIdentity
+      }.count == 1)
+  }
+}
+
+@MainActor
+private struct StressAF024Fixture: View {
+  static let targetIdentity = testIdentity("StressAF024", "Target")
+
+  @State private var allowsTargetHitTesting = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle target hit testing") {
+        allowsTargetHitTesting.toggle()
+      }
+      Text("Stable gated target")
+        .id(Self.targetIdentity)
+        .focusable()
+        .allowsHitTesting(allowsTargetHitTesting)
+    }
+  }
+}
