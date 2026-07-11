@@ -831,3 +831,63 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 019: per-axis confirmed-slack invalidation
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 019 slack invalidation stays isolated to the changed axis")
+  func sceneHost019SlackInvalidationStaysIsolatedToChangedAxis() {
+    // Hypothesis: updating one invalid size relation can clear or preserve both
+    // axis records because confirmed slack is retained as one aggregate value.
+    for _ in 0..<16 {
+      var widthInvalidated = HostedSurfaceConfirmedSlack()
+      widthInvalidated.update(
+        preferredGridSize: .init(width: 10, height: 5),
+        renderedGridSize: .init(width: 14, height: 9)
+      )
+      widthInvalidated.update(
+        preferredGridSize: .init(width: 14, height: 5),
+        renderedGridSize: .init(width: 14, height: 8)
+      )
+      #expect(
+        widthInvalidated.confirmedPreferredWidth(proposed: 12, preferred: 14, rendered: 14)
+          == nil)
+      #expect(
+        widthInvalidated.confirmedPreferredHeight(proposed: 8, preferred: 5, rendered: 8) == 5)
+      #expect(
+        HostedSurfaceSizeNegotiator(
+          cellSize: .init(width: 1, height: 1),
+          preferredGridSize: .init(width: 14, height: 5),
+          renderedGridSize: .init(width: 14, height: 8),
+          confirmedSlack: widthInvalidated
+        ).negotiate(proposedWidth: 12, proposedHeight: 8)
+          == .init(size: .init(width: 12, height: 5), probeGridSize: nil)
+      )
+
+      var heightInvalidated = HostedSurfaceConfirmedSlack()
+      heightInvalidated.update(
+        preferredGridSize: .init(width: 10, height: 5),
+        renderedGridSize: .init(width: 14, height: 9)
+      )
+      heightInvalidated.update(
+        preferredGridSize: .init(width: 10, height: 9),
+        renderedGridSize: .init(width: 13, height: 9)
+      )
+      #expect(
+        heightInvalidated.confirmedPreferredWidth(proposed: 12, preferred: 10, rendered: 13)
+          == 10)
+      #expect(
+        heightInvalidated.confirmedPreferredHeight(proposed: 7, preferred: 9, rendered: 9)
+          == nil)
+      #expect(
+        HostedSurfaceSizeNegotiator(
+          cellSize: .init(width: 1, height: 1),
+          preferredGridSize: .init(width: 10, height: 9),
+          renderedGridSize: .init(width: 13, height: 9),
+          confirmedSlack: heightInvalidated
+        ).negotiate(proposedWidth: 12, proposedHeight: 7)
+          == .init(size: .init(width: 10, height: 7), probeGridSize: nil)
+      )
+    }
+  }
+}
