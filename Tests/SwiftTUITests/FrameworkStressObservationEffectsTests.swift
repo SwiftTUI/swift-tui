@@ -959,3 +959,67 @@ private struct ObservationEffects016View: View {
     }
   }
 }
+
+// MARK: - Attempt 017: preference writer/transform topology churn
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 017 preference writer and transform retain authored order")
+  func observationEffects017PreferenceWriterTransformRetainOrder() throws {
+    // Hypothesis: preference folding can retain the previous modifier topology
+    // after a writer and transform exchange places at a stable identity.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects017"),
+      size: .init(width: 66, height: 7)
+    ) {
+      ObservationEffects017View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Flip Preference Order 017")
+      let expected =
+        generation.isMultiple(of: 2)
+        ? "[\(generation), \(100 + generation)]"
+        : "[\(100 + generation), \(generation)]"
+      withKnownIssue("A reordered transformPreference retains its generation-zero closure") {
+        #expect(frame.contains("017 values \(expected)"))
+      }
+    }
+  }
+}
+
+private struct ObservationEffects017View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Flip Preference Order 017") { generation += 1 }
+      target
+        .frame(width: 62, height: 2, alignment: .topLeading)
+        .overlayPreferenceValue(
+          ObservationEffectsListPreferenceKey.self,
+          alignment: .bottomLeading
+        ) { value in
+          Text("017 values \(value)")
+        }
+    }
+  }
+
+  @ViewBuilder private var target: some View {
+    if generation.isMultiple(of: 2) {
+      Text("source")
+        .preference(key: ObservationEffectsListPreferenceKey.self, value: [generation])
+        .transformPreference(ObservationEffectsListPreferenceKey.self) {
+          $0.append(100 + generation)
+        }
+        .id("observation-effects-017-source")
+    } else {
+      Text("source")
+        .transformPreference(ObservationEffectsListPreferenceKey.self) {
+          $0.append(100 + generation)
+        }
+        .preference(key: ObservationEffectsListPreferenceKey.self, value: [generation])
+        .id("observation-effects-017-source")
+    }
+  }
+}
