@@ -299,3 +299,57 @@ private final class ObservationEffects005Item: Identifiable {
     self.value = value
   }
 }
+
+// MARK: - Attempt 006: observable child-object replacement
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 006 replacing a nested child arms the new registrar")
+  func observationEffects006ReplacingNestedChildArmsNewRegistrar() throws {
+    // Hypothesis: tracking the parent child property may suppress the nested
+    // registrar replacement when the child identity changes repeatedly.
+    let first = ObservationEffects006Child(label: "A")
+    let second = ObservationEffects006Child(label: "B")
+    let parent = ObservationEffects006Parent(child: first)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects006"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects006View(parent: parent)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      parent.child = generation.isMultiple(of: 2) ? first : second
+      parent.child.value = generation
+      let frame = try harness.render()
+      #expect(frame.contains("006 \(parent.child.label) \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects006View: View {
+  let parent: ObservationEffects006Parent
+
+  var body: some View {
+    Text("006 \(parent.child.label) \(parent.child.value)")
+  }
+}
+
+@Observable
+private final class ObservationEffects006Parent {
+  var child: ObservationEffects006Child
+
+  init(child: ObservationEffects006Child) {
+    self.child = child
+  }
+}
+
+@Observable
+private final class ObservationEffects006Child {
+  let label: String
+  var value = 0
+
+  init(label: String) {
+    self.label = label
+  }
+}
