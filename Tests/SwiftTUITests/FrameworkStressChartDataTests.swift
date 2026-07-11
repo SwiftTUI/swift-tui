@@ -95,6 +95,69 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 007: comparison per-row total replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 007 comparison rows replace optional totals and paired values")
+  func chartData007ComparisonRowsReplaceOptionalTotalsAndPairedValues() {
+    // Hypothesis: ComparisonChart can retain a row's old effective total when
+    // current, baseline, and optional total all change without changing row count.
+    struct Root: View {
+      let generation: Int
+
+      var firstTotal: Double? {
+        generation.isMultiple(of: 2) ? nil : Double(60 + generation)
+      }
+
+      var secondTotal: Double? {
+        generation.isMultiple(of: 3) ? Double(80 + generation) : nil
+      }
+
+      var expectedMaximum: Int {
+        let first = firstTotal ?? max(Double(10 + generation), 15)
+        let second = secondTotal ?? max(30, Double(25 + generation))
+        return Int(max(first, second))
+      }
+
+      var body: some View {
+        let entries = [
+          ComparisonEntry(
+            "A\(generation)",
+            current: Double(10 + generation),
+            baseline: 15,
+            total: firstTotal,
+            tone: .automatic
+          ),
+          ComparisonEntry(
+            "B\(generation)",
+            current: -30,
+            baseline: Double(25 + generation),
+            total: secondTotal,
+            tone: .critical
+          ),
+        ]
+        ComparisonChart(
+          "Compare \(generation)",
+          entries: generation.isMultiple(of: 2) ? entries : Array(entries.reversed()),
+          barWidth: 14,
+          labelWidth: 7
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "007", proposal: .init(width: 58, height: 7)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Compare \(generation)"))
+      #expect(text.contains("max \(root.expectedMaximum)"))
+      #expect(text.contains("\(10 + generation)/15"))
+      #expect(text.contains("-30/\(25 + generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 006: stacked optional total replacement
 
 extension FrameworkStressChartDataTests {
