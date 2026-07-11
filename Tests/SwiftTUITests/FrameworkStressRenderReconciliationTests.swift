@@ -1381,4 +1381,51 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 033: Routed sibling draw reorder
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 033 routed sibling reorder matches current draw order")
+  func renderReconciliation033RoutedSiblingReorderMatchesCurrentDrawOrder() {
+    // Hypothesis: retained draw lookup by ViewNodeID can preserve an old traversal order while
+    // entity routing reuses the same row nodes in a new order and cardinality.
+    struct Root: View {
+      let rows: [String]
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(rows, id: \.self) { row in
+            Text(row)
+              .id("render-reconciliation-033-\(row)")
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation033")
+    let variants = [
+      ["ALPHA", "BRAVO", "CHARLIE"],
+      ["CHARLIE", "ALPHA", "BRAVO"],
+      ["BRAVO", "DELTA", "ALPHA"],
+      ["DELTA", "CHARLIE"],
+      ["ALPHA", "BRAVO", "CHARLIE"],
+    ]
+
+    for generation in 0..<25 {
+      let root = Root(rows: variants[generation % variants.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained) == root.rows.joined(separator: "\n"))
+    }
+  }
+}
+
 // MARK: - End
