@@ -1417,3 +1417,44 @@ private func sceneHostLiveRegionNode(
     liveRegion: politeness
   )
 }
+
+// MARK: - Attempt 029: stable live-region node through identity remint
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 029 stable live region owner announces through identity remint")
+  func sceneHost029StableLiveRegionOwnerAnnouncesThroughIdentityRemint() {
+    // Hypothesis: semantic identity replacement can make an existing
+    // ViewNodeID look newly inserted and suppress every subsequent label change.
+    var announcer = LiveRegionAnnouncer()
+    let nodeID = ViewNodeID(rawValue: 2_900)
+    _ = announcer.announcements(
+      for: .init(
+        accessibilityNodes: [
+          sceneHostLiveRegionNode(
+            nodeID: nodeID,
+            identity: testIdentity("SceneHost029", "identity-0"),
+            label: "State 0"
+          )
+        ]
+      )
+    )
+
+    for generation in 1...16 {
+      let announcements = announcer.announcements(
+        for: .init(
+          accessibilityNodes: [
+            sceneHostLiveRegionNode(
+              nodeID: nodeID,
+              identity: testIdentity("SceneHost029", "identity-\(generation)"),
+              label: "State \(generation)"
+            )
+          ]
+        )
+      )
+
+      #expect(announcements.count == 1)
+      #expect(announcements.first?.label == "State \(generation)")
+      #expect(announcements.first?.politeness == .polite)
+    }
+  }
+}
