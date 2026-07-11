@@ -552,4 +552,34 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 016: ProgressView value-domain churn
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 016 ProgressView follows changing value domains")
+  func componentComposition016ProgressViewFollowsChangingValueDomains() {
+    // Hypothesis: the metric track can retain an earlier total when value and total alternate.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ProgressView(
+          "progress-\(generation)",
+          value: Double((generation * 7) % 23),
+          total: generation.isMultiple(of: 2) ? 22 : 9,
+          barWidth: 14
+        )
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition016")
+    for generation in 0..<20 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.drawTree == frames.fresh.drawTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
