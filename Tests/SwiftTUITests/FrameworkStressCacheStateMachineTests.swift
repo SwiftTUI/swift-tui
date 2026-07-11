@@ -188,4 +188,21 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 011 capacity one admits a repeated bypassed key")
+  func cacheState011CapacityOneAdmitsRepeatedBypassedKey() {
+    // Hypothesis: a one-entry cache can never promote a twice-seen bypass candidate.
+    let cache = TextLayoutCache(capacity: 1)
+    let options = TextLayoutOptions(width: 4)
+    _ = cache.layout(for: "alpha", options: options)
+    _ = cache.layout(for: "beta", options: options)
+    _ = cache.layout(for: "alpha", options: options)
+    let beta = cache.layout(for: "beta", options: options)
+    #expect(beta.lines.map(\.text) == ["beta"])
+    #expect(cache.metrics.entries == 1)
+    #expect(cache.metrics.stores == 2)
+    #expect(cache.metrics.evictions == 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
