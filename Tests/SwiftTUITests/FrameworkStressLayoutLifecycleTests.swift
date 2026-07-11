@@ -1313,3 +1313,77 @@ private struct StressLL021Sheet: View {
     }
   }
 }
+
+// MARK: - Attempt 022: onChange modifier reorder
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 022 reordered onChange modifiers keep semantic baselines")
+  func stress022ReorderedOnChangeModifiersKeepSemanticBaselines() throws {
+    // Hypothesis: identity-plus-ordinal storage may cross-wire the previous
+    // values when two onChange modifiers exchange order.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL022", "Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      StressLL022Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      _ = try harness.clickText("Mutate Reordered Changes")
+      withKnownIssue("Reordered onChange modifiers exchange their ordinal baselines") {
+        #expect(probe.events.contains("first:\(generation - 1)->\(generation)"))
+        #expect(
+          probe.events.contains("second:\((generation - 1) * 10)->\(generation * 10)")
+        )
+        #expect(probe.events.count == generation * 2)
+      }
+      #expect(harness.lifecycleRegistrationCount <= 2)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL022Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var first = 0
+  @State private var second = 0
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Mutate Reordered Changes") {
+        first += 1
+        second += 10
+        reversed.toggle()
+      }
+      observedValue
+        .id("reordered-change-source")
+    }
+  }
+
+  @ViewBuilder private var observedValue: some View {
+    if reversed {
+      source
+        .onChange(of: second) { old, new in
+          probe.events.append("second:\(old)->\(new)")
+        }
+        .onChange(of: first) { old, new in
+          probe.events.append("first:\(old)->\(new)")
+        }
+    } else {
+      source
+        .onChange(of: first) { old, new in
+          probe.events.append("first:\(old)->\(new)")
+        }
+        .onChange(of: second) { old, new in
+          probe.events.append("second:\(old)->\(new)")
+        }
+    }
+  }
+
+  private var source: some View {
+    Text("change values \(first) \(second)")
+  }
+}
