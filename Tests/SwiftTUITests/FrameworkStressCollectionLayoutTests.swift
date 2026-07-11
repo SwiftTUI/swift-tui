@@ -1190,3 +1190,82 @@ private struct CollectionLayout019Root: View {
     .frame(width: 8, height: 2, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 020: List payload and selection reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 020 List selection follows current row payload order")
+  func collectionLayout020ListSelectionFollowsCurrentRowPayloadOrder() {
+    // Hypothesis: List may reuse its row-index payload array after same-ID
+    // labels reorder, leaving selection chrome on an obsolete visual row.
+    let selection = CollectionLayout020SelectionBox()
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout020")
+
+    for generation in 0..<24 {
+      let reordered = !generation.isMultiple(of: 2)
+      let root = CollectionLayout020Root(
+        generation: generation,
+        reordered: reordered,
+        selection: selection
+      )
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 20, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 20, height: 6)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(collectionLayoutText(retained).contains("020 B-\(generation)"))
+    }
+  }
+}
+
+@MainActor
+private final class CollectionLayout020SelectionBox {
+  var value = 2
+}
+
+private struct CollectionLayout020Row: Identifiable {
+  let id: Int
+  let label: String
+}
+
+@MainActor
+private struct CollectionLayout020Root: View {
+  let generation: Int
+  let reordered: Bool
+  let selection: CollectionLayout020SelectionBox
+
+  private var rows: [CollectionLayout020Row] {
+    let values = [
+      CollectionLayout020Row(id: 1, label: "A-\(generation)"),
+      CollectionLayout020Row(id: 2, label: "B-\(generation)"),
+      CollectionLayout020Row(id: 3, label: "C-\(generation)"),
+    ]
+    return reordered ? [values[2], values[0], values[1]] : values
+  }
+
+  var body: some View {
+    List(
+      selection: Binding(
+        get: { selection.value },
+        set: { selection.value = $0 }
+      )
+    ) {
+      ForEach(rows) { row in
+        Text("020 \(row.label)").tag(row.id)
+      }
+    }
+    .frame(width: 20, height: 6, alignment: .topLeading)
+  }
+}
