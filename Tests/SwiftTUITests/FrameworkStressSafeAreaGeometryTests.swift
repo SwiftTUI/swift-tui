@@ -109,6 +109,60 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 022: named coordinate-space movement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 022 named space follows current placement")
+  func safeAreaGeometry022NamedSpaceFollowsCurrentPlacement() {
+    // Hypothesis: a retained named-coordinate table can preserve the first owner's placed frame
+    // when safe-area motion and a same-identity spacer relocate both owner and reader.
+    struct Root: View {
+      let generation: Int
+      let prefixHeight: Int
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("prefix")
+            .frame(height: prefixHeight, alignment: .topLeading)
+          Text("board")
+            .frame(width: 12, height: 1, alignment: .leading)
+            .coordinateSpace(name: "board-022")
+          GeometryReader { proxy in
+            let frame = proxy.frame(in: .named("board-022"))
+            Text(
+              "022 g\(generation) frame \(Int(frame.origin.x)),\(Int(frame.origin.y))"
+            )
+          }
+          .frame(width: 32, height: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry022")
+    let heights = [0, 3, 1, 5, 2, 0]
+
+    for generation in 0..<18 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, prefixHeight: heights[generation % heights.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 14),
+        safeAreaInsets: generation.isMultiple(of: 2)
+          ? .init(top: 1, leading: 2)
+          : .init(top: 2, leading: 0)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("022 g\(generation) frame"))
+      #expect(frames.retained.diagnostics.geometryResolutionDiagnostics.missingNamedCoordinateSpaceCount == 0)
+    }
+  }
+}
+
 // MARK: - Attempt 021: local and global frame freshness through safe-area motion
 
 extension FrameworkStressSafeAreaGeometryTests {
