@@ -1426,6 +1426,68 @@ private struct StressPS031Fixture: View {
   }
 }
 
+// MARK: - Attempt 032: live palette-command snapshot
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 032 an open palette sheet refreshes command payloads")
+  func stress032OpenPaletteSheetRefreshesCommandPayloads() throws {
+    // Hypothesis: the palette sheet may keep the absorbed command snapshot
+    // from activation even when sheet-owned input invalidates the source scope.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS032", "Root"),
+      size: .init(width: 72, height: 18)
+    ) {
+      StressPS032Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open palette sheet")
+    let frame = try harness.clickText("Advance palette source")
+    let currentCommandIsVisible = frame.contains("Palette command 1")
+    _ = try harness.clickText(
+      currentCommandIsVisible ? "Palette command 1" : "Palette command 0"
+    )
+
+    withKnownIssue("An open palette sheet retains its activation command payload") {
+      #expect(currentCommandIsVisible)
+    }
+    #expect(probe.markers == ["palette-1"])
+  }
+}
+
+@MainActor
+private struct StressPS032Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var showsPalette = false
+  @State private var generation = 0
+
+  var body: some View {
+    Panel(id: "palette-source") {
+      Button("Open palette sheet") {
+        showsPalette = true
+      }
+    }
+    .paletteCommand(name: "Palette command \(generation)") {
+      probe.markers.append("palette-\(generation)")
+    }
+    .panel(id: "palette-host")
+    .paletteSheet("Stress palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Advance palette source") {
+          generation += 1
+        }
+        if let command = commands.first {
+          Button(command.name) {
+            command.action()
+          }
+        }
+      }
+    }
+    .frame(width: 70, height: 16, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
