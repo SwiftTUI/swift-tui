@@ -231,3 +231,71 @@ private final class ObservationEffects004Value {
     self.name = name
   }
 }
+
+// MARK: - Attempt 005: selected observable collection element replacement
+
+extension FrameworkStressObservationEffectsTests {
+  @Test(
+    "stress observation effects 005 replacing the selected collection element rebinds observation")
+  func observationEffects005SelectedCollectionReplacementRebindsObservation() throws {
+    // Hypothesis: an indexed collection read may keep the registrar belonging
+    // to the element previously stored at that index.
+    let retired = ObservationEffects005Item(id: 0, value: 0)
+    let live = ObservationEffects005Item(id: 0, value: 100)
+    let store = ObservationEffects005Store(items: [retired])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects005"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects005View(store: store)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      retired.value = generation
+      var frame = try harness.render()
+      #expect(frame.contains("005 selected \(generation)"))
+
+      live.value = 100 + generation
+      store.items[0] = live
+      frame = try harness.render()
+      #expect(frame.contains("005 selected \(100 + generation)"))
+
+      retired.value = 1000 + generation
+      frame = try harness.render()
+      #expect(frame.contains("005 selected \(100 + generation)"))
+
+      store.items[0] = retired
+      retired.value = generation
+      _ = try harness.render()
+    }
+  }
+}
+
+private struct ObservationEffects005View: View {
+  let store: ObservationEffects005Store
+
+  var body: some View {
+    Text("005 selected \(store.items[0].value)")
+  }
+}
+
+@Observable
+private final class ObservationEffects005Store {
+  var items: [ObservationEffects005Item]
+
+  init(items: [ObservationEffects005Item]) {
+    self.items = items
+  }
+}
+
+@Observable
+private final class ObservationEffects005Item: Identifiable {
+  let id: Int
+  var value: Int
+
+  init(id: Int, value: Int) {
+    self.id = id
+    self.value = value
+  }
+}
