@@ -724,3 +724,65 @@ private struct StressNP010DeepDestination: View {
     }
   }
 }
+
+// MARK: - Attempt 011: nested NavigationStack pop scoping
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 011 nested stack pops innermost scope first")
+  func stress011NestedStackPopsInnermostScopeFirst() throws {
+    // Hypothesis: pop-entry depth comparison can select the enclosing stack's
+    // destination while focus is inside a nested NavigationStack destination.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP011", "Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      StressNP011Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Outer Stack Destination")
+    _ = try harness.clickText("Open Inner Stack Destination")
+    _ = try harness.focusText("Inner Stack Focus Target")
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("outer stack destination"))
+    #expect(frame.contains("Open Inner Stack Destination"))
+    #expect(!frame.contains("Inner Stack Focus Target"))
+
+    _ = try harness.focusText("Open Inner Stack Destination")
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Open Outer Stack Destination"))
+    #expect(!frame.contains("outer stack destination"))
+  }
+}
+
+@MainActor
+private struct StressNP011Fixture: View {
+  @State private var outer = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-011-outer-stack") {
+      Button("Open Outer Stack Destination") { outer = true }
+        .navigationDestination(isPresented: $outer) {
+          StressNP011OuterDestination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP011OuterDestination: View {
+  @State private var inner = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("outer stack destination")
+      NavigationStack(id: "stress-np-011-inner-stack") {
+        Button("Open Inner Stack Destination") { inner = true }
+          .navigationDestination(isPresented: $inner) {
+            Button("Inner Stack Focus Target") {}
+          }
+      }
+    }
+  }
+}
