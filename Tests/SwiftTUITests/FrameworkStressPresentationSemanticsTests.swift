@@ -1381,6 +1381,51 @@ private struct StressPS030Fixture: View {
   }
 }
 
+// MARK: - Attempt 031: toolbar enablement churn
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 031 disabling a toolbar item removes its live action")
+  func stress031DisablingToolbarItemRemovesLiveAction() throws {
+    // Hypothesis: retained toolbar-strip action refresh may update chrome but
+    // leave the previously enabled handler installed.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS031", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      StressPS031Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable toolbar item")
+    _ = try harness.clickText("Mutable tool")
+
+    #expect(probe.markers.isEmpty)
+    #expect(harness.actionRegistrationCount == 1)
+  }
+}
+
+@MainActor
+private struct StressPS031Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var itemIsEnabled = true
+
+  var body: some View {
+    Panel(id: "enabled-toolbar-panel") {
+      Button("Disable toolbar item") {
+        itemIsEnabled = false
+      }
+      .toolbarItem(
+        .init(title: "Mutable tool", isEnabled: itemIsEnabled) {
+          probe.markers.append("fired")
+        }
+      )
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 50, height: 7, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
