@@ -1172,3 +1172,64 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 026: runtime-configuration builder fork isolation
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 026 forked configuration builders stay value isolated")
+  func sceneHost026ForkedConfigurationBuildersStayValueIsolated() {
+    // Hypothesis: nested WebConfig replacement can expose shared builder
+    // storage so one branch mutates its sibling's output mode or scene ID.
+    let base = RuntimeConfiguration.builder()
+      .color(.never)
+      .web(port: 7000, bind: "127.0.0.1", sceneID: "original")
+    let baseExpected = RuntimeConfiguration(
+      color: .never,
+      web: .init(port: 7000, bind: "127.0.0.1", sceneID: "original")
+    )
+
+    for generation in 0..<24 {
+      let leftScene = WindowIdentifier("left-\(generation)")
+      let rightScene = WindowIdentifier("right-\(generation)")
+      let leftOutput: RuntimeConfiguration.OutputMode =
+        generation.isMultiple(of: 2)
+        ? .json
+        : .accessible
+      let left =
+        base
+        .output(leftOutput)
+        .web(port: 7100 + generation, bind: "left", openBrowser: true, sceneID: leftScene)
+        .build()
+      let right =
+        base
+        .glyphs(.ascii)
+        .motion(.reduced)
+        .web(port: 7200 + generation, bind: "right", sceneID: rightScene)
+        .build()
+
+      #expect(base.build() == baseExpected)
+      #expect(
+        left
+          == .init(
+            color: .never,
+            output: leftOutput,
+            web: .init(
+              port: 7100 + generation,
+              bind: "left",
+              openBrowser: true,
+              sceneID: leftScene
+            )
+          )
+      )
+      #expect(
+        right
+          == .init(
+            color: .never,
+            glyphs: .ascii,
+            motion: .reduced,
+            web: .init(port: 7200 + generation, bind: "right", sceneID: rightScene)
+          )
+      )
+    }
+  }
+}
