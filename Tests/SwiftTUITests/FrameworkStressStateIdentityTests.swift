@@ -2035,6 +2035,72 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 030: Environment dependencies on duplicate entity identities
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 030 duplicate rows both refresh environment reads")
+  func stateIdentity030DuplicateRowsBothRefreshEnvironmentReads() throws {
+    // Hypothesis: two reader ViewNodeIDs share one runtime identity, so environment invalidation
+    // can collapse them and leave one duplicate occurrence on a stale value.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity030"),
+      size: .init(width: 62, height: 10)
+    ) {
+      StateIdentity030Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...4 {
+      let frame = try harness.clickText("Advance Environment 030")
+      #expect(frame.contains("030 Primary Value V\(generation)"))
+      #expect(frame.contains("030 Secondary Value V\(generation)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity030Item: Identifiable {
+    let id = 30
+    let label: String
+  }
+
+  private struct StateIdentity030Root: View {
+    @State private var generation = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Advance Environment 030") { generation += 1 }
+        ForEach([
+          StateIdentity030Item(label: "Primary"),
+          StateIdentity030Item(label: "Secondary"),
+        ]) { item in
+          StateIdentity030Reader(label: item.label)
+        }
+      }
+      .environment(\.stress030Value, "V\(generation)")
+    }
+  }
+
+  private struct StateIdentity030Reader: View {
+    let label: String
+    @Environment(\.stress030Value) private var value
+
+    var body: some View {
+      Text("030 \(label) Value \(value)")
+    }
+  }
+}
+
+private enum Stress030ValueKey: EnvironmentKey {
+  static let defaultValue = "default"
+}
+
+extension EnvironmentValues {
+  fileprivate var stress030Value: String {
+    get { self[Stress030ValueKey.self] }
+    set { self[Stress030ValueKey.self] = newValue }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
