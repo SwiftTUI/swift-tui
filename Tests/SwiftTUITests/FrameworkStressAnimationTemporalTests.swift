@@ -766,3 +766,57 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 015: insertion-offset custom sampling cadence
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 015 insertion offset custom curve samples once per frame")
+  func animationTemporal015InsertionOffsetCustomCurveSamplesOncePerFrame() throws {
+    // Hypothesis: the resolved animation pass and placed overlay pass can both
+    // evaluate a stateful insertion curve during one frame.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "015", probe: probe))
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal015", "Root")
+    let proposal = ProposedSize(width: 40, height: 6)
+
+    withAnimationSinks(controller) {
+      _ = renderer.render(
+        animationTemporal015View(show: false),
+        context: .init(identity: identity),
+        proposal: proposal
+      )
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      let inserted = renderer.render(
+        animationTemporal015View(show: true),
+        context: .init(identity: identity, transaction: transaction),
+        proposal: proposal
+      )
+      #expect(controller.activeInsertionOffsetCount == 1)
+      let callsBefore = probe.observations.count
+      let sampleTime = MonotonicInstant.now()
+      var resolved = inserted.resolvedTree
+      _ = controller.applyInterpolations(to: &resolved, at: sampleTime)
+      _ = controller.placedAnimationOverlaySnapshot(
+        for: inserted.placedTree,
+        at: sampleTime,
+        surfaceSize: .init(width: 40, height: 6)
+      )
+      #expect(probe.observations.count - callsBefore == 1)
+    }
+  }
+}
+
+@MainActor
+@ViewBuilder
+private func animationTemporal015View(show: Bool) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    if show {
+      Text("animation temporal 015")
+        .transition(.offset(x: 12))
+    }
+  }
+}
+
