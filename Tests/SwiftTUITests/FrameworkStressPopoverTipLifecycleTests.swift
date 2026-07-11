@@ -525,6 +525,40 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 014: bindingless tip ID replacement
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 014 replacing the tip id remints the portal entry")
+  func popoverTip014ReplacingTipIDRemintsPortalEntry() throws {
+    // Hypothesis: a bindingless modifier can preserve its prior portal token
+    // and payload when the tip's Identifiable ID changes in place.
+    let rootIdentity = testIdentity("PopoverTipStress014", "Root")
+    let model = PopoverTipStressModel()
+    model.message = nil
+    model.icon = nil
+    model.actions = []
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model,
+      bindingless: true
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let priorTitle = model.title
+      model.generation = generation
+      model.tipID = "replacement-\(generation)"
+      model.title = "Replacement tip \(generation)"
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      #expect(frame.contains("Replacement tip \(generation)"))
+      #expect(!frame.contains(priorTitle))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
