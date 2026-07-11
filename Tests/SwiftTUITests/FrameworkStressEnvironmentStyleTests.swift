@@ -824,6 +824,72 @@ extension EnvironmentStyle017Reader: @MainActor Equatable {
   }
 }
 
+// MARK: - Attempt 018: AnyView environment-writer replacement
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 018 AnyView branch replacement drops departed override")
+  func environmentStyle018AnyViewBranchReplacementDropsDepartedOverride() throws {
+    // Hypothesis: AnyView payload replacement can reuse the erased subtree's prior environment
+    // writer even after switching to a different concrete reader type without that override.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle018"),
+      size: .init(width: 76, height: 8)
+    ) {
+      EnvironmentStyle018Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...14 {
+      _ = try harness.clickText("Advance Erased Environment 018")
+      var frame = try harness.clickText("Toggle Erased Branch 018")
+      #expect(frame.contains("018 secondary outer-\(generation)"))
+
+      frame = try harness.clickText("Toggle Erased Branch 018")
+      #expect(frame.contains("018 primary inner-\(generation)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle018Primary: View {
+  @Environment(\.environmentStyleString) private var value
+
+  var body: some View {
+    Text("018 primary \(value)")
+  }
+}
+
+private struct EnvironmentStyle018Secondary: View {
+  @Environment(\.environmentStyleString) private var value
+
+  var body: some View {
+    HStack(spacing: 0) {
+      Text("018 secondary ")
+      Text(value)
+    }
+  }
+}
+
+private struct EnvironmentStyle018Root: View {
+  @State private var generation = 0
+  @State private var showsPrimary = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Erased Environment 018") { generation += 1 }
+      Button("Toggle Erased Branch 018") { showsPrimary.toggle() }
+      if showsPrimary {
+        AnyView(
+          EnvironmentStyle018Primary()
+            .environment(\.environmentStyleString, "inner-\(generation)")
+        )
+      } else {
+        AnyView(EnvironmentStyle018Secondary())
+      }
+    }
+    .environment(\.environmentStyleString, "outer-\(generation)")
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
