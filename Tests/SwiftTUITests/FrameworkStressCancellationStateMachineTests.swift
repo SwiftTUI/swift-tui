@@ -148,4 +148,19 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 010 start and cancel have one winner")
+  func cancellationState010StartAndCancelHaveOneWinner() async {
+    // Hypothesis: independent transitions can both report success under contention.
+    for _ in 0..<100 {
+      let token = FrameTailJobCancellationToken()
+      async let started = Task.detached { token.markStarted() }.value
+      async let cancelled = Task.detached { token.cancelBeforeStart() }.value
+      let results = await (started, cancelled)
+      #expect([results.0, results.1].filter { $0 }.count == 1)
+      #expect(["started", "cancelled_before_start"].contains(token.currentState.rawValue))
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
