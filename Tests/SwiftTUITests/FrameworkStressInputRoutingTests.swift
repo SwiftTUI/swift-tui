@@ -1134,3 +1134,59 @@ private struct StressInput020Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 021: stacked updating gestures
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Stacked updating gestures keep both GestureState cells coherent and bounded")
+  func stressInputRouting021StackedGestureStatesUpdateAndResetTogether() throws {
+    // Hypothesis: stacking updating decorators at one identity may register
+    // only one state cell, leaving the other stale or unreset after release.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput021Root"),
+      size: .init(width: 52, height: 6)
+    ) {
+      StressInput021Fixture()
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "first 0 second 0"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    let activeFrame = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 4, y: start.y)
+    )
+
+    #expect(activeFrame.contains("first 4 second 4"))
+    #expect(harness.gestureStateBindingCount == 2)
+
+    let endedFrame = try harness.sendMouse(
+      .up(.primary),
+      at: Point(x: start.x + 4, y: start.y)
+    )
+    #expect(endedFrame.contains("first 0 second 0"))
+    #expect(harness.gestureStateBindingCount == 2)
+  }
+}
+
+private struct StressInput021Fixture: View {
+  @GestureState private var first = Vector.zero
+  @GestureState private var second = Vector.zero
+
+  var body: some View {
+    Text("first \(Int(first.dx)) second \(Int(second.dx))")
+      .frame(width: 32, height: 1, alignment: .leading)
+      .gesture(
+        DragGesture()
+          .updating($first) { value, state, _ in
+            state = value.translation
+          }
+      )
+      .gesture(
+        DragGesture()
+          .updating($second) { value, state, _ in
+            state = value.translation
+          }
+      )
+  }
+}
