@@ -584,3 +584,50 @@ extension FrameworkStressControlBindingTests {
     #expect(selection.writes == ["c"])
   }
 }
+
+// MARK: - Attempt 013: slider wheel binding retarget
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 013 slider wheel writes only its current binding")
+  func stressControlBinding013SliderWheelWritesOnlyCurrentBinding() throws {
+    // Hypothesis: Slider's root wheel route can preserve the original numeric binding after the
+    // stable control retargets even when its keyboard and track routes use the replacement.
+    let first = ControlStressProbe(8)
+    let second = ControlStressProbe(1)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress013", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      ControlStress013Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget slider wheel 013")
+    let sliderPoint = try #require(harness.point(forText: "Wheel slider 013"))
+    _ = try harness.scrollPointer(at: sliderPoint, deltaY: -1)
+
+    #expect(first.value == 8)
+    #expect(first.writes.isEmpty)
+    #expect(second.value == 2)
+    #expect(second.writes == [2])
+  }
+}
+
+@MainActor
+private struct ControlStress013Fixture: View {
+  let first: ControlStressProbe<Int>
+  let second: ControlStressProbe<Int>
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget slider wheel 013") { usesSecond = true }
+      Slider(
+        "Wheel slider 013",
+        value: usesSecond ? second.binding() : first.binding(),
+        in: 0...10
+      )
+      .id("wheel-slider-013")
+    }
+  }
+}
