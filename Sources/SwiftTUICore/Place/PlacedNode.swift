@@ -88,6 +88,21 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   }
 }
 
+/// Estimated frame for a lazy container's never-placed child, derived from
+/// the container's allocation snapshot at place time. The offsets are the
+/// exact frames placement would assign, so a `scrollTo` aimed at an
+/// out-of-window row can target the estimate and let materialization catch
+/// up once the viewport arrives.
+package struct LazyChildScrollEstimate: Equatable, Sendable {
+  package var identity: Identity
+  package var rect: CellRect
+
+  package init(identity: Identity, rect: CellRect) {
+    self.identity = identity
+    self.rect = rect
+  }
+}
+
 /// A node after layout has assigned concrete bounds.
 ///
 /// Placement owns final bounds, content bounds, clipping, z-order, child
@@ -185,6 +200,11 @@ package struct PlacedNode: Equatable, Sendable {
   /// controller can compute matched-geometry bounds during
   /// capture+diff.
   package var matchedGeometry: MatchedGeometryConfig?
+  /// Estimated frames for this lazy container's never-placed children —
+  /// see ``LazyChildScrollEstimate``. Populated only on lazy containers
+  /// whose allocation covers more children than the visible window placed;
+  /// `nil` everywhere else.
+  package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
   package var resolvedMetadata: PlacedNodeResolvedMetadata {
     get {
       PlacedNodeResolvedMetadata(

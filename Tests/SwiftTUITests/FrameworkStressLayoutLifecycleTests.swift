@@ -138,9 +138,7 @@ extension FrameworkStressLayoutLifecycleTests {
     for generation in 1...8 {
       _ = try harness.clickText("Prepend Row")
       let frame = try harness.clickText("Reveal Stable")
-      withKnownIssue("ScrollViewReader cannot reveal an unplaced stable row in a LazyVStack") {
-        #expect(frame.contains("stable row 10 first \(-generation)"))
-      }
+      #expect(frame.contains("stable row 10 first \(-generation)"))
       #expect(harness.scrollPositionRegistrationCount == 1)
       #expect(harness.lifecycleRegistrationCount <= 2)
     }

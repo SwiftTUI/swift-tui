@@ -425,6 +425,23 @@ extension SemanticExtractor {
         frame.node.semanticMetadata.scrollRole == nil
         ? frame.activeScrollIdentity
         : frame.node.identity
+      // A lazy container's never-placed children have no placed nodes for
+      // the walk to visit — publish their allocation-derived estimates so a
+      // `scrollTo` can target an out-of-window row (the estimate is the
+      // exact frame placement would assign).
+      if let childScrollIdentity,
+        let estimates = frame.node.lazyChildScrollEstimates
+      {
+        for estimate in estimates where !estimate.rect.isEmpty {
+          targets.append(
+            ScrollTarget(
+              identity: estimate.identity,
+              scrollIdentity: childScrollIdentity,
+              rect: estimate.rect
+            )
+          )
+        }
+      }
       for child in frame.node.children.reversed() {
         stack.append(
           Frame(

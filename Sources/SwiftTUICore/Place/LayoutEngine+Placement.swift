@@ -14,7 +14,7 @@ extension LayoutEngine {
       children: children
     )
 
-    return PlacedNode(
+    var node = PlacedNode(
       viewNodeID: resolved.viewNodeID,
       identity: resolved.identity,
       resolvedMetadata: .init(
@@ -25,6 +25,63 @@ extension LayoutEngine {
       contentBounds: contentBounds,
       children: children
     )
+    node.lazyChildScrollEstimates = lazyChildScrollEstimates(
+      for: resolved,
+      bounds: bounds,
+      measured: measured,
+      placedChildren: children
+    )
+    return node
+  }
+
+  /// Estimated frames for a lazy container's never-placed children. A
+  /// `scrollTo` aimed at an out-of-window lazy row has no placed frame, but
+  /// the allocation snapshot already computed the exact offset placement
+  /// would assign — publish it so the scroll command can target it and let
+  /// materialization catch up once the viewport arrives.
+  private func lazyChildScrollEstimates(
+    for resolved: ResolvedNode,
+    bounds: CellRect,
+    measured: MeasuredNode,
+    placedChildren: [PlacedNode]
+  ) -> [LazyChildScrollEstimate]? {
+    guard
+      case .lazyStack = resolved.layoutBehavior,
+      let snapshot = measured.containerAllocationSnapshot?.lazyStack,
+      snapshot.childIdentities.count == snapshot.childMainOffsets.count,
+      snapshot.childIdentities.count > placedChildren.count
+    else {
+      return nil
+    }
+
+    let placedIdentities = Set(placedChildren.map(\.identity))
+    let crossLength = max(0, snapshot.crossLeading + snapshot.crossTrailing)
+    var estimates: [LazyChildScrollEstimate] = []
+    estimates.reserveCapacity(snapshot.childIdentities.count - placedChildren.count)
+    for (index, identity) in snapshot.childIdentities.enumerated()
+    where !placedIdentities.contains(identity) {
+      let rect: CellRect =
+        switch snapshot.axis {
+        case .vertical:
+          CellRect(
+            origin: CellPoint(
+              x: bounds.origin.x,
+              y: bounds.origin.y + snapshot.childMainOffsets[index]
+            ),
+            size: CellSize(width: crossLength, height: snapshot.childMainLengths[index])
+          )
+        case .horizontal:
+          CellRect(
+            origin: CellPoint(
+              x: bounds.origin.x + snapshot.childMainOffsets[index],
+              y: bounds.origin.y
+            ),
+            size: CellSize(width: snapshot.childMainLengths[index], height: crossLength)
+          )
+        }
+      estimates.append(LazyChildScrollEstimate(identity: identity, rect: rect))
+    }
+    return estimates.isEmpty ? nil : estimates
   }
 
   package func combinedContentBounds(
@@ -158,7 +215,7 @@ extension LayoutEngine {
       translatedPlacement(child, by: delta)
     }
 
-    return PlacedNode(
+    var translatedNode = PlacedNode(
       viewNodeID: node.viewNodeID,
       identity: node.identity,
       kind: node.kind,
@@ -180,6 +237,15 @@ extension LayoutEngine {
       isTransient: node.isTransient,
       matchedGeometry: node.matchedGeometry
     )
+    translatedNode.lazyChildScrollEstimates = node.lazyChildScrollEstimates.map { estimates in
+      estimates.map { estimate in
+        LazyChildScrollEstimate(
+          identity: estimate.identity,
+          rect: translated(estimate.rect, by: delta)
+        )
+      }
+    }
+    return translatedNode
   }
 
   private func translated(

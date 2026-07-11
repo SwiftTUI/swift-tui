@@ -54,6 +54,7 @@ extension LayoutEngine {
       axis: axis,
       childMainOffsets: childMainOffsets,
       childMainLengths: childMainLengths,
+      childIdentities: children.map(\.identity),
       contentMainLength: nextOffset,
       crossLeading: crossMetrics.leading,
       crossTrailing: crossMetrics.trailing

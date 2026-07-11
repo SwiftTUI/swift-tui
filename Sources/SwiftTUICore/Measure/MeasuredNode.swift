@@ -30,6 +30,13 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   package var axis: Axis
   package var childMainOffsets: [Int]
   package var childMainLengths: [Int]
+  /// Index-parallel child identities, captured from the already-materialized
+  /// children the allocation measured. Placement uses them to publish
+  /// estimated scroll targets for children outside the visible window — a
+  /// `scrollTo` aimed at a never-placed lazy row has no placed frame to
+  /// resolve against, but its allocation offset is exactly the frame it
+  /// would get if placed.
+  package var childIdentities: [Identity]
   package var contentMainLength: Int
   package var crossLeading: Int
   package var crossTrailing: Int
@@ -38,6 +45,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     axis: Axis,
     childMainOffsets: [Int] = [],
     childMainLengths: [Int] = [],
+    childIdentities: [Identity] = [],
     contentMainLength: Int = 0,
     crossLeading: Int = 0,
     crossTrailing: Int = 0
@@ -45,6 +53,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     self.axis = axis
     self.childMainOffsets = childMainOffsets
     self.childMainLengths = childMainLengths
+    self.childIdentities = childIdentities
     self.contentMainLength = contentMainLength
     self.crossLeading = crossLeading
     self.crossTrailing = crossTrailing
