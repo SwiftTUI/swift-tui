@@ -45,6 +45,49 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 002: Reused StateBox across explicit identity replacement
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 002 explicit id replacement resets a reused view value")
+  func stateIdentity002ExplicitIDReplacementResetsReusedValue() throws {
+    // Hypothesis: a newly routed entity can be seeded from a StateBox mutated by the entity
+    // it replaced when the authored view value itself is deliberately reused.
+    let shared = StateIdentitySharedCounter(label: "002")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity002"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StateIdentity002Root(shared: shared)
+    }
+    defer { harness.shutdown() }
+
+    var replacementFrames: [String] = []
+    for generation in 0..<4 {
+      _ = try harness.clickText("002 Increment")
+      let frame = try harness.clickText("Replace 002")
+      #expect(frame.contains("002 Owner \(generation + 1)"))
+      replacementFrames.append(frame)
+    }
+
+    withKnownIssue("A reused StateBox carries its mutation across explicit-ID replacement") {
+      #expect(replacementFrames.allSatisfy { $0.contains("002 Count 0") })
+    }
+  }
+
+  private struct StateIdentity002Root: View {
+    let shared: StateIdentitySharedCounter
+    @State private var generation = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("002 Owner \(generation)")
+        Button("Replace 002") { generation += 1 }
+        shared.id("state-identity-002-\(generation)")
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
