@@ -1225,3 +1225,67 @@ private struct StressNP018Popover: View {
     }
   }
 }
+
+// MARK: - Attempt 019: active popover binding retarget
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 019 Escape writes retargeted popover binding")
+  func stress019EscapeWritesRetargetedPopoverBinding() throws {
+    // Hypothesis: an open popover can retain the dismiss closure captured from
+    // its original Boolean binding after the modifier switches bindings.
+    let probe = StressNP019Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP019", "Root"),
+      size: .init(width: 58, height: 12)
+    ) {
+      StressNP019Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open First Popover Binding")
+    _ = try harness.clickText("Retarget Popover Binding")
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(probe.first)
+    #expect(!probe.second)
+    #expect(frame.contains("Open First Popover Binding"))
+    #expect(!frame.contains("Retarget Popover Binding"))
+    #expect(stressNPPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private final class StressNP019Probe {
+  var first = false
+  var second = false
+
+  func firstBinding() -> Binding<Bool> {
+    Binding(get: { self.first }, set: { self.first = $0 })
+  }
+
+  func secondBinding() -> Binding<Bool> {
+    Binding(get: { self.second }, set: { self.second = $0 })
+  }
+}
+
+@MainActor
+private struct StressNP019Fixture: View {
+  let probe: StressNP019Probe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("popover binding first \(probe.first) second \(probe.second)")
+      Button("Open First Popover Binding") { probe.first = true }
+        .popover(
+          isPresented: usesSecond ? probe.secondBinding() : probe.firstBinding(),
+          arrowEdge: .trailing
+        ) {
+          Button("Retarget Popover Binding") {
+            probe.second = true
+            usesSecond = true
+          }
+        }
+    }
+  }
+}
