@@ -559,6 +559,43 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 015: source identity replacement
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 015 source identity replacement keeps one current entry")
+  func popoverTip015SourceIdentityReplacementKeepsOneCurrentEntry() throws {
+    // Hypothesis: reminting the declaration source while the same tip remains
+    // active can leave the departed source's portal entry or action route live.
+    let rootIdentity = testIdentity("PopoverTipStress015", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "stable-across-source"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.generation = generation
+      model.sourceIdentity = generation
+      model.primaryPresented = true
+      model.title = "Source generation \(generation)"
+      model.actions = [.init(id: "source", title: "Use source \(generation)")]
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      #expect(frame.contains("Source generation \(generation)"))
+      #expect(!frame.contains("Source generation \(generation - 1)"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+      _ = try harness.clickText("Use source \(generation)", chooseLast: true)
+      #expect(model.actionLog.last == "source@\(generation)")
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
