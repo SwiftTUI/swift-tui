@@ -306,4 +306,28 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 020 consumer cancellation reaches producer")
+  func cancellationState020ConsumerCancellationReachesProducer() async {
+    // Hypothesis: a suspended consumer can terminate without cancelling the backing task.
+    let counter = CancellationStressCounter()
+    let stream = makeTaskBackedAsyncStream {
+      (continuation: AsyncStream<Int>.Continuation) in
+      continuation.yield(1)
+      while !Task.isCancelled { await Task.yield() }
+      counter.increment()
+    }
+    let consumer = Task {
+      var iterator = stream.makeAsyncIterator()
+      _ = await iterator.next()
+      _ = await iterator.next()
+    }
+    for _ in 0..<20 { await Task.yield() }
+    consumer.cancel()
+    _ = await consumer.result
+    for _ in 0..<1_000 where counter.count == 0 { await Task.yield() }
+    #expect(counter.count == 1)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
