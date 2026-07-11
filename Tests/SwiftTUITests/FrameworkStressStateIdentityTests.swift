@@ -528,6 +528,100 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 009: Default-focus ordinals under conditional modifier churn
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 009 default focus follows the arriving modifier shape")
+  func stateIdentity009DefaultFocusFollowsArrivingModifierShape() throws {
+    // Hypothesis: removing the first of two default-focus modifiers shifts ordinal-backed
+    // seed state and can leave a fresh owner with no usable default candidate.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity009"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity009Root()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("009 Focus first"))
+    var defaultsFollowedModifierShape = true
+    for generation in 1...4 {
+      let frame = try harness.clickText("Churn 009")
+      #expect(frame.contains("009 Generation \(generation)"))
+      let field = generation.isMultiple(of: 2) ? "first" : "second"
+      defaultsFollowedModifierShape =
+        defaultsFollowedModifierShape
+        && frame.contains("009 Focus \(field)")
+      #expect(harness.defaultFocusRegistrationCount <= 2)
+    }
+
+    withKnownIssue("Default-focus ordinal churn clears the requested replacement focus") {
+      #expect(defaultsFollowedModifierShape)
+    }
+  }
+
+  private enum StateIdentity009Field: Hashable {
+    case first
+    case second
+  }
+
+  private struct StateIdentity009Root: View {
+    @State private var generation = 0
+    @FocusState private var focusedField: StateIdentity009Field?
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("009 Generation \(generation)")
+        Text("009 Focus \(focusLabel)")
+        Button("Churn 009") { generation += 1 }
+        StateIdentity009Controls(
+          generation: generation,
+          focusedField: $focusedField,
+          includesFirstDefault: generation.isMultiple(of: 2)
+        )
+        .id("state-identity-009-owner-\(generation)")
+      }
+    }
+
+    private var focusLabel: String {
+      switch focusedField {
+      case .first: "first"
+      case .second: "second"
+      case nil: "none"
+      }
+    }
+
+  }
+
+  private struct StateIdentity009Controls: View {
+    let generation: Int
+    let focusedField: FocusState<StateIdentity009Field?>.Binding
+    let includesFirstDefault: Bool
+
+    var body: some View {
+      if includesFirstDefault {
+        controls
+          .defaultFocus(focusedField, .second)
+          .defaultFocus(focusedField, .first)
+      } else {
+        controls
+          .defaultFocus(focusedField, .second)
+      }
+    }
+
+    private var controls: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("First 009") {}
+          .id(testIdentity("StateIdentity009", "first", "\(generation)"))
+          .focused(focusedField, equals: .first)
+        Button("Second 009") {}
+          .id(testIdentity("StateIdentity009", "second", "\(generation)"))
+          .focused(focusedField, equals: .second)
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
