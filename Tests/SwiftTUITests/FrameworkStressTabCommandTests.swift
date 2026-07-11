@@ -435,3 +435,61 @@ private struct StressTC008Fixture: View {
     .frame(width: 56, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 009: toolbar placement and action replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 009 toolbar placement swap refreshes its action")
+  func stressTabCommand009ToolbarPlacementSwapRefreshesAction() throws {
+    // Hypothesis: late host reconciliation may move cached chrome but retain
+    // the action authored for the previous placement generation.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC009", "Root"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StressTC009Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Move toolbar")
+    let bodyPoint = try #require(harness.point(forText: "Body anchor"))
+    let toolPoint = try #require(harness.point(forText: "Bottom tool"))
+    #expect(bodyPoint.y < toolPoint.y)
+
+    _ = try harness.clickText("Bottom tool")
+    #expect(probe.events == ["bottom"])
+  }
+}
+
+private struct StressTC009ToolbarStyle: ToolbarStyle {
+  let placement: ToolbarPlacement
+
+  var itemLayout: HStackLayout {
+    HStackLayout(alignment: .center, spacing: 1)
+  }
+}
+
+@MainActor
+private struct StressTC009Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var atBottom = false
+
+  var body: some View {
+    Panel(id: "stress-tc-009-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Body anchor")
+        Button("Move toolbar") {
+          atBottom = true
+        }
+        .toolbarItem(
+          .init(title: atBottom ? "Bottom tool" : "Top tool") {
+            probe.events.append(atBottom ? "bottom" : "top")
+          }
+        )
+      }
+    }
+    .toolbar(style: StressTC009ToolbarStyle(placement: atBottom ? .bottom : .top))
+    .frame(width: 56, height: 8, alignment: .topLeading)
+  }
+}
