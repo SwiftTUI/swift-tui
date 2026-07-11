@@ -844,3 +844,61 @@ private struct ToastLifecycle016Root: View {
     }
   }
 }
+
+// MARK: - Attempt 017: source reorder identity
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 017 reordered sources preserve toast identity and order")
+  func toastLifecycle017ReorderedSourcesPreserveToastIdentityAndOrder() throws {
+    // Hypothesis: declarative toast storage can follow structural source order rather than ForEach
+    // entity identity, duplicating items or exchanging their activation ordinals after reorder.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle017"),
+      size: .init(width: 66, height: 15)
+    ) {
+      ToastLifecycle017Root()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...10 {
+      let frame = try harness.clickText("Reverse Toast Sources 017")
+      #expect(
+        toastLifecycleContainsInOrder(
+          ["identity toast alpha", "identity toast beta"],
+          in: frame
+        )
+      )
+      #expect(frame.components(separatedBy: "identity toast alpha").count - 1 == 1)
+      #expect(frame.components(separatedBy: "identity toast beta").count - 1 == 1)
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+private struct ToastLifecycle017Item: Identifiable {
+  let id: String
+}
+
+@MainActor
+private struct ToastLifecycle017Root: View {
+  @State private var reversed = false
+
+  private var items: [ToastLifecycle017Item] {
+    let source = ["alpha", "beta"].map(ToastLifecycle017Item.init(id:))
+    return reversed ? Array(source.reversed()) : source
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse Toast Sources 017") { reversed.toggle() }
+      ForEach(items) { item in
+        Text("source \(item.id)")
+          .toast(
+            "identity toast \(item.id)",
+            isPresented: .constant(true),
+            duration: nil
+          )
+      }
+    }
+  }
+}
