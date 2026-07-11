@@ -94,6 +94,54 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 011: inset adornment size churn
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 011 inset height churn remeasures surviving base")
+  func safeAreaGeometry011InsetHeightChurnRemeasuresSurvivingBase() {
+    // Hypothesis: retained safe-area inset measurement can refresh the adornment frame while
+    // leaving the surviving GeometryReader at the base proposal from an earlier height.
+    struct Root: View {
+      let generation: Int
+      let insetHeight: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "011 base g\(generation) h\(insetHeight) "
+              + "\(proxy.size.width)x\(proxy.size.height)"
+          )
+        }
+        .safeAreaInset(edge: .bottom, alignment: .bottomLeading) {
+          Text("011 inset g\(generation)")
+            .frame(height: insetHeight, alignment: .bottomLeading)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry011")
+    let heights = [1, 4, 2, 6, 1, 3]
+
+    for generation in 0..<18 {
+      let height = heights[generation % heights.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, insetHeight: height),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 18),
+        safeAreaInsets: .init(bottom: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("011 base g\(generation) h\(height)"))
+    }
+  }
+}
+
 // MARK: - Attempt 010: safe-area inset spacing replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
