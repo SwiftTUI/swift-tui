@@ -1723,3 +1723,60 @@ private struct StressLL028Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 029: opaque environment equality
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 029 non Equatable environment replacement invalidates reader")
+  func stress029NonEquatableEnvironmentReplacementInvalidatesReader() throws {
+    // Hypothesis: reflection-based equality may treat distinct non-Equatable
+    // values as equal and incorrectly retain an EnvironmentReader subtree.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL029", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressLL029Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      let frame = try harness.clickText("Replace Opaque Environment")
+      #expect(frame.contains("opaque environment payload \(generation)"))
+    }
+  }
+}
+
+private struct StressLL029OpaqueValue: Sendable, CustomDebugStringConvertible {
+  var payload: Int
+
+  var debugDescription: String { "opaque-environment-value" }
+}
+
+private enum StressLL029EnvironmentKey: EnvironmentKey {
+  static let defaultValue = StressLL029OpaqueValue(payload: -1)
+}
+
+extension EnvironmentValues {
+  fileprivate var stressLL029OpaqueValue: StressLL029OpaqueValue {
+    get { self[StressLL029EnvironmentKey.self] }
+    set { self[StressLL029EnvironmentKey.self] = newValue }
+  }
+}
+
+@MainActor
+private struct StressLL029Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Opaque Environment") { generation += 1 }
+      EnvironmentReader(\.stressLL029OpaqueValue) { value in
+        Text("opaque environment payload \(value.payload)")
+      }
+      .environment(
+        \.stressLL029OpaqueValue,
+        StressLL029OpaqueValue(payload: generation)
+      )
+    }
+  }
+}
