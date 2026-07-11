@@ -582,4 +582,29 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 017: ProgressView bar-width replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 017 ProgressView remeasures replacement bar widths")
+  func componentComposition017ProgressViewRemeasuresReplacementBarWidths() {
+    // Hypothesis: changing only barWidth can reuse an obsolete metric-track measurement.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ProgressView(value: 0.5, total: 1, barWidth: [3, 17, 8][generation % 3])
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition017")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
