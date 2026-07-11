@@ -253,4 +253,23 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 024 null and absent themes converge")
+  func styleTransport024NullAndAbsentThemesConverge() throws {
+    // Hypothesis: explicit null can enter a different decode branch from an omitted theme.
+    let appearance =
+      ##""appearance":{"foregroundColor":"#112233","backgroundColor":"#445566","tintColor":"#778899","colorSchemeContrast":"standard","source":"fallback"}"##
+    let absent = "{\(appearance)}"
+    let explicitNull = "{\(appearance),\"theme\":null}"
+    let first = try #require(
+      TerminalRenderStyleCodec.decodeBase64(StyleTransportBase64.encode(Array(absent.utf8)))
+    )
+    let second = try #require(
+      TerminalRenderStyleCodec.decodeBase64(StyleTransportBase64.encode(Array(explicitNull.utf8)))
+    )
+    #expect(first == second)
+    #expect(first.resolvedTheme == second.resolvedTheme)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
