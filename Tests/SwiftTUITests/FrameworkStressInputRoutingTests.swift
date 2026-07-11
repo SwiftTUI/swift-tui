@@ -1025,3 +1025,45 @@ private struct StressInput018Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 019: partial double-tap across owner remint
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A partial double-tap cannot complete on a departed gesture owner")
+  func stressInputRouting019PartialDoubleTapDoesNotFireDepartedOwner() throws {
+    // Hypothesis: the first tap may leave an active count-two recognizer that
+    // survives an owner remint and fires its stale closure on the second tap.
+    let departedFires = StressInputBox<[Int]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput019Root"),
+      size: .init(width: 42, height: 6)
+    ) {
+      StressInput019Fixture(departedFires: departedFires)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Double tap remint")
+    _ = try harness.clickText("Double tap remint")
+
+    withKnownIssue("A count-two tap recognizer fires its departed owner's closure") {
+      #expect(departedFires.value.isEmpty)
+    }
+  }
+}
+
+private struct StressInput019Fixture: View {
+  let departedFires: StressInputBox<[Int]>
+  @State private var generation = 0
+
+  var body: some View {
+    Text("Double tap remint")
+      .id(testIdentity("StressInput019", "Owner", "(generation)"))
+      .frame(width: 24, height: 1, alignment: .leading)
+      .onTapGesture {
+        generation += 1
+      }
+      .onTapGesture(count: 2) {
+        departedFires.value.append(generation)
+      }
+  }
+}
