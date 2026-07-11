@@ -150,4 +150,51 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 004: Canvas geometry churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 004 canvas context tracks oscillating geometry")
+  func renderReconciliation004CanvasContextTracksOscillatingGeometry() {
+    // Hypothesis: a retained Canvas DrawNode may invoke its drawing with the cached frame size
+    // after the same identity revisits an earlier measurement-cache proposal.
+    struct CurrentCorner: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setCell(
+          at: CellPoint(x: max(0, context.size.width - 1), y: max(0, context.size.height - 1)),
+          character: "C",
+          foreground: .green
+        )
+      }
+    }
+
+    struct Root: View {
+      let width: Int
+      let height: Int
+
+      var body: some View {
+        Canvas(CurrentCorner())
+          .frame(width: width, height: height)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation004")
+    let sizes = [(2, 1), (7, 3), (3, 2), (6, 1), (2, 3)]
+
+    for generation in 0..<20 {
+      let size = sizes[generation % sizes.count]
+      let frame = renderer.render(
+        Root(width: size.0, height: size.1),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(frame.rasterSurface.size == CellSize(width: size.0, height: size.1))
+      #expect(frame.rasterSurface.cells[size.1 - 1][size.0 - 1].character == "C")
+    }
+  }
+}
+
 // MARK: - End
