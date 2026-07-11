@@ -742,3 +742,51 @@ private struct StressTC013Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 014: layout-realized toolbar replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 014 geometry toolbar adopts the latest proposal action")
+  func stressTabCommand014GeometryToolbarAdoptsLatestProposalAction() throws {
+    // Hypothesis: a layout-realized contribution may repaint its new measured
+    // title while the cached strip retains the action captured at the old width.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC014", "Root"),
+      size: .init(width: 72, height: 11)
+    ) {
+      StressTC014Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.clickText("Grow host")
+    #expect(frame.contains("Width 50"))
+    #expect(!frame.contains("Width 30"))
+
+    _ = try harness.clickText("Width 50")
+    #expect(probe.events == ["50"])
+  }
+}
+
+@MainActor
+private struct StressTC014Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var wide = false
+
+  var body: some View {
+    Panel(id: "stress-tc-014-panel") {
+      GeometryReader { proxy in
+        Button("Grow host") {
+          wide = true
+        }
+        .toolbarItem(
+          .init(title: "Width \(proxy.size.width)") {
+            probe.events.append("\(proxy.size.width)")
+          }
+        )
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: wide ? 50 : 30, height: 8, alignment: .topLeading)
+  }
+}
