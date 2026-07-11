@@ -773,3 +773,50 @@ private struct GestureScroll015Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 016: successive anchor changes
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 016 successive scroll anchors use live geometry")
+  func gestureScroll016SuccessiveScrollAnchorsUseLiveGeometry() throws {
+    // Hypothesis: a second command for the same target may reuse its pre-scroll
+    // rect, compounding the first anchor delta instead of realigning from live geometry.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll016Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      GestureScroll016Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Target to top")
+    #expect(position.value.y == 8)
+    _ = try harness.clickText("Target to bottom")
+    #expect(position.value.y == 5)
+  }
+}
+
+private struct GestureScroll016Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 1) {
+          Button("Target to top") { _ = proxy.scrollTo("anchor-target", anchor: .top) }
+          Button("Target to bottom") { _ = proxy.scrollTo("anchor-target", anchor: .bottom) }
+        }
+        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { row in
+              Text("Anchor row \(row)")
+                .id(row == 8 ? "anchor-target" : "anchor-row-\(row)")
+            }
+          }
+        }
+        .frame(width: 28, height: 4, alignment: .topLeading)
+      }
+    }
+  }
+}
