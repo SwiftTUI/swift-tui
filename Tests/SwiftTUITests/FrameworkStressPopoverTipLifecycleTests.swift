@@ -111,6 +111,41 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 004: tip action closure freshness
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 004 stable action dispatches its current closure")
+  func popoverTip004StableActionDispatchesCurrentClosure() throws {
+    // Hypothesis: a stable action ID can keep the closure captured by the
+    // first detached tip payload after the source view re-resolves.
+    let rootIdentity = testIdentity("PopoverTipStress004", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "action-freshness"
+    model.title = "Action freshness tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "run", title: "Run current tip action")]
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.generation = generation
+      model.primaryPresented = true
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let frame = try harness.clickText("Run current tip action", chooseLast: true)
+
+      #expect(model.actionLog.last == "run@\(generation)")
+      #expect(!model.primaryPresented)
+      #expect(!frame.contains("Action freshness tip"))
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
