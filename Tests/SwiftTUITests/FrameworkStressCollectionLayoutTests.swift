@@ -989,3 +989,69 @@ private struct CollectionLayout016Root: View {
     .frame(width: 16, height: 4, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 017: lazy viewport proposal churn
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 017 viewport resize rematerializes lazy range")
+  func collectionLayout017ViewportResizeRematerializesLazyRange() {
+    // Hypothesis: the visible-range binary search may reuse the previous
+    // viewport length when only the enclosing frame proposal changes.
+    let position = CollectionLayout017ScrollBox()
+    position.value = .init(x: 0, y: 5)
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout017")
+
+    for generation in 0..<24 {
+      let height = generation.isMultiple(of: 2) ? 2 : 5
+      let root = CollectionLayout017Root(height: height, position: position)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: height)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: height)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(retained.rasterSurface.lines.first == "017 row 5")
+      #expect(retained.rasterSurface.lines[height - 1] == "017 row \(4 + height)")
+    }
+  }
+}
+
+@MainActor
+private final class CollectionLayout017ScrollBox {
+  var value = ScrollPosition.zero
+}
+
+@MainActor
+private struct CollectionLayout017Root: View {
+  let height: Int
+  let position: CollectionLayout017ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { position.value },
+        set: { position.value = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<20) { value in
+          Text("017 row \(value)")
+        }
+      }
+    }
+    .frame(width: 16, height: height, alignment: .topLeading)
+  }
+}
