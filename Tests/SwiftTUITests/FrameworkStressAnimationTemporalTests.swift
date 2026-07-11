@@ -214,3 +214,46 @@ private struct AnimationTemporal004Row: Identifiable, Sendable {
   let value: Int
   let opacity: Double
 }
+
+// MARK: - Attempt 005: explicit identity value-animation lifetime
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 005 explicit identity replacement starts a fresh baseline")
+  func animationTemporal005ExplicitIdentityReplacementStartsFreshBaseline() throws {
+    // Hypothesis: the modifier's reserved state slot can survive explicit ID
+    // replacement and animate the new owner from its predecessor's value.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let identity = testIdentity("AnimationTemporal005", "Root")
+    let proposal = ProposedSize(width: 40, height: 4)
+
+    _ = renderer.render(
+      animationTemporal005View(owner: "a", value: 1, opacity: 0.2),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    _ = renderer.render(
+      animationTemporal005View(owner: "b", value: 2, opacity: 0.8),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    #expect(controller.activeAnimationCount == 0)
+
+    _ = renderer.render(
+      animationTemporal005View(owner: "b", value: 3, opacity: 0.4),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    withKnownIssue("A replacement owner does not establish a live value-animation baseline") {
+      #expect(controller.activeAnimationCount == 1)
+    }
+  }
+}
+
+@MainActor
+private func animationTemporal005View(owner: String, value: Int, opacity: Double) -> some View {
+  Text("animation temporal 005")
+    .opacity(opacity)
+    .animation(.linear(duration: .seconds(4)), value: value)
+    .id(owner)
+}
