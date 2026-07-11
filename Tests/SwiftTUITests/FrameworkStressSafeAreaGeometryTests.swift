@@ -109,6 +109,51 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 017: GeometryReader closure freshness at unchanged bounds
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 017 geometry closure uses current capture")
+  func safeAreaGeometry017GeometryClosureUsesCurrentCapture() {
+    // Hypothesis: an unchanged LayoutDependentContent signature can reuse the first GeometryReader
+    // realizer and its captured closure even though the owning view is reevaluated every frame.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "017 capture \(generation) size \(proxy.size.width)x\(proxy.size.height)"
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(width: 40, height: 8, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry017")
+
+    for generation in 0..<24 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 12)
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(text.contains("017 capture \(generation) size 40x8"))
+      if generation > 0 {
+        #expect(!text.contains("017 capture \(generation - 1)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 016: inset GeometryReader environment freshness
 
 extension FrameworkStressSafeAreaGeometryTests {
