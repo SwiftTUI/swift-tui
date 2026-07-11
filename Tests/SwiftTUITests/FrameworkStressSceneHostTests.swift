@@ -496,3 +496,59 @@ extension FrameworkStressSceneHostTests {
     #expect(resumed == targets)
   }
 }
+
+// MARK: - Attempt 013: retained surface across session replacement
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 013 replacement sessions isolate producer sequences")
+  func sceneHost013ReplacementSessionsIsolateProducerSequences() async throws {
+    // Hypothesis: retaining one host surface can leak its prior sequence into a
+    // replacement runtime or overwrite history at the producer boundary.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 20, height: 4),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+    var firstSequences: [UInt64] = []
+    var retainedSequences: [UInt64] = []
+
+    for _ in 0..<8 {
+      let baselineCount = retainedSequences.count
+      let session = try HostedSceneSession(
+        for: SceneHostSessionApp(),
+        sceneID: "primary",
+        surface: surface
+      )
+      let runTask = Task { try await session.start() }
+      _ = await surface.waitForFrames { $0.count > baselineCount }
+
+      _ = try await session.stopAndWait()
+      _ = try await runTask.value
+      let frames = await surface.waitForFrames { _ in true }
+      let produced = frames.dropFirst(baselineCount)
+      let first = try #require(produced.first)
+
+      #expect(Array(frames.prefix(baselineCount).map(\.sequence)) == retainedSequences)
+      #expect(first.sequence == 0)
+      #expect(
+        zip(produced, produced.dropFirst()).allSatisfy { previous, current in
+          current.sequence > previous.sequence
+        }
+      )
+      firstSequences.append(first.sequence)
+      retainedSequences = frames.map(\.sequence)
+    }
+
+    #expect(firstSequences == Array(repeating: 0, count: 8))
+    #expect(retainedSequences.count >= 8)
+  }
+}
+
+private struct SceneHostSessionApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      Text("session root")
+    }
+  }
+}
