@@ -436,3 +436,56 @@ private struct CollectionLayout007Root: View {
     .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 008: Group-forwarded indexed source
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 008 Group forwards current lazy collection order")
+  func collectionLayout008GroupForwardsCurrentLazyCollectionOrder() {
+    // Hypothesis: Group's indexed-source forwarding may preserve the first
+    // ForEach provider after the wrapped collection changes count and order.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout008")
+    let variants = [[1, 2, 3], [4, 3, 2, 1], [2], [5, 1, 3]]
+
+    for generation in 0..<24 {
+      let values = variants[generation % variants.count]
+      let root = CollectionLayout008Root(values: values)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 15, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 15, height: 5)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutText(retained).contains("008 grouped \(values[0])"))
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout008Root: View {
+  let values: [Int]
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Group {
+          ForEach(values, id: \.self) { value in
+            Text("008 grouped \(value)")
+          }
+        }
+      }
+    }
+    .frame(width: 15, height: 5, alignment: .topLeading)
+  }
+}
