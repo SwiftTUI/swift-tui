@@ -948,6 +948,64 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 015: ForEach row cardinality crosses the Group boundary
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 015 row cardinality churn preserves stable child state")
+  func stateIdentity015RowCardinalityChurnPreservesStableChildState() throws {
+    // Hypothesis: changing a row from one resolved child to a spliced Group changes which node
+    // absorbs its entity route and can reset or detach the always-present stateful child.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity015"),
+      size: .init(width: 58, height: 11)
+    ) {
+      StateIdentity015Root()
+    }
+    defer { harness.shutdown() }
+
+    for expected in 1...4 {
+      var frame = try harness.clickText("Increment Stable Row 015")
+      #expect(frame.contains("015 Stable Count \(expected)"))
+      frame = try harness.clickText("Expand Row 015")
+      #expect(frame.contains("015 Optional Child"))
+      #expect(frame.contains("015 Stable Count \(expected)"))
+      frame = try harness.clickText("Collapse Row 015")
+      #expect(!frame.contains("015 Optional Child"))
+      #expect(frame.contains("015 Stable Count \(expected)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity015Root: View {
+    @State private var isExpanded = false
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isExpanded ? "Collapse Row 015" : "Expand Row 015") {
+          isExpanded.toggle()
+        }
+        ForEach([1], id: \.self) { _ in
+          StateIdentity015StableCounter()
+          if isExpanded {
+            Text("015 Optional Child")
+          }
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity015StableCounter: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("015 Stable Count \(count)")
+        Button("Increment Stable Row 015") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
