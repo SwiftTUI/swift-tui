@@ -109,6 +109,58 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 016: inset GeometryReader environment freshness
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 016 inset geometry sees current host safe area")
+  func safeAreaGeometry016InsetGeometrySeesCurrentHostSafeArea() {
+    // Hypothesis: the layout-realized boundary captured by a safe-area inset can refresh bounds
+    // while continuing to expose the host safe-area insets from its first generation.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Text("016 base g\(generation)")
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+          .safeAreaInset(edge: .top, alignment: .topLeading) {
+            GeometryReader { proxy in
+              Text(
+                "016 inset g\(generation) "
+                  + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading),"
+                  + "\(proxy.safeAreaInsets.bottom),\(proxy.safeAreaInsets.trailing)"
+              )
+            }
+            .frame(height: 2)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry016")
+    let insets = [
+      EdgeInsets(top: 1, leading: 3, bottom: 2, trailing: 0),
+      EdgeInsets(top: 3, leading: 0, bottom: 0, trailing: 3),
+      EdgeInsets(top: 0, leading: 2, bottom: 3, trailing: 1),
+    ]
+
+    for generation in 0..<18 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 52, height: 16),
+        safeAreaInsets: insets[generation % insets.count]
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("016 inset g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 015: stored inset payload freshness
 
 extension FrameworkStressSafeAreaGeometryTests {
