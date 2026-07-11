@@ -135,3 +135,69 @@ private struct StressNP002Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 003: same-ID item destination reactivation
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 003 reactivated item starts fresh state")
+  func stress003ReactivatedItemStartsFreshState() throws {
+    // Hypothesis: clearing and restoring an item with the same ID can reuse a
+    // departed activation's local state or stale payload generation.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP003", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressNP003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for version in 0..<8 {
+      var frame = try harness.clickText("Open Stable Item")
+      #expect(frame.contains("stable item version \(version) local 0"))
+      frame = try harness.clickText("Increment Stable Item Local")
+      #expect(frame.contains("stable item version \(version) local 1"))
+      frame = try harness.clickText("Close Stable Item")
+      #expect(frame.contains("Open Stable Item"))
+      #expect(!frame.contains("stable item version"))
+      #expect(harness.actionRegistrationCount <= 1)
+    }
+  }
+}
+
+private struct StressNP003Item: Identifiable, Sendable {
+  let id = "stable"
+  var version: Int
+}
+
+@MainActor
+private struct StressNP003Fixture: View {
+  @State private var item: StressNP003Item?
+  @State private var nextVersion = 0
+
+  var body: some View {
+    NavigationStack(id: "stress-np-003-stack") {
+      Button("Open Stable Item") {
+        item = StressNP003Item(version: nextVersion)
+        nextVersion += 1
+      }
+      .navigationDestination(item: $item) { item in
+        StressNP003Destination(item: item, activeItem: $item)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP003Destination: View {
+  let item: StressNP003Item
+  @Binding var activeItem: StressNP003Item?
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("stable item version \(item.version) local \(local)")
+      Button("Increment Stable Item Local") { local += 1 }
+      Button("Close Stable Item") { activeItem = nil }
+    }
+  }
+}
