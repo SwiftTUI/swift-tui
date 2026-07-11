@@ -810,6 +810,22 @@ package final class ViewGraph {
       if flattenedStateOwnerNodeIDByIdentity[registered.identity] == registered.viewNodeID {
         return registered
       }
+      // Duplicate occurrences: the identity index names the last-resolved
+      // sibling, but a live registered node carrying a *different* entity
+      // lifetime is a distinct occurrence (the second `7` in
+      // `ForEach([7, 7])`), not a superseded mint. Redirecting to the index
+      // occupant would fold every duplicate's reads and writes into one row.
+      let registeredEntity =
+        registered.committed.entityIdentity
+        ?? entityRoutingTable.entityByNodeID[registered.viewNodeID]
+      if let registeredEntity,
+        let occupant,
+        registeredEntity
+          != (occupant.committed.entityIdentity
+            ?? entityRoutingTable.entityByNodeID[occupant.viewNodeID])
+      {
+        return registered
+      }
       // The registered node's own identity is the exact index key its
       // successor occupies; the authoring identity below can name a different
       // node when state slots live on a wrapper (a capture-host or modifier
@@ -827,6 +843,18 @@ package final class ViewGraph {
       return reminted
     }
     return registered
+  }
+
+  /// The action registration recorded on the exact node that produced a hit
+  /// region. Duplicate explicit IDs collapse to a single `Identity` in the
+  /// last-write-wins action registry, but every occurrence keeps its own
+  /// node record — dispatching through the hit region's owner node runs the
+  /// clicked occurrence's closure instead of the last-registered duplicate's.
+  package func occurrenceActionRegistration(
+    ownerNodeID: ViewNodeID,
+    identity: Identity
+  ) -> LocalActionRegistry.Registration? {
+    nodeIfExists(for: ownerNodeID)?.registeredHandlers.action.registrations[identity]
   }
 
   package func containsNode(

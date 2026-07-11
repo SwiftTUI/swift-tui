@@ -778,9 +778,7 @@ extension FrameworkStressStateIdentityTests {
       #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
     }
 
-    withKnownIssue("Nested ForEach row actions lose their live state owner after outer reorder") {
-      #expect(stateFollowedOuterEntity)
-    }
+    #expect(stateFollowedOuterEntity)
   }
 
   private struct StateIdentity012Root: View {
@@ -1211,9 +1209,7 @@ extension FrameworkStressStateIdentityTests {
       #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
     }
 
-    withKnownIssue("Duplicate-ID row actions dispatch into the wrong occurrence owner") {
-      #expect(occurrencesStayedIndependent)
-    }
+    #expect(occurrencesStayedIndependent)
   }
 
   private struct StateIdentity019Item: Identifiable {
@@ -1687,9 +1683,7 @@ extension FrameworkStressStateIdentityTests {
       #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
     }
 
-    withKnownIssue("AnyView-hosted duplicate-ID actions dispatch into the wrong occurrence") {
-      #expect(occurrencesStayedIndependent)
-    }
+    #expect(occurrencesStayedIndependent)
   }
 
   private struct StateIdentity025Item: Identifiable {

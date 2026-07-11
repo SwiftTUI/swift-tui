@@ -457,6 +457,16 @@ extension View {
     in context: ResolveContext,
     body makeBody: () -> Body
   ) -> [ResolvedNode] {
+    // Ambient-wins is load-bearing here: capture-hosted content (tab bodies,
+    // scoped payloads, dirty-frontier evaluator re-runs) deliberately
+    // evaluates under a reinstalled enclosing scope, and re-scoping at this
+    // boundary detaches those bodies' captured @State from their true owner
+    // (verified by ButtonFocusStabilityTests' TabView delete regression).
+    // The known hole this leaves open: a view VALUE reused under several
+    // mounts resolves every mount's body under the single enclosing ambient,
+    // so all mounts share one state owner (stress state identity 004). The
+    // fix belongs at the chain-content seam that skips resolveView's
+    // authoring mint, not here.
     if let authoringContext = currentAuthoringContext() {
       let body = context.trackingObservableAccess {
         makeBody()

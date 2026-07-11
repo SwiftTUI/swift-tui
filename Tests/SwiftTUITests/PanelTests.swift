@@ -67,10 +67,13 @@ struct PanelTests {
     )
 
     #expect(resolved.children.map(\.entityIdentity?.occurrence) == [0, 1])
+    // Occurrence-qualified element identity: the second duplicate resolves
+    // under a distinct identity so its subtree's nodes, registrations, and
+    // state slots stay an independent lifetime (occurrence 0 is unchanged).
     #expect(
       resolved.children.map(\.identity) == [
         testIdentity("Root", "VStack[0]", "ID[\"dup\"]"),
-        testIdentity("Root", "VStack[0]", "ID[\"dup\"]"),
+        testIdentity("Root", "VStack[0]", "ID[\"dup\"#1]"),
       ])
 
     let issues = resolved.duplicateEntityIdentityRuntimeIssues()

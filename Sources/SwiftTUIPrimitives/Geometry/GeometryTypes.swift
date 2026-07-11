@@ -626,6 +626,19 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
     child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))]")
   }
 
+  /// An explicit-ID child qualified by its duplicate-occurrence ordinal.
+  /// Occurrence 0 is byte-identical to `explicitID(_:)`, so unique ids (the
+  /// overwhelmingly common case) keep their identity paths unchanged; later
+  /// occurrences get a distinct identity so their whole subtrees — nodes,
+  /// state slots, and runtime registrations — stay independent lifetimes
+  /// instead of colliding on the primary occurrence's identity keys.
+  package func explicitID<ID: Hashable>(_ id: ID, occurrence: Int) -> Self {
+    guard occurrence > 0 else {
+      return explicitID(id)
+    }
+    return child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))#\(occurrence)]")
+  }
+
   public func isAncestor(of other: Self) -> Bool {
     guard components.count <= other.components.count else {
       return false

@@ -226,7 +226,10 @@ extension RunLoop {
 
     if let actionIdentity {
       let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-      let handled = localActionRegistry.dispatch(identity: actionIdentity)
+      let handled = dispatchActivationAction(
+        identity: actionIdentity,
+        hitOwnerNodeID: hitTarget?.region.routeID.ownerNodeID
+      )
       if handled {
         recordFollowUpInvalidation(
           for: actionIdentity,
@@ -234,6 +237,28 @@ extension RunLoop {
         )
       }
     }
+  }
+
+  /// Runs the activation for `identity`, preferring the handler recorded on
+  /// the hit region's owner node. Duplicate-ID occurrences share one
+  /// `Identity` in the last-write-wins action registry, so identity dispatch
+  /// alone runs the wrong occurrence's closure for every duplicate but the
+  /// last-registered one. Regions without an owner and ancestor-walked
+  /// activation identities (whose handler lives above the hit node) keep the
+  /// identity-keyed dispatch.
+  private func dispatchActivationAction(
+    identity: Identity,
+    hitOwnerNodeID: ViewNodeID?
+  ) -> Bool {
+    if let hitOwnerNodeID,
+      let registration = renderer.viewGraph.occurrenceActionRegistration(
+        ownerNodeID: hitOwnerNodeID,
+        identity: identity
+      )
+    {
+      return registration.handler()
+    }
+    return localActionRegistry.dispatch(identity: identity)
   }
 
   package func handleMouseMove(
