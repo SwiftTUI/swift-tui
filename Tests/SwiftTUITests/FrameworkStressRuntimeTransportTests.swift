@@ -36,6 +36,34 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 018: pre-subscription event retention
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 018 pre-subscription events retain exact order")
+  func runtimeTransport018PreSubscriptionEventsRetainExactOrder() async {
+    // Hypothesis: installing the first stream after mixed events arrived can
+    // drain only the last kind or reorder buffered key and paste payloads.
+    let reader = InjectedTerminalInputReader()
+    let expected: [InputEvent] = [
+      .key(.character("a")),
+      .paste(.init(content: "payload")),
+      .key(.character("z")),
+    ]
+    reader.send(expected)
+
+    let task = Task {
+      var events: [InputEvent] = []
+      for await event in reader.inputEvents() {
+        events.append(event)
+      }
+      return events
+    }
+    reader.finish()
+
+    #expect(await task.value == expected)
+  }
+}
+
 // MARK: - Attempt 017: false paste-end prefix
 
 extension FrameworkStressRuntimeTransportTests {
