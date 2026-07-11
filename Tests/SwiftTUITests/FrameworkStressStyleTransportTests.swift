@@ -122,4 +122,16 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 013 every simple string escape decodes in order")
+  func styleTransport013EverySimpleStringEscapeDecodesInOrder() {
+    // Hypothesis: adjacent escape sequences can skip or duplicate one decoded scalar.
+    var parser = StyleTransportJSONParser(
+      #"{"v":"quote:\" slash:\/ backslash:\\ b:\b f:\f n:\n r:\r t:\t"}"#
+    )
+    let expected = "quote:\" slash:/ backslash:\\ b:\u{8} f:\u{c} n:\n r:\r t:\t"
+    #expect(parser.parse()?.objectValue?["v"]?.stringValue == expected)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
