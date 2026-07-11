@@ -899,3 +899,49 @@ private struct StressNP013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: repeated navigation focus restoration
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 014 pop restores root focus repeatedly")
+  func stress014PopRestoresRootFocusRepeatedly() throws {
+    // Hypothesis: detached-root focus bookkeeping can retain a departed
+    // destination identity or lose the root focus target after repeated pops.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP014", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressNP014Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...8 {
+      _ = try harness.focusText("Push Focus Destination")
+      _ = try harness.clickText("Push Focus Destination")
+      _ = try harness.focusText("Destination Focus Target")
+      let frame = try harness.pressKey(KeyPress(.escape))
+      let rootFocus = try harness.focusIdentity(forText: "Push Focus Destination")
+
+      #expect(frame.contains("root focus surface"))
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == rootFocus)
+      #expect(harness.focusRegionCount == 1)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP014Fixture: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-014-stack") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("root focus surface")
+        Button("Push Focus Destination") { isPresented = true }
+      }
+      .navigationDestination(isPresented: $isPresented) {
+        Button("Destination Focus Target") {}
+      }
+    }
+  }
+}
