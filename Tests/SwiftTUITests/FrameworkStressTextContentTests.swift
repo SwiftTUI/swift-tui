@@ -1030,3 +1030,48 @@ private struct TextContent027Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 028: single-line Unicode paste sanitization
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 028 field paste filters newlines around graphemes")
+  func textContent028FieldPasteFiltersNewlinesAroundGraphemes() throws {
+    // Hypothesis: single-line paste sanitization can split extended graphemes or leave a carriage
+    // return when removing mixed CR, LF, and CRLF sequences at a moved caret.
+    let text = TextContentBox("A👨‍👩‍👧‍👦B")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent028Root"),
+      size: .init(width: 40, height: 3)
+    ) {
+      TextContent028Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent028Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.paste("X\r\n👋🏿\nY\rZ")
+
+    #expect(text.writeCount == 1)
+    let expected = "A👨‍👩‍👧‍👦X👋🏿YZB"
+    let isSanitized =
+      text.value == expected
+      && !text.value.unicodeScalars.contains { $0.value == 0x0A || $0.value == 0x0D }
+      && harness.frame.contains(expected)
+    withKnownIssue("Single-line paste preserves CRLF as one extended grapheme cluster") {
+      #expect(isSanitized)
+    }
+  }
+}
+
+@MainActor
+private struct TextContent028Fixture: View {
+  static let fieldIdentity = testIdentity("TextContent028", "Field")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    TextField("Value", text: text.binding())
+      .id(Self.fieldIdentity)
+      .textFieldStyle(.plain)
+  }
+}
