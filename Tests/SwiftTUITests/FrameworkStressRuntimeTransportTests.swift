@@ -30,7 +30,7 @@ extension FrameworkStressRuntimeTransportTests {
 
     #expect(
       coalescedInputEvents([.mouse(first), .mouse(second), .mouse(third)]) == [
-        .mouse(first), .mouse(second), .mouse(third)
+        .mouse(first), .mouse(second), .mouse(third),
       ]
     )
   }
@@ -134,6 +134,60 @@ extension FrameworkStressRuntimeTransportTests {
     )
     #expect(plan.spanUpdates == [.init(row: 4, column: 4, renderedSpan: "X", cellsChanged: 1)])
     #expect(plan.cellsChanged == 1)
+  }
+}
+
+// MARK: - Attempt 025: shrink-regrow baseline handoff
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 025 shrink and regrow converge without stale clears")
+  func runtimeTransport025ShrinkAndRegrowConvergeWithoutStaleClears() {
+    // Hypothesis: clearing a shortened row can poison the next diff baseline,
+    // causing regrown text to be skipped or the old clear to repeat forever.
+    let planner = TerminalPresentationPlanner(capabilityProfile: .previewUnicode)
+    let original = RasterSurface(
+      size: .init(width: 10, height: 1),
+      lines: ["abcdefghij"]
+    )
+    let shrunken = RasterSurface(
+      size: .init(width: 10, height: 1),
+      lines: ["abc"]
+    )
+    let regrown = RasterSurface(
+      size: .init(width: 10, height: 1),
+      lines: ["abcWXYZhij"]
+    )
+
+    let shrinkPlan = planner.plan(
+      previousSurface: original,
+      currentSurface: shrunken
+    )
+    #expect(
+      shrinkPlan.spanUpdates == [
+        .init(row: 0, column: 3, renderedSpan: "       ", cellsChanged: 7)
+      ]
+    )
+
+    let regrowPlan = planner.plan(
+      previousSurface: shrunken,
+      currentSurface: regrown
+    )
+    #expect(
+      regrowPlan.spanUpdates == [
+        .init(row: 0, column: 3, renderedSpan: "WXYZhij", cellsChanged: 7)
+      ]
+    )
+
+    let convergedPlan = planner.plan(
+      previousSurface: regrown,
+      currentSurface: regrown,
+      damage: .init(
+        textRows: [.init(row: 0, columnRanges: [3..<10])]
+      )
+    )
+    #expect(convergedPlan.strategy == .incremental)
+    #expect(convergedPlan.rowBatches.isEmpty)
+    #expect(convergedPlan.cellsChanged == 0)
   }
 }
 
@@ -263,7 +317,7 @@ extension FrameworkStressRuntimeTransportTests {
 
     #expect(
       await task.value == [
-        .key(.character("n")), .key(.character("e")), .key(.character("w"))
+        .key(.character("n")), .key(.character("e")), .key(.character("w")),
       ]
     )
     _ = staleStream
