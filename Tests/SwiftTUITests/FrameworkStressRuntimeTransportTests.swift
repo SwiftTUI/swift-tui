@@ -36,6 +36,38 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 009: signal boundary inside pointer traffic
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 009 signal keeps pointer batches on both sides")
+  func runtimeTransport009SignalKeepsPointerBatchesOnBothSides() throws {
+    // Hypothesis: a signal inserted during a pointer burst can be appended to
+    // the pointer batch or allow motion on both sides to coalesce together.
+    let buffer = EventPumpBuffer()
+    _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 1, y: 1)))))
+    _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 2, y: 1)))))
+    _ = buffer.enqueue(.signal("SIGWINCH"))
+    _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 8, y: 1)))))
+    _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 9, y: 1)))))
+
+    let before = try #require(buffer.drain().first)
+    let signal = try #require(buffer.drain().first)
+    let after = try #require(buffer.drain().first)
+
+    guard case .input(.mouse(let beforeMouse)) = before,
+      case .signal(let name) = signal,
+      case .input(.mouse(let afterMouse)) = after
+    else {
+      Issue.record("expected pointer, signal, pointer batch ordering")
+      return
+    }
+    #expect(beforeMouse.location.cell == CellPoint(x: 2, y: 1))
+    #expect(name == "SIGWINCH")
+    #expect(afterMouse.location.cell == CellPoint(x: 9, y: 1))
+    #expect(buffer.drain().isEmpty)
+  }
+}
+
 // MARK: - Attempt 008: event-pump wake ownership
 
 extension FrameworkStressRuntimeTransportTests {
