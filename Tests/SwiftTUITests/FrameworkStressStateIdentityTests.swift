@@ -827,6 +827,72 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 013: Empty ForEach element teardown anchoring
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 013 empty foreach elements leave no graph orphans")
+  func stateIdentity013EmptyForEachElementsLeaveNoOrphans() throws {
+    // Hypothesis: ForEach drops an EmptyView element with a bare continue while its neighboring
+    // Group path explicitly anchors the minted element node to the hosted-detached ledger.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity013"),
+      size: .init(width: 58, height: 12)
+    ) {
+      StateIdentity013Root()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Hide Row Content 013")
+      #expect(!frame.contains("Visible Row 013"))
+      frame = try harness.clickText("Remove Collection 013")
+      #expect(!frame.contains("Visible Row 013"))
+      frame = try harness.clickText("Insert Collection 013")
+      #expect(!frame.contains("Visible Row 013"))
+      frame = try harness.clickText("Show Row Content 013")
+      #expect(frame.contains("Visible Row 013 1"))
+      frame = try harness.clickText("Remove Collection 013")
+      #expect(!frame.contains("Visible Row 013"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+      frame = try harness.clickText("Insert Collection 013")
+      #expect(frame.contains("Visible Row 013 1"))
+    }
+  }
+
+  private struct StateIdentity013Root: View {
+    @State private var showsContent = true
+    @State private var showsCollection = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(showsContent ? "Hide Row Content 013" : "Show Row Content 013") {
+          showsContent.toggle()
+        }
+        Button(showsCollection ? "Remove Collection 013" : "Insert Collection 013") {
+          showsCollection.toggle()
+        }
+        if showsCollection {
+          ForEach([1, 2, 3], id: \.self) { value in
+            StateIdentity013Row(value: value, isVisible: showsContent)
+          }
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity013Row: View {
+    let value: Int
+    let isVisible: Bool
+
+    @ViewBuilder
+    var body: some View {
+      if isVisible {
+        Text("Visible Row 013 \(value)")
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
