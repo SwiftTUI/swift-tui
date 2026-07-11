@@ -305,3 +305,76 @@ private struct CollectionLayout005Root: View {
     .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 006: zero-height lazy-row transitions
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 006 empty lazy rows release following offsets")
+  func collectionLayout006EmptyLazyRowsReleaseFollowingOffsets() {
+    // Hypothesis: zero-height indexed children may leave stale offsets or a
+    // visible-range boundary that hides the stable row following them.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout006")
+
+    for generation in 0..<20 {
+      let root = CollectionLayout006Root(expanded: !generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 6)
+      )
+      let expectedHeight = root.expanded ? 6 : 1
+      let matchesCurrentEmptyRows =
+        retained.rasterSurface == fresh.rasterSurface
+        && retained.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == expectedHeight
+        && collectionLayoutText(retained).contains("006 stable tail")
+
+      if root.expanded {
+        withKnownIssue(
+          "Lazy indexed allocation retains zero-height rows after their conditional content appears"
+        ) {
+          #expect(matchesCurrentEmptyRows)
+        }
+      } else {
+        #expect(matchesCurrentEmptyRows)
+      }
+    }
+  }
+}
+
+private struct CollectionLayout006Row: Identifiable {
+  let id: Int
+  let isVisible: Bool
+}
+
+@MainActor
+private struct CollectionLayout006Root: View {
+  let expanded: Bool
+
+  private var rows: [CollectionLayout006Row] {
+    (0..<6).map { value in
+      .init(id: value, isVisible: expanded || value == 5)
+    }
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(rows) { row in
+          if row.isVisible {
+            Text(row.id == 5 ? "006 stable tail" : "006 row \(row.id)")
+          }
+        }
+      }
+    }
+    .frame(width: 16, height: 6, alignment: .topLeading)
+  }
+}
