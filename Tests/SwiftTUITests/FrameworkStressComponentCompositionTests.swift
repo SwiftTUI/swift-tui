@@ -520,4 +520,36 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 015: labeled GroupBox family replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 015 labeled and unlabeled boxes replace cleanly")
+  func componentComposition015LabeledAndUnlabeledBoxesReplaceCleanly() {
+    // Hypothesis: swapping generic GroupBox families at one identity can retain label height.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            GroupBox("label-\(generation)") { Text("body-\(generation)") }
+          } else {
+            GroupBox { Text("body-\(generation)") }
+          }
+        }
+        .id("stable-group-box")
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition015")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
