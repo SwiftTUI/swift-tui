@@ -724,3 +724,50 @@ private struct ObservationEffects012View: View {
     }
   }
 }
+
+// MARK: - Attempt 013: unrelated environment-key churn
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 013 unrelated key churn never masks a later dependency change")
+  func observationEffects013UnrelatedKeyChurnDoesNotMaskDependencyChange() throws {
+    // Hypothesis: selective environment dependency bookkeeping may advance a
+    // reader's reuse snapshot on an unrelated key and miss its next real key.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects013"),
+      size: .init(width: 62, height: 7)
+    ) {
+      ObservationEffects013View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      var frame = try harness.clickText("Advance Unrelated 013")
+      #expect(frame.contains("013 value \(generation - 1)"))
+      frame = try harness.clickText("Advance Dependency 013")
+      #expect(frame.contains("013 value \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects013Reader: View {
+  @Environment(\.observationEffectsInt) private var value
+
+  var body: some View {
+    Text("013 value \(value)")
+  }
+}
+
+private struct ObservationEffects013View: View {
+  @State private var value = 0
+  @State private var unrelated = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Unrelated 013") { unrelated += 1 }
+      Button("Advance Dependency 013") { value += 1 }
+      ObservationEffects013Reader()
+    }
+    .environment(\.observationEffectsInt, value)
+    .environment(\.observationEffectsAux, "aux-\(unrelated)")
+  }
+}
