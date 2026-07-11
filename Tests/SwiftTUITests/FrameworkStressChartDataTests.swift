@@ -95,6 +95,50 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 013: bullet marker and fill replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 013 bullet target marker crosses live fill and total domains")
+  func chartData013BulletTargetMarkerCrossesLiveFillAndTotalDomains() {
+    // Hypothesis: BulletChart can retain either the target marker index or its
+    // filled/empty glyph when value, target, total, and width all change together.
+    struct Root: View {
+      let generation: Int
+
+      var values: (value: Double, target: Double, total: Double) {
+        switch generation % 4 {
+        case 0: (0, 0, 0)
+        case 1: (Double(20 + generation), Double(80 + generation), 100)
+        case 2: (Double(90 + generation), Double(10 + generation), 100)
+        default: (5, Double(30 + generation), -1)
+        }
+      }
+
+      var body: some View {
+        let values = values
+        BulletChart(
+          "Bullet \(generation)",
+          value: values.value,
+          target: values.target,
+          total: values.total,
+          tone: generation.isMultiple(of: 2) ? .info : .critical,
+          barWidth: 8 + generation % 7
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "013", proposal: .init(width: 52, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let target = Int(Root(generation: generation).values.target)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Bullet \(generation)"))
+      #expect(text.contains("t \(target)"))
+      #expect(chartDataAccessibilityLabels(snapshot).contains("Bullet \(generation): t \(target)"))
+    }
+  }
+}
+
 // MARK: - Attempt 012: meter total-sign boundary churn
 
 extension FrameworkStressChartDataTests {
