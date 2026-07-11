@@ -877,6 +877,50 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 023: active source teardown and reinsertion
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 023 source teardown prunes entry and routes")
+  func popoverTip023SourceTeardownPrunesEntryAndRoutes() throws {
+    // Hypothesis: removing an active declaration source can leave its portal
+    // item or Button route alive until another presentation replaces it.
+    let rootIdentity = testIdentity("PopoverTipStress023", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "source-teardown"
+    model.title = "Source teardown tip 0"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "teardown", title: "Current teardown action")]
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.sourceVisible = false
+      var frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(!frame.contains("Source teardown tip"))
+      #expect(!frame.contains("Current teardown action"))
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+      #expect(harness.actionRegistrationCount <= 1)
+
+      model.generation = generation
+      model.sourceIdentity = generation
+      model.primaryPresented = true
+      model.title = "Source teardown tip \(generation)"
+      model.sourceVisible = true
+      frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(frame.contains("Source teardown tip \(generation)"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+
+      _ = try harness.clickText("Current teardown action", chooseLast: true)
+      #expect(model.actionLog.last == "teardown@\(generation)")
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
