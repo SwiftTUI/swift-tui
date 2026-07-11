@@ -1801,3 +1801,59 @@ private struct AnimationTemporal031Fixture: View {
   }
 }
 
+// MARK: - Attempt 032: timeline cadence task replacement
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 032 reduce motion replaces timeline cadence task")
+  func animationTemporal032ReduceMotionReplacesTimelineCadenceTask() async throws {
+    // Hypothesis: an environment-only cadence change can update rendered
+    // context without cancelling the schedule iterator running in the old mode.
+    let probe = AnimationTemporalTimelineProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal032", "Root"),
+      size: .init(width: 64, height: 8)
+    ) {
+      AnimationTemporal032Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    try await animationTemporalWaitUntil("normal cadence timeline did not start") {
+      probe.events.last?.mode == .normal
+    }
+
+    for generation in 1...8 {
+      let expectsReducedMotion = !generation.isMultiple(of: 2)
+      let label = expectsReducedMotion ? "Reduce Timeline Motion" : "Restore Timeline Motion"
+      let eventsBeforeToggle = probe.events.count
+      _ = try harness.clickText(label)
+      let expectedMode: TimelineScheduleMode =
+        expectsReducedMotion ? .lowFrequency : .normal
+      try await animationTemporalWaitUntil("timeline did not restart in \(expectedMode) mode") {
+        probe.events.last?.mode == expectedMode
+          && probe.events.count > eventsBeforeToggle
+      }
+      #expect(probe.events.count == eventsBeforeToggle + 1)
+      #expect(harness.activeTaskCount == 1)
+      #expect(harness.activeTaskDescriptorCount == 1)
+    }
+  }
+}
+
+@MainActor
+private struct AnimationTemporal032Fixture: View {
+  let probe: AnimationTemporalTimelineProbe
+  @State private var reducedMotion = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button(reducedMotion ? "Restore Timeline Motion" : "Reduce Timeline Motion") {
+        reducedMotion.toggle()
+      }
+      TimelineView(AnimationTemporalStableSchedule(token: 32, probe: probe)) { context in
+        Text("032 \(context.cadence == .normal ? "normal" : "low")")
+      }
+    }
+    .environment(\.accessibilityReduceMotion, reducedMotion)
+  }
+}
+
