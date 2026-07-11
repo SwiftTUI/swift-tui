@@ -829,6 +829,54 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 022: disabled environment propagation
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 022 disabled source disables the detached action")
+  func popoverTip022DisabledSourceDisablesDetachedAction() throws {
+    // Hypothesis: portal attachment payloads can lose the source environment,
+    // leaving tip actions enabled while their declaration subtree is disabled.
+    let rootIdentity = testIdentity("PopoverTipStress022", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "disabled-environment"
+    model.title = "Disabled environment tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "environment", title: "Environment action")]
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    var disabledActionsStayedInert = true
+    for generation in 1...8 {
+      model.generation = generation
+      model.primaryPresented = true
+      model.sourceDisabled = false
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      _ = try harness.clickText("Environment action", chooseLast: true)
+      #expect(model.actionLog.last == "environment@\(generation)")
+      #expect(!model.primaryPresented)
+
+      let actionCount = model.actionLog.count
+      model.primaryPresented = true
+      model.sourceDisabled = true
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      _ = try harness.clickText("Environment action", chooseLast: true)
+      disabledActionsStayedInert =
+        disabledActionsStayedInert
+        && model.actionLog.count == actionCount
+        && model.primaryPresented
+    }
+
+    withKnownIssue("Popover-tip action payloads ignore the source disabled environment") {
+      #expect(disabledActionsStayedInert)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
