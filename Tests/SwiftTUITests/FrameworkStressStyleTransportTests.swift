@@ -12,4 +12,14 @@ struct FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 002 one-byte payload preserves double padding")
+  func styleTransport002OneBytePayloadPreservesDoublePadding() {
+    // Hypothesis: the final one-byte chunk can emit or consume an extra zero.
+    let encoded = StyleTransportBase64.encode([0xFF])
+    #expect(encoded == "/w==")
+    #expect(StyleTransportBase64.decode(encoded) == [0xFF])
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
