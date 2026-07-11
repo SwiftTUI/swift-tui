@@ -905,3 +905,79 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 017: animated style-family replacement
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 017 cross-family fill animation snaps to current style")
+  func visualEffects017CrossFamilyFillAnimationSnapsToCurrentStyle() {
+    // Hypothesis: a shape-fill animation can keep the previous slot's concrete AnyAnimatable box
+    // when the style family changes, applying a stale color or gradient instead of snapping.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(800))
+    controller.register(animation)
+    let identity = testIdentity("VisualEffects017", "Shape")
+
+    func style(for generation: Int) -> AnyShapeStyle {
+      switch generation % 4 {
+      case 0:
+        AnyShapeStyle(Color.red)
+      case 1:
+        AnyShapeStyle(
+          LinearGradient(colors: [.yellow, .blue], startPoint: .leading, endPoint: .trailing)
+        )
+      case 2:
+        AnyShapeStyle(
+          RadialGradient(colors: [.white, .magenta], center: .center, endRadius: 6)
+        )
+      default:
+        AnyShapeStyle(TileStyle(.dots, foreground: Color.cyan, background: Color.black))
+      }
+    }
+
+    func node(for generation: Int) -> ResolvedNode {
+      ResolvedNode(
+        identity: identity,
+        kind: .view("Ellipse"),
+        drawPayload: .shape(
+          ShapePayload(
+            geometry: .ellipse,
+            operation: .fill(style: style(for: generation))
+          )
+        )
+      )
+    }
+
+    func fillStyle(in node: ResolvedNode) -> AnyShapeStyle? {
+      guard case .shape(let payload) = node.drawPayload,
+        case .fill(let style, _) = payload.operation
+      else {
+        return nil
+      }
+      return style
+    }
+
+    let start = MonotonicInstant.now()
+    controller.processResolvedTree(node(for: 0), transaction: .init(), timestamp: start)
+
+    for generation in 1...16 {
+      let targetStyle = style(for: generation)
+      var targetNode = node(for: generation)
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      let frameStart = start.advanced(by: .milliseconds(generation * 1000))
+
+      controller.processResolvedTree(
+        targetNode,
+        transaction: transaction,
+        timestamp: frameStart
+      )
+      _ = controller.applyInterpolations(
+        to: &targetNode,
+        at: frameStart.advanced(by: .milliseconds(400))
+      )
+
+      #expect(fillStyle(in: targetNode) == targetStyle)
+    }
+  }
+}
