@@ -222,4 +222,21 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 013 reset clears admission history")
+  func cacheState013ResetClearsAdmissionHistory() {
+    // Hypothesis: reset can clear entries but leave a bypass candidate ready for immediate admission.
+    let cache = TextLayoutCache(capacity: 1)
+    let options = TextLayoutOptions(width: nil)
+    _ = cache.layout(for: "alpha", options: options)
+    _ = cache.layout(for: "beta", options: options)
+    cache.reset()
+    _ = cache.layout(for: "gamma", options: options)
+    _ = cache.layout(for: "beta", options: options)
+    #expect(cache.metrics.entries == 1)
+    #expect(cache.metrics.stores == 1)
+    #expect(cache.metrics.bypassedStores == 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
