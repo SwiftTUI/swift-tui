@@ -1268,3 +1268,50 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 023: analytic overlay-mask geometry churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 023 strokeBorder overlay remasks background geometry")
+  func visualEffects023StrokeBorderOverlayRemasksBackgroundGeometry() {
+    // Hypothesis: DrawExtractor can retain the first overlay BorderMask when a strokeBorder shape
+    // changes analytic geometry, clipping the current background with a departed silhouette.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        EmptyView()
+          .frame(width: 24, height: 10, alignment: .topLeading)
+          .background(Color.blue.opacity(0.65))
+          .overlay {
+            switch generation % 4 {
+            case 0:
+              AnyView(Circle().strokeBorder(Color.white, style: .single))
+            case 1:
+              AnyView(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.white, style: .single))
+            case 2:
+              AnyView(Capsule().strokeBorder(Color.white, style: .single))
+            default:
+              AnyView(Rectangle().strokeBorder(Color.white, style: .single))
+            }
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects023")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
