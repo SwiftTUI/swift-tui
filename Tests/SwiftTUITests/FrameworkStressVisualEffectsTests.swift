@@ -603,3 +603,61 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 012: gradient stop-cardinality churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 012 linear gradient follows current stop topology")
+  func visualEffects012LinearGradientFollowsCurrentStopTopology() {
+    // Hypothesis: retained style snapshots can reuse an equal endpoint pair while overlooking a
+    // changed Gradient stop count or location, replaying a stale interpolation topology.
+    struct Root: View {
+      let generation: Int
+
+      var gradient: Gradient {
+        switch generation % 4 {
+        case 0:
+          Gradient(colors: [.red, .blue])
+        case 1:
+          Gradient(colors: [.red, .green, .blue])
+        case 2:
+          Gradient(stops: [
+            .init(color: .yellow, location: 0),
+            .init(color: .magenta, location: 0.18),
+            .init(color: .cyan, location: 1),
+          ])
+        default:
+          Gradient(colors: [.white])
+        }
+      }
+
+      var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+          .fill(
+            LinearGradient(
+              gradient: gradient,
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+          .frame(width: 27, height: 8)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects012")
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
