@@ -555,3 +555,32 @@ extension FrameworkStressControlBindingTests {
     #expect(selection.writes.isEmpty)
   }
 }
+
+// MARK: - Attempt 012: picker backward navigation from missing selection
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 012 picker backward navigation recovers to last tag")
+  func stressControlBinding012PickerBackwardNavigationRecoversToLastTag() throws {
+    // Hypothesis: a Picker whose external selection has no current option can retain a stale
+    // selected index and move backward from that index instead of recovering to the last live tag.
+    let selection = ControlStressProbe("missing")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress012", "Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      Picker("Recovery picker 012", selection: selection.binding()) {
+        Text("Alpha recovery 012").tag("a")
+        Text("Beta recovery 012").tag("b")
+        Text("Gamma recovery 012").tag("c")
+      }
+      .pickerStyle(.segmented)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Recovery picker 012")
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+
+    #expect(selection.value == "c")
+    #expect(selection.writes == ["c"])
+  }
+}
