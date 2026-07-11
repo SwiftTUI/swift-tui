@@ -74,3 +74,61 @@ private struct TableOutline001Root: View {
     .frame(width: 28, height: 7, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 002: table column cardinality churn
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 002 table column cardinality rebuilds cell mapping")
+  func tableOutline002TableColumnCardinalityRebuildsCellMapping() {
+    // Hypothesis: changing the number of columns can leave retained separators
+    // or cell-to-column indices from the prior table payload.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Table(
+          selection: .constant(1),
+          columns: generation.isMultiple(of: 2)
+            ? [.init("Only", width: 8)]
+            : [
+              .init("A", width: 6),
+              .init("B", width: 7, alignment: .center),
+              .init("C", width: 5, alignment: .trailing),
+            ]
+        ) {
+          TableRow {
+            Text("A-\(generation)")
+            Text("B-\(generation)")
+            Text("C-\(generation)")
+          }
+          .tag(1)
+        }
+        .frame(width: 34, height: 7, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline002")
+    for generation in 0..<18 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 34, height: 7)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 34, height: 7)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.resolvedTree.drawPayload == fresh.resolvedTree.drawPayload)
+      #expect(tableOutlineText(retained).contains("A-\(generation)"))
+      #expect(tableOutlineText(retained).contains("C-\(generation)") == !generation.isMultiple(of: 2))
+    }
+  }
+}
