@@ -36,6 +36,47 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 008: event-pump wake ownership
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 008 event pump wakes once per pending batch")
+  func runtimeTransport008EventPumpWakesOncePerPendingBatch() throws {
+    // Hypothesis: an in-place pointer merge can report a new batch wake, or a
+    // later key batch can fail to wake because the pointer batch already did.
+    let buffer = EventPumpBuffer()
+
+    #expect(
+      buffer.enqueue(
+        .input(.mouse(.init(kind: .moved, location: .init(x: 1, y: 1))))
+      )
+    )
+    #expect(
+      !buffer.enqueue(
+        .input(.mouse(.init(kind: .moved, location: .init(x: 5, y: 1))))
+      )
+    )
+    #expect(buffer.enqueue(.input(.key(.character("q")))))
+
+    let firstBatch = buffer.drain()
+    let firstEvent = try #require(firstBatch.first)
+    guard case .input(.mouse(let mouse)) = firstEvent else {
+      Issue.record("expected a merged pointer event")
+      return
+    }
+    #expect(firstBatch.count == 1)
+    #expect(mouse.location.cell == CellPoint(x: 5, y: 1))
+
+    let secondBatch = buffer.drain()
+    guard case .input(.key(let key))? = secondBatch.first else {
+      Issue.record("expected a key in the second batch")
+      return
+    }
+    #expect(secondBatch.count == 1)
+    #expect(key == KeyPress(.character("q")))
+    #expect(!buffer.hasPendingEvents())
+  }
+}
+
 // MARK: - Attempt 007: click boundary inside motion traffic
 
 extension FrameworkStressRuntimeTransportTests {
