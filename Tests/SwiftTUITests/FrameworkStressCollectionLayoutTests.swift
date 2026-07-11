@@ -547,3 +547,67 @@ private struct CollectionLayout009Root: View {
     .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 010: heterogeneous LazyHStack reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 010 horizontal lazy reorder rebuilds row offsets")
+  func collectionLayout010HorizontalLazyReorderRebuildsRowOffsets() {
+    // Hypothesis: horizontal indexed allocation may preserve widths by source
+    // index after stable entities move to different collection positions.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout010")
+
+    for generation in 0..<24 {
+      let root = CollectionLayout010Root(rotated: !generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 3)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 3)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
+private struct CollectionLayout010Row: Identifiable {
+  let id: Int
+  let width: Int
+}
+
+@MainActor
+private struct CollectionLayout010Root: View {
+  let rotated: Bool
+
+  private var rows: [CollectionLayout010Row] {
+    let base = [
+      CollectionLayout010Row(id: 1, width: 4),
+      CollectionLayout010Row(id: 2, width: 8),
+      CollectionLayout010Row(id: 3, width: 3),
+    ]
+    return rotated ? [base[1], base[2], base[0]] : base
+  }
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      LazyHStack(alignment: .top, spacing: 1) {
+        ForEach(rows) { row in
+          Text("\(row.id)")
+            .frame(width: row.width, height: 2, alignment: .topLeading)
+        }
+      }
+    }
+    .frame(width: 16, height: 3, alignment: .topLeading)
+  }
+}
