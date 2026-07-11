@@ -201,3 +201,67 @@ private struct StressNP003Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 004: active source identity remint
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 004 reminted source replaces active destination")
+  func stress004RemintedSourceReplacesActiveDestination() throws {
+    // Hypothesis: reminting the declaration source while its external binding
+    // stays true can strand the old destination or reuse its state lifetime.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP004", "Root"),
+      size: .init(width: 50, height: 10)
+    ) {
+      StressNP004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Remintable Destination")
+    for generation in 1...8 {
+      _ = try harness.clickText("Increment Reminted Local")
+      let frame = try harness.clickText("Remint Destination Source")
+      #expect(frame.contains("reminted generation \(generation) local 0"))
+      #expect(
+        frame.components(separatedBy: "reminted generation").count - 1 == 1
+      )
+      withKnownIssue("Source remint retains departed destination action registrations") {
+        #expect(harness.actionRegistrationCount <= 3)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP004Fixture: View {
+  @State private var isPresented = false
+  @State private var generation = 0
+
+  var body: some View {
+    NavigationStack(id: "stress-np-004-stack") {
+      Button("Open Remintable Destination") { isPresented = true }
+        .id("stress-np-004-source-\(generation)")
+        .navigationDestination(isPresented: $isPresented) {
+          StressNP004Destination(
+            generation: generation,
+            sourceGeneration: $generation
+          )
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP004Destination: View {
+  let generation: Int
+  @Binding var sourceGeneration: Int
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("reminted generation \(generation) local \(local)")
+      Button("Increment Reminted Local") { local += 1 }
+      Button("Remint Destination Source") { sourceGeneration += 1 }
+    }
+  }
+}
