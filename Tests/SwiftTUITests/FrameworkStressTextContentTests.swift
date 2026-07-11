@@ -517,3 +517,37 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 016: terminal-control presentation churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 016 control scalars stay sanitized across presentations")
+  func textContent016ControlScalarsStaySanitizedAcrossPresentations() {
+    // Hypothesis: retained raster cells or terminal presentation state can replay an unsanitized
+    // C0, C1, or escape scalar after the authored control kind changes in place.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent016")
+    let controls: [Character] = ["\u{001B}", "\u{0007}", "\u{009B}"]
+
+    for generation in 0..<24 {
+      let control = controls[generation % controls.count]
+      let content = "A\(control)B"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 3, height: 1),
+        content: Text(content)
+      )
+      let presented = terminalRenderer.render(frames.retained.rasterSurface)
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(presented.contains("A�B"))
+      #expect(!presented.contains("A\(control)B"))
+      #expect(frames.retained.semanticSnapshot.focusRegions.isEmpty)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.isEmpty)
+    }
+  }
+}
