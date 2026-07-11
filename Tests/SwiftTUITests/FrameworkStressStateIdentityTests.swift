@@ -1655,6 +1655,100 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 025: Duplicate occurrences below AnyView hosting
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 025 anyview duplicate occurrence churn stays bounded")
+  func stateIdentity025AnyViewDuplicateOccurrenceChurnStaysBounded() throws {
+    // Hypothesis: duplicate occurrence routes are exempt from the normal resolved-identity
+    // tiebreak, and an AnyView host can hide a stale occurrence home during cardinality churn.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity025"),
+      size: .init(width: 64, height: 12)
+    ) {
+      StateIdentity025Root()
+    }
+    defer { harness.shutdown() }
+
+    var occurrencesStayedIndependent = true
+    for primaryCount in 1...4 {
+      var frame = try harness.clickText("Increment Any Primary 025")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("025 Any Primary Count \(primaryCount)")
+        && frame.contains("025 Any Secondary Count 0")
+      frame = try harness.clickText("Increment Any Secondary 025")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("025 Any Primary Count \(primaryCount)")
+        && frame.contains("025 Any Secondary Count 1")
+      frame = try harness.clickText("Shrink Any Duplicates 025")
+      #expect(!frame.contains("025 Any Secondary Count"))
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("025 Any Primary Count \(primaryCount)")
+      frame = try harness.clickText("Expand Any Duplicates 025")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("025 Any Secondary Count 0")
+        && frame.contains("025 Any Primary Count \(primaryCount)")
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+
+    withKnownIssue("AnyView-hosted duplicate-ID actions dispatch into the wrong occurrence") {
+      #expect(occurrencesStayedIndependent)
+    }
+  }
+
+  private struct StateIdentity025Item: Identifiable {
+    let id = 25
+    let label: String
+  }
+
+  private struct StateIdentity025Root: View {
+    @State private var isExpanded = true
+
+    private var items: [StateIdentity025Item] {
+      isExpanded
+        ? [.init(label: "Primary"), .init(label: "Secondary")]
+        : [.init(label: "Primary")]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isExpanded ? "Shrink Any Duplicates 025" : "Expand Any Duplicates 025") {
+          isExpanded.toggle()
+        }
+        AnyView(StateIdentity025Rows(items: items))
+      }
+    }
+  }
+
+  private struct StateIdentity025Rows: View {
+    let items: [StateIdentity025Item]
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(items) { item in
+          StateIdentity025Row(label: item.label)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity025Row: View {
+    let label: String
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("025 Any \(label) Count \(count)")
+        Button("Increment Any \(label) 025") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
