@@ -1165,3 +1165,58 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 021: border-blend stop and phase churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 021 border blend follows current stops and phase")
+  func visualEffects021BorderBlendFollowsCurrentStopsAndPhase() {
+    // Hypothesis: retained border layout behavior can update blendPhase while preserving the first
+    // BorderBlend stop topology, producing plausible motion along the wrong color loop.
+    struct Root: View {
+      let generation: Int
+
+      var blend: BorderBlend {
+        switch generation % 3 {
+        case 0:
+          BorderBlend([.red, .blue, .red])
+        case 1:
+          BorderBlend([.yellow, .green, .magenta, .yellow])
+        default:
+          BorderBlend(stops: [
+            .init(color: .white, location: 0),
+            .init(color: .cyan, location: 0.2),
+            .init(color: .blue, location: 0.85),
+            .init(color: .white, location: 1),
+          ])
+        }
+      }
+
+      var body: some View {
+        Text("retained border blend")
+          .frame(width: 28, height: 7)
+          .border(
+            blend: blend,
+            set: .single,
+            phase: Double(generation % 11) / 11
+          )
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects021")
+
+    for generation in 0..<33 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
