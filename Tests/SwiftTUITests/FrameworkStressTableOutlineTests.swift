@@ -591,3 +591,67 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 011: table handler restoration after disablement
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 011 reenabled table installs its current binding")
+  func tableOutline011ReenabledTableInstallsCurrentBinding() {
+    // Hypothesis: removing handlers through a disabled ancestor can restore the
+    // pre-disable Table selection closure when the control becomes enabled again.
+    final class SelectionBox {
+      var value = 1
+      var writes = 0
+    }
+    struct Root: View {
+      let box: SelectionBox
+      let enabled: Bool
+      let tableIdentity: Identity
+
+      var body: some View {
+        Table(
+          selection: Binding(
+            get: { box.value },
+            set: {
+              box.value = $0
+              box.writes += 1
+            }
+          ),
+          columns: [.init("Rows", width: 8)]
+        ) {
+          TableRow { Text("one") }.tag(1)
+          TableRow { Text("two") }.tag(2)
+        }
+        .id(tableIdentity)
+        .disabled(!enabled)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline011")
+    let tableIdentity = testIdentity("TableOutline011", "Table")
+    var retired: [SelectionBox] = []
+
+    for generation in 0..<18 {
+      let enabled = generation % 3 == 2
+      let box = SelectionBox()
+      let registry = LocalKeyHandlerRegistry()
+      _ = renderer.render(
+        Root(box: box, enabled: enabled, tableIdentity: tableIdentity),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          localKeyHandlerRegistry: registry,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 16, height: 8)
+      )
+
+      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown) == enabled)
+      #expect(box.value == (enabled ? 2 : 1))
+      #expect(box.writes == (enabled ? 1 : 0))
+      #expect(retired.allSatisfy { $0.writes <= 1 })
+      retired.append(box)
+    }
+  }
+}
