@@ -98,3 +98,38 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 003: narrow continuation-marker transition
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 003 narrow word wrapping switches marker strategy")
+  func textContent003NarrowWordWrappingSwitchesMarkerStrategy() {
+    // Hypothesis: retained long-word layout can replay continuation markers when a width-one or
+    // width-two proposal should fall back to unadorned cluster wrapping.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent003")
+
+    for generation in 0..<24 {
+      let width = [1, 3, 2, 4][generation % 4]
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text("ABCDEFGHIJ").textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        frames.retained.rasterSurface.lines.joined().contains("–")
+          == (width >= 3)
+      )
+      #expect(
+        frames.retained.rasterSurface.lines.allSatisfy {
+          textContentVisibleWidth($0) <= width
+        }
+      )
+    }
+  }
+}
