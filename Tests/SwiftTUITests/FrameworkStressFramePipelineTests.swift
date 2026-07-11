@@ -1635,3 +1635,78 @@ extension FrameworkStressFramePipelineTests {
     )
   }
 }
+
+// MARK: - Attempt 031: overlapping sibling damage normalizes
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 031 overlapping dirty siblings merge exact ranges")
+  func framePipeline031OverlappingDirtySiblingsMergeExactRanges() throws {
+    // Hypothesis: unioning multiple dirty-subtree contributions can preserve
+    // duplicate or overlapping spans, producing inconsistent raster culling.
+    let rootIdentity = testIdentity()
+    let firstIdentity = testIdentity("FramePipeline031First")
+    let secondIdentity = testIdentity("FramePipeline031Second")
+    let cleanIdentity = testIdentity("FramePipeline031Clean")
+
+    func root(firstPayload: String, secondPayload: String) -> FramePipelineArtifactNode {
+      FramePipelineArtifactNode(
+        viewNodeID: ViewNodeID(rawValue: 1),
+        identity: rootIdentity,
+        bounds: .init(origin: .zero, size: .init(width: 12, height: 5)),
+        children: [
+          FramePipelineArtifactNode(
+            viewNodeID: ViewNodeID(rawValue: 2),
+            identity: firstIdentity,
+            bounds: .init(origin: .init(x: 1, y: 1), size: .init(width: 5, height: 2)),
+            drawPayload: .text(firstPayload)
+          ),
+          FramePipelineArtifactNode(
+            viewNodeID: ViewNodeID(rawValue: 3),
+            identity: secondIdentity,
+            bounds: .init(origin: .init(x: 4, y: 2), size: .init(width: 5, height: 2)),
+            drawPayload: .text(secondPayload)
+          ),
+          FramePipelineArtifactNode(
+            viewNodeID: ViewNodeID(rawValue: 4),
+            identity: cleanIdentity,
+            bounds: .init(origin: .init(x: 0, y: 4), size: .init(width: 5, height: 1)),
+            drawPayload: .text("clean")
+          ),
+        ]
+      )
+    }
+
+    let previous = framePipelineArtifacts(
+      root: root(firstPayload: "old-first", secondPayload: "old-second"),
+      rasterLine: "previous"
+    )
+    let current = framePipelineArtifacts(
+      root: root(firstPayload: "new-first", secondPayload: "new-second"),
+      rasterLine: "current"
+    )
+    let state = FrameTailRetainedState()
+    state.storeCommittedFrame(
+      previous,
+      baselinePlacedTree: previous.placedTree,
+      proposal: .init(width: 12, height: 5)
+    )
+    let retained = state.input(invalidatedIdentities: [firstIdentity, secondIdentity])
+    let plan = FrameTailPresentationDamageResolver.resolve(
+      rootIdentity: rootIdentity,
+      placed: current.placedTree,
+      retainedLayout: retained.retainedLayout,
+      previousSurfaceTopology: retained.previousSurfaceTopology
+    )
+    let damage = try #require(plan.damage)
+
+    #expect(plan.barriers.isEmpty)
+    #expect(
+      damage.textRows == [
+        .init(row: 1, columnRanges: [1..<6]),
+        .init(row: 2, columnRanges: [1..<9]),
+        .init(row: 3, columnRanges: [4..<9]),
+      ]
+    )
+    #expect(damage.columnRanges(for: 2) == [1..<9])
+  }
+}
