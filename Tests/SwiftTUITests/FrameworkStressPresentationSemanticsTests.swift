@@ -1282,6 +1282,44 @@ private struct StressPS028Fixture: View {
   }
 }
 
+// MARK: - Attempt 029: menu overlay accessibility teardown
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 029 closing a menu removes its overlay accessibility nodes")
+  func stress029ClosingMenuRemovesOverlayAccessibilityNodes() throws {
+    // Hypothesis: semantic products extracted from a detached menu entry may
+    // survive the visual one-to-zero portal teardown.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS029", "Root"),
+      size: .init(width: 44, height: 10)
+    ) {
+      StressPS029Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Semantic menu")
+    #expect(
+      stressAccessibilityNodes(in: harness).contains { $0.label == "Semantic menu item" }
+    )
+
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(
+      !stressAccessibilityNodes(in: harness).contains { $0.label == "Semantic menu item" }
+    )
+    #expect(stressPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private struct StressPS029Fixture: View {
+  var body: some View {
+    Menu("Semantic menu") {
+      Button("Semantic menu item") {}
+        .accessibilityLabel("Semantic menu item")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
