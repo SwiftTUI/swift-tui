@@ -17,6 +17,7 @@ private final class StressPresentationProbe {
   var firstInt = 0
   var secondInt = 0
   var selection = "b"
+  var secondSelection = "a"
 
   func firstBoolBinding() -> Binding<Bool> {
     Binding(get: { self.firstBool }, set: { self.firstBool = $0 })
@@ -36,6 +37,10 @@ private final class StressPresentationProbe {
 
   func selectionBinding() -> Binding<String> {
     Binding(get: { self.selection }, set: { self.selection = $0 })
+  }
+
+  func secondSelectionBinding() -> Binding<String> {
+    Binding(get: { self.secondSelection }, set: { self.secondSelection = $0 })
   }
 }
 
@@ -550,6 +555,56 @@ private struct StressPS012Fixture: View {
       Text("Beta \(generation)").tag("b")
     }
     .pickerStyle(.menu)
+  }
+}
+
+// MARK: - Attempt 013: picker binding retarget
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 013 a stable picker writes only its current binding")
+  func stress013StablePickerWritesCurrentBinding() throws {
+    // Hypothesis: the retained Picker key-handler registration may keep the
+    // binding captured before the control was retargeted.
+    let probe = StressPresentationProbe()
+    probe.selection = "c"
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS013", "Root"),
+      size: .init(width: 50, height: 10)
+    ) {
+      StressPS013Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget picker")
+    _ = try harness.focusText("Mode")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(probe.selection == "c")
+    #expect(probe.secondSelection == "b")
+  }
+}
+
+@MainActor
+private struct StressPS013Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget picker") {
+        usesSecond = true
+      }
+      Picker(
+        "Mode",
+        selection: usesSecond ? probe.secondSelectionBinding() : probe.selectionBinding()
+      ) {
+        Text("A").tag("a")
+        Text("B").tag("b")
+        Text("C").tag("c")
+      }
+      .id("stable-picker")
+      .pickerStyle(.segmented)
+    }
   }
 }
 
