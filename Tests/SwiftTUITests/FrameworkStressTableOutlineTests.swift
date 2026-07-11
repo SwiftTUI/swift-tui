@@ -1078,3 +1078,66 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 019: outline depth contraction and expansion
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 019 outline depth replacement removes departed ancestry")
+  func tableOutline019OutlineDepthReplacementRemovesDepartedAncestry() {
+    // Hypothesis: contracting a retained recursive path can leave a departed
+    // intermediate node or give the surviving leaf its old indentation depth.
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+
+      var body: some View {
+        OutlineGroup(nodes, children: \.children) { Text($0.title) }
+          .outlineStyle(.ascii)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline019")
+    for generation in 0..<21 {
+      let leaf = TableOutlineNode(id: "leaf", title: "leaf-\(generation)")
+      let nodes: [TableOutlineNode]
+      switch generation % 3 {
+      case 0:
+        nodes = [
+          .init(
+            id: "root",
+            title: "root-\(generation)",
+            children: [
+              .init(id: "middle", title: "middle-\(generation)", children: [leaf])
+            ]
+          )
+        ]
+      case 1:
+        nodes = [
+          .init(id: "root", title: "root-\(generation)", children: [leaf])
+        ]
+      default:
+        nodes = [leaf]
+      }
+      let root = Root(nodes: nodes)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 28, height: 8)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 28, height: 8)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(rendered.contains("leaf-\(generation)"))
+      #expect(rendered.contains("middle-") == (generation % 3 == 0))
+      #expect(rendered.contains("root-") == (generation % 3 != 2))
+    }
+  }
+}
