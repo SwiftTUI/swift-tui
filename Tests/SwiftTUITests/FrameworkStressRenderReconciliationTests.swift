@@ -509,4 +509,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 012: Equal-scalar wide-glyph churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 012 equal scalar counts remeasure terminal cell width")
+  func renderReconciliation012EqualScalarCountsRemeasureTerminalCellWidth() {
+    // Hypothesis: a relaxed text measurement signature may mistake equal scalar counts for equal
+    // cell width, retaining one-line ASCII geometry for a same-count wide-glyph replacement.
+    struct Root: View {
+      let content: String
+
+      var body: some View {
+        Text(content)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation012")
+    let contents = ["AAAA", "界界界界", "BBBB", "語語語語"]
+    let proposal = ProposedSize(width: 4, height: nil)
+
+    for generation in 0..<20 {
+      let content = contents[generation % contents.count]
+      let root = Root(content: content)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(renderStressText(retained).contains(String(content.prefix(1))))
+    }
+  }
+}
+
 // MARK: - End
