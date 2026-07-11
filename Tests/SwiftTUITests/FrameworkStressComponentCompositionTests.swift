@@ -807,4 +807,36 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 024: ForeignSurface grid geometry replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 024 ForeignSurface replaces grid geometry")
+  func componentComposition024ForeignSurfaceReplacesGridGeometry() {
+    // Hypothesis: an earlier foreign-grid extent can survive when rows shrink and regrow.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        let width = [1, 4, 2][generation % 3]
+        let cells = [Array(repeating: RasterCell(character: "G"), count: width)]
+        ForeignSurface(
+          payload: ComponentCompositionForeignPayload(
+            grid: .init(size: .init(width: width, height: 1), cells: cells)
+          )
+        )
+        .frame(width: width, height: 1)
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition024")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
