@@ -62,6 +62,18 @@ private func safeAreaGeometryMeasurementsMatch(
     }
 }
 
+private func safeAreaGeometrySelectedChildIndex(_ node: MeasuredNode) -> Int? {
+  if let selectedChildIndex = node.containerAllocationSnapshot?.selectedChildIndex {
+    return selectedChildIndex
+  }
+  for child in node.childMeasurements {
+    if let selectedChildIndex = safeAreaGeometrySelectedChildIndex(child) {
+      return selectedChildIndex
+    }
+  }
+  return nil
+}
+
 // MARK: - Attempt 001: root safe-area environment round trip
 
 extension FrameworkStressSafeAreaGeometryTests {
@@ -105,6 +117,68 @@ extension FrameworkStressSafeAreaGeometryTests {
       #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
       #expect(frames.retained.placedTree == frames.fresh.placedTree)
       #expect(safeAreaGeometryText(frames.retained).contains("001 g\(generation)"))
+    }
+  }
+}
+
+// MARK: - Attempt 025: ViewThatFits selection under safe-area churn
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 025 safe area selects one current fitting geometry")
+  func safeAreaGeometry025SafeAreaSelectsOneCurrentFittingGeometry() {
+    // Hypothesis: ViewThatFits can reuse its prior selected index when only host safe-area insets
+    // change the available width, realizing a candidate that no longer fits or two candidates.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        ViewThatFits(in: .horizontal) {
+          GeometryReader { proxy in
+            Text("025 wide g\(generation) \(proxy.size.width)")
+          }
+          .frame(width: 32, height: 1)
+
+          GeometryReader { proxy in
+            Text("025 medium g\(generation) \(proxy.size.width)")
+          }
+          .frame(width: 22, height: 1)
+
+          GeometryReader { proxy in
+            Text("025 compact g\(generation) \(proxy.size.width)")
+          }
+          .frame(width: 10, height: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry025")
+    let insets = [
+      EdgeInsets(leading: 1, trailing: 1),
+      EdgeInsets(leading: 8, trailing: 8),
+      EdgeInsets(leading: 15, trailing: 15),
+      EdgeInsets(leading: 1, trailing: 1),
+    ]
+    let expectedIndices = [0, 1, 2, 0]
+
+    for generation in 0..<20 {
+      let index = generation % insets.count
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 44, height: 8),
+        safeAreaInsets: insets[index]
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(
+        safeAreaGeometrySelectedChildIndex(frames.retained.measuredTree) == expectedIndices[index]
+      )
+      #expect(frames.retained.diagnostics.work.layoutDependentRealizations == 1)
     }
   }
 }
@@ -278,7 +352,10 @@ extension FrameworkStressSafeAreaGeometryTests {
       #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
       #expect(frames.retained.placedTree == frames.fresh.placedTree)
       #expect(safeAreaGeometryText(frames.retained).contains("022 g\(generation) frame"))
-      #expect(frames.retained.diagnostics.geometryResolutionDiagnostics.missingNamedCoordinateSpaceCount == 0)
+      #expect(
+        frames.retained.diagnostics.geometryResolutionDiagnostics
+          .missingNamedCoordinateSpaceCount == 0
+      )
     }
   }
 }
