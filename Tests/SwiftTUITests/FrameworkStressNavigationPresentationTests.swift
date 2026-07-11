@@ -640,3 +640,87 @@ private struct StressNP009MiddleDestination: View {
     }
   }
 }
+
+// MARK: - Attempt 010: intermediate item payload refresh under a deep route
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 010 deep route follows intermediate item refresh")
+  func stress010DeepRouteFollowsIntermediateItemRefresh() throws {
+    // Hypothesis: refreshing a same-ID item in an intermediate destination can
+    // collapse its active child route or leave the deepest payload stale.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP010", "Root"),
+      size: .init(width: 54, height: 10)
+    ) {
+      StressNP010Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Versioned Destination")
+    _ = try harness.clickText("Open Deep Version Route")
+    for version in 1...8 {
+      _ = try harness.clickText("Increment Deep Version Local")
+      let frame = try harness.clickText("Refresh Intermediate Item")
+      #expect(frame.contains("deep outer version \(version) local \(version)"))
+      #expect(harness.actionRegistrationCount <= 4)
+    }
+  }
+}
+
+private struct StressNP010Item: Identifiable, Sendable {
+  let id = "versioned"
+  var version: Int
+}
+
+@MainActor
+private struct StressNP010Fixture: View {
+  @State private var item: StressNP010Item?
+
+  var body: some View {
+    NavigationStack(id: "stress-np-010-stack") {
+      Button("Open Versioned Destination") {
+        item = StressNP010Item(version: 0)
+      }
+      .navigationDestination(item: $item) { item in
+        StressNP010Intermediate(item: item, activeItem: $item)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP010Intermediate: View {
+  let item: StressNP010Item
+  @Binding var activeItem: StressNP010Item?
+  @State private var showsDeep = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("intermediate version \(item.version)")
+      Button("Open Deep Version Route") { showsDeep = true }
+    }
+    .navigationDestination(isPresented: $showsDeep) {
+      StressNP010DeepDestination(
+        outerVersion: item.version,
+        activeItem: $activeItem
+      )
+    }
+  }
+}
+
+@MainActor
+private struct StressNP010DeepDestination: View {
+  let outerVersion: Int
+  @Binding var activeItem: StressNP010Item?
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("deep outer version \(outerVersion) local \(local)")
+      Button("Increment Deep Version Local") { local += 1 }
+      Button("Refresh Intermediate Item") {
+        activeItem = StressNP010Item(version: outerVersion + 1)
+      }
+    }
+  }
+}
