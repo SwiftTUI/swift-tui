@@ -107,4 +107,20 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 006 oversized replacement evicts peers not itself")
+  func cacheState006OversizedReplacementEvictsPeersNotItself() {
+    // Hypothesis: replacing a protected key with a larger cost can stop before older peers drain.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 3, bytes: 30)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(10), policy: policy)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(10), policy: policy)
+    cache.upsert("c", value: 3, cost: stressCacheEntry(10), policy: policy)
+    cache.upsert("b", value: 20, cost: stressCacheEntry(100), policy: policy)
+    #expect(cache.count == 1)
+    #expect(cache.peek("b") == 20)
+    #expect(cache.totalCost == stressCacheEntry(100))
+  }
+}
+
 // NEXT CACHE STRESS TEST
