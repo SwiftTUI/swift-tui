@@ -1525,3 +1525,74 @@ private struct CollectionLayout024Root: View {
     .frame(width: 20, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 025: duplicate List tag occurrence geometry
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 025 duplicate List tags mark current first occurrence")
+  func collectionLayout025DuplicateListTagsMarkCurrentFirstOccurrence() {
+    // Hypothesis: List selection geometry may retain the old row index for a
+    // duplicate tag after its first occurrence moves or temporarily departs.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout025")
+    let listIdentity = testIdentity("CollectionLayout025", "List")
+    let a = CollectionLayout025Row(id: 1, tag: 7, label: "A")
+    let b = CollectionLayout025Row(id: 2, tag: 7, label: "B")
+    let c = CollectionLayout025Row(id: 3, tag: 8, label: "C")
+    let variants = [[a, b, c], [b, c, a], [c, a], [a, c, b]]
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = listIdentity
+
+    for generation in 0..<24 {
+      let rows = variants[generation % variants.count]
+      let root = CollectionLayout025Root(rows: rows, listIdentity: listIdentity)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let expectedSelectedLabel = rows.first { $0.tag == 7 }!.label
+      let selectedLine = retained.rasterSurface.lines.first { $0.contains("▌") }
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(selectedLine?.contains("025 \(expectedSelectedLabel)") == true)
+    }
+  }
+}
+
+private struct CollectionLayout025Row: Identifiable {
+  let id: Int
+  let tag: Int
+  let label: String
+}
+
+@MainActor
+private struct CollectionLayout025Root: View {
+  let rows: [CollectionLayout025Row]
+  let listIdentity: Identity
+
+  var body: some View {
+    List(selection: .constant(7)) {
+      ForEach(rows) { row in
+        Text("025 \(row.label)").tag(row.tag)
+      }
+    }
+    .id(listIdentity)
+    .listStyle(.plain)
+    .frame(width: 18, height: 6, alignment: .topLeading)
+  }
+}
