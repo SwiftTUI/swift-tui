@@ -94,6 +94,50 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 003: safe-area padding amount replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 003 padding amount follows every replacement")
+  func safeAreaGeometry003PaddingAmountFollowsEveryReplacement() {
+    // Hypothesis: the environment-derived portion of safe-area padding can update while the
+    // explicit additional amount remains cached from an earlier generation.
+    struct Root: View {
+      let generation: Int
+      let amount: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "003 g\(generation) a\(amount) \(proxy.size.width)x\(proxy.size.height) "
+              + "s\(proxy.safeAreaInsets.leading),\(proxy.safeAreaInsets.trailing)"
+          )
+        }
+        .safeAreaPadding([.leading, .trailing], amount)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry003")
+    let amounts = [0, 4, 1, -3, 7, 0]
+
+    for generation in 0..<18 {
+      let amount = amounts[generation % amounts.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, amount: amount),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: .init(top: 1, leading: 2, bottom: 1, trailing: 3)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("003 g\(generation) a\(amount)"))
+    }
+  }
+}
+
 // MARK: - Attempt 002: safe-area padding edge replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
