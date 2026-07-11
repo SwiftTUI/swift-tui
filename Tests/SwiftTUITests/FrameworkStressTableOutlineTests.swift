@@ -140,7 +140,8 @@ extension FrameworkStressTableOutlineTests {
       #expect(retained.rasterSurface == fresh.rasterSurface)
       #expect(retained.resolvedTree.drawPayload == fresh.resolvedTree.drawPayload)
       #expect(tableOutlineText(retained).contains("A-\(generation)"))
-      #expect(tableOutlineText(retained).contains("C-\(generation)") == !generation.isMultiple(of: 2))
+      #expect(
+        tableOutlineText(retained).contains("C-\(generation)") == !generation.isMultiple(of: 2))
     }
   }
 }
@@ -763,7 +764,8 @@ extension FrameworkStressTableOutlineTests {
         context: .init(identity: identity),
         proposal: .init(width: 20, height: 12)
       )
-      let tokens = ["start-\(generation)"]
+      let tokens =
+        ["start-\(generation)"]
         + ids.map { "item-\($0)-g\(generation)" }
         + ["end-\(generation)"]
       guard case .table(let payload) = retained.resolvedTree.drawPayload else {
@@ -819,7 +821,8 @@ extension FrameworkStressTableOutlineTests {
         TableOutlineNode(id: "b", title: "B-\(generation)"),
         TableOutlineNode(id: "c", title: "C-\(generation)"),
       ]
-      let ordered = generation.isMultiple(of: 2) ? children : [children[2], children[0], children[1]]
+      let ordered =
+        generation.isMultiple(of: 2) ? children : [children[2], children[0], children[1]]
       let root = Root(
         nodes: [
           .init(id: "root", title: "Root-\(generation)", children: ordered)
@@ -955,7 +958,8 @@ extension FrameworkStressTableOutlineTests {
         context: .init(identity: identity),
         proposal: .init(width: 26, height: 8)
       )
-      let expected = underLeft
+      let expected =
+        underLeft
         ? ["left-\(generation)", "leaf-\(generation)", "right-\(generation)"]
         : ["left-\(generation)", "right-\(generation)", "leaf-\(generation)"]
 
@@ -995,7 +999,8 @@ extension FrameworkStressTableOutlineTests {
         children: [.init(id: "b1", title: "B1-\(generation)")]
       )
       let nodes = generation.isMultiple(of: 2) ? [a, b] : [b, a]
-      let expected = generation.isMultiple(of: 2)
+      let expected =
+        generation.isMultiple(of: 2)
         ? ["A-\(generation)", "A1-\(generation)", "B-\(generation)", "B1-\(generation)"]
         : ["B-\(generation)", "B1-\(generation)", "A-\(generation)", "A1-\(generation)"]
       let root = Root(nodes: nodes)
@@ -1426,5 +1431,65 @@ private struct TableOutline024Fixture: View {
       }
       .outlineStyle(.plain)
     }
+  }
+}
+
+// MARK: - Attempt 025: outline row state under reorder
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 025 stable outline row state follows reordered identity")
+  func tableOutline025StableOutlineRowStateFollowsReorderedIdentity() throws {
+    // Hypothesis: OutlineTree can key row-local state by recursive structural
+    // slot instead of the stable node ID when root rows exchange order.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TableOutline025"),
+      size: .init(width: 36, height: 8)
+    ) {
+      TableOutline025Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for expectedCount in 0..<8 {
+      let incremented = try harness.clickText("A count \(expectedCount)")
+      #expect(incremented.contains("A count \(expectedCount + 1)"))
+      let reordered = try harness.clickText("Reverse outline roots")
+      #expect(reordered.contains("A count \(expectedCount + 1)"))
+      withKnownIssue("Reordered OutlineGroup rows share one row-local State slot") {
+        #expect(reordered.contains("B count 0"))
+      }
+    }
+  }
+}
+
+@MainActor
+private struct TableOutline025Fixture: View {
+  @State private var reversed = false
+
+  private var nodes: [TableOutlineNode] {
+    let values = [
+      TableOutlineNode(id: "a", title: "A"),
+      TableOutlineNode(id: "b", title: "B"),
+    ]
+    return reversed ? Array(values.reversed()) : values
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse outline roots") { reversed.toggle() }
+      OutlineGroup(nodes, children: \.children) { node in
+        TableOutline025Row(title: node.title)
+      }
+      .outlineStyle(.plain)
+    }
+  }
+}
+
+@MainActor
+private struct TableOutline025Row: View {
+  let title: String
+  @State private var count = 0
+
+  var body: some View {
+    Button("\(title) count \(count)") { count += 1 }
   }
 }
