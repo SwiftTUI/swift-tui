@@ -89,14 +89,22 @@ extension RunLoop {
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
       }?.focusInteractions ?? .automatic
 
-    if let focusedIdentity,
-      localKeyHandlerRegistry.hasHandler(identity: focusedIdentity)
-    {
+    if let focusedIdentity {
+      // Bubble from the focused identity up its hosting chain (SwiftUI
+      // parity: `.onKeyPress` above a `.frame`/`.id` boundary registers at
+      // the structural ancestor identity, which an identity-string walk
+      // cannot reach from a rerooted focus identity). The focused identity
+      // itself dispatches first, preserving stacked-handler priority and
+      // editor interception at the exact identity.
       let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-      let handled = localKeyHandlerRegistry.dispatch(
-        identity: focusedIdentity,
-        keyPress: keyPress
-      )
+      var handled = false
+      for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
+      where localKeyHandlerRegistry.hasHandler(identity: identity) {
+        if localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress) {
+          handled = true
+          break
+        }
+      }
       // The handler's own `@State` writes already invalidate the precise
       // readers (reader attribution), so the coarse root sweep is redundant
       // whenever the dispatch invalidated anything — and a full-tree re-resolve

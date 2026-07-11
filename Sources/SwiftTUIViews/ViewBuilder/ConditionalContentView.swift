@@ -44,6 +44,11 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        // The collapsed branch still occupies its source position: consume
+        // one structural index so trailing siblings keep their identities
+        // when the `if` toggles (a plain EmptyView child consumes one too).
+        // No node is minted for it.
+        nextIndex += 1
         return
       }
       let branchContext = context.child(component: .init(rawValue: "false"))
@@ -133,6 +138,10 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        // Mirror appendDeclaredChildren: the collapsed branch consumes one
+        // structural index (the DeclaredChildrenView contract requires both
+        // traversals to advance `nextIndex` identically).
+        nextIndex += 1
         return
       }
       let branchContext = context.child(component: .init(rawValue: "false"))

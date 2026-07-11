@@ -42,14 +42,14 @@ extension RunLoop {
       currentRouteID.pairsIgnoringOwner(with: hoveredRouteID)
     {
       hoveredPointerRouteID = hoveredRouteID
-      localPointerHandlerRegistry.dispatchHover(
+      dispatchHoverSupersedingTraversalOnMutation(
         routeID: hoveredRouteID,
         phase: .moved(localLocation)
       )
     } else {
       clearPointerHover()
       hoveredPointerRouteID = hoveredRouteID
-      localPointerHandlerRegistry.dispatchHover(
+      dispatchHoverSupersedingTraversalOnMutation(
         routeID: hoveredRouteID,
         phase: .entered(localLocation)
       )
@@ -61,10 +61,31 @@ extension RunLoop {
       return
     }
     self.hoveredPointerRouteID = nil
-    localPointerHandlerRegistry.dispatchHover(
+    dispatchHoverSupersedingTraversalOnMutation(
       routeID: hoveredPointerRouteID,
       phase: .exited
     )
+  }
+
+  /// Dispatches a hover phase and, when a handler mutated state, drops the
+  /// pending keyboard-traversal record. Passive pointer moves deliberately
+  /// keep that record (they can race the frame resolving the traversal's
+  /// landing) — but a hover handler that requested an invalidation makes
+  /// this input a deliberate mutation like a click: a focus region removed
+  /// by it vanished because of the hover, not the traversal, so the
+  /// traversal must not continue onto the region's document-order neighbor.
+  private func dispatchHoverSupersedingTraversalOnMutation(
+    routeID: RouteID,
+    phase: HoverPhase
+  ) {
+    let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+    localPointerHandlerRegistry.dispatchHover(
+      routeID: routeID,
+      phase: phase
+    )
+    if schedulerPendingInvalidations() != invalidationsBeforeDispatch {
+      pendingFocusTraversal = nil
+    }
   }
 
   package func pointerHoverRouteID(

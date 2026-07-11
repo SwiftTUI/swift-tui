@@ -857,6 +857,30 @@ package final class ViewGraph {
     nodeIfExists(for: ownerNodeID)?.registeredHandlers.action.registrations[identity]
   }
 
+  /// Identities along the hosting chain from `identity` outward,
+  /// nearest-first — the key-event bubble path. `parent` links stop at
+  /// island seams (`.id`-rerooted subtrees, capture-hosted content), so the
+  /// walk bridges them with `evaluationHost`, mirroring the upward
+  /// invalidation walks. Handlers registered above such a seam are
+  /// otherwise unreachable from the focused identity: a rerooted focus
+  /// identity is never a path-descendant of the handler's structural
+  /// identity, so no identity-string walk can connect them.
+  package func keyEventBubblePath(
+    from identity: Identity,
+    limit: Int = 64
+  ) -> [Identity] {
+    var path = [identity]
+    var visited: Set<Identity> = [identity]
+    var node = nodeIfExists(for: identity)
+    while let current = node, path.count < limit {
+      if visited.insert(current.identity).inserted {
+        path.append(current.identity)
+      }
+      node = current.parent ?? current.evaluationHost
+    }
+    return path
+  }
+
   package func containsNode(
     for identity: Identity
   ) -> Bool {

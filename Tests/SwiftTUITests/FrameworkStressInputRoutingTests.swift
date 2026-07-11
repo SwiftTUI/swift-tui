@@ -1843,10 +1843,8 @@ extension FrameworkStressInputRoutingTests {
     let point = try #require(harness.point(forText: "Rebind row 1"))
     _ = try harness.scrollPointer(at: point, deltaY: 1)
 
-    withKnownIssue("A stable ScrollView retains its previous position binding") {
-      #expect(first.value == .zero)
-      #expect(second.value == ScrollPosition(x: 0, y: 1))
-    }
+    #expect(first.value == .zero)
+    #expect(second.value == ScrollPosition(x: 0, y: 1))
   }
 }
 
@@ -1900,9 +1898,7 @@ extension FrameworkStressInputRoutingTests {
     let point = Point(x: 1, y: 1)
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     _ = try harness.scrollPointer(at: point, deltaX: 1, deltaY: 0)
-    withKnownIssue("Changing ScrollView axes leaves the old vertical handler installed") {
-      #expect(position.value == ScrollPosition(x: 1, y: 0))
-    }
+    #expect(position.value == ScrollPosition(x: 1, y: 0))
   }
 }
 

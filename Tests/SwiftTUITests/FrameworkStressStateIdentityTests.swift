@@ -1847,9 +1847,7 @@ extension FrameworkStressStateIdentityTests {
         && frame.contains("027 Trailing Count \(expected)")
     }
 
-    withKnownIssue("An implicit-empty prefix shifts and resets the trailing sibling state") {
-      #expect(trailingStateSurvivedPrefixChurn)
-    }
+    #expect(trailingStateSurvivedPrefixChurn)
   }
 
   private struct StateIdentity027Root: View {
