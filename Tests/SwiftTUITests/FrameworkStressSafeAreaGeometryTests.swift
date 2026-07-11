@@ -109,6 +109,61 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 021: local and global frame freshness through safe-area motion
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 021 global frame follows safe-area motion")
+  func safeAreaGeometry021GlobalFrameFollowsSafeAreaMotion() {
+    // Hypothesis: GeometryProxy can receive current local bounds while its placed-frame table keeps
+    // the global origin from the prior safe-area and sibling-width configuration.
+    struct Root: View {
+      let generation: Int
+      let prefixWidth: Int
+
+      var body: some View {
+        HStack(alignment: .top, spacing: 1) {
+          Text("P")
+            .frame(width: prefixWidth, height: 1)
+          GeometryReader { proxy in
+            let local = proxy.frame(in: .local)
+            let global = proxy.frame(in: .global)
+            Text(
+              "021 g\(generation) l\(Int(local.origin.x)),\(Int(local.origin.y)) "
+                + "g\(Int(global.origin.x)),\(Int(global.origin.y))"
+            )
+          }
+          .frame(width: 28, height: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry021")
+    let widths = [2, 9, 4, 12, 2]
+    let insets = [
+      EdgeInsets(top: 1, leading: 2),
+      EdgeInsets(top: 3, leading: 0),
+      EdgeInsets(top: 0, leading: 4),
+    ]
+
+    for generation in 0..<20 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, prefixWidth: widths[generation % widths.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 64, height: 10),
+        safeAreaInsets: insets[generation % insets.count]
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("021 g\(generation) l0,0"))
+    }
+  }
+}
+
 // MARK: - Attempt 020: GeometryReader pointer-capability churn
 
 extension FrameworkStressSafeAreaGeometryTests {
