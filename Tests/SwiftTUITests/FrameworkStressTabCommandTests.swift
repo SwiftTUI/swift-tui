@@ -790,3 +790,57 @@ private struct StressTC014Fixture: View {
     .frame(width: wide ? 50 : 30, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 015: toolbar signature cycle action freshness
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 015 reenabled toolbar cache uses replacement action")
+  func stressTabCommand015ReenabledToolbarCacheUsesReplacementAction() throws {
+    // Hypothesis: cycling enabled -> disabled -> enabled revisits the first
+    // strip signature and may restore its generation-zero action from cache.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC015", "Root"),
+      size: .init(width: 66, height: 10)
+    ) {
+      StressTC015Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Disable tool")
+    _ = try harness.clickText("Enable replacement")
+    _ = try harness.clickText("Mutable tool")
+
+    #expect(probe.events == ["generation-2"])
+  }
+}
+
+@MainActor
+private struct StressTC015Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var enabled = true
+  @State private var generation = 0
+
+  var body: some View {
+    Panel(id: "stress-tc-015-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Disable tool") {
+          generation = 1
+          enabled = false
+        }
+        Button("Enable replacement") {
+          generation = 2
+          enabled = true
+        }
+        Text("generation \(generation)")
+          .toolbarItem(
+            .init(title: "Mutable tool", isEnabled: enabled) {
+              probe.events.append("generation-\(generation)")
+            }
+          )
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 64, height: 8, alignment: .topLeading)
+  }
+}
