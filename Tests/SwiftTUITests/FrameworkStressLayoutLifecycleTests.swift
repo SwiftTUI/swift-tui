@@ -1247,3 +1247,69 @@ private struct StressLL020Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 021: navigation teardown inside a sheet
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 021 dismissing sheet tears down nested navigation destination")
+  func stress021DismissingSheetTearsDownNestedNavigationDestination() throws {
+    // Hypothesis: a destination root detached by NavigationStack can outlive
+    // the portal entry that hosts its navigation stack.
+    let baseline = SoundnessProbeConfiguration.teardownCoherenceViolationCount
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL021", "Root"),
+      size: .init(width: 54, height: 12)
+    ) {
+      StressLL021Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...6 {
+      _ = try harness.clickText("Open Navigation Sheet")
+      var frame = try harness.clickText("Push Sheet Detail", chooseLast: true)
+      #expect(frame.contains("nested sheet detail"))
+      #expect(harness.activeTaskCount == 1)
+      frame = try harness.clickText("Dismiss Sheet From Detail", chooseLast: true)
+      #expect(!frame.contains("nested sheet detail"))
+      #expect(harness.activeTaskCount == 0)
+      #expect(harness.actionRegistrationCount <= 1)
+    }
+
+    #expect(SoundnessProbeConfiguration.teardownCoherenceViolationCount == baseline)
+  }
+}
+
+@MainActor
+private struct StressLL021Fixture: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    Button("Open Navigation Sheet") { isPresented = true }
+      .sheet("Navigation", isPresented: $isPresented) {
+        StressLL021Sheet(isPresented: $isPresented)
+      }
+  }
+}
+
+@MainActor
+private struct StressLL021Sheet: View {
+  @Binding var isPresented: Bool
+  @State private var showsDetail = false
+
+  var body: some View {
+    NavigationStack(id: "stress-021-navigation") {
+      Button("Push Sheet Detail") { showsDetail = true }
+        .navigationDestination(isPresented: $showsDetail) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("nested sheet detail")
+              .task(id: "nested-sheet-detail-task") {
+                while !Task.isCancelled {
+                  await Task.yield()
+                }
+              }
+            Button("Dismiss Sheet From Detail") { isPresented = false }
+          }
+        }
+    }
+  }
+}
