@@ -1431,3 +1431,53 @@ private struct ObservationEffects024View: View {
     }
   }
 }
+
+// MARK: - Attempt 025: initial onChange after teardown and reinsertion
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 025 initial onChange fires for every reinserted lifetime")
+  func observationEffects025InitialOnChangeFiresForEachReinsertedLifetime() throws {
+    // Hypothesis: the graph-level previous-value store can outlive removal of
+    // an explicit identity and suppress `initial` for the next lifetime.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects025"),
+      size: .init(width: 70, height: 8)
+    ) {
+      ObservationEffects025View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Observer 025")
+      #expect(probe.events.isEmpty)
+
+      _ = try harness.clickText("Advance Hidden Value 025")
+      #expect(probe.events.isEmpty)
+
+      _ = try harness.clickText("Toggle Observer 025")
+      #expect(probe.events == ["\(generation)->\(generation)"])
+    }
+  }
+}
+
+private struct ObservationEffects025View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var isVisible = true
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Observer 025") { isVisible.toggle() }
+      Button("Advance Hidden Value 025") { value += 1 }
+      if isVisible {
+        Text("025 value \(value)")
+          .onChange(of: value, initial: true) { oldValue, newValue in
+            probe.events.append("\(oldValue)->\(newValue)")
+          }
+          .id("observation-effects-025-observer")
+      }
+    }
+  }
+}
