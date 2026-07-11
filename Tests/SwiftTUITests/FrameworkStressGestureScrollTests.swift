@@ -1209,3 +1209,48 @@ private struct GestureScroll023Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 024: scroll takeover threshold ownership
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 024 nested control yields only after scroll threshold")
+  func gestureScroll024NestedControlYieldsOnlyAfterScrollThreshold() throws {
+    // Hypothesis: ancestor takeover may either swallow a sub-threshold control
+    // activation or let the control activate after a real pan has claimed it.
+    let position = GestureScrollBox(ScrollPosition.zero)
+    let activations = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll024Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      GestureScroll024Fixture(position: position, activations: activations)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Takeover button"))
+    _ = try harness.drag(from: start, to: Point(x: start.x + 1, y: start.y))
+    #expect(activations.value == 1)
+    #expect(position.value == .zero)
+
+    _ = try harness.drag(from: start, to: Point(x: start.x, y: start.y - 3))
+    #expect(activations.value == 1)
+    #expect(position.value.y == 3)
+  }
+}
+
+private struct GestureScroll024Fixture: View {
+  let position: GestureScrollBox<ScrollPosition>
+  let activations: GestureScrollBox<Int>
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Takeover prefix")
+        Button("Takeover button") { activations.value += 1 }
+          .frame(width: 26, height: 3, alignment: .center)
+        ForEach(0..<10) { row in Text("Takeover tail \(row)") }
+      }
+    }
+    .frame(width: 30, height: 5, alignment: .topLeading)
+  }
+}
