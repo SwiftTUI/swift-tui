@@ -478,3 +478,72 @@ private struct StressNP007Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 008: active destination binding retarget
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 008 pop writes retargeted Boolean binding")
+  func stress008PopWritesRetargetedBooleanBinding() throws {
+    // Hypothesis: a stable Boolean destination can retain the dismiss closure
+    // for the binding that originally activated it after the modifier retargets.
+    let probe = StressNP008Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP008", "Root"),
+      size: .init(width: 54, height: 10)
+    ) {
+      StressNP008Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open First Destination Binding")
+    _ = try harness.clickText("Retarget Destination Binding")
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(probe.first)
+    #expect(!probe.second)
+    #expect(frame.contains("binding first true second false"))
+    #expect(!frame.contains("retargeted destination"))
+  }
+}
+
+@MainActor
+private final class StressNP008Probe {
+  var first = false
+  var second = false
+
+  func firstBinding() -> Binding<Bool> {
+    Binding(get: { self.first }, set: { self.first = $0 })
+  }
+
+  func secondBinding() -> Binding<Bool> {
+    Binding(get: { self.second }, set: { self.second = $0 })
+  }
+}
+
+@MainActor
+private struct StressNP008Fixture: View {
+  let probe: StressNP008Probe
+  @State private var usesSecond = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-008-stack") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("binding first \(probe.first) second \(probe.second)")
+        Button("Open First Destination Binding") {
+          probe.first = true
+        }
+      }
+      .navigationDestination(
+        isPresented: usesSecond ? probe.secondBinding() : probe.firstBinding()
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("retargeted destination")
+          Button("Retarget Destination Binding") {
+            probe.second = true
+            usesSecond = true
+          }
+        }
+      }
+    }
+  }
+}
