@@ -36,6 +36,36 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 019: stream continuation replacement
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 019 latest input stream owns subsequent events")
+  func runtimeTransport019LatestInputStreamOwnsSubsequentEvents() async {
+    // Hypothesis: replacing a stream continuation can leave delivery attached
+    // to the retained older stream or let its teardown clear the newer owner.
+    let reader = InjectedTerminalInputReader()
+    let staleStream = reader.inputEvents()
+    let latestStream = reader.inputEvents()
+    let task = Task {
+      var events: [InputEvent] = []
+      for await event in latestStream {
+        events.append(event)
+      }
+      return events
+    }
+
+    reader.send([.key(.character("n")), .key(.character("e")), .key(.character("w"))])
+    reader.finish()
+
+    #expect(
+      await task.value == [
+        .key(.character("n")), .key(.character("e")), .key(.character("w"))
+      ]
+    )
+    _ = staleStream
+  }
+}
+
 // MARK: - Attempt 018: pre-subscription event retention
 
 extension FrameworkStressRuntimeTransportTests {
