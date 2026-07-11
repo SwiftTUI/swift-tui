@@ -860,3 +860,47 @@ private struct ControlStress018Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 019: stepper wheel step replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 019 stepper wheel uses its replacement step")
+  func stressControlBinding019StepperWheelUsesReplacementStep() throws {
+    // Hypothesis: Stepper's root wheel handler can retain the original step while the child
+    // affordances and keyboard registration resolve the replacement adjustment contract.
+    let value = ControlStressProbe(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress019", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      ControlStress019Fixture(value: value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Use step three 019")
+    let stepperPoint = try #require(harness.point(forText: "Wheel stepper 019"))
+    _ = try harness.scrollPointer(at: stepperPoint, deltaY: -1)
+
+    #expect(value.value == 3)
+    #expect(value.writes == [3])
+  }
+}
+
+@MainActor
+private struct ControlStress019Fixture: View {
+  let value: ControlStressProbe<Int>
+  @State private var usesLargeStep = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Use step three 019") { usesLargeStep = true }
+      Stepper(
+        "Wheel stepper 019",
+        value: value.binding(),
+        in: 0...12,
+        step: usesLargeStep ? 3 : 1
+      )
+      .id("wheel-stepper-019")
+    }
+  }
+}
