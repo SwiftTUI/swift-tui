@@ -793,3 +793,63 @@ private struct CollectionLayout013Root: View {
     .frame(width: 18, height: 4, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 014: indexed-to-eager lazy topology switching
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 014 lazy fast path and fallback preserve order")
+  func collectionLayout014LazyFastPathAndFallbackPreserveOrder() {
+    // Hypothesis: replacing an indexed single-ForEach LazyVStack with the
+    // mixed-static fallback can reuse the former child topology or offsets.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout014")
+
+    for generation in 0..<20 {
+      let mixed = !generation.isMultiple(of: 2)
+      let root = CollectionLayout014Root(mixed: mixed)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 18, height: 5)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      let expectedFirst = mixed ? "014 static head" : "014 row 1"
+      #expect(retained.rasterSurface.lines.first == expectedFirst)
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout014Root: View {
+  let mixed: Bool
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      if mixed {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Text("014 static head")
+          ForEach([1, 2, 3], id: \.self) { value in
+            Text("014 row \(value)")
+          }
+        }
+      } else {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach([1, 2, 3], id: \.self) { value in
+            Text("014 row \(value)")
+          }
+        }
+      }
+    }
+    .frame(width: 18, height: 5, alignment: .topLeading)
+  }
+}
