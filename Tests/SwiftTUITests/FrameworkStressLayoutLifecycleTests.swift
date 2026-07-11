@@ -833,3 +833,60 @@ private struct StressLL013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: stacked same-family sheets
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 014 dismissing newest sheet reveals older sheet")
+  func stress014DismissingNewestSheetRevealsOlderSheet() throws {
+    // Hypothesis: replacing a sheet-family overlay entry may discard or strand
+    // the older active declaration instead of revealing it after dismissal.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL014", "Root"),
+      size: .init(width: 52, height: 12)
+    ) {
+      StressLL014Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...6 {
+      var frame = try harness.clickText("Open Sheet A")
+      #expect(frame.contains("sheet A body"))
+      frame = try harness.clickText("Open Sheet B", chooseLast: true)
+      #expect(frame.contains("sheet B body"))
+      #expect(!frame.contains("sheet A body"))
+      frame = try harness.clickText("Close Sheet B", chooseLast: true)
+      #expect(frame.contains("sheet A body"))
+      #expect(!frame.contains("sheet B body"))
+      frame = try harness.clickText("Close Sheet A", chooseLast: true)
+      #expect(!frame.contains("sheet A body"))
+      #expect(harness.lifecycleRegistrationCount <= 4)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL014Fixture: View {
+  @State private var sheetA = false
+  @State private var sheetB = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Open Sheet A") { sheetA = true }
+      Text("base surface")
+    }
+    .sheet("Sheet A", isPresented: $sheetA) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("sheet A body")
+        Button("Open Sheet B") { sheetB = true }
+        Button("Close Sheet A") { sheetA = false }
+      }
+    }
+    .sheet("Sheet B", isPresented: $sheetB) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("sheet B body")
+        Button("Close Sheet B") { sheetB = false }
+      }
+    }
+  }
+}
