@@ -1216,4 +1216,43 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 029: Hit-testing availability churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 029 hit testing routes follow current allowance")
+  func renderReconciliation029HitTestingRoutesFollowCurrentAllowance() {
+    // Hypothesis: semantic extraction can retain an interaction region after allowsHitTesting
+    // turns false because geometry and gesture registration identity remain unchanged.
+    struct Root: View {
+      let allowed: Bool
+
+      var body: some View {
+        Text("Target")
+          .frame(width: 8, height: 3)
+          .onTapGesture {}
+          .allowsHitTesting(allowed)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation029")
+
+    for generation in 0..<18 {
+      let allowed = generation.isMultiple(of: 2)
+      let root = Root(allowed: allowed)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(retained.semanticSnapshot.interactionRegions.isEmpty != allowed)
+    }
+  }
+}
+
 // MARK: - End
