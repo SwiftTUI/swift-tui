@@ -727,3 +727,70 @@ private struct SceneHostEnvironmentView: View {
     )
   }
 }
+
+// MARK: - Attempt 017: whole hosted-session state replacement
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 017 replacement sessions reset state and discard stale actions")
+  func sceneHost017ReplacementSessionsResetStateAndDiscardStaleActions() async throws {
+    // Hypothesis: replacing a session on one surface can restore the departed
+    // state container or dispatch a key command through an earlier run loop.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 24, height: 5),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+
+    for _ in 0..<8 {
+      let baselineCount = await surface.waitForFrames { _ in true }.count
+      let session = try HostedSceneSession(
+        for: SceneHostCounterApp(),
+        sceneID: "primary",
+        surface: surface
+      )
+      let runTask = Task { try await session.start() }
+      _ = await surface.waitForFrames { frames in
+        frames.dropFirst(baselineCount).contains { sceneHostRasterText($0).contains("Count 0") }
+      }
+
+      session.send(.key(KeyPress(.character("i"), modifiers: .ctrl)))
+      let incremented = await surface.waitForFrames { frames in
+        frames.dropFirst(baselineCount).contains { sceneHostRasterText($0).contains("Count 1") }
+      }
+      let currentFrames = incremented.dropFirst(baselineCount)
+      #expect(currentFrames.contains { sceneHostRasterText($0).contains("Count 0") })
+      #expect(currentFrames.contains { sceneHostRasterText($0).contains("Count 1") })
+      #expect(!currentFrames.contains { sceneHostRasterText($0).contains("Count 2") })
+
+      _ = try await session.stopAndWait()
+      _ = try await runTask.value
+    }
+  }
+}
+
+private struct SceneHostCounterApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      SceneHostCounterView()
+    }
+  }
+}
+
+private struct SceneHostCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    Panel(id: "counter") {
+      Text("Count \(count)")
+        .focusable(true)
+    }
+    .keyCommand("Increment", key: .character("i"), modifiers: .ctrl) {
+      count += 1
+    }
+  }
+}
+
+private func sceneHostRasterText(_ frame: SemanticHostFrame) -> String {
+  frame.raster.lines.joined(separator: "\n")
+}
