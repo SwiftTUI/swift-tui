@@ -458,3 +458,31 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 014: leading zero-width cluster placement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 014 leading zero-width clusters preserve visible placement")
+  func textContent014LeadingZeroWidthClustersPreserveVisiblePlacement() {
+    // Hypothesis: a retained leading zero-width combining or format cluster can advance the draw
+    // cursor even though fresh measurement assigns it no terminal cells.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent014")
+
+    for generation in 0..<20 {
+      let content = generation.isMultiple(of: 2) ? "\u{0301}AB" : "\u{2060}AB"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 2, height: nil),
+        content: Text(content)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == .init(width: 2, height: 1))
+      #expect(frames.retained.rasterSurface.lines == ["AB"])
+    }
+  }
+}
