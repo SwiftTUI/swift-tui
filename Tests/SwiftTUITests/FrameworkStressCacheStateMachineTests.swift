@@ -239,4 +239,19 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 014 reset restarts every public metric")
+  func cacheState014ResetRestartsEveryPublicMetric() {
+    // Hypothesis: hit-heavy access-log state can leak counters into the next epoch.
+    let cache = TextLayoutCache(capacity: 4)
+    let options = TextLayoutOptions(width: 5)
+    for _ in 0..<20 { _ = cache.layout(for: "alpha beta", options: options) }
+    cache.reset()
+    #expect(cache.metrics == .init())
+    #expect(cache.accessLogDepth == 0)
+    _ = cache.layout(for: "fresh", options: options)
+    #expect(cache.metrics == .init(entries: 1, lookups: 1, hits: 0, misses: 1, stores: 1))
+  }
+}
+
 // NEXT CACHE STRESS TEST
