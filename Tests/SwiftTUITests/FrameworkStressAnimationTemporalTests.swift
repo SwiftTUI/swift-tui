@@ -620,6 +620,7 @@ extension FrameworkStressAnimationTemporalTests {
 private final class AnimationTemporalCustomStateProbe: Sendable {
   private let storage = Mutex<[Int]>([])
   private let merges = Atomic<Int>(0)
+  private let velocities = Atomic<Int>(0)
 
   var observations: [Int] {
     storage.withLock { $0 }
@@ -629,12 +630,20 @@ private final class AnimationTemporalCustomStateProbe: Sendable {
     merges.load(ordering: .relaxed)
   }
 
+  var velocityCallCount: Int {
+    velocities.load(ordering: .relaxed)
+  }
+
   func record(_ value: Int) {
     storage.withLock { $0.append(value) }
   }
 
   func recordMerge() {
     merges.wrappingAdd(1, ordering: .relaxed)
+  }
+
+  func recordVelocity() {
+    velocities.wrappingAdd(1, ordering: .relaxed)
   }
 }
 
@@ -666,7 +675,54 @@ private struct AnimationTemporalStatefulCurve: CustomAnimation {
     return true
   }
 
+  func velocity<V: VectorArithmetic>(
+    value: V,
+    time: Duration,
+    context: AnimationContext<V>
+  ) -> V? {
+    probe.recordVelocity()
+    return value
+  }
+
   static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
 
   func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+
+// MARK: - Attempt 013: custom velocity handoff
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 013 interrupted retarget consults custom velocity")
+  func animationTemporal013InterruptedRetargetConsultsCustomVelocity() throws {
+    // Hypothesis: interruption samples visual progress but omits the custom
+    // curve's velocity hook, losing momentum across the replacement.
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "013", probe: probe))
+    let controller = AnimationController()
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal013", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(50))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 1),
+      transaction: transaction,
+      timestamp: start
+    )
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0.3),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(200))
+    )
+
+    withKnownIssue("AnimationController interruption never calls CustomAnimation.velocity") {
+      #expect(probe.velocityCallCount > 0)
+    }
+  }
+}
+
