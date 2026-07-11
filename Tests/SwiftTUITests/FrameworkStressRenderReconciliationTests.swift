@@ -836,4 +836,49 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 020: Clip enable and disable churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 020 removing clip restores current overflow")
+  func renderReconciliation020RemovingClipRestoresCurrentOverflow() {
+    // Hypothesis: retained draw extraction may preserve an ancestor clip command after the
+    // clipping modifier disappears, because child measurement stays fixed across both branches.
+    struct Root: View {
+      let clipped: Bool
+
+      var body: some View {
+        if clipped {
+          Text("ABCDEFG")
+            .fixedSize()
+            .frame(width: 3, alignment: .leading)
+            .clipped()
+            .id("render-reconciliation-020")
+        } else {
+          Text("ABCDEFG")
+            .fixedSize()
+            .frame(width: 3, alignment: .leading)
+            .id("render-reconciliation-020")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation020")
+
+    for generation in 0..<18 {
+      let root = Root(clipped: generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - End
