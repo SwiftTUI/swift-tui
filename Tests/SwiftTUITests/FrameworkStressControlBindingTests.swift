@@ -816,3 +816,47 @@ private struct ControlStress017Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 018: stepper decrement route bounds replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 018 stepper decrement honors replacement lower bound")
+  func stressControlBinding018StepperDecrementHonorsReplacementLowerBound() throws {
+    // Hypothesis: Stepper can render its decrement affordance as unavailable for new bounds while
+    // the retained decrement pointer route still applies the previous range contract.
+    let value = ControlStressProbe(5)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress018", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      ControlStress018Fixture(value: value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Raise stepper minimum 018")
+    _ = try harness.clickText("◁")
+
+    withKnownIssue("An inactive Stepper decrement falls through to the root increment action") {
+      #expect(value.value == 5 && value.writes.isEmpty)
+    }
+  }
+}
+
+@MainActor
+private struct ControlStress018Fixture: View {
+  let value: ControlStressProbe<Int>
+  @State private var usesRaisedMinimum = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Raise stepper minimum 018") { usesRaisedMinimum = true }
+      Stepper(
+        "Bounded stepper 018",
+        value: value.binding(),
+        in: usesRaisedMinimum ? 5...15 : 0...10,
+        step: usesRaisedMinimum ? 2 : 1
+      )
+      .id("bounded-stepper-018")
+    }
+  }
+}
