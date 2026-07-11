@@ -1082,4 +1082,53 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 026: Alignment-guide closure capture churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 026 alignment guide reads its current closure capture")
+  func renderReconciliation026AlignmentGuideReadsCurrentClosureCapture() {
+    // Hypothesis: alignment-guide metadata stores a closure behind a stable structural slot;
+    // equivalence may ignore capture changes and retain the first guide value during placement.
+    struct Root: View {
+      let raiseSecond: Bool
+
+      var body: some View {
+        HStack(alignment: .bottom, spacing: 0) {
+          Text("A")
+            .frame(width: 1, height: 4, alignment: .topLeading)
+          Text("B")
+            .alignmentGuide(.bottom) { dimensions in
+              raiseSecond ? dimensions[.top] : dimensions[.bottom]
+            }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation026")
+    var everyFrameMatchedFreshLayout = true
+
+    for generation in 0..<16 {
+      let root = Root(raiseSecond: generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      everyFrameMatchedFreshLayout =
+        everyFrameMatchedFreshLayout
+        && retained.rasterSurface == fresh.rasterSurface
+        && retained.placedTree == fresh.placedTree
+    }
+
+    withKnownIssue("A stable alignmentGuide retains its first closure capture") {
+      #expect(everyFrameMatchedFreshLayout)
+    }
+  }
+}
+
 // MARK: - End
