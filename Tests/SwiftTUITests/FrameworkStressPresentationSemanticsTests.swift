@@ -213,6 +213,51 @@ private struct StressPS005Fixture: View {
   }
 }
 
+// MARK: - Attempt 006: live menu action refresh
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 006 an open menu dispatches its current action closure")
+  func stress006OpenMenuDispatchesCurrentActionClosure() throws {
+    // Hypothesis: refreshing an open menu's rendered payload may leave its
+    // action registration bound to the activation frame's closure.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS006", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS006Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Action menu")
+    _ = try harness.clickText("Advance action")
+    _ = try harness.clickText("Run generation 0")
+
+    #expect(probe.markers == ["generation-1"])
+  }
+}
+
+@MainActor
+private struct StressPS006Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var generation = 0
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Menu("Action menu") {
+        Button("Run generation \(generation)") {
+          probe.markers.append("generation-\(generation)")
+        }
+      }
+      Spacer().frame(width: 31)
+      Button("Advance action") {
+        generation += 1
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
