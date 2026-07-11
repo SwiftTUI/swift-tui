@@ -157,9 +157,7 @@ extension FrameworkStressStateIdentityTests {
         && frame.contains("Right 004 Count \(expected)")
     }
 
-    withKnownIssue("Two live owners of one stateful view value share StateBox mutations") {
-      #expect(ownersStayedIsolated)
-    }
+    #expect(ownersStayedIsolated)
   }
 
   private struct StateIdentity004Root: View {

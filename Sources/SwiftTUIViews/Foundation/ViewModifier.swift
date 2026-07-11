@@ -23,7 +23,26 @@ package struct ModifierContentInputs<Base: View> {
   private func applyAuthoringContext<Result>(
     _ body: () -> Result
   ) -> Result {
-    withAuthoringContext(authoringScope?.authoringContext) {
+    // An ambient context carrying a per-mount rebase of THIS chain's captured
+    // enclosing scope (an outer identity modifier's `resolveOwned`) must stay
+    // in effect: the construction capture is per view VALUE, so reinstalling
+    // it under a value mounted at several identities would collapse every
+    // mount's `@State` onto the one captured owner (stress state identity
+    // 004). The origin check keeps this narrow — an ambient rebased from a
+    // DIFFERENT scope (foreign capture hosting) still yields to the capture.
+    if let captured = authoringScope?.authoringContext {
+      if let ambient = currentAuthoringContext(),
+        let origin = ambient.rebasedFromOwnerNodeID,
+        origin == captured.ownerNodeID,
+        ambient.ownerNodeID != captured.ownerNodeID
+      {
+        return body()
+      }
+      return withAuthoringContext(captured) {
+        body()
+      }
+    }
+    return withAuthoringContext(nil) {
       body()
     }
   }
@@ -42,7 +61,8 @@ package struct ModifierContentInputs<Base: View> {
         ownerNodeID: ViewNodeContext.current?.viewNodeID ?? scope.ownerNodeID,
         stateGraphScope: ViewNodeContext.current?.ownerGraph.map(StateGraphScopeID.init)
           ?? scope.stateGraphScope,
-        ordinalTracker: scope.ordinalTracker
+        ordinalTracker: scope.ordinalTracker,
+        rebasedFromOwnerNodeID: scope.ownerNodeID
       )
     }
     return withAuthoringContext(rebased) {

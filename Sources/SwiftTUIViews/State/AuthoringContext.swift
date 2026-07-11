@@ -34,6 +34,14 @@ package struct AuthoringContext {
   var ownerNodeID: SwiftTUICore.ViewNodeID?
   var stateGraphScope: StateGraphScopeID?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
+  /// When this context is a per-mount rebase of a captured enclosing scope
+  /// (an identity modifier's `resolveOwned`), the owner the capture named
+  /// before the rebase. A modifier chain about to reinstall a construction
+  /// capture with this same owner is looking at the scope this context was
+  /// derived from — the ambient rebase is the mount-specific refinement and
+  /// must win, or every mount of a shared view value collapses onto the one
+  /// captured owner (stress state identity 004).
+  var rebasedFromOwnerNodeID: SwiftTUICore.ViewNodeID?
 
   /// Primary initializer. `structuralIdentity` defaults to `viewIdentity`
   /// so non-iterating construction sites (the common case) need not
@@ -48,7 +56,8 @@ package struct AuthoringContext {
     viewNode: SwiftTUICore.ViewNode? = nil,
     ownerNodeID: SwiftTUICore.ViewNodeID? = nil,
     stateGraphScope: StateGraphScopeID? = nil,
-    ordinalTracker: AuthoringOrdinalTracker = .init()
+    ordinalTracker: AuthoringOrdinalTracker = .init(),
+    rebasedFromOwnerNodeID: SwiftTUICore.ViewNodeID? = nil
   ) {
     self.viewIdentity = viewIdentity
     let resolvedStructuralPath =
@@ -62,6 +71,7 @@ package struct AuthoringContext {
     self.stateGraphScope =
       stateGraphScope ?? viewNode?.ownerGraph.map(StateGraphScopeID.init)
     self.ordinalTracker = ordinalTracker
+    self.rebasedFromOwnerNodeID = rebasedFromOwnerNodeID
   }
 }
 
@@ -249,7 +259,8 @@ package func dynamicPropertyAuthoringContext(
       viewNode: viewNode,
       ownerNodeID: current.ownerNodeID,
       stateGraphScope: current.stateGraphScope,
-      ordinalTracker: current.ordinalTracker
+      ordinalTracker: current.ordinalTracker,
+      rebasedFromOwnerNodeID: current.rebasedFromOwnerNodeID
     )
   }
 

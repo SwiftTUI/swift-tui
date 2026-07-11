@@ -462,11 +462,12 @@ extension View {
     // evaluates under a reinstalled enclosing scope, and re-scoping at this
     // boundary detaches those bodies' captured @State from their true owner
     // (verified by ButtonFocusStabilityTests' TabView delete regression).
-    // The known hole this leaves open: a view VALUE reused under several
-    // mounts resolves every mount's body under the single enclosing ambient,
-    // so all mounts share one state owner (stress state identity 004). The
-    // fix belongs at the chain-content seam that skips resolveView's
-    // authoring mint, not here.
+    // The multi-mount aliasing this would otherwise allow (one view VALUE
+    // mounted at several identities sharing one state owner) is handled at
+    // the chain-content seam instead: an identity modifier's per-mount
+    // rebase survives the inner chains' capture reinstall via
+    // `AuthoringContext.rebasedFromOwnerNodeID` (see
+    // `ModifierContentInputs.applyAuthoringContext`).
     if let authoringContext = currentAuthoringContext() {
       let body = context.trackingObservableAccess {
         makeBody()
