@@ -1771,3 +1771,88 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 032: image attachment damage coverage
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 032 image damage covers old and current visible bounds")
+  func visualEffects032ImageDamageCoversOldAndCurrentVisibleBounds() throws {
+    // Hypothesis: RasterSurfaceDamageDiff can notice an image source change yet damage only the
+    // current attachment, leaving pixels from the previous clipped placement undisposed.
+    let red = try makePNGBytes(
+      width: 16,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 16 * 16)
+    )
+    let blue = try makePNGBytes(
+      width: 16,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 0, green: 0, blue: 255), count: 16 * 16)
+    )
+
+    struct Root: View {
+      let bytes: [UInt8]
+      let generation: Int
+
+      var body: some View {
+        Image(data: bytes)
+          .resizable()
+          .frame(width: 6, height: 3)
+          .offset(x: (generation % 7) - 2, y: (generation % 3) - 1)
+          .frame(width: 10, height: 5, alignment: .topLeading)
+          .clipped()
+      }
+    }
+
+    func damage(_ damage: PresentationDamage, covers rect: CellRect) -> Bool {
+      guard rect.size.width > 0, rect.size.height > 0 else {
+        return true
+      }
+      for row in rect.origin.y..<(rect.origin.y + rect.size.height) {
+        guard let ranges = damage.columnRanges(for: row) else {
+          return false
+        }
+        if ranges.isEmpty {
+          continue
+        }
+        for column in rect.origin.x..<(rect.origin.x + rect.size.width) {
+          if !ranges.contains(where: { $0.contains(column) }) {
+            return false
+          }
+        }
+      }
+      return true
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects032")
+    var previousSurface: RasterSurface?
+    var previousAttachment: RasterImageAttachment?
+
+    for generation in 0..<24 {
+      let root = Root(bytes: generation.isMultiple(of: 2) ? red : blue, generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let currentAttachment = try #require(retained.rasterSurface.imageAttachments.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      if let previousSurface, let previousAttachment {
+        let diff = try #require(
+          RasterSurfaceDamageDiff.diff(
+            previous: previousSurface,
+            current: retained.rasterSurface
+          )
+        )
+        #expect(damage(diff, covers: previousAttachment.visibleBounds))
+        #expect(damage(diff, covers: currentAttachment.visibleBounds))
+      }
+      previousSurface = retained.rasterSurface
+      previousAttachment = currentAttachment
+    }
+  }
+}
