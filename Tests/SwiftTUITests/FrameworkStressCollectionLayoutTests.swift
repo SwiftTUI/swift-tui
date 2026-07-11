@@ -611,3 +611,55 @@ private struct CollectionLayout010Root: View {
     .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 011: multi-view horizontal lazy rows
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 011 horizontal lazy ForEach flattens row children")
+  func collectionLayout011HorizontalLazyForEachFlattensRowChildren() {
+    // Hypothesis: LazyHStack's indexed source also treats each multi-view
+    // ForEach result as an overlaying Group instead of distinct horizontal cells.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout011")
+
+    for generation in 0..<16 {
+      let values = generation.isMultiple(of: 2) ? [1, 2, 3] : [3, 2, 1]
+      let root = CollectionLayout011Root(values: values)
+      let snapshot = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 20, height: 2)
+      )
+      let rendered = collectionLayoutText(snapshot)
+      let flattenedEveryChild =
+        values.allSatisfy { rendered.contains("A\($0)") && rendered.contains("B\($0)") }
+        && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.width == 17
+
+      withKnownIssue(
+        "Indexed LazyHStack treats a multi-view ForEach row as one overlapping Group"
+      ) {
+        #expect(flattenedEveryChild)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout011Root: View {
+  let values: [Int]
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      LazyHStack(alignment: .top, spacing: 1) {
+        ForEach(values, id: \.self) { value in
+          Text("A\(value)")
+          Text("B\(value)")
+        }
+      }
+    }
+    .frame(width: 20, height: 2, alignment: .topLeading)
+  }
+}
