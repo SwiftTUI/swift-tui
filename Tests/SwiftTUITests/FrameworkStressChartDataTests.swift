@@ -95,6 +95,70 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 019: line series cardinality and z-order churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 019 line series shrink regrow and reorder rebuilds z ownership")
+  func chartData019LineSeriesShrinkRegrowAndReorderRebuildsZOwnership() {
+    // Hypothesis: composed-grid series indices can outlive a departed series or
+    // point at the wrong tone after colliding series shrink, regrow, and reorder.
+    struct Root: View {
+      let generation: Int
+
+      var series: [LineChartSeries] {
+        let count: Int
+        switch generation % 4 {
+        case 0: count = 0
+        case 1: count = 1
+        default: count = 4
+        }
+        let values = (0..<count).map { index in
+          LineChartSeries(
+            "S\(index)-\(generation)",
+            points: [
+              .init(x: 0, y: Double(index - generation % 3)),
+              .init(x: 5, y: Double(8 - index + generation % 5)),
+              .init(x: 10, y: Double(index * 2 - 3)),
+            ],
+            style: index.isMultiple(of: 3) ? .area : (index.isMultiple(of: 2) ? .step : .line),
+            tone: index.isMultiple(of: 2) ? .success : .warning
+          )
+        }
+        return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+      }
+
+      var body: some View {
+        LineChart(
+          "Series set \(generation)",
+          series: series,
+          height: 7,
+          width: 40
+        )
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.bottom)
+      }
+    }
+
+    chartDataExercise(attempt: "019", proposal: .init(width: 72, height: 13)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Series set \(generation)"))
+      #expect(text.contains("\(root.series.count) series"))
+      for series in root.series {
+        #expect(text.contains(series.label))
+      }
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains(
+          "Series set \(generation): \(root.series.count) series"
+        )
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 018: line style and baseline replacement
 
 extension FrameworkStressChartDataTests {
