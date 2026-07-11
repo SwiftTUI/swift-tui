@@ -162,3 +162,72 @@ private struct ObservationEffects003View: View {
 private final class ObservationEffects003Model {
   var value = 0
 }
+
+// MARK: - Attempt 004: stable reader model replacement
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 004 a replaced model drops the retired observation callback")
+  func observationEffects004ReplacedModelDropsRetiredObservationCallback() throws {
+    // Hypothesis: a stable reader can stay registered to both the old and new
+    // registrar, allowing the retired model to drive a stale recomputation.
+    let first = ObservationEffects004Value(name: "first")
+    let second = ObservationEffects004Value(name: "second")
+    let holder = ObservationEffects004Holder(current: first)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects004"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects004View(holder: holder)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      first.value = generation
+      var frame = try harness.render()
+      #expect(frame.contains("004 first \(generation)"))
+
+      holder.current = second
+      frame = try harness.render()
+      #expect(frame.contains("004 second \(generation - 1)"))
+
+      first.value = generation + 100
+      frame = try harness.render()
+      #expect(frame.contains("004 second \(generation - 1)"))
+
+      second.value = generation
+      frame = try harness.render()
+      #expect(frame.contains("004 second \(generation)"))
+
+      holder.current = first
+      _ = try harness.render()
+    }
+  }
+}
+
+private struct ObservationEffects004View: View {
+  let holder: ObservationEffects004Holder
+
+  var body: some View {
+    Text("004 \(holder.current.name) \(holder.current.value)")
+      .id("observation-effects-004-reader")
+  }
+}
+
+@Observable
+private final class ObservationEffects004Holder {
+  var current: ObservationEffects004Value
+
+  init(current: ObservationEffects004Value) {
+    self.current = current
+  }
+}
+
+@Observable
+private final class ObservationEffects004Value {
+  let name: String
+  var value = 0
+
+  init(name: String) {
+    self.name = name
+  }
+}
