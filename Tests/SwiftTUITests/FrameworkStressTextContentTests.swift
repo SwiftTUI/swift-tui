@@ -745,3 +745,52 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 022: adjacent same-destination link identities
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 022 adjacent links keep distinct semantic identities")
+  func textContent022AdjacentLinksKeepDistinctSemanticIdentities() {
+    // Hypothesis: rich-run normalization can merge adjacent links that share a destination and
+    // style, collapsing their retained inline identities after separator or cardinality churn.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent022")
+    let destination = "https://shared.example"
+
+    for generation in 0..<20 {
+      let hasThird = generation.isMultiple(of: 2)
+      let content =
+        hasThird
+        ? Text(
+          "\(Link("A", destination: .init(destination)))-\(Link("B", destination: .init(destination))) \(Link("C", destination: .init(destination)))"
+        )
+        : Text(
+          "\(Link("A", destination: .init(destination)))\(Link("B", destination: .init(destination)))"
+        )
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 6, height: 1),
+        content: content
+      )
+      let expectedCount = hasThird ? 3 : 2
+      let expectedIdentities = (0..<expectedCount).map {
+        testIdentity("TextContent022", "InlineLink[\($0)]")
+      }
+      let hyperlinkCells = frames.retained.rasterSurface.cells.flatMap { row in
+        row.filter { $0.hyperlink == destination }
+      }
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(frames.retained.semanticSnapshot.focusRegions.map(\.identity) == expectedIdentities)
+      #expect(
+        frames.retained.semanticSnapshot.interactionRegions.map(\.identity) == expectedIdentities
+      )
+      #expect(hyperlinkCells.count == expectedCount)
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains(destination))
+    }
+  }
+}
