@@ -1378,3 +1378,53 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 024: outline row action freshness
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 024 outline row button dispatches its current closure")
+  func tableOutline024OutlineRowButtonDispatchesCurrentClosure() throws {
+    // Hypothesis: recursively hosted row content can redraw a current Button
+    // label while restoring the action closure from the first outline generation.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TableOutline024"),
+      size: .init(width: 34, height: 9)
+    ) {
+      TableOutline024Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Advance outline")
+      #expect(harness.frame.contains("Leaf action \(generation)"))
+      let frame = try harness.clickText("Leaf action \(generation)")
+      #expect(frame.contains("fired \(generation)"))
+    }
+  }
+}
+
+@MainActor
+private struct TableOutline024Fixture: View {
+  @State private var generation = 0
+  @State private var fired = -1
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance outline") { generation += 1 }
+      Text("fired \(fired)")
+      OutlineGroup(
+        [
+          TableOutlineNode(
+            id: "root",
+            title: "Root",
+            children: [.init(id: "leaf", title: "Leaf action \(generation)")]
+          )
+        ],
+        children: \.children
+      ) { node in
+        Button(node.title) { fired = generation }
+      }
+      .outlineStyle(.plain)
+    }
+  }
+}
