@@ -287,3 +287,56 @@ private struct GestureScroll006Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 007: coordinate-space replacement during drag
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 007 active drag adopts a new coordinate space")
+  func gestureScroll007ActiveDragAdoptsNewCoordinateSpace() throws {
+    // Hypothesis: preserving an active primitive across re-resolution keeps
+    // the coordinate space captured at press time even after it is re-authored.
+    let values = GestureScrollBox<[DragGesture.Value]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll007Root"),
+      size: .init(width: 50, height: 7)
+    ) {
+      GestureScroll007Fixture(values: values)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Coordinate drag"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 2, y: start.y))
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 4, y: start.y))
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 4, y: start.y))
+
+    let latest = try #require(values.value.last)
+    let expectedGlobal = Point(
+      x: floor(start.x + 4) + 0.5,
+      y: floor(start.y) + 0.5
+    )
+    withKnownIssue("An active DragGesture retains its original coordinate space") {
+      #expect(latest.location == expectedGlobal)
+    }
+  }
+}
+
+private struct GestureScroll007Fixture: View {
+  let values: GestureScrollBox<[DragGesture.Value]>
+  @State private var usesGlobal = false
+
+  var body: some View {
+    HStack(spacing: 0) {
+      Text("prefix:")
+      Text("Coordinate drag")
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture(coordinateSpace: usesGlobal ? .global : .local)
+            .onChanged { value in
+              values.value.append(value)
+              usesGlobal = true
+            }
+        )
+    }
+  }
+}
