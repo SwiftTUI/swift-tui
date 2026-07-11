@@ -1352,3 +1352,34 @@ extension FrameworkStressFramePipelineTests {
     #expect(Set(frame.supersededAnimationBatchIDs).count == 2)
   }
 }
+
+// MARK: - Attempt 023: replay unions old and new dirty identities
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 023 cancelled replay unions old and new invalidations")
+  func framePipeline023CancelledReplayUnionsOldAndNewInvalidations() throws {
+    // Hypothesis: cancellation replay can replace, rather than union with, a
+    // newer dirty set when the two generations share one identity.
+    let scheduler = FrameScheduler()
+    let shared = testIdentity("FramePipeline023", "Shared")
+    let oldOnly = testIdentity("FramePipeline023", "OldOnly")
+    let newOnly = testIdentity("FramePipeline023", "NewOnly")
+    scheduler.requestInvalidation(of: [shared])
+    scheduler.requestInvalidation(of: [newOnly])
+
+    scheduler.replayCancelledFrameIntent(
+      framePipelineScheduledFrame(identities: [shared, oldOnly])
+    )
+
+    let frame = try #require(
+      scheduler.consumeReadyFrame(
+        at: MonotonicInstant(offset: .seconds(70_023)),
+        armedBefore: scheduler.deadlineArmCut
+      )
+    )
+    #expect(frame.invalidatedIdentities == [shared, oldOnly, newOnly])
+    #expect(frame.causes == [.invalidation])
+    #expect(frame.intentRequestCount == 3)
+    #expect(scheduler.consumeReadyFrame() == nil)
+  }
+}
