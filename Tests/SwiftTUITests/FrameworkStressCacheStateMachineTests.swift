@@ -373,4 +373,23 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 023 latest repeated candidate displaces true LRU")
+  func cacheState023LatestRepeatedCandidateDisplacesTrueLRU() {
+    // Hypothesis: candidate admission can evict the most recent entry instead of the true LRU.
+    let cache = TextLayoutCache(capacity: 2)
+    let options = TextLayoutOptions(width: nil)
+    _ = cache.layout(for: "a", options: options)
+    _ = cache.layout(for: "b", options: options)
+    _ = cache.layout(for: "candidate", options: options)
+    _ = cache.layout(for: "a", options: options)
+    _ = cache.layout(for: "candidate", options: options)
+    let before = cache.metrics
+    _ = cache.layout(for: "a", options: options)
+    _ = cache.layout(for: "b", options: options)
+    #expect(cache.metrics.hits == before.hits + 1)
+    #expect(cache.metrics.misses == before.misses + 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
