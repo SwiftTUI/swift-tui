@@ -1314,3 +1314,58 @@ private struct ObservationEffects022View: View {
     }
   }
 }
+
+// MARK: - Attempt 023: Optional onChange baselines
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 023 Optional onChange preserves nil and some transitions")
+  func observationEffects023OptionalOnChangePreservesTransitions() throws {
+    // Hypothesis: the graph-level baseline box can confuse Optional.none with
+    // an absent baseline and swallow nil-to-some or some-to-nil transitions.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects023"),
+      size: .init(width: 68, height: 9)
+    ) {
+      ObservationEffects023View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Set Optional 023")
+      #expect(probe.events == ["nil->\(generation)"])
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Bump Optional 023")
+      #expect(probe.events == ["\(generation)->\(generation + 1)"])
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Clear Optional 023")
+      #expect(probe.events == ["\(generation + 1)->nil"])
+    }
+  }
+}
+
+private struct ObservationEffects023View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+  @State private var value: Int?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Set Optional 023") {
+        generation += 1
+        value = generation
+      }
+      Button("Bump Optional 023") { value = value.map { $0 + 1 } }
+      Button("Clear Optional 023") { value = nil }
+      Text("023 value \(value.map(String.init) ?? "nil")")
+        .onChange(of: value) { oldValue, newValue in
+          probe.events.append(
+            "\(oldValue.map(String.init) ?? "nil")->\(newValue.map(String.init) ?? "nil")"
+          )
+        }
+    }
+  }
+}
