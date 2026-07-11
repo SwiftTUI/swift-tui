@@ -422,3 +422,54 @@ private struct ControlStress008Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 009: picker wheel binding retarget
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 009 picker wheel writes only its current binding")
+  func stressControlBinding009PickerWheelWritesOnlyCurrentBinding() throws {
+    // Hypothesis: the Picker root pointer route can retain a superseded selection binding even
+    // when keyboard navigation for the same stable control has been refreshed correctly.
+    let first = ControlStressProbe("c")
+    let second = ControlStressProbe("a")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress009", "Root"),
+      size: .init(width: 52, height: 9)
+    ) {
+      ControlStress009Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget picker wheel 009")
+    let pickerPoint = try #require(harness.point(forText: "Wheel picker 009"))
+    _ = try harness.scrollPointer(at: pickerPoint, deltaY: 1)
+
+    #expect(first.value == "c")
+    #expect(first.writes.isEmpty)
+    #expect(second.value == "b")
+    #expect(second.writes == ["b"])
+  }
+}
+
+@MainActor
+private struct ControlStress009Fixture: View {
+  let first: ControlStressProbe<String>
+  let second: ControlStressProbe<String>
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget picker wheel 009") { usesSecond = true }
+      Picker(
+        "Wheel picker 009",
+        selection: usesSecond ? second.binding() : first.binding()
+      ) {
+        Text("Alpha 009").tag("a")
+        Text("Beta 009").tag("b")
+        Text("Gamma 009").tag("c")
+      }
+      .id("wheel-picker-009")
+      .pickerStyle(.segmented)
+    }
+  }
+}
