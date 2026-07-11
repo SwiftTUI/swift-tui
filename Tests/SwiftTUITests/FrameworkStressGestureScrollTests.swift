@@ -602,3 +602,64 @@ private struct GestureScroll012Fixture: View {
     .frame(width: 30, height: 4)
   }
 }
+
+// MARK: - Attempt 013: drop callback rebinding
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 013 stable drop scope uses its current callback")
+  func gestureScroll013StableDropScopeUsesCurrentCallback() throws {
+    // Hypothesis: snapshot restoration may reinstall the drop closure captured
+    // before a stable Panel scope re-authors its destination.
+    let destinations = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll013Root"),
+      size: .init(width: 50, height: 9)
+    ) {
+      GestureScroll013Fixture(destinations: destinations)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget drop")
+    let point = try #require(harness.point(forText: "Current drop target"))
+    _ = try harness.drop(
+      paths: [DroppedPath("/tmp/gesture-scroll-013")],
+      context: DropContext(location: point)
+    )
+
+    #expect(destinations.value == ["second"])
+    #expect(harness.dropDestinationRegistrationCount == 1)
+  }
+}
+
+private struct GestureScroll013Fixture: View {
+  let destinations: GestureScrollBox<[String]>
+  @State private var targetsSecond = false
+
+  var body: some View {
+    if targetsSecond {
+      Panel(id: "gesture-scroll-013-panel") {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Retarget drop") {}
+          Text("Current drop target").focusable()
+        }
+      }
+      .dropDestination { _ in
+        destinations.value.append("second")
+        return true
+      }
+      .frame(width: 32, height: 5)
+    } else {
+      Panel(id: "gesture-scroll-013-panel") {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Retarget drop") { targetsSecond = true }
+          Text("Current drop target").focusable()
+        }
+      }
+      .dropDestination { _ in
+        destinations.value.append("first")
+        return true
+      }
+      .frame(width: 32, height: 5)
+    }
+  }
+}
