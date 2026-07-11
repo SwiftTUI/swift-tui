@@ -758,6 +758,75 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 012: Nested entity scope follows an outer reorder
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 012 nested row state follows outer entity reorder")
+  func stateIdentity012NestedRowStateFollowsOuterReorder() throws {
+    // Hypothesis: inner ForEach entity scope includes the outer row's positional structural
+    // path, so moving the outer entity can reset or misroute otherwise-stable inner state.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity012"),
+      size: .init(width: 66, height: 14)
+    ) {
+      StateIdentity012Root()
+    }
+    defer { harness.shutdown() }
+
+    var stateFollowedOuterEntity = true
+    for expected in 1...4 {
+      var frame = try harness.clickText("Outer 1 Inner 10 Increment 012")
+      stateFollowedOuterEntity =
+        stateFollowedOuterEntity
+        && frame.contains("Outer 1 Inner 10 Count \(expected)")
+      frame = try harness.clickText("Reverse Outer 012")
+      stateFollowedOuterEntity =
+        stateFollowedOuterEntity
+        && frame.contains("Outer 1 Inner 10 Count \(expected)")
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+
+    withKnownIssue("Nested ForEach row actions lose their live state owner after outer reorder") {
+      #expect(stateFollowedOuterEntity)
+    }
+  }
+
+  private struct StateIdentity012Root: View {
+    @State private var isReversed = false
+
+    private var outerValues: [Int] {
+      isReversed ? [2, 1] : [1, 2]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reverse Outer 012") { isReversed.toggle() }
+        ForEach(outerValues, id: \.self) { outer in
+          VStack(alignment: .leading, spacing: 0) {
+            Text("Outer \(outer)")
+            ForEach([10, 11], id: \.self) { inner in
+              StateIdentity012InnerRow(outer: outer, inner: inner)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity012InnerRow: View {
+    let outer: Int
+    let inner: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Outer \(outer) Inner \(inner) Count \(count)")
+        Button("Outer \(outer) Inner \(inner) Increment 012") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
