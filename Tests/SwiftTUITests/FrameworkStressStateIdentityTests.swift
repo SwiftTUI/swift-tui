@@ -2303,6 +2303,82 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 034: List index routes refresh after insertion and reorder
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 034 list row actions follow the visible reordered tag")
+  func stateIdentity034ListRowActionsFollowVisibleReorderedTag() throws {
+    // Hypothesis: List action identities are row-index based, so front insertion and reorder can
+    // leave an index's old tag-capturing closure in the live action registry.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity034"),
+      size: .init(width: 64, height: 15)
+    ) {
+      StateIdentity034Root()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Two 034")
+      #expect(frame.contains("034 Selected 2 Activated 2"))
+      frame = try harness.clickText("Churn List 034")
+      #expect(frame.contains("Four 034"))
+
+      frame = try harness.clickText("Four 034")
+      #expect(frame.contains("034 Selected 4 Activated 4"))
+      frame = try harness.clickText("One 034")
+      #expect(frame.contains("034 Selected 1 Activated 1"))
+
+      frame = try harness.clickText("Restore List 034")
+      #expect(!frame.contains("Four 034"))
+      frame = try harness.clickText("Three 034")
+      #expect(frame.contains("034 Selected 3 Activated 3"))
+      #expect(harness.actionRegistrationCount <= 5)
+    }
+  }
+
+  private struct StateIdentity034Item: Identifiable {
+    let id: Int
+    let label: String
+  }
+
+  private struct StateIdentity034Root: View {
+    @State private var usesAlternateOrder = false
+    @State private var selection = 1
+    @State private var activated = 0
+
+    private var items: [StateIdentity034Item] {
+      if usesAlternateOrder {
+        return [
+          .init(id: 4, label: "Four"),
+          .init(id: 3, label: "Three"),
+          .init(id: 2, label: "Two"),
+          .init(id: 1, label: "One"),
+        ]
+      }
+      return [
+        .init(id: 1, label: "One"),
+        .init(id: 2, label: "Two"),
+        .init(id: 3, label: "Three"),
+      ]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("034 Selected \(selection) Activated \(activated)")
+        Button(usesAlternateOrder ? "Restore List 034" : "Churn List 034") {
+          usesAlternateOrder.toggle()
+        }
+        List(selection: $selection, onActivate: { activated = $0 }) {
+          ForEach(items) { item in
+            Text("\(item.label) 034").tag(item.id)
+          }
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
