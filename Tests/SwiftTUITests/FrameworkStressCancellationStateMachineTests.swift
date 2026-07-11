@@ -163,4 +163,16 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 011 resume before install completes")
+  func cancellationState011ResumeBeforeInstallCompletes() async {
+    // Hypothesis: an early winner can be forgotten before the continuation arrives.
+    for _ in 0..<100 {
+      let gate = OneShotContinuationGate()
+      gate.resume()
+      await awaitStressGate(gate)
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
