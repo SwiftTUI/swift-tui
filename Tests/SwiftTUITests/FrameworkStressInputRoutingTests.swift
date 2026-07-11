@@ -54,6 +54,59 @@ extension FrameworkStressInputRoutingTests {
   }
 }
 
+// MARK: - Attempt 006: stable non-Hashable FocusedValue convergence
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A stable non-Hashable FocusedValue converges under repeated renders")
+  func stressInputRouting006StableNonHashableFocusedValueConverges() throws {
+    // Hypothesis: conservative focused-value equality may treat an unchanged
+    // non-Hashable payload as new forever and exhaust the focus-sync budget.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput006Root"),
+      size: .init(width: 40, height: 8)
+    ) {
+      StressInput006Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Stable nonhashable focus")
+    for _ in 0..<8 {
+      _ = try harness.render()
+      #expect(harness.focusedValueRegistrationCount == 1)
+    }
+  }
+}
+
+private struct StressInput006Payload: Equatable, Sendable {
+  var label: String
+  var revision: Int
+}
+
+private enum StressInput006FocusedKey: FocusedValueKey {
+  typealias Value = StressInput006Payload
+}
+
+extension FocusedValues {
+  fileprivate var stressInput006Payload: StressInput006Payload? {
+    get { self[StressInput006FocusedKey.self] }
+    set { self[StressInput006FocusedKey.self] = newValue }
+  }
+}
+
+private struct StressInput006Fixture: View {
+  static let focusIdentity = testIdentity("StressInput006", "Focus")
+
+  var body: some View {
+    Text("Stable nonhashable focus")
+      .id(Self.focusIdentity)
+      .focusable()
+      .focusedValue(
+        \.stressInput006Payload,
+        StressInput006Payload(label: "stable", revision: 7)
+      )
+  }
+}
+
 private enum StressInput001Field: Hashable {
   case a
   case b
