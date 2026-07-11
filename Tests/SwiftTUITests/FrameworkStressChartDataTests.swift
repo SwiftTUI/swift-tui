@@ -95,6 +95,61 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 010: sparkline empty and constant-domain churn
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 010 sparkline empty constant and ramp domains replace cleanly")
+  func chartData010SparklineEmptyConstantAndRampDomainsReplaceCleanly() {
+    // Hypothesis: transitions through the empty and zero-span fast paths can
+    // preserve a prior ramp string or accessibility summary in retained output.
+    struct Root: View {
+      let generation: Int
+
+      var values: [Double] {
+        switch generation % 3 {
+        case 0: []
+        case 1: Array(repeating: Double(generation), count: 4)
+        default: (0..<(2 + generation % 7)).map(Double.init)
+        }
+      }
+
+      var expectedSummary: String {
+        switch generation % 3 {
+        case 0: "no data"
+        case 1: "lo \(generation) hi \(generation)"
+        default: "lo 0 hi \(values.count - 1)"
+        }
+      }
+
+      var expectedGlyphs: String {
+        switch generation % 3 {
+        case 0: "[]"
+        case 1: "▄▄▄▄"
+        default: sparklineGlyphString(values)
+        }
+      }
+
+      var body: some View {
+        Sparkline("Modes \(generation)", values: values)
+      }
+    }
+
+    chartDataExercise(attempt: "010", proposal: .init(width: 54, height: 5)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      #expect(text.contains(root.expectedSummary))
+      #expect(text.contains(root.expectedGlyphs))
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains(
+          "Modes \(generation): \(root.expectedSummary)"
+        )
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 009: sparkline migrating extrema
 
 extension FrameworkStressChartDataTests {
