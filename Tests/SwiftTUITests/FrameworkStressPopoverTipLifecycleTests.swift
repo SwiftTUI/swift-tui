@@ -632,6 +632,39 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 017: duplicate-source traversal reorder
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 017 reordered sources publish the current latest tip")
+  func popoverTip017ReorderedSourcesPublishCurrentLatestTip() throws {
+    // Hypothesis: the stored coordinator ordering can remain pinned to the
+    // first traversal order when two live sources reorder around each other.
+    let rootIdentity = testIdentity("PopoverTipStress017", "Root")
+    let model = PopoverTipDuplicateStressModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: rootIdentity,
+      size: .init(width: 88, height: 24)
+    ) {
+      PopoverTipDuplicateStressRoot(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      model.firstGeneration = generation
+      model.secondGeneration = generation
+      model.reverseSources.toggle()
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      let expected = model.reverseSources ? "First" : "Second"
+      let departed = model.reverseSources ? "Second" : "First"
+      #expect(frame.contains("\(expected) duplicate tip \(generation)"))
+      #expect(!frame.contains("\(departed) duplicate tip \(generation)"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
