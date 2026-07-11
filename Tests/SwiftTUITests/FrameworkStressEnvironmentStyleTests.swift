@@ -476,6 +476,51 @@ private struct EnvironmentStyle010Root: View {
   }
 }
 
+// MARK: - Attempt 011: enabled propagation through retained custom style
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 011 custom button style receives current enabled state")
+  func environmentStyle011CustomButtonStyleReceivesCurrentEnabledState() throws {
+    // Hypothesis: disabled transforms can invalidate the control action table without replacing
+    // the retained ButtonStyleConfiguration consumed by a custom style body.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle011"),
+      size: .init(width: 76, height: 7)
+    ) {
+      EnvironmentStyle011Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Toggle Enabled 011")
+      let marker = generation.isMultiple(of: 2) ? "enabled" : "disabled"
+      #expect(frame.contains("\(marker) Enabled Target 011"))
+    }
+  }
+}
+
+private struct EnvironmentStyle011ButtonStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      Text(configuration.isEnabled ? "enabled" : "disabled")
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle011Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Enabled 011") { generation += 1 }
+      Button("Enabled Target 011") {}
+        .buttonStyle(EnvironmentStyle011ButtonStyle())
+        .disabled(!generation.isMultiple(of: 2))
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
