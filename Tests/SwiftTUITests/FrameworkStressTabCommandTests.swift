@@ -604,3 +604,72 @@ private struct StressTC011Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 012: toolbar contribution migrates to ancestor
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 012 removed inner toolbar migrates its item exactly once")
+  func stressTabCommand012RemovedInnerToolbarMigratesItemExactlyOnce() throws {
+    // Hypothesis: nested late-preference hosts may leave the inner strip alive
+    // while also allowing its contribution to bubble into the outer strip.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC012", "Root"),
+      size: .init(width: 72, height: 13)
+    ) {
+      StressTC012Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.clickText("Remove inner host")
+    let firstTitle = try #require(frame.firstRange(of: "Migrating tool"))
+    #expect(!frame[firstTitle.upperBound...].contains("Migrating tool"))
+
+    _ = try harness.clickText("Migrating tool")
+    #expect(probe.events == ["migrated"])
+  }
+}
+
+@MainActor
+private struct StressTC012Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var innerHosted = true
+
+  var body: some View {
+    Panel(id: "stress-tc-012-outer") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Remove inner host") {
+          innerHosted = false
+        }
+        innerPanel
+        Text("Outer source")
+          .toolbarItem(.init(title: "Outer tool") {})
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 70, height: 11, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var innerPanel: some View {
+    if innerHosted {
+      Panel(id: "stress-tc-012-inner") {
+        migratingSource
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+    } else {
+      Panel(id: "stress-tc-012-inner") {
+        migratingSource
+      }
+    }
+  }
+
+  private var migratingSource: some View {
+    Text("Inner source")
+      .toolbarItem(
+        .init(title: "Migrating tool") {
+          probe.events.append("migrated")
+        }
+      )
+  }
+}
