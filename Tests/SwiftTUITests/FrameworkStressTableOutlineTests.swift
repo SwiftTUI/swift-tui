@@ -132,3 +132,52 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 003: table header visibility churn
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 003 table header visibility leaves no stale row")
+  func tableOutline003TableHeaderVisibilityLeavesNoStaleRow() {
+    // Hypothesis: toggling the environment-driven header row can preserve its
+    // old height or paint after the header payload becomes hidden.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Table(
+          selection: .constant(1),
+          columns: [.init("Header-\(generation)", width: 14)]
+        ) {
+          TableRow { Text("row-\(generation)") }.tag(1)
+        }
+        .tableHeaders(generation.isMultiple(of: 2) ? .visible : .hidden)
+        .frame(width: 20, height: 7, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline003")
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 20, height: 7)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 20, height: 7)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(rendered.contains("Header-\(generation)") == generation.isMultiple(of: 2))
+      #expect(rendered.contains("row-\(generation)"))
+    }
+  }
+}
