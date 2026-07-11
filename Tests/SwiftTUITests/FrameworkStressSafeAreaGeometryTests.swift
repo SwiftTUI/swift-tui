@@ -109,6 +109,60 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 023: named coordinate-space replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 023 renamed space drops departed registration")
+  func safeAreaGeometry023RenamedSpaceDropsDepartedRegistration() {
+    // Hypothesis: changing only a coordinate-space name can append to the retained placed-frame
+    // table, allowing a departed name to keep resolving after the owner has been renamed.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let currentName = "space-023-\(generation)"
+        let departedName = "space-023-\(max(0, generation - 1))"
+
+        VStack(alignment: .leading, spacing: 0) {
+          Text("023 owner g\(generation)")
+            .frame(width: 18, height: 1)
+            .coordinateSpace(name: currentName)
+          GeometryReader { proxy in
+            let current = proxy.frame(in: .named(currentName))
+            let departed = proxy.frame(in: .named(departedName))
+            Text(
+              "023 g\(generation) current \(Int(current.origin.y)) "
+                + "departed \(Int(departed.origin.y))"
+            )
+          }
+          .frame(width: 42, height: 1)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry023")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 52, height: 10),
+        safeAreaInsets: .init(top: 1, leading: 1)
+      )
+
+      let diagnostics = frames.retained.diagnostics.geometryResolutionDiagnostics
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("023 g\(generation) current"))
+      #expect(diagnostics.missingNamedCoordinateSpaceCount == (generation == 0 ? 0 : 1))
+    }
+  }
+}
+
 // MARK: - Attempt 022: named coordinate-space movement
 
 extension FrameworkStressSafeAreaGeometryTests {
