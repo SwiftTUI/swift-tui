@@ -1247,3 +1247,68 @@ private struct StressAF022Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 023: focus-scope child replacement
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 023 replaced scope children reseat inside live scope")
+  func stress023ReplacedScopeChildrenReseatInsideLiveScope() throws {
+    // Hypothesis: focus replacement can lose the surviving scope path and fall back outside the
+    // scope when every child identity is replaced by a focused child's own key action.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF023", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressAF023Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 0..<10 {
+      _ = try harness.focus(StressAF023Fixture.firstIdentity(generation))
+      _ = try harness.pressKey(KeyPress(.character("r")))
+      #expect(
+        harness.runLoop.focusTracker.currentFocusIdentity
+          == StressAF023Fixture.firstIdentity(generation + 1))
+    }
+
+    #expect(harness.focusRegionCount == 3)
+  }
+}
+
+@MainActor
+private struct StressAF023Fixture: View {
+  static let outerIdentity = testIdentity("StressAF023", "Outer")
+  static let scopeIdentity = testIdentity("StressAF023", "Scope")
+
+  static func firstIdentity(_ generation: Int) -> Identity {
+    testIdentity("StressAF023", "First", "\(generation)")
+  }
+
+  static func secondIdentity(_ generation: Int) -> Identity {
+    testIdentity("StressAF023", "Second", "\(generation)")
+  }
+
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Outer focus target")
+        .id(Self.outerIdentity)
+        .focusable()
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Scoped first \(generation)")
+          .id(Self.firstIdentity(generation))
+          .focusable()
+          .onKeyPress(.character("r")) { _ in
+            generation += 1
+            return .handled
+          }
+        Text("Scoped second \(generation)")
+          .id(Self.secondIdentity(generation))
+          .focusable()
+      }
+      .id(Self.scopeIdentity)
+      .focusScope()
+    }
+  }
+}
