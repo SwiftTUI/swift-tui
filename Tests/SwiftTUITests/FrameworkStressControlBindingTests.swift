@@ -1166,3 +1166,60 @@ private struct ControlStress024Fixture: View {
     )
   }
 }
+
+// MARK: - Attempt 025: text field disabled external replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 025 text field resumes from disabled replacement value")
+  func stressControlBinding025TextFieldResumesFromDisabledReplacementValue() throws {
+    // Hypothesis: disabling a focused TextField while replacing its external binding can leave a
+    // live key handler during the inert interval or restore the pre-replacement editing buffer.
+    let text = ControlStressProbe("alpha")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress025", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      ControlStress025Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(ControlStress025Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
+    _ = try harness.pressKey(KeyPress(.character("x")))
+    #expect(text.value == "beta")
+    #expect(text.writes.isEmpty)
+
+    _ = try harness.clickText("Reenable text field 025")
+    _ = try harness.focus(ControlStress025Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("!")))
+    #expect(text.value == "beta!")
+    #expect(text.writes == ["beta!"])
+  }
+}
+
+@MainActor
+private struct ControlStress025Fixture: View {
+  static let fieldIdentity = testIdentity("ControlStress025", "Field")
+
+  let text: ControlStressProbe<String>
+  @State private var isEnabled = true
+  @State private var externalRevision = 0
+
+  var body: some View {
+    Panel(id: testIdentity("ControlStress025", "Panel")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reenable text field 025") { isEnabled = true }
+        Text("Text field external revision 025 \(externalRevision)")
+        TextField("Bound field 025", text: text.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+          .disabled(!isEnabled)
+      }
+    }
+    .keyCommand("Disable and replace field 025", key: .character("d"), modifiers: .ctrl) {
+      isEnabled = false
+      text.value = "beta"
+      externalRevision += 1
+    }
+  }
+}
