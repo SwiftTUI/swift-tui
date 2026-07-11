@@ -492,3 +492,45 @@ private func animationTemporalNode(
     drawMetadata: metadata
   )
 }
+
+// MARK: - Attempt 010: rapid property retarget convergence
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 010 rapid property retarget converges on latest target")
+  func animationTemporal010RapidPropertyRetargetConvergesOnLatestTarget() throws {
+    // Hypothesis: repeated sample-and-replace retargeting can retain parallel
+    // records for one slot or complete against an earlier target.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal010", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(20))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    var latestTarget = 0.0
+
+    for generation in 1...16 {
+      latestTarget = Double(generation) / 20
+      let node = animationTemporalNode(identity: identity, opacity: latestTarget)
+      controller.processResolvedTree(
+        node,
+        transaction: transaction,
+        timestamp: start.advanced(by: .milliseconds(generation * 20))
+      )
+      #expect(controller.activeAnimationCount == 1)
+    }
+
+    var finalTree = animationTemporalNode(identity: identity, opacity: latestTarget)
+    _ = controller.applyInterpolations(
+      to: &finalTree,
+      at: start.advanced(by: .seconds(5))
+    )
+    #expect(controller.activeAnimationCount == 0)
+    #expect(finalTree.drawMetadata.baseStyle.explicitOpacity == latestTarget)
+  }
+}
