@@ -1372,3 +1372,48 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 025: moving oversized shape under a stable clip
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 025 stable clip follows oversized shape translation")
+  func visualEffects025StableClipFollowsOversizedShapeTranslation() {
+    // Hypothesis: retained clip commands can combine the current clip bounds with a previous child
+    // translation, leaving stale gradient fragments as an oversized shape moves behind the viewport.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        RoundedRectangle(cornerRadius: 3)
+          .fill(
+            LinearGradient(
+              colors: [.red, .yellow, .blue],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
+          .frame(width: 30, height: 13)
+          .offset(x: (generation % 11) - 5, y: (generation % 7) - 3)
+          .frame(width: 14, height: 6, alignment: .topLeading)
+          .clipped()
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects025")
+
+    for generation in 0..<35 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface.size == CellSize(width: 14, height: 6))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
