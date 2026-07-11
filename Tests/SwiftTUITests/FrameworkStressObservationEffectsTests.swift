@@ -1533,3 +1533,56 @@ private struct ObservationEffects026View: View {
     }
   }
 }
+
+// MARK: - Attempt 027: departed onChange branch suppression
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 027 a value change cannot dispatch through a removed observer")
+  func observationEffects027ValueChangeCannotDispatchThroughRemovedObserver() throws {
+    // Hypothesis: a queued change descriptor from the previous committed tree
+    // can survive a frame that mutates its value and removes its owner together.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects027"),
+      size: .init(width: 72, height: 7)
+    ) {
+      ObservationEffects027View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      var frame = try harness.clickText("Mutate and Remove 027")
+      #expect(frame.contains("027 observer absent"))
+      #expect(probe.events.isEmpty)
+
+      frame = try harness.clickText("Restore Observer 027")
+      #expect(frame.contains("027 observer present"))
+      #expect(probe.events.isEmpty)
+    }
+  }
+}
+
+private struct ObservationEffects027View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var isVisible = true
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Mutate and Remove 027") {
+        value += 1
+        isVisible = false
+      }
+      Button("Restore Observer 027") { isVisible = true }
+      Text(isVisible ? "027 observer present" : "027 observer absent")
+      if isVisible {
+        Text("027 value \(value)")
+          .onChange(of: value) { oldValue, newValue in
+            probe.events.append("\(oldValue)->\(newValue)")
+          }
+          .id("observation-effects-027-observer")
+      }
+    }
+  }
+}
