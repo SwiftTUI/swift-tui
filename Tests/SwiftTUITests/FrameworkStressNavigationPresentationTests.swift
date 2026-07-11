@@ -1289,3 +1289,74 @@ private struct StressNP019Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 020: sheet source remint inside an active destination
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 020 reminted sheet source preserves navigation route")
+  func stress020RemintedSheetSourcePreservesNavigationRoute() throws {
+    // Hypothesis: replacing a sheet declaration source inside a detached
+    // destination can duplicate the overlay or corrupt the destination pop.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP020", "Root"),
+      size: .init(width: 58, height: 13)
+    ) {
+      StressNP020Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Reminted Sheet Destination")
+    _ = try harness.clickText("Open Nested Reminted Sheet")
+    for generation in 1...8 {
+      let frame = try harness.clickText("Remint Nested Sheet Source", chooseLast: true)
+      #expect(frame.contains("nested sheet generation \(generation)"))
+      #expect(
+        frame.components(separatedBy: "nested sheet generation").count - 1 == 1
+      )
+      #expect(stressNPPresentationEntryCount(in: harness) == 1)
+      #expect(harness.actionRegistrationCount <= 4)
+    }
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("nested sheet destination generation 8"))
+    #expect(!frame.contains("Remint Nested Sheet Source"))
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Push Reminted Sheet Destination"))
+  }
+}
+
+@MainActor
+private struct StressNP020Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-020-stack") {
+      Button("Push Reminted Sheet Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP020Destination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP020Destination: View {
+  @State private var sheet = false
+  @State private var generation = 0
+
+  var body: some View {
+    Group {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("nested sheet destination generation \(generation)")
+        Button("Open Nested Reminted Sheet") { sheet = true }
+      }
+    }
+    .id("stress-np-020-sheet-source-\(generation)")
+    .sheet("Nested Reminted Sheet", isPresented: $sheet) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("nested sheet generation \(generation)")
+        Button("Remint Nested Sheet Source") { generation += 1 }
+      }
+    }
+  }
+}
