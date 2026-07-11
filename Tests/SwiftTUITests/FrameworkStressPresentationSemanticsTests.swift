@@ -93,3 +93,28 @@ private struct StressPS001Fixture: View {
     .frame(width: 70, height: 16, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 002: retained overlay host two-to-one transition
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 002 dismissing a sheet preserves its underlying menu")
+  func stress002DismissingSheetPreservesUnderlyingMenu() throws {
+    // Hypothesis: after a two-entry commit, retained overlay-host reuse may
+    // leave the dismissed sheet child present or discard the surviving menu.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS002", "Root"),
+      size: .init(width: 72, height: 18)
+    ) {
+      StressPS001Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Actions")
+    _ = try harness.clickText("Open sheet from menu")
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(frame.contains("Open sheet from menu"))
+    #expect(!frame.contains("Sheet overlay body"))
+    #expect(stressPresentationEntryCount(in: harness) == 1)
+  }
+}
