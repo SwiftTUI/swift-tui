@@ -704,3 +704,44 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 021: inline-link geometry churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 021 inline-link label churn updates semantic geometry")
+  func textContent021InlineLinkLabelChurnUpdatesSemanticGeometry() {
+    // Hypothesis: inline-link focus and interaction fragments can retain the short label's one-line
+    // bounds when the same link identity expands across multiple wrapped lines.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent021")
+    let destination = "https://geometry.example"
+
+    for generation in 0..<20 {
+      let isLong = generation.isMultiple(of: 2)
+      let label = isLong ? "BETA LONG" : "B"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 6, height: nil),
+        content: Text("A \(Link(label, destination: .init(destination))) Z")
+      )
+      let linkCells = frames.retained.rasterSurface.cells.flatMap { row in
+        row.filter { $0.hyperlink == destination }
+      }
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(frames.retained.semanticSnapshot.focusRegions.count == 1)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.count == (isLong ? 2 : 1))
+      #expect(linkCells.count == (isLong ? 8 : 1))
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains(destination))
+      if isLong {
+        #expect(frames.retained.semanticSnapshot.focusRegions[0].rect.size.height == 2)
+      } else {
+        #expect(frames.retained.semanticSnapshot.focusRegions[0].rect.size.height == 1)
+      }
+    }
+  }
+}
