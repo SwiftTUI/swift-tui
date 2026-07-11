@@ -507,3 +507,70 @@ private struct StressLL008Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 009: toolbar item migration across late hosts
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 009 late toolbar item migrates between nested hosts")
+  func stress009LateToolbarItemMigratesBetweenNestedHosts() throws {
+    // Hypothesis: recursive late-preference reconciliation may leave an item
+    // absorbed by its former host after the inner toolbar disappears.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL009", "Root"),
+      size: .init(width: 56, height: 12)
+    ) {
+      StressLL009Fixture()
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = 0
+    for generation in 1...8 {
+      var frame = try harness.clickText("Move Toolbar Item")
+      #expect(frame.components(separatedBy: "Run \(generation)").count - 1 == 1)
+      frame = try harness.clickText("Run \(generation)", chooseLast: true)
+      expectedTotal += generation + 1
+      #expect(frame.contains("toolbar total \(expectedTotal)"))
+      #expect(harness.actionRegistrationCount <= 3)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL009Fixture: View {
+  @State private var generation = 0
+  @State private var total = 0
+
+  var body: some View {
+    Panel(id: "outer-toolbar") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Move Toolbar Item") { generation += 1 }
+        Text("toolbar total \(total)")
+        if generation.isMultiple(of: 2) {
+          Panel(id: "inner-toolbar") {
+            lateItemSource
+          }
+          .toolbar(style: DefaultBottomToolbarStyle())
+        } else {
+          lateItemSource
+        }
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 54, height: 10, alignment: .topLeading)
+  }
+
+  private var lateItemSource: some View {
+    GeometryReader { proxy in
+      Text("late body \(generation) \(proxy.size.width)x\(proxy.size.height)")
+        .toolbarItem(
+          .init(
+            title: "Run \(generation)",
+            icon: nil,
+            position: .top,
+            isEnabled: true,
+            action: { total += generation + 1 }
+          )
+        )
+    }
+  }
+}
