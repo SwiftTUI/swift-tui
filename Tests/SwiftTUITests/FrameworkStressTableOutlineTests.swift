@@ -1141,3 +1141,60 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 020: live outline-style replacement
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 020 outline connectors follow the current style")
+  func tableOutline020OutlineConnectorsFollowCurrentStyle() {
+    // Hypothesis: OutlineTree can retain connector draw payloads from the
+    // previous environment style even while row text resolves freshly.
+    struct Root: View {
+      let style: AnyOutlineStyle
+      let generation: Int
+
+      var body: some View {
+        OutlineGroup(
+          [
+            TableOutlineNode(
+              id: "root",
+              title: "root-\(generation)",
+              children: [.init(id: "leaf", title: "leaf-\(generation)")]
+            )
+          ],
+          children: \.children
+        ) { Text($0.title) }
+        .outlineStyle(style)
+      }
+    }
+
+    let variants: [(AnyOutlineStyle, String)] = [
+      (.rounded, "╰─"),
+      (.plain, "└─"),
+      (.ascii, "`-"),
+    ]
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline020")
+    for generation in 0..<21 {
+      let variant = variants[generation % variants.count]
+      let root = Root(style: variant.0, generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 24, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 24, height: 5)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(rendered.contains("\(variant.1) leaf-\(generation)"))
+    }
+  }
+}
