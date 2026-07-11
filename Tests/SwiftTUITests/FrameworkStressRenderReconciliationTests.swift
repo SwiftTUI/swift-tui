@@ -881,4 +881,43 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 021: Background alignment churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 021 background follows current alignment")
+  func renderReconciliation021BackgroundFollowsCurrentAlignment() {
+    // Hypothesis: a retained background subtree can reuse its earlier placement because its
+    // authored content is unchanged even when the wrapper's alignment metadata changes.
+    struct Root: View {
+      let alignment: Alignment
+
+      var body: some View {
+        Text("F")
+          .frame(width: 7, height: 3)
+          .background(alignment: alignment) {
+            Text("B")
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation021")
+    let alignments: [Alignment] = [.topLeading, .bottomTrailing, .center, .topTrailing]
+
+    for generation in 0..<20 {
+      let root = Root(alignment: alignments[generation % alignments.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - End
