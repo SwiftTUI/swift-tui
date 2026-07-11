@@ -449,3 +449,63 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 009: shape-stroke placement churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 009 shape stroke follows inset and outset placement")
+  func visualEffects009ShapeStrokeFollowsInsetAndOutsetPlacement() {
+    // Hypothesis: retained shape payloads can preserve StrokeStyle.Placement independently from
+    // their current border glyph set, shifting a live stroke by one cell after placement churn.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        RoundedRectangle(cornerRadius: 3)
+          .stroke(
+            Color.yellow,
+            style: StrokeStyle(
+              lineWidth: 1,
+              borderSet: .single,
+              placement: generation.isMultiple(of: 2) ? .outset : .inset
+            )
+          )
+          .frame(width: 20, height: 8)
+      }
+    }
+
+    func placement(in node: ResolvedNode) -> StrokeStyle.Placement? {
+      if case .shape(let payload) = node.drawPayload,
+        case .stroke(_, let style, _, _) = payload.operation
+      {
+        return style.placement
+      }
+      for child in node.children {
+        if let value = placement(in: child) {
+          return value
+        }
+      }
+      return nil
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects009")
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(
+        placement(in: retained.resolvedTree)
+          == (generation.isMultiple(of: 2) ? .outset : .inset)
+      )
+    }
+  }
+}
