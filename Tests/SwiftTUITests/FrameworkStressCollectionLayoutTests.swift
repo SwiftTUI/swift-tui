@@ -198,3 +198,55 @@ private struct CollectionLayout003Root: View {
     .frame(width: 14, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 004: lazy indexed cardinality churn
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 004 lazy allocation follows collection cardinality")
+  func collectionLayout004LazyAllocationFollowsCollectionCardinality() {
+    // Hypothesis: retained lazy allocation may keep childSizes or content
+    // length from a prior source after the ForEach count grows or contracts.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout004")
+    let counts = [1, 7, 3, 9, 2, 6]
+
+    for generation in 0..<24 {
+      let count = counts[generation % counts.count]
+      let root = CollectionLayout004Root(count: count)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 15, height: 5)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 15, height: 5)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(collectionLayoutText(retained).contains("004 row 0 of \(count)"))
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout004Root: View {
+  let count: Int
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<count) { value in
+          Text("004 row \(value) of \(count)")
+        }
+      }
+    }
+    .frame(width: 15, height: 5, alignment: .topLeading)
+  }
+}
