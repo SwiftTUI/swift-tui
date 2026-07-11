@@ -905,3 +905,62 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 016: outline node reparenting
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 016 reparented outline node follows its current ancestry")
+  func tableOutline016ReparentedOutlineNodeFollowsCurrentAncestry() {
+    // Hypothesis: the recursive entity route can keep a stable leaf under its
+    // former parent after the same ID moves to another outline branch.
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+
+      var body: some View {
+        OutlineGroup(nodes, children: \.children) { node in
+          Text(node.title)
+        }
+        .outlineStyle(.ascii)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline016")
+    for generation in 0..<20 {
+      let leaf = TableOutlineNode(id: "leaf", title: "leaf-\(generation)")
+      let underLeft = generation.isMultiple(of: 2)
+      let nodes = [
+        TableOutlineNode(
+          id: "left",
+          title: "left-\(generation)",
+          children: underLeft ? [leaf] : nil
+        ),
+        TableOutlineNode(
+          id: "right",
+          title: "right-\(generation)",
+          children: underLeft ? nil : [leaf]
+        ),
+      ]
+      let root = Root(nodes: nodes)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 26, height: 8)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 26, height: 8)
+      )
+      let expected = underLeft
+        ? ["left-\(generation)", "leaf-\(generation)", "right-\(generation)"]
+        : ["left-\(generation)", "right-\(generation)", "leaf-\(generation)"]
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(tableOutlineContainsInOrder(expected, in: tableOutlineText(retained)))
+    }
+  }
+}
