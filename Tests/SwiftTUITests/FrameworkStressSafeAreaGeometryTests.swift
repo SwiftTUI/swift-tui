@@ -94,6 +94,59 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 007: nested ignore removal and reinsertion
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 007 removed inner ignore cannot leak reclamation")
+  func safeAreaGeometry007RemovedInnerIgnoreCannotLeakReclamation() {
+    // Hypothesis: an inner IgnoreSafeArea node can leave reclaimed leading space attached to a
+    // surviving outer ignore after the conditional owner is removed and later recreated.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 3) {
+            GeometryReader { proxy in
+              Text(
+                "007 g\(generation) inner \(proxy.size.width)x\(proxy.size.height) "
+                  + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+              )
+            }
+            .ignoresSafeArea(.leading)
+          } else {
+            GeometryReader { proxy in
+              Text(
+                "007 g\(generation) outer \(proxy.size.width)x\(proxy.size.height) "
+                  + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+              )
+            }
+          }
+        }
+        .ignoresSafeArea(.top)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry007")
+
+    for generation in 0..<18 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: .init(top: 2, leading: 4, bottom: 1, trailing: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("007 g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 006: padding and ignore authored-order replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
