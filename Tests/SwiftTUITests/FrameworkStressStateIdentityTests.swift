@@ -1512,6 +1512,85 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 023: Stable AnyView payload changes child cardinality
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 023 anyview payload cardinality churn reconciles cleanly")
+  func stateIdentity023AnyViewPayloadCardinalityChurnReconcilesCleanly() throws {
+    // Hypothesis: the payload type and shell identity stay stable while its output crosses
+    // EmptyView, direct-child, and Group normalization paths with different teardown rules.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity023"),
+      size: .init(width: 62, height: 11)
+    ) {
+      StateIdentity023Root()
+    }
+    defer { harness.shutdown() }
+
+    var stableChildSurvivedCardinalityChurn = true
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Next Shape 023")
+      stableChildSurvivedCardinalityChurn =
+        stableChildSurvivedCardinalityChurn
+        && frame.contains("023 Stable Count 0")
+      frame = try harness.clickText("Increment Stable 023")
+      stableChildSurvivedCardinalityChurn =
+        stableChildSurvivedCardinalityChurn
+        && frame.contains("023 Stable Count 1")
+      frame = try harness.clickText("Next Shape 023")
+      stableChildSurvivedCardinalityChurn =
+        stableChildSurvivedCardinalityChurn
+        && frame.contains("023 Stable Count 1")
+        && frame.contains("023 Optional Child")
+      frame = try harness.clickText("Next Shape 023")
+      #expect(!frame.contains("023 Stable Count"))
+      #expect(!frame.contains("023 Optional Child"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+
+    withKnownIssue("AnyView one-to-many payload churn drops part of the stable child subtree") {
+      #expect(stableChildSurvivedCardinalityChurn)
+    }
+  }
+
+  private struct StateIdentity023Root: View {
+    @State private var mode = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("023 Mode \(mode)")
+        Button("Next Shape 023") { mode = (mode + 1) % 3 }
+        AnyView(StateIdentity023Payload(mode: mode))
+      }
+    }
+  }
+
+  private struct StateIdentity023Payload: View {
+    let mode: Int
+
+    @ViewBuilder
+    var body: some View {
+      if mode != 0 {
+        StateIdentity023Counter()
+        if mode == 2 {
+          Text("023 Optional Child")
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity023Counter: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("023 Stable Count \(count)")
+        Button("Increment Stable 023") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
