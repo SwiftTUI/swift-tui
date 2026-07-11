@@ -53,4 +53,14 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 006 malformed lengths are rejected without prefix decode")
+  func styleTransport006MalformedLengthsAreRejectedWithoutPrefixDecode() {
+    // Hypothesis: a valid prefix can be returned while one to three trailing scalars are ignored.
+    for encoded in ["A", "AAA", "AAAAA", "AAAAAAA"] {
+      #expect(StyleTransportBase64.decode(encoded) == nil)
+    }
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
