@@ -839,4 +839,40 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
-// NEXT COMPONENT STRESS TEST
+// MARK: - Attempt 025: EquatableView topology replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 025 EquatableView insertion leaves no identity residue")
+  func componentComposition025EquatableViewInsertionLeavesNoIdentityResidue() {
+    // Hypothesis: adding and removing the wrapper node at one explicit identity can revive
+    // an obsolete memoized subtree when the wrapped value returns.
+    struct Row: View, Equatable {
+      let value: String
+      var body: some View { Text(value) }
+    }
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            Row(value: "wrapped-\(generation)").equatable()
+          } else {
+            Row(value: "plain-\(generation)")
+          }
+        }
+        .id("stable-equatable-row")
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition025")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let expected = generation.isMultiple(of: 2) ? "wrapped-\(generation)" : "plain-\(generation)"
+      #expect(componentCompositionText(frames.retained).contains(expected))
+    }
+  }
+}
