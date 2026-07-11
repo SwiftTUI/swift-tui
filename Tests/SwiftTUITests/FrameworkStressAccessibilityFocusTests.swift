@@ -1176,3 +1176,74 @@ private struct StressAF021Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 022: focus-section traversal under reorder
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 022 tab escapes reordered focus section")
+  func stress022TabEscapesReorderedFocusSection() throws {
+    // Hypothesis: retained section metadata can follow the old structural ordinal when two focus
+    // sections reorder, causing Tab to stop inside the current section instead of escaping it.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF022", "Root"),
+      size: .init(width: 46, height: 9)
+    ) {
+      StressAF022Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<10 {
+      _ = try harness.focus(StressAF022Fixture.firstIdentity)
+      _ = try harness.pressKey(KeyPress(.tab))
+      #expect(
+        harness.runLoop.focusTracker.currentFocusIdentity
+          == StressAF022Fixture.outsideIdentity)
+      _ = try harness.pressKey(KeyPress(.character("r")))
+    }
+
+    #expect(harness.focusRegionCount == 3)
+  }
+}
+
+@MainActor
+private struct StressAF022Fixture: View {
+  static let firstIdentity = testIdentity("StressAF022", "Section", "First")
+  static let secondIdentity = testIdentity("StressAF022", "Section", "Second")
+  static let outsideIdentity = testIdentity("StressAF022", "Outside")
+
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if reversed {
+        outside
+        groupedSection
+      } else {
+        groupedSection
+        outside
+      }
+    }
+  }
+
+  private var groupedSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Section first")
+        .id(Self.firstIdentity)
+        .focusable()
+      Text("Section second")
+        .id(Self.secondIdentity)
+        .focusable()
+    }
+    .focusSection()
+  }
+
+  private var outside: some View {
+    Text("Outside section")
+      .id(Self.outsideIdentity)
+      .focusable()
+      .onKeyPress(.character("r")) { _ in
+        reversed.toggle()
+        return .handled
+      }
+  }
+}
