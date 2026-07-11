@@ -537,3 +537,57 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 010: table key-order replacement
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 010 table key navigation follows reordered tags")
+  func tableOutline010TableKeyNavigationFollowsReorderedTags() {
+    // Hypothesis: Table's key closure can refresh its binding but retain the
+    // selectableTags array captured before stable rows reordered.
+    final class SelectionBox { var value = 1 }
+    struct Row: Identifiable { let id: Int }
+    struct Root: View {
+      let rows: [Row]
+      let box: SelectionBox
+      let tableIdentity: Identity
+
+      var body: some View {
+        Table(
+          selection: Binding(get: { box.value }, set: { box.value = $0 }),
+          columns: [.init("Rows", width: 8)]
+        ) {
+          ForEach(rows) { row in
+            TableRow { Text("row-\(row.id)") }.tag(row.id)
+          }
+        }
+        .id(tableIdentity)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline010")
+    let tableIdentity = testIdentity("TableOutline010", "Table")
+    let box = SelectionBox()
+    let variants = [[1, 2, 3], [3, 1, 2], [2, 3, 1]]
+
+    for generation in 0..<18 {
+      let order = variants[generation % variants.count]
+      box.value = order[0]
+      let registry = LocalKeyHandlerRegistry()
+      _ = renderer.render(
+        Root(rows: order.map(Row.init(id:)), box: box, tableIdentity: tableIdentity),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          localKeyHandlerRegistry: registry,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 16, height: 9)
+      )
+
+      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(box.value == order[1])
+    }
+  }
+}
