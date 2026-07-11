@@ -864,6 +864,53 @@ private struct StressPS019Fixture: View {
   }
 }
 
+// MARK: - Attempt 020: disclosure binding retarget
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test(
+    "stress presentation semantics 020 a stable disclosure writes its current expansion binding")
+  func stress020StableDisclosureWritesCurrentExpansionBinding() throws {
+    // Hypothesis: DisclosureGroup's retained action registration may toggle
+    // the expansion binding from before a same-identity retarget.
+    let probe = StressPresentationProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS020", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressPS020Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget disclosure")
+    let frame = try harness.clickText("Bound details")
+
+    #expect(probe.firstBool == false)
+    #expect(probe.secondBool == true)
+    #expect(frame.contains("Current bound content"))
+  }
+}
+
+@MainActor
+private struct StressPS020Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget disclosure") {
+        usesSecond = true
+      }
+      DisclosureGroup(
+        "Bound details",
+        isExpanded: usesSecond ? probe.secondBoolBinding() : probe.firstBoolBinding()
+      ) {
+        Text("Current bound content")
+      }
+      .id("stable-disclosure")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
