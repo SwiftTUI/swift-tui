@@ -834,3 +834,43 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 024: truncated inline-link semantics
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 024 truncated link excludes hidden and ellipsis cells")
+  func textContent024TruncatedLinkExcludesHiddenAndEllipsisCells() {
+    // Hypothesis: rich-text truncation can carry an inline link's run index onto the synthetic
+    // ellipsis or preserve semantic width for hidden suffix clusters.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent024")
+    let destination = "https://truncated.example"
+
+    for generation in 0..<20 {
+      let label = generation.isMultiple(of: 2) ? "ABCDEFGHIJ" : "ABCDKLMNOP"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 5, height: 1),
+        content: Text("\(Link(label, destination: .init(destination)))")
+          .lineLimit(1)
+          .truncationMode(.tail)
+      )
+      let cells = frames.retained.rasterSurface.cells[0]
+      let focusRegion = frames.retained.semanticSnapshot.focusRegions.first
+      let interactionRegion = frames.retained.semanticSnapshot.interactionRegions.first
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(frames.retained.rasterSurface.lines == ["ABCD…"])
+      #expect(cells.prefix(4).allSatisfy { $0.hyperlink == destination })
+      #expect(cells[4].character == "…")
+      #expect(cells[4].hyperlink == nil)
+      #expect(focusRegion?.rect.size == .init(width: 4, height: 1))
+      #expect(interactionRegion?.rect.size == .init(width: 4, height: 1))
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains(destination))
+    }
+  }
+}
