@@ -239,3 +239,51 @@ private struct GestureScroll005Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 006: primitive gesture shape replacement
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 006 replacing tap with long press drops tap semantics")
+  func gestureScroll006ReplacingTapWithLongPressDropsTapSemantics() throws {
+    // Hypothesis: stable-identity route replay may retain the old non-capturing
+    // tap recognizer when the authored primitive changes to a long press.
+    let taps = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll006Root"),
+      size: .init(width: 46, height: 7)
+    ) {
+      GestureScroll006Fixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Use long press")
+    _ = try harness.clickText("Shape changing gesture")
+
+    #expect(taps.value == 0)
+    #expect(harness.gestureRecognizerCount == 1)
+  }
+}
+
+private struct GestureScroll006Fixture: View {
+  static let identity = testIdentity("GestureScroll006", "Target")
+
+  let taps: GestureScrollBox<Int>
+  @State private var usesLongPress = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Use long press") { usesLongPress = true }
+      if usesLongPress {
+        Text("Shape changing gesture")
+          .id(Self.identity)
+          .frame(width: 28, height: 1, alignment: .leading)
+          .onLongPressGesture(minimumDuration: .seconds(2)) {}
+      } else {
+        Text("Shape changing gesture")
+          .id(Self.identity)
+          .frame(width: 28, height: 1, alignment: .leading)
+          .onTapGesture { taps.value += 1 }
+      }
+    }
+  }
+}
