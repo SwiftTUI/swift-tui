@@ -243,3 +243,37 @@ extension FrameworkStressComponentCompositionTests {
     }
   }
 }
+
+// MARK: - Attempt 006: ControlGroup child cardinality
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 006 ControlGroup follows current child cardinality")
+  func componentComposition006ControlGroupFollowsCurrentChildCardinality() {
+    // Hypothesis: ControlGroup's nested variadic HStack can retain a removed control.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        ControlGroup {
+          Button("always-\(generation)") {}
+          if generation.isMultiple(of: 2) {
+            Button("optional-\(generation)") {}
+          }
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition006")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("always-\(generation)"))
+      #expect(text.contains("optional-\(generation)") == generation.isMultiple(of: 2))
+    }
+  }
+}
+
+// NEXT COMPONENT STRESS TEST
