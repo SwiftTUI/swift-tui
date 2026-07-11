@@ -1217,3 +1217,54 @@ private struct StressTC021Fixture: View {
     .frame(width: 56, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 022: key modifier replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 022 modifier replacement removes the old binding tuple")
+  func stressTabCommand022ModifierReplacementRemovesOldBindingTuple() throws {
+    // Hypothesis: replacing only EventModifiers may leave both hash keys in the
+    // command table even though the modifier is one field of the binding tuple.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC022", "Root"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StressTC022Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace modifiers")
+    _ = try harness.pressKey(KeyPress(.character("k"), modifiers: .ctrl))
+    _ = try harness.pressKey(KeyPress(.character("k"), modifiers: .alt))
+
+    #expect(probe.events == ["alt-1"])
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+@MainActor
+private struct StressTC022Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var usesAlt = false
+
+  var body: some View {
+    Panel(id: "stress-tc-022-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Replace modifiers") {
+          usesAlt = true
+        }
+        Text("Modifier focus")
+          .focusable()
+      }
+    }
+    .keyCommand(
+      "Mutable modifiers",
+      key: .character("k"),
+      modifiers: usesAlt ? .alt : .ctrl
+    ) {
+      probe.events.append(usesAlt ? "alt-1" : "ctrl-0")
+    }
+    .frame(width: 56, height: 8, alignment: .topLeading)
+  }
+}
