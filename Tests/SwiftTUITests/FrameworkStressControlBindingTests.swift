@@ -724,3 +724,49 @@ private struct ControlStress015Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 016: slider activation at and after upper bound
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 016 slider activation respects the live upper bound")
+  func stressControlBinding016SliderActivationRespectsLiveUpperBound() throws {
+    // Hypothesis: Slider's activation action can either issue a redundant write at its upper bound
+    // or remain inert after an external replacement moves the value back into the live range.
+    let value = ControlStressProbe(10)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress016", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      ControlStress016Fixture(value: value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Activation slider 016")
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(value.value == 10)
+    #expect(value.writes.isEmpty)
+
+    _ = try harness.clickText("Reset slider to nine 016")
+    _ = try harness.focusText("Activation slider 016")
+    _ = try harness.pressKey(KeyPress(.space))
+    #expect(value.value == 10)
+    #expect(value.writes == [10])
+  }
+}
+
+@MainActor
+private struct ControlStress016Fixture: View {
+  let value: ControlStressProbe<Int>
+  @State private var externalRevision = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reset slider to nine 016") {
+        value.value = 9
+        externalRevision += 1
+      }
+      Slider("Activation slider 016", value: value.binding(), in: 0...10)
+      Text("External slider revision 016 \(externalRevision)")
+    }
+  }
+}
