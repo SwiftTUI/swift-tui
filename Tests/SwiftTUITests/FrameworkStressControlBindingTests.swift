@@ -326,3 +326,48 @@ private struct ControlStress006Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 007: toggle external write during pointer press
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 007 pressed toggle flips the latest external value")
+  func stressControlBinding007PressedToggleFlipsLatestExternalValue() throws {
+    // Hypothesis: a Toggle pointer press can snapshot the old Boolean and overwrite a newer
+    // external binding value when the release activation arrives after an intervening render.
+    let probe = ControlStressProbe(false)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress007", "Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      ControlStress007Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    let target = try #require(harness.point(forText: "Press toggle 007"))
+    _ = try harness.sendMouse(.down(.primary), at: target)
+    _ = try harness.pressKey(KeyPress(.character("e"), modifiers: .ctrl))
+    _ = try harness.sendMouse(.up(.primary), at: target)
+
+    #expect(probe.value == false)
+    #expect(probe.writes == [false])
+  }
+}
+
+@MainActor
+private struct ControlStress007Fixture: View {
+  let probe: ControlStressProbe<Bool>
+  @State private var externalRevision = 0
+
+  var body: some View {
+    Panel(id: testIdentity("ControlStress007", "Panel")) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("External revision 007 \(externalRevision)")
+        Toggle("Press toggle 007", isOn: probe.binding())
+      }
+    }
+    .keyCommand("Externally enable 007", key: .character("e"), modifiers: .ctrl) {
+      probe.value = true
+      externalRevision += 1
+    }
+  }
+}
