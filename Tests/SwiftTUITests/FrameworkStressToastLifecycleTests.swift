@@ -1173,8 +1173,13 @@ extension FrameworkStressToastLifecycleTests {
 @MainActor
 private final class ToastLifecycleEventProbe {
   var events: [String] = []
-  var taskStarts = 0
-  var taskCancellations = 0
+  var taskStarts = 0 {
+    didSet { taskChanges.notify() }
+  }
+  var taskCancellations = 0 {
+    didSet { taskChanges.notify() }
+  }
+  let taskChanges = MainActorConditionSignal()
 }
 
 @MainActor
@@ -1205,6 +1210,78 @@ private struct ToastLifecycle023Root: View {
     }
     .toast(isPresented: $isPresented, duration: nil) {
       ToastLifecycle023Content(cycle: cycle, probe: probe)
+    }
+  }
+}
+
+// MARK: - Attempt 024: content task cancellation and restart
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 024 content task cancels and restarts with each item")
+  func toastLifecycle024ContentTaskCancelsAndRestartsWithEachItem() async throws {
+    // Hypothesis: portal row reuse can keep a toast content task alive after close or suppress the
+    // next activation's task start because its descriptor matches the departed item.
+    let probe = ToastLifecycleEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle024"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ToastLifecycle024Root(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...6 {
+      _ = try harness.clickText("Open Task Toast 024")
+      await probe.taskChanges.wait {
+        probe.taskStarts == cycle
+      }
+      _ = try harness.render()
+      #expect(harness.activeTaskCount == 1)
+
+      _ = try harness.clickText("Close Task Toast 024")
+      await probe.taskChanges.wait {
+        probe.taskCancellations == cycle
+      }
+      _ = try harness.render()
+      #expect(harness.activeTaskCount == 0)
+      #expect(harness.activeTaskDescriptorCount == 0)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle024Content: View {
+  let cycle: Int
+  let probe: ToastLifecycleEventProbe
+
+  var body: some View {
+    Text("task toast cycle \(cycle)")
+      .task {
+        probe.taskStarts += 1
+        while !Task.isCancelled {
+          await Task.yield()
+        }
+        probe.taskCancellations += 1
+      }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle024Root: View {
+  let probe: ToastLifecycleEventProbe
+  @State private var isPresented = false
+  @State private var cycle = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Open Task Toast 024") {
+        cycle += 1
+        isPresented = true
+      }
+      Button("Close Task Toast 024") { isPresented = false }
+    }
+    .toast(isPresented: $isPresented, duration: nil) {
+      ToastLifecycle024Content(cycle: cycle, probe: probe)
     }
   }
 }
