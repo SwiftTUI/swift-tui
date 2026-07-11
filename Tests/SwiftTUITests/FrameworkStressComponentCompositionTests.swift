@@ -73,3 +73,54 @@ extension FrameworkStressComponentCompositionTests {
     }
   }
 }
+
+// MARK: - Attempt 002: Label child-topology replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 002 Label replaces child topology without residue")
+  func componentComposition002LabelReplacesChildTopologyWithoutResidue() {
+    // Hypothesis: Label can retain a removed variadic child when its icon and
+    // title builders alternate between one and two resolved elements.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Label {
+          if generation.isMultiple(of: 2) {
+            Text("single-title-\(generation)")
+          } else {
+            Text("first-title-\(generation)")
+            Text("second-title-\(generation)")
+          }
+        } icon: {
+          if generation.isMultiple(of: 3) {
+            Text("single-icon")
+          } else {
+            Text("left-icon")
+            Text("right-icon")
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition002")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("single-title-\(generation)") == generation.isMultiple(of: 2))
+      if generation.isMultiple(of: 2), generation > 0 {
+        #expect(!text.contains("second-title-\(generation - 1)"))
+      }
+      if generation.isMultiple(of: 3) {
+        #expect(!text.contains("right-icon"))
+      }
+    }
+  }
+}
