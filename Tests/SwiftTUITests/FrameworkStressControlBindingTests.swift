@@ -371,3 +371,54 @@ private struct ControlStress007Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 008: radio picker option-prefix insertion
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 008 inserted picker prefix keeps option routes aligned")
+  func stressControlBinding008InsertedPickerPrefixKeepsOptionRoutesAligned() throws {
+    // Hypothesis: inserting an option before a stable radio Picker can preserve index-derived
+    // pointer handlers from the prior option list and write the tag formerly at the clicked row.
+    let selection = ControlStressProbe("a")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress008", "Root"),
+      size: .init(width: 48, height: 11)
+    ) {
+      ControlStress008Fixture(selection: selection)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Prepend option 008")
+    _ = try harness.clickText("Beta option 008")
+
+    #expect(selection.value == "b")
+    #expect(selection.writes == ["b"])
+  }
+}
+
+@MainActor
+private struct ControlStress008Fixture: View {
+  let selection: ControlStressProbe<String>
+  @State private var includesPrefix = false
+
+  private var options: [(String, String)] {
+    var result = [("a", "Alpha option 008"), ("b", "Beta option 008")]
+    if includesPrefix {
+      result.insert(("x", "Prefix option 008"), at: 0)
+    }
+    return result
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Prepend option 008") { includesPrefix = true }
+      Picker("Radio picker 008", selection: selection.binding()) {
+        ForEach(options, id: \.0) { option in
+          Text(option.1).tag(option.0)
+        }
+      }
+      .id("radio-picker-008")
+      .pickerStyle(.radioGroup)
+    }
+  }
+}
