@@ -30,4 +30,14 @@ struct FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 002 repeated start preserves started state")
+  func cancellationState002RepeatedStartPreservesStartedState() {
+    // Hypothesis: repeated start notifications can become false after the first transition.
+    let token = FrameTailJobCancellationToken()
+    for _ in 0..<32 { #expect(token.markStarted()) }
+    #expect(token.currentState.rawValue == "started")
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
