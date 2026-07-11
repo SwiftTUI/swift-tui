@@ -439,6 +439,46 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 012: explicit binding reactivation lifetime
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 012 binding reactivation starts with current content")
+  func popoverTip012BindingReactivationStartsWithCurrentContent() throws {
+    // Hypothesis: repeatedly toggling the explicit binding can resurrect the
+    // prior portal payload or its dismiss registration on reactivation.
+    let rootIdentity = testIdentity("PopoverTipStress012", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "binding-reactivation"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      model.primaryPresented = false
+      var frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+
+      model.generation = generation
+      model.title = "Reactivated tip \(generation)"
+      model.actions = [.init(id: "reactivated", title: "Close reactivated \(generation)")]
+      model.primaryPresented = true
+      frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(frame.contains("Reactivated tip \(generation)"))
+      #expect(!frame.contains("Reactivated tip \(generation - 1)"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+
+      frame = try harness.pressKey(KeyPress(.escape))
+      #expect(!model.primaryPresented)
+      #expect(!frame.contains("Reactivated tip \(generation)"))
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
