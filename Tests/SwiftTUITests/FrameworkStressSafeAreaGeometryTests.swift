@@ -94,6 +94,60 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 006: padding and ignore authored-order replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 006 padding and ignore preserve authored order")
+  func safeAreaGeometry006PaddingAndIgnorePreserveAuthoredOrder() {
+    // Hypothesis: modifier-chain equivalence can treat safe-area padding and reclamation as
+    // commutative, retaining the prior measurement when their authored order reverses.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let content = GeometryReader { proxy in
+          Text(
+            "006 g\(generation) \(proxy.size.width)x\(proxy.size.height) "
+              + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+          )
+        }
+
+        if generation.isMultiple(of: 2) {
+          AnyView(
+            content
+              .safeAreaPadding([.top, .leading], 1)
+              .ignoresSafeArea(.top)
+          )
+        } else {
+          AnyView(
+            content
+              .ignoresSafeArea(.top)
+              .safeAreaPadding([.top, .leading], 1)
+          )
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry006")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: .init(top: 2, leading: 3, bottom: 1, trailing: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("006 g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 005: ignored safe-area edge replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
