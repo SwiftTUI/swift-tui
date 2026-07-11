@@ -94,3 +94,44 @@ extension FrameworkStressChartDataTests {
     }
   }
 }
+
+// MARK: - Attempt 002: bar signed-domain replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 002 bar signed extrema refresh summary and track geometry")
+  func chartData002BarSignedExtremaRefreshSummaryAndTrackGeometry() {
+    // Hypothesis: replacing a positive maximum with a larger negative value can
+    // refresh the printed number while retaining the prior normalization domain.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let extreme = Double(40 + generation)
+        BarChart(
+          "Signed \(generation)",
+          entries: [
+            .init("neg\(generation)", value: -extreme, tone: .critical),
+            .init("pos\(generation)", value: Double((generation % 7) + 1), tone: .info),
+            .init("zero\(generation)", value: 0, tone: .automatic),
+          ],
+          barWidth: generation.isMultiple(of: 2) ? 13 : 17,
+          labelWidth: generation.isMultiple(of: 3) ? 7 : 9
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "002", proposal: .init(width: 52, height: 8)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Signed \(generation)"))
+      #expect(text.contains("-\(40 + generation)"))
+      #expect(text.contains("max \(40 + generation)"))
+      #expect(
+        chartDataAccessibilityLabels(snapshot).contains(
+          "Signed \(generation): max \(40 + generation)"
+        )
+      )
+    }
+  }
+}
