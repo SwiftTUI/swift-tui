@@ -40,4 +40,21 @@ struct FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 002 removing LRU preserves neighbor chain")
+  func cacheState002RemovingLRUPreservesNeighborChain() {
+    // Hypothesis: unlinking the head can leave the next node's previous pointer dangling.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 2, bytes: .max)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(1), policy: policy)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(1), policy: policy)
+    cache.removeValue(forKey: "a")
+    cache.upsert("c", value: 3, cost: stressCacheEntry(1), policy: policy)
+    cache.upsert("d", value: 4, cost: stressCacheEntry(1), policy: policy)
+    #expect(cache.peek("b") == nil)
+    #expect(cache.peek("c") == 3)
+    #expect(cache.peek("d") == 4)
+  }
+}
+
 // NEXT CACHE STRESS TEST
