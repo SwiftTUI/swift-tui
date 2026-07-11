@@ -39,6 +39,41 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 002: optional tip message topology freshness
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 002 optional message leaves no retained payload")
+  func popoverTip002OptionalMessageLeavesNoRetainedPayload() throws {
+    // Hypothesis: removing the optional message can leave the prior message
+    // child retained in the detached portal content tree.
+    let rootIdentity = testIdentity("PopoverTipStress002", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "optional-message"
+    model.title = "Optional message tip"
+    model.icon = nil
+    model.actions = []
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      model.generation = generation
+      model.message = generation.isMultiple(of: 2) ? nil : "Message payload \(generation)"
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      if let message = model.message {
+        #expect(frame.contains(message))
+      } else {
+        #expect(!frame.contains("Message payload \(generation - 1)"))
+      }
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
