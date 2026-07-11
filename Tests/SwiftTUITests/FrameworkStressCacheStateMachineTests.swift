@@ -299,4 +299,19 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 018 canonical Unicode spellings converge safely")
+  func cacheState018CanonicalUnicodeSpellingsConvergeSafely() {
+    // Hypothesis: canonically equal String keys can return incompatible cluster geometry.
+    let cache = TextLayoutCache(capacity: 4)
+    let composed = cache.layout(for: "é", options: .init(width: nil))
+    let decomposed = cache.layout(for: "e\u{301}", options: .init(width: nil))
+    #expect(composed.lines[0].text == "é")
+    #expect(decomposed.lines[0].text == "e\u{301}")
+    #expect(decomposed == composed)
+    #expect(cache.metrics.entries == 1)
+    #expect(cache.metrics.hits == 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
