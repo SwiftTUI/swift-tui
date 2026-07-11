@@ -91,4 +91,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 010 padding is legal only in the final chunk")
+  func styleTransport010PaddingIsLegalOnlyInTheFinalChunk() {
+    // Hypothesis: early padding can truncate the payload while trailing chunks are ignored.
+    #expect(StyleTransportBase64.decode("AA==AAAA") == nil)
+    #expect(StyleTransportBase64.decode("AAA=AAAA") == nil)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
