@@ -1140,3 +1140,71 @@ private struct ToastLifecycle022Root: View {
     .toast("focus neutral toast", isPresented: $isPresented, duration: nil)
   }
 }
+
+// MARK: - Attempt 023: content lifecycle pairing
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 023 content lifecycle pairs once per activation")
+  func toastLifecycle023ContentLifecyclePairsOncePerActivation() throws {
+    // Hypothesis: force-refreshing toast attachment payloads can duplicate appear handlers, miss a
+    // disappear, or retain a previous activation's lifecycle closure.
+    let probe = ToastLifecycleEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle023"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ToastLifecycle023Root(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...10 {
+      _ = try harness.clickText("Open Lifecycle Toast 023")
+      #expect(probe.events.last == "appear-\(cycle)")
+      #expect(harness.lifecycleRegistrationCount == 2)
+
+      _ = try harness.clickText("Close Lifecycle Toast 023")
+      #expect(probe.events.suffix(2) == ["appear-\(cycle)", "disappear-\(cycle)"])
+      #expect(probe.events.count == cycle * 2)
+      #expect(harness.lifecycleRegistrationCount == 0)
+    }
+  }
+}
+
+@MainActor
+private final class ToastLifecycleEventProbe {
+  var events: [String] = []
+  var taskStarts = 0
+  var taskCancellations = 0
+}
+
+@MainActor
+private struct ToastLifecycle023Content: View {
+  let cycle: Int
+  let probe: ToastLifecycleEventProbe
+
+  var body: some View {
+    Text("lifecycle toast cycle \(cycle)")
+      .onAppear { probe.events.append("appear-\(cycle)") }
+      .onDisappear { probe.events.append("disappear-\(cycle)") }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle023Root: View {
+  let probe: ToastLifecycleEventProbe
+  @State private var isPresented = false
+  @State private var cycle = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Open Lifecycle Toast 023") {
+        cycle += 1
+        isPresented = true
+      }
+      Button("Close Lifecycle Toast 023") { isPresented = false }
+    }
+    .toast(isPresented: $isPresented, duration: nil) {
+      ToastLifecycle023Content(cycle: cycle, probe: probe)
+    }
+  }
+}
