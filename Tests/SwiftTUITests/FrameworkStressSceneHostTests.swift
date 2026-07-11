@@ -256,3 +256,49 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 007: descriptor and executable selection lockstep
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 007 descriptors and selections stay lockstep through topology churn")
+  func sceneHost007DescriptorsAndSelectionsStayLockstepThroughTopologyChurn() {
+    // Hypothesis: the descriptor and executable-selection visitors can diverge
+    // when optional, erased, and array-built scene nodes change cardinality.
+    for generation in 0..<24 {
+      let scene = sceneHost007Scene(generation: generation)
+      let descriptors = collectWindowSceneDescriptors(from: scene)
+      let selections = collectWindowSceneSelections(from: scene)
+
+      #expect(selections.map(\.descriptor) == descriptors)
+      #expect(selections.map(\.identifier) == descriptors.map(\.id))
+      #expect(selections.map(\.title) == descriptors.map(\.title))
+      #expect(selections.map(\.isDefault) == descriptors.map(\.isDefault))
+      #expect(Set(selections.map(\.rootIdentity)).count == selections.count)
+    }
+  }
+}
+
+@MainActor
+@SceneBuilder
+private func sceneHost007Scene(generation: Int) -> some Scene {
+  if generation.isMultiple(of: 2) {
+    AnyScene(
+      WindowGroup("Prefix \(generation)", id: WindowIdentifier("prefix-\(generation)")) {
+        Text("prefix")
+      })
+  }
+  for index in 0...(generation % 4) {
+    WindowGroup("Array \(index)", id: WindowIdentifier("array-\(generation)-\(index)")) {
+      Text("array \(index)")
+    }
+  }
+  if generation.isMultiple(of: 5) {
+    AnyScene(
+      AnyScene(
+        WindowGroup("Suffix \(generation)", id: WindowIdentifier("suffix-\(generation)")) {
+          Text("suffix")
+        }
+      )
+    )
+  }
+}
