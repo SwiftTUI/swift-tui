@@ -542,3 +542,57 @@ private struct StressAF010Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 011: live-region policy churn
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 011 live region publishes current politeness")
+  func stress011LiveRegionPublishesCurrentPoliteness() throws {
+    // Hypothesis: a stable status node can retain its prior live-region policy when politeness and
+    // label change together through off, polite, and assertive generations.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF011", "Root"),
+      size: .init(width: 52, height: 7)
+    ) {
+      StressAF011Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<14 {
+      _ = try harness.clickText("Cycle live policy")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Live status 14" }
+    )
+    #expect(target.role == .status)
+    #expect(target.liveRegion == .assertive)
+    #expect(!accessibilityFocusNodes(in: harness).contains { $0.label == "Live status 13" })
+  }
+}
+
+@MainActor
+private struct StressAF011Fixture: View {
+  @State private var generation = 0
+
+  private var politeness: AccessibilityPoliteness {
+    switch generation % 3 {
+    case 0: .off
+    case 1: .polite
+    default: .assertive
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Cycle live policy") {
+        generation += 1
+      }
+      Text("Stable status")
+        .id("stress-af-011-status")
+        .accessibilityRole(.status)
+        .accessibilityLabel("Live status \(generation)")
+        .accessibilityLiveRegion(politeness)
+    }
+  }
+}
