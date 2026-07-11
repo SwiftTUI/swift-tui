@@ -109,6 +109,61 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 013: nested inset removal and reinsertion
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 013 removed nested inset restores surviving base")
+  func safeAreaGeometry013RemovedNestedInsetRestoresSurvivingBase() {
+    // Hypothesis: tearing down one of two nested safe-area inset modifiers can strand its consumed
+    // width in the surviving inset's base measurement or leave its old adornment painted.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let base = GeometryReader { proxy in
+          Text("013 base g\(generation) \(proxy.size.width)x\(proxy.size.height)")
+        }
+        .safeAreaInset(edge: .top, alignment: .topLeading) {
+          Text("013 top g\(generation)")
+        }
+
+        if generation.isMultiple(of: 2) {
+          AnyView(
+            base.safeAreaInset(edge: .leading, alignment: .topLeading) {
+              Text("013 leading g\(generation)")
+                .frame(width: 8)
+            }
+          )
+        } else {
+          AnyView(base)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry013")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 50, height: 16),
+        safeAreaInsets: .init(top: 1, leading: 2)
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        safeAreaGeometryMeasurementsMatch(frames.retained.measuredTree, frames.fresh.measuredTree)
+      )
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(text.contains("013 top g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 012: inset adornment cardinality churn
 
 extension FrameworkStressSafeAreaGeometryTests {
