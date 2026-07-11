@@ -659,4 +659,39 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 020: determinate family replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 020 determinate and indeterminate progress replace cleanly")
+  func componentComposition020DeterminateAndIndeterminateProgressReplaceCleanly() {
+    // Hypothesis: swapping ProgressView generic families at a stable identity can preserve
+    // the prior summary or indeterminate track subtree.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            ProgressView("fixed-\(generation)", value: 1, total: 4, barWidth: 10)
+          } else {
+            ProgressView("moving-\(generation)", barWidth: 10)
+          }
+        }
+        .id("stable-progress")
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition020")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("fixed-\(generation)") == generation.isMultiple(of: 2))
+      #expect(text.contains("moving-\(generation)") == !generation.isMultiple(of: 2))
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
