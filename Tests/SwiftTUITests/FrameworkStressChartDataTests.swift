@@ -15,6 +15,7 @@ private func chartDataExercise<Root: View>(
   attempt: String,
   generations: ClosedRange<Int> = 0...16,
   proposal: ProposedSize = .init(width: 64, height: 16),
+  compareSemanticSnapshot: Bool = true,
   makeRoot: (Int) -> Root,
   verify: (Int, RenderSnapshot) -> Void
 ) {
@@ -41,10 +42,24 @@ private func chartDataExercise<Root: View>(
       retained.rasterSurface == fresh.rasterSurface,
       "retained raster diverged in chart attempt \(attempt), generation \(generation)"
     )
-    #expect(
-      retained.semanticSnapshot == fresh.semanticSnapshot,
-      "retained semantics diverged in chart attempt \(attempt), generation \(generation)"
-    )
+    if compareSemanticSnapshot {
+      #expect(
+        retained.semanticSnapshot == fresh.semanticSnapshot,
+        "retained semantics diverged in chart attempt \(attempt), generation \(generation)"
+      )
+    } else {
+      let retainedNodes = retained.semanticSnapshot.accessibilityNodes
+      let freshNodes = fresh.semanticSnapshot.accessibilityNodes
+      #expect(retainedNodes.map(\.identity) == freshNodes.map(\.identity))
+      #expect(retainedNodes.map(\.parentIdentity) == freshNodes.map(\.parentIdentity))
+      #expect(retainedNodes.map(\.rect) == freshNodes.map(\.rect))
+      #expect(retainedNodes.map(\.role) == freshNodes.map(\.role))
+      #expect(retainedNodes.map(\.label) == freshNodes.map(\.label))
+      #expect(retainedNodes.map(\.hint) == freshNodes.map(\.hint))
+      #expect(retainedNodes.map(\.hidden) == freshNodes.map(\.hidden))
+      #expect(retainedNodes.map(\.liveRegion) == freshNodes.map(\.liveRegion))
+      #expect(retainedNodes.map(\.cursorAnchor) == freshNodes.map(\.cursorAnchor))
+    }
     verify(generation, retained)
   }
 }
@@ -101,6 +116,106 @@ extension FrameworkStressChartDataTests {
       #expect(text.contains("B\(generation)"))
       #expect(
         chartDataAccessibilityLabels(snapshot).contains { $0.contains("Bars \(generation):") })
+    }
+  }
+}
+
+// MARK: - Attempt 025: AnyView cross-chart topology replacement
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 025 AnyView replaces unrelated chart families at one slot")
+  func chartData025AnyViewReplacesUnrelatedChartFamiliesAtOneSlot() {
+    // Hypothesis: AnyView can reuse a primitive chart's value-collapsed subtree
+    // after an unrelated chart family replaces it at the same erased identity.
+    struct Root: View {
+      let generation: Int
+
+      var expectedMarker: String { "marker-\(generation)" }
+
+      var body: some View {
+        switch generation % 6 {
+        case 0:
+          AnyView(
+            BarChart(
+              expectedMarker,
+              entries: [.init("bar", value: Double(generation + 1))],
+              barWidth: 10,
+              labelWidth: 5
+            )
+          )
+        case 1:
+          AnyView(
+            LineChart(
+              expectedMarker,
+              series: [
+                .init(
+                  "line-\(generation)",
+                  points: [.init(x: 0, y: 0), .init(x: 1, y: Double(generation + 1))]
+                )
+              ],
+              height: 5,
+              width: 28
+            )
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartLegend(.hidden)
+          )
+        case 2:
+          AnyView(
+            CalendarHeatmap(
+              expectedMarker,
+              days: [.init(chartDataDate(day: generation % 10), value: Double(generation + 1))],
+              range: chartDataDate(day: 0)...chartDataDate(day: 13),
+              calendar: chartDataUTCGregorian,
+              showsMonthHeader: false,
+              showsDayLabels: false,
+              showsScaleLegend: false
+            )
+          )
+        case 3:
+          AnyView(
+            Meter(
+              expectedMarker,
+              value: Double(generation),
+              total: Double(generation + 10),
+              barWidth: 12
+            )
+          )
+        case 4:
+          AnyView(
+            Timeline([
+              .init(expectedMarker, detail: "timeline-\(generation)", tone: .success)
+            ])
+          )
+        default:
+          AnyView(
+            ThresholdGauge(
+              expectedMarker,
+              value: Double(generation),
+              total: Double(generation + 20),
+              bands: [
+                .init(upTo: Double(generation + 5), tone: .success),
+                .init(upTo: Double(generation + 20), tone: .critical),
+              ],
+              barWidth: 11
+            )
+          )
+        }
+      }
+    }
+
+    chartDataExercise(
+      attempt: "025",
+      proposal: .init(width: 58, height: 13),
+      compareSemanticSnapshot: false
+    ) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("marker-\(generation)"))
+      if generation > 0 {
+        #expect(!text.contains("marker-\(generation - 1)"))
+      }
     }
   }
 }
