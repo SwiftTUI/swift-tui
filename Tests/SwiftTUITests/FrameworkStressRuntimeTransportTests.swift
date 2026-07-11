@@ -36,6 +36,40 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 020: direct-handler handoff
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 020 direct handler handoff partitions event ownership")
+  func runtimeTransport020DirectHandlerHandoffPartitionsEventOwnership() async {
+    // Hypothesis: installing and clearing the direct event path can duplicate
+    // buffered events or strand the first event returned to stream delivery.
+    let reader = InjectedTerminalInputReader()
+    let buffered: [InputEvent] = [.key(.character("a")), .key(.character("b"))]
+    reader.send(buffered)
+
+    let directEvents = Mutex<[InputEvent]>([])
+    let drained = reader.installDirectHandler { event in
+      directEvents.withLock { $0.append(event) }
+    }
+    reader.send([.key(.character("c")), .key(.character("d"))])
+    reader.clearDirectHandler()
+
+    let task = Task {
+      var events: [InputEvent] = []
+      for await event in reader.inputEvents() {
+        events.append(event)
+      }
+      return events
+    }
+    reader.send(.key(.character("e")))
+    reader.finish()
+
+    #expect(drained == buffered)
+    #expect(directEvents.withLock { $0 } == [.key(.character("c")), .key(.character("d"))])
+    #expect(await task.value == [.key(.character("e"))])
+  }
+}
+
 // MARK: - Attempt 019: stream continuation replacement
 
 extension FrameworkStressRuntimeTransportTests {
