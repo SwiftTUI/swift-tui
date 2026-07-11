@@ -1111,3 +1111,47 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 021: transition-free entity reorder
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 021 foreach reorder creates no transition work")
+  func animationTemporal021ForEachReorderCreatesNoTransitionWork() throws {
+    // Hypothesis: identity-set diffing can treat entity movement between row
+    // positions as a removal plus insertion even though every entity survives.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal021", "Root")
+    let proposal = ProposedSize(width: 40, height: 8)
+
+    withAnimationSinks(controller) {
+      _ = renderer.render(
+        animationTemporal021View(rows: ["a", "b", "c"]),
+        context: .init(identity: identity),
+        proposal: proposal
+      )
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      _ = renderer.render(
+        animationTemporal021View(rows: ["c", "a", "b"]),
+        context: .init(identity: identity, transaction: transaction),
+        proposal: proposal
+      )
+    }
+
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(controller.activeInsertionOffsetCount == 0)
+  }
+}
+
+@MainActor
+private func animationTemporal021View(rows: [String]) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    ForEach(rows, id: \.self) { row in
+      Text("021 row \(row)")
+        .transition(.opacity.combined(with: .offset(x: 4)))
+    }
+  }
+}
+
