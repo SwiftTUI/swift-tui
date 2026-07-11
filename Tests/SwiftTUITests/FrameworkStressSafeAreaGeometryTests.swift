@@ -109,6 +109,55 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 018: GeometryReader host proposal oscillation
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 018 geometry follows host proposal oscillation")
+  func safeAreaGeometry018GeometryFollowsHostProposalOscillation() {
+    // Hypothesis: revisiting a prior host size after an intervening proposal can reuse a stale
+    // layout-realized child whose closure and placed bounds came from the wrong generation.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text("018 g\(generation) size \(proxy.size.width)x\(proxy.size.height)")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry018")
+    let sizes = [
+      CellSize(width: 44, height: 14),
+      CellSize(width: 30, height: 9),
+      CellSize(width: 58, height: 18),
+      CellSize(width: 44, height: 14),
+    ]
+
+    for generation in 0..<20 {
+      let size = sizes[generation % sizes.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: size,
+        safeAreaInsets: .init(top: 1, leading: 2, bottom: 1, trailing: 2)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(
+        safeAreaGeometryText(frames.retained)
+          .contains("018 g\(generation) size \(size.width - 4)x\(size.height - 2)")
+      )
+    }
+  }
+}
+
 // MARK: - Attempt 017: GeometryReader closure freshness at unchanged bounds
 
 extension FrameworkStressSafeAreaGeometryTests {
