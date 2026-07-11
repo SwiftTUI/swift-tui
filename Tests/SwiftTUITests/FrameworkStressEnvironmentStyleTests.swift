@@ -60,6 +60,14 @@ private enum EnvironmentStyleAnchorListKey: PreferenceKey {
   }
 }
 
+private enum EnvironmentStyleStringListPreferenceKey: PreferenceKey {
+  static let defaultValue: [String] = []
+
+  static func reduce(value: inout [String], nextValue: () -> [String]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 @MainActor
 private final class EnvironmentStyleEventProbe {
   var events: [String] = []
@@ -1148,6 +1156,69 @@ private struct EnvironmentStyle022Root: View {
           }
           Text("022 \(markers.joined(separator: " "))")
         }
+      }
+    }
+  }
+}
+
+// MARK: - Attempt 023: stacked preference-derived layers
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 023 stacked preference layers read current reduction")
+  func environmentStyle023StackedPreferenceLayersReadCurrentReduction() throws {
+    // Hypothesis: background and overlay readers for one key can share retained preference state,
+    // causing one layer to see the prior source order after keyed children move.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle023"),
+      size: .init(width: 82, height: 10)
+    ) {
+      EnvironmentStyle023Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      _ = try harness.clickText("Reorder Layer Sources 023")
+      let frame = try harness.clickText("Advance Layer Values 023")
+      let values = generation.isMultiple(of: 2) ? "A-\(generation),B-\(generation)" : "B-\(generation),A-\(generation)"
+      #expect(frame.contains("023 overlay \(values)"))
+      #expect(frame.contains("023 background \(values)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle023Root: View {
+  @State private var generation = 0
+  @State private var reversed = false
+
+  private var labels: [String] {
+    reversed ? ["B", "A"] : ["A", "B"]
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Layer Sources 023") { reversed.toggle() }
+      Button("Advance Layer Values 023") { generation += 1 }
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(labels, id: \.self) { label in
+          Text("source \(label)")
+            .preference(
+              key: EnvironmentStyleStringListPreferenceKey.self,
+              value: ["\(label)-\(generation)"]
+            )
+        }
+      }
+      .frame(width: 78, height: 5, alignment: .center)
+      .backgroundPreferenceValue(
+        EnvironmentStyleStringListPreferenceKey.self,
+        alignment: .bottomLeading
+      ) { values in
+        Text("023 background \(values.joined(separator: ","))")
+      }
+      .overlayPreferenceValue(
+        EnvironmentStyleStringListPreferenceKey.self,
+        alignment: .topLeading
+      ) { values in
+        Text("023 overlay \(values.joined(separator: ","))")
       }
     }
   }
