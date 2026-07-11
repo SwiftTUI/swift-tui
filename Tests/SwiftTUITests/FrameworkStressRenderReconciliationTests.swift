@@ -595,4 +595,41 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 014: Explicit-newline topology churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 014 explicit newline topology follows current content")
+  func renderReconciliation014ExplicitNewlineTopologyFollowsCurrentContent() {
+    // Hypothesis: equal total cell counts with different explicit-newline boundaries can collide
+    // in retained measurement, leaving the current glyphs placed on the previous line topology.
+    struct Root: View {
+      let content: String
+
+      var body: some View {
+        Text(content)
+          .frame(width: 6, alignment: .leading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation014")
+    let contents = ["AA\nBBBB", "AAAA\nBB", "A\nB\nC\nD", "ABCDEF"]
+
+    for generation in 0..<20 {
+      let root = Root(content: contents[generation % contents.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
 // MARK: - End
