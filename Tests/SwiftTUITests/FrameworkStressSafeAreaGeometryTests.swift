@@ -47,6 +47,21 @@ private func safeAreaGeometryText(_ snapshot: RenderSnapshot) -> String {
   snapshot.rasterSurface.lines.joined(separator: "\n")
 }
 
+private func safeAreaGeometryMeasurementsMatch(
+  _ lhs: MeasuredNode,
+  _ rhs: MeasuredNode
+) -> Bool {
+  lhs.identity == rhs.identity
+    && lhs.proposal == rhs.proposal
+    && lhs.measuredSize == rhs.measuredSize
+    && lhs.containerAllocationSnapshot == rhs.containerAllocationSnapshot
+    && lhs.subtreeNodeCount == rhs.subtreeNodeCount
+    && lhs.childMeasurements.count == rhs.childMeasurements.count
+    && zip(lhs.childMeasurements, rhs.childMeasurements).allSatisfy {
+      safeAreaGeometryMeasurementsMatch($0, $1)
+    }
+}
+
 // MARK: - Attempt 001: root safe-area environment round trip
 
 extension FrameworkStressSafeAreaGeometryTests {
@@ -90,6 +105,61 @@ extension FrameworkStressSafeAreaGeometryTests {
       #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
       #expect(frames.retained.placedTree == frames.fresh.placedTree)
       #expect(safeAreaGeometryText(frames.retained).contains("001 g\(generation)"))
+    }
+  }
+}
+
+// MARK: - Attempt 012: inset adornment cardinality churn
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 012 inset row cardinality leaves no phantom strip")
+  func safeAreaGeometry012InsetRowCardinalityLeavesNoPhantomStrip() {
+    // Hypothesis: a zero-to-many inset child transition can retain the prior adornment height or
+    // departed rows in the safe-area placement request after the indexed source changes shape.
+    struct Root: View {
+      let generation: Int
+      let rowCount: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "012 base g\(generation) c\(rowCount) "
+              + "\(proxy.size.width)x\(proxy.size.height)"
+          )
+        }
+        .safeAreaInset(edge: .top, alignment: .topLeading) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<rowCount, id: \.self) { row in
+              Text("012 inset g\(generation) r\(row)")
+            }
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry012")
+    let counts = [0, 3, 1, 5, 0, 2]
+
+    for generation in 0..<18 {
+      let rowCount = counts[generation % counts.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, rowCount: rowCount),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 18),
+        safeAreaInsets: .init(top: 1)
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        safeAreaGeometryMeasurementsMatch(frames.retained.measuredTree, frames.fresh.measuredTree)
+      )
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(text.contains("012 base g\(generation) c\(rowCount)"))
+      #expect(text.contains("012 inset g\(generation)") == (rowCount > 0))
     }
   }
 }
