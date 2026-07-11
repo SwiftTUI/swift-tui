@@ -782,6 +782,53 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 021: modal-to-read-only focus restoration
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 021 removing the last action restores base focus")
+  func popoverTip021RemovingLastActionRestoresBaseFocus() throws {
+    // Hypothesis: when an action-bearing tip becomes read-only, the portal can
+    // retain its old focus gate instead of adopting the current nonmodal policy.
+    let rootIdentity = testIdentity("PopoverTipStress021", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "focus-restoration"
+    model.title = "Focus restoration tip"
+    model.message = nil
+    model.icon = nil
+    model.hasTip = false
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    let controlPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+    #expect(controlPaths.contains(popoverTipStressBaseIdentity.path))
+
+    var removalRestoredBaseFocus = true
+    for _ in 1...12 {
+      model.hasTip = true
+      model.actions = [.init(id: "modal", title: "Modal focus action")]
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let modalPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+      #expect(!modalPaths.contains(popoverTipStressBaseIdentity.path))
+
+      model.actions = []
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let readOnlyPaths = harness.runLoop.focusTracker.focusRegions.map(\.identity.path)
+      removalRestoredBaseFocus =
+        removalRestoredBaseFocus
+        && readOnlyPaths.contains(popoverTipStressBaseIdentity.path)
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+
+    withKnownIssue("Read-only popover tips keep suppressing base focus after actions are removed") {
+      #expect(removalRestoredBaseFocus)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
