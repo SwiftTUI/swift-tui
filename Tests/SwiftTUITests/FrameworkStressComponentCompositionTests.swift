@@ -158,3 +158,42 @@ extension FrameworkStressComponentCompositionTests {
     }
   }
 }
+
+// MARK: - Attempt 004: LabeledContent content cardinality
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 004 LabeledContent drops removed trailing children")
+  func componentComposition004LabeledContentDropsRemovedTrailingChildren() {
+    // Hypothesis: changing the content builder's flattened child count can
+    // leave a trailing value from the preceding generation in the HStack.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        LabeledContent {
+          Text("primary-\(generation)")
+          if generation.isMultiple(of: 2) {
+            Text("optional-\(generation)")
+          }
+        } label: {
+          Text("label-\(generation)")
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition004")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("primary-\(generation)"))
+      #expect(text.contains("optional-\(generation)") == generation.isMultiple(of: 2))
+    }
+  }
+}
