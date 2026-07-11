@@ -853,3 +853,73 @@ private struct CollectionLayout014Root: View {
     .frame(width: 18, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 015: lazy cross-axis alignment churn
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 015 lazy alignment tracks changing row widths")
+  func collectionLayout015LazyAlignmentTracksChangingRowWidths() {
+    // Hypothesis: retained lazy cross metrics may keep the previous leading
+    // edge when alignment and the widest collection child change together.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout015")
+
+    for generation in 0..<24 {
+      let trailing = !generation.isMultiple(of: 2)
+      let root = CollectionLayout015Root(trailing: trailing)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 20, height: 4)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 20, height: 4)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+    }
+  }
+}
+
+private struct CollectionLayout015Row: Identifiable {
+  let id: Int
+  let label: String
+  let width: Int
+}
+
+@MainActor
+private struct CollectionLayout015Root: View {
+  let trailing: Bool
+
+  private var rows: [CollectionLayout015Row] {
+    trailing
+      ? [
+        .init(id: 3, label: "wide", width: 14),
+        .init(id: 4, label: "narrow", width: 7),
+      ]
+      : [
+        .init(id: 1, label: "short", width: 7),
+        .init(id: 2, label: "medium", width: 10),
+      ]
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: trailing ? .trailing : .leading, spacing: 0) {
+        ForEach(rows) { row in
+          Text("015 \(row.label)")
+            .frame(width: row.width, alignment: .leading)
+        }
+      }
+      .frame(width: 20, alignment: .topLeading)
+    }
+    .frame(width: 20, height: 4, alignment: .topLeading)
+  }
+}
