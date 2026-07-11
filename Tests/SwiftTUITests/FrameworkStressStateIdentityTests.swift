@@ -450,6 +450,84 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 008: onChange baseline ownership under ordinal shifts
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 008 surviving onChange keeps its own baseline")
+  func stateIdentity008SurvivingOnChangeKeepsOwnBaseline() throws {
+    // Hypothesis: when an earlier modifier disappears, the surviving onChange can claim its
+    // ordinal and read the departed modifier's identity-keyed previous value.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity008"),
+      size: .init(width: 72, height: 11)
+    ) {
+      StateIdentity008Root()
+    }
+    defer { harness.shutdown() }
+
+    var expectedChanges = 0
+    var expectedValue = 100
+    for _ in 0..<4 {
+      expectedChanges += 1
+      expectedValue += 1
+      var frame = try harness.clickText("Bump B 008")
+      #expect(frame.contains("008 B changes \(expectedChanges)"))
+      #expect(frame.contains("008 B old \(expectedValue - 1) new \(expectedValue)"))
+
+      frame = try harness.clickText("Remove First 008")
+      #expect(frame.contains("008 First absent"))
+
+      expectedChanges += 1
+      expectedValue += 1
+      frame = try harness.clickText("Bump B 008")
+      #expect(frame.contains("008 B changes \(expectedChanges)"))
+      #expect(frame.contains("008 B old \(expectedValue - 1) new \(expectedValue)"))
+
+      frame = try harness.clickText("Add First 008")
+      #expect(frame.contains("008 First present"))
+    }
+  }
+
+  private struct StateIdentity008Root: View {
+    @State private var first = 0
+    @State private var second = 100
+    @State private var includesFirst = true
+    @State private var secondChangeCount = 0
+    @State private var lastSecondOld = -1
+    @State private var lastSecondNew = -1
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(includesFirst ? "008 First present" : "008 First absent")
+        Text("008 B changes \(secondChangeCount)")
+        Text("008 B old \(lastSecondOld) new \(lastSecondNew)")
+        Button("Bump B 008") { second += 1 }
+        Button(includesFirst ? "Remove First 008" : "Add First 008") {
+          includesFirst.toggle()
+        }
+        if includesFirst {
+          Text("008 observer")
+            .onChange(of: first) { _, _ in }
+            .onChange(of: second) { oldValue, newValue in
+              secondChangeCount += 1
+              lastSecondOld = oldValue
+              lastSecondNew = newValue
+            }
+            .id("state-identity-008-observer")
+        } else {
+          Text("008 observer")
+            .onChange(of: second) { oldValue, newValue in
+              secondChangeCount += 1
+              lastSecondOld = oldValue
+              lastSecondNew = newValue
+            }
+            .id("state-identity-008-observer")
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
