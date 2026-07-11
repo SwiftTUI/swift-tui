@@ -168,4 +168,24 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 010 repeated clear cycles rebuild both anchors")
+  func cacheState010RepeatedClearCyclesRebuildBothAnchors() {
+    // Hypothesis: removeAll can leave a stale list endpoint after repeated eviction history.
+    var cache = BoundedLRUCache<Int, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 3, bytes: .max)
+    for cycle in 0..<30 {
+      for offset in 0..<8 {
+        let key = cycle * 10 + offset
+        cache.upsert(key, value: key, cost: stressCacheEntry(1), policy: policy)
+      }
+      cache.removeAll()
+      #expect(cache.count == 0)
+      #expect(cache.totalCost == .zero)
+    }
+    cache.upsert(999, value: 999, cost: stressCacheEntry(1), policy: policy)
+    #expect(cache.peek(999) == 999)
+  }
+}
+
 // NEXT CACHE STRESS TEST
