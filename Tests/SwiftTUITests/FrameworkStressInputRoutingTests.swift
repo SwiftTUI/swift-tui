@@ -1288,3 +1288,51 @@ private struct StressInput023Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 024: stationary pointer after hovered geometry moves
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Hover exits when the hovered target moves away under a stationary pointer")
+  func stressInputRouting024HoverExitsAfterGeometryMovesAway() throws {
+    // Hypothesis: hover state stores only a route identity and never re-hit-
+    // tests the last pointer location after a render changes route geometry.
+    let phases = StressInputBox<[HoverPhase]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput024Root"),
+      size: .init(width: 56, height: 6)
+    ) {
+      StressInput024Fixture(phases: phases)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Moving hover target"))
+    _ = try harness.movePointer(to: point)
+    _ = try harness.render()
+
+    #expect(
+      phases.value.first.map { phase in
+        if case .entered = phase { return true }
+        return false
+      } == true)
+    withKnownIssue("Stationary-pointer hover is not re-hit-tested after geometry moves") {
+      #expect(phases.value.last == .exited)
+    }
+  }
+}
+
+private struct StressInput024Fixture: View {
+  let phases: StressInputBox<[HoverPhase]>
+  @State private var moved = false
+
+  var body: some View {
+    Text("Moving hover target")
+      .frame(width: 22, height: 1, alignment: .leading)
+      .padding(.leading, moved ? 28 : 0)
+      .onPointerHover { phase in
+        phases.value.append(phase)
+        if case .entered = phase {
+          moved = true
+        }
+      }
+  }
+}
