@@ -596,3 +596,55 @@ private struct StressAF011Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 012: live-region modifier removal
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 012 removed live region policy leaves no residue")
+  func stress012RemovedLiveRegionPolicyLeavesNoResidue() throws {
+    // Hypothesis: same-identity conditional replacement can leave a departed live-region policy
+    // on a status node that should return to ordinary, non-announcing semantics.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF012", "Root"),
+      size: .init(width: 50, height: 7)
+    ) {
+      StressAF012Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<11 {
+      _ = try harness.clickText("Toggle live modifier")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Optional live status" }
+    )
+    #expect(target.role == .status)
+    #expect(target.liveRegion == nil)
+  }
+}
+
+@MainActor
+private struct StressAF012Fixture: View {
+  @State private var isLive = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle live modifier") {
+        isLive.toggle()
+      }
+      if isLive {
+        status.accessibilityLiveRegion(.polite)
+      } else {
+        status
+      }
+    }
+  }
+
+  private var status: some View {
+    Text("Stable optional status")
+      .id("stress-af-012-status")
+      .accessibilityRole(.status)
+      .accessibilityLabel("Optional live status")
+  }
+}
