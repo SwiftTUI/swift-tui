@@ -857,3 +857,47 @@ private struct StressAF016Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 017: focused target becomes nonfocusable
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 017 disabling focused target clears focus and region")
+  func stress017DisablingFocusedTargetClearsFocusAndRegion() throws {
+    // Hypothesis: a key-handler invalidation originating from the focused node can leave both the
+    // tracker and retained semantic snapshot pointing at that node after it becomes nonfocusable.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF017", "Root"),
+      size: .init(width: 44, height: 6)
+    ) {
+      StressAF017Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressAF017Fixture.targetIdentity)
+    _ = try harness.pressKey(KeyPress(.character("r")))
+
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == nil)
+    #expect(
+      !harness.runLoop.latestSemanticSnapshot.focusRegions.contains {
+        $0.identity == StressAF017Fixture.targetIdentity
+      })
+  }
+}
+
+@MainActor
+private struct StressAF017Fixture: View {
+  static let targetIdentity = testIdentity("StressAF017", "Target")
+
+  @State private var isFocusable = true
+
+  var body: some View {
+    Text("Self-disabling focus target")
+      .id(Self.targetIdentity)
+      .focusable(isFocusable)
+      .accessibilityLabel("Self-disabling focus target")
+      .onKeyPress(.character("r")) { _ in
+        isFocusable = false
+        return .handled
+      }
+  }
+}
