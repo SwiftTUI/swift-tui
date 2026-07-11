@@ -794,3 +794,40 @@ private struct SceneHostCounterView: View {
 private func sceneHostRasterText(_ frame: SemanticHostFrame) -> String {
   frame.raster.lines.joined(separator: "\n")
 }
+
+// MARK: - Attempt 018: independent hosted-size axes
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 018 mixed proposals keep negotiated axes independent")
+  func sceneHost018MixedProposalsKeepNegotiatedAxesIndependent() {
+    // Hypothesis: resolving one finite host axis can accidentally substitute
+    // its proposal or probe state into the opposite unspecified axis.
+    let negotiator = HostedSurfaceSizeNegotiator(
+      cellSize: .init(width: 2, height: 4),
+      preferredGridSize: .init(width: 10, height: 6),
+      renderedGridSize: .init(width: 12, height: 8)
+    )
+
+    for generation in 1...24 {
+      if generation.isMultiple(of: 2) {
+        let proposedWidth = Double(3 + generation) * 2 + 1.5
+        let expectedCells = min(10, 3 + generation)
+        let result = negotiator.negotiate(
+          proposedWidth: proposedWidth,
+          proposedHeight: nil
+        )
+        #expect(result.size == .init(width: Double(expectedCells) * 2, height: 24))
+        #expect(result.probeGridSize == nil)
+      } else {
+        let proposedHeight = Double(2 + generation) * 4 + 3.5
+        let expectedCells = min(6, 2 + generation)
+        let result = negotiator.negotiate(
+          proposedWidth: nil,
+          proposedHeight: proposedHeight
+        )
+        #expect(result.size == .init(width: 20, height: Double(expectedCells) * 4))
+        #expect(result.probeGridSize == nil)
+      }
+    }
+  }
+}
