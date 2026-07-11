@@ -1475,3 +1475,58 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 027: same-size embedded-image replacement
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 027 same-size image replacement publishes current bytes")
+  func visualEffects027SameSizeImageReplacementPublishesCurrentBytes() throws {
+    // Hypothesis: the image resolver or retained draw payload can treat pixel dimensions as the
+    // asset identity, preserving prior embedded bytes when content changes without a size change.
+    let red = try makePNGBytes(
+      width: 8,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 128)
+    )
+    let green = try makePNGBytes(
+      width: 8,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 0, green: 255, blue: 0), count: 128)
+    )
+    let blue = try makePNGBytes(
+      width: 8,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 0, green: 0, blue: 255), count: 128)
+    )
+    let images = [red, green, blue]
+
+    struct Root: View {
+      let bytes: [UInt8]
+
+      var body: some View {
+        Image(data: bytes)
+          .frame(width: 6, height: 3, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects027")
+
+    for generation in 0..<24 {
+      let bytes = images[generation % images.count]
+      let root = Root(bytes: bytes)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+      let attachment = try #require(retained.rasterSurface.imageAttachments.first)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(attachment.source == .data(bytes))
+      #expect(attachment.resolvedReference == .embeddedImage(bytes))
+    }
+  }
+}
