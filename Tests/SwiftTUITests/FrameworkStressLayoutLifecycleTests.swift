@@ -1191,3 +1191,59 @@ private struct StressLL019Fixture: View {
     .id(value)
   }
 }
+
+// MARK: - Attempt 020: overflow disappearance across width churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 020 overflow menu collapses after overflow options disappear")
+  func stress020OverflowMenuCollapsesAfterOptionsDisappear() throws {
+    // Hypothesis: the expanded state slot is never cleared while the trailing
+    // options disappear, so restoring them resurrects an open stale menu.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL020", "Root"),
+      size: .init(width: 24, height: 11)
+    ) {
+      StressLL020Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 1...6 {
+      var frame = try harness.clickText("▾")
+      #expect(frame.contains("Four"))
+      frame = try harness.clickText("Toggle Overflow Tabs")
+      #expect(!frame.contains("Four"))
+      frame = try harness.clickText("Toggle Overflow Tabs")
+      withKnownIssue("Restoring overflow options resurrects the previously expanded menu") {
+        #expect(frame.contains("▾"))
+        #expect(!frame.contains("Four"))
+      }
+      #expect(harness.pointerHandlerCount <= 9)
+      if frame.contains("▴") {
+        frame = try harness.clickText("▴")
+        #expect(!frame.contains("Four"))
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL020Fixture: View {
+  @State private var selection = "first"
+  @State private var showsOverflowTabs = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Overflow Tabs") { showsOverflowTabs.toggle() }
+      TabView(selection: $selection) {
+        Tab("One", value: "first") { Text("first width content") }
+        Tab("Two", value: "second") { Text("second width content") }
+        if showsOverflowTabs {
+          Tab("Three", value: "third") { Text("third width content") }
+          Tab("Four", value: "fourth") { Text("fourth width content") }
+        }
+      }
+      .tabViewStyle(.literalTabs)
+      .frame(width: 24, height: 7, alignment: .topLeading)
+    }
+  }
+}
