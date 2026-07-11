@@ -1268,3 +1268,62 @@ private struct StressTC022Fixture: View {
     .frame(width: 56, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 023: sibling command-scope reorder
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 023 sibling panel reorder preserves focused command owner")
+  func stressTabCommand023SiblingPanelReorderPreservesFocusedCommandOwner() throws {
+    // Hypothesis: scope-path publication may follow sibling ordinal after a
+    // reorder, routing the right leaf through the left Panel's same-key command.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC023", "Root"),
+      size: .init(width: 66, height: 12)
+    ) {
+      StressTC023Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Left command focus")
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    _ = try harness.clickText("Reverse command panels")
+    _ = try harness.focusText("Right command focus")
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    #expect(probe.events == ["left", "right"])
+    #expect(harness.keyCommandRegistrationCount == 2)
+  }
+}
+
+@MainActor
+private struct StressTC023Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse command panels") {
+        reversed = true
+      }
+      if reversed {
+        commandPanel("Right", marker: "right")
+        commandPanel("Left", marker: "left")
+      } else {
+        commandPanel("Left", marker: "left")
+        commandPanel("Right", marker: "right")
+      }
+    }
+    .frame(width: 64, height: 10, alignment: .topLeading)
+  }
+
+  private func commandPanel(_ label: String, marker: String) -> some View {
+    Panel(id: "stress-tc-023-\(marker)") {
+      Text("\(label) command focus")
+        .focusable()
+    }
+    .keyCommand("Save \(label)", key: .character("s"), modifiers: .ctrl) {
+      probe.events.append(marker)
+    }
+  }
+}
