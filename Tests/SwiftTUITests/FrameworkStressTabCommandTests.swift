@@ -75,3 +75,53 @@ private struct StressTC001Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 002: focused-tab removal fallback
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 002 removed focused tab falls forward at its old ordinal")
+  func stressTabCommand002RemovedFocusedTabFallsForward() throws {
+    // Hypothesis: when the tag carrying stored focus departs, stale tag lookup
+    // may jump back to selection instead of retaining the departed tab's slot.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC002", "Root"),
+      size: .init(width: 56, height: 10)
+    ) {
+      StressTC002Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressTC002Fixture.tabsIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.pressKey(KeyPress(.character("x"), modifiers: .ctrl))
+    let frame = try harness.pressKey(KeyPress(.return))
+
+    #expect(frame.contains("C body selected"))
+    #expect(!frame.contains("A body selected"))
+  }
+}
+
+@MainActor
+private struct StressTC002Fixture: View {
+  static let tabsIdentity = testIdentity("StressTC002", "Tabs")
+
+  @State private var includesB = true
+  @State private var selection = "a"
+
+  var body: some View {
+    Panel(id: "stress-tc-002-panel") {
+      TabView(selection: $selection) {
+        Tab("A", value: "a") { Text("A body selected") }
+        if includesB {
+          Tab("B", value: "b") { Text("B body selected") }
+        }
+        Tab("C", value: "c") { Text("C body selected") }
+      }
+      .id(Self.tabsIdentity)
+    }
+    .keyCommand("Remove B", key: .character("x"), modifiers: .ctrl) {
+      includesB = false
+    }
+    .frame(width: 54, height: 8, alignment: .topLeading)
+  }
+}
