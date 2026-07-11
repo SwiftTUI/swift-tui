@@ -593,3 +593,36 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 018: equal-width emoji payload replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 018 emoji modifier replacement publishes current grapheme")
+  func textContent018EmojiModifierReplacementPublishesCurrentGrapheme() {
+    // Hypothesis: retained raster substitution can treat two equal-width emoji-modifier sequences
+    // as the same draw payload and keep the previous skin-tone bytes.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent018")
+
+    for generation in 0..<20 {
+      let emoji = generation.isMultiple(of: 2) ? "👋🏻" : "👋🏿"
+      let otherEmoji = generation.isMultiple(of: 2) ? "👋🏿" : "👋🏻"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 4, height: 1),
+        content: Text("A\(emoji)B")
+      )
+      let presented = terminalRenderer.render(frames.retained.rasterSurface)
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.rasterSurface.lines.joined().contains(emoji))
+      #expect(!frames.retained.rasterSurface.lines.joined().contains(otherEmoji))
+      #expect(presented.contains(emoji))
+      #expect(frames.retained.semanticSnapshot.focusRegions.isEmpty)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.isEmpty)
+    }
+  }
+}
