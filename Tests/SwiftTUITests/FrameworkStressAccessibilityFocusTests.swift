@@ -753,3 +753,54 @@ private struct StressAF014Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 015: accessibility cursor anchor removal
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 015 removed cursor anchor does not persist")
+  func stress015RemovedCursorAnchorDoesNotPersist() throws {
+    // Hypothesis: conditional same-identity replacement can retain an explicit cursor anchor after
+    // the replacement returns to ordinary accessibility metadata.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF015", "Root"),
+      size: .init(width: 48, height: 7)
+    ) {
+      StressAF015Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<11 {
+      _ = try harness.clickText("Toggle cursor anchor")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Optional cursor target" }
+    )
+    #expect(target.cursorAnchor == nil)
+  }
+}
+
+@MainActor
+private struct StressAF015Fixture: View {
+  @State private var hasAnchor = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle cursor anchor") {
+        hasAnchor.toggle()
+      }
+      if hasAnchor {
+        target.accessibilityCursorAnchor(.init(x: 4, y: 0))
+      } else {
+        target
+      }
+    }
+  }
+
+  private var target: some View {
+    Text("Cursor target")
+      .id("stress-af-015-target")
+      .accessibilityRole(.button)
+      .accessibilityLabel("Optional cursor target")
+  }
+}
