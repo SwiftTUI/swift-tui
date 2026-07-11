@@ -148,3 +148,43 @@ private struct GestureScroll003Fixture: View {
     )
   }
 }
+
+// MARK: - Attempt 004: gesture-only mask versus descendant
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 004 gesture mask suppresses descendant recognizers")
+  func gestureScroll004GestureMaskSuppressesDescendantRecognizers() throws {
+    // Hypothesis: `.gesture` may be treated only as an attachment-local flag,
+    // allowing a descendant recognizer to consume the event it should exclude.
+    let events = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll004Root"),
+      size: .init(width: 42, height: 7)
+    ) {
+      GestureScroll004Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Exclusive parent gesture")
+
+    withKnownIssue("GestureMask.gesture does not suppress descendant recognizers") {
+      #expect(events.value == ["parent"])
+    }
+  }
+}
+
+private struct GestureScroll004Fixture: View {
+  let events: GestureScrollBox<[String]>
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Exclusive parent gesture")
+        .frame(width: 28, height: 1, alignment: .leading)
+        .onTapGesture { events.value.append("child") }
+    }
+    .gesture(
+      TapGesture().onEnded { events.value.append("parent") },
+      including: .gesture
+    )
+  }
+}
