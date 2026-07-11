@@ -1456,3 +1456,34 @@ extension FrameworkStressFramePipelineTests {
     #expect(!scheduler.hasPendingFrame(at: now))
   }
 }
+
+// MARK: - Attempt 026: replay ignores non-invalidation work
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 026 cancelled non-invalidation causes do not replay")
+  func framePipeline026CancelledNonInvalidationCausesDoNotReplay() {
+    // Hypothesis: replay can synthesize a coarse invalidation from cancelled
+    // input, signal, external, or deadline causes that carry no graph intent.
+    let scheduler = FrameScheduler()
+    let base = MonotonicInstant(offset: .seconds(70_026))
+    let cancelled = ScheduledFrame(
+      causes: [.input, .signal, .external, .deadline],
+      invalidatedIdentities: [],
+      signalNames: ["SIGWINCH"],
+      externalReasons: ["host-resize"],
+      triggeredDeadline: base,
+      nextDeadline: base.advanced(by: .seconds(1))
+    )
+
+    scheduler.replayCancelledFrameIntent(cancelled)
+
+    #expect(!scheduler.hasPendingFrame(at: base.advanced(by: .seconds(2))))
+    #expect(scheduler.nextWakeInstant(after: base) == nil)
+    #expect(
+      scheduler.consumeReadyFrame(
+        at: base.advanced(by: .seconds(2)),
+        armedBefore: scheduler.deadlineArmCut
+      ) == nil
+    )
+  }
+}
