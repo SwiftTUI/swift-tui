@@ -330,3 +330,81 @@ private struct StressNP005Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 006: active destination source reorder
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 006 reordered source preserves active destination")
+  func stress006ReorderedSourcePreservesActiveDestination() throws {
+    // Hypothesis: moving a stable declaration source across a sibling can
+    // drop its active instance or recreate the destination's local state.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP006", "Root"),
+      size: .init(width: 50, height: 10)
+    ) {
+      StressNP006Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Reorder Destination")
+    for generation in 1...8 {
+      _ = try harness.clickText("Increment Reorder Local")
+      let frame = try harness.clickText("Reorder Destination Source")
+      withKnownIssue("Reordered destination source splits local state by structural slot") {
+        #expect(
+          frame.contains(
+            "source reversed \(!generation.isMultiple(of: 2)) local \(generation)"
+          )
+        )
+      }
+      #expect(harness.actionRegistrationCount <= 3)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP006Fixture: View {
+  @State private var isPresented = false
+  @State private var reversed = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-006-stack") {
+      VStack(alignment: .leading, spacing: 0) {
+        if reversed {
+          peer
+          source
+        } else {
+          source
+          peer
+        }
+      }
+    }
+  }
+
+  private var source: some View {
+    Button("Open Reorder Destination") { isPresented = true }
+      .id("stress-np-006-source")
+      .navigationDestination(isPresented: $isPresented) {
+        StressNP006Destination(reversed: $reversed)
+      }
+  }
+
+  private var peer: some View {
+    Text("stable reorder peer")
+      .id("stress-np-006-peer")
+  }
+}
+
+@MainActor
+private struct StressNP006Destination: View {
+  @Binding var reversed: Bool
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("source reversed \(reversed) local \(local)")
+      Button("Increment Reorder Local") { local += 1 }
+      Button("Reorder Destination Source") { reversed.toggle() }
+    }
+  }
+}
