@@ -1155,3 +1155,74 @@ private func animationTemporal021View(rows: [String]) -> some View {
   }
 }
 
+// MARK: - Attempt 022: entity reparent transition stability
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 022 stable entity reparent creates no false transition")
+  func animationTemporal022StableEntityReparentCreatesNoFalseTransition() throws {
+    // Hypothesis: transition diffing follows structural Identity rather than
+    // ViewNodeID and animates a surviving entity when it changes parents.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal022", "Root")
+    let leftID = testIdentity("AnimationTemporal022", "Left")
+    let rightID = testIdentity("AnimationTemporal022", "Right")
+    let oldLeafID = testIdentity("AnimationTemporal022", "Left", "Entity")
+    let newLeafID = testIdentity("AnimationTemporal022", "Right", "Entity")
+    let nodeID = ViewNodeID(rawValue: 22)
+    let start = MonotonicInstant(offset: .seconds(100))
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: oldLeafID,
+      viewNodeID: nodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [
+          animationTemporalRoot(
+            identity: leftID,
+            children: [animationTemporalNode(identity: oldLeafID, viewNodeID: nodeID)]
+          ),
+          animationTemporalRoot(identity: rightID),
+        ]
+      ),
+      transaction: .init(),
+      timestamp: start
+    )
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: newLeafID,
+      viewNodeID: nodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [
+          animationTemporalRoot(identity: leftID),
+          animationTemporalRoot(
+            identity: rightID,
+            children: [animationTemporalNode(identity: newLeafID, viewNodeID: nodeID)]
+          ),
+        ]
+      ),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+
+    withKnownIssue("A reparented ViewNodeID is treated as transition removal and insertion") {
+      #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+      #expect(controller.activeAnimationCount == 0)
+    }
+  }
+}
+
