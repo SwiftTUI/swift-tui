@@ -298,3 +298,62 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 006: conditional table-cell topology
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 006 conditional table cells follow current row topology")
+  func tableOutline006ConditionalTableCellsFollowCurrentRowTopology() {
+    // Hypothesis: a TableRow that alternates between one and three declared
+    // cells can retain the departed cells in its value-collapsed row payload.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Table(
+          selection: .constant(1),
+          columns: [
+            .init("A", width: 7),
+            .init("B", width: 7),
+            .init("C", width: 7),
+          ]
+        ) {
+          TableRow {
+            Text("a-\(generation)")
+            if !generation.isMultiple(of: 2) {
+              Text("b-\(generation)")
+              Text("c-\(generation)")
+            }
+          }
+          .tag(1)
+        }
+        .frame(width: 30, height: 7, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline006")
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 30, height: 7)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 30, height: 7)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.resolvedTree.drawPayload == fresh.resolvedTree.drawPayload)
+      #expect(rendered.contains("a-\(generation)"))
+      #expect(rendered.contains("c-\(generation)") == !generation.isMultiple(of: 2))
+    }
+  }
+}
