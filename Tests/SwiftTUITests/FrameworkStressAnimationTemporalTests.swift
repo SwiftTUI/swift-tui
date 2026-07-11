@@ -1340,3 +1340,67 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 025: selective removal cancellation on reinsertion
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 025 reinsertion cancels only its matching removal")
+  func animationTemporal025ReinsertionCancelsOnlyMatchingRemoval() throws {
+    // Hypothesis: reinsertion either leaves its own overlay alive or clears all
+    // sibling removals instead of matching by the returning owner.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal025", "Root")
+    let firstID = testIdentity("AnimationTemporal025", "First")
+    let secondID = testIdentity("AnimationTemporal025", "Second")
+    let firstNodeID = ViewNodeID(rawValue: 251)
+    let secondNodeID = ViewNodeID(rawValue: 252)
+    let start = MonotonicInstant(offset: .seconds(130))
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: firstID, viewNodeID: firstNodeID, transition: AnyTransition.opacity)
+    controller.registerTransition(
+      for: secondID, viewNodeID: secondNodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [
+          animationTemporalNode(identity: firstID, viewNodeID: firstNodeID),
+          animationTemporalNode(identity: secondID, viewNodeID: secondNodeID),
+        ]
+      ),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(20))
+    )
+    #expect(controller.debugStateSnapshot().removingIdentities.count == 2)
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: firstID, viewNodeID: firstNodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(
+        identity: rootID,
+        children: [animationTemporalNode(identity: firstID, viewNodeID: firstNodeID)]
+      ),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+    let remaining = controller.debugStateSnapshot().removingIdentities
+    withKnownIssue("Reinsertion does not cancel only its matching removal overlay") {
+      #expect(remaining == [secondID])
+    }
+  }
+}
+
