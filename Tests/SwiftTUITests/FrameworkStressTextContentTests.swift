@@ -551,3 +551,45 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 017: OSC-8 destination sanitization churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 017 hyperlink destinations sanitize every replacement")
+  func textContent017HyperlinkDestinationsSanitizeEveryReplacement() {
+    // Hypothesis: retained hyperlink cells or terminal OSC-8 state can reuse a previously
+    // sanitized destination and let controls from the current destination cross the boundary.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent017")
+
+    for generation in 0..<20 {
+      let first = generation.isMultiple(of: 2)
+      let rawDestination =
+        first
+        ? "https://safe.example/\u{001B}\\\u{0007}one"
+        : "https://safe.example/\u{009B}\u{001B}\\two"
+      let safeDestination = first ? "https://safe.example/one" : "https://safe.example/two"
+      let content = Text("Go \(Link("Docs", destination: .init(rawDestination)))")
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 7, height: 1),
+        content: content
+      )
+      let presented = terminalRenderer.render(frames.retained.rasterSurface)
+      let rasterHyperlinks = Set(
+        frames.retained.rasterSurface.cells.flatMap { row in
+          row.compactMap(\.hyperlink)
+        })
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(rasterHyperlinks == [rawDestination])
+      #expect(frames.retained.semanticSnapshot.focusRegions.count == 1)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.count == 1)
+      #expect(presented.contains("\u{001B}]8;;\(safeDestination)\u{001B}\\"))
+      #expect(!presented.contains(rawDestination))
+    }
+  }
+}
