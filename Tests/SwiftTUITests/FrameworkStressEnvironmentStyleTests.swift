@@ -131,6 +131,74 @@ private struct EnvironmentStyle004Root: View {
   }
 }
 
+// MARK: - Attempt 005: nested environment action teardown
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 005 removing nested action restores current outer action")
+  func environmentStyle005RemovingNestedActionRestoresCurrentOuterAction() throws {
+    // Hypothesis: a closure-valued nearest action can survive its modifier's removal, masking the
+    // current outer action even though the stable invoker is reevaluated.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle005"),
+      size: .init(width: 72, height: 7)
+    ) {
+      EnvironmentStyle005Root()
+    }
+    defer { harness.shutdown() }
+
+    var expected = 0
+    for generation in 1...10 {
+      _ = try harness.clickText("Advance Action 005")
+      var frame = try harness.clickText("Invoke Environment Action 005")
+      expected += generation
+      #expect(frame.contains("005 generation \(generation) total \(expected)"))
+
+      _ = try harness.clickText("Toggle Inner Action 005")
+      frame = try harness.clickText("Invoke Environment Action 005")
+      expected += generation * 10
+      #expect(frame.contains("005 generation \(generation) total \(expected)"))
+      _ = try harness.clickText("Toggle Inner Action 005")
+    }
+  }
+}
+
+private struct EnvironmentStyle005Invoker: View {
+  @Environment(\.environmentStyleAction) private var action
+
+  var body: some View {
+    Button("Invoke Environment Action 005") { action() }
+  }
+}
+
+private struct EnvironmentStyle005Root: View {
+  @State private var generation = 0
+  @State private var total = 0
+  @State private var usesInner = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Action 005") { generation += 1 }
+      Button("Toggle Inner Action 005") { usesInner.toggle() }
+      Text("005 generation \(generation) total \(total)")
+      Group {
+        if usesInner {
+          EnvironmentStyle005Invoker()
+            .environment(
+              \.environmentStyleAction,
+              EnvironmentStyleAction { total += generation }
+            )
+        } else {
+          EnvironmentStyle005Invoker()
+        }
+      }
+    }
+    .environment(
+      \.environmentStyleAction,
+      EnvironmentStyleAction { total += generation * 10 }
+    )
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
