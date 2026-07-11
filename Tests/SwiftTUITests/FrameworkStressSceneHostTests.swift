@@ -957,3 +957,64 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 022: growth-probe feedback convergence
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 022 growth probe feedback converges without a two cycle")
+  func sceneHost022GrowthProbeFeedbackConvergesWithoutTwoCycle() {
+    // Hypothesis: once a large probe confirms slack, returning to the preferred
+    // rendered grid can erase that evidence and request the same probe forever.
+    for generation in 0..<16 {
+      let preferred = CellSize(width: 8 + generation % 5, height: 4 + generation % 3)
+      let probe = CellSize(width: preferred.width + 7, height: preferred.height + 5)
+      let cellSize = HostLengthSize(width: 2, height: 3)
+      var slack = HostedSurfaceConfirmedSlack()
+
+      let first = HostedSurfaceSizeNegotiator(
+        cellSize: cellSize,
+        preferredGridSize: preferred,
+        renderedGridSize: preferred,
+        confirmedSlack: slack
+      ).negotiate(
+        proposedWidth: Double(probe.width) * cellSize.width,
+        proposedHeight: Double(probe.height) * cellSize.height
+      )
+      #expect(
+        first
+          == .init(
+            size: .init(
+              width: Double(preferred.width) * cellSize.width,
+              height: Double(preferred.height) * cellSize.height
+            ),
+            probeGridSize: probe
+          )
+      )
+
+      slack.update(preferredGridSize: preferred, renderedGridSize: probe)
+      let confirmed = HostedSurfaceSizeNegotiator(
+        cellSize: cellSize,
+        preferredGridSize: preferred,
+        renderedGridSize: probe,
+        confirmedSlack: slack
+      ).negotiate(
+        proposedWidth: Double(probe.width) * cellSize.width,
+        proposedHeight: Double(probe.height) * cellSize.height
+      )
+      #expect(confirmed.size == first.size)
+      #expect(confirmed.probeGridSize == nil)
+
+      slack.update(preferredGridSize: preferred, renderedGridSize: preferred)
+      let revisited = HostedSurfaceSizeNegotiator(
+        cellSize: cellSize,
+        preferredGridSize: preferred,
+        renderedGridSize: preferred,
+        confirmedSlack: slack
+      ).negotiate(
+        proposedWidth: Double(probe.width) * cellSize.width,
+        proposedHeight: Double(probe.height) * cellSize.height
+      )
+      #expect(revisited == confirmed)
+    }
+  }
+}
