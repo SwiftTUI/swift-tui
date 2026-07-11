@@ -157,3 +157,74 @@ private struct StressInput002Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 003: directional continuation after focus-region removal
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Right-arrow continuation remains geometric after the landing target disappears")
+  func stressInputRouting003DirectionalContinuationPreservesGeometry() throws {
+    // Hypothesis: removal of the first directional landing may fall back to
+    // document order, selecting the below-row decoy instead of the next region
+    // on the same horizontal ray.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput003Root"),
+      size: .init(width: 52, height: 8)
+    ) {
+      StressInput003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Geo A")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity
+        == (try harness.focusIdentity(forText: "Geo C"))
+    )
+  }
+}
+
+private enum StressInput003Field: Hashable {
+  case a
+  case b
+  case c
+  case decoy
+}
+
+private struct StressInput003Fixture: View {
+  static let aIdentity = testIdentity("StressInput003", "A")
+  static let bIdentity = testIdentity("StressInput003", "B")
+  static let cIdentity = testIdentity("StressInput003", "C")
+  static let decoyIdentity = testIdentity("StressInput003", "Decoy")
+
+  @FocusState private var focusedField: StressInput003Field?
+  @State private var removesLanding = false
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      Button("Geo A") {}
+        .id(Self.aIdentity)
+        .focused($focusedField, equals: .a)
+      Button("Geo Decoy") {}
+        .id(Self.decoyIdentity)
+        .focused($focusedField, equals: .decoy)
+        .padding(.top, 3)
+      if !removesLanding {
+        Button("Geo B") {}
+          .id(Self.bIdentity)
+          .focused($focusedField, equals: .b)
+          .padding(.leading, 14)
+      }
+      Button("Geo C") {}
+        .id(Self.cIdentity)
+        .focused($focusedField, equals: .c)
+        .padding(.leading, 28)
+    }
+    .frame(width: 48, height: 6, alignment: .topLeading)
+    .onChange(of: focusedField) { _, next in
+      if next == .b {
+        removesLanding = true
+      }
+    }
+  }
+}
