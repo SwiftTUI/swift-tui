@@ -703,3 +703,49 @@ private struct ToastLifecycle013Root: View {
     )
   }
 }
+
+// MARK: - Attempt 014: source subtree teardown
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 014 removing the source prunes its entry and timer")
+  func toastLifecycle014RemovingSourcePrunesEntryAndTimer() throws {
+    // Hypothesis: direct toast declarations can survive source-subtree removal because they have no
+    // presentation trigger leaf to report the departed emitter.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle014"),
+      size: .init(width: 62, height: 10)
+    ) {
+      ToastLifecycle014Root()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("removed source toast"))
+    #expect(toastLifecycleEntryCount(in: harness) == 1)
+    #expect(harness.activeTaskCount == 1)
+
+    let removed = try harness.clickText("Remove Toast Source 014")
+    #expect(removed.contains("toast source removed"))
+    #expect(!removed.contains("removed source toast"))
+    #expect(toastLifecycleEntryCount(in: harness) == 0)
+    #expect(harness.activeTaskCount == 0)
+    #expect(harness.activeTaskDescriptorCount == 0)
+  }
+}
+
+@MainActor
+private struct ToastLifecycle014Root: View {
+  @State private var includesSource = true
+  @State private var isPresented = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove Toast Source 014") { includesSource = false }
+      if includesSource {
+        Text("active toast source")
+          .toast("removed source toast", isPresented: $isPresented, duration: 1.0)
+      } else {
+        Text("toast source removed")
+      }
+    }
+  }
+}
