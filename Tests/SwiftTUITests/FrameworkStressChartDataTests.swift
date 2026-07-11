@@ -95,6 +95,52 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 015: timeline order and detail topology
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 015 timeline reorder and optional details rebuild connectors")
+  func chartData015TimelineReorderAndOptionalDetailsRebuildConnectors() {
+    // Hypothesis: Timeline's index-keyed entry topology can retain an earlier
+    // last-row connector or optional detail line through reorder and cardinality churn.
+    struct Root: View {
+      let generation: Int
+
+      var entries: [TimelineEntry] {
+        let count = generation.isMultiple(of: 3) ? 1 : 4
+        let values = (0..<count).map { index in
+          TimelineEntry(
+            "T\(index)-\(generation)",
+            detail: (index + generation).isMultiple(of: 2) ? "D\(index)-\(generation)" : nil,
+            tone: index.isMultiple(of: 2) ? .success : .warning
+          )
+        }
+        return generation.isMultiple(of: 2) ? values : Array(values.reversed())
+      }
+
+      var body: some View {
+        Timeline(entries)
+      }
+    }
+
+    chartDataExercise(attempt: "015", proposal: .init(width: 46, height: 16)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let root = Root(generation: generation)
+      let text = chartDataText(snapshot)
+      for entry in root.entries {
+        #expect(text.contains(entry.title))
+        if let detail = entry.detail {
+          #expect(text.contains(detail))
+        }
+      }
+      if root.entries.count == 1 {
+        #expect(!text.contains("T3-\(generation)"))
+      }
+      #expect(text.contains("╰"))
+    }
+  }
+}
+
 // MARK: - Attempt 014: threshold band normalization replacement
 
 extension FrameworkStressChartDataTests {
