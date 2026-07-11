@@ -902,3 +902,61 @@ private struct ToastLifecycle017Root: View {
     }
   }
 }
+
+// MARK: - Attempt 018: simultaneous activation order
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 018 simultaneous activation has stable source order")
+  func toastLifecycle018SimultaneousActivationHasStableSourceOrder() throws {
+    // Hypothesis: rebuilding the family store from multiple newly active declarations can depend on
+    // dictionary iteration and change the visible stacking order across activation cycles.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle018"),
+      size: .init(width: 66, height: 15)
+    ) {
+      ToastLifecycle018Root()
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...8 {
+      let frame = try harness.clickText("Open Toast Pair 018")
+      #expect(
+        toastLifecycleContainsInOrder(
+          ["simultaneous first \(cycle)", "simultaneous second \(cycle)"],
+          in: frame
+        )
+      )
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+
+      let closed = try harness.clickText("Close Toast Pair 018")
+      #expect(!closed.contains("simultaneous first"))
+      #expect(!closed.contains("simultaneous second"))
+      #expect(toastLifecycleEntryCount(in: harness) == 0)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle018Root: View {
+  @State private var first = false
+  @State private var second = false
+  @State private var cycle = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Open Toast Pair 018") {
+        cycle += 1
+        first = true
+        second = true
+      }
+      Button("Close Toast Pair 018") {
+        first = false
+        second = false
+      }
+      Text("first source")
+        .toast("simultaneous first \(cycle)", isPresented: $first, duration: nil)
+      Text("second source")
+        .toast("simultaneous second \(cycle)", isPresented: $second, duration: nil)
+    }
+  }
+}
