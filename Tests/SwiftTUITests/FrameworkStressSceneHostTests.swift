@@ -1458,3 +1458,47 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 030: semantic label and politeness churn
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 030 live region label churn uses the new priority once")
+  func sceneHost030LiveRegionLabelChurnUsesNewPriorityOnce() {
+    // Hypothesis: changing a live region's label and politeness together can
+    // publish the old priority or repeat the same semantic change next frame.
+    var announcer = LiveRegionAnnouncer()
+    let nodeID = ViewNodeID(rawValue: 3_000)
+    let identity = testIdentity("SceneHost030", "status")
+    _ = announcer.announcements(
+      for: .init(
+        accessibilityNodes: [
+          sceneHostLiveRegionNode(nodeID: nodeID, identity: identity, label: "State 0")
+        ]
+      )
+    )
+
+    for generation in 1...16 {
+      let politeness: AccessibilityPoliteness =
+        generation.isMultiple(of: 2)
+        ? .assertive
+        : .polite
+      let snapshot = SemanticSnapshot(
+        accessibilityNodes: [
+          sceneHostLiveRegionNode(
+            nodeID: nodeID,
+            identity: identity,
+            label: "State \(generation)",
+            politeness: politeness
+          )
+        ]
+      )
+      let changed = announcer.announcements(for: snapshot)
+      let unchanged = announcer.announcements(for: snapshot)
+
+      #expect(changed.count == 1)
+      #expect(changed.first?.label == "State \(generation)")
+      #expect(changed.first?.politeness == politeness)
+      #expect(unchanged.isEmpty)
+    }
+  }
+}
