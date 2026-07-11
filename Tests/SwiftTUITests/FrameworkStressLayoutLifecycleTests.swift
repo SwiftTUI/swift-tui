@@ -178,3 +178,82 @@ private struct StressLL003Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 004: custom layout value churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 004 custom layout placement follows current layout value")
+  func stress004CustomLayoutPlacementFollowsCurrentLayoutValue() throws {
+    // Hypothesis: a retained custom-layout snapshot may keep the first
+    // placement algorithm when only a layout value changes.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL004", "Root"),
+      size: .init(width: 36, height: 7)
+    ) {
+      StressLL004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Reverse Layout")
+      let a = try #require(harness.point(forText: "Alpha"))
+      let b = try #require(harness.point(forText: "Beta"))
+      if generation.isMultiple(of: 2) {
+        #expect(a.x < b.x)
+      } else {
+        #expect(b.x < a.x)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL004Fixture: View {
+  @State private var reversed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse Layout") { reversed.toggle() }
+      StressLL004Layout(reversed: reversed) {
+        Text("Alpha")
+        Text("Beta")
+      }
+      .frame(width: 30, height: 2, alignment: .topLeading)
+    }
+  }
+}
+
+private struct StressLL004Layout: Layout {
+  var reversed: Bool
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    return .init(
+      width: sizes.reduce(0) { $0 + $1.width } + max(0, sizes.count - 1),
+      height: sizes.map(\.height).max() ?? 0
+    )
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    let order = reversed ? Array(subviews.indices.reversed()) : Array(subviews.indices)
+    var x = bounds.origin.x
+    for index in order {
+      let size = subviews[index].sizeThatFits(.unspecified)
+      subviews[index].place(
+        at: .init(x: x, y: bounds.origin.y),
+        anchor: .topLeading,
+        proposal: .init(width: size.width, height: size.height)
+      )
+      x += size.width + 1
+    }
+  }
+}
