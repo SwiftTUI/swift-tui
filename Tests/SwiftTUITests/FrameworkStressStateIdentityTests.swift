@@ -88,6 +88,51 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 003: Reinserted reused value starts a fresh lifetime
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 003 removal and reinsertion do not resurrect state")
+  func stateIdentity003RemovalReinsertionDoesNotResurrectState() throws {
+    // Hypothesis: retained owner values on a long-lived StateBox can outlive graph-node teardown
+    // and silently seed the next lifetime when the exact authored value is reinserted.
+    let shared = StateIdentitySharedCounter(label: "003")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity003"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StateIdentity003Root(shared: shared)
+    }
+    defer { harness.shutdown() }
+
+    var reinsertionFrames: [String] = []
+    for _ in 0..<4 {
+      _ = try harness.clickText("003 Increment")
+      var frame = try harness.clickText("Remove 003")
+      #expect(!frame.contains("003 Count"))
+      frame = try harness.clickText("Insert 003")
+      reinsertionFrames.append(frame)
+    }
+
+    withKnownIssue("A reused StateBox resurrects its mutation after committed removal") {
+      #expect(reinsertionFrames.allSatisfy { $0.contains("003 Count 0") })
+    }
+  }
+
+  private struct StateIdentity003Root: View {
+    let shared: StateIdentitySharedCounter
+    @State private var isVisible = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isVisible ? "Remove 003" : "Insert 003") { isVisible.toggle() }
+        if isVisible {
+          shared
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
