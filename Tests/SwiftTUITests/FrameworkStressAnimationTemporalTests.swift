@@ -102,3 +102,63 @@ private func animationTemporal002View(opacity: Double, watchedValue: Int) -> som
     .opacity(opacity)
     .animation(nil, value: watchedValue)
 }
+
+// MARK: - Attempt 003: value-animation baseline through entity reorder
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 003 value animation baselines follow reordered entities")
+  func animationTemporal003ValueBaselinesFollowReorderedEntities() throws {
+    // Hypothesis: the silent previous-value slot can follow structural row
+    // position instead of entity identity and animate unchanged reordered rows.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let identity = testIdentity("AnimationTemporal003", "Root")
+    let proposal = ProposedSize(width: 40, height: 6)
+    let initial = [
+      AnimationTemporal003Row(id: "a", value: 1, opacity: 0.2),
+      AnimationTemporal003Row(id: "b", value: 2, opacity: 0.7),
+    ]
+
+    _ = renderer.render(
+      animationTemporal003View(rows: initial),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    _ = renderer.render(
+      animationTemporal003View(rows: Array(initial.reversed())),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    #expect(controller.activeAnimationCount == 0)
+
+    let changed = [
+      AnimationTemporal003Row(id: "b", value: 2, opacity: 0.7),
+      AnimationTemporal003Row(id: "a", value: 3, opacity: 0.9),
+    ]
+    _ = renderer.render(
+      animationTemporal003View(rows: changed),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    withKnownIssue("A reordered ForEach entity loses its value-animation baseline") {
+      #expect(controller.activeAnimationCount == 1)
+    }
+  }
+}
+
+private struct AnimationTemporal003Row: Identifiable, Sendable {
+  let id: String
+  let value: Int
+  let opacity: Double
+}
+
+@MainActor
+private func animationTemporal003View(rows: [AnimationTemporal003Row]) -> some View {
+  VStack(alignment: .leading, spacing: 0) {
+    ForEach(rows) { row in
+      Text("003 row \(row.id)")
+        .opacity(row.opacity)
+        .animation(.linear(duration: .seconds(4)), value: row.value)
+    }
+  }
+}
