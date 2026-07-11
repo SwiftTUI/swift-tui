@@ -134,3 +134,57 @@ private struct FramePipelineNestedView: View {
     }
   }
 }
+
+// MARK: - Attempt 003: revisited dirty baseline
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 003 revisited dirty sibling uses latest committed baseline")
+  func framePipeline003RevisitedDirtySiblingUsesLatestCommittedBaseline() {
+    // Hypothesis: an A-dirty, B-dirty, A-dirty sequence can index A against
+    // the first frame and reuse B from the intermediate generation incorrectly.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline003", "Root")
+    let firstIdentity = testIdentity("FramePipeline003", "Root", "VStack[0]")
+    let secondIdentity = testIdentity("FramePipeline003", "Root", "VStack[1]")
+    let proposal = ProposedSize(width: 42, height: 4)
+    var first = "A-0"
+    var second = "B-0"
+
+    _ = renderer.render(
+      FramePipelineSiblingView(first: first, second: second),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    func renderAndCheck(dirtyIdentity: Identity) {
+      let retained = renderer.render(
+        FramePipelineSiblingView(first: first, second: second),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [dirtyIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache())).render(
+        FramePipelineSiblingView(first: first, second: second),
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.diagnostics.work.resolvedNodesReused >= 1)
+      #expect(retained.diagnostics.input.invalidatedIdentities == [dirtyIdentity])
+    }
+
+    for cycle in 1...12 {
+      first = "A-\(cycle)"
+      renderAndCheck(dirtyIdentity: firstIdentity)
+
+      second = "B-\(cycle)"
+      renderAndCheck(dirtyIdentity: secondIdentity)
+
+      first = "A-\(cycle - 1)"
+      renderAndCheck(dirtyIdentity: firstIdentity)
+    }
+  }
+}
