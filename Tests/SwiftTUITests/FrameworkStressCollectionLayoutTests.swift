@@ -1122,3 +1122,71 @@ private struct CollectionLayout018Root: View {
     .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 019: horizontal viewport reorder
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 019 horizontal viewport paints reordered entities")
+  func collectionLayout019HorizontalViewportPaintsReorderedEntities() {
+    // Hypothesis: an x-offset viewport can retain the previously realized
+    // source indices after the same entities reorder horizontally.
+    let position = CollectionLayout019ScrollBox()
+    position.value = .init(x: 6, y: 0)
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout019")
+
+    for generation in 0..<24 {
+      let values = generation.isMultiple(of: 2)
+        ? ["A", "B", "C", "D", "E", "F"]
+        : ["F", "E", "D", "C", "B", "A"]
+      let root = CollectionLayout019Root(values: values, position: position)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 8, height: 2)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 8, height: 2)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(retained.rasterSurface.lines.first?.hasPrefix(values[2]) == true)
+    }
+  }
+}
+
+@MainActor
+private final class CollectionLayout019ScrollBox {
+  var value = ScrollPosition.zero
+}
+
+@MainActor
+private struct CollectionLayout019Root: View {
+  let values: [String]
+  let position: CollectionLayout019ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .horizontal,
+      showsIndicators: false,
+      position: Binding(
+        get: { position.value },
+        set: { position.value = $0 }
+      )
+    ) {
+      LazyHStack(alignment: .top, spacing: 0) {
+        ForEach(values, id: \.self) { value in
+          Text(value)
+            .frame(width: 3, alignment: .leading)
+        }
+      }
+    }
+    .frame(width: 8, height: 2, alignment: .topLeading)
+  }
+}
