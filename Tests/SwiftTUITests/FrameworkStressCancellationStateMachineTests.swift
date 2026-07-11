@@ -330,4 +330,15 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 021 removed baseline keys are not carried")
+  func cancellationState021RemovedBaselineKeysAreNotCarried() {
+    // Hypothesis: a removal from live can be misclassified as a concurrent insertion.
+    let baseline = ["a": 1, "b": 2]
+    let live = ["b": 2]
+    let carried = ConcurrentRegistrationCarry.sinceBaseline(live: live, baseline: baseline)
+    #expect(carried.isEmpty)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
