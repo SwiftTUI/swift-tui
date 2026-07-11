@@ -260,3 +260,39 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 008: wide-cluster truncation edges
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 008 wide-cluster truncation preserves current edges")
+  func textContent008WideClusterTruncationPreservesCurrentEdges() {
+    // Hypothesis: retained truncation can slice head or middle output using stale scalar-width
+    // offsets when two-cell clusters occupy the current edge budget.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent008")
+    let modes: [Text.TruncationMode] = [.tail, .head, .middle]
+    var observedLines: Set<String> = []
+
+    for generation in 0..<24 {
+      let modeIndex = generation % modes.count
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 5, height: nil),
+        content: Text("界ABCDE界FG")
+          .lineLimit(1)
+          .truncationMode(modes[modeIndex])
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let line = frames.retained.rasterSurface.lines[0]
+      observedLines.insert(line)
+      #expect(line.contains("…"))
+      #expect(textContentVisibleWidth(line) <= 5)
+    }
+
+    #expect(observedLines.count == modes.count)
+  }
+}
