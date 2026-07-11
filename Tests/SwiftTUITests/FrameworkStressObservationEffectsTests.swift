@@ -1133,3 +1133,81 @@ private struct ObservationEffects019View: View {
     }
   }
 }
+
+// MARK: - Attempt 020: optional same-key preference observer insertion
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 020 inserting an observer preserves the survivor baseline")
+  func observationEffects020InsertedObserverPreservesSurvivorBaseline() throws {
+    // Hypothesis: same-key preference registrations use positional ordinals,
+    // so inserting a leading observer can transfer the survivor's baseline.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects020"),
+      size: .init(width: 68, height: 8)
+    ) {
+      ObservationEffects020View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Preference 020")
+      #expect(probe.events == ["survivor:\(generation * 2 - 1)"])
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Leading Observer 020")
+      withKnownIssue("An inserted same-key observer inherits the survivor's ordinal baseline") {
+        #expect(probe.events == ["leading:\(generation * 2 - 1)"])
+      }
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Preference 020")
+      #expect(
+        probe.events.sorted()
+          == ["leading:\(generation * 2)", "survivor:\(generation * 2)"].sorted()
+      )
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Leading Observer 020")
+      #expect(probe.events.isEmpty)
+    }
+  }
+}
+
+private struct ObservationEffects020View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+  @State private var hasLeadingObserver = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Preference 020") { generation += 1 }
+      Button("Toggle Leading Observer 020") { hasLeadingObserver.toggle() }
+      observedSource
+    }
+  }
+
+  @ViewBuilder private var observedSource: some View {
+    if hasLeadingObserver {
+      source
+        .onPreferenceChange(ObservationEffectsIntPreferenceKey.self) { value in
+          probe.events.append("leading:\(value)")
+        }
+        .onPreferenceChange(ObservationEffectsIntPreferenceKey.self) { value in
+          probe.events.append("survivor:\(value)")
+        }
+    } else {
+      source
+        .onPreferenceChange(ObservationEffectsIntPreferenceKey.self) { value in
+          probe.events.append("survivor:\(value)")
+        }
+    }
+  }
+
+  private var source: some View {
+    Text("020 preference \(generation)")
+      .preference(key: ObservationEffectsIntPreferenceKey.self, value: generation)
+      .id("observation-effects-020-source")
+  }
+}
