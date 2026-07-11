@@ -1017,6 +1017,58 @@ private struct EnvironmentStyle020Root: View {
   }
 }
 
+// MARK: - Attempt 021: preference callback environment freshness
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 021 preference callback reads current environment")
+  func environmentStyle021PreferenceCallbackReadsCurrentEnvironment() throws {
+    // Hypothesis: a stable preference observer can refresh its baseline while retaining the first
+    // environment snapshot captured by its registration action.
+    let probe = EnvironmentStyleEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle021"),
+      size: .init(width: 78, height: 7)
+    ) {
+      EnvironmentStyle021Root(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Observed Environment 021")
+      #expect(probe.events == ["observer-env-\(generation):\(generation)"])
+      #expect(harness.preferenceObservationRegistrationCount == 1)
+    }
+  }
+}
+
+private struct EnvironmentStyle021Observer: View {
+  let generation: Int
+  let probe: EnvironmentStyleEventProbe
+  @Environment(\.environmentStyleString) private var environmentValue
+
+  var body: some View {
+    Text("021 observed \(generation)")
+      .preference(key: EnvironmentStyleIntPreferenceKey.self, value: generation)
+      .onPreferenceChange(EnvironmentStyleIntPreferenceKey.self) { value in
+        probe.events.append("\(environmentValue):\(value)")
+      }
+  }
+}
+
+private struct EnvironmentStyle021Root: View {
+  let probe: EnvironmentStyleEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Observed Environment 021") { generation += 1 }
+      EnvironmentStyle021Observer(generation: generation, probe: probe)
+        .environment(\.environmentStyleString, "observer-env-\(generation)")
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
