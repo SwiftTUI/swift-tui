@@ -197,3 +197,49 @@ extension FrameworkStressComponentCompositionTests {
     }
   }
 }
+
+// MARK: - Attempt 005: LabeledContent entity reorder
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 005 reordered LabeledContent rows keep current values")
+  func componentComposition005ReorderedLabeledContentRowsKeepCurrentValues() {
+    // Hypothesis: the primitive's synthesized children can be reused by
+    // occurrence after stable row entities reorder, swapping trailing values.
+    struct Entry: Identifiable {
+      let id: String
+      let value: String
+    }
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let base = [
+          Entry(id: "alpha", value: "A-\(generation)"),
+          Entry(id: "beta", value: "B-\(generation)"),
+          Entry(id: "gamma", value: "C-\(generation)"),
+        ]
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(generation.isMultiple(of: 2) ? base : Array(base.reversed())) { entry in
+            LabeledContent(entry.id, value: entry.value)
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition005")
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      let text = componentCompositionText(frames.retained)
+      #expect(text.contains("alpha") && text.contains("A-\(generation)"))
+      #expect(text.contains("beta") && text.contains("B-\(generation)"))
+      #expect(text.contains("gamma") && text.contains("C-\(generation)"))
+    }
+  }
+}
