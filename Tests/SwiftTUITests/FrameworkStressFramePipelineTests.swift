@@ -974,3 +974,67 @@ private struct FramePipelineCommitPlanView: View {
     }
   }
 }
+
+// MARK: - Attempt 016: stale candidate preserves sibling commit products
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 016 stale candidate skip preserves sibling products")
+  func framePipeline016StaleCandidateSkipPreservesSiblingProducts() async {
+    // Hypothesis: the stale-baseline guard can preserve graph state but still
+    // rewind a sibling commit's retained raster, visibility, or index products.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline016", "Root")
+    let proposal = ProposedSize(width: 40, height: 4)
+    _ = renderer.render(
+      FramePipelineSiblingView(first: "baseline-a", second: "baseline-b"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let staleDraft = renderer.prepareFrameHeadForCancellationTesting(
+      FramePipelineSiblingView(first: "stale-a", second: "stale-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let sibling = renderer.render(
+      FramePipelineSiblingView(first: "sibling-latest-a", second: "sibling-latest-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let committedGraph = renderer.viewGraph.debugTotalStateSnapshot()
+    let committedInput = renderer.frameTailRenderer.retainedInput(invalidatedIdentities: [])
+    let committedDrawn = renderer.frameTailRenderer.previousDrawnIdentities
+    let committedMetric = renderer.frameTailRenderer.memoryMetricSnapshot
+
+    let skipped = await renderer.resolveCompletedFrameCandidateForTesting(staleDraft)
+
+    #expect(skipped)
+    #expect(renderer.viewGraph.debugTotalStateSnapshot() == committedGraph)
+    #expect(
+      renderer.frameTailRenderer.retainedInput(invalidatedIdentities: []).previousRasterSurface
+        == committedInput.previousRasterSurface
+    )
+    #expect(
+      renderer.frameTailRenderer.retainedInput(invalidatedIdentities: []).previousRasterSurface
+        == sibling.rasterSurface
+    )
+    #expect(renderer.frameTailRenderer.previousDrawnIdentities == committedDrawn)
+    #expect(renderer.frameTailRenderer.memoryMetricSnapshot == committedMetric)
+
+    let replay = renderer.render(
+      FramePipelineSiblingView(first: "sibling-latest-a", second: "sibling-latest-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    #expect(replay.rasterSurface == sibling.rasterSurface)
+  }
+}
