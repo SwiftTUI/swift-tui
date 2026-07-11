@@ -1116,6 +1116,68 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 018: Entity route release across a committed absence
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 018 reinserted entity starts a fresh row lifetime")
+  func stateIdentity018ReinsertedEntityStartsFreshLifetime() throws {
+    // Hypothesis: an inactive entity route or deferred-removal node can survive an empty frame
+    // and resurrect row-local state when the same data ID later returns.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity018"),
+      size: .init(width: 62, height: 12)
+    ) {
+      StateIdentity018Root()
+    }
+    defer { harness.shutdown() }
+
+    for stableCount in 1...4 {
+      var frame = try harness.clickText("Increment Row 1 018")
+      #expect(frame.contains("018 Row 1 Count 1"))
+      frame = try harness.clickText("Increment Row 2 018")
+      #expect(frame.contains("018 Row 2 Count \(stableCount)"))
+
+      frame = try harness.clickText("Remove Row 1 018")
+      #expect(!frame.contains("018 Row 1 Count"))
+      frame = try harness.clickText("Insert Row 1 018")
+      #expect(frame.contains("018 Row 1 Count 0"))
+      #expect(frame.contains("018 Row 2 Count \(stableCount)"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+  }
+
+  private struct StateIdentity018Root: View {
+    @State private var includesFirst = true
+
+    private var values: [Int] {
+      includesFirst ? [1, 2] : [2]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(includesFirst ? "Remove Row 1 018" : "Insert Row 1 018") {
+          includesFirst.toggle()
+        }
+        ForEach(values, id: \.self) { value in
+          StateIdentity018Row(value: value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity018Row: View {
+    let value: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("018 Row \(value) Count \(count)")
+        Button("Increment Row \(value) 018") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
