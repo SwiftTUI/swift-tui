@@ -95,6 +95,55 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 004: column maximum-owner migration
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 004 column maximum owner migrates through reordered rows")
+  func chartData004ColumnMaximumOwnerMigratesThroughReorderedRows() {
+    // Hypothesis: the normalized height cache can stay attached to an old array
+    // offset when the maximum value and declaration order rotate independently.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let maximumIndex = generation % 3
+        let base = (0..<3).map { index in
+          BarChartEntry(
+            "\(index)\(generation % 10)",
+            value: index == maximumIndex
+              ? (index.isMultiple(of: 2) ? -Double(100 + generation) : Double(100 + generation))
+              : Double(20 + index * 10),
+            tone: index == maximumIndex ? .critical : .info
+          )
+        }
+        let entries: [BarChartEntry]
+        switch generation % 3 {
+        case 1: entries = [base[1], base[2], base[0]]
+        case 2: entries = [base[2], base[0], base[1]]
+        default: entries = base
+        }
+        ColumnChart(
+          "Peak \(generation)",
+          entries: entries,
+          chartHeight: 7,
+          columnWidth: 2
+        )
+      }
+    }
+
+    chartDataExercise(attempt: "004", proposal: .init(width: 46, height: 12)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Peak \(generation)"))
+      #expect(text.contains("max \(100 + generation)"))
+      for index in 0..<3 {
+        #expect(text.contains("\(index)\(generation % 10)"))
+      }
+    }
+  }
+}
+
 // MARK: - Attempt 003: column cardinality shrink and regrow
 
 extension FrameworkStressChartDataTests {
