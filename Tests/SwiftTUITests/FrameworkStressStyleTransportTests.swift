@@ -272,4 +272,31 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
-// NEXT STYLE TRANSPORT STRESS TEST
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 025 repeated style families round trip exactly")
+  func styleTransport025RepeatedStyleFamiliesRoundTripExactly() throws {
+    // Hypothesis: palette sorting, optional themes, or color quantization can retain prior payloads.
+    for generation in 0..<100 {
+      let foreground = Color(hexRGB: 0x102000 + UInt32(generation))
+      let background = Color(hexRGB: 0x304000 + UInt32(generation))
+      let tint = Color(hexRGB: 0x506000 + UInt32(generation))
+      let appearance = TerminalAppearance(
+        foregroundColor: foreground,
+        backgroundColor: background,
+        tintColor: tint,
+        palette: [
+          generation % 16: Color(hexRGB: 0x708000 + UInt32(generation))
+        ],
+        colorSchemeContrast: generation.isMultiple(of: 2) ? .standard : .increased,
+        source: generation.isMultiple(of: 3) ? .fallback : .override
+      )
+      let theme =
+        generation.isMultiple(of: 2)
+        ? Theme(foreground: foreground, background: background, tint: tint)
+        : nil
+      let style = TerminalRenderStyle(appearance: appearance, theme: theme)
+      let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))
+      #expect(TerminalRenderStyleCodec.decodeBase64(encoded) == style)
+    }
+  }
+}
