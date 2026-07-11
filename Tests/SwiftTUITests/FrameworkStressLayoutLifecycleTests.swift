@@ -780,3 +780,56 @@ private struct StressLL012Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 013: hidden navigation root freshness
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 013 hidden navigation root returns with current state")
+  func stress013HiddenNavigationRootReturnsWithCurrentState() throws {
+    // Hypothesis: the detached hosted root may return with a stale snapshot or
+    // a duplicate task after it is mutated while a destination is visible.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL013", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressLL013Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Push Hidden Root")
+      _ = try harness.clickText("Mutate Hidden Root")
+      let frame = try harness.clickText("Pop Hidden Root")
+      #expect(frame.contains("root model \(generation)"))
+      #expect(harness.activeTaskCount == 1)
+      #expect(harness.activeTaskDescriptorCount == 1)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL013Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var isPresented = false
+
+  var body: some View {
+    NavigationStack(id: "stress-013-navigation") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("root model \(probe.count)")
+          .task(id: "hidden-root-task") {
+            while !Task.isCancelled {
+              await Task.yield()
+            }
+          }
+        Button("Push Hidden Root") { isPresented = true }
+      }
+      .navigationDestination(isPresented: $isPresented) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Mutate Hidden Root") { probe.count += 1 }
+          Button("Pop Hidden Root") { isPresented = false }
+        }
+      }
+    }
+  }
+}
