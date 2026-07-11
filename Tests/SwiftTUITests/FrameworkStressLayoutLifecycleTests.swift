@@ -1552,3 +1552,51 @@ private struct StressLL025Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 026: task descriptor and identity churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 026 task registry targets newest closure across identity churn")
+  func stress026TaskRegistryTargetsNewestClosureAcrossIdentityChurn() async throws {
+    // Hypothesis: identityChanged task diff suppression may leave the prior
+    // descriptor's registration or closure live when both identity and ID move.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL026", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressLL026Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Churn Task Identity")
+      let registrations = harness.runLoop.localTaskRegistry.snapshot().values.flatMap { $0 }
+      let registration = try #require(registrations.first)
+      #expect(registrations.count == 1)
+      await registration.run()
+      #expect(probe.events.last == "run:\(generation)")
+    }
+  }
+}
+
+private struct StressLL026TaskID: Equatable, Sendable {
+  var generation: Int
+}
+
+@MainActor
+private struct StressLL026Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Churn Task Identity") { generation += 1 }
+      Text("task owner generation \(generation)")
+        .id("task-owner-\(generation % 2)")
+        .task(id: StressLL026TaskID(generation: generation)) {
+          probe.events.append("run:\(generation)")
+        }
+    }
+  }
+}
