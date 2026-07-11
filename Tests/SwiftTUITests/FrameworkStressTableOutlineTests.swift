@@ -357,3 +357,53 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 007: table row-style replacement
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 007 table row styles replace retained paint metadata")
+  func tableOutline007TableRowStylesReplaceRetainedPaintMetadata() {
+    // Hypothesis: Table's detached row subtrees can preserve an earlier row
+    // foreground, background, or separator policy after the live modifiers change.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Table(selection: .constant(1), columns: [.init("Styled", width: 12)]) {
+          TableRow { Text("styled-\(generation)") }
+            .tag(1)
+            .listRowBackground(generation.isMultiple(of: 2) ? Color.red : .blue)
+            .listRowForegroundStyle(generation.isMultiple(of: 2) ? Color.yellow : .cyan)
+            .listRowSeparator(
+              generation.isMultiple(of: 2) ? .hidden : .visible,
+              edges: generation.isMultiple(of: 2) ? .bottom : .top
+            )
+        }
+        .frame(width: 20, height: 7, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline007")
+    for generation in 0..<20 {
+      let root = Root(generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 20, height: 7)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 20, height: 7)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.resolvedTree.drawPayload == fresh.resolvedTree.drawPayload)
+      #expect(tableOutlineText(retained).contains("styled-\(generation)"))
+    }
+  }
+}
