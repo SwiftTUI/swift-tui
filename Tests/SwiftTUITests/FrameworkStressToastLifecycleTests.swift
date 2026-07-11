@@ -59,3 +59,57 @@ private struct ToastLifecycle001Root: View {
     )
   }
 }
+
+// MARK: - Attempt 002: content cardinality replacement
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 002 active content replaces its child cardinality")
+  func toastLifecycle002ActiveContentReplacesItsChildCardinality() throws {
+    // Hypothesis: a retained ToastContent attachment can preserve the previous one-child or
+    // two-child topology even after the source emits a freshly built payload group.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle002"),
+      size: .init(width: 62, height: 12)
+    ) {
+      ToastLifecycle002Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      let frame = try harness.clickText("Replace Toast Topology 002")
+      if generation.isMultiple(of: 2) {
+        #expect(frame.contains("compact toast generation \(generation)"))
+        #expect(!frame.contains("detail toast generation \(generation)"))
+      } else {
+        #expect(frame.contains("primary toast generation \(generation)"))
+        #expect(frame.contains("detail toast generation \(generation)"))
+        #expect(!frame.contains("compact toast generation \(generation)"))
+      }
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle002Root: View {
+  @State private var generation = 0
+  @State private var expanded = false
+  @State private var isPresented = true
+
+  var body: some View {
+    Button("Replace Toast Topology 002") {
+      generation += 1
+      expanded.toggle()
+    }
+    .toast(isPresented: $isPresented, duration: nil) {
+      if expanded {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("primary toast generation \(generation)")
+          Text("detail toast generation \(generation)")
+        }
+      } else {
+        Text("compact toast generation \(generation)")
+      }
+    }
+  }
+}
