@@ -439,3 +439,49 @@ private struct GestureScroll009Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 010: multi-tap count replacement
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 010 partial tap sequence adopts a new required count")
+  func gestureScroll010PartialTapSequenceAdoptsNewRequiredCount() throws {
+    // Hypothesis: preserving a partial multi-tap recognizer retains its old
+    // required count when the same attachment is re-authored between taps.
+    let fires = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll010Root"),
+      size: .init(width: 48, height: 7)
+    ) {
+      GestureScroll010Fixture(fires: fires)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Retuned multi tap"))
+    _ = try harness.click(point)
+    _ = try harness.movePointer(to: point)
+    _ = try harness.click(point)
+
+    withKnownIssue("A partial TapGesture retains its original required count") {
+      #expect(fires.value == 1)
+    }
+  }
+}
+
+private struct GestureScroll010Fixture: View {
+  let fires: GestureScrollBox<Int>
+  @State private var requiredCount = 3
+
+  var body: some View {
+    Text("Retuned multi tap")
+      .frame(width: 26, height: 1, alignment: .leading)
+      .onPointerHover { phase in
+        if case .entered = phase {
+          requiredCount = 2
+        }
+      }
+      .gesture(
+        TapGesture(count: requiredCount)
+          .onEnded { fires.value += 1 }
+      )
+  }
+}
