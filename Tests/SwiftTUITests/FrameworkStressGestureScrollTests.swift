@@ -340,3 +340,50 @@ private struct GestureScroll007Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 008: minimum-distance replacement during drag
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 008 active drag adopts a reduced minimum distance")
+  func gestureScroll008ActiveDragAdoptsReducedMinimumDistance() throws {
+    // Hypothesis: the preserved primitive keeps its press-time threshold after
+    // a hover-driven re-resolution authors a lower minimum distance.
+    let changes = GestureScrollBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll008Root"),
+      size: .init(width: 46, height: 7)
+    ) {
+      GestureScroll008Fixture(changes: changes)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Threshold drag"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.movePointer(to: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 2, y: start.y))
+
+    withKnownIssue("Active DragGesture retains its press-time minimum distance") {
+      #expect(changes.value == 1)
+    }
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 2, y: start.y))
+  }
+}
+
+private struct GestureScroll008Fixture: View {
+  let changes: GestureScrollBox<Int>
+  @State private var minimumDistance = 8.0
+
+  var body: some View {
+    Text("Threshold drag")
+      .frame(width: 24, height: 1, alignment: .leading)
+      .onPointerHover { phase in
+        if case .entered = phase {
+          minimumDistance = 1
+        }
+      }
+      .gesture(
+        DragGesture(minimumDistance: minimumDistance)
+          .onChanged { _ in changes.value += 1 }
+      )
+  }
+}
