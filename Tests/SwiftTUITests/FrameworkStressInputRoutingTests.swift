@@ -738,3 +738,68 @@ private struct StressInput012Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 013: duplicate keyCommand override removal
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Removing a duplicate overriding command reveals the remaining command")
+  func stressInputRouting013RemovingDuplicateCommandRevealsBaseCommand() throws {
+    // Hypothesis: last-writer command replacement may erase the underlying
+    // descriptor permanently when the overriding modifier leaves the tree.
+    let events = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput013Root"),
+      size: .init(width: 48, height: 10)
+    ) {
+      StressInput013Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput013Fixture.focusIdentity)
+    _ = try harness.pressKey(KeyPress(.character("k"), modifiers: .ctrl))
+    #expect(events.value == ["override"])
+
+    _ = try harness.clickText("Remove command override")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput013Fixture.focusIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("k"), modifiers: .ctrl))
+
+    #expect(events.value == ["override", "base"])
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+private struct StressInput013Fixture: View {
+  static let focusIdentity = testIdentity("StressInput013", "Focus")
+
+  let events: StressInputBox<[String]>
+  @State private var hasOverride = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove command override") { hasOverride = false }
+      if hasOverride {
+        Panel(id: "stress-input-013-panel") {
+          Text("Duplicate command focus")
+            .id(Self.focusIdentity)
+            .focusable()
+        }
+        .keyCommand("Base", key: .character("k"), modifiers: .ctrl) {
+          events.value.append("base")
+        }
+        .keyCommand("Override", key: .character("k"), modifiers: .ctrl) {
+          events.value.append("override")
+        }
+      } else {
+        Panel(id: "stress-input-013-panel") {
+          Text("Duplicate command focus")
+            .id(Self.focusIdentity)
+            .focusable()
+        }
+        .keyCommand("Base", key: .character("k"), modifiers: .ctrl) {
+          events.value.append("base")
+        }
+      }
+    }
+  }
+}
