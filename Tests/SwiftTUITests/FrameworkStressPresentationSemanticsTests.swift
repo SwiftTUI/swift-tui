@@ -952,6 +952,53 @@ private struct StressPS021Fixture: View {
   }
 }
 
+// MARK: - Attempt 022: slider binding retarget
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 022 a stable slider writes only its current binding")
+  func stress022StableSliderWritesCurrentBinding() throws {
+    // Hypothesis: the Slider's retained key and pointer registrations may keep
+    // the binding captured before a same-identity retarget.
+    let probe = StressPresentationProbe()
+    probe.firstInt = 8
+    probe.secondInt = 1
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS022", "Root"),
+      size: .init(width: 54, height: 9)
+    ) {
+      StressPS022Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retarget slider")
+    _ = try harness.focusText("Stable slider")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(probe.firstInt == 8)
+    #expect(probe.secondInt == 2)
+  }
+}
+
+@MainActor
+private struct StressPS022Fixture: View {
+  let probe: StressPresentationProbe
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget slider") {
+        usesSecond = true
+      }
+      Slider(
+        "Stable slider",
+        value: usesSecond ? probe.secondIntBinding() : probe.firstIntBinding(),
+        in: 0...10
+      )
+      .id("stable-slider")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
