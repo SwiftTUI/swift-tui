@@ -722,3 +722,54 @@ private struct GestureScroll014Fixture: View {
     .frame(width: 38, height: 7)
   }
 }
+
+// MARK: - Attempt 015: hover and captured drag coexistence
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 015 hover subscription coexists with captured drag")
+  func gestureScroll015HoverSubscriptionCoexistsWithCapturedDrag() throws {
+    // Hypothesis: a hover route at the same identity may replace or intercept
+    // the capturing drag's primary pointer handler during dispatch.
+    let hoverPhases = GestureScrollBox<[String]>([])
+    let dragEvents = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll015Root"),
+      size: .init(width: 50, height: 8)
+    ) {
+      GestureScroll015Fixture(hoverPhases: hoverPhases, dragEvents: dragEvents)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Hover drag target"))
+    _ = try harness.movePointer(to: start)
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.movePointer(to: Point(x: 48, y: 7))
+
+    #expect(dragEvents.value == ["changed", "changed", "changed", "ended"])
+    #expect(hoverPhases.value == ["entered", "exited"])
+  }
+}
+
+private struct GestureScroll015Fixture: View {
+  let hoverPhases: GestureScrollBox<[String]>
+  let dragEvents: GestureScrollBox<[String]>
+
+  var body: some View {
+    Text("Hover drag target")
+      .frame(width: 26, height: 1, alignment: .leading)
+      .onPointerHover { phase in
+        switch phase {
+        case .entered: hoverPhases.value.append("entered")
+        case .moved: break
+        case .exited: hoverPhases.value.append("exited")
+        }
+      }
+      .gesture(
+        DragGesture()
+          .onChanged { _ in dragEvents.value.append("changed") }
+          .onEnded { _ in dragEvents.value.append("ended") }
+      )
+  }
+}
