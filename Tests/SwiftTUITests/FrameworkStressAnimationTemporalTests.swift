@@ -435,3 +435,60 @@ private func animationTemporal008View(
     .animation(animation, value: value)
     .environment(\.accessibilityReduceMotion, reducedMotion)
 }
+
+// MARK: - Attempt 009: completed animation registration retention
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 009 completed unique animations keep registration bounded")
+  func animationTemporal009CompletedUniqueAnimationsKeepRegistrationBounded() throws {
+    // Hypothesis: the controller's box-to-animation ledger never prunes unique
+    // finite curves after their last active record completes.
+    let controller = AnimationController()
+    let identity = testIdentity("AnimationTemporal009", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(10))
+    var baseline = animationTemporalNode(identity: identity, opacity: 0.1)
+    controller.processResolvedTree(baseline, transaction: .init(), timestamp: start)
+
+    for generation in 1...24 {
+      let animation = Animation.linear(duration: .milliseconds(100 + generation))
+      controller.register(animation)
+      baseline = animationTemporalNode(
+        identity: identity,
+        opacity: generation.isMultiple(of: 2) ? 0.2 : 0.8
+      )
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      let frameTime = start.advanced(by: .seconds(generation))
+      controller.processResolvedTree(baseline, transaction: transaction, timestamp: frameTime)
+      var tickTree = baseline
+      _ = controller.applyInterpolations(
+        to: &tickTree,
+        at: frameTime.advanced(by: .seconds(1))
+      )
+      #expect(controller.activeAnimationCount == 0)
+    }
+
+    withKnownIssue("Completed unique animations remain in the controller registration ledger") {
+      #expect(controller.debugStateSnapshot().registeredAnimationCount <= 2)
+    }
+  }
+}
+
+private func animationTemporalNode(
+  identity: Identity,
+  opacity: Double = 1,
+  padding: EdgeInsets? = nil,
+  viewNodeID: ViewNodeID? = nil,
+  children: [ResolvedNode] = []
+) -> ResolvedNode {
+  var metadata = DrawMetadata()
+  metadata.baseStyle.explicitOpacity = opacity
+  return ResolvedNode(
+    viewNodeID: viewNodeID,
+    identity: identity,
+    kind: .view("AnimationTemporalLeaf"),
+    children: children,
+    layoutBehavior: padding.map(LayoutBehavior.padding) ?? .intrinsic,
+    drawMetadata: metadata
+  )
+}
