@@ -1055,3 +1055,70 @@ private struct CollectionLayout017Root: View {
     .frame(width: 16, height: height, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 018: prefix removal at retained offset
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 018 prefix removal paints current lazy rows")
+  func collectionLayout018PrefixRemovalPaintsCurrentLazyRows() {
+    // Hypothesis: retained viewport placement may translate cached children
+    // from before a prefix removal instead of materializing the new indices.
+    let position = CollectionLayout018ScrollBox()
+    position.value = .init(x: 0, y: 5)
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout018")
+
+    for generation in 0..<24 {
+      let removedPrefix = !generation.isMultiple(of: 2)
+      let values = removedPrefix ? Array(3..<12) : Array(0..<12)
+      let root = CollectionLayout018Root(values: values, position: position)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 16, height: 3)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 16, height: 3)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      let expectedFirst = removedPrefix ? "018 row 8" : "018 row 5"
+      #expect(retained.rasterSurface.lines.first == expectedFirst)
+    }
+  }
+}
+
+@MainActor
+private final class CollectionLayout018ScrollBox {
+  var value = ScrollPosition.zero
+}
+
+@MainActor
+private struct CollectionLayout018Root: View {
+  let values: [Int]
+  let position: CollectionLayout018ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { position.value },
+        set: { position.value = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(values, id: \.self) { value in
+          Text("018 row \(value)")
+        }
+      }
+    }
+    .frame(width: 16, height: 3, alignment: .topLeading)
+  }
+}
