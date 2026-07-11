@@ -704,6 +704,45 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 019: preferred-edge replacement
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 019 preferred edge relocates the live tip")
+  func popoverTip019PreferredEdgeRelocatesLiveTip() throws {
+    // Hypothesis: placement can reuse the first PopoverPresentationItem's
+    // arrow edge while every other item field remains stable.
+    let rootIdentity = testIdentity("PopoverTipStress019", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "preferred-edge"
+    model.title = "Preferred edge tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = []
+    model.sourceOffset = 38
+    model.sourceWidth = 10
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    for _ in 1...10 {
+      model.arrowEdge = .leading
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let source = try #require(harness.point(forText: "Tip anchor"))
+      let leading = try #require(harness.point(forText: "Preferred edge tip"))
+      #expect(leading.x < source.x)
+
+      model.arrowEdge = .trailing
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      let trailing = try #require(harness.point(forText: "Preferred edge tip"))
+      #expect(trailing.x > source.x)
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
