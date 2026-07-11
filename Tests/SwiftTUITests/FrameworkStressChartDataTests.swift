@@ -95,6 +95,64 @@ extension FrameworkStressChartDataTests {
   }
 }
 
+// MARK: - Attempt 021: line degenerate and extreme finite domains
+
+extension FrameworkStressChartDataTests {
+  @Test("stress chart data 021 line degenerate tiny and huge finite domains converge")
+  func chartData021LineDegenerateTinyAndHugeFiniteDomainsConverge() {
+    // Hypothesis: a retained domain fast path can remain stuck after a zero-span
+    // frame when the next generation expands to tiny or very large finite ranges.
+    struct Root: View {
+      let generation: Int
+
+      var points: [LineChartPoint] {
+        switch generation % 4 {
+        case 0: [.init(x: 0, y: 0)]
+        case 1:
+          [
+            .init(x: 5, y: -5),
+            .init(x: 5, y: -5),
+            .init(x: 5, y: -5),
+          ]
+        case 2:
+          [
+            .init(x: -1e150, y: 1e150),
+            .init(x: 0, y: 0),
+            .init(x: 1e150, y: -1e150),
+          ]
+        default:
+          [
+            .init(x: -1e-150, y: -1e-150),
+            .init(x: 0, y: 1e-150),
+            .init(x: 1e-150, y: 0),
+          ]
+        }
+      }
+
+      var body: some View {
+        LineChart(
+          "Finite \(generation)",
+          series: [.init("Domain \(generation)", points: points)],
+          height: 7,
+          width: 36
+        )
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.bottom)
+      }
+    }
+
+    chartDataExercise(attempt: "021", proposal: .init(width: 54, height: 13)) { generation in
+      Root(generation: generation)
+    } verify: { generation, snapshot in
+      let text = chartDataText(snapshot)
+      #expect(text.contains("Finite \(generation)"))
+      #expect(text.contains("Domain \(generation)"))
+      #expect(text.contains("1 series"))
+    }
+  }
+}
+
 // MARK: - Attempt 020: line axis and legend topology replacement
 
 extension FrameworkStressChartDataTests {
