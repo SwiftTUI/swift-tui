@@ -430,4 +430,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 010: Truncation-mode cache churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 010 truncation mode never replays a prior edge")
+  func renderReconciliation010TruncationModeNeverReplaysPriorEdge() {
+    // Hypothesis: the text-layout cache separates truncation modes, while retained placement
+    // equivalence may not, causing head, middle, and tail output to alias after cycling.
+    struct Root: View {
+      let mode: Text.TruncationMode
+
+      var body: some View {
+        Text("ABCDEFGHIJKLMN")
+          .lineLimit(1)
+          .truncationMode(mode)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation010")
+    let proposal = ProposedSize(width: 7, height: nil)
+    let modes: [Text.TruncationMode] = [.head, .middle, .tail]
+
+    for generation in 0..<18 {
+      let root = Root(mode: modes[generation % modes.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: proposal
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: proposal
+      )
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained).contains("…"))
+    }
+  }
+}
+
 // MARK: - End
