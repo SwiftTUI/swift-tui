@@ -92,4 +92,19 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 005 zero policy protects only latest entry")
+  func cacheState005ZeroPolicyProtectsOnlyLatestEntry() {
+    // Hypothesis: a policy that every entry violates can loop or preserve an older neighbor.
+    var cache = BoundedLRUCache<Int, Int, StressCacheCost>()
+    let zero = StressCacheCost.zero
+    for value in 0..<40 {
+      cache.upsert(value, value: value, cost: stressCacheEntry(1), policy: zero)
+      #expect(cache.count == 1)
+      #expect(cache.peek(value) == value)
+    }
+    #expect(cache.evictionCount == 39)
+  }
+}
+
 // NEXT CACHE STRESS TEST
