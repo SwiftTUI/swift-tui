@@ -1038,3 +1038,63 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 019: compositing-group topology churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 019 compositing group topology leaves and returns")
+  func visualEffects019CompositingGroupTopologyLeavesAndReturns() {
+    // Hypothesis: retained surface-composition metadata can outlive a removed compositingGroup,
+    // continuing to isolate a stable erased subtree after the group modifier has departed.
+    struct Root: View {
+      let generation: Int
+
+      var layeredContent: some View {
+        Rectangle()
+          .fill(Color.blue.opacity(0.7))
+          .frame(width: 22, height: 8)
+          .overlay {
+            Circle()
+              .fill(Color.yellow.opacity(0.6))
+              .frame(width: 14, height: 7)
+          }
+      }
+
+      var body: some View {
+        Group {
+          if generation.isMultiple(of: 2) {
+            AnyView(layeredContent.compositingGroup())
+          } else {
+            AnyView(layeredContent)
+          }
+        }
+      }
+    }
+
+    func containsCompositingGroup(_ node: PlacedNode) -> Bool {
+      if node.surfaceComposition.role == .isolatedCompositingGroup {
+        return true
+      }
+      return node.children.contains(where: containsCompositingGroup)
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects019")
+
+    for generation in 0..<24 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(
+        containsCompositingGroup(retained.placedTree) == generation.isMultiple(of: 2)
+      )
+    }
+  }
+}
