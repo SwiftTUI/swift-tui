@@ -662,6 +662,55 @@ private struct EnvironmentStyle014Root: View {
   }
 }
 
+// MARK: - Attempt 015: cross-type erased text-field-style replacement
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 015 erased text field style replaces concrete family")
+  func environmentStyle015ErasedTextFieldStyleReplacesConcreteFamily() throws {
+    // Hypothesis: one AnyTextFieldStyle environment slot can keep a prior concrete box when it
+    // alternates between built-in and custom style families around a stable field identity.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle015"),
+      size: .init(width: 78, height: 7)
+    ) {
+      EnvironmentStyle015Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...14 {
+      let frame = try harness.clickText("Toggle Field Family 015")
+      #expect(frame.contains("field-value-\(generation)"))
+      if generation.isMultiple(of: 2) {
+        #expect(!frame.contains("custom-field-\(generation)"))
+      } else {
+        #expect(frame.contains("custom-field-\(generation)"))
+      }
+    }
+  }
+}
+
+private struct EnvironmentStyle015Root: View {
+  @State private var generation = 0
+  @State private var value = "field-value-0"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Field Family 015") {
+        generation += 1
+        value = "field-value-\(generation)"
+      }
+      TextField("Field 015", text: $value)
+        .textFieldStyle(
+          generation.isMultiple(of: 2)
+            ? AnyTextFieldStyle.plain
+            : AnyTextFieldStyle(
+              EnvironmentStyle014TextFieldStyle(marker: "custom-field-\(generation)")
+            )
+        )
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
