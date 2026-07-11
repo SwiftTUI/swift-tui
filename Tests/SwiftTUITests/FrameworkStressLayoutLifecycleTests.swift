@@ -1119,3 +1119,75 @@ private struct StressLL018Fixture: View {
     .id(value)
   }
 }
+
+// MARK: - Attempt 019: removing a focused overflow tab
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 019 overflow routes drop a removed focused tab")
+  func stress019OverflowRoutesDropARemovedFocusedTab() throws {
+    // Hypothesis: an expanded overflow surface may retain the removed option's
+    // item route and stored focus index after the options array contracts.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL019", "Root"),
+      size: .init(width: 52, height: 11)
+    ) {
+      StressLL019Fixture()
+    }
+    defer { harness.shutdown() }
+
+    var frame = harness.frame
+    if !frame.contains("Fifth Extremely Long") {
+      let initialTrigger = frame.contains("▼") ? "▼" : "▾"
+      frame = try harness.clickText(initialTrigger)
+    }
+    #expect(frame.contains("Fifth Extremely Long"))
+
+    for _ in 1...8 {
+      let handlersWithFifth = harness.pointerHandlerCount
+      frame = try harness.clickText("Toggle Fifth Tab")
+      #expect(!frame.contains("Fifth Extremely Long"))
+      #expect(harness.pointerHandlerCount < handlersWithFifth)
+
+      frame = try harness.clickText("Toggle Fifth Tab")
+      if !frame.contains("Fifth Extremely Long") {
+        let restoredTrigger = frame.contains("▼") ? "▼" : "▾"
+        frame = try harness.clickText(restoredTrigger)
+      }
+      #expect(frame.contains("Fifth Extremely Long"))
+      frame = try harness.clickText("Fifth Extremely Long", chooseLast: true)
+      #expect(frame.contains("selected overflow fifth"))
+      #expect(harness.pointerHandlerCount <= 14)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL019Fixture: View {
+  @State private var selection = "fifth"
+  @State private var includesFifth = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Fifth Tab") { includesFifth.toggle() }
+      Text("selected overflow \(selection)")
+      TabView(selection: $selection) {
+        overflowTab("First Extremely Long", value: "first")
+        overflowTab("Second Extremely Long", value: "second")
+        overflowTab("Third Extremely Long", value: "third")
+        overflowTab("Fourth Extremely Long", value: "fourth")
+        if includesFifth {
+          overflowTab("Fifth Extremely Long", value: "fifth")
+        }
+      }
+      .tabViewStyle(.literalTabs)
+      .frame(width: 30, height: 7, alignment: .topLeading)
+    }
+  }
+
+  private func overflowTab(_ label: String, value: String) -> some View {
+    Tab(label, value: value) {
+      Text("overflow content \(value)")
+    }
+    .id(value)
+  }
+}
