@@ -107,6 +107,84 @@ private struct StressInput006Fixture: View {
   }
 }
 
+// MARK: - Attempt 007: conditional focused-value key removal
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Removing focused-value key B clears B while preserving sibling key A")
+  func stressInputRouting007ConditionalFocusedValueKeyIsRemovedPrecisely() throws {
+    // Hypothesis: same-identity focused-value restoration may merge a departed
+    // conditional key back into the live registration that still publishes A.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput007Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressInput007Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput007Fixture.focusIdentity)
+    var values = harness.runLoop.localFocusedValuesRegistry.focusedValues(
+      for: StressInput007Fixture.focusIdentity
+    )
+    #expect(values.stressInput007A == "A")
+    #expect(values.stressInput007B == "B")
+
+    _ = try harness.clickText("Remove focused B")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput007Fixture.focusIdentity)
+    _ = try harness.render()
+    values = harness.runLoop.localFocusedValuesRegistry.focusedValues(
+      for: StressInput007Fixture.focusIdentity
+    )
+
+    #expect(values.stressInput007A == "A")
+    #expect(values.stressInput007B == nil)
+  }
+}
+
+private enum StressInput007AKey: FocusedValueKey {
+  typealias Value = String
+}
+
+private enum StressInput007BKey: FocusedValueKey {
+  typealias Value = String
+}
+
+extension FocusedValues {
+  fileprivate var stressInput007A: String? {
+    get { self[StressInput007AKey.self] }
+    set { self[StressInput007AKey.self] = newValue }
+  }
+
+  fileprivate var stressInput007B: String? {
+    get { self[StressInput007BKey.self] }
+    set { self[StressInput007BKey.self] = newValue }
+  }
+}
+
+private struct StressInput007Fixture: View {
+  static let focusIdentity = testIdentity("StressInput007", "Focus")
+
+  @State private var includesB = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove focused B") { includesB = false }
+      if includesB {
+        Text("Focused A and B")
+          .id(Self.focusIdentity)
+          .focusable()
+          .focusedValue(\.stressInput007A, "A")
+          .focusedValue(\.stressInput007B, "B")
+      } else {
+        Text("Focused A only")
+          .id(Self.focusIdentity)
+          .focusable()
+          .focusedValue(\.stressInput007A, "A")
+      }
+    }
+  }
+}
+
 private enum StressInput001Field: Hashable {
   case a
   case b
