@@ -631,3 +631,48 @@ private struct ControlStress013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: slider track range replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 014 slider track uses its replacement range")
+  func stressControlBinding014SliderTrackUsesReplacementRange() throws {
+    // Hypothesis: a stable Slider can redraw for new bounds while its index-derived track pointer
+    // route continues mapping locations through the old range and step contract.
+    let value = ControlStressProbe(8)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress014", "Root"),
+      size: .init(width: 58, height: 9)
+    ) {
+      ControlStress014Fixture(value: value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Replace slider range 014")
+    let leftThumb = try #require(harness.point(forText: "●"))
+    _ = try harness.click(Point(x: leftThumb.x + 7, y: leftThumb.y))
+
+    #expect(value.value == 20)
+    #expect(value.writes == [20, 20])
+  }
+}
+
+@MainActor
+private struct ControlStress014Fixture: View {
+  let value: ControlStressProbe<Int>
+  @State private var usesReplacementRange = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace slider range 014") { usesReplacementRange = true }
+      Slider(
+        "Track slider 014",
+        value: value.binding(),
+        in: usesReplacementRange ? 10...20 : 0...10,
+        step: usesReplacementRange ? 5 : 1
+      )
+      .id("track-slider-014")
+      Text("Slider value 014 \(value.value)")
+    }
+  }
+}
