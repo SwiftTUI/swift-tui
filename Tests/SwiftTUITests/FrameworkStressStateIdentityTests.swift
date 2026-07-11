@@ -1265,6 +1265,103 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 020: Simultaneous entity move, removal, and insertion
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 020 mixed entity reconciliation stays acyclic")
+  func stateIdentity020MixedEntityReconciliationStaysAcyclic() throws {
+    // Hypothesis: moving two routed nodes across containers while removing and inserting peers
+    // can leave an old identity index entry that adopts a node into its own subtree.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity020"),
+      size: .init(width: 72, height: 14)
+    ) {
+      StateIdentity020Root()
+    }
+    defer { harness.shutdown() }
+
+    var actionsStayedLive = true
+    for _ in 0..<4 {
+      var frame = try harness.clickText("Increment Entity 1 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 1")
+      frame = try harness.clickText("Increment Entity 3 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 3")
+      frame = try harness.clickText("Increment Entity 2 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 2")
+
+      frame = try harness.clickText("Swap Entity Layout 020")
+      #expect(frame.contains("020 Entity 4 Count"))
+      #expect(!frame.contains("020 Entity 2 Count"))
+
+      frame = try harness.clickText("Increment Entity 1 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 1")
+      frame = try harness.clickText("Increment Entity 3 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 3")
+      frame = try harness.clickText("Increment Entity 4 020")
+      actionsStayedLive = actionsStayedLive && frame.contains("020 Last 4")
+
+      frame = try harness.clickText("Restore Entity Layout 020")
+      #expect(frame.contains("020 Entity 2 Count"))
+      #expect(!frame.contains("020 Entity 4 Count"))
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+
+    #expect(actionsStayedLive)
+  }
+
+  private struct StateIdentity020Root: View {
+    @State private var usesAlternateLayout = false
+    @State private var lastActivated = -1
+
+    private var leftIDs: [Int] {
+      usesAlternateLayout ? [3, 4] : [1, 2]
+    }
+
+    private var rightIDs: [Int] {
+      usesAlternateLayout ? [1] : [3]
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("020 Last \(lastActivated)")
+        Button(usesAlternateLayout ? "Restore Entity Layout 020" : "Swap Entity Layout 020") {
+          usesAlternateLayout.toggle()
+        }
+        HStack(alignment: .top, spacing: 2) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(leftIDs, id: \.self) { value in
+              StateIdentity020Row(value: value, lastActivated: $lastActivated)
+                .id(testIdentity("StateIdentity020", "entity", "\(value)"))
+            }
+          }
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(rightIDs, id: \.self) { value in
+              StateIdentity020Row(value: value, lastActivated: $lastActivated)
+                .id(testIdentity("StateIdentity020", "entity", "\(value)"))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity020Row: View {
+    let value: Int
+    @Binding var lastActivated: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("020 Entity \(value) Count \(count)")
+        Button("Increment Entity \(value) 020") {
+          count += 1
+          lastActivated = value
+        }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
