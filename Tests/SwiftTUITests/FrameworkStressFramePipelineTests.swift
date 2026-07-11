@@ -1176,3 +1176,43 @@ private struct FramePipelineVisualOnlyView: View {
       .id(testIdentity("FramePipelineVisualOnly", "\(value)"))
   }
 }
+
+// MARK: - Attempt 019: redundant handler exemption is narrow
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 019 redundant handler exemption preserves preference blocker")
+  func framePipeline019RedundantHandlerExemptionPreservesPreferenceBlocker() {
+    // Hypothesis: exempting handler installation as redundant can subtract the
+    // whole runtime-registration impact and accidentally erase preferences.
+    let root = framePipelineArtifactTree(prefix: "FramePipeline019", childCount: 1)
+    let commitPlan = CommitPlan(
+      handlerInstallations: [
+        HandlerInstallation(handlerID: testRoute("FramePipeline019", "Button"))
+      ]
+    )
+    let diagnostics = FrameDiagnostics(
+      drop: .init(eligibilityBlockers: [.preferenceObservationDelta])
+    )
+    let artifacts = framePipelineArtifacts(
+      root: root,
+      rasterLine: "preference-blocker",
+      commitPlan: commitPlan,
+      diagnostics: diagnostics
+    )
+
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true,
+        redundantHandlerInstallationsAreVisualOnly: true
+      )
+    )
+    let decision = CompletedFrameDropDecision.dropVisualOnly(eligibility: eligibility)
+
+    #expect(eligibility.blockers == [.preferenceObservationDelta])
+    #expect(eligibility.impact.preferences)
+    #expect(!eligibility.impact.runtimeRegistrations)
+    #expect(decision.action == .blocked)
+    #expect(decision.reconciliation.blockers == [.preferenceObservationDelta])
+  }
+}
