@@ -1419,3 +1419,40 @@ extension FrameworkStressFramePipelineTests {
     #expect(deadlineFrame.nextDeadline == nil)
   }
 }
+
+// MARK: - Attempt 025: sorted due deadlines respect arm cut
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 025 earlier post-cut deadline survives pre-cut drain")
+  func framePipeline025EarlierPostCutDeadlineSurvivesPreCutDrain() throws {
+    // Hypothesis: a newly armed deadline sorted ahead of older entries can be
+    // deleted when a cut drains later-in-time, pre-cut deadlines around it.
+    let scheduler = FrameScheduler()
+    let base = MonotonicInstant(offset: .seconds(70_025))
+    let preCutFirst = base.advanced(by: .milliseconds(20))
+    let preCutSecond = base.advanced(by: .milliseconds(30))
+    let postCutEarlier = base.advanced(by: .milliseconds(10))
+    scheduler.requestDeadline(preCutFirst)
+    scheduler.requestDeadline(preCutSecond)
+    let cut = scheduler.deadlineArmCut
+    scheduler.requestDeadline(postCutEarlier)
+    let now = base.advanced(by: .milliseconds(40))
+
+    let firstDrain = try #require(
+      scheduler.consumeReadyFrame(at: now, armedBefore: cut)
+    )
+    #expect(firstDrain.causes == [.deadline])
+    #expect(firstDrain.triggeredDeadline == preCutSecond)
+    #expect(firstDrain.nextDeadline == postCutEarlier)
+    #expect(scheduler.hasPendingFrame(at: now))
+    #expect(scheduler.nextWakeInstant(after: now) == now)
+
+    let nextDrain = try #require(
+      scheduler.consumeReadyFrame(at: now, armedBefore: scheduler.deadlineArmCut)
+    )
+    #expect(nextDrain.causes == [.deadline])
+    #expect(nextDrain.triggeredDeadline == postCutEarlier)
+    #expect(nextDrain.nextDeadline == nil)
+    #expect(!scheduler.hasPendingFrame(at: now))
+  }
+}
