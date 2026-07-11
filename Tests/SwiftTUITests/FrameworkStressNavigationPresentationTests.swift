@@ -1360,3 +1360,77 @@ private struct StressNP020Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 021: live alert action refresh in a destination
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 021 alert actions capture current destination state")
+  func stress021AlertActionsCaptureCurrentDestinationState() throws {
+    // Hypothesis: a retained alert portal payload can render updated text while
+    // dispatching the action closure captured by an earlier activation.
+    let probe = StressNP021Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP021", "Root"),
+      size: .init(width: 62, height: 14)
+    ) {
+      StressNP021Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Alert Destination")
+    for generation in 1...6 {
+      _ = try harness.clickText("Open Stateful Alert")
+      let refreshed = try harness.clickText("Advance Alert Generation", chooseLast: true)
+      #expect(refreshed.contains("alert generation \(generation)"))
+      _ = try harness.clickText("Record Alert Generation", chooseLast: true)
+      #expect(probe.markers == Array(1...generation).map { "record \($0)" })
+      #expect(stressNPPresentationEntryCount(in: harness) == 0)
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+}
+
+@MainActor
+private final class StressNP021Probe {
+  var markers: [String] = []
+}
+
+@MainActor
+private struct StressNP021Fixture: View {
+  let probe: StressNP021Probe
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-021-stack") {
+      Button("Push Alert Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP021Destination(probe: probe)
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP021Destination: View {
+  let probe: StressNP021Probe
+  @State private var alert = false
+  @State private var generation = 0
+
+  var body: some View {
+    Button("Open Stateful Alert") { alert = true }
+      .alert(
+        "Stateful Alert",
+        isPresented: $alert,
+        actions: {
+          Button("Advance Alert Generation") { generation += 1 }
+          Button("Record Alert Generation") {
+            probe.markers.append("record \(generation)")
+            alert = false
+          }
+        },
+        message: {
+          Text("alert generation \(generation)")
+        }
+      )
+  }
+}
