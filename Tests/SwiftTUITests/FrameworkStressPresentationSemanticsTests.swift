@@ -77,6 +77,51 @@ extension FrameworkStressPresentationSemanticsTests {
   }
 }
 
+// MARK: - Attempt 003: open menu source removal
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 003 removing an open menu source prunes its portal entry")
+  func stress003RemovingOpenMenuSourcePrunesPortalEntry() throws {
+    // Hypothesis: declarative presentation synchronization may preserve the
+    // last active menu after its source identity leaves the resolved tree.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS003", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS003Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Transient menu")
+    let frame = try harness.clickText("Remove menu source")
+
+    #expect(!frame.contains("Transient overlay item"))
+    #expect(stressPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private struct StressPS003Fixture: View {
+  @State private var showsMenu = true
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      if showsMenu {
+        Menu("Transient menu") {
+          Button("Transient overlay item") {}
+        }
+      } else {
+        Text("Menu source absent")
+      }
+      Spacer().frame(width: 28)
+      Button("Remove menu source") {
+        showsMenu = false
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
