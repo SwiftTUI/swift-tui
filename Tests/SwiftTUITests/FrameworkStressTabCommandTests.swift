@@ -493,3 +493,58 @@ private struct StressTC009Fixture: View {
     .frame(width: 56, height: 8, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 010: inserted toolbar prefix ownership
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 010 inserted toolbar prefix retargets trailing actions")
+  func stressTabCommand010InsertedToolbarPrefixRetargetsTrailingActions() throws {
+    // Hypothesis: cached toolbar buttons are refreshed by ordinal and may keep
+    // C's visual title paired with B's action after a new first contribution.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC010", "Root"),
+      size: .init(width: 64, height: 10)
+    ) {
+      StressTC010Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Insert first tool")
+    _ = try harness.clickText("C tool")
+
+    #expect(probe.events == ["c"])
+  }
+}
+
+@MainActor
+private struct StressTC010Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var hasPrefix = false
+
+  var body: some View {
+    Panel(id: "stress-tc-010-panel") {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Insert first tool") {
+          hasPrefix = true
+        }
+        if hasPrefix {
+          source("Prefix", marker: "prefix")
+        }
+        source("B", marker: "b")
+        source("C", marker: "c")
+      }
+    }
+    .toolbar(style: DefaultTopToolbarStyle())
+    .frame(width: 62, height: 8, alignment: .topLeading)
+  }
+
+  private func source(_ name: String, marker: String) -> some View {
+    Text("\(name) source")
+      .toolbarItem(
+        .init(title: "\(name) tool") {
+          probe.events.append(marker)
+        }
+      )
+  }
+}
