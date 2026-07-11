@@ -767,3 +767,58 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 015: tile glyph and paint churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 015 tile fill follows current pattern and paints")
+  func visualEffects015TileFillFollowsCurrentPatternAndPaints() {
+    // Hypothesis: TileStyle's empty generic animatable data and nested erased paints can make a
+    // retained fill reuse old pattern glyphs or a departed optional background paint.
+    struct Root: View {
+      let generation: Int
+
+      var style: TileStyle {
+        switch generation % 4 {
+        case 0:
+          TileStyle(.lightShade, foreground: Color.red)
+        case 1:
+          TileStyle(.dots, foreground: Color.blue, background: Color.black)
+        case 2:
+          TileStyle(
+            .init(rows: ["/\\", "\\/"]),
+            foreground: LinearGradient(
+              colors: [.yellow, .magenta],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+        default:
+          TileStyle(.checkerShade, foreground: Color.cyan, background: Color.green.opacity(0.4))
+        }
+      }
+
+      var body: some View {
+        Capsule()
+          .fill(style)
+          .frame(width: 26, height: 9)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects015")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
