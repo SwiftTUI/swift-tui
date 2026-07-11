@@ -238,4 +238,48 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 006: Canvas inherited foreground churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 006 canvas resolves the current inherited foreground")
+  func renderReconciliation006CanvasResolvesCurrentInheritedForeground() {
+    // Hypothesis: Canvas disables retained phase extraction at its payload, while its inherited
+    // style lives in placed metadata; partial reuse may therefore pair the old style with new dots.
+    struct UnstyledDot: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setPixel(at: .zero)
+      }
+    }
+
+    struct Root: View {
+      let useRed: Bool
+
+      var body: some View {
+        Canvas(UnstyledDot())
+          .frame(width: 1, height: 1)
+          .foregroundStyle(useRed ? Color.red : Color.blue)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation006")
+
+    for generation in 0..<16 {
+      let useRed = generation.isMultiple(of: 2)
+      let frame = renderer.render(
+        Root(useRed: useRed),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(
+        frame.rasterSurface.cells[0][0].style?.foregroundColor
+          == (useRed ? Color.red : Color.blue)
+      )
+    }
+  }
+}
+
 // MARK: - End
