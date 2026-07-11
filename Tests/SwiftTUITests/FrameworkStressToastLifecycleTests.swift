@@ -1053,3 +1053,42 @@ private struct ToastLifecycle020Root: View {
       )
   }
 }
+
+// MARK: - Attempt 021: nonmodal base interaction
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 021 active toast preserves base interaction routing")
+  func toastLifecycle021ActiveToastPreservesBaseInteractionRouting() throws {
+    // Hypothesis: repeated portal refresh can accidentally promote toast interaction gating to the
+    // family overlay root and suppress actions in the underlying base tree.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle021"),
+      size: .init(width: 66, height: 12)
+    ) {
+      ToastLifecycle021Root()
+    }
+    defer { harness.shutdown() }
+
+    for count in 1...12 {
+      let frame = try harness.clickText("Activate Base Under Toast 021")
+      #expect(frame.contains("base activation count \(count)"))
+      #expect(frame.contains("nonmodal interaction toast"))
+      #expect(harness.actionRegistrationCount == 1)
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle021Root: View {
+  @State private var count = 0
+  @State private var isPresented = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Activate Base Under Toast 021") { count += 1 }
+      Text("base activation count \(count)")
+    }
+    .toast("nonmodal interaction toast", isPresented: $isPresented, duration: nil)
+  }
+}
