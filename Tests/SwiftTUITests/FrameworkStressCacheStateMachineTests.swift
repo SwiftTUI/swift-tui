@@ -414,4 +414,26 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
-// NEXT CACHE STRESS TEST
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 025 concurrent mixed-key churn stays bounded")
+  func cacheState025ConcurrentMixedKeyChurnStaysBounded() async {
+    // Hypothesis: concurrent misses can overshoot capacity between compute and locked insertion.
+    let cache = TextLayoutCache(capacity: 8)
+    let count = await withTaskGroup(of: TextLayoutResult.self, returning: Int.self) { group in
+      for index in 0..<128 {
+        group.addTask {
+          cache.layout(
+            for: "item-\(index % 24)-payload",
+            options: .init(width: 5 + index % 4, lineLimit: 2)
+          )
+        }
+      }
+      var completed = 0
+      for await _ in group { completed += 1 }
+      return completed
+    }
+    #expect(count == 128)
+    #expect(cache.metrics.entries <= 8)
+    #expect(cache.accessLogDepth <= 32)
+  }
+}
