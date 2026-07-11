@@ -36,6 +36,27 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 011: bytewise bracketed paste framing
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 011 bytewise bracketed paste emits one payload")
+  func runtimeTransport011BytewiseBracketedPasteEmitsOnePayload() {
+    // Hypothesis: a start or end marker fragmented at every byte boundary can
+    // leak escape bytes as keys or split one paste into multiple events.
+    var parser = TerminalInputParser()
+    let bytes = Array("\u{001B}[200~alpha beta\u{001B}[201~".utf8)
+    var events: [InputEvent] = []
+
+    for byte in bytes {
+      events.append(contentsOf: parser.feed([byte]))
+    }
+
+    withKnownIssue("A bytewise bracketed-paste envelope leaks its framing as key events") {
+      #expect(events == [.paste(.init(content: "alpha beta"))])
+    }
+  }
+}
+
 // MARK: - Attempt 010: event-pump drain and regrow
 
 extension FrameworkStressRuntimeTransportTests {
