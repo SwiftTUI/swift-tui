@@ -36,6 +36,35 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 006: drop boundary inside hover traffic
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 006 drop keeps surrounding hover runs ordered")
+  func runtimeTransport006DropKeepsSurroundingHoverRunsOrdered() {
+    // Hypothesis: a file drop can be appended into a coalescible hover batch,
+    // causing pre-drop motion to be replaced by post-drop motion.
+    let drop: InputEvent = .drop(
+      paths: ["/tmp/one", "/tmp/two"],
+      context: .init(location: .init(x: 3, y: 3), modifiers: .alt)
+    )
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .moved, location: .init(x: 1, y: 1))),
+      .mouse(.init(kind: .moved, location: .init(x: 2, y: 1))),
+      drop,
+      .mouse(.init(kind: .moved, location: .init(x: 7, y: 1))),
+      .mouse(.init(kind: .moved, location: .init(x: 8, y: 1))),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .moved, location: .init(x: 2, y: 1))),
+        drop,
+        .mouse(.init(kind: .moved, location: .init(x: 8, y: 1))),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 005: paste boundary inside pointer traffic
 
 extension FrameworkStressRuntimeTransportTests {
