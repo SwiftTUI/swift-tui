@@ -705,3 +705,47 @@ private func framePipelinePlan(
     lifecycleEvents: lifecycleEvents
   )
 }
+
+// MARK: - Attempt 012: task descriptor round trip
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 012 task descriptor A B A restarts exact lifetime")
+  func framePipeline012TaskDescriptorABARestartsExactLifetime() {
+    // Hypothesis: commit-plan task diffing can remember that descriptor A ran
+    // once and suppress its restart after an intervening descriptor B.
+    let graph = ViewGraph()
+    let taskA = TaskDescriptor(id: "task-A", priority: .medium)
+    let taskB = TaskDescriptor(id: "task-B", priority: .high)
+    let empty = framePipelineLifecycleTree(prefix: "FramePipeline012", includesLeaf: false)
+    let treeA = framePipelineLifecycleTree(
+      prefix: "FramePipeline012",
+      includesLeaf: true,
+      task: taskA
+    )
+    let treeB = framePipelineLifecycleTree(
+      prefix: "FramePipeline012",
+      includesLeaf: true,
+      task: taskB
+    )
+    _ = graph.applySnapshot(empty)
+    _ = framePipelinePlan(graph: graph, resolved: treeA)
+
+    let toB = framePipelinePlan(graph: graph, resolved: treeB)
+    let backToA = framePipelinePlan(graph: graph, resolved: treeA)
+    let steadyA = framePipelinePlan(graph: graph, resolved: treeA)
+
+    #expect(
+      toB.lifecycle.map(\.operation) == [
+        .taskCancel(taskA),
+        .taskStart(taskB),
+      ]
+    )
+    #expect(
+      backToA.lifecycle.map(\.operation) == [
+        .taskCancel(taskB),
+        .taskStart(taskA),
+      ]
+    )
+    #expect(steadyA.lifecycle.isEmpty)
+  }
+}
