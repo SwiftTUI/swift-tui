@@ -676,3 +676,51 @@ private struct ControlStress014Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 015: slider numeric storage kind replacement
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 015 slider replacement switches numeric binding type")
+  func stressControlBinding015SliderReplacementSwitchesNumericBindingType() throws {
+    // Hypothesis: replacing an integer Slider with a same-identity Double Slider can restore the
+    // integer key handler because both variants publish the same control registration shape.
+    let integer = ControlStressProbe(4)
+    let double = ControlStressProbe(0.25)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress015", "Root"),
+      size: .init(width: 58, height: 9)
+    ) {
+      ControlStress015Fixture(integer: integer, double: double)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Use double slider 015")
+    _ = try harness.focusText("Numeric slider 015")
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(integer.value == 4)
+    #expect(integer.writes.isEmpty)
+    #expect(double.value == 0.5)
+    #expect(double.writes == [0.5])
+  }
+}
+
+@MainActor
+private struct ControlStress015Fixture: View {
+  let integer: ControlStressProbe<Int>
+  let double: ControlStressProbe<Double>
+  @State private var usesDouble = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Use double slider 015") { usesDouble = true }
+      if usesDouble {
+        Slider("Numeric slider 015", value: double.binding(), in: 0.0...1.0, step: 0.25)
+          .id("numeric-slider-015")
+      } else {
+        Slider("Numeric slider 015", value: integer.binding(), in: 0...8, step: 2)
+          .id("numeric-slider-015")
+      }
+    }
+  }
+}
