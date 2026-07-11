@@ -327,3 +327,60 @@ private struct StressAF006Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 007: accessibility parent identity reparenting
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 007 reparented child references current semantic container")
+  func stress007ReparentedChildReferencesCurrentSemanticContainer() throws {
+    // Hypothesis: an explicitly identified child moving between semantic containers can retain
+    // the departed parent's identity in the flattened accessibility hierarchy.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF007", "Root"),
+      size: .init(width: 54, height: 8)
+    ) {
+      StressAF007Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<9 {
+      _ = try harness.clickText("Move semantic child")
+    }
+
+    let nodes = accessibilityFocusNodes(in: harness)
+    let currentParent = try #require(nodes.first { $0.label == "Container B" })
+    let child = try #require(nodes.first { $0.label == "Reparented child 9" })
+    #expect(child.parentIdentity == currentParent.identity)
+    #expect(!nodes.contains { $0.label == "Container A" })
+  }
+}
+
+@MainActor
+private struct StressAF007Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Move semantic child") {
+        generation += 1
+      }
+      if generation.isMultiple(of: 2) {
+        semanticContainer("A")
+      } else {
+        semanticContainer("B")
+      }
+    }
+  }
+
+  private func semanticContainer(_ name: String) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Child content")
+        .id("stress-af-007-child")
+        .accessibilityRole(.status)
+        .accessibilityLabel("Reparented child \(generation)")
+    }
+    .id("stress-af-007-container-\(name)")
+    .accessibilityRole(.region)
+    .accessibilityLabel("Container \(name)")
+  }
+}
