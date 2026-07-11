@@ -36,6 +36,36 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 022: stale damage on equal surfaces
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 022 stale damage hints emit no terminal work")
+  func runtimeTransport022StaleDamageHintsEmitNoTerminalWork() {
+    // Hypothesis: a retained dirty range can repaint unchanged cells forever
+    // even after the committed surface has converged.
+    let planner = TerminalPresentationPlanner(capabilityProfile: .previewUnicode)
+    let surface = RasterSurface(
+      size: .init(width: 12, height: 3),
+      lines: ["alpha", "bravo", "charlie"]
+    )
+    let damage = PresentationDamage(
+      textRows: [.init(row: 1, columnRanges: [1..<5])]
+    )
+
+    for _ in 0..<24 {
+      let plan = planner.plan(
+        previousSurface: surface,
+        currentSurface: surface,
+        damage: damage
+      )
+      #expect(plan.strategy == .incremental)
+      #expect(plan.rowBatches.isEmpty)
+      #expect(plan.linesTouched == 0)
+      #expect(plan.cellsChanged == 0)
+    }
+  }
+}
+
 // MARK: - Attempt 021: finish with pending mouse cluster
 
 extension FrameworkStressRuntimeTransportTests {
