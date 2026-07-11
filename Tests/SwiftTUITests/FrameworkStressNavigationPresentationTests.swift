@@ -1531,3 +1531,86 @@ private struct StressNP022Destination: View {
       .id("stress-np-022-peer")
   }
 }
+
+// MARK: - Attempt 023: alert over sheet over navigation destination
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 023 Escape unwinds alert sheet destination")
+  func stress023EscapeUnwindsAlertSheetDestination() throws {
+    // Hypothesis: fixed presentation-family z-order composed with navigation
+    // can skip the sheet layer or consume the destination pop too early.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP023", "Root"),
+      size: .init(width: 64, height: 16)
+    ) {
+      StressNP023Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Push Layered Destination")
+    _ = try harness.clickText("Push Layered Destination")
+    _ = try harness.focusText("Open Layered Sheet")
+    _ = try harness.clickText("Open Layered Sheet")
+    _ = try harness.focusText("Open Alert Above Sheet")
+    _ = try harness.clickText("Open Alert Above Sheet")
+    _ = try harness.focusText("Alert Layer Target")
+    #expect(stressNPPresentationEntryCount(in: harness) == 2)
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("layered sheet body"))
+    #expect(!frame.contains("Alert Layer Target"))
+    #expect(stressNPPresentationEntryCount(in: harness) == 1)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("layered destination body"))
+    #expect(!frame.contains("layered sheet body"))
+    #expect(stressNPPresentationEntryCount(in: harness) == 0)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Push Layered Destination"))
+    #expect(!frame.contains("layered destination body"))
+  }
+}
+
+@MainActor
+private struct StressNP023Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-023-stack") {
+      Button("Push Layered Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP023Destination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP023Destination: View {
+  @State private var sheet = false
+  @State private var alert = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("layered destination body")
+      Button("Open Layered Sheet") { sheet = true }
+    }
+    .sheet("Layered Sheet", isPresented: $sheet) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("layered sheet body")
+        Button("Open Alert Above Sheet") { alert = true }
+      }
+    }
+    .alert(
+      "Layered Alert",
+      isPresented: $alert,
+      actions: {
+        Button("Alert Layer Target") {}
+      },
+      message: {
+        Text("alert above sheet body")
+      }
+    )
+  }
+}
