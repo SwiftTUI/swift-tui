@@ -1316,3 +1316,65 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 023: selected outline node reparenting
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 023 selected outline node follows reparented geometry")
+  func tableOutline023SelectedOutlineNodeFollowsReparentedGeometry() {
+    // Hypothesis: List selection geometry can stay at a leaf's former flattened
+    // row when that stable node moves between outline parents.
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+      let listIdentity: Identity
+
+      var body: some View {
+        List(nodes, selection: .constant("leaf"), children: \.children) { node in
+          Text(node.title)
+        }
+        .id(listIdentity)
+        .listStyle(.plain)
+        .frame(width: 24, height: 9, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TableOutline023")
+    let listIdentity = testIdentity("TableOutline023", "List")
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = listIdentity
+
+    for generation in 0..<20 {
+      let leaf = TableOutlineNode(id: "leaf", title: "selected-leaf-\(generation)")
+      let underLeft = generation.isMultiple(of: 2)
+      let nodes = [
+        TableOutlineNode(id: "left", title: "left", children: underLeft ? [leaf] : nil),
+        TableOutlineNode(id: "right", title: "right", children: underLeft ? nil : [leaf]),
+      ]
+      let root = Root(nodes: nodes, listIdentity: listIdentity)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity],
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 24, height: 9)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          environmentValues: environment,
+          applyEnvironmentValues: true
+        ),
+        proposal: .init(width: 24, height: 9)
+      )
+      let selectedLine = retained.rasterSurface.lines.first { $0.contains("▌") }
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(selectedLine?.contains("selected-leaf-\(generation)") == true)
+    }
+  }
+}
