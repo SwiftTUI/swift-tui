@@ -4897,7 +4897,7 @@ private struct MultipleTaskModifierStressID: Equatable, Sendable {
 }
 
 @MainActor
-private final class StressRuntimeHarness<Content: View> {
+final class StressRuntimeHarness<Content: View> {
   private let terminal: StressRecordingHost
   let runLoop: SwiftTUIRuntime.RunLoop<Int, Content>
   private var renderedFrames = 0
@@ -5119,8 +5119,26 @@ private final class StressRuntimeHarness<Content: View> {
 
   @discardableResult
   func focus(_ identity: Identity) throws -> String {
-    #expect(runLoop.focusTracker.setFocus(to: identity))
+    let changed = runLoop.focusTracker.setFocus(to: identity)
+    #expect(changed || runLoop.focusTracker.currentFocusIdentity == identity)
     return try render()
+  }
+
+  @discardableResult
+  func focusText(_ label: String, chooseLast: Bool = false) throws -> String {
+    try focus(focusIdentity(forText: label, chooseLast: chooseLast))
+  }
+
+  func focusIdentity(forText label: String, chooseLast: Bool = false) throws -> Identity {
+    let point = try #require(
+      terminal.centerOfText(label, chooseLast: chooseLast),
+      "could not find focus target '\(label)' in frame:\n\(frame)"
+    )
+    let region = try #require(
+      runLoop.focusTracker.focusRegions.last(where: { $0.rect.contains(point.containingCell) }),
+      "could not find a focus region containing '\(label)' at \(point)"
+    )
+    return region.identity
   }
 
   @discardableResult
