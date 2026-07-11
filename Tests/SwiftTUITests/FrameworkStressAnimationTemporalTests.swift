@@ -1551,3 +1551,60 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 029: matched swap transition de-duplication
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 029 matched swap does not retain removal overlay")
+  func animationTemporal029MatchedSwapDoesNotRetainRemovalOverlay() throws {
+    // Hypothesis: a transition registration on the old matched counterpart can
+    // create a second removal animation after the match already consumed it.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(2))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal029", "Root")
+    let sourceID = testIdentity("AnimationTemporal029", "Source")
+    let targetID = testIdentity("AnimationTemporal029", "Target")
+    let sourceNodeID = ViewNodeID(rawValue: 291)
+    let targetNodeID = ViewNodeID(rawValue: 292)
+    let key = MatchedGeometryKey(id: "animation-temporal-029")
+    let start = MonotonicInstant(offset: .seconds(170))
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: sourceID,
+      viewNodeID: sourceNodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    let source = animationTemporalMatchedNode(identity: sourceID, nodeID: 291, key: key)
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [source]),
+      transaction: .init(),
+      timestamp: start
+    )
+    controller.capturePlacedTree(
+      animationTemporalPlacedRoot(
+        identity: rootID,
+        children: [animationTemporalPlacedMatchedNode(identity: sourceID, key: key, x: 0)]
+      )
+    )
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: targetID,
+      viewNodeID: targetNodeID,
+      transition: AnyTransition.opacity
+    )
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let target = animationTemporalMatchedNode(identity: targetID, nodeID: 292, key: key)
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [target]),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(20))
+    )
+    #expect(controller.activeMatchedGeometryCount == 1)
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+  }
+}
