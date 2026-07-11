@@ -68,3 +68,56 @@ private struct ObservationEffects001View: View {
     )
   }
 }
+
+// MARK: - Attempt 002: nested computed observable dependency switching
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 002 nested computed dependency re-arms its backing read")
+  func observationEffects002NestedComputedDependencyRearmsBackingRead() throws {
+    // Hypothesis: a computed property reached through a nested observable can
+    // leave the bridge armed for the backing field from its first branch.
+    let model = ObservationEffects002Model()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects002"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects002View(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      model.child.usesFirst.toggle()
+      if model.child.usesFirst {
+        model.child.first = generation
+      } else {
+        model.child.second = generation
+      }
+      let frame = try harness.render()
+      #expect(frame.contains("002 \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects002View: View {
+  let model: ObservationEffects002Model
+
+  var body: some View {
+    Text("002 \(model.child.selectedValue)")
+  }
+}
+
+@Observable
+private final class ObservationEffects002Model {
+  var child = ObservationEffects002Child()
+}
+
+@Observable
+private final class ObservationEffects002Child {
+  var usesFirst = true
+  var first = 0
+  var second = 0
+
+  var selectedValue: Int {
+    usesFirst ? first : second
+  }
+}
