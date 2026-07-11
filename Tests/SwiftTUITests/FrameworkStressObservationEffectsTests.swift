@@ -1869,3 +1869,54 @@ extension ResolvedNode {
     return nil
   }
 }
+
+// MARK: - Attempt 033: lifecycle closure refresh
+
+extension FrameworkStressObservationEffectsTests {
+  @Test(
+    "stress observation effects 033 appear and disappear dispatch the latest registered closures")
+  func observationEffects033LifecycleDispatchesLatestRegisteredClosures() throws {
+    // Hypothesis: stable lifecycle handler IDs can preserve the first closure
+    // even after many visible re-resolves update the captured payload.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects033"),
+      size: .init(width: 74, height: 8)
+    ) {
+      ObservationEffects033View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Advance Lifecycle Payload 033")
+      #expect(probe.events.isEmpty)
+
+      _ = try harness.clickText("Toggle Lifecycle Owner 033")
+      #expect(probe.events == ["disappear:\(generation)"])
+
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Toggle Lifecycle Owner 033")
+      #expect(probe.events == ["appear:\(generation)"])
+    }
+  }
+}
+
+private struct ObservationEffects033View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+  @State private var isVisible = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Lifecycle Payload 033") { generation += 1 }
+      Button("Toggle Lifecycle Owner 033") { isVisible.toggle() }
+      if isVisible {
+        Text("033 lifecycle generation \(generation)")
+          .onAppear { probe.events.append("appear:\(generation)") }
+          .onDisappear { probe.events.append("disappear:\(generation)") }
+          .id("observation-effects-033-owner")
+      }
+    }
+  }
+}
