@@ -214,3 +214,67 @@ private struct ToastLifecycle004Root: View {
       )
   }
 }
+
+// MARK: - Attempt 005: active environment capture
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 005 active content reads the current source environment")
+  func toastLifecycle005ActiveContentReadsTheCurrentSourceEnvironment() throws {
+    // Hypothesis: portal payloads can retain the environment snapshot from activation and keep an
+    // active toast reader isolated from later source-environment replacements.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle005"),
+      size: .init(width: 60, height: 10)
+    ) {
+      ToastLifecycle005Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      let frame = try harness.clickText("Advance Toast Environment 005")
+      #expect(frame.contains("source environment value-\(generation)"))
+      withKnownIssue("Toast content loses the source environment at the portal boundary") {
+        #expect(frame.contains("toast environment value-\(generation)"))
+      }
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+private enum ToastLifecycleEnvironmentKey: EnvironmentKey {
+  static let defaultValue = "default"
+}
+
+extension EnvironmentValues {
+  fileprivate var toastLifecycleValue: String {
+    get { self[ToastLifecycleEnvironmentKey.self] }
+    set { self[ToastLifecycleEnvironmentKey.self] = newValue }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle005Reader: View {
+  let prefix: String
+  @Environment(\.toastLifecycleValue) private var value
+
+  var body: some View {
+    Text("\(prefix) environment \(value)")
+  }
+}
+
+@MainActor
+private struct ToastLifecycle005Root: View {
+  @State private var generation = 0
+  @State private var isPresented = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Toast Environment 005") { generation += 1 }
+      ToastLifecycle005Reader(prefix: "source")
+    }
+    .toast(isPresented: $isPresented, duration: nil) {
+      ToastLifecycle005Reader(prefix: "toast")
+    }
+    .environment(\.toastLifecycleValue, "value-\(generation)")
+  }
+}
