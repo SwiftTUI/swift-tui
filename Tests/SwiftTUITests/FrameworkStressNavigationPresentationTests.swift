@@ -1434,3 +1434,100 @@ private struct StressNP021Destination: View {
       )
   }
 }
+
+// MARK: - Attempt 022: active confirmation source reorder
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 022 reordered confirmation keeps current actions")
+  func stress022ReorderedConfirmationKeepsCurrentActions() throws {
+    // Hypothesis: moving an active confirmation declaration across a sibling
+    // can duplicate its portal entry or retain a stale action payload.
+    let probe = StressNP022Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP022", "Root"),
+      size: .init(width: 64, height: 15)
+    ) {
+      StressNP022Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Confirmation Destination")
+    _ = try harness.clickText("Open Reorder Confirmation")
+    for generation in 1...6 {
+      let frame = try harness.clickText("Reorder Confirmation Source", chooseLast: true)
+      #expect(frame.contains("confirmation generation \(generation)"))
+      #expect(stressNPPresentationEntryCount(in: harness) == 1)
+    }
+
+    _ = try harness.clickText("Commit Confirmation Generation", chooseLast: true)
+    #expect(probe.markers == ["commit 6"])
+    #expect(stressNPPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private final class StressNP022Probe {
+  var markers: [String] = []
+}
+
+@MainActor
+private struct StressNP022Fixture: View {
+  let probe: StressNP022Probe
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-022-stack") {
+      Button("Push Confirmation Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP022Destination(probe: probe)
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP022Destination: View {
+  let probe: StressNP022Probe
+  @State private var confirmation = false
+  @State private var reversed = false
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if reversed {
+        peer
+        source
+      } else {
+        source
+        peer
+      }
+    }
+  }
+
+  private var source: some View {
+    Button("Open Reorder Confirmation") { confirmation = true }
+      .id("stress-np-022-confirmation-source")
+      .confirmationDialog(
+        "Reorder Confirmation",
+        isPresented: $confirmation,
+        actions: {
+          Button("Reorder Confirmation Source") {
+            generation += 1
+            reversed.toggle()
+          }
+          Button("Commit Confirmation Generation") {
+            probe.markers.append("commit \(generation)")
+            confirmation = false
+          }
+        },
+        message: {
+          Text("confirmation generation \(generation)")
+        }
+      )
+  }
+
+  private var peer: some View {
+    Text("confirmation stable peer")
+      .id("stress-np-022-peer")
+  }
+}
