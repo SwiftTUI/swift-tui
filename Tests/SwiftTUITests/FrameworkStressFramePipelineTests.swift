@@ -188,3 +188,44 @@ extension FrameworkStressFramePipelineTests {
     }
   }
 }
+
+// MARK: - Attempt 004: clean generation clears dirty evidence
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 004 clean generation clears prior dirty diagnostics")
+  func framePipeline004CleanGenerationClearsPriorDirtyDiagnostics() {
+    // Hypothesis: a narrow invalidation can remain in the retained frame input
+    // and be reported or recomputed again on the following clean generation.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline004", "Root")
+    let dirtyIdentity = testIdentity("FramePipeline004", "Root", "VStack[1]")
+    let proposal = ProposedSize(width: 40, height: 4)
+
+    _ = renderer.render(
+      FramePipelineSiblingView(first: "stable", second: "value-0"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    renderer.enableSelectiveEvaluation()
+    let dirty = renderer.render(
+      FramePipelineSiblingView(first: "stable", second: "value-1"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [dirtyIdentity]
+      ),
+      proposal: proposal
+    )
+    let clean = renderer.render(
+      FramePipelineSiblingView(first: "stable", second: "value-1"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    #expect(dirty.diagnostics.input.invalidatedIdentities == [dirtyIdentity])
+    #expect(clean.diagnostics.input.invalidatedIdentities.isEmpty)
+    #expect(clean.diagnostics.work.resolvedNodesComputed == 0)
+    #expect(clean.diagnostics.work.resolvedNodesReused == 0)
+    #expect(clean.rasterSurface == dirty.rasterSurface)
+    #expect(clean.presentationDamage?.dirtyRows.isEmpty == true)
+  }
+}
