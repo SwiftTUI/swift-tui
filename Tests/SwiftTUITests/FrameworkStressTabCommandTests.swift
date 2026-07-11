@@ -223,3 +223,52 @@ private struct StressTC004Fixture: View {
     .frame(width: 60, height: 9, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 005: style replacement with stored focus
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 005 style replacement preserves focused activation")
+  func stressTabCommand005StyleReplacementPreservesFocusedActivation() throws {
+    // Hypothesis: replacing the complete style body while strip focus is
+    // parked on B may discard the stored tag or restore an obsolete action.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC005", "Root"),
+      size: .init(width: 60, height: 11)
+    ) {
+      StressTC005Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressTC005Fixture.tabsIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    let frame = try harness.pressKey(KeyPress(.return))
+
+    #expect(frame.contains("B content after style replacement"))
+    #expect(!frame.contains("A content after style replacement"))
+  }
+}
+
+@MainActor
+private struct StressTC005Fixture: View {
+  static let tabsIdentity = testIdentity("StressTC005", "Tabs")
+
+  @State private var usesPowerline = false
+  @State private var selection = "a"
+
+  var body: some View {
+    Panel(id: "stress-tc-005-panel") {
+      TabView(selection: $selection) {
+        Tab("A", value: "a") { Text("A content after style replacement") }
+        Tab("B", value: "b") { Text("B content after style replacement") }
+        Tab("C", value: "c") { Text("C content after style replacement") }
+      }
+      .tabViewStyle(usesPowerline ? .powerline : .literalTabs)
+      .id(Self.tabsIdentity)
+    }
+    .keyCommand("Replace style", key: .character("s"), modifiers: .ctrl) {
+      usesPowerline = true
+    }
+    .frame(width: 58, height: 9, alignment: .topLeading)
+  }
+}
