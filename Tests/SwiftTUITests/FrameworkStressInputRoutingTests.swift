@@ -1457,3 +1457,60 @@ private struct StressInput026Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 027: spatial drop with a modal overlay
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A spatial drop targets the topmost modal instead of the background")
+  func stressInputRouting027SpatialDropPrefersTopmostModal() throws {
+    // Hypothesis: drop hit testing may walk the base semantic tree before the
+    // presentation portal and dispatch to an obscured background scope.
+    let destinations = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput027Root"),
+      size: .init(width: 64, height: 14)
+    ) {
+      StressInput027Fixture(destinations: destinations)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open drop modal")
+    let point = try #require(harness.point(forText: "Modal drop zone", chooseLast: true))
+    _ = try harness.drop(
+      paths: [DroppedPath("/tmp/stress-input-027")],
+      context: DropContext(location: point)
+    )
+
+    #expect(destinations.value == ["modal"])
+  }
+}
+
+private struct StressInput027Fixture: View {
+  let destinations: StressInputBox<[String]>
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Open drop modal") { isPresented = true }
+      Panel(id: "stress-input-027-background") {
+        Text("Background drop zone")
+          .focusable()
+      }
+      .dropDestination { _ in
+        destinations.value.append("background")
+        return true
+      }
+    }
+    .sheet("Stress drop modal", isPresented: $isPresented) {
+      Panel(id: "stress-input-027-modal") {
+        Text("Modal drop zone")
+          .focusable()
+      }
+      .dropDestination { _ in
+        destinations.value.append("modal")
+        return true
+      }
+      .frame(width: 32, height: 6)
+    }
+  }
+}
