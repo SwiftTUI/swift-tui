@@ -1701,3 +1701,87 @@ private struct StressNP024Sheet: View {
     .id("stress-np-024-inner-host-\(generation)")
   }
 }
+
+// MARK: - Attempt 025: alert over confirmation over destination
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 025 Escape unwinds alert confirmation destination")
+  func stress025EscapeUnwindsAlertConfirmationDestination() throws {
+    // Hypothesis: two prompt-family coordinators with adjacent z-order can
+    // dismiss together or expose the navigation pop before the lower prompt.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP025", "Root"),
+      size: .init(width: 66, height: 16)
+    ) {
+      StressNP025Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Push Prompt Destination")
+    _ = try harness.clickText("Open Layered Confirmation")
+    _ = try harness.clickText("Open Alert Above Confirmation", chooseLast: true)
+    _ = try harness.focusText("Alert Above Confirmation Target")
+    #expect(stressNPPresentationEntryCount(in: harness) == 2)
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Open Alert Above Confirmation"))
+    #expect(!frame.contains("Alert Above Confirmation Target"))
+    #expect(stressNPPresentationEntryCount(in: harness) == 1)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("prompt destination body"))
+    #expect(!frame.contains("Open Alert Above Confirmation"))
+    #expect(stressNPPresentationEntryCount(in: harness) == 0)
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Push Prompt Destination"))
+    #expect(!frame.contains("prompt destination body"))
+  }
+}
+
+@MainActor
+private struct StressNP025Fixture: View {
+  @State private var destination = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-025-stack") {
+      Button("Push Prompt Destination") { destination = true }
+        .navigationDestination(isPresented: $destination) {
+          StressNP025Destination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP025Destination: View {
+  @State private var confirmation = false
+  @State private var alert = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("prompt destination body")
+      Button("Open Layered Confirmation") { confirmation = true }
+    }
+    .confirmationDialog(
+      "Layered Confirmation",
+      isPresented: $confirmation,
+      actions: {
+        Button("Open Alert Above Confirmation") { alert = true }
+      },
+      message: {
+        Text("confirmation below alert body")
+      }
+    )
+    .alert(
+      "Alert Above Confirmation",
+      isPresented: $alert,
+      actions: {
+        Button("Alert Above Confirmation Target") {}
+      },
+      message: {
+        Text("alert above confirmation body")
+      }
+    )
+  }
+}
