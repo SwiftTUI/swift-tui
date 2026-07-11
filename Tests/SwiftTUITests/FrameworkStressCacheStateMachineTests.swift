@@ -392,4 +392,26 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 024 concurrent same-key misses converge")
+  func cacheState024ConcurrentSameKeyMissesConverge() async {
+    // Hypothesis: two-phase lookup can store duplicate same-key entries or return divergent layouts.
+    let cache = TextLayoutCache(capacity: 8)
+    let options = TextLayoutOptions(width: 7, lineLimit: 2, truncationMode: .middle)
+    let results = await withTaskGroup(of: TextLayoutResult.self, returning: [TextLayoutResult].self) {
+      group in
+      for _ in 0..<64 {
+        group.addTask { cache.layout(for: "alpha beta gamma delta", options: options) }
+      }
+      var values: [TextLayoutResult] = []
+      for await value in group { values.append(value) }
+      return values
+    }
+    #expect(results.count == 64)
+    #expect(Set(results.map { $0.lines.map(\.text).joined(separator: "|") }).count == 1)
+    #expect(cache.metrics.entries == 1)
+    #expect(cache.metrics.stores == 1)
+  }
+}
+
 // NEXT CACHE STRESS TEST
