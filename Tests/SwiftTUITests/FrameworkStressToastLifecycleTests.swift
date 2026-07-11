@@ -1003,3 +1003,53 @@ private struct ToastLifecycle019Root: View {
     }
   }
 }
+
+// MARK: - Attempt 020: chained modifier coexistence
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 020 chained toast modifiers keep independent items")
+  func toastLifecycle020ChainedToastModifiersKeepIndependentItems() throws {
+    // Hypothesis: two toast modifiers attached to one authored source can publish the same source
+    // identity and portal token, causing the later declaration to overwrite the earlier item.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle020"),
+      size: .init(width: 68, height: 15)
+    ) {
+      ToastLifecycle020Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      let frame = try harness.clickText("Refresh Chained Toasts 020")
+      #expect(frame.contains("outer chained toast \(generation)"))
+      withKnownIssue("Chained toast modifiers overwrite the inner item for one source identity") {
+        #expect(
+          frame.contains("inner chained toast \(generation)")
+            && frame.components(separatedBy: "chained toast").count - 1 == 2
+        )
+      }
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+    }
+  }
+}
+
+@MainActor
+private struct ToastLifecycle020Root: View {
+  @State private var generation = 0
+  @State private var inner = true
+  @State private var outer = true
+
+  var body: some View {
+    Button("Refresh Chained Toasts 020") { generation += 1 }
+      .toast(
+        "inner chained toast \(generation)",
+        isPresented: $inner,
+        duration: nil
+      )
+      .toast(
+        "outer chained toast \(generation)",
+        isPresented: $outer,
+        duration: nil
+      )
+  }
+}
