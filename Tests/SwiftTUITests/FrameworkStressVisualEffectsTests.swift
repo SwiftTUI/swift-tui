@@ -713,3 +713,57 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 014: shape-style family replacement
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 014 fill replaces color gradient and tile style families")
+  func visualEffects014FillReplacesColorGradientAndTileStyleFamilies() {
+    // Hypothesis: retained ShapeOperation storage can preserve the first AnyShapeStyle case while
+    // later generations replace it with a structurally different paint family at the same slot.
+    struct Root: View {
+      let generation: Int
+
+      var style: AnyShapeStyle {
+        switch generation % 4 {
+        case 0:
+          AnyShapeStyle(Color.red)
+        case 1:
+          AnyShapeStyle(
+            LinearGradient(colors: [.yellow, .blue], startPoint: .top, endPoint: .bottom)
+          )
+        case 2:
+          AnyShapeStyle(
+            RadialGradient(colors: [.white, .magenta], center: .center, endRadius: 8)
+          )
+        default:
+          AnyShapeStyle(
+            TileStyle(.checkerShade, foreground: Color.cyan, background: Color.black)
+          )
+        }
+      }
+
+      var body: some View {
+        RoundedRectangle(cornerRadius: 3)
+          .fill(style)
+          .frame(width: 24, height: 10)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects014")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
