@@ -199,6 +199,81 @@ private struct EnvironmentStyle005Root: View {
   }
 }
 
+// MARK: - Attempt 006: keyed environment action reorder
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 006 reordered invokers keep entity-owned environment actions")
+  func environmentStyle006ReorderedInvokersKeepEntityOwnedActions() throws {
+    // Hypothesis: closure-valued environment actions can be restored by structural slot when
+    // keyed owners reorder, swapping otherwise-current actions between entities.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle006"),
+      size: .init(width: 76, height: 9)
+    ) {
+      EnvironmentStyle006Root()
+    }
+    defer { harness.shutdown() }
+
+    var expectedA = 0
+    var expectedB = 0
+    for generation in 1...10 {
+      _ = try harness.clickText("Reorder Action Owners 006")
+      _ = try harness.clickText("Advance Actions 006")
+      _ = try harness.clickText("Invoke Action 006 A")
+      let frame = try harness.clickText("Invoke Action 006 B")
+      expectedA += generation
+      expectedB += generation * 10
+      #expect(frame.contains("006 totals A \(expectedA) B \(expectedB)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle006Invoker: View {
+  let label: String
+  @Environment(\.environmentStyleAction) private var action
+
+  var body: some View {
+    Button("Invoke Action 006 \(label)") { action() }
+  }
+}
+
+private struct EnvironmentStyle006Item: Identifiable {
+  let id: String
+}
+
+private struct EnvironmentStyle006Root: View {
+  @State private var generation = 0
+  @State private var reversed = false
+  @State private var totalA = 0
+  @State private var totalB = 0
+
+  private var items: [EnvironmentStyle006Item] {
+    let source = [EnvironmentStyle006Item(id: "A"), EnvironmentStyle006Item(id: "B")]
+    return reversed ? Array(source.reversed()) : source
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reorder Action Owners 006") { reversed.toggle() }
+      Button("Advance Actions 006") { generation += 1 }
+      Text("006 totals A \(totalA) B \(totalB)")
+      ForEach(items) { item in
+        EnvironmentStyle006Invoker(label: item.id)
+          .environment(
+            \.environmentStyleAction,
+            EnvironmentStyleAction {
+              if item.id == "A" {
+                totalA += generation
+              } else {
+                totalB += generation * 10
+              }
+            }
+          )
+      }
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
