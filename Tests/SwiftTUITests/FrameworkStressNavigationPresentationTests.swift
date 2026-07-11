@@ -786,3 +786,55 @@ private struct StressNP011OuterDestination: View {
     }
   }
 }
+
+// MARK: - Attempt 012: sibling NavigationStack focus-scoped pop routing
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 012 focused sibling stack receives Escape pop")
+  func stress012FocusedSiblingStackReceivesEscapePop() throws {
+    // Hypothesis: when sibling stacks both publish active pop entries, global
+    // last-wins reduction can pop the unfocused sibling's destination.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP012", "Root"),
+      size: .init(width: 72, height: 9)
+    ) {
+      StressNP012Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Right Destination Target")
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Left Destination Target"))
+    #expect(frame.contains("Right Root Target"))
+    #expect(!frame.contains("Right Destination Target"))
+
+    _ = try harness.focusText("Left Destination Target")
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Left Root Target"))
+    #expect(frame.contains("Right Root Target"))
+    #expect(!frame.contains("Left Destination Target"))
+  }
+}
+
+@MainActor
+private struct StressNP012Fixture: View {
+  @State private var left = true
+  @State private var right = true
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 2) {
+      NavigationStack(id: "stress-np-012-left") {
+        Button("Left Root Target") { left = true }
+          .navigationDestination(isPresented: $left) {
+            Button("Left Destination Target") {}
+          }
+      }
+      NavigationStack(id: "stress-np-012-right") {
+        Button("Right Root Target") { right = true }
+          .navigationDestination(isPresented: $right) {
+            Button("Right Destination Target") {}
+          }
+      }
+    }
+  }
+}
