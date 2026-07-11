@@ -502,3 +502,60 @@ extension FrameworkStressInputRoutingTests {
     }
   }
 }
+
+// MARK: - Attempt 009: stacked same-key handler priority under churn
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Stacked same-key handler priority survives repeated closure rebinding")
+  func stressInputRouting009StackedKeyHandlerPrioritySurvivesChurn() throws {
+    // Hypothesis: partial handler-bucket restoration may invert outer-before-
+    // inner dispatch priority when closures are rebound at a stable identity.
+    let events = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput009Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      StressInput009Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 0..<6 {
+      _ = harness.runLoop.focusTracker.setFocus(to: StressInput009Fixture.focusIdentity)
+      _ = try harness.render()
+      _ = try harness.pressKey(KeyPress(.character("k")))
+      #expect(
+        Array(events.value.suffix(2)) == [
+          "outer-(generation)",
+          "inner-(generation)",
+        ]
+      )
+      if generation < 5 {
+        _ = try harness.clickText("Rebind key owners")
+      }
+    }
+  }
+}
+
+private struct StressInput009Fixture: View {
+  static let focusIdentity = testIdentity("StressInput009", "Focus")
+
+  let events: StressInputBox<[String]>
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebind key owners") { generation += 1 }
+      Text("Stacked key target (generation)")
+        .id(Self.focusIdentity)
+        .focusable()
+        .onKeyPress(.character("k")) { _ in
+          events.value.append("inner-(generation)")
+          return .handled
+        }
+        .onKeyPress(.character("k")) { _ in
+          events.value.append("outer-(generation)")
+          return .ignored
+        }
+    }
+  }
+}
