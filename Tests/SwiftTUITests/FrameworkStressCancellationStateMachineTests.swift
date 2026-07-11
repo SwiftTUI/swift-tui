@@ -224,4 +224,23 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 015 alternating install-resume races never hang")
+  func cancellationState015AlternatingInstallResumeRacesNeverHang() async {
+    // Hypothesis: rapid winner/installer ordering changes can strand a pending state.
+    for generation in 0..<200 {
+      let gate = OneShotContinuationGate()
+      if generation.isMultiple(of: 2) {
+        gate.resume()
+        await awaitStressGate(gate)
+      } else {
+        let waiter = Task { await awaitStressGate(gate) }
+        await Task.yield()
+        gate.resume()
+        await waiter.value
+      }
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
