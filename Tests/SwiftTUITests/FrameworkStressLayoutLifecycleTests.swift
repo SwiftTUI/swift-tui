@@ -444,3 +444,66 @@ private struct StressLL007Fixture: View {
       .preference(key: StressLL007PreferenceKey.self, value: generation)
   }
 }
+
+// MARK: - Attempt 008: anchor payload after owner remint
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 008 anchor resolves the current reminted source node")
+  func stress008AnchorResolvesTheCurrentRemintedSourceNode() throws {
+    // Hypothesis: an anchor preference may retain the departed source's
+    // viewNodeID and resolve its previous frame after owner identity churn.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL008", "Root"),
+      size: .init(width: 40, height: 8)
+    ) {
+      StressLL008Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...10 {
+      let frame = try harness.clickText("Remint Anchor")
+      let expectedX = generation.isMultiple(of: 2) ? 2 : 14
+      withKnownIssue("The anchor overlay retains its first reminted source payload") {
+        #expect(frame.contains("anchor x \(expectedX) generation \(generation)"))
+      }
+    }
+  }
+}
+
+private enum StressLL008AnchorKey: PreferenceKey {
+  static let defaultValue: Anchor<Rect>? = nil
+
+  static func reduce(
+    value: inout Anchor<Rect>?,
+    nextValue: () -> Anchor<Rect>?
+  ) {
+    value = nextValue() ?? value
+  }
+}
+
+@MainActor
+private struct StressLL008Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remint Anchor") { generation += 1 }
+      Group {
+        Text("anchor source")
+          .frame(width: 8, height: 1, alignment: .topLeading)
+          .id("anchor-source")
+          .anchorPreference(key: StressLL008AnchorKey.self, value: .bounds) { $0 }
+          .offset(x: generation.isMultiple(of: 2) ? 2 : 14)
+      }
+      .id("anchor-owner-\(generation)")
+      .frame(width: 38, height: 4, alignment: .topLeading)
+      .overlayPreferenceValue(StressLL008AnchorKey.self, alignment: .bottomLeading) { anchor in
+        GeometryReader { proxy in
+          let rect = anchor.map { proxy[$0] } ?? .zero
+          Text("anchor x \(Int(rect.origin.x)) generation \(generation)")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        }
+      }
+    }
+  }
+}
