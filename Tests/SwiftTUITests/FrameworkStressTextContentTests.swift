@@ -1252,3 +1252,46 @@ private struct TextContent032Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 033: cross-newline selection replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 033 editor replacement clears cross-line selection")
+  func textContent033EditorReplacementClearsCrossLineSelection() throws {
+    // Hypothesis: replacing a reverse-direction TextEditor selection that crosses a newline can
+    // leave the old anchor active, so the following character replaces current content again.
+    let text = TextContentBox("ab\ncd")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent033Root"),
+      size: .init(width: 24, height: 6)
+    ) {
+      TextContent033Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent033Fixture.editorIdentity)
+    _ = try harness.pressKey(KeyPress(.home, modifiers: .shift))
+    _ = try harness.pressKey(KeyPress(.arrowLeft, modifiers: .shift))
+    _ = try harness.paste("👋🏿\nQ")
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.value == "ab👋🏿\nQ!")
+    #expect(text.writeCount == 2)
+    #expect(harness.frame.contains("ab👋🏿"))
+    #expect(harness.frame.contains("Q!"))
+    #expect(!harness.frame.contains("cd"))
+  }
+}
+
+@MainActor
+private struct TextContent033Fixture: View {
+  static let editorIdentity = testIdentity("TextContent033", "Editor")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    TextEditor(text: text.binding())
+      .id(Self.editorIdentity)
+      .frame(width: 18, height: 5, alignment: .topLeading)
+  }
+}
