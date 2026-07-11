@@ -490,4 +490,34 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 014: nested GroupBox replacement
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 014 nested GroupBox churn keeps current borders")
+  func componentComposition014NestedGroupBoxChurnKeepsCurrentBorders() {
+    // Hypothesis: repeated nested chrome can reuse an inner border at obsolete bounds.
+    struct Root: View {
+      let generation: Int
+      var body: some View {
+        GroupBox("outer-\(generation)") {
+          GroupBox("inner-\(generation)") {
+            Text(String(repeating: "x", count: 3 + generation % 9))
+          }
+        }
+      }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition014")
+    for generation in 0..<16 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
