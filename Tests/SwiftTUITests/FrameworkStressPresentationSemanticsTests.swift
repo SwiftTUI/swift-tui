@@ -462,6 +462,50 @@ private struct StressPS010Fixture: View {
   }
 }
 
+// MARK: - Attempt 011: segmented picker entity reorder
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 011 a reordered picker follows the selected tag")
+  func stress011ReorderedPickerFollowsSelectedTag() throws {
+    // Hypothesis: a stable Picker may retain its first tag-to-index table when
+    // option entities reorder without changing cardinality.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS011", "Root"),
+      size: .init(width: 50, height: 10)
+    ) {
+      StressPS011Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reverse options")
+    _ = try harness.focusText("Mode")
+    let frame = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(frame.contains("Selection a"))
+  }
+}
+
+@MainActor
+private struct StressPS011Fixture: View {
+  @State private var reversed = false
+  @State private var selection = "b"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse options") {
+        reversed.toggle()
+      }
+      Picker("Mode", selection: $selection) {
+        ForEach(reversed ? ["c", "b", "a"] : ["a", "b", "c"], id: \.self) { option in
+          Text(option.uppercased()).tag(option)
+        }
+      }
+      .pickerStyle(.segmented)
+      Text("Selection \(selection)")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
