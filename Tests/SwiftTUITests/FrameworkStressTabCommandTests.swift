@@ -1049,3 +1049,64 @@ private struct StressTC018Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 019: palette enablement replacement
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 019 reenabled palette row uses replacement action")
+  func stressTabCommand019ReenabledPaletteRowUsesReplacementAction() throws {
+    // Hypothesis: an open sheet may update a command's enabled chrome but keep
+    // the disabled generation's action payload when the row is reenabled.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC019", "Root"),
+      size: .init(width: 72, height: 15)
+    ) {
+      StressTC019Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open enablement palette")
+    _ = try harness.clickText("Enable palette command")
+    _ = try harness.clickText("Mutable palette action")
+
+    withKnownIssue("Reenabled palette row dispatches the disabled generation-zero action") {
+      #expect(probe.events == ["generation-1"])
+    }
+  }
+}
+
+@MainActor
+private struct StressTC019Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var enabled = false
+  @State private var generation = 0
+  @State private var showsPalette = false
+
+  var body: some View {
+    Panel(id: "stress-tc-019-source") {
+      Button("Open enablement palette") {
+        showsPalette = true
+      }
+    }
+    .paletteCommand(name: "Mutable palette action", isEnabled: enabled) {
+      probe.events.append("generation-\(generation)")
+    }
+    .panel(id: "stress-tc-019-host")
+    .paletteSheet("Enablement palette", isPresented: $showsPalette) { commands in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Enable palette command") {
+          generation = 1
+          enabled = true
+        }
+        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
+          Button(entry.element.name) {
+            entry.element.action()
+          }
+          .disabled(!entry.element.isEnabled)
+        }
+      }
+    }
+    .frame(width: 70, height: 13, alignment: .topLeading)
+  }
+}
