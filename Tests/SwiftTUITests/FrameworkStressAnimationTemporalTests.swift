@@ -378,3 +378,60 @@ private func animationTemporalDescendant(in node: ResolvedNode, text: String) ->
   }
   return nil
 }
+
+// MARK: - Attempt 008: reduce-motion animation intent recovery
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 008 reduce motion disables and restores value animation")
+  func animationTemporal008ReduceMotionDisablesAndRestoresValueAnimation() throws {
+    // Hypothesis: the reduced-motion disabled transaction can become the
+    // retained baseline and survive after accessibility policy is restored.
+    let renderer = DefaultRenderer()
+    let animation = Animation.linear(duration: .seconds(4))
+    renderer.internalAnimationController.register(animation)
+    let identity = testIdentity("AnimationTemporal008", "Root")
+    let proposal = ProposedSize(width: 44, height: 4)
+
+    _ = renderer.render(
+      animationTemporal008View(value: 0, reducedMotion: false, animation: animation),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    let reduced = renderer.render(
+      animationTemporal008View(value: 1, reducedMotion: true, animation: animation),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    let reducedPayload = try #require(
+      animationTemporalDescendant(in: reduced.resolvedTree, text: "animation temporal 008")
+    )
+    withKnownIssue("Reduced motion does not disable a changed value-animation modifier") {
+      #expect(reducedPayload.transactionSnapshot.animationRequest == .disabled)
+    }
+
+    let restored = renderer.render(
+      animationTemporal008View(value: 2, reducedMotion: false, animation: animation),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    let restoredPayload = try #require(
+      animationTemporalDescendant(in: restored.resolvedTree, text: "animation temporal 008")
+    )
+    withKnownIssue("Value-animation intent does not recover after reduce motion is disabled") {
+      #expect(
+        restoredPayload.transactionSnapshot.animationRequest == .animate(animation.animationBox))
+    }
+  }
+}
+
+@MainActor
+private func animationTemporal008View(
+  value: Int,
+  reducedMotion: Bool,
+  animation: Animation
+) -> some View {
+  Text("animation temporal 008")
+    .opacity(value.isMultiple(of: 2) ? 0.2 : 0.8)
+    .animation(animation, value: value)
+    .environment(\.accessibilityReduceMotion, reducedMotion)
+}
