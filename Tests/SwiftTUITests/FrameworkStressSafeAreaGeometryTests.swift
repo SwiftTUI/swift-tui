@@ -109,6 +109,68 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 014: nested inset authored-order replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 014 nested inset order stays semantic")
+  func safeAreaGeometry014NestedInsetOrderStaysSemantic() {
+    // Hypothesis: two inset modifiers on different axes can be canonicalized by edge, causing a
+    // retained tree to ignore authored-order changes that alter each adornment's proposal.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        let base = GeometryReader { proxy in
+          Text("014 base g\(generation) \(proxy.size.width)x\(proxy.size.height)")
+        }
+
+        if generation.isMultiple(of: 2) {
+          AnyView(
+            base
+              .safeAreaInset(edge: .top, alignment: .topLeading) {
+                Text("014 top g\(generation)")
+              }
+              .safeAreaInset(edge: .leading, alignment: .topLeading) {
+                Text("014 lead g\(generation)").frame(width: 7)
+              }
+          )
+        } else {
+          AnyView(
+            base
+              .safeAreaInset(edge: .leading, alignment: .topLeading) {
+                Text("014 lead g\(generation)").frame(width: 7)
+              }
+              .safeAreaInset(edge: .top, alignment: .topLeading) {
+                Text("014 top g\(generation)")
+              }
+          )
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry014")
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 50, height: 16),
+        safeAreaInsets: .init(top: 1, leading: 2)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        safeAreaGeometryMeasurementsMatch(frames.retained.measuredTree, frames.fresh.measuredTree)
+      )
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("014 base g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 013: nested inset removal and reinsertion
 
 extension FrameworkStressSafeAreaGeometryTests {
