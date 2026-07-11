@@ -288,6 +288,7 @@ extension FrameworkStressFramePipelineTests {
 }
 
 private struct FramePipelineArtifactNode {
+  var viewNodeID: ViewNodeID? = nil
   var identity: Identity
   var bounds: CellRect
   var children: [Self] = []
@@ -300,6 +301,7 @@ private func framePipelineArtifactTree(
 ) -> FramePipelineArtifactNode {
   let children = (0..<childCount).map { index in
     FramePipelineArtifactNode(
+      viewNodeID: ViewNodeID(rawValue: UInt64(index + 2)),
       identity: testIdentity(prefix, "Root", "Child[\(index)]"),
       bounds: .init(
         origin: .init(x: 0, y: index),
@@ -309,6 +311,7 @@ private func framePipelineArtifactTree(
     )
   }
   return FramePipelineArtifactNode(
+    viewNodeID: ViewNodeID(rawValue: 1),
     identity: testIdentity(prefix, "Root"),
     bounds: .init(
       origin: .zero,
@@ -327,6 +330,7 @@ private func framePipelineArtifacts(
 ) -> FrameArtifacts {
   func resolved(_ node: FramePipelineArtifactNode) -> ResolvedNode {
     ResolvedNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       kind: .view("FramePipelineArtifact"),
       children: node.children.map(resolved),
@@ -337,6 +341,7 @@ private func framePipelineArtifacts(
 
   func measured(_ node: FramePipelineArtifactNode) -> MeasuredNode {
     MeasuredNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       proposal: .init(width: node.bounds.size.width, height: node.bounds.size.height),
       measuredSize: node.bounds.size,
@@ -346,6 +351,7 @@ private func framePipelineArtifacts(
 
   func placed(_ node: FramePipelineArtifactNode) -> PlacedNode {
     PlacedNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       bounds: node.bounds,
       children: node.children.map(placed),
@@ -355,6 +361,7 @@ private func framePipelineArtifacts(
 
   func draw(_ node: FramePipelineArtifactNode) -> DrawNode {
     DrawNode(
+      viewNodeID: node.viewNodeID,
       identity: node.identity,
       bounds: node.bounds,
       children: node.children.map(draw)
@@ -481,5 +488,45 @@ extension FrameworkStressFramePipelineTests {
         ) == .wholeTreeIdentical
       )
     }
+  }
+}
+
+// MARK: - Attempt 008: retained index shrink and regrow
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 008 retained index metrics follow shrink and regrow")
+  func framePipeline008RetainedIndexMetricsFollowShrinkAndRegrow() throws {
+    // Hypothesis: the retained index patch path can keep removed entries after
+    // a shrink, then alias them when the same structural slots regrow.
+    let state = FrameTailRetainedState()
+    let proposal = ProposedSize(width: 12, height: 24)
+    let largeRoot = framePipelineArtifactTree(prefix: "FramePipeline008", childCount: 24)
+    let smallRoot = framePipelineArtifactTree(prefix: "FramePipeline008", childCount: 2)
+    let regrownRoot = framePipelineArtifactTree(prefix: "FramePipeline008", childCount: 12)
+    let departedIdentity = testIdentity("FramePipeline008", "Root", "Child[10]")
+
+    let large = framePipelineArtifacts(root: largeRoot, rasterLine: "large")
+    state.storeCommittedFrame(large, baselinePlacedTree: large.placedTree, proposal: proposal)
+    #expect(state.memoryMetricSnapshot.count == 25)
+    #expect(state.memoryMetricSnapshot.detail?["resolved"] == 25)
+
+    let small = framePipelineArtifacts(root: smallRoot, rasterLine: "small")
+    state.storeCommittedFrame(small, baselinePlacedTree: small.placedTree, proposal: proposal)
+    let afterShrink = state.memoryMetricSnapshot
+    #expect(afterShrink.count == 3)
+    #expect(afterShrink.detail?["resolved"] == 3)
+    #expect(
+      state.input(invalidatedIdentities: []).retainedLayout.resolvedNode(for: departedIdentity)
+        == nil
+    )
+
+    let regrown = framePipelineArtifacts(root: regrownRoot, rasterLine: "regrown")
+    state.storeCommittedFrame(regrown, baselinePlacedTree: regrown.placedTree, proposal: proposal)
+    let afterRegrow = state.memoryMetricSnapshot
+    #expect(afterRegrow.count == 13)
+    #expect(afterRegrow.detail?["resolved"] == 13)
+    _ = try #require(
+      state.input(invalidatedIdentities: []).retainedLayout.resolvedNode(for: departedIdentity)
+    )
   }
 }
