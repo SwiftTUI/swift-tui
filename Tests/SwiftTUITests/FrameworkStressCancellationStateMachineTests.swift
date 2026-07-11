@@ -175,4 +175,18 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 012 install before resume completes")
+  func cancellationState012InstallBeforeResumeCompletes() async {
+    // Hypothesis: a waiting continuation can be overwritten or left suspended.
+    for _ in 0..<100 {
+      let gate = OneShotContinuationGate()
+      let task = Task { await awaitStressGate(gate) }
+      await Task.yield()
+      gate.resume()
+      await task.value
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
