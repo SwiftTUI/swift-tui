@@ -528,3 +528,30 @@ private struct ControlStress010Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 011: duplicate picker tags avoid redundant writes
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 011 duplicate selected tag avoids binding write")
+  func stressControlBinding011DuplicateSelectedTagAvoidsBindingWrite() throws {
+    // Hypothesis: option occurrence routing may bypass Picker's selection equality check when two
+    // distinct rows carry the same tag, producing a redundant external binding write.
+    let selection = ControlStressProbe("shared")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress011", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      Picker("Alias picker 011", selection: selection.binding()) {
+        Text("First alias 011").tag("shared")
+        Text("Second alias 011").tag("shared")
+      }
+      .pickerStyle(.radioGroup)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Second alias 011")
+
+    #expect(selection.value == "shared")
+    #expect(selection.writes.isEmpty)
+  }
+}
