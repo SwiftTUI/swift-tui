@@ -408,3 +408,73 @@ private struct StressNP006Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 007: active source cardinality churn
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 007 source cardinality preserves active route")
+  func stress007SourceCardinalityPreservesActiveRoute() throws {
+    // Hypothesis: changing a destination source from one resolved child to a
+    // grouped pair can shift its declaration identity or activation slot.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP007", "Root"),
+      size: .init(width: 52, height: 10)
+    ) {
+      StressNP007Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Cardinality Destination")
+    for generation in 1...8 {
+      _ = try harness.clickText("Increment Cardinality Local")
+      let frame = try harness.clickText("Toggle Source Cardinality")
+      withKnownIssue("Source cardinality churn splits destination state lifetimes") {
+        #expect(
+          frame.contains(
+            "source expanded \(!generation.isMultiple(of: 2)) local \(generation)"
+          )
+        )
+      }
+      withKnownIssue("Source cardinality churn retains departed action registrations") {
+        #expect(harness.actionRegistrationCount <= 3)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP007Fixture: View {
+  @State private var isPresented = false
+  @State private var expanded = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-007-stack") {
+      Group {
+        if expanded {
+          Button("Open Cardinality Destination") { isPresented = true }
+          Text("cardinality peer")
+        } else {
+          Button("Open Cardinality Destination") { isPresented = true }
+        }
+      }
+      .id("stress-np-007-source")
+      .navigationDestination(isPresented: $isPresented) {
+        StressNP007Destination(expanded: $expanded)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP007Destination: View {
+  @Binding var expanded: Bool
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("source expanded \(expanded) local \(local)")
+      Button("Increment Cardinality Local") { local += 1 }
+      Button("Toggle Source Cardinality") { expanded.toggle() }
+    }
+  }
+}
