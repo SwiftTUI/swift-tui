@@ -94,6 +94,50 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 008: safe-area inset edge replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 008 inset migrates across every edge")
+  func safeAreaGeometry008InsetMigratesAcrossEveryEdge() {
+    // Hypothesis: retained safe-area inset placement can update the stored edge while reusing the
+    // previous base proposal or leaving the adornment painted at its departed edge.
+    struct Root: View {
+      let generation: Int
+      let edge: Edge
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text("008 base g\(generation) \(proxy.size.width)x\(proxy.size.height)")
+        }
+        .safeAreaInset(edge: edge, alignment: .topLeading) {
+          Text("008 inset g\(generation)")
+            .frame(width: 18, height: 2, alignment: .topLeading)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry008")
+    let edges: [Edge] = [.top, .trailing, .bottom, .leading]
+
+    for generation in 0..<16 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, edge: edges[generation % edges.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 16),
+        safeAreaInsets: .init(top: 1, leading: 2, bottom: 1, trailing: 2)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("008 inset g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 007: nested ignore removal and reinsertion
 
 extension FrameworkStressSafeAreaGeometryTests {
