@@ -661,3 +661,55 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 013: radial-gradient geometry churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 013 radial gradient follows current center and radii")
+  func visualEffects013RadialGradientFollowsCurrentCenterAndRadii() {
+    // Hypothesis: radial-gradient retained equivalence can refresh colors but reuse an old center
+    // or radius pair, especially when a later generation returns to a prior endpoint radius.
+    struct Root: View {
+      let generation: Int
+
+      var center: UnitPoint {
+        switch generation % 5 {
+        case 0: .center
+        case 1: .topLeading
+        case 2: .bottomTrailing
+        case 3: UnitPoint(x: 0.25, y: 0.7)
+        default: UnitPoint(x: 0.8, y: 0.3)
+        }
+      }
+
+      var body: some View {
+        Ellipse()
+          .fill(
+            RadialGradient(
+              colors: [.white, .cyan, .blue],
+              center: center,
+              startRadius: Double(generation % 3),
+              endRadius: Double(5 + generation % 7)
+            )
+          )
+          .frame(width: 25, height: 11)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects013")
+
+    for generation in 0..<35 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
