@@ -728,3 +728,68 @@ private struct CollectionLayout012Root: View {
     .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 013: stable lazy entity payload topology
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 013 stable lazy entity updates payload extent")
+  func collectionLayout013StableLazyEntityUpdatesPayloadExtent() {
+    // Hypothesis: an ID-stable indexed row may preserve its scalar Text
+    // measurement after its payload becomes a two-child stack.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout013")
+
+    for generation in 0..<20 {
+      let root = CollectionLayout013Root(expanded: !generation.isMultiple(of: 2))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 4)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 18, height: 4)
+      )
+      let matchesCurrentTopology =
+        retained.rasterSurface == fresh.rasterSurface
+        && retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes
+
+      if root.expanded {
+        withKnownIssue(
+          "Lazy indexed allocation retains the scalar extent after an ID-stable row becomes a stack"
+        ) {
+          #expect(matchesCurrentTopology)
+        }
+      } else {
+        #expect(matchesCurrentTopology)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout013Root: View {
+  let expanded: Bool
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach([13], id: \.self) { _ in
+          if expanded {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("013 expanded top")
+              Text("013 expanded bottom")
+            }
+          } else {
+            Text("013 collapsed")
+          }
+        }
+      }
+    }
+    .frame(width: 18, height: 4, alignment: .topLeading)
+  }
+}
