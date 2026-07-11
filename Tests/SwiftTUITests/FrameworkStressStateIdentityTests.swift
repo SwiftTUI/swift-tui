@@ -1828,6 +1828,72 @@ private final class StateIdentity026Model {
   var actionB = 0
 }
 
+// MARK: - Attempt 027: Implicit EmptyView shifts a trailing stateful sibling
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 027 optional prefix does not reset trailing state")
+  func stateIdentity027OptionalPrefixDoesNotResetTrailingState() throws {
+    // Hypothesis: an implicit-empty false branch consumes no declared-child index, shifting the
+    // trailing sibling between structural slots whenever the prefix appears or disappears.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity027"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity027Root()
+    }
+    defer { harness.shutdown() }
+
+    var trailingStateSurvivedPrefixChurn = true
+    for expected in 1...4 {
+      var frame = try harness.clickText("Increment Trailing 027")
+      trailingStateSurvivedPrefixChurn =
+        trailingStateSurvivedPrefixChurn
+        && frame.contains("027 Trailing Count \(expected)")
+      frame = try harness.clickText("Hide Prefix 027")
+      #expect(!frame.contains("027 Optional Prefix"))
+      trailingStateSurvivedPrefixChurn =
+        trailingStateSurvivedPrefixChurn
+        && frame.contains("027 Trailing Count \(expected)")
+      frame = try harness.clickText("Show Prefix 027")
+      #expect(frame.contains("027 Optional Prefix"))
+      trailingStateSurvivedPrefixChurn =
+        trailingStateSurvivedPrefixChurn
+        && frame.contains("027 Trailing Count \(expected)")
+    }
+
+    withKnownIssue("An implicit-empty prefix shifts and resets the trailing sibling state") {
+      #expect(trailingStateSurvivedPrefixChurn)
+    }
+  }
+
+  private struct StateIdentity027Root: View {
+    @State private var showsPrefix = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(showsPrefix ? "Hide Prefix 027" : "Show Prefix 027") {
+          showsPrefix.toggle()
+        }
+        if showsPrefix {
+          Text("027 Optional Prefix")
+        }
+        StateIdentity027TrailingCounter()
+      }
+    }
+  }
+
+  private struct StateIdentity027TrailingCounter: View {
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("027 Trailing Count \(count)")
+        Button("Increment Trailing 027") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
