@@ -687,6 +687,58 @@ private struct StressPS015Fixture: View {
   }
 }
 
+// MARK: - Attempt 016: picker style replacement
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 016 changing picker style replaces its navigation contract")
+  func stress016ChangingPickerStyleReplacesNavigationContract() throws {
+    // Hypothesis: a stable explicit identity may retain the old style's key
+    // handler after replacing horizontal segmented navigation with vertical radio navigation.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS016", "Root"),
+      size: .init(width: 48, height: 11)
+    ) {
+      StressPS016Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Use radio style")
+    _ = try harness.focusText("Mode")
+    var frame = try harness.pressKey(KeyPress(.arrowRight))
+    #expect(frame.contains("Selection a"))
+    frame = try harness.pressKey(KeyPress(.arrowDown))
+    #expect(frame.contains("Selection b"))
+  }
+}
+
+@MainActor
+private struct StressPS016Fixture: View {
+  @State private var usesRadio = false
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Use radio style") {
+        usesRadio = true
+      }
+      if usesRadio {
+        picker.pickerStyle(.radioGroup)
+      } else {
+        picker.pickerStyle(.segmented)
+      }
+      Text("Selection \(selection)")
+    }
+  }
+
+  private var picker: some View {
+    Picker("Mode", selection: $selection) {
+      Text("A").tag("a")
+      Text("B").tag("b")
+    }
+    .id("style-replaced-picker")
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
