@@ -874,3 +874,49 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 025: nested rich-style inheritance churn
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 025 nested link styles follow current inheritance")
+  func textContent025NestedLinkStylesFollowCurrentInheritance() {
+    // Hypothesis: retained rich-run merging can combine the current link-local emphasis with the
+    // previous outer foreground instead of rebuilding both style layers together.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let terminalRenderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    let rootIdentity = testIdentity("TextContent025")
+    let destination = "https://style.example"
+
+    for generation in 0..<20 {
+      let isBold = generation.isMultiple(of: 2)
+      let content =
+        isBold
+        ? Text(
+          "A \(Link(Text("L").bold(), destination: .init(destination))) Z"
+        ).foregroundStyle(.red)
+        : Text(
+          "A \(Link(Text("L").italic(), destination: .init(destination))) Z"
+        ).foregroundStyle(.blue)
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 5, height: 1),
+        content: content
+      )
+      let cells = frames.retained.rasterSurface.cells[0]
+      let outerStyle = cells[0].style
+      let linkStyle = cells[2].style
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.semanticSnapshot == frames.fresh.semanticSnapshot)
+      #expect(outerStyle?.foregroundColor == (isBold ? .red : .blue))
+      #expect(linkStyle?.emphasis.contains(.bold) == isBold)
+      #expect(linkStyle?.emphasis.contains(.italic) == !isBold)
+      #expect(cells[2].hyperlink == destination)
+      #expect(frames.retained.semanticSnapshot.focusRegions.count == 1)
+      #expect(frames.retained.semanticSnapshot.interactionRegions.count == 1)
+      #expect(terminalRenderer.render(frames.retained.rasterSurface).contains(destination))
+    }
+  }
+}
