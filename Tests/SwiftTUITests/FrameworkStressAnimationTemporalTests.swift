@@ -1913,3 +1913,58 @@ private struct AnimationTemporal033Fixture: View {
   }
 }
 
+// MARK: - Attempt 034: PhaseAnimator reduce-motion teardown recovery
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 034 reduce motion removes and restores one phase task")
+  func animationTemporal034ReduceMotionRemovesAndRestoresOnePhaseTask() throws {
+    // Hypothesis: crossing PhaseAnimator's reduce-motion branch can strand the
+    // suspended loop task or reinstall duplicate loops when motion returns.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal034", "Root"),
+      size: .init(width: 64, height: 8)
+    ) {
+      AnimationTemporal034Fixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.activeTaskCount == 1)
+    #expect(harness.activeTaskDescriptorCount == 1)
+
+    var missedRestorations: [Int] = []
+    for generation in 1...8 {
+      _ = try harness.clickText("Reduce Phase Motion")
+      #expect(harness.activeTaskCount == 0)
+      #expect(harness.activeTaskDescriptorCount == 0)
+
+      _ = try harness.clickText("Restore Phase Motion")
+      if harness.activeTaskCount != 1 || harness.activeTaskDescriptorCount != 1 {
+        missedRestorations.append(generation)
+      }
+    }
+
+    withKnownIssue("PhaseAnimator does not reinstall its loop task after reduce motion clears") {
+      #expect(missedRestorations.isEmpty)
+    }
+  }
+}
+
+@MainActor
+private struct AnimationTemporal034Fixture: View {
+  @State private var reducedMotion = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button(reducedMotion ? "Restore Phase Motion" : "Reduce Phase Motion") {
+        reducedMotion.toggle()
+      }
+      PhaseAnimator([0, 1]) { phase in
+        Text("034 phase \(phase)")
+          .opacity(phase == 0 ? 0.2 : 1)
+      } animation: { _ in
+        .linear(duration: .seconds(60))
+      }
+    }
+    .environment(\.accessibilityReduceMotion, reducedMotion)
+  }
+}
