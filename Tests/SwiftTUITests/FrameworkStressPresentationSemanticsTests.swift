@@ -608,6 +608,49 @@ private struct StressPS013Fixture: View {
   }
 }
 
+// MARK: - Attempt 014: selected picker tag removal
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 014 removing the selected tag clears the menu trigger")
+  func stress014RemovingSelectedTagClearsMenuTrigger() throws {
+    // Hypothesis: the Picker's collected-option cache may continue displaying
+    // the departed selected label after its tag no longer exists.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS014", "Root"),
+      size: .init(width: 42, height: 9)
+    ) {
+      StressPS014Fixture()
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.clickText("Remove selected tag")
+
+    #expect(frame.contains("Select"))
+    #expect(!frame.contains("Beta selected"))
+  }
+}
+
+@MainActor
+private struct StressPS014Fixture: View {
+  @State private var includesSelected = true
+  @State private var selection = "b"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove selected tag") {
+        includesSelected = false
+      }
+      Picker("Mode", selection: $selection) {
+        Text("Alpha option").tag("a")
+        if includesSelected {
+          Text("Beta selected").tag("b")
+        }
+      }
+      .pickerStyle(.menu)
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
