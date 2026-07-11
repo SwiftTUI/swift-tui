@@ -63,4 +63,14 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 007 nonalphabet scalars reject the whole payload")
+  func styleTransport007NonalphabetScalarsRejectTheWholePayload() {
+    // Hypothesis: invalid alphabet entries can decode as zero and yield plausible JSON.
+    for encoded in ["AA A", "AA-A", "AA_A", "AA\nA", "AAéA"] {
+      #expect(StyleTransportBase64.decode(encoded) == nil)
+    }
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
