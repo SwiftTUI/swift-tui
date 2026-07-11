@@ -1327,3 +1327,67 @@ private struct StressTC023Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 024: outer command teardown reveals inner
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 024 removing outer claimant reveals inner command")
+  func stressTabCommand024RemovingOuterClaimantRevealsInnerCommand() throws {
+    // Hypothesis: strict shallowest-wins lookup may retain a departed outer
+    // claimant and keep consuming the chord before the live inner scope.
+    let probe = TabCommandStressProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC024", "Root"),
+      size: .init(width: 66, height: 11)
+    ) {
+      StressTC024Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Nested command focus")
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    _ = try harness.clickText("Remove outer command")
+    _ = try harness.focusText("Nested command focus")
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    #expect(probe.events == ["outer", "inner"])
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+@MainActor
+private struct StressTC024Fixture: View {
+  let probe: TabCommandStressProbe
+  @State private var outerClaims = true
+
+  var body: some View {
+    Group {
+      if outerClaims {
+        outerPanel
+          .keyCommand("Outer save", key: .character("s"), modifiers: .ctrl) {
+            probe.events.append("outer")
+          }
+      } else {
+        outerPanel
+      }
+    }
+    .frame(width: 64, height: 9, alignment: .topLeading)
+  }
+
+  private var outerPanel: some View & ActionScope & Sendable {
+    Panel(id: "stress-tc-024-outer") {
+      Panel(id: "stress-tc-024-inner") {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Remove outer command") {
+            outerClaims = false
+          }
+          Text("Nested command focus")
+            .focusable()
+        }
+      }
+      .keyCommand("Inner save", key: .character("s"), modifiers: .ctrl) {
+        probe.events.append("inner")
+      }
+    }
+  }
+}
