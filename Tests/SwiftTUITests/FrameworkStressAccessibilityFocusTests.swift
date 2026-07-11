@@ -804,3 +804,56 @@ private struct StressAF015Fixture: View {
       .accessibilityLabel("Optional cursor target")
   }
 }
+
+// MARK: - Attempt 016: focus interaction capability churn
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 016 focus region publishes current interaction capability")
+  func stress016FocusRegionPublishesCurrentInteractionCapability() throws {
+    // Hypothesis: a stable focus region can retain its first activation/edit capability when only
+    // FocusInteractions changes across otherwise geometry-identical renders.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF016", "Root"),
+      size: .init(width: 52, height: 7)
+    ) {
+      StressAF016Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<13 {
+      _ = try harness.clickText("Cycle focus capability")
+    }
+
+    let target = try #require(
+      harness.runLoop.latestSemanticSnapshot.focusRegions.first {
+        $0.identity == StressAF016Fixture.targetIdentity
+      }
+    )
+    #expect(target.focusInteractions == .edit)
+    #expect(
+      harness.runLoop.latestSemanticSnapshot.focusRegions.filter {
+        $0.identity == StressAF016Fixture.targetIdentity
+      }.count == 1)
+  }
+}
+
+@MainActor
+private struct StressAF016Fixture: View {
+  static let targetIdentity = testIdentity("StressAF016", "Target")
+
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Cycle focus capability") {
+        generation += 1
+      }
+      Text("Focus interaction target")
+        .id(Self.targetIdentity)
+        .focusable(
+          true,
+          interactions: generation.isMultiple(of: 2) ? .activate : .edit
+        )
+    }
+  }
+}
