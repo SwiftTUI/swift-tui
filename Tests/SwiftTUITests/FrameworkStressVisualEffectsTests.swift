@@ -107,6 +107,48 @@ extension FrameworkStressVisualEffectsTests {
   }
 }
 
+// MARK: - Attempt 002: custom-path control-point churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 002 custom path uses its current control points")
+  func visualEffects002CustomPathUsesCurrentControlPoints() {
+    // Hypothesis: BoxedPath's storage-identity equality shortcut can let retained draw extraction
+    // pair a newly boxed custom path with an older path after repeated same-shape reconstruction.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        var path = Path()
+        let shoulder = Double((generation % 7) + 1) / 8
+        path.move(to: Point(x: 0.05, y: 0.05))
+        path.addLine(to: Point(x: 0.95, y: shoulder))
+        path.addLine(to: Point(x: 0.7 - shoulder / 3, y: 0.95))
+        path.addLine(to: Point(x: 0.1 + shoulder / 4, y: 0.7))
+        path.close()
+        return VisualEffectsPathShape(pathValue: path)
+          .fill(Color.cyan)
+          .frame(width: 20, height: 9)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects002")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - Attempt 003: custom-path fill-rule churn
 
 extension FrameworkStressVisualEffectsTests {
@@ -167,34 +209,35 @@ extension FrameworkStressVisualEffectsTests {
   }
 }
 
-// MARK: - Attempt 002: custom-path control-point churn
+// MARK: - Attempt 004: open and closed path topology churn
 
 extension FrameworkStressVisualEffectsTests {
-  @Test("stress visual effects 002 custom path uses its current control points")
-  func visualEffects002CustomPathUsesCurrentControlPoints() {
-    // Hypothesis: BoxedPath's storage-identity equality shortcut can let retained draw extraction
-    // pair a newly boxed custom path with an older path after repeated same-shape reconstruction.
+  @Test("stress visual effects 004 path stroke follows open and closed topology")
+  func visualEffects004PathStrokeFollowsOpenAndClosedTopology() {
+    // Hypothesis: retained path-stroke commands can preserve a departed closing segment because
+    // only the point sequence, rather than the close element, participates in payload refresh.
     struct Root: View {
       let generation: Int
 
       var body: some View {
         var path = Path()
-        let shoulder = Double((generation % 7) + 1) / 8
-        path.move(to: Point(x: 0.05, y: 0.05))
-        path.addLine(to: Point(x: 0.95, y: shoulder))
-        path.addLine(to: Point(x: 0.7 - shoulder / 3, y: 0.95))
-        path.addLine(to: Point(x: 0.1 + shoulder / 4, y: 0.7))
-        path.close()
+        path.move(to: Point(x: 0.08, y: 0.1))
+        path.addLine(to: Point(x: 0.9, y: 0.18))
+        path.addLine(to: Point(x: 0.55, y: 0.9))
+        if generation.isMultiple(of: 2) {
+          path.close()
+        }
         return VisualEffectsPathShape(pathValue: path)
-          .fill(Color.cyan)
-          .frame(width: 20, height: 9)
+          .stroke(Color.magenta, style: .single)
+          .frame(width: 22, height: 10)
       }
     }
 
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
-    let identity = testIdentity("VisualEffects002")
+    let identity = testIdentity("VisualEffects004")
+    var previous: RasterSurface?
 
-    for generation in 0..<28 {
+    for generation in 0..<20 {
       let root = Root(generation: generation)
       let retained = visualEffectsRetainedFrame(
         root,
@@ -205,6 +248,10 @@ extension FrameworkStressVisualEffectsTests {
       let fresh = visualEffectsFreshFrame(root, identity: identity)
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
+      if let previous {
+        #expect(retained.rasterSurface != previous)
+      }
+      previous = retained.rasterSurface
     }
   }
 }
