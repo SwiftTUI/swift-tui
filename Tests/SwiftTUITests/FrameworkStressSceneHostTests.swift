@@ -924,3 +924,36 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 021: preferred-size disappearance clears slack
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 021 preferred size disappearance clears confirmed slack")
+  func sceneHost021PreferredSizeDisappearanceClearsConfirmedSlack() {
+    // Hypothesis: a nil preferred-size generation can leave old slack evidence
+    // active when the same preferred dimensions later reappear.
+    var slack = HostedSurfaceConfirmedSlack()
+
+    for _ in 0..<16 {
+      slack.update(
+        preferredGridSize: .init(width: 8, height: 4),
+        renderedGridSize: .init(width: 12, height: 8)
+      )
+      #expect(slack.confirmedPreferredWidth(proposed: 10, preferred: 8, rendered: 12) == 8)
+      #expect(slack.confirmedPreferredHeight(proposed: 6, preferred: 4, rendered: 8) == 4)
+
+      slack.update(preferredGridSize: nil, renderedGridSize: .init(width: 12, height: 8))
+      #expect(slack.confirmedPreferredWidth(proposed: 10, preferred: 8, rendered: 12) == nil)
+      #expect(slack.confirmedPreferredHeight(proposed: 6, preferred: 4, rendered: 8) == nil)
+      #expect(
+        HostedSurfaceSizeNegotiator(
+          cellSize: .init(width: 2, height: 3),
+          preferredGridSize: .init(width: 8, height: 4),
+          renderedGridSize: .init(width: 12, height: 8),
+          confirmedSlack: slack
+        ).negotiate(proposedWidth: 20, proposedHeight: 18)
+          == .init(size: .init(width: 16, height: 12), probeGridSize: nil)
+      )
+    }
+  }
+}
