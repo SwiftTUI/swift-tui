@@ -1632,3 +1632,72 @@ private struct StressInput029Fixture: View {
     .frame(width: 28, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 030: stable focused identity relocated offscreen
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A stable focused identity is re-revealed after relocating offscreen")
+  func stressInputRouting030RelocatedFocusedIdentityIsRevealedAgain() throws {
+    // Hypothesis: reveal freshness keyed only by focused identity ignores a
+    // geometry relocation of that still-focused identity.
+    let position = StressInputBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput030Root"),
+      size: .init(width: 40, height: 9)
+    ) {
+      StressInput030Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput030Fixture.focusIdentity)
+    #expect(position.value.y == 0)
+    let frame = try harness.pressKey(KeyPress(.character("m")))
+
+    withKnownIssue("A stable focused identity is not re-revealed after geometry relocation") {
+      #expect(position.value.y > 0)
+      #expect(frame.contains("Relocating focus target"))
+    }
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity == StressInput030Fixture.focusIdentity)
+  }
+}
+
+private struct StressInput030Fixture: View {
+  static let focusIdentity = testIdentity("StressInput030", "Focus")
+  static let scrollIdentity = testIdentity("StressInput030", "Scroll")
+
+  let position: StressInputBox<ScrollPosition>
+  @State private var movesLow = false
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: position.binding()
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        if !movesLow {
+          focusTarget
+        }
+        ForEach(0..<16) { row in
+          Text("Relocation spacer (row)")
+        }
+        if movesLow {
+          focusTarget
+        }
+      }
+    }
+    .id(Self.scrollIdentity)
+    .frame(width: 30, height: 5, alignment: .topLeading)
+  }
+
+  private var focusTarget: some View {
+    Text("Relocating focus target")
+      .id(Self.focusIdentity)
+      .focusable()
+      .onKeyPress(.character("m")) { _ in
+        movesLow = true
+        return .handled
+      }
+  }
+}
