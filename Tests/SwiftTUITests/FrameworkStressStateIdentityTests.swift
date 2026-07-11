@@ -702,6 +702,62 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 011: Non-zero-based RandomAccessCollection identity
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 011 array slice rows retain identity")
+  func stateIdentity011ArraySliceRowsRetainIdentity() throws {
+    // Hypothesis: ForEach's zero-based element offset can be confused with an ArraySlice's
+    // non-zero collection index when routes are rebuilt across window movement.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity011"),
+      size: .init(width: 56, height: 12)
+    ) {
+      StateIdentity011Root()
+    }
+    defer { harness.shutdown() }
+
+    for expected in 1...4 {
+      var frame = try harness.clickText("Row 3 Increment 011")
+      #expect(frame.contains("Row 3 Count \(expected)"))
+      frame = try harness.clickText("Advance Slice 011")
+      #expect(frame.contains("011 Slice 3...5"))
+      #expect(frame.contains("Row 3 Count \(expected)"))
+      frame = try harness.clickText("Retreat Slice 011")
+      #expect(frame.contains("011 Slice 2...4"))
+      #expect(frame.contains("Row 3 Count \(expected)"))
+    }
+  }
+
+  private struct StateIdentity011Root: View {
+    private let items = Array(0..<8)
+    @State private var lowerBound = 2
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("011 Slice \(lowerBound)...\(lowerBound + 2)")
+        Button("Advance Slice 011") { lowerBound = 3 }
+        Button("Retreat Slice 011") { lowerBound = 2 }
+        ForEach(items[lowerBound..<(lowerBound + 3)], id: \.self) { value in
+          StateIdentity011Row(value: value)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity011Row: View {
+    let value: Int
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Row \(value) Count \(count)")
+        Button("Row \(value) Increment 011") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
