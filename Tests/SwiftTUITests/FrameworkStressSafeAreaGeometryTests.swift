@@ -93,3 +93,48 @@ extension FrameworkStressSafeAreaGeometryTests {
     }
   }
 }
+
+// MARK: - Attempt 002: safe-area padding edge replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 002 padding drops every departed edge")
+  func safeAreaGeometry002PaddingDropsEveryDepartedEdge() {
+    // Hypothesis: an equal-total edge-mask replacement can reuse the prior padding node because
+    // retained measurement observes only the aggregate horizontal and vertical insets.
+    struct Root: View {
+      let generation: Int
+      let edges: Edge.Set
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "002 g\(generation) \(proxy.size.width)x\(proxy.size.height) "
+              + "s\(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading),"
+              + "\(proxy.safeAreaInsets.bottom),\(proxy.safeAreaInsets.trailing)"
+          )
+        }
+        .safeAreaPadding(edges)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry002")
+    let masks: [Edge.Set] = [.top, .leading, .bottom, .trailing, [.top, .bottom], .all]
+    let insets = EdgeInsets(top: 2, leading: 3, bottom: 2, trailing: 3)
+
+    for generation in 0..<18 {
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, edges: masks[generation % masks.count]),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        safeAreaInsets: insets
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("002 g\(generation)"))
+    }
+  }
+}
