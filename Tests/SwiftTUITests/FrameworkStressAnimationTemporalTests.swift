@@ -257,3 +257,61 @@ private func animationTemporal005View(owner: String, value: Int, opacity: Double
     .animation(.linear(duration: .seconds(4)), value: value)
     .id(owner)
 }
+
+// MARK: - Attempt 006: removed value-animation modifier intent
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 006 removed value animation leaves no stale intent")
+  func animationTemporal006RemovedValueAnimationLeavesNoStaleIntent() throws {
+    // Hypothesis: retained transaction state can preserve a departed
+    // `.animation(nil,value:)` modifier and disable the stable payload later.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimationTemporal006", "Root"),
+      size: .init(width: 52, height: 8)
+    ) {
+      AnimationTemporal006View()
+    }
+    defer { harness.shutdown() }
+
+    var missedGenerations: [Int] = []
+    for generation in 1...8 {
+      _ = try harness.clickText("Toggle Suppressor 006")
+      _ = try harness.clickText("Animate Opacity 006")
+      if harness.runLoop.renderer.internalAnimationController.activeAnimationCount != 1 {
+        missedGenerations.append(generation)
+      }
+      _ = try harness.clickText("Toggle Suppressor 006")
+      _ = try harness.clickText("Animate Opacity 006")
+    }
+    withKnownIssue("A departed value-animation modifier suppresses later outer animation") {
+      #expect(missedGenerations.isEmpty)
+    }
+  }
+}
+
+@MainActor
+private struct AnimationTemporal006View: View {
+  @State private var opacity = 0.2
+  @State private var suppresses = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Suppressor 006") { suppresses.toggle() }
+      Button("Animate Opacity 006") {
+        withAnimation(.linear(duration: .seconds(4))) {
+          opacity = opacity < 0.5 ? 0.9 : 0.2
+        }
+      }
+      if suppresses {
+        Text("006 payload")
+          .opacity(opacity)
+          .animation(nil, value: opacity)
+          .id("animation-temporal-006-payload")
+      } else {
+        Text("006 payload")
+          .opacity(opacity)
+          .id("animation-temporal-006-payload")
+      }
+    }
+  }
+}
