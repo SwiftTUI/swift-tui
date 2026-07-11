@@ -1755,3 +1755,58 @@ private struct ObservationEffects030View: View {
       .id("observation-effects-030-owner")
   }
 }
+
+// MARK: - Attempt 031: task closure environment capture
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 031 task registration captures the current environment")
+  func observationEffects031TaskRegistrationCapturesCurrentEnvironment() async throws {
+    // Hypothesis: HandlerDescriptorIntake may stamp a task operation with the
+    // first environment even while its ID and visible payload update.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects031"),
+      size: .init(width: 74, height: 7)
+    ) {
+      ObservationEffects031View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      _ = try harness.clickText("Advance Task Environment 031")
+      let registrations = harness.runLoop.localTaskRegistry.snapshot().values.flatMap { $0 }
+      let registration = try #require(registrations.first)
+      #expect(registrations.count == 1)
+      probe.events.removeAll(keepingCapacity: true)
+      await registration.run()
+      #expect(probe.events.last == "task-env-\(generation):\(generation)")
+    }
+  }
+}
+
+private struct ObservationEffects031Owner: View {
+  let generation: Int
+  let probe: ObservationEffectsEventProbe
+  @Environment(\.observationEffectsString) private var environmentValue
+
+  var body: some View {
+    Text("031 generation \(generation)")
+      .task(id: generation) {
+        probe.events.append("\(environmentValue):\(generation)")
+      }
+  }
+}
+
+private struct ObservationEffects031View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Task Environment 031") { generation += 1 }
+      ObservationEffects031Owner(generation: generation, probe: probe)
+        .environment(\.observationEffectsString, "task-env-\(generation)")
+        .id("observation-effects-031-owner")
+    }
+  }
+}
