@@ -964,3 +964,57 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 017: outline root-subtree reorder
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 017 reordered roots carry their current subtrees")
+  func tableOutline017ReorderedRootsCarryCurrentSubtrees() {
+    // Hypothesis: root entity reordering can move only the parent row while a
+    // retained descendant traversal remains at the old structural slot.
+    struct Root: View {
+      let nodes: [TableOutlineNode]
+
+      var body: some View {
+        OutlineGroup(nodes, children: \.children) { Text($0.title) }
+          .outlineStyle(.rounded)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline017")
+    for generation in 0..<20 {
+      let a = TableOutlineNode(
+        id: "a",
+        title: "A-\(generation)",
+        children: [.init(id: "a1", title: "A1-\(generation)")]
+      )
+      let b = TableOutlineNode(
+        id: "b",
+        title: "B-\(generation)",
+        children: [.init(id: "b1", title: "B1-\(generation)")]
+      )
+      let nodes = generation.isMultiple(of: 2) ? [a, b] : [b, a]
+      let expected = generation.isMultiple(of: 2)
+        ? ["A-\(generation)", "A1-\(generation)", "B-\(generation)", "B1-\(generation)"]
+        : ["B-\(generation)", "B1-\(generation)", "A-\(generation)", "A1-\(generation)"]
+      let root = Root(nodes: nodes)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 24, height: 10)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 24, height: 10)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(tableOutlineContainsInOrder(expected, in: tableOutlineText(retained)))
+    }
+  }
+}
