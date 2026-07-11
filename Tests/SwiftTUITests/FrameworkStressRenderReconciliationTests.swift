@@ -719,4 +719,40 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 017: Foreground-style retained draw churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 017 retained text uses its current foreground")
+  func renderReconciliation017RetainedTextUsesCurrentForeground() {
+    // Hypothesis: a draw-only environment change reuses measurement and placement, leaving the
+    // retained DrawNode's resolved style stale when the same colors recur out of order.
+    struct Root: View {
+      let color: Color
+
+      var body: some View {
+        Text("COLOR")
+          .foregroundStyle(color)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation017")
+    let colors: [Color] = [.red, .green, .blue, .white, .green, .red]
+
+    for generation in 0..<24 {
+      let color = colors[generation % colors.count]
+      let frame = renderer.render(
+        Root(color: color),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(frame.rasterSurface.cells[0][0].style?.foregroundColor == color)
+      #expect(frame.diagnostics.work.measuredNodesComputed == (generation == 0 ? 1 : 0))
+    }
+  }
+}
+
 // MARK: - End
