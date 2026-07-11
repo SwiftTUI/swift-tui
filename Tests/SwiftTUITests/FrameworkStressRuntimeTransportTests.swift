@@ -36,6 +36,38 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 010: event-pump drain and regrow
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 010 repeated empty drains preserve later batches")
+  func runtimeTransport010RepeatedEmptyDrainsPreserveLaterBatches() throws {
+    // Hypothesis: removing the final batch and then draining empty can leave the
+    // buffer in a state where the next pointer cluster is lost or mis-merged.
+    let buffer = EventPumpBuffer()
+
+    for generation in 0..<32 {
+      #expect(buffer.drain().isEmpty)
+      #expect(!buffer.hasPendingEvents())
+      #expect(
+        buffer.enqueue(
+          .input(
+            .mouse(
+              .init(kind: .moved, location: .init(x: Double(generation), y: 2))
+            )
+          )
+        )
+      )
+      let event = try #require(buffer.drain().first)
+      guard case .input(.mouse(let mouse)) = event else {
+        Issue.record("expected a pointer event after empty drain generation \(generation)")
+        return
+      }
+      #expect(mouse.location.cell == CellPoint(x: generation, y: 2))
+      #expect(!buffer.hasPendingEvents())
+    }
+  }
+}
+
 // MARK: - Attempt 009: signal boundary inside pointer traffic
 
 extension FrameworkStressRuntimeTransportTests {
