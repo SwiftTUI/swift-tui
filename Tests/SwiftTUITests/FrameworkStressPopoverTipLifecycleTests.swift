@@ -181,6 +181,47 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 006: action order churn
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 006 action routes follow current authored order")
+  func popoverTip006ActionRoutesFollowCurrentAuthoredOrder() throws {
+    // Hypothesis: retained portal children can preserve the original action
+    // order even after the tip publishes the same IDs in a new order.
+    let rootIdentity = testIdentity("PopoverTipStress006", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "action-order"
+    model.title = "Action order tip"
+    model.message = nil
+    model.icon = nil
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model
+    )
+    defer { harness.shutdown() }
+
+    let authoredOrders = [
+      ["Alpha", "Beta", "Gamma"],
+      ["Gamma", "Alpha", "Beta"],
+      ["Beta", "Gamma", "Alpha"],
+    ]
+    for generation in 1...9 {
+      let order = authoredOrders[generation % authoredOrders.count]
+      model.generation = generation
+      model.primaryPresented = true
+      model.actions = order.map { .init(id: $0, title: $0) }
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      let points = try order.map { try #require(harness.point(forText: $0)) }
+      #expect(points[0].x < points[1].x)
+      #expect(points[1].x < points[2].x)
+      _ = try harness.clickText(order[0], chooseLast: true)
+      #expect(model.actionLog.last == "\(order[0])@\(generation)")
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
@@ -260,7 +301,7 @@ private struct PopoverTipStressRoot: View {
       }
 
       Text("base count \(model.baseActionCount)")
-      Text("actions \(model.actionLog.joined(separator: ","))")
+      Text("action count \(model.actionLog.count)")
     }
     .frame(width: 88, height: 22, alignment: .topLeading)
   }
