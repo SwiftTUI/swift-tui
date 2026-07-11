@@ -1752,3 +1752,52 @@ extension FrameworkStressFramePipelineTests {
     #expect(!diagnostics.requiresFullGraphicsReplay)
   }
 }
+
+// MARK: - Attempt 033: elision uses only latest committed visibility
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 033 offscreen elision uses latest visible generation")
+  func framePipeline033OffscreenElisionUsesLatestVisibleGeneration() {
+    // Hypothesis: drawn identities from a departed committed generation can
+    // survive in the elision input and force an offscreen deadline to render.
+    let state = FrameTailRetainedState()
+    let root = framePipelineArtifactTree(prefix: "FramePipeline033", childCount: 2)
+    let departed = root.children[0].identity
+    let visible = root.children[1].identity
+    let proposal = ProposedSize(width: 12, height: 2)
+
+    let first = framePipelineArtifacts(
+      root: root,
+      rasterLine: "departed-visible",
+      drawnIdentities: [departed]
+    )
+    state.storeCommittedFrame(first, baselinePlacedTree: first.placedTree, proposal: proposal)
+    #expect(state.previousDrawnIdentities == [departed])
+
+    let second = framePipelineArtifacts(
+      root: root,
+      rasterLine: "current-visible",
+      drawnIdentities: [visible]
+    )
+    state.storeCommittedFrame(second, baselinePlacedTree: second.placedTree, proposal: proposal)
+    let latestDrawn = state.previousDrawnIdentities
+    #expect(latestDrawn == [visible])
+
+    #expect(
+      OffscreenFrameElision.shouldElide(
+        causes: [.deadline],
+        animationRequest: .inherit,
+        redrawIdentities: [departed],
+        drawnIdentities: latestDrawn
+      )
+    )
+    #expect(
+      !OffscreenFrameElision.shouldElide(
+        causes: [.deadline],
+        animationRequest: .inherit,
+        redrawIdentities: [visible],
+        drawnIdentities: latestDrawn
+      )
+    )
+  }
+}
