@@ -23,10 +23,28 @@ private enum EnvironmentStyleOptionalKey: EnvironmentKey {
   static let defaultValue: String? = nil
 }
 
+private struct EnvironmentStyleAction: Sendable {
+  let perform: @MainActor @Sendable () -> Void
+
+  @MainActor
+  func callAsFunction() {
+    perform()
+  }
+}
+
+private enum EnvironmentStyleActionKey: EnvironmentKey {
+  static let defaultValue = EnvironmentStyleAction {}
+}
+
 extension EnvironmentValues {
   fileprivate var environmentStyleOptional: String? {
     get { self[EnvironmentStyleOptionalKey.self] }
     set { self[EnvironmentStyleOptionalKey.self] = newValue }
+  }
+
+  fileprivate var environmentStyleAction: EnvironmentStyleAction {
+    get { self[EnvironmentStyleActionKey.self] }
+    set { self[EnvironmentStyleActionKey.self] = newValue }
   }
 }
 
@@ -58,6 +76,57 @@ extension FrameworkStressEnvironmentStyleTests {
 
       frame = try harness.clickText("Toggle Override 001")
       #expect(frame.contains("001 value inner-\(generation)"))
+    }
+  }
+}
+
+// MARK: - Attempt 004: closure-valued environment action freshness
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 004 stable invoker dispatches current environment action")
+  func environmentStyle004StableInvokerDispatchesCurrentEnvironmentAction() throws {
+    // Hypothesis: reflection-based environment snapshot comparison can treat closure-valued
+    // actions as unchanged and leave a stable invoker dispatching the first closure.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle004"),
+      size: .init(width: 72, height: 7)
+    ) {
+      EnvironmentStyle004Root()
+    }
+    defer { harness.shutdown() }
+
+    var expected = 0
+    for generation in 1...12 {
+      _ = try harness.clickText("Advance Action 004")
+      let frame = try harness.clickText("Invoke Environment Action 004")
+      expected += generation
+      #expect(frame.contains("004 generation \(generation) total \(expected)"))
+      #expect(harness.actionRegistrationCount == 2)
+    }
+  }
+}
+
+private struct EnvironmentStyle004Invoker: View {
+  @Environment(\.environmentStyleAction) private var action
+
+  var body: some View {
+    Button("Invoke Environment Action 004") { action() }
+  }
+}
+
+private struct EnvironmentStyle004Root: View {
+  @State private var generation = 0
+  @State private var total = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Action 004") { generation += 1 }
+      Text("004 generation \(generation) total \(total)")
+      EnvironmentStyle004Invoker()
+        .environment(
+          \.environmentStyleAction,
+          EnvironmentStyleAction { total += generation }
+        )
     }
   }
 }
