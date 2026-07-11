@@ -351,4 +351,16 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 023 empty baseline carries every live registration")
+  func cancellationState023EmptyBaselineCarriesEveryLiveRegistration() {
+    // Hypothesis: an empty snapshot can trigger an empty fast path and lose all concurrent work.
+    let live = Dictionary(uniqueKeysWithValues: (0..<100).map { ($0, "v\($0)") })
+    let carried = ConcurrentRegistrationCarry.sinceBaseline(live: live, baseline: [:])
+    var target: [Int: String] = [:]
+    ConcurrentRegistrationCarry.reapply(carried, into: &target)
+    #expect(target == live)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
