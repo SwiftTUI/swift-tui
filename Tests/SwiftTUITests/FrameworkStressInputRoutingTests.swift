@@ -1190,3 +1190,64 @@ private struct StressInput021Fixture: View {
       )
   }
 }
+
+// MARK: - Attempt 022: add a stacked gesture while another is active
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A gesture added during an active drag remains installed after the drag ends")
+  func stressInputRouting022GestureAddedDuringActiveGesturePersists() throws {
+    // Hypothesis: registerStacked may discard a newly authored recognizer when
+    // the current-pass recognizer is active and never publish it after release.
+    let taps = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput022Root"),
+      size: .init(width: 44, height: 6)
+    ) {
+      StressInput022Fixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Dynamic gesture"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 4, y: start.y)
+    )
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 4, y: start.y))
+    _ = try harness.clickText("Dynamic gesture")
+
+    withKnownIssue("A gesture added while a drag is active is discarded after release") {
+      #expect(taps.value == 1)
+    }
+  }
+}
+
+private struct StressInput022Fixture: View {
+  static let gestureIdentity = testIdentity("StressInput022", "Gesture")
+
+  let taps: StressInputBox<Int>
+  @State private var installsTap = false
+
+  var body: some View {
+    if installsTap {
+      Text("Dynamic gesture")
+        .id(Self.gestureIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture().onChanged { _ in }
+        )
+        .onTapGesture {
+          taps.value += 1
+        }
+    } else {
+      Text("Dynamic gesture")
+        .id(Self.gestureIdentity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(
+          DragGesture().onChanged { _ in
+            installsTap = true
+          }
+        )
+    }
+  }
+}
