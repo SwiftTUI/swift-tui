@@ -1165,3 +1165,43 @@ private struct TextContent030Fixture: View {
       .textFieldStyle(.plain)
   }
 }
+
+// MARK: - Attempt 031: visual-wrap vertical movement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 031 editor vertical movement follows visual wrapping")
+  func textContent031EditorVerticalMovementFollowsVisualWrapping() throws {
+    // Hypothesis: TextEditor computes Up and Down against an unbounded layout map, so a visually
+    // wrapped line behaves as one logical line and leaves the caret at the document end.
+    let text = TextContentBox("ABCDEFGHIJKL")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent031Root"),
+      size: .init(width: 12, height: 6)
+    ) {
+      TextContent031Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent031Fixture.editorIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowUp))
+    _ = try harness.pressKey(KeyPress(.character("!")))
+
+    #expect(text.writeCount == 1)
+    withKnownIssue("TextEditor vertical movement ignores its rendered wrapping width") {
+      #expect(text.value == "ABCDEFG!HIJKL")
+    }
+  }
+}
+
+@MainActor
+private struct TextContent031Fixture: View {
+  static let editorIdentity = testIdentity("TextContent031", "Editor")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    TextEditor(text: text.binding())
+      .id(Self.editorIdentity)
+      .frame(width: 7, height: 5, alignment: .topLeading)
+  }
+}
