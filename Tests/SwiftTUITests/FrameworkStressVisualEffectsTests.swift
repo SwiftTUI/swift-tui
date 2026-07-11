@@ -822,3 +822,86 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 016: unequal-stop gradient animation churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 016 unequal gradient stop counts snap to current target")
+  func visualEffects016UnequalGradientStopCountsSnapToCurrentTarget() {
+    // Hypothesis: AnimatableArray returns empty arithmetic for unequal counts, but repeated shape-
+    // fill animations may still enqueue that invalid interpolation and preserve an older gradient.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+    let identity = testIdentity("VisualEffects016", "Shape")
+
+    func gradient(for generation: Int) -> LinearGradient {
+      if generation.isMultiple(of: 2) {
+        return LinearGradient(
+          gradient: Gradient(colors: [.red, .blue]),
+          startPoint: .leading,
+          endPoint: .trailing
+        )
+      }
+      return LinearGradient(
+        gradient: Gradient(stops: [
+          .init(color: .yellow, location: 0),
+          .init(color: .green, location: 0.35),
+          .init(color: .magenta, location: 1),
+        ]),
+        startPoint: .top,
+        endPoint: .bottom
+      )
+    }
+
+    func node(for generation: Int) -> ResolvedNode {
+      ResolvedNode(
+        identity: identity,
+        kind: .view("Rectangle"),
+        drawPayload: .shape(
+          ShapePayload(
+            geometry: .rectangle,
+            operation: .fill(style: AnyShapeStyle(gradient(for: generation)))
+          )
+        )
+      )
+    }
+
+    func fillGradient(in node: ResolvedNode) -> LinearGradient? {
+      guard case .shape(let payload) = node.drawPayload,
+        case .fill(let style, _) = payload.operation,
+        case .linearGradient(let gradient) = style
+      else {
+        return nil
+      }
+      return gradient
+    }
+
+    let start = MonotonicInstant.now()
+    controller.processResolvedTree(node(for: 0), transaction: .init(), timestamp: start)
+
+    for generation in 1...16 {
+      let targetGradient = gradient(for: generation)
+      var targetNode = node(for: generation)
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      let frameStart = start.advanced(by: .milliseconds(generation * 1200))
+
+      controller.processResolvedTree(
+        targetNode,
+        transaction: transaction,
+        timestamp: frameStart
+      )
+      _ = controller.applyInterpolations(
+        to: &targetNode,
+        at: frameStart.advanced(by: .milliseconds(500))
+      )
+
+      withKnownIssue(
+        "Unequal-count gradient animation retains prior stops while interpolating current endpoints"
+      ) {
+        #expect(fillGradient(in: targetNode) == targetGradient)
+      }
+    }
+  }
+}
