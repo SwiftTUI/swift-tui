@@ -1837,3 +1837,62 @@ private struct StressInput032Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 033: ScrollView axes replacement
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Changing ScrollView axes replaces every old-axis input contract")
+  func stressInputRouting033ChangingAxesDropsOldScrollHandlers() throws {
+    // Hypothesis: a restored body handler from the vertical configuration may
+    // coexist with the new horizontal handler at the stable route identity.
+    let position = StressInputBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput033Root"),
+      size: .init(width: 42, height: 9)
+    ) {
+      StressInput033Fixture(position: position)
+    }
+    defer { harness.shutdown() }
+
+    let scrollFocus = try #require(harness.runLoop.focusTracker.focusRegions.first)
+    _ = try harness.focus(scrollFocus.identity)
+    _ = try harness.pressKey(KeyPress(.character("r")))
+    let point = Point(x: 1, y: 1)
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+    _ = try harness.scrollPointer(at: point, deltaX: 1, deltaY: 0)
+    withKnownIssue("Changing ScrollView axes leaves the old vertical handler installed") {
+      #expect(position.value == ScrollPosition(x: 1, y: 0))
+    }
+  }
+}
+
+private struct StressInput033Fixture: View {
+  static let scrollIdentity = testIdentity("StressInput033", "Scroll")
+
+  let position: StressInputBox<ScrollPosition>
+  @State private var usesHorizontalAxis = false
+
+  var body: some View {
+    ScrollView(
+      usesHorizontalAxis ? .horizontal : .vertical,
+      showsIndicators: false,
+      position: position.binding()
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<12) { row in
+          HStack(spacing: 0) {
+            ForEach(0..<12) { column in
+              Text("G\(row)-\(column) ")
+            }
+          }
+        }
+      }
+    }
+    .id(Self.scrollIdentity)
+    .frame(width: 20, height: 5, alignment: .topLeading)
+    .onKeyPress(.character("r")) { _ in
+      usesHorizontalAxis = true
+      return .handled
+    }
+  }
+}
