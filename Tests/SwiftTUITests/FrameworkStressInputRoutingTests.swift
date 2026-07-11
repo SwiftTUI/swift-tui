@@ -1336,3 +1336,64 @@ private struct StressInput024Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 025: stacked hover phases under partial churn
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Stacked hover modifiers receive balanced phases across partial owner churn")
+  func stressInputRouting025StackedHoverPhasesRemainBalanced() throws {
+    // Hypothesis: restoring one hover contribution after its state write may
+    // replace the sibling contribution or lose one sibling's exit phase.
+    let events = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput025Root"),
+      size: .init(width: 52, height: 8)
+    ) {
+      StressInput025Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Stacked hover"))
+    _ = try harness.movePointer(to: point)
+    _ = try harness.movePointer(to: Point(x: 50, y: 7))
+
+    withKnownIssue("Stacked hover dispatch drops the inner modifier's balanced phases") {
+      #expect(events.value.filter { $0 == "inner-entered" }.count == 1)
+      #expect(events.value.filter { $0 == "outer-entered" }.count == 1)
+      #expect(events.value.filter { $0 == "inner-exited" }.count == 1)
+      #expect(events.value.filter { $0 == "outer-exited" }.count == 1)
+    }
+  }
+}
+
+private struct StressInput025Fixture: View {
+  let events: StressInputBox<[String]>
+  @State private var generation = 0
+
+  var body: some View {
+    Text("Stacked hover (generation)")
+      .id(testIdentity("StressInput025", "Hover"))
+      .frame(width: 24, height: 1, alignment: .leading)
+      .onPointerHover { phase in
+        switch phase {
+        case .entered:
+          events.value.append("inner-entered")
+          generation += 1
+        case .moved:
+          break
+        case .exited:
+          events.value.append("inner-exited")
+        }
+      }
+      .onPointerHover { phase in
+        switch phase {
+        case .entered:
+          events.value.append("outer-entered")
+        case .moved:
+          break
+        case .exited:
+          events.value.append("outer-exited")
+        }
+      }
+  }
+}
