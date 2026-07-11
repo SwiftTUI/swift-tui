@@ -739,6 +739,49 @@ private struct StressPS016Fixture: View {
   }
 }
 
+// MARK: - Attempt 017: disabling active menu-style picker
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 017 disabling an active menu picker removes option routes")
+  func stress017DisablingActiveMenuPickerRemovesOptionRoutes() throws {
+    // Hypothesis: focused menu-style Picker expansion may outlive the
+    // enablement transition and preserve its option handlers and rows.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS017", "Root"),
+      size: .init(width: 46, height: 11)
+    ) {
+      StressPS017Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Alpha option")
+    let frame = try harness.clickText("Disable picker")
+
+    #expect(!frame.contains("Beta option"))
+    #expect(harness.keyHandlerCount == 0)
+  }
+}
+
+@MainActor
+private struct StressPS017Fixture: View {
+  @State private var isDisabled = false
+  @State private var selection = "a"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Disable picker") {
+        isDisabled = true
+      }
+      Picker("Mode", selection: $selection) {
+        Text("Alpha option").tag("a")
+        Text("Beta option").tag("b")
+      }
+      .pickerStyle(.menu)
+      .disabled(isDisabled)
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
