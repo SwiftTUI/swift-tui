@@ -36,6 +36,37 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 016: split pixel mouse envelope
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 016 split pixel mouse envelope keeps subcell precision")
+  func runtimeTransport016SplitPixelMouseEnvelopeKeepsSubcellPrecision() {
+    // Hypothesis: buffering an incomplete SGR-Pixels coordinate can fall back
+    // to cell precision when the final coordinate arrives in another read.
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+
+    #expect(parser.feed(Array("\u{001B}[<0;17;".utf8)).isEmpty)
+    #expect(
+      parser.feed(Array("33M".utf8)) == [
+        .mouse(
+          .init(
+            kind: .down(.primary),
+            location: .subCell(
+              location: .init(x: 2, y: 2),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: .init(x: 16, y: 32)
+            )
+          )
+        )
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 015: malformed CSI recovery
 
 extension FrameworkStressRuntimeTransportTests {
