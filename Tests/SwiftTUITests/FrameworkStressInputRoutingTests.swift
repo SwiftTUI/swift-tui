@@ -288,3 +288,42 @@ private struct StressInput004Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 005: stale FocusState request ahead of a live request
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A stale pending FocusState request does not block a later live request")
+  func stressInputRouting005StaleFocusRequestDoesNotBlockLiveRequest() throws {
+    // Hypothesis: desiredFocusRequest may return early when its first pending
+    // group selects a removed identity, never considering the next live group.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput005Root"),
+      size: .init(width: 20, height: 4)
+    ) {
+      EmptyView()
+    }
+    defer { harness.shutdown() }
+
+    let stale = testIdentity("StressInput005", "Stale")
+    let live = testIdentity("StressInput005", "Live")
+    let registry = harness.runLoop.localFocusBindingRegistry
+    registry.register(
+      identity: stale,
+      bindingID: "stale",
+      hasPendingRequest: true,
+      isSelected: true,
+      applyRuntimeFocus: { _ in false }
+    )
+    registry.register(
+      identity: live,
+      bindingID: "live",
+      hasPendingRequest: true,
+      isSelected: true,
+      applyRuntimeFocus: { _ in false }
+    )
+
+    withKnownIssue("A stale FocusState request blocks the later live request") {
+      #expect(registry.desiredFocusRequest(allowedIdentities: [live]) == .focus(live))
+    }
+  }
+}
