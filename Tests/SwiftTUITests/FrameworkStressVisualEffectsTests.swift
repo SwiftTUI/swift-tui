@@ -46,6 +46,15 @@ private func visualEffectsBrailleDotCount(_ cell: RasterCell) -> Int {
   return Int(scalar - 0x2800).nonzeroBitCount
 }
 
+private struct VisualEffectsPathShape: InsettableShape {
+  let pathValue: Path
+  var rule: FillRule = .nonZero
+
+  var geometry: ShapeGeometry {
+    .path(BoxedPath(pathValue), rule)
+  }
+}
+
 // MARK: - Attempt 001: analytic shape-family churn
 
 extension FrameworkStressVisualEffectsTests {
@@ -94,6 +103,48 @@ extension FrameworkStressVisualEffectsTests {
           visualEffectsBrailleDotCount($0) > 0 || $0.style?.backgroundColor != nil
         }
       )
+    }
+  }
+}
+
+// MARK: - Attempt 002: custom-path control-point churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 002 custom path uses its current control points")
+  func visualEffects002CustomPathUsesCurrentControlPoints() {
+    // Hypothesis: BoxedPath's storage-identity equality shortcut can let retained draw extraction
+    // pair a newly boxed custom path with an older path after repeated same-shape reconstruction.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        var path = Path()
+        let shoulder = Double((generation % 7) + 1) / 8
+        path.move(to: Point(x: 0.05, y: 0.05))
+        path.addLine(to: Point(x: 0.95, y: shoulder))
+        path.addLine(to: Point(x: 0.7 - shoulder / 3, y: 0.95))
+        path.addLine(to: Point(x: 0.1 + shoulder / 4, y: 0.7))
+        path.close()
+        return VisualEffectsPathShape(pathValue: path)
+          .fill(Color.cyan)
+          .frame(width: 20, height: 9)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects002")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
     }
   }
 }
