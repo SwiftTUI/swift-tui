@@ -135,4 +135,17 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 009 completed token never installs waiters")
+  func cancellationState009CompletedTokenNeverInstallsWaiters() async {
+    // Hypothesis: the initial state check can race and suspend on an already completed token.
+    let token = FrameTailJobCancellationToken()
+    #expect(token.markStarted())
+    token.markCompleted()
+    for _ in 0..<32 {
+      #expect(await token.waitUntilLeavesQueue().rawValue == "completed")
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
