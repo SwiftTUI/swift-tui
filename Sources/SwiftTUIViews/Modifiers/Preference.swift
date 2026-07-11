@@ -231,7 +231,15 @@ public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
     // here would keep serving content computed from the previous fold.
     var overlayContext = context.child(component: .named("overlay"))
     overlayContext.withinChurnedSubtree = true
-    let overlayNode = overlayView.resolve(in: overlayContext)
+    // Resolve under the declaration-site scope like `OverlayModifier`'s
+    // stored view: primitive leaves that defer authored closures past this
+    // resolve (a `GeometryReader`'s realization) capture the ambient here —
+    // an unwrapped resolve would hand their dynamic-property reads to the
+    // evaluating node's owner instead of the authoring body's (the
+    // stale-`@State`-binding family).
+    let overlayNode = withAuthoringContext(authoringScope) {
+      overlayView.resolve(in: overlayContext)
+    }
     return [
       ResolvedNode(
         identity: context.identity,
@@ -272,10 +280,14 @@ public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: 
       }
     }
     // Mirrors the overlay variant: the background derives from the fold, so
-    // reuse below here must not outlive the wrapper's recompute.
+    // reuse below here must not outlive the wrapper's recompute, and the
+    // resolve runs under the declaration-site scope so deferred authored
+    // closures bind their dynamic properties to the authoring body's owner.
     var backgroundContext = context.child(component: .named("background"))
     backgroundContext.withinChurnedSubtree = true
-    let backgroundNode = backgroundView.resolve(in: backgroundContext)
+    let backgroundNode = withAuthoringContext(authoringScope) {
+      backgroundView.resolve(in: backgroundContext)
+    }
     return [
       ResolvedNode(
         identity: context.identity,

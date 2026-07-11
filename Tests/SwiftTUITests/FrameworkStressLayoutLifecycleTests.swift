@@ -463,9 +463,7 @@ extension FrameworkStressLayoutLifecycleTests {
     for generation in 1...10 {
       let frame = try harness.clickText("Remint Anchor")
       let expectedX = generation.isMultiple(of: 2) ? 2 : 14
-      withKnownIssue("The anchor overlay retains its first reminted source payload") {
-        #expect(frame.contains("anchor x \(expectedX) generation \(generation)"))
-      }
+      #expect(frame.contains("anchor x \(expectedX) generation \(generation)"))
     }
   }
 }
