@@ -749,3 +749,57 @@ private struct ToastLifecycle014Root: View {
     }
   }
 }
+
+// MARK: - Attempt 015: sibling toast stacking order
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 015 sibling toasts stack in activation order")
+  func toastLifecycle015SiblingToastsStackInActivationOrder() throws {
+    // Hypothesis: coordinator reconciliation across independently invalidated sources can collapse
+    // the older toast or reverse the family's activation ordering.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle015"),
+      size: .init(width: 64, height: 14)
+    ) {
+      ToastLifecycle015Root()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Show Older Toast 015")
+    let frame = try harness.clickText("Show Newer Toast 015")
+
+    #expect(
+      toastLifecycleContainsInOrder(
+        ["older sibling toast", "newer sibling toast"],
+        in: frame
+      )
+    )
+    #expect(toastLifecycleEntryCount(in: harness) == 1)
+  }
+}
+
+private func toastLifecycleContainsInOrder(_ tokens: [String], in frame: String) -> Bool {
+  var cursor = frame.startIndex
+  for token in tokens {
+    guard let range = frame.range(of: token, range: cursor..<frame.endIndex) else {
+      return false
+    }
+    cursor = range.upperBound
+  }
+  return true
+}
+
+@MainActor
+private struct ToastLifecycle015Root: View {
+  @State private var older = false
+  @State private var newer = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Show Older Toast 015") { older = true }
+        .toast("older sibling toast", isPresented: $older, duration: nil)
+      Button("Show Newer Toast 015") { newer = true }
+        .toast("newer sibling toast", isPresented: $newer, duration: nil)
+    }
+  }
+}
