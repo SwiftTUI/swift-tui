@@ -1701,3 +1701,82 @@ private struct StressInput030Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 031: momentum across same-identity route replacement
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Momentum does not transfer to a replacement ScrollView route with the same identity")
+  func stressInputRouting031MomentumDoesNotTransferToReplacementRoute() throws {
+    // Hypothesis: momentum keyed only by route Identity may mutate a newly
+    // mounted binding after the original scroll owner is replaced.
+    let first = StressInputBox(ScrollPosition.zero)
+    let second = StressInputBox(ScrollPosition.zero)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput031Root"),
+      size: .init(width: 40, height: 9)
+    ) {
+      StressInput031Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Momentum row 0")
+    let start = MonotonicInstant.now()
+    #expect(
+      harness.runLoop.scrollMomentum.begin(
+        identity: StressInput031Fixture.scrollIdentity,
+        offsetVelocity: Vector(dx: 0, dy: 30),
+        canScrollX: false,
+        canScrollY: true,
+        now: start
+      )
+    )
+
+    _ = try harness.pressKey(KeyPress(.character("r")))
+    let ticks = harness.runLoop.scrollMomentum.step(
+      to: start.advanced(by: .milliseconds(100))
+    )
+    for tick in ticks {
+      _ = harness.runLoop.localScrollPositionRegistry.scrollBy(
+        x: tick.deltaX,
+        y: tick.deltaY,
+        scopeIdentity: tick.identity
+      )
+    }
+
+    withKnownIssue("Momentum continues mutating the retired binding after route replacement") {
+      #expect(first.value == .zero)
+      #expect(second.value == .zero)
+    }
+  }
+}
+
+private struct StressInput031Fixture: View {
+  static let scrollIdentity = testIdentity("StressInput031", "Scroll")
+
+  let first: StressInputBox<ScrollPosition>
+  let second: StressInputBox<ScrollPosition>
+  @State private var targetsSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(targetsSecond ? "Binding B" : "Binding A")
+      ScrollView(
+        .vertical,
+        showsIndicators: false,
+        position: targetsSecond ? second.binding() : first.binding()
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<40) { row in
+            Text("Momentum row \(row)")
+          }
+        }
+      }
+      .id(Self.scrollIdentity)
+      .frame(width: 28, height: 5, alignment: .topLeading)
+      .onKeyPress(.character("r")) { _ in
+        targetsSecond = true
+        return .handled
+      }
+    }
+  }
+}
