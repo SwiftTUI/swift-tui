@@ -53,4 +53,15 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 004 late cancellation cannot undo start")
+  func cancellationState004LateCancellationCannotUndoStart() {
+    // Hypothesis: cancelBeforeStart can win after markStarted publishes started.
+    let token = FrameTailJobCancellationToken()
+    #expect(token.markStarted())
+    for _ in 0..<32 { #expect(!token.cancelBeforeStart()) }
+    #expect(token.currentState.rawValue == "started")
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
