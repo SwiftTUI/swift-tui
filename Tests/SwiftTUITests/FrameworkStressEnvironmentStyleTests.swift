@@ -19,6 +19,21 @@ extension EnvironmentValues {
   }
 }
 
+private enum EnvironmentStyleOptionalKey: EnvironmentKey {
+  static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+  fileprivate var environmentStyleOptional: String? {
+    get { self[EnvironmentStyleOptionalKey.self] }
+    set { self[EnvironmentStyleOptionalKey.self] = newValue }
+  }
+}
+
+private func environmentStyleText(_ snapshot: RenderSnapshot) -> String {
+  snapshot.rasterSurface.lines.joined(separator: "\n")
+}
+
 // MARK: - Attempt 001: reminted nested override removal
 
 extension FrameworkStressEnvironmentStyleTests {
@@ -131,6 +146,54 @@ private struct EnvironmentStyle002Root: View {
         EnvironmentStyle002Reader(id: item.id)
           .environment(\.environmentStyleString, "\(item.id)-\(generation)")
       }
+    }
+  }
+}
+
+// MARK: - Attempt 003: optional writer absence versus explicit nil
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 003 removing explicit nil reveals optional outer value")
+  func environmentStyle003RemovingExplicitNilRevealsOptionalOuterValue() {
+    // Hypothesis: snapshot equality can collapse an absent Optional writer with an explicit nil
+    // writer, preventing removal from exposing the live outer Optional value.
+    struct Reader: View {
+      @Environment(\.environmentStyleOptional) private var value
+
+      var body: some View {
+        Text("003 value \(value ?? "nil")")
+      }
+    }
+
+    struct Root: View {
+      let generation: Int
+      let masksOuter: Bool
+
+      var body: some View {
+        Group {
+          if masksOuter {
+            Reader().environment(\.environmentStyleOptional, nil)
+          } else {
+            Reader()
+          }
+        }
+        .environment(\.environmentStyleOptional, "outer-\(generation)")
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("EnvironmentStyle003")
+    for generation in 0..<18 {
+      let masksOuter = generation.isMultiple(of: 2)
+      let frame = renderer.render(
+        Root(generation: generation, masksOuter: masksOuter),
+        context: .init(identity: identity, invalidatedIdentities: [identity])
+      )
+      #expect(
+        environmentStyleText(frame).contains(
+          masksOuter ? "003 value nil" : "003 value outer-\(generation)"
+        )
+      )
     }
   }
 }
