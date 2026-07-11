@@ -111,6 +111,91 @@ struct LocalGestureRegistryTests {
     #expect(tracker.tornDown == true)
   }
 
+  // MARK: - Restore-time callback adoption (the record-refresh seam)
+
+  @Test("restore adopts a strictly fresher record's callbacks into an active recognizer")
+  func restoreAdoptsFresherCallbacksIntoActiveRecognizer() {
+    // The mid-gesture re-resolve shape: the owner re-resolved while its
+    // recognizer was active, so the committed record carries a recognizer
+    // authored AFTER the preserved one began its interaction. The preserved
+    // recognizer must keep its interaction state but adopt the record's
+    // authored callbacks — otherwise dispatch keeps writing through bindings
+    // the view has since re-authored.
+    let registry = LocalGestureRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "drag")])
+    let owner = RuntimeRegistrationOwnerKey(viewNodeID: ViewNodeID(rawValue: 1), identity: identity)
+    let fired = FiredLog()
+
+    let original = CallbackRecognizer { fired.entries.append("original") }
+    original.phase = .began
+    let preserved = AnyGestureRecognizer(original)
+    registry.restore([identity: preserved], ownersByIdentity: [identity: owner])
+
+    let reauthored = AnyGestureRecognizer(
+      CallbackRecognizer { fired.entries.append("reauthored") }
+    )
+    registry.restore([identity: reauthored], ownersByIdentity: [identity: owner])
+
+    let served = registry.recognizer(for: identity)
+    #expect(served === preserved)
+    _ = served?.handle(
+      event: LocalPointerEvent(kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
+    )
+    #expect(fired.entries == ["reauthored"])
+  }
+
+  @Test("restore keeps an active recognizer's callbacks against a stale record")
+  func restoreDoesNotAdoptStaleCallbacksIntoActiveRecognizer() {
+    // The cache-hit-frame shape: a publication re-feeds a committed record
+    // that predates the active recognizer's own authoring. Adopting it would
+    // regress callbacks backward (the branch-swap regression), so the mint
+    // gate must refuse.
+    let registry = LocalGestureRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "drag")])
+    let owner = RuntimeRegistrationOwnerKey(viewNodeID: ViewNodeID(rawValue: 1), identity: identity)
+    let fired = FiredLog()
+
+    let stale = AnyGestureRecognizer(
+      CallbackRecognizer { fired.entries.append("stale") }
+    )
+    let original = CallbackRecognizer { fired.entries.append("original") }
+    original.phase = .began
+    let preserved = AnyGestureRecognizer(original)
+    registry.restore([identity: preserved], ownersByIdentity: [identity: owner])
+
+    registry.restore([identity: stale], ownersByIdentity: [identity: owner])
+
+    let served = registry.recognizer(for: identity)
+    #expect(served === preserved)
+    _ = served?.handle(
+      event: LocalPointerEvent(kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
+    )
+    #expect(fired.entries == ["original"])
+  }
+
+  @Test("re-restoring an already-adopted record does not re-adopt")
+  func reRestoreOfAdoptedRecordIsIdempotent() {
+    // The per-frame double restore: the same committed record is re-installed
+    // twice in one frame. The second pass carries the same mint the first
+    // already adopted, so it must not adopt again.
+    let registry = LocalGestureRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "drag")])
+    let owner = RuntimeRegistrationOwnerKey(viewNodeID: ViewNodeID(rawValue: 1), identity: identity)
+
+    let original = CallbackRecognizer {}
+    original.phase = .began
+    let preserved = AnyGestureRecognizer(original)
+    registry.restore([identity: preserved], ownersByIdentity: [identity: owner])
+
+    let reauthoredBase = CallbackRecognizer {}
+    let reauthored = AnyGestureRecognizer(reauthoredBase)
+    registry.restore([identity: reauthored], ownersByIdentity: [identity: owner])
+    #expect(original.adoptionCount == 1)
+
+    registry.restore([identity: reauthored], ownersByIdentity: [identity: owner])
+    #expect(original.adoptionCount == 1)
+  }
+
   @Test("prune keeps live-owned recognizers and drops departed-owned ones")
   func pruneSplitsByOwnerLiveness() {
     let registry = LocalGestureRegistry()
@@ -151,6 +236,39 @@ private final class NoopRecognizer: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() {}
+}
+
+@MainActor
+private final class FiredLog {
+  var entries: [String] = []
+}
+
+@MainActor
+private final class CallbackRecognizer: GestureRecognizer {
+  typealias Value = Int
+  var phase: GestureRecognizerPhase = .possible
+  private(set) var action: @MainActor () -> Void
+  private(set) var adoptionCount = 0
+
+  init(action: @escaping @MainActor () -> Void = {}) {
+    self.action = action
+  }
+
+  func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
+    action()
+    return .handled
+  }
+
+  func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+  func currentValue() -> Int? { nil }
+  func tearDown() {}
+
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? CallbackRecognizer else { return false }
+    action = other.action
+    adoptionCount += 1
+    return true
+  }
 }
 
 @MainActor

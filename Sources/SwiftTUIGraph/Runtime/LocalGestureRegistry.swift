@@ -71,7 +71,9 @@ package final class LocalGestureRegistry: Equatable {
         previousElements[index] !== incoming
       {
         let preserved = previousElements[index]
-        _ = preserved.adoptAuthoredCallbacks(from: incoming)
+        if preserved.adoptAuthoredCallbacks(from: incoming) {
+          preserved.noteCarriedAuthoredMint(incoming.carriedAuthoredMintGeneration)
+        }
         incoming.tearDown()
         result.append(preserved)
       } else {
@@ -220,6 +222,20 @@ package final class LocalGestureRegistry: Equatable {
       if let existing = recognizers[identity] {
         if existing.isActive {
           if existing !== recognizer {
+            // The record-refresh seam: the committed record can carry a
+            // recognizer authored AFTER this preserved one began its
+            // interaction (the owner re-resolved mid-gesture, and the
+            // resolve pass's registry starts empty so its reconciliation
+            // never saw the active recognizer). Adopt the record's authored
+            // callbacks so dispatch writes the re-authored bindings; the
+            // mint gate keeps a stale record re-published on a cache-hit
+            // frame from regressing callbacks backward, and makes the
+            // per-frame double restore idempotent.
+            if recognizer.carriedAuthoredMintGeneration > existing.carriedAuthoredMintGeneration,
+              existing.adoptAuthoredCallbacks(from: recognizer)
+            {
+              existing.noteCarriedAuthoredMint(recognizer.carriedAuthoredMintGeneration)
+            }
             recognizer.tearDown()
           }
           // Triple fallback, unique in the registry family (F100): when the

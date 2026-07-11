@@ -137,6 +137,20 @@ public final class AnyGestureRecognizer {
   package let base: AnyObject
   public let valueType: Any.Type
 
+  /// Monotonic authoring order across every recognizer the process builds.
+  /// A recognizer authored by a later resolve pass carries a strictly
+  /// greater mint, giving `LocalGestureRegistry.restore` a freshness order
+  /// between a preserved mid-interaction recognizer and the committed
+  /// record being re-installed over it: authored callbacks are adopted only
+  /// from a strictly fresher record, never from a stale one re-published on
+  /// a cache-hit frame (which would regress callbacks backward).
+  private static var authoredMintCounter: UInt64 = 0
+
+  /// The freshest authoring mint whose user callbacks this recognizer
+  /// carries: its own construction mint, advanced when a restore or pass
+  /// reconciliation adopts a fresher registration's callbacks.
+  package private(set) var carriedAuthoredMintGeneration: UInt64
+
   package init<R: GestureRecognizer>(_ recognizer: R) {
     self._phase = { recognizer.phase }
     self._isActive = { recognizer.isActive }
@@ -147,6 +161,16 @@ public final class AnyGestureRecognizer {
     self._adoptAuthoredCallbacks = { recognizer.adoptAuthoredCallbacks(from: $0) }
     self.base = recognizer
     self.valueType = R.Value.self
+    // 64-bit wraparound is deliberately unguarded (F122): unreachable in
+    // practice, and the freshness comparisons assume no value reuse.
+    Self.authoredMintCounter &+= 1
+    self.carriedAuthoredMintGeneration = Self.authoredMintCounter
+  }
+
+  /// Records that this recognizer's callbacks now reflect the authoring
+  /// mint of an adopted registration. Never moves backward.
+  package func noteCarriedAuthoredMint(_ mint: UInt64) {
+    carriedAuthoredMintGeneration = max(carriedAuthoredMintGeneration, mint)
   }
 
   public var phase: GestureRecognizerPhase { _phase() }

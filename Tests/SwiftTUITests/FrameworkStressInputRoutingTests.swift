@@ -1123,6 +1123,60 @@ private struct StressInput020Fixture: View {
   }
 }
 
+// MARK: - Attempt 020b: active drag retargeted at a stable identity
+
+extension FrameworkStressInputRoutingTests {
+  @Test("An active drag at a stable identity adopts the re-authored binding")
+  func stressInputRouting020bActiveDragAdoptsReauthoredCallbacksAtStableIdentity() throws {
+    // The record-refresh seam isolated from attempt 020's conditional-branch
+    // identity flip: the gesture value is swapped in place, so the node
+    // identity (and with it the pointer capture) is stable across the
+    // retarget. The preserved mid-drag recognizer must adopt the re-authored
+    // closure when the committed record is restored over it.
+    let firstChanges = StressInputBox(0)
+    let secondChanges = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput020BRoot"),
+      size: .init(width: 44, height: 6)
+    ) {
+      StressInput020BFixture(firstChanges: firstChanges, secondChanges: secondChanges)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Stable retarget"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 3, y: start.y)
+    )
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 3, y: start.y))
+
+    #expect(firstChanges.value == 1)
+    #expect(secondChanges.value >= 1)
+  }
+}
+
+private struct StressInput020BFixture: View {
+  let firstChanges: StressInputBox<Int>
+  let secondChanges: StressInputBox<Int>
+  @State private var targetsSecond = false
+
+  var body: some View {
+    Text("Stable retarget")
+      .frame(width: 24, height: 1, alignment: .leading)
+      .gesture(
+        targetsSecond
+          ? DragGesture().onChanged { _ in
+            secondChanges.value += 1
+          }
+          : DragGesture().onChanged { _ in
+            firstChanges.value += 1
+            targetsSecond = true
+          }
+      )
+  }
+}
+
 // MARK: - Attempt 021: stacked updating gestures
 
 extension FrameworkStressInputRoutingTests {
