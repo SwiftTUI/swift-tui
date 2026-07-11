@@ -73,3 +73,48 @@ private struct ControlStress001Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 002: duplicate-label button entity reorder
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 002 reordered duplicate buttons dispatch by entity")
+  func stressControlBinding002ReorderedDuplicateButtonsDispatchByEntity() throws {
+    // Hypothesis: after stable ForEach entities reorder, duplicate visible labels can leave their
+    // pointer routes associated with the former occurrence order instead of the current entities.
+    let probe = ControlStressProbe<[Int]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress002", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      ControlStress002Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reverse buttons 002")
+    _ = try harness.clickText("Duplicate action 002")
+    _ = try harness.clickText("Duplicate action 002", chooseLast: true)
+
+    #expect(probe.value == [2, 1])
+  }
+}
+
+@MainActor
+private struct ControlStress002Fixture: View {
+  let probe: ControlStressProbe<[Int]>
+  @State private var isReversed = false
+
+  private var values: [Int] {
+    isReversed ? [2, 1] : [1, 2]
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse buttons 002") { isReversed = true }
+      ForEach(values, id: \.self) { value in
+        Button("Duplicate action 002") {
+          probe.value.append(value)
+        }
+      }
+    }
+  }
+}
