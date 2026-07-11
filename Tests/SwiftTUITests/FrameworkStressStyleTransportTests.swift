@@ -205,4 +205,19 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 021 minimal appearance decodes with default palette")
+  func styleTransport021MinimalAppearanceDecodesWithDefaultPalette() throws {
+    // Hypothesis: omitting both optional transport fields can leave palette storage uninitialized.
+    let json =
+      ##"{"appearance":{"foregroundColor":"#112233","backgroundColor":"#445566","tintColor":"#778899","colorSchemeContrast":"standard","source":"override"}}"##
+    let encoded = StyleTransportBase64.encode(Array(json.utf8))
+    let style = try #require(TerminalRenderStyleCodec.decodeBase64(encoded))
+    #expect(style.theme == nil)
+    #expect(style.appearance.foregroundColor.hexString() == "#112233")
+    #expect(style.appearance.palette[0] == TerminalPalette.default[0])
+    #expect(style.appearance.palette[15] == TerminalPalette.default[15])
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
