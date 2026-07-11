@@ -1481,3 +1481,55 @@ private struct ObservationEffects025View: View {
     }
   }
 }
+
+// MARK: - Attempt 026: onChange closure environment capture
+
+extension FrameworkStressObservationEffectsTests {
+  @Test(
+    "stress observation effects 026 onChange dispatch reads the current registration environment")
+  func observationEffects026OnChangeReadsCurrentRegistrationEnvironment() throws {
+    // Hypothesis: a reminted observer's descriptor can retain the environment
+    // snapshot captured by an earlier owner while its value payload is fresh.
+    let probe = ObservationEffectsEventProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects026"),
+      size: .init(width: 72, height: 7)
+    ) {
+      ObservationEffects026View(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      probe.events.removeAll(keepingCapacity: true)
+      _ = try harness.clickText("Remint Change Owner 026")
+      #expect(probe.events == ["env-\(generation):\(generation)"])
+    }
+  }
+}
+
+private struct ObservationEffects026Observer: View {
+  let value: Int
+  let probe: ObservationEffectsEventProbe
+  @Environment(\.observationEffectsString) private var environmentValue
+
+  var body: some View {
+    Text("026 value \(value)")
+      .onChange(of: value, initial: true) { _, newValue in
+        probe.events.append("\(environmentValue):\(newValue)")
+      }
+  }
+}
+
+private struct ObservationEffects026View: View {
+  let probe: ObservationEffectsEventProbe
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remint Change Owner 026") { generation += 1 }
+      ObservationEffects026Observer(value: generation, probe: probe)
+        .environment(\.observationEffectsString, "env-\(generation)")
+        .id("observation-effects-026-owner-\(generation)")
+    }
+  }
+}
