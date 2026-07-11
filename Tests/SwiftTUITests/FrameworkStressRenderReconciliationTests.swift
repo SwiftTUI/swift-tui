@@ -755,4 +755,41 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 018: Opacity retained draw churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 018 opacity oscillation matches a fresh raster")
+  func renderReconciliation018OpacityOscillationMatchesFreshRaster() {
+    // Hypothesis: opacity is mirrored into retained placed metadata and draw commands; partial
+    // metadata synchronization may update one phase while raster reuses the earlier alpha.
+    struct Root: View {
+      let opacity: Double
+
+      var body: some View {
+        Text("OPACITY")
+          .foregroundStyle(Color.red)
+          .opacity(opacity)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation018")
+    let opacities = [1.0, 0.25, 0.0, 0.75, 0.5, 1.0]
+
+    for generation in 0..<24 {
+      let root = Root(opacity: opacities[generation % opacities.count])
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
+
 // MARK: - End
