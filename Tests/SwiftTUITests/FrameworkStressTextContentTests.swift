@@ -1295,3 +1295,88 @@ private struct TextContent033Fixture: View {
       .frame(width: 18, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 034: stable-identity input-kind cycle
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 034 stable identity adopts each input contract")
+  func textContent034StableIdentityAdoptsEachInputContract() throws {
+    // Hypothesis: cycling one retained identity through TextField, SecureField, and TextEditor can
+    // carry the prior control's caret, masking, or newline traits into the replacement type.
+    let text = TextContentBox("abcd")
+    let mode = TextContentBox(TextContent034Mode.field)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent034Root"),
+      size: .init(width: 36, height: 10)
+    ) {
+      TextContent034Fixture(text: text, mode: mode)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent034Fixture.controlIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.character("F")))
+    #expect(text.value == "abFcd")
+    #expect(harness.frame.contains("abFcd"))
+
+    _ = try harness.clickText("Show secure")
+    _ = try harness.focus(TextContent034Fixture.controlIdentity)
+    _ = try harness.pressKey(KeyPress(.character("S")))
+    #expect(text.value == "secretS")
+    #expect(harness.frame.contains("•••••••"))
+    #expect(!harness.frame.contains("secretS"))
+
+    _ = try harness.clickText("Show editor")
+    _ = try harness.focus(TextContent034Fixture.controlIdentity)
+    _ = try harness.pressKey(KeyPress(.return))
+    _ = try harness.pressKey(KeyPress(.character("E")))
+    #expect(text.value == "one\ntwo\nE")
+    #expect(text.writeCount == 4)
+    #expect(harness.frame.contains("one"))
+    #expect(harness.frame.contains("two"))
+    #expect(harness.frame.contains("E"))
+  }
+}
+
+private enum TextContent034Mode {
+  case field
+  case secure
+  case editor
+}
+
+@MainActor
+private struct TextContent034Fixture: View {
+  static let controlIdentity = testIdentity("TextContent034", "Control")
+
+  let text: TextContentBox<String>
+  let mode: TextContentBox<TextContent034Mode>
+
+  @ViewBuilder
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Show secure") {
+        text.value = "secret"
+        mode.value = .secure
+      }
+      Button("Show editor") {
+        text.value = "one\ntwo"
+        mode.value = .editor
+      }
+      switch mode.value {
+      case .field:
+        TextField("Value", text: text.binding())
+          .id(Self.controlIdentity)
+          .textFieldStyle(.plain)
+      case .secure:
+        SecureField("Secret", text: text.binding())
+          .id(Self.controlIdentity)
+          .textFieldStyle(.plain)
+      case .editor:
+        TextEditor(text: text.binding())
+          .id(Self.controlIdentity)
+          .frame(width: 18, height: 5, alignment: .topLeading)
+      }
+    }
+  }
+}
