@@ -1291,3 +1291,129 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 028: duplicate semantic identities with distinct graph owners
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 028 duplicate live region owners stay isolated through reorder")
+  func sceneHost028DuplicateLiveRegionOwnersStayIsolatedThroughReorder() throws {
+    // Hypothesis: semantic-order churn can cross-compare duplicate-Identity
+    // live regions instead of following their graph-issued occurrence owners.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("SceneHost028")
+
+    func snapshot(
+      _ rows: [SceneHost028LiveRegionRow],
+      invalidated: Bool
+    ) -> SemanticSnapshot {
+      renderer.render(
+        SceneHost028DuplicateLiveRegionList(rows: rows),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: invalidated ? [rootIdentity] : []
+        )
+      ).semanticSnapshot
+    }
+
+    func node(
+      labelPrefix: String,
+      in snapshot: SemanticSnapshot
+    ) throws -> AccessibilityNode {
+      try #require(
+        snapshot.accessibilityNodes.first { node in
+          node.liveRegion == .polite
+            && node.label?.hasPrefix(labelPrefix) == true
+        }
+      )
+    }
+
+    let alpha = SceneHost028LiveRegionRow(id: 1, label: "Alpha")
+    let pivot = SceneHost028LiveRegionRow(id: 2, label: "Pivot")
+    var beta = SceneHost028LiveRegionRow(id: 1, label: "Beta 0")
+    let baseline = snapshot([alpha, beta, pivot], invalidated: false)
+    let baselineAlpha = try node(labelPrefix: "Alpha", in: baseline)
+    let baselineBeta = try node(labelPrefix: "Beta", in: baseline)
+    let baselinePivot = try node(labelPrefix: "Pivot", in: baseline)
+    let alphaNodeID = try #require(baselineAlpha.viewNodeID)
+    let betaNodeID = try #require(baselineBeta.viewNodeID)
+    let pivotNodeID = try #require(baselinePivot.viewNodeID)
+
+    #expect(baselineAlpha.identity == baselineBeta.identity)
+    #expect(Set([alphaNodeID, betaNodeID, pivotNodeID]).count == 3)
+
+    func expectStableOwners(
+      in snapshot: SemanticSnapshot
+    ) throws {
+      let currentAlpha = try node(labelPrefix: "Alpha", in: snapshot)
+      let currentBeta = try node(labelPrefix: "Beta", in: snapshot)
+      let currentPivot = try node(labelPrefix: "Pivot", in: snapshot)
+
+      #expect(currentAlpha.identity == currentBeta.identity)
+      #expect(currentAlpha.viewNodeID == alphaNodeID)
+      #expect(currentBeta.viewNodeID == betaNodeID)
+      #expect(currentPivot.viewNodeID == pivotNodeID)
+    }
+
+    var announcer = LiveRegionAnnouncer()
+    #expect(announcer.announcements(for: baseline).isEmpty)
+
+    for generation in 1...16 {
+      let reorderedRows =
+        generation.isMultiple(of: 2)
+        ? [alpha, beta, pivot]
+        : [pivot, alpha, beta]
+      let reordered = snapshot(reorderedRows, invalidated: true)
+      try expectStableOwners(in: reordered)
+      #expect(announcer.announcements(for: reordered).isEmpty)
+
+      beta = SceneHost028LiveRegionRow(id: 1, label: "Beta \(generation)")
+      let changedRows =
+        generation.isMultiple(of: 2)
+        ? [alpha, beta, pivot]
+        : [pivot, alpha, beta]
+      let changed = snapshot(changedRows, invalidated: true)
+      try expectStableOwners(in: changed)
+
+      #expect(
+        announcer.announcements(for: changed)
+          == [LiveRegionAnnouncement(politeness: .polite, label: beta.label)]
+      )
+    }
+  }
+}
+
+private struct SceneHost028DuplicateLiveRegionList: View {
+  var rows: [SceneHost028LiveRegionRow]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(rows, id: \.id) { row in
+        Text(row.label)
+          .accessibilityRole(.status)
+          .accessibilityLabel(row.label)
+          .accessibilityLiveRegion(.polite)
+      }
+    }
+  }
+}
+
+private struct SceneHost028LiveRegionRow: Hashable, Sendable {
+  var id: Int
+  var label: String
+}
+
+private func sceneHostLiveRegionNode(
+  nodeID: ViewNodeID,
+  identity: Identity,
+  label: String,
+  politeness: AccessibilityPoliteness = .polite
+) -> AccessibilityNode {
+  AccessibilityNode(
+    viewNodeID: nodeID,
+    identity: identity,
+    rect: .init(origin: .zero, size: .init(width: 10, height: 1)),
+    role: .status,
+    label: label,
+    liveRegion: politeness
+  )
+}
