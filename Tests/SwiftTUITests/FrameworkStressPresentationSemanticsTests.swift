@@ -651,6 +651,42 @@ private struct StressPS014Fixture: View {
   }
 }
 
+// MARK: - Attempt 015: duplicate picker labels
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 015 duplicate picker labels route by option occurrence")
+  func stress015DuplicatePickerLabelsRouteByOccurrence() throws {
+    // Hypothesis: pointer route IDs derived from a stable Picker may collapse
+    // equal labels and dispatch both rows through the first tag.
+    let probe = StressPresentationProbe()
+    probe.selection = "a"
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS015", "Root"),
+      size: .init(width: 42, height: 10)
+    ) {
+      StressPS015Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Duplicate option", chooseLast: true)
+
+    #expect(probe.selection == "b")
+  }
+}
+
+@MainActor
+private struct StressPS015Fixture: View {
+  let probe: StressPresentationProbe
+
+  var body: some View {
+    Picker("Duplicate mode", selection: probe.selectionBinding()) {
+      Text("Duplicate option").tag("a")
+      Text("Duplicate option").tag("b")
+    }
+    .pickerStyle(.radioGroup)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
