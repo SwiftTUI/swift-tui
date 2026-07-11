@@ -951,3 +951,69 @@ private struct ControlStress020Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 021: duplicate-label disclosure entity reorder
+
+extension FrameworkStressControlBindingTests {
+  @Test("stress control binding 021 reordered disclosures expand by entity")
+  func stressControlBinding021ReorderedDisclosuresExpandByEntity() throws {
+    // Hypothesis: after DisclosureGroup entities reorder, duplicate labels can retain occurrence-
+    // indexed action routes that toggle the binding and content formerly occupying that row.
+    let probe = ControlStress021Probe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ControlStress021", "Root"),
+      size: .init(width: 54, height: 11)
+    ) {
+      ControlStress021Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reverse disclosures 021")
+    let frame = try harness.clickText("Duplicate disclosure 021")
+
+    #expect(probe.values == [1: false, 2: true])
+    #expect(probe.writtenIDs == [2])
+    #expect(frame.contains("Disclosure body 021 2"))
+    #expect(!frame.contains("Disclosure body 021 1"))
+  }
+}
+
+@MainActor
+private final class ControlStress021Probe {
+  var values = [1: false, 2: false]
+  var writtenIDs: [Int] = []
+
+  func binding(for id: Int) -> Binding<Bool> {
+    Binding(
+      get: { self.values[id, default: false] },
+      set: {
+        self.values[id] = $0
+        self.writtenIDs.append(id)
+      }
+    )
+  }
+}
+
+@MainActor
+private struct ControlStress021Fixture: View {
+  let probe: ControlStress021Probe
+  @State private var isReversed = false
+
+  private var values: [Int] {
+    isReversed ? [2, 1] : [1, 2]
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Reverse disclosures 021") { isReversed = true }
+      ForEach(values, id: \.self) { value in
+        DisclosureGroup(
+          "Duplicate disclosure 021",
+          isExpanded: probe.binding(for: value)
+        ) {
+          Text("Disclosure body 021 \(value)")
+        }
+      }
+    }
+  }
+}
