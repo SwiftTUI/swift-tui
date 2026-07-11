@@ -819,3 +819,68 @@ private struct ObservationEffects014View: View {
     }
   }
 }
+
+// MARK: - Attempt 015: non-Equatable CustomReflectable environment equality
+
+extension FrameworkStressObservationEffectsTests {
+  @Test(
+    "stress observation effects 015 custom reflection collisions do not hide environment changes")
+  func observationEffects015CustomReflectionCollisionDoesNotHideEnvironmentChange() throws {
+    // Hypothesis: non-Equatable environment equality falls back to reflection,
+    // so two payloads with the same custom mirror may compare as unchanged.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects015"),
+      size: .init(width: 62, height: 6)
+    ) {
+      ObservationEffects015View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Replace Reflected Value 015")
+      #expect(frame.contains("015 payload \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects015Value: Sendable, CustomReflectable {
+  var payload: Int
+
+  var customMirror: Mirror {
+    Mirror(self, children: ["constant": 0])
+  }
+}
+
+private enum ObservationEffects015EnvironmentKey: EnvironmentKey {
+  static let defaultValue = ObservationEffects015Value(payload: -1)
+}
+
+extension EnvironmentValues {
+  fileprivate var observationEffects015Value: ObservationEffects015Value {
+    get { self[ObservationEffects015EnvironmentKey.self] }
+    set { self[ObservationEffects015EnvironmentKey.self] = newValue }
+  }
+}
+
+private struct ObservationEffects015Reader: View {
+  @Environment(\.observationEffects015Value) private var value
+
+  var body: some View {
+    Text("015 payload \(value.payload)")
+  }
+}
+
+private struct ObservationEffects015View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace Reflected Value 015") { generation += 1 }
+      ObservationEffects015Reader()
+        .environment(
+          \.observationEffects015Value,
+          ObservationEffects015Value(payload: generation)
+        )
+    }
+  }
+}
