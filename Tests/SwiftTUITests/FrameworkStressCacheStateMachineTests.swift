@@ -254,4 +254,20 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 015 bounded and unbounded widths never alias")
+  func cacheState015BoundedAndUnboundedWidthsNeverAlias() {
+    // Hypothesis: nil width and a large finite width can collide after key normalization.
+    let cache = TextLayoutCache(capacity: 4)
+    let content = "alpha beta gamma"
+    let bounded = cache.layout(for: content, options: .init(width: 5))
+    let unbounded = cache.layout(for: content, options: .init(width: nil))
+    #expect(bounded != unbounded)
+    #expect(cache.metrics.entries == 2)
+    _ = cache.layout(for: content, options: .init(width: 5))
+    _ = cache.layout(for: content, options: .init(width: nil))
+    #expect(cache.metrics.hits == 2)
+  }
+}
+
 // NEXT CACHE STRESS TEST
