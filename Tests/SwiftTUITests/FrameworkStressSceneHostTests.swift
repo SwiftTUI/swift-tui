@@ -1502,3 +1502,53 @@ extension FrameworkStressSceneHostTests {
     }
   }
 }
+
+// MARK: - Attempt 031: imperative announcement burst in host frame
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 031 imperative announcement burst reaches one semantic host frame")
+  func sceneHost031ImperativeAnnouncementBurstReachesOneSemanticHostFrame() async throws {
+    // Hypothesis: repeated imperative announcements queued by one action can
+    // overwrite each other before semantic host-frame commit.
+    let surface = HostedRasterSurface(
+      surfaceSize: .init(width: 24, height: 4),
+      appearance: .fallback,
+      frameDelivery: .assumedMainActor,
+      onFrame: { _ in }
+    )
+    let session = try HostedSceneSession(
+      for: SceneHostAnnouncementApp(),
+      sceneID: "primary",
+      surface: surface
+    )
+    let runTask = Task { try await session.start() }
+    _ = await surface.waitForFrame()
+
+    session.send(.key(KeyPress(.return)))
+    let frames = await surface.waitForFrames { frames in
+      frames.contains { $0.semantics.accessibilityAnnouncements.count == 3 }
+    }
+    let announced = try #require(
+      frames.first { $0.semantics.accessibilityAnnouncements.count == 3 }
+    ).semantics.accessibilityAnnouncements
+
+    #expect(announced.map(\.message) == ["First", "Urgent", "Last"])
+    #expect(announced.map(\.politeness) == [.polite, .assertive, .polite])
+
+    _ = try await session.stopAndWait()
+    _ = try await runTask.value
+  }
+}
+
+private struct SceneHostAnnouncementApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: "primary") {
+      Button("Burst") {
+        AccessibilityAnnouncer.announce("First", politeness: .polite)
+        AccessibilityAnnouncer.announce("Urgent", politeness: .assertive)
+        AccessibilityAnnouncer.announce("Last", politeness: .polite)
+      }
+      .accessibilityLabel("Burst announcements")
+    }
+  }
+}
