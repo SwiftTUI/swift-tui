@@ -634,4 +634,29 @@ extension FrameworkStressComponentCompositionTests {
   }
 }
 
+// MARK: - Attempt 019: indeterminate reduce-motion policy
+
+extension FrameworkStressComponentCompositionTests {
+  @Test("stress component composition 019 indeterminate progress follows reduce-motion churn")
+  func componentComposition019IndeterminateProgressFollowsReduceMotionChurn() {
+    // Hypothesis: the indeterminate branch can retain animated track children after motion is reduced.
+    struct Root: View {
+      let generation: Int
+      var body: some View { ProgressView("loading-\(generation)", barWidth: 11) }
+    }
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("ComponentComposition019")
+    for generation in 0..<18 {
+      var environment = EnvironmentValues()
+      environment.accessibilityReduceMotion = !generation.isMultiple(of: 2)
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation, environmentValues: environment
+      )
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
 // NEXT COMPONENT STRESS TEST
