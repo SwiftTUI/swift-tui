@@ -174,3 +174,53 @@ private final class SceneHost004Model {
     return buildCount
   }
 }
+
+// MARK: - Attempt 005: selected scene exit-binding replacement
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 005 selected exit bindings never revive earlier keys")
+  func sceneHost005SelectedExitBindingsNeverReviveEarlierKeys() throws {
+    // Hypothesis: repeated scene traversal can select a stale pre-chain
+    // WindowGroup copy whose earlier exit binding survived replacement.
+    for generation in 0..<24 {
+      let currentKeys = [
+        KeyPress(.character("x"), modifiers: generation.isMultiple(of: 2) ? .ctrl : .shift),
+        KeyPress(.escape),
+      ]
+      var visitor = SceneHostExitBindingsVisitor()
+      let bindings = withWindowSceneConfiguration(
+        in: sceneHost005Scene(generation: generation, currentKeys: currentKeys),
+        matching: "target",
+        visitor: &visitor
+      )
+
+      #expect(try #require(bindings).keys == currentKeys)
+      #expect(bindings?.contains(KeyPress(.character("a"), modifiers: .ctrl)) == false)
+      #expect(bindings?.contains(KeyPress(.character("d"), modifiers: .ctrl)) == false)
+    }
+  }
+}
+
+@MainActor
+@SceneBuilder
+private func sceneHost005Scene(generation: Int, currentKeys: [KeyPress]) -> some Scene {
+  if generation.isMultiple(of: 2) {
+    WindowGroup(id: "other") { Text("other") }
+  }
+  WindowGroup(id: "target") { Text("target") }
+    .exitOnKey(.character("a"), modifiers: .ctrl)
+    .exitOnKeys(currentKeys)
+  if !generation.isMultiple(of: 2) {
+    WindowGroup(id: "other") { Text("other") }
+  }
+}
+
+@MainActor
+private struct SceneHostExitBindingsVisitor: WindowSceneConfigurationVisitor {
+  mutating func visit<Content: View>(
+    descriptor _: SceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<ExitKeyBindings> {
+    .finish(configuration.exitKeyBindings)
+  }
+}
