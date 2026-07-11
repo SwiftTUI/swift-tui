@@ -169,6 +169,50 @@ private struct StressPS004Fixture: View {
   }
 }
 
+// MARK: - Attempt 005: live menu payload refresh
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 005 an open menu renders its current payload")
+  func stress005OpenMenuRendersCurrentPayload() throws {
+    // Hypothesis: an active menu item may retain the content payload captured
+    // when its portal entry first became active.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS005", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS005Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Payload menu")
+    let frame = try harness.clickText("Advance payload")
+
+    withKnownIssue("An open menu retains the payload captured when it was activated") {
+      #expect(frame.contains("Payload generation 1"))
+      #expect(!frame.contains("Payload generation 0"))
+    }
+    #expect(stressPresentationEntryCount(in: harness) == 1)
+  }
+}
+
+@MainActor
+private struct StressPS005Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      Menu("Payload menu") {
+        Text("Payload generation \(generation)")
+      }
+      Spacer().frame(width: 31)
+      Button("Advance payload") {
+        generation += 1
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
