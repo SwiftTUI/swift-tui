@@ -133,3 +133,34 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 004: token-kind replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 004 token replacement removes stale continuation markers")
+  func textContent004TokenReplacementRemovesStaleContinuationMarkers() {
+    // Hypothesis: retained wrapping can preserve a word-like token's continuation-marker lines
+    // after equal-width punctuation changes that token to cluster wrapping.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent004")
+
+    for generation in 0..<20 {
+      let wordLike = generation.isMultiple(of: 2)
+      let content = wordLike ? "ABCDEFGHIJK" : "AB/CD:EF.GH"
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: 5, height: nil),
+        content: Text(content).textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        frames.retained.rasterSurface.lines.joined().contains("–")
+          == wordLike
+      )
+    }
+  }
+}
