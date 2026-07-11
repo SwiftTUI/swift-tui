@@ -566,6 +566,51 @@ private struct EnvironmentStyle012Root: View {
   }
 }
 
+// MARK: - Attempt 013: button-border-shape propagation
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 013 custom button style receives current border shape")
+  func environmentStyle013CustomButtonStyleReceivesCurrentBorderShape() throws {
+    // Hypothesis: buttonBorderShape can be omitted from erased-style invalidation, retaining an
+    // earlier configuration after the environment writer changes in place.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle013"),
+      size: .init(width: 76, height: 7)
+    ) {
+      EnvironmentStyle013Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Toggle Border Shape 013")
+      let marker = generation.isMultiple(of: 2) ? "automatic" : "rounded"
+      #expect(frame.contains("\(marker) Border Shape Target 013"))
+    }
+  }
+}
+
+private struct EnvironmentStyle013ButtonStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      Text(configuration.buttonBorderShape == .roundedRectangle ? "rounded" : "automatic")
+      configuration.label
+    }
+  }
+}
+
+private struct EnvironmentStyle013Root: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Border Shape 013") { generation += 1 }
+      Button("Border Shape Target 013") {}
+        .buttonStyle(EnvironmentStyle013ButtonStyle())
+        .buttonBorderShape(generation.isMultiple(of: 2) ? .automatic : .roundedRectangle)
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
