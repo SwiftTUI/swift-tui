@@ -1391,3 +1391,67 @@ private struct StressTC024Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 025: ambiguity clears after sibling teardown
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 025 sibling teardown restores unambiguous active command path")
+  func stressTabCommand025SiblingTeardownRestoresActiveCommandPath() throws {
+    // Hypothesis: once divergent visible command hosts mark the active context
+    // ambiguous, tearing one down may leave that empty-path decision cached.
+    let probe = TabCommandStressProbe()
+    let model = StressTC025Model()
+    let rootIdentity = testIdentity("StressTC025", "Root")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: rootIdentity,
+      size: .init(width: 64, height: 10)
+    ) {
+      StressTC025Fixture(probe: probe, model: model)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    #expect(probe.events.isEmpty)
+
+    model.includesLeft = false
+    harness.runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    #expect(probe.events == ["right"])
+    #expect(harness.keyCommandRegistrationCount == 1)
+  }
+}
+
+@MainActor
+private final class StressTC025Model {
+  var includesLeft = true
+}
+
+@MainActor
+private struct StressTC025Fixture: View {
+  let probe: TabCommandStressProbe
+  let model: StressTC025Model
+
+  var body: some View {
+    Panel(id: "stress-tc-025-outer") {
+      VStack(alignment: .leading, spacing: 0) {
+        if model.includesLeft {
+          Panel(id: "stress-tc-025-left") {
+            Text("Left bare command host")
+          }
+          .keyCommand("Left save", key: .character("s"), modifiers: .ctrl) {
+            probe.events.append("left")
+          }
+        }
+        Panel(id: "stress-tc-025-right") {
+          Text("Right bare command host")
+        }
+        .keyCommand("Right save", key: .character("s"), modifiers: .ctrl) {
+          probe.events.append("right")
+        }
+      }
+    }
+    .frame(width: 62, height: 8, alignment: .topLeading)
+  }
+}
