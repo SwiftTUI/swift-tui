@@ -1078,3 +1078,58 @@ private struct ObservationEffects018View: View {
     )
   }
 }
+
+// MARK: - Attempt 019: preference background after source removal
+
+extension FrameworkStressObservationEffectsTests {
+  @Test(
+    "stress observation effects 019 removing the last source restores the default background payload"
+  )
+  func observationEffects019RemovingLastSourceRestoresDefaultBackgroundPayload() throws {
+    // Hypothesis: late preference reconciliation can carry the departed
+    // source's reduced value into a background reader for another frame.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects019"),
+      size: .init(width: 68, height: 8)
+    ) {
+      ObservationEffects019View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      var frame = try harness.clickText("Toggle Preference Source 019")
+      #expect(frame.contains("019 background []"))
+      frame = try harness.clickText("Advance Hidden Source 019")
+      #expect(frame.contains("019 background []"))
+      frame = try harness.clickText("Toggle Preference Source 019")
+      #expect(frame.contains("019 background [\(generation)]"))
+    }
+  }
+}
+
+private struct ObservationEffects019View: View {
+  @State private var generation = 0
+  @State private var showsSource = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Preference Source 019") { showsSource.toggle() }
+      Button("Advance Hidden Source 019") { generation += 1 }
+      Group {
+        if showsSource {
+          Text("live source")
+            .preference(key: ObservationEffectsListPreferenceKey.self, value: [generation])
+        } else {
+          Text("no source")
+        }
+      }
+      .frame(width: 64, height: 2, alignment: .topLeading)
+      .backgroundPreferenceValue(
+        ObservationEffectsListPreferenceKey.self,
+        alignment: .bottomLeading
+      ) { value in
+        Text("019 background \(value)")
+      }
+    }
+  }
+}
