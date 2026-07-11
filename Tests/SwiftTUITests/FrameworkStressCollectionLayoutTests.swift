@@ -250,3 +250,58 @@ private struct CollectionLayout004Root: View {
     .frame(width: 15, height: 5, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 005: multi-view lazy ForEach rows
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 005 lazy ForEach flattens every authored row child")
+  func collectionLayout005LazyForEachFlattensEveryAuthoredRowChild() {
+    // Hypothesis: the indexed lazy source may expose one Group per ForEach
+    // element, causing that row's multiple authored children to overlap.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout005")
+
+    for generation in 0..<16 {
+      let reversed = !generation.isMultiple(of: 2)
+      let values = reversed ? [3, 2, 1] : [1, 2, 3]
+      let root = CollectionLayout005Root(values: values)
+      let snapshot = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let expected = values.flatMap { value in
+        ["005 label \(value)", "005 detail \(value)"]
+      }
+
+      let flattenedEveryChild =
+        Array(snapshot.rasterSurface.lines.prefix(6)) == expected
+        && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == 6
+      withKnownIssue(
+        "Indexed LazyVStack treats a multi-view ForEach row as one overlapping Group"
+      ) {
+        #expect(flattenedEveryChild)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CollectionLayout005Root: View {
+  let values: [Int]
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(values, id: \.self) { value in
+          Text("005 label \(value)")
+          Text("005 detail \(value)")
+        }
+      }
+    }
+    .frame(width: 18, height: 6, alignment: .topLeading)
+  }
+}
