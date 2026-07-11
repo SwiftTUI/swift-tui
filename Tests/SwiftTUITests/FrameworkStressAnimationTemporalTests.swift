@@ -1057,3 +1057,57 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
+// MARK: - Attempt 020: live transition replacement
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 020 removal uses latest transition effect")
+  func animationTemporal020RemovalUsesLatestTransitionEffect() throws {
+    // Hypothesis: previous-transition rollover can preserve the first effect
+    // after the stable node changes its transition declaration.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal020", "Root")
+    let leafID = testIdentity("AnimationTemporal020", "Leaf")
+    let nodeID = ViewNodeID(rawValue: 20)
+    let start = MonotonicInstant(offset: .seconds(90))
+    let leaf = animationTemporalNode(identity: leafID, viewNodeID: nodeID)
+    let shown = animationTemporalRoot(identity: rootID, children: [leaf])
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafID, viewNodeID: nodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(shown, transaction: .init(), timestamp: start)
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafID,
+      viewNodeID: nodeID,
+      transition: AnyTransition.offset(x: 10)
+    )
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      shown,
+      transaction: .init(),
+      timestamp: start.advanced(by: .milliseconds(20))
+    )
+
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var removed = animationTemporalRoot(identity: rootID)
+    controller.processResolvedTree(
+      removed,
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+    _ = controller.applyInterpolations(
+      to: &removed,
+      at: start.advanced(by: .milliseconds(540))
+    )
+    #expect(animationTemporalContainsOffset(in: removed))
+  }
+}
+
