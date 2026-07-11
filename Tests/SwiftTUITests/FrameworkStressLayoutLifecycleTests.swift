@@ -1788,9 +1788,7 @@ extension FrameworkStressLayoutLifecycleTests {
     _ = try harness.clickText("Open Environment Sheet")
     for generation in 1...8 {
       let frame = try harness.clickText("Advance Root Environment", chooseLast: true)
-      withKnownIssue("Portal-hosted sheet content loses the presenting declaration environment") {
-        #expect(frame.contains("sheet environment \(generation)"))
-      }
+      #expect(frame.contains("sheet environment \(generation)"))
       #expect(harness.actionRegistrationCount <= 3)
     }
   }

@@ -300,6 +300,34 @@ public struct ResolveContext: Equatable, Sendable {
     return context
   }
 
+  /// Returns this context resolving under `values` as its inherited authored
+  /// environment while keeping the frame-level runtime focus/press state this
+  /// context already carries.
+  ///
+  /// Portal-hosted presentation content resolves under the portal host's
+  /// context rather than the presenting declaration's, so the presenter's
+  /// authored environment (`.disabled`, `.environment` writes, styles) never
+  /// reaches the overlay on its own; overlay entry composition applies the
+  /// declaration-captured values through this builder. The focus/press side
+  /// fields and the collected `focusedValues` belong to the resolving frame —
+  /// adopting the capture's would replay the presenter's focus into the
+  /// overlay.
+  package func replacingEnvironmentValues(
+    _ values: EnvironmentValues
+  ) -> Self {
+    var copy = self
+    var replaced = values
+    // Raw side-field access: infrastructure carry-over, not a runtime-focus
+    // read attributable to the evaluating node.
+    replaced._focusedIdentity = environmentValues._focusedIdentity
+    replaced._pressedIdentity = environmentValues._pressedIdentity
+    replaced._isFocused = environmentValues._isFocused
+    replaced.focusedValues = focusedValues
+    copy.environmentValues = replaced
+    copy.environment = replaced.applying(to: environment)
+    return copy
+  }
+
   package func settingEnvironment<Value>(
     _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
     to value: Value

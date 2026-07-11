@@ -336,9 +336,7 @@ extension FrameworkStressPresentationSemanticsTests {
     _ = try harness.clickText("Disable menu")
     _ = try harness.clickText("Disabled overlay action")
 
-    withKnownIssue("Open menu content retains the enabled environment from activation") {
-      #expect(probe.markers.isEmpty)
-    }
+    #expect(probe.markers.isEmpty)
   }
 }
 

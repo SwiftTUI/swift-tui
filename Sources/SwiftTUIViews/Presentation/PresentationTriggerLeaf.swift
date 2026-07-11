@@ -134,11 +134,21 @@ func resolvePresentationModifier<Base: View>(
   // the background — its Layer-A reuse is what makes sheet-open O(overlay).
   triggerContext.withinChurnedSubtree = true
   let triggerIdentity = triggerContext.identity
+  // Captured at the modifier's context so the declaration carries the
+  // presenter's inherited environment (everything authored above the
+  // presentation modifier). Re-captured on every wrapper re-resolve, which is
+  // exactly when an environment change can reach an open presentation — the
+  // re-minted declaration then refreshes the overlay entry subtree.
+  let sourceEnvironmentValues = context.environmentValues
   let trigger = PresentationTriggerLeaf(
     sourceIdentity: resolvedBackground.identity,
     isActive: isActive
   ) {
-    declaration(resolvedBackground, triggerIdentity)
+    var value = declaration(resolvedBackground, triggerIdentity)
+    for index in value.declarations.indices {
+      value.declarations[index].sourceEnvironmentValues = sourceEnvironmentValues
+    }
+    return value
   }
   let triggerNode = resolveView(
     trigger,

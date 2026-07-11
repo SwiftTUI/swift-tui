@@ -9,6 +9,11 @@ package struct OverlayStackEntry: Sendable {
   package var acceptsEscape: Bool
   package var dismiss: (@MainActor @Sendable () -> Void)?
   package var payload: PortalAttachmentPayload
+  /// The presenting declaration's captured environment, attached by
+  /// `PresentationCoordinatorRegistry.overlayEntries()`. The entry host
+  /// resolves the entry's content under it so portal-hosted presentation
+  /// content inherits the presenter's authored environment.
+  package var sourceEnvironmentValues: EnvironmentValues?
 
   package init(
     id: String,
@@ -18,7 +23,8 @@ package struct OverlayStackEntry: Sendable {
     modalPolicy: PortalModalPolicy,
     acceptsEscape: Bool,
     dismiss: (@MainActor @Sendable () -> Void)?,
-    payload: PortalAttachmentPayload
+    payload: PortalAttachmentPayload,
+    sourceEnvironmentValues: EnvironmentValues? = nil
   ) {
     self.id = id
     self.portalEntryID = portalEntryID
@@ -28,6 +34,7 @@ package struct OverlayStackEntry: Sendable {
     self.acceptsEscape = acceptsEscape
     self.dismiss = dismiss
     self.payload = payload
+    self.sourceEnvironmentValues = sourceEnvironmentValues
   }
 
   package var surfaceStableKey: String {
@@ -162,7 +169,15 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
   var entry: OverlayStackEntry
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let bodyContext = context.child(component: .named("body"))
+    var bodyContext = context.child(component: .named("body"))
+    // Portal-hosted content otherwise resolves under the portal root's
+    // context, so the presenter's authored environment (`.disabled`,
+    // `.environment` writes, styles) would never reach the entry. Frame-level
+    // focus/press state stays portal-side — see
+    // `ResolveContext.replacingEnvironmentValues`.
+    if let sourceEnvironmentValues = entry.sourceEnvironmentValues {
+      bodyContext = bodyContext.replacingEnvironmentValues(sourceEnvironmentValues)
+    }
     let bodyNode = entry.payload.resolve(in: bodyContext)
     var entryNode = ResolvedNode(
       identity: context.identity,

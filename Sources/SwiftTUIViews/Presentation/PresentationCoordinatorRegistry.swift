@@ -191,6 +191,7 @@ package final class PresentationCoordinatorRegistry {
     fileprivate var menu: PresentationCoordinatorBox<MenuPresentationCoordinator>.Checkpoint
     fileprivate var toast: PresentationCoordinatorBox<ToastPresentationCoordinator>.Checkpoint
     fileprivate var reconciledDeclarationGenerations: [Identity: UInt64]
+    fileprivate var sourceEnvironmentValuesBySource: [Identity: EnvironmentValues]
   }
 
   package let alert = PresentationCoordinatorBox<AlertPresentationCoordinator>()
@@ -217,6 +218,13 @@ package final class PresentationCoordinatorRegistry {
   /// entry list is otherwise unchanged.
   private var reconciledDeclarationGenerations: [Identity: UInt64] = [:]
 
+  /// The presenting declarations' captured environments observed by the most
+  /// recent `reconcile`, per source. `overlayEntries()` attaches them so
+  /// portal-hosted entry content resolves under the presenter's inherited
+  /// environment. Same lifecycle as `reconciledDeclarationGenerations`:
+  /// rebuilt wholesale from each reconcile's declarations.
+  private var sourceEnvironmentValuesBySource: [Identity: EnvironmentValues] = [:]
+
   package init() {}
 
   package func makeCheckpoint() -> Checkpoint {
@@ -227,7 +235,8 @@ package final class PresentationCoordinatorRegistry {
       popover: popover.makeCheckpoint(),
       menu: menu.makeCheckpoint(),
       toast: toast.makeCheckpoint(),
-      reconciledDeclarationGenerations: reconciledDeclarationGenerations
+      reconciledDeclarationGenerations: reconciledDeclarationGenerations,
+      sourceEnvironmentValuesBySource: sourceEnvironmentValuesBySource
     )
   }
 
@@ -239,6 +248,7 @@ package final class PresentationCoordinatorRegistry {
     menu.restoreCheckpoint(checkpoint.menu)
     toast.restoreCheckpoint(checkpoint.toast)
     reconciledDeclarationGenerations = checkpoint.reconciledDeclarationGenerations
+    sourceEnvironmentValuesBySource = checkpoint.sourceEnvironmentValuesBySource
   }
 
   package func setImperativeInvalidationTarget(
@@ -277,6 +287,11 @@ package final class PresentationCoordinatorRegistry {
         declaration.mintGeneration
       )
     }
+    sourceEnvironmentValuesBySource = declarations.reduce(
+      into: [Identity: EnvironmentValues]()
+    ) { map, declaration in
+      map[declaration.sourceIdentity] = declaration.sourceEnvironmentValues
+    }
     let refreshed = generations != reconciledDeclarationGenerations
     reconciledDeclarationGenerations = generations
     return refreshed
@@ -286,6 +301,17 @@ package final class PresentationCoordinatorRegistry {
     allBoxes
       .compactMap {
         $0.overlayEntry()
+      }
+      .map { entry in
+        // Attach the presenting declaration's captured environment so the
+        // overlay entry host resolves the entry's content under it. Entries
+        // without a reconciled declaration (imperative presentations) keep
+        // resolving under the portal host's environment.
+        var entry = entry
+        entry.sourceEnvironmentValues = entry.portalEntryID.flatMap { portalEntryID in
+          sourceEnvironmentValuesBySource[portalEntryID.sourceIdentity]
+        }
+        return entry
       }
       .sorted { lhs, rhs in
         portalOrderingPrecedes(lhs.ordering, rhs.ordering)

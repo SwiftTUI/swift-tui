@@ -295,18 +295,20 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
       }
     )
 
+    var declaration = PresentationCoordinatorDeclaration(
+      sourceIdentity: sourceIdentity
+    ) { registry in
+      registry.toast.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
+    }
+    // Toasts declare directly (no trigger leaf), so they stamp the captured
+    // presenter environment themselves — mirrors `resolvePresentationModifier`.
+    declaration.sourceEnvironmentValues = context.environmentValues
     node.preferenceValues.merge(
       PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: .init(
-        declarations: [
-          .init(sourceIdentity: sourceIdentity) { registry in
-            registry.toast.sync(
-              sourceIdentity: sourceIdentity,
-              items: [item]
-            )
-          }
-        ]
-      )
+      value: .init(declarations: [declaration])
     )
     return [node]
   }

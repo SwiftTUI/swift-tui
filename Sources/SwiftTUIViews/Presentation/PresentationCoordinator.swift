@@ -206,6 +206,12 @@ package struct PresentationCoordinatorDeclaration: Sendable {
   package var sourceIdentity: Identity
   /// Construction-time mint — see ``PresentationDeclarationGenerationMint``.
   package var mintGeneration: UInt64
+  /// The presenting declaration's inherited environment, captured when the
+  /// declaration was built. Overlay entry composition resolves portal-hosted
+  /// content under it (`ResolveContext.replacingEnvironmentValues`) so the
+  /// presenter's authored environment reaches the presented content. `nil`
+  /// for imperative presentations, which have no declaration context.
+  package var sourceEnvironmentValues: EnvironmentValues?
   package var apply: @MainActor @Sendable (PresentationCoordinatorRegistry) -> Void
 
   package init(
