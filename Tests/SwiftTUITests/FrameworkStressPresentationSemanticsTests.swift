@@ -911,6 +911,47 @@ private struct StressPS020Fixture: View {
   }
 }
 
+// MARK: - Attempt 021: disclosure identity replacement
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 021 a reminted disclosure installs one live action")
+  func stress021RemintedDisclosureInstallsOneLiveAction() throws {
+    // Hypothesis: replacing an expanded DisclosureGroup's explicit identity
+    // may leave its departed action registration shadowing the new lifetime.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS021", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressPS021Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Remint disclosure")
+    let frame = try harness.clickText("Reminted details 1")
+
+    #expect(!frame.contains("Reminted content"))
+    #expect(harness.actionRegistrationCount == 2)
+  }
+}
+
+@MainActor
+private struct StressPS021Fixture: View {
+  @State private var isExpanded = true
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remint disclosure") {
+        generation += 1
+      }
+      DisclosureGroup("Reminted details \(generation)", isExpanded: $isExpanded) {
+        Text("Reminted content")
+      }
+      .id(generation)
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
