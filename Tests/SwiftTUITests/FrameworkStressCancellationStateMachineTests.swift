@@ -189,4 +189,21 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 013 repeated resume wakes exactly once")
+  func cancellationState013RepeatedResumeWakesExactlyOnce() async {
+    // Hypothesis: repeated winners can resume the same checked continuation twice.
+    let gate = OneShotContinuationGate()
+    let counter = CancellationStressCounter()
+    let task = Task {
+      await awaitStressGate(gate)
+      counter.increment()
+    }
+    await Task.yield()
+    for _ in 0..<1_000 { gate.resume() }
+    await task.value
+    #expect(counter.count == 1)
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
