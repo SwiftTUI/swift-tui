@@ -596,6 +596,42 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 016: duplicate tip ID source isolation
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 016 duplicate tip ids keep both sources")
+  func popoverTip016DuplicateTipIDsKeepBothSources() throws {
+    // Hypothesis: two sources publishing the same tip ID can collide in the
+    // coordinator and share the wrong dismiss binding.
+    let rootIdentity = testIdentity("PopoverTipStress016", "Root")
+    let model = PopoverTipDuplicateStressModel()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: rootIdentity,
+      size: .init(width: 88, height: 24)
+    ) {
+      PopoverTipDuplicateStressRoot(model: model)
+    }
+    defer { harness.shutdown() }
+
+    // Popovers intentionally display the latest item only; dismissing it
+    // must reveal the older live item instead of losing it to an ID collision.
+    #expect(popoverTipStressEntryCount(in: harness) == 1)
+    #expect(!harness.frame.contains("First duplicate tip"))
+    #expect(harness.frame.contains("Second duplicate tip"))
+
+    _ = try harness.clickText("Acknowledge second", chooseLast: true)
+    #expect(model.firstPresented)
+    #expect(!model.secondPresented)
+    #expect(popoverTipStressEntryCount(in: harness) == 1)
+    #expect(harness.frame.contains("First duplicate tip"))
+
+    _ = try harness.clickText("Acknowledge first", chooseLast: true)
+    #expect(!model.firstPresented)
+    #expect(!model.secondPresented)
+    #expect(popoverTipStressEntryCount(in: harness) == 0)
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
@@ -718,9 +754,21 @@ private final class PopoverTipDuplicateStressModel {
   var reverseSources = false
   var firstVisible = true
   var secondVisible = true
+  var firstTipID = "shared-tip-id"
+  var secondTipID = "shared-tip-id"
+  var firstPresented = true
+  var secondPresented = true
   var firstGeneration = 0
   var secondGeneration = 0
   var actionLog: [String] = []
+
+  func firstBinding() -> Binding<Bool> {
+    Binding(get: { self.firstPresented }, set: { self.firstPresented = $0 })
+  }
+
+  func secondBinding() -> Binding<Bool> {
+    Binding(get: { self.secondPresented }, set: { self.secondPresented = $0 })
+  }
 }
 
 private struct PopoverTipDuplicateStressRoot: View {
@@ -748,13 +796,14 @@ private struct PopoverTipDuplicateStressRoot: View {
         .id("first-duplicate-source")
         .popoverTip(
           PopoverTipStressTip(
-            id: "shared-tip-id",
+            id: model.firstTipID,
             titleText: "First duplicate tip \(generation)",
             messageText: nil,
             iconText: "1",
             actions: [.init(id: "first", title: "Acknowledge first")],
             isEligible: true
           ),
+          isPresented: model.firstBinding(),
           arrowEdge: .trailing
         ) { action in
           model.actionLog.append("first:\(action.id)@\(generation)")
@@ -770,13 +819,14 @@ private struct PopoverTipDuplicateStressRoot: View {
         .id("second-duplicate-source")
         .popoverTip(
           PopoverTipStressTip(
-            id: "shared-tip-id",
+            id: model.secondTipID,
             titleText: "Second duplicate tip \(generation)",
             messageText: nil,
             iconText: "2",
             actions: [.init(id: "second", title: "Acknowledge second")],
             isEligible: true
           ),
+          isPresented: model.secondBinding(),
           arrowEdge: .trailing
         ) { action in
           model.actionLog.append("second:\(action.id)@\(generation)")
