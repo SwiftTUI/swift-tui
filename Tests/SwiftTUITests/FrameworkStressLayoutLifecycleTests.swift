@@ -1387,3 +1387,49 @@ private struct StressLL022Fixture: View {
     Text("change values \(first) \(second)")
   }
 }
+
+// MARK: - Attempt 023: cascading onChange writes
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 023 cascading onChange dispatches each transition once")
+  func stress023CascadingOnChangeDispatchesEachTransitionOnce() throws {
+    // Hypothesis: a change handler that schedules the next value can be
+    // replayed from a stale registry snapshot or lose the second transition.
+    let probe = StressLayoutLifecycleProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL023", "Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressLL023Fixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...8 {
+      let frame = try harness.clickText("Start Change Cascade")
+      #expect(frame.contains("cascade value \(cycle * 2)"))
+      #expect(probe.events.count == cycle * 2)
+      #expect(probe.events[cycle * 2 - 2] == "\(cycle * 2 - 2)->\(cycle * 2 - 1)")
+      #expect(probe.events[cycle * 2 - 1] == "\(cycle * 2 - 1)->\(cycle * 2)")
+      #expect(harness.lifecycleRegistrationCount <= 1)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL023Fixture: View {
+  let probe: StressLayoutLifecycleProbe
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Start Change Cascade") { value += 1 }
+      Text("cascade value \(value)")
+        .onChange(of: value) { old, new in
+          probe.events.append("\(old)->\(new)")
+          if !new.isMultiple(of: 2) {
+            value = new + 1
+          }
+        }
+    }
+  }
+}
