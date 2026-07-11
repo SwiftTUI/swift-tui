@@ -1315,3 +1315,60 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 024: custom-path overlay-mask topology churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 024 custom strokeBorder remasks current path background")
+  func visualEffects024CustomStrokeBorderRemasksCurrentPathBackground() {
+    // Hypothesis: overlay background masking can key a custom border mask by shape kind and bounds,
+    // missing changed BoxedPath topology and continuing to expose the old path interior.
+    struct Root: View {
+      let generation: Int
+
+      var path: Path {
+        var value = Path()
+        if generation.isMultiple(of: 2) {
+          value.move(to: Point(x: 0.5, y: 0.02))
+          value.addLine(to: Point(x: 0.98, y: 0.5))
+          value.addLine(to: Point(x: 0.5, y: 0.98))
+          value.addLine(to: Point(x: 0.02, y: 0.5))
+        } else {
+          value.move(to: Point(x: 0.05, y: 0.08))
+          value.addLine(to: Point(x: 0.95, y: 0.2))
+          value.addLine(to: Point(x: 0.72, y: 0.92))
+          value.addLine(to: Point(x: 0.2, y: 0.72))
+        }
+        value.close()
+        return value
+      }
+
+      var body: some View {
+        EmptyView()
+          .frame(width: 26, height: 11, alignment: .topLeading)
+          .background(Color.green.opacity(0.55))
+          .overlay {
+            VisualEffectsPathShape(pathValue: path)
+              .inset(by: generation % 3)
+              .strokeBorder(Color.white, style: .single)
+          }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects024")
+
+    for generation in 0..<30 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
