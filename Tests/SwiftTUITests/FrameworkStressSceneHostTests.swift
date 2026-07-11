@@ -95,3 +95,41 @@ private func sceneHost002Scene(generation: Int) -> some Scene {
     )
   }
 }
+
+// MARK: - Attempt 003: duplicate scene identifier occurrence order
+
+extension FrameworkStressSceneHostTests {
+  @Test("stress scene host 003 duplicate scene identifiers retain authored occurrences")
+  func sceneHost003DuplicateSceneIdentifiersRetainAuthoredOccurrences() {
+    // Hypothesis: selection collection can deduplicate WindowGroups by their
+    // normalized identifier and silently retain only one current occurrence.
+    for generation in 0..<24 {
+      let scene = sceneHost003Scene(generation: generation)
+      let descriptors = collectWindowSceneDescriptors(from: scene)
+      let selections = collectWindowSceneSelections(from: scene)
+      let expectedTitles =
+        generation.isMultiple(of: 2)
+        ? ["First", "Second", "Third"]
+        : ["Third", "Second", "First"]
+
+      #expect(descriptors.map(\.id.rawValue) == ["shared", "shared", "shared"])
+      #expect(descriptors.map(\.title) == expectedTitles.map(Optional.some))
+      #expect(selections.map(\.title) == expectedTitles.map(Optional.some))
+      #expect(selections.map(\.isDefault) == [true, false, false])
+    }
+  }
+}
+
+@MainActor
+@SceneBuilder
+private func sceneHost003Scene(generation: Int) -> some Scene {
+  if generation.isMultiple(of: 2) {
+    WindowGroup("First", id: "shared") { Text("first") }
+    WindowGroup("Second", id: "shared") { Text("second") }
+    WindowGroup("Third", id: "shared") { Text("third") }
+  } else {
+    WindowGroup("Third", id: "shared") { Text("third") }
+    WindowGroup("Second", id: "shared") { Text("second") }
+    WindowGroup("First", id: "shared") { Text("first") }
+  }
+}
