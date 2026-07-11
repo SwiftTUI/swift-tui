@@ -1044,6 +1044,51 @@ private struct StressPS023Fixture: View {
   }
 }
 
+// MARK: - Attempt 024: stepper step churn
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 024 a stable stepper uses its current step")
+  func stress024StableStepperUsesCurrentStep() throws {
+    // Hypothesis: retained Stepper key handlers may keep the first step value
+    // after the stable control changes its adjustment contract.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS024", "Root"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StressPS024Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Use step three")
+    _ = try harness.focusText("Step control")
+    let frame = try harness.pressKey(KeyPress(.arrowRight))
+
+    #expect(frame.contains("Stepper value 3"))
+  }
+}
+
+@MainActor
+private struct StressPS024Fixture: View {
+  @State private var usesLargeStep = false
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Use step three") {
+        usesLargeStep = true
+      }
+      Stepper(
+        "Step control",
+        value: $value,
+        in: 0...12,
+        step: usesLargeStep ? 3 : 1
+      )
+      .id("stable-stepper")
+      Text("Stepper value \(value)")
+    }
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
