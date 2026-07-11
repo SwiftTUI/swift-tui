@@ -136,7 +136,11 @@ package struct TerminationNodeRecord: RuntimeNodeRecord {
 package struct PointerNodeRecord: RuntimeNodeRecord {
   package var handlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:]
   package var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
-  package var hoverHandlers: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:]
+  // Ordered stack per route: stacked `.onPointerHover` levels on one chain
+  // node share the exact route key, and every level must keep receiving
+  // phases — a single-slot map would silently drop all but the last-recorded
+  // level. The capture-session reset keeps the append idempotent per pass.
+  package var hoverHandlers: [RouteID: [LocalPointerHandlerRegistry.HoverHandler]] = [:]
   package var hoverOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
 
   package init() {}
@@ -167,7 +171,7 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
     hoverOwners[routeID] = .current(identity: routeID.identity)
-    hoverHandlers[routeID] = handler
+    hoverHandlers[routeID, default: []].append(handler)
   }
 }
 

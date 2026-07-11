@@ -4964,7 +4964,7 @@ final class StressRuntimeHarness<Content: View> {
   }
 
   var pointerHoverHandlerCount: Int {
-    runLoop.localPointerHandlerRegistry.snapshotHover().count
+    runLoop.localPointerHandlerRegistry.snapshotHover().values.reduce(0) { $0 + $1.count }
   }
 
   var gestureRecognizerCount: Int {

@@ -1356,9 +1356,7 @@ extension FrameworkStressInputRoutingTests {
         if case .entered = phase { return true }
         return false
       } == true)
-    withKnownIssue("Stationary-pointer hover is not re-hit-tested after geometry moves") {
-      #expect(phases.value.last == .exited)
-    }
+    #expect(phases.value.last == .exited)
   }
 }
 
@@ -1367,15 +1365,20 @@ private struct StressInput024Fixture: View {
   @State private var moved = false
 
   var body: some View {
+    // The hover attaches INSIDE the padding: the padded area is part of a
+    // hover region's bounds (SwiftUI parity), so hovering the padding
+    // wrapper would keep the pointer legitimately inside after the shift.
+    // Padding applied outside relocates the hover region itself away from
+    // the stationary pointer — the premise this test pins.
     Text("Moving hover target")
       .frame(width: 22, height: 1, alignment: .leading)
-      .padding(.leading, moved ? 28 : 0)
       .onPointerHover { phase in
         phases.value.append(phase)
         if case .entered = phase {
           moved = true
         }
       }
+      .padding(.leading, moved ? 28 : 0)
   }
 }
 
@@ -1399,12 +1402,10 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.movePointer(to: point)
     _ = try harness.movePointer(to: Point(x: 50, y: 7))
 
-    withKnownIssue("Stacked hover dispatch drops the inner modifier's balanced phases") {
-      #expect(events.value.filter { $0 == "inner-entered" }.count == 1)
-      #expect(events.value.filter { $0 == "outer-entered" }.count == 1)
-      #expect(events.value.filter { $0 == "inner-exited" }.count == 1)
-      #expect(events.value.filter { $0 == "outer-exited" }.count == 1)
-    }
+    #expect(events.value.filter { $0 == "inner-entered" }.count == 1)
+    #expect(events.value.filter { $0 == "outer-entered" }.count == 1)
+    #expect(events.value.filter { $0 == "inner-exited" }.count == 1)
+    #expect(events.value.filter { $0 == "outer-exited" }.count == 1)
   }
 }
 
@@ -1632,9 +1633,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.scrollPointer(at: point, deltaY: 1)
 
     #expect(inner.value.y == 5)
-    withKnownIssue("Nested wheel routing does not chain to the outer view at the inner edge") {
-      #expect(outer.value.y == 1)
-    }
+    #expect(outer.value.y == 1)
   }
 }
 

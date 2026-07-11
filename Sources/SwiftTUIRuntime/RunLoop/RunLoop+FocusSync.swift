@@ -173,6 +173,11 @@ extension RunLoop {
         self.hoveredPointerRouteID = nil
       }
     }
+    // The paired re-key above tracks the hovered region by identity + kind
+    // wherever it moved — including out from under a stationary pointer.
+    // Re-hit-test the stored pointer location so a region that departed the
+    // pointer's cell delivers its balanced `.exited`.
+    reconcilePointerHover()
 
     let previousModalFocusScopePath = currentModalFocusScopePath()
     let nextModalFocusScopePath = activeModalFocusScopePath(

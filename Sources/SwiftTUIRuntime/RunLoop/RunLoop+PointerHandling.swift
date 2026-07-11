@@ -5,6 +5,7 @@ extension RunLoop {
   package func handleMouseEvent(
     _ mouseEvent: MouseEvent
   ) {
+    lastPointerLocation = mouseEvent.location
     // Deliberate pointer actions supersede the pending keyboard traversal
     // record (passive hover moves do not — they can race the frame that
     // resolves the traversal's landing).
@@ -354,33 +355,52 @@ extension RunLoop {
   ) {
     // Scroll events should not move keyboard focus — the scroll target
     // is resolved independently via scrollTarget(at:).
-    if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
-      // A wheel notch is an explicit reposition: cancel any fling on that route
-      // so the discrete scroll wins instead of fighting the decay.
-      cancelScrollMomentum(containing: scrollRoute.identity)
-      let routeID = primaryRouteID(
-        for: scrollRoute.identity,
-        ownerNodeID: scrollRoute.viewNodeID
-      )
-      let handled = dispatchPointerEvent(
-        preferredRouteID: routeID,
-        identity: scrollRoute.identity,
-        event: .init(
-          kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
-          location: location,
-          targetRect: scrollRoute.viewportRect,
-          scrollContext: .init(
-            viewportRect: scrollRoute.viewportRect,
-            contentBounds: scrollRoute.contentBounds
-          ),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
-          timestamp: timestamp
+    if var scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
+      var refusedIdentities: Set<Identity> = []
+      while true {
+        // A wheel notch is an explicit reposition: cancel any fling on that route
+        // so the discrete scroll wins instead of fighting the decay.
+        cancelScrollMomentum(containing: scrollRoute.identity)
+        let routeID = primaryRouteID(
+          for: scrollRoute.identity,
+          ownerNodeID: scrollRoute.viewNodeID
         )
-      )
-      if handled {
-        scheduler.requestInvalidation(
-          of: scrollPointerInvalidationIdentities(for: scrollRoute.identity)
+        let handled = dispatchPointerEvent(
+          preferredRouteID: routeID,
+          identity: scrollRoute.identity,
+          event: .init(
+            kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
+            location: location,
+            targetRect: scrollRoute.viewportRect,
+            scrollContext: .init(
+              viewportRect: scrollRoute.viewportRect,
+              contentBounds: scrollRoute.contentBounds
+            ),
+            namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+            timestamp: timestamp
+          )
         )
+        if handled {
+          scheduler.requestInvalidation(
+            of: scrollPointerInvalidationIdentities(for: scrollRoute.identity)
+          )
+          break
+        }
+        // The route refused the delta (clamped at its edge, or the delta
+        // doesn't match its scrollable axis). Chain outward to the
+        // next-innermost spatially enclosing route that can consume it.
+        refusedIdentities.insert(scrollRoute.identity)
+        guard
+          let enclosingRoute = scrollTarget(
+            at: location,
+            excluding: refusedIdentities,
+            deltaX: deltaX,
+            deltaY: deltaY
+          )
+        else {
+          break
+        }
+        scrollRoute = enclosingRoute
       }
     } else if let hitTarget = hitTarget(at: location) {
       let handled = dispatchPointerEvent(

@@ -82,8 +82,8 @@ struct RoutePairingRegistryTests {
     var received: [String] = []
     // Restore with distinct recencies: insertion evicts the strictly staler
     // copy, so only the fresher handler remains to receive a paired dispatch.
-    registry.restoreHover([olderRoute: { _ in received.append("older") }], recency: 1)
-    registry.restoreHover([fresherRoute: { _ in received.append("fresher") }], recency: 2)
+    registry.restoreHover([olderRoute: [{ _ in received.append("older") }]], recency: 1)
+    registry.restoreHover([fresherRoute: [{ _ in received.append("fresher") }]], recency: 2)
 
     registry.dispatchHover(
       routeID: RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 12)),
@@ -98,13 +98,41 @@ struct RoutePairingRegistryTests {
     let stackedHigh = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 22))
     registry.restoreHover(
       [
-        stackedLow: { _ in received.append("low") },
-        stackedHigh: { _ in received.append("high") },
+        stackedLow: [{ _ in received.append("low") }],
+        stackedHigh: [{ _ in received.append("high") }],
       ],
       recency: 3
     )
     registry.dispatchHover(routeID: RouteID(identity: identity), phase: .exited)
     #expect(received == ["high"])
+  }
+
+  @MainActor
+  @Test("stacked hover levels on one route all receive each phase in order")
+  func stackedHoverLevelsAllReceiveEachPhase() {
+    let identity = testIdentity("PairingRoot", "stackedHover")
+    let route = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 7))
+    let registry = LocalPointerHandlerRegistry()
+
+    var received: [String] = []
+    // One route key carrying a two-level stack — the shape stacked
+    // `.onPointerHover` modifiers on a single chain node produce.
+    registry.restoreHover(
+      [route: [{ _ in received.append("inner") }, { _ in received.append("outer") }]],
+      recency: 1
+    )
+    registry.dispatchHover(routeID: RouteID(identity: identity), phase: .exited)
+    #expect(received == ["inner", "outer"])
+    received = []
+
+    // The per-frame double restore is idempotent: an equal-recency restore
+    // replaces the stack wholesale instead of appending duplicates.
+    registry.restoreHover(
+      [route: [{ _ in received.append("inner") }, { _ in received.append("outer") }]],
+      recency: 1
+    )
+    registry.dispatchHover(routeID: RouteID(identity: identity), phase: .exited)
+    #expect(received == ["inner", "outer"])
   }
 
   // MARK: - Key/paste registration ordinals

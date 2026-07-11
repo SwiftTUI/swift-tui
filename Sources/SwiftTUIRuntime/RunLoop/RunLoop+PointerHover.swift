@@ -56,6 +56,36 @@ extension RunLoop {
     }
   }
 
+  /// Re-hit-tests the stored pointer location against the just-published
+  /// frame after focus-sync re-keying. Hover is otherwise recomputed only on
+  /// pointer events, so a mutation that moves the hovered region out from
+  /// under a stationary pointer keeps hover alive forever — the paired
+  /// re-key preserves it by identity + kind wherever the region went.
+  /// Boundary changes only: an unchanged pairing stays silent (re-running
+  /// the full hover update would re-dispatch `.moved` on every frame while
+  /// the pointer rests on a live region), and with no active hover there is
+  /// nothing to reconcile — new hovers are minted only by real pointer
+  /// events.
+  package func reconcilePointerHover() {
+    guard let currentRouteID = hoveredPointerRouteID,
+      let location = lastPointerLocation,
+      localPointerHandlerRegistry.hasHoverSubscribers
+    else {
+      return
+    }
+    let freshRouteID = hitTarget(at: location)
+      .flatMap { hitTarget in
+        pointerHoverRouteID(
+          startingAt: hitTarget.region.identity,
+          preferredRouteID: hitTarget.region.routeID
+        )
+      }
+    if let freshRouteID, freshRouteID.pairsIgnoringOwner(with: currentRouteID) {
+      return
+    }
+    updatePointerHover(at: location)
+  }
+
   package func clearPointerHover() {
     guard let hoveredPointerRouteID else {
       return

@@ -77,7 +77,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
   package typealias HoverHandler = @MainActor @Sendable (HoverPhase) -> Void
 
   private var handlers: [RouteID: Handler] = [:]
-  private var hoverHandlers: [RouteID: HoverHandler] = [:]
+  // Ordered stack per route: stacked `.onPointerHover` levels on one chain
+  // node register under the exact same route key back-to-back within one
+  // capture session, and every level must receive balanced phases.
+  private var hoverHandlers: [RouteID: [HoverHandler]] = [:]
   private var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
   private var hoverHandlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
   // Recency (the contributing node's visited-frame stamp) per hover route.
@@ -87,7 +90,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
   // never-re-captured copy under the same identity with a different
   // `ownerNodeID`. On insert, a fresher registration for the same
   // owner-agnostic route evicts the stale one so the registry holds one entry
-  // per logical hover handler.
+  // per logical hover stack.
   private var hoverHandlerRecencies: [RouteID: UInt64] = [:]
 
   package init() {}
@@ -116,30 +119,44 @@ package final class LocalPointerHandlerRegistry: Equatable {
     routeID: RouteID,
     handler: @escaping HoverHandler
   ) {
-    insertHoverHandler(
-      routeID: routeID,
-      handler: handler,
-      owner: .current(identity: routeID.identity),
-      recency: ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
-    )
+    let recency = ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
+    guard evictingCollidingHoverRoutes(for: routeID, recency: recency) else {
+      return
+    }
+    // A strictly fresher stamp starts this pass's stack for the route; an
+    // equal stamp appends — stacked `.onPointerHover` levels on one chain
+    // register back-to-back within one capture session and every level must
+    // dispatch; a staler stamp is a shadowed re-feed and is dropped.
+    if let existingRecency = hoverHandlerRecencies[routeID] {
+      if recency > existingRecency {
+        hoverHandlers[routeID] = [handler]
+      } else if recency == existingRecency {
+        hoverHandlers[routeID, default: []].append(handler)
+      } else {
+        return
+      }
+    } else {
+      hoverHandlers[routeID] = [handler]
+    }
+    hoverHandlerOwners[routeID] = .current(identity: routeID.identity)
+    hoverHandlerRecencies[routeID] = recency
     ViewNodeContext.current?.recordPointerHoverHandlerRegistration(
       routeID: routeID,
       handler: handler
     )
   }
 
-  /// Inserts a hover handler, evicting any stale same-owner-agnostic entry: an
-  /// entry for the same identity+kind whose contributing node has a strictly
-  /// older visited stamp is an abandoned level's shadowed copy, not a distinct
-  /// stacked handler. A strictly fresher existing entry wins instead (the
-  /// incoming one is the shadowed copy being re-restored). Equal recency keeps
-  /// both — genuinely stacked same-frame registrations stay distinct per owner.
-  private func insertHoverHandler(
-    routeID: RouteID,
-    handler: @escaping HoverHandler,
-    owner: RuntimeRegistrationOwnerKey,
+  /// Cross-owner collision policy, unchanged from the single-handler model:
+  /// an entry for the same identity+kind under a different owner whose
+  /// contributing node has a strictly older visited stamp is an abandoned
+  /// level's shadowed copy — evict it. A strictly fresher existing entry wins
+  /// instead (the incoming one is the shadowed copy being re-restored) —
+  /// returns `false` so the caller drops the incoming registration. Equal
+  /// recency keeps both owners' entries distinct.
+  private func evictingCollidingHoverRoutes(
+    for routeID: RouteID,
     recency: UInt64
-  ) {
+  ) -> Bool {
     let collidingRoutes = hoverHandlers.keys.filter { existing in
       existing.pairsIgnoringOwner(with: routeID) && existing != routeID
     }
@@ -150,12 +167,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
         hoverHandlerOwners.removeValue(forKey: existing)
         hoverHandlerRecencies.removeValue(forKey: existing)
       } else if existingRecency > recency {
-        return
+        return false
       }
     }
-    hoverHandlers[routeID] = handler
-    hoverHandlerOwners[routeID] = owner
-    hoverHandlerRecencies[routeID] = recency
+    return true
   }
 
   package func hasHandler(
@@ -262,7 +277,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
     guard let resolved = hoverRouteID(pairingWith: routeID) else {
       return
     }
-    hoverHandlers[resolved]?(phase)
+    // Every stacked level receives the phase, in registration order.
+    for handler in hoverHandlers[resolved] ?? [] {
+      handler(phase)
+    }
   }
 
   package func reset() {
@@ -319,7 +337,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handlers
   }
 
-  package func snapshotHover() -> [RouteID: HoverHandler] {
+  package func snapshotHover() -> [RouteID: [HoverHandler]] {
     hoverHandlers
   }
 
@@ -338,7 +356,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
   }
 
   package func restoreHover(
-    _ snapshot: [RouteID: HoverHandler],
+    _ snapshot: [RouteID: [HoverHandler]],
     ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:],
     recency: UInt64 = 0
   ) {
@@ -346,13 +364,25 @@ package final class LocalPointerHandlerRegistry: Equatable {
       return
     }
 
-    for (routeID, handler) in snapshot {
-      insertHoverHandler(
-        routeID: routeID,
-        handler: handler,
-        owner: ownersByRouteID[routeID] ?? .init(identity: routeID.identity),
-        recency: recency
-      )
+    for (routeID, stackedHandlers) in snapshot {
+      guard !stackedHandlers.isEmpty,
+        evictingCollidingHoverRoutes(for: routeID, recency: recency)
+      else {
+        continue
+      }
+      // Whole-stack replace at an equal-or-fresher stamp: the committed
+      // record carries the route's complete stack, and replacing (never
+      // appending) keeps the per-frame double restore idempotent. An older
+      // snapshot must not clobber a live re-registration.
+      if let existingRecency = hoverHandlerRecencies[routeID],
+        recency < existingRecency
+      {
+        continue
+      }
+      hoverHandlers[routeID] = stackedHandlers
+      hoverHandlerOwners[routeID] =
+        ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
+      hoverHandlerRecencies[routeID] = recency
     }
   }
 }

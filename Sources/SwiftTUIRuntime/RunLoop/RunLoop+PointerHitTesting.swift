@@ -39,14 +39,25 @@ extension RunLoop {
     return !hasSmallerDescendant
   }
 
+  /// Resolves the innermost scroll route containing `location` that can
+  /// consume the delta. `excluding` names routes that already refused the
+  /// delta (clamped at their edge, or the delta doesn't match a scrollable
+  /// axis) so the wheel dispatch can chain outward: the identity-ancestor
+  /// fallback inside `dispatchPointerEvent` cannot reach a spatially
+  /// enclosing scroll view whose explicit identity is a *sibling* of the
+  /// refusing route's, so the retry re-resolves spatially instead.
   package func scrollTarget(
     at location: PointerLocation,
+    excluding excludedIdentities: Set<Identity> = [],
     deltaX: Int = 0,
     deltaY: Int = 0
   ) -> ScrollRoute? {
     let routes = latestSemanticSnapshot.scrollRoutes
       .filter { route in
-        guard route.viewportRect.contains(location.cell) else {
+        guard
+          !excludedIdentities.contains(route.identity),
+          route.viewportRect.contains(location.cell)
+        else {
           return false
         }
         let scrollsHorizontally = route.contentBounds.size.width > route.viewportRect.size.width
