@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -276,5 +277,80 @@ private struct ToastLifecycle005Root: View {
       ToastLifecycle005Reader(prefix: "toast")
     }
     .environment(\.toastLifecycleValue, "value-\(generation)")
+  }
+}
+
+// MARK: - Attempt 006: active timer binding retarget
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("stress toast lifecycle 006 active timer dismisses the current binding target")
+  func toastLifecycle006ActiveTimerDismissesTheCurrentBindingTarget() async throws {
+    // Hypothesis: the stable toast task can keep the Binding captured at activation even after the
+    // live modifier retargets its dismissal write to a replacement owner.
+    let bindingChanges = MainActorConditionSignal()
+    let first = ToastLifecycleBox(true, signal: bindingChanges)
+    let second = ToastLifecycleBox(true, signal: bindingChanges)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToastLifecycle006"),
+      size: .init(width: 64, height: 10)
+    ) {
+      ToastLifecycle006Root(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    let retargeted = try harness.clickText("Retarget Toast Binding 006")
+    #expect(retargeted.contains("dismiss target second"))
+
+    await bindingChanges.wait {
+      !first.value || !second.value
+    }
+    _ = try harness.render()
+    withKnownIssue("Active toast timer retains its activation binding after source retarget") {
+      #expect(first.value && !second.value)
+    }
+  }
+}
+
+@MainActor
+private final class ToastLifecycleBox<Value> {
+  var value: Value {
+    didSet { signal?.notify() }
+  }
+  private(set) var writes: [Value] = []
+  private let signal: MainActorConditionSignal?
+
+  init(_ value: Value, signal: MainActorConditionSignal? = nil) {
+    self.value = value
+    self.signal = signal
+  }
+
+  func binding() -> Binding<Value> {
+    Binding(
+      get: { self.value },
+      set: {
+        self.value = $0
+        self.writes.append($0)
+      }
+    )
+  }
+}
+
+@MainActor
+private struct ToastLifecycle006Root: View {
+  let first: ToastLifecycleBox<Bool>
+  let second: ToastLifecycleBox<Bool>
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget Toast Binding 006") { usesSecond = true }
+      Text("dismiss target \(usesSecond ? "second" : "first")")
+      Text("first \(first.value) second \(second.value)")
+    }
+    .toast(
+      "retargeted timer toast",
+      isPresented: usesSecond ? second.binding() : first.binding(),
+      duration: 0.08
+    )
   }
 }
