@@ -94,6 +94,51 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 010: safe-area inset spacing replacement
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 010 inset spacing recomputes base proposal")
+  func safeAreaGeometry010InsetSpacingRecomputesBaseProposal() {
+    // Hypothesis: changing only inset spacing can reuse the old consumed amount, especially when
+    // negative input clamps to zero and later returns to a positive value.
+    struct Root: View {
+      let generation: Int
+      let spacing: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text("010 base g\(generation) p\(spacing) \(proxy.size.width)x\(proxy.size.height)")
+        }
+        .safeAreaInset(edge: .top, alignment: .topLeading, spacing: spacing) {
+          Text("010 inset g\(generation)")
+            .frame(height: 2)
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry010")
+    let spacings = [-4, 0, 3, 1, 6, -1]
+
+    for generation in 0..<18 {
+      let spacing = spacings[generation % spacings.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation, spacing: spacing),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        size: .init(width: 48, height: 16),
+        safeAreaInsets: .init(top: 1)
+      )
+
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(safeAreaGeometryText(frames.retained).contains("010 base g\(generation)"))
+    }
+  }
+}
+
 // MARK: - Attempt 009: safe-area inset alignment replacement
 
 extension FrameworkStressSafeAreaGeometryTests {
