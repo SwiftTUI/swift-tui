@@ -257,3 +257,58 @@ private struct StressLL004Layout: Layout {
     }
   }
 }
+
+// MARK: - Attempt 005: offset and position entity churn
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 005 stable entity uses current offset or position placement")
+  func stress005StableEntityUsesCurrentOffsetOrPositionPlacement() throws {
+    // Hypothesis: placement reuse may retain an entity's prior layout behavior
+    // when offset and position reserve the same outer size.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL005", "Root"),
+      size: .init(width: 44, height: 9)
+    ) {
+      StressLL005Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...8 {
+      _ = try harness.clickText("Toggle Placement")
+      let point = try #require(harness.point(forText: "Moving Target"))
+      if generation.isMultiple(of: 2) {
+        #expect(point.x < 20)
+      } else {
+        #expect(point.x > 20)
+      }
+      let frame = try harness.click(point)
+      #expect(frame.contains("activations \(generation)"))
+      #expect(harness.actionRegistrationCount <= 2)
+    }
+  }
+}
+
+@MainActor
+private struct StressLL005Fixture: View {
+  @State private var usesPosition = false
+  @State private var activations = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Placement") { usesPosition.toggle() }
+      Text("activations \(activations)")
+      ZStack(alignment: .topLeading) {
+        if usesPosition {
+          Button("Moving Target") { activations += 1 }
+            .id("moving-target")
+            .position(x: 30, y: 1)
+        } else {
+          Button("Moving Target") { activations += 1 }
+            .id("moving-target")
+            .offset(x: 2, y: 0)
+        }
+      }
+      .frame(width: 42, height: 5, alignment: .topLeading)
+    }
+  }
+}
