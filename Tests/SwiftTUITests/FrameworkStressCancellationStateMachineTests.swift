@@ -363,4 +363,21 @@ extension FrameworkStressCancellationStateMachineTests {
   }
 }
 
+extension FrameworkStressCancellationStateMachineTests {
+  @Test("stress cancellation state machine 024 repeated publish cycles retain each new key")
+  func cancellationState024RepeatedPublishCyclesRetainEachNewKey() {
+    // Hypothesis: successive baselines can forget a registration added in an earlier carry cycle.
+    var live: [Int: Int] = [:]
+    for generation in 0..<100 {
+      let baseline = live
+      live[generation] = generation
+      let carried = ConcurrentRegistrationCarry.sinceBaseline(live: live, baseline: baseline)
+      var restored = baseline
+      ConcurrentRegistrationCarry.reapply(carried, into: &restored)
+      #expect(restored == live)
+      live = restored
+    }
+  }
+}
+
 // NEXT CANCELLATION STRESS TEST
