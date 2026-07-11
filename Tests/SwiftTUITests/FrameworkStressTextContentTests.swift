@@ -195,3 +195,38 @@ extension FrameworkStressTextContentTests {
     }
   }
 }
+
+// MARK: - Attempt 006: zero-width and wide-cluster wrapping
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 006 zero-width marks do not retain wide-cluster breaks")
+  func textContent006ZeroWidthMarksDoNotRetainWideClusterBreaks() {
+    // Hypothesis: zero-width format clusters can remain charged to a neighboring wide glyph in
+    // retained wrapping after the mark moves to the other side of that glyph.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("TextContent006")
+
+    for generation in 0..<20 {
+      let content =
+        generation.isMultiple(of: 2)
+        ? "A\u{200B}界B C"
+        : "A界\u{2060}B C"
+      let width = generation.isMultiple(of: 3) ? 3 : 4
+      let frames = textContentRetainedAndFresh(
+        renderer: renderer,
+        rootIdentity: rootIdentity,
+        generation: generation,
+        proposal: .init(width: width, height: nil),
+        content: Text(content).textWrappingStrategy(.wordBoundary)
+      )
+
+      #expect(frames.retained.measuredTree.measuredSize == frames.fresh.measuredTree.measuredSize)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(
+        frames.retained.rasterSurface.lines.allSatisfy {
+          textContentVisibleWidth($0) <= width
+        }
+      )
+    }
+  }
+}
