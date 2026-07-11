@@ -1112,3 +1112,67 @@ extension FrameworkStressFramePipelineTests {
     #expect(replay.rasterSurface == latest.rasterSurface)
   }
 }
+
+// MARK: - Attempt 018: completed-drop progress run resets
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 018 progress commit resets completed drop run")
+  func framePipeline018ProgressCommitResetsCompletedDropRun() async throws {
+    // Hypothesis: the forward-progress commit can leave the drop counter at its
+    // limit, forcing every later superseded visual frame to commit forever.
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("FramePipeline018", "Root")
+    let proposal = ProposedSize(width: 30, height: 3)
+    _ = renderer.render(
+      FramePipelineVisualOnlyView(value: 0),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    func renderStale(_ value: Int) async -> CancellableRenderOutcome {
+      await renderer.renderAsyncCancellable(
+        FramePipelineVisualOnlyView(value: value),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: [rootIdentity]
+        ),
+        proposal: proposal,
+        newestDesiredGeneration: { RenderGeneration(10_000) },
+        completedFramePolicy: .dropCompletedVisualOnly,
+        shouldCancelQueued: { false }
+      )
+    }
+
+    let first = await renderStale(1)
+    #expect(first.tailJobState == .droppedCompleted)
+    #expect(first.completedFrameDropDecision?.action == .dropVisualOnly)
+    #expect(renderer.visualOnlyDropRun.count == 1)
+
+    let second = await renderStale(2)
+    #expect(second.tailJobState == .droppedCompleted)
+    #expect(second.completedFrameDropDecision?.action == .dropVisualOnly)
+    #expect(renderer.visualOnlyDropRun.count == 2)
+
+    let forced = await renderStale(3)
+    #expect(forced.tailJobState == .completed)
+    #expect(forced.completedFrameDropDecision?.action == .commitOrdered)
+    #expect(forced.completedFrameDropDecision?.reconciliation.blockReason == .progressStarvation)
+    _ = try #require(forced.artifacts)
+    #expect(renderer.visualOnlyDropRun.count == 0)
+
+    let afterProgress = await renderStale(4)
+    #expect(afterProgress.tailJobState == .droppedCompleted)
+    #expect(afterProgress.completedFrameDropDecision?.action == .dropVisualOnly)
+    #expect(renderer.visualOnlyDropRun.count == 1)
+  }
+}
+
+@MainActor
+private struct FramePipelineVisualOnlyView: View {
+  let value: Int
+
+  var body: some View {
+    Text("visual \(value)")
+      .id(testIdentity("FramePipelineVisualOnly", "\(value)"))
+  }
+}
