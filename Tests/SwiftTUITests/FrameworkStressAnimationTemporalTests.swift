@@ -954,3 +954,106 @@ extension FrameworkStressAnimationTemporalTests {
     #expect(controller.activeAnimationCount == 0)
   }
 }
+
+private func animationTemporalRoot(
+  identity: Identity,
+  children: [ResolvedNode] = []
+) -> ResolvedNode {
+  ResolvedNode(identity: identity, kind: .view("AnimationTemporalRoot"), children: children)
+}
+
+private func animationTemporalContainsOffset(in node: ResolvedNode) -> Bool {
+  if case .offset = node.layoutBehavior {
+    return true
+  }
+  return node.children.contains { animationTemporalContainsOffset(in: $0) }
+}
+
+private func animationTemporalMatchedNode(
+  identity: Identity,
+  nodeID: UInt64,
+  key: MatchedGeometryKey
+) -> ResolvedNode {
+  var node = animationTemporalNode(
+    identity: identity,
+    viewNodeID: ViewNodeID(rawValue: nodeID)
+  )
+  node.matchedGeometry = MatchedGeometryConfig(key: key)
+  return node
+}
+
+private func animationTemporalPlacedRoot(
+  identity: Identity,
+  children: [PlacedNode]
+) -> PlacedNode {
+  PlacedNode(
+    identity: identity,
+    bounds: CellRect(origin: CellPoint(x: 0, y: 0), size: CellSize(width: 80, height: 8)),
+    children: children
+  )
+}
+
+private func animationTemporalPlacedMatchedNode(
+  identity: Identity,
+  key: MatchedGeometryKey,
+  x: Int
+) -> PlacedNode {
+  PlacedNode(
+    identity: identity,
+    bounds: CellRect(origin: CellPoint(x: x, y: 0), size: CellSize(width: 8, height: 1)),
+    matchedGeometry: MatchedGeometryConfig(key: key)
+  )
+}
+
+// MARK: - Attempt 019: departed transition registration
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 019 removed transition modifier cannot animate later removal")
+  func animationTemporal019RemovedTransitionCannotAnimateLaterRemoval() throws {
+    // Hypothesis: transition collection merges pending registrations without
+    // deleting a live node's departed modifier, so a later removal reuses it.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let rootID = testIdentity("AnimationTemporal019", "Root")
+    let leafID = testIdentity("AnimationTemporal019", "Leaf")
+    let nodeID = ViewNodeID(rawValue: 19)
+    let start = MonotonicInstant(offset: .seconds(80))
+    let leaf = animationTemporalNode(identity: leafID, viewNodeID: nodeID)
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafID, viewNodeID: nodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [leaf]),
+      transaction: .init(),
+      timestamp: start
+    )
+
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID, children: [leaf]),
+      transaction: .init(),
+      timestamp: start.advanced(by: .milliseconds(20))
+    )
+    withKnownIssue("A removed transition modifier remains registered on its live node") {
+      #expect(controller.debugStateSnapshot().transitionNodeIDs.isEmpty)
+    }
+
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      animationTemporalRoot(identity: rootID),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(40))
+    )
+    withKnownIssue("A stale transition registration animates a later removal") {
+      #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    }
+  }
+}
+
