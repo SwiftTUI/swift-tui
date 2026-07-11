@@ -100,4 +100,14 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 011 JSON whitespace is accepted at every boundary")
+  func styleTransport011JSONWhitespaceIsAcceptedAtEveryBoundary() {
+    // Hypothesis: whitespace after a comma or colon can advance the parser twice.
+    var parser = StyleTransportJSONParser(" \n { \t \"a\" \r : \n \"b\" \t } \r ")
+    let value = parser.parse()
+    #expect(value?.objectValue?["a"]?.stringValue == "b")
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
