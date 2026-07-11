@@ -229,3 +229,154 @@ extension FrameworkStressFramePipelineTests {
     #expect(clean.presentationDamage?.dirtyRows.isEmpty == true)
   }
 }
+
+// MARK: - Attempt 005: proposal-specific phase products
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 005 revisited proposal rejects intervening phase products")
+  func framePipeline005RevisitedProposalRejectsInterveningPhaseProducts() {
+    // Hypothesis: proposal A -> B -> A can carry B's retained semantic/draw
+    // products into the revisited A frame because only tree identity is checked.
+    let state = FrameTailRetainedState()
+    let root = framePipelineArtifactTree(prefix: "FramePipeline005", childCount: 2)
+    let artifacts = framePipelineArtifacts(root: root, rasterLine: "phase-products")
+    let proposalA = ProposedSize(width: 24, height: 4)
+    let proposalB = ProposedSize(width: 12, height: 4)
+
+    state.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: artifacts.placedTree,
+      proposal: proposalA
+    )
+    let firstA = state.input(invalidatedIdentities: [])
+    #expect(
+      firstA.phaseExtractionProof(
+        for: proposalA,
+        placed: artifacts.placedTree,
+        animationOverlaySnapshot: .init()
+      ) == .wholeTreeIdentical
+    )
+
+    state.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: artifacts.placedTree,
+      proposal: proposalB
+    )
+    let afterB = state.input(invalidatedIdentities: [])
+    #expect(
+      afterB.phaseExtractionProof(
+        for: proposalA,
+        placed: artifacts.placedTree,
+        animationOverlaySnapshot: .init()
+      ) == .none
+    )
+
+    state.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: artifacts.placedTree,
+      proposal: proposalA
+    )
+    let revisitedA = state.input(invalidatedIdentities: [])
+    #expect(
+      revisitedA.phaseExtractionProof(
+        for: proposalA,
+        placed: artifacts.placedTree,
+        animationOverlaySnapshot: .init()
+      ) == .wholeTreeIdentical
+    )
+  }
+}
+
+private struct FramePipelineArtifactNode {
+  var identity: Identity
+  var bounds: CellRect
+  var children: [Self] = []
+  var drawPayload: DrawPayload = .none
+}
+
+private func framePipelineArtifactTree(
+  prefix: String,
+  childCount: Int
+) -> FramePipelineArtifactNode {
+  let children = (0..<childCount).map { index in
+    FramePipelineArtifactNode(
+      identity: testIdentity(prefix, "Root", "Child[\(index)]"),
+      bounds: .init(
+        origin: .init(x: 0, y: index),
+        size: .init(width: 12, height: 1)
+      ),
+      drawPayload: .text("child-\(index)")
+    )
+  }
+  return FramePipelineArtifactNode(
+    identity: testIdentity(prefix, "Root"),
+    bounds: .init(
+      origin: .zero,
+      size: .init(width: 12, height: max(1, childCount))
+    ),
+    children: children
+  )
+}
+
+private func framePipelineArtifacts(
+  root: FramePipelineArtifactNode,
+  rasterLine: String,
+  drawnIdentities: Set<Identity>? = nil,
+  commitPlan: CommitPlan = .init(),
+  diagnostics: FrameDiagnostics = .init()
+) -> FrameArtifacts {
+  func resolved(_ node: FramePipelineArtifactNode) -> ResolvedNode {
+    ResolvedNode(
+      identity: node.identity,
+      kind: .view("FramePipelineArtifact"),
+      children: node.children.map(resolved),
+      drawPayload: node.drawPayload,
+      intrinsicSize: node.bounds.size
+    )
+  }
+
+  func measured(_ node: FramePipelineArtifactNode) -> MeasuredNode {
+    MeasuredNode(
+      identity: node.identity,
+      proposal: .init(width: node.bounds.size.width, height: node.bounds.size.height),
+      measuredSize: node.bounds.size,
+      childMeasurements: node.children.map(measured)
+    )
+  }
+
+  func placed(_ node: FramePipelineArtifactNode) -> PlacedNode {
+    PlacedNode(
+      identity: node.identity,
+      bounds: node.bounds,
+      children: node.children.map(placed),
+      drawPayload: node.drawPayload
+    )
+  }
+
+  func draw(_ node: FramePipelineArtifactNode) -> DrawNode {
+    DrawNode(
+      identity: node.identity,
+      bounds: node.bounds,
+      children: node.children.map(draw)
+    )
+  }
+
+  func identities(_ node: FramePipelineArtifactNode) -> Set<Identity> {
+    node.children.reduce(into: Set([node.identity])) { result, child in
+      result.formUnion(identities(child))
+    }
+  }
+
+  return FrameArtifacts(
+    resolvedTree: resolved(root),
+    measuredTree: measured(root),
+    placedTree: placed(root),
+    semanticSnapshot: .init(),
+    drawTree: draw(root),
+    rasterSurface: .init(size: root.bounds.size, lines: [rasterLine]),
+    presentationDamage: nil,
+    drawnIdentities: drawnIdentities ?? identities(root),
+    commitPlan: commitPlan,
+    diagnostics: diagnostics
+  )
+}
