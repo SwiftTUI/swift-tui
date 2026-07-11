@@ -122,6 +122,53 @@ private struct StressPS003Fixture: View {
   }
 }
 
+// MARK: - Attempt 004: menu source reinsertion
+
+extension FrameworkStressPresentationSemanticsTests {
+  @Test("stress presentation semantics 004 a reinserted menu source starts collapsed")
+  func stress004ReinsertedMenuSourceStartsCollapsed() throws {
+    // Hypothesis: a removed menu's State slot or presentation declaration may
+    // be resurrected when the same structural source is inserted again.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressPS004", "Root"),
+      size: .init(width: 72, height: 16)
+    ) {
+      StressPS004Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Reinsertable menu")
+    _ = try harness.clickText("Toggle menu source")
+    let frame = try harness.clickText("Toggle menu source")
+
+    #expect(frame.contains("Reinsertable menu"))
+    #expect(!frame.contains("Reinserted overlay item"))
+    #expect(stressPresentationEntryCount(in: harness) == 0)
+  }
+}
+
+@MainActor
+private struct StressPS004Fixture: View {
+  @State private var showsMenu = true
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      if showsMenu {
+        Menu("Reinsertable menu") {
+          Button("Reinserted overlay item") {}
+        }
+      } else {
+        Text("Menu source absent")
+      }
+      Spacer().frame(width: 25)
+      Button("Toggle menu source") {
+        showsMenu.toggle()
+      }
+    }
+    .frame(width: 70, height: 14, alignment: .topLeading)
+  }
+}
+
 @MainActor
 private struct StressPS001Fixture: View {
   @State private var showsSheet = false
