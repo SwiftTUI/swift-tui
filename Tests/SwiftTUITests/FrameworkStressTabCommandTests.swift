@@ -272,3 +272,59 @@ private struct StressTC005Fixture: View {
     .frame(width: 58, height: 9, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 006: departed overflow surface state
+
+extension FrameworkStressTabCommandTests {
+  @Test("stress tab command 006 departed overflow surface does not resurrect expanded")
+  func stressTabCommand006DepartedOverflowDoesNotResurrectExpanded() throws {
+    // Hypothesis: expansion lives in a private state slot and may survive a
+    // style with no overflow surface, reopening when literal tabs return.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressTC006", "Root"),
+      size: .init(width: 24, height: 10)
+    ) {
+      StressTC006Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressTC006Fixture.tabsIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    let expanded = try harness.pressKey(KeyPress(.return))
+    #expect(expanded.contains("Three"))
+    #expect(expanded.contains("Four"))
+
+    _ = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+    let restored = try harness.pressKey(KeyPress(.character("s"), modifiers: .ctrl))
+
+    #expect(!restored.contains("Three"))
+    #expect(!restored.contains("Four"))
+    #expect(restored.contains("One content"))
+  }
+}
+
+@MainActor
+private struct StressTC006Fixture: View {
+  static let tabsIdentity = testIdentity("StressTC006", "Tabs")
+
+  @State private var usesLiteral = true
+  @State private var selection = "one"
+
+  var body: some View {
+    Panel(id: "stress-tc-006-panel") {
+      TabView(selection: $selection) {
+        Tab("One", value: "one") { Text("One content") }
+        Tab("Two", value: "two") { Text("Two content") }
+        Tab("Three", value: "three") { Text("Three content") }
+        Tab("Four", value: "four") { Text("Four content") }
+      }
+      .tabViewStyle(usesLiteral ? .literalTabs : .underline)
+      .id(Self.tabsIdentity)
+    }
+    .keyCommand("Toggle style", key: .character("s"), modifiers: .ctrl) {
+      usesLiteral.toggle()
+    }
+    .frame(width: 24, height: 10, alignment: .topLeading)
+  }
+}
