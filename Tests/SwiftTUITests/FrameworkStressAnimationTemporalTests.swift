@@ -162,3 +162,55 @@ private func animationTemporal003View(rows: [AnimationTemporal003Row]) -> some V
     }
   }
 }
+
+// MARK: - Attempt 004: duplicate occurrence value-animation isolation
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 004 duplicate occurrences isolate value animation baselines")
+  func animationTemporal004DuplicateOccurrencesIsolateValueBaselines() throws {
+    // Hypothesis: duplicate entity routes can collapse their silent modifier
+    // slots and make one occurrence consume the other's watched-value baseline.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let identity = testIdentity("AnimationTemporal004", "Root")
+    let proposal = ProposedSize(width: 40, height: 6)
+
+    _ = renderer.render(
+      animationTemporal004View(firstValue: 1, firstOpacity: 0.2),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    _ = renderer.render(
+      animationTemporal004View(firstValue: 3, firstOpacity: 0.9),
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+
+    withKnownIssue("Duplicate ForEach occurrences lose independent value-animation baselines") {
+      #expect(controller.activeAnimationCount == 1)
+    }
+  }
+}
+
+@MainActor
+private func animationTemporal004View(firstValue: Int, firstOpacity: Double) -> some View {
+  let rows = [
+    AnimationTemporal004Row(
+      id: "duplicate", label: "first", value: firstValue, opacity: firstOpacity),
+    AnimationTemporal004Row(id: "duplicate", label: "second", value: 2, opacity: 0.6),
+  ]
+  return VStack(alignment: .leading, spacing: 0) {
+    ForEach(rows) { row in
+      Text("004 \(row.label)")
+        .opacity(row.opacity)
+        .animation(.linear(duration: .seconds(4)), value: row.value)
+    }
+  }
+}
+
+private struct AnimationTemporal004Row: Identifiable, Sendable {
+  let id: String
+  let label: String
+  let value: Int
+  let opacity: Double
+}
