@@ -702,3 +702,54 @@ private struct StressAF013Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 014: accessibility cursor anchor translation
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 014 cursor anchor follows local and layout movement")
+  func stress014CursorAnchorFollowsLocalAndLayoutMovement() throws {
+    // Hypothesis: retained semantic placement can apply either the previous local cursor anchor or
+    // the previous global origin when both change on a stable accessibility node.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF014", "Root"),
+      size: .init(width: 52, height: 7)
+    ) {
+      StressAF014Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<13 {
+      _ = try harness.clickText("Move cursor anchor")
+    }
+
+    let target = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Moving cursor anchor" }
+    )
+    #expect(target.rect.origin.x == 3)
+    #expect(
+      target.cursorAnchor
+        == CellPoint(x: target.rect.origin.x + 1, y: target.rect.origin.y))
+  }
+}
+
+@MainActor
+private struct StressAF014Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Move cursor anchor") {
+        generation += 1
+      }
+      HStack(spacing: 0) {
+        Spacer().frame(width: generation % 5)
+        Text("Anchor target")
+          .frame(width: 16, alignment: .leading)
+          .id("stress-af-014-target")
+          .accessibilityRole(.button)
+          .accessibilityLabel("Moving cursor anchor")
+          .accessibilityCursorAnchor(.init(x: generation % 4, y: 0))
+      }
+    }
+  }
+}
