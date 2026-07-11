@@ -57,4 +57,22 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 003 removing MRU keeps survivor promotable")
+  func cacheState003RemovingMRUKeepsSurvivorPromotable() {
+    // Hypothesis: unlinking the tail can strand mruKey on the removed node.
+    var cache = BoundedLRUCache<String, Int, StressCacheCost>()
+    let policy = StressCacheCost(entries: 2, bytes: .max)
+    cache.upsert("a", value: 1, cost: stressCacheEntry(1), policy: policy)
+    cache.upsert("b", value: 2, cost: stressCacheEntry(1), policy: policy)
+    cache.removeValue(forKey: "b")
+    #expect(cache.recordAccess("a") == 1)
+    cache.upsert("c", value: 3, cost: stressCacheEntry(1), policy: policy)
+    cache.upsert("d", value: 4, cost: stressCacheEntry(1), policy: policy)
+    #expect(cache.peek("a") == nil)
+    #expect(cache.peek("c") == 3)
+    #expect(cache.peek("d") == 4)
+  }
+}
+
 // NEXT CACHE STRESS TEST
