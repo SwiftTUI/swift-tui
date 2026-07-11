@@ -353,3 +353,67 @@ private final class ObservationEffects006Child {
     self.label = label
   }
 }
+
+// MARK: - Attempt 007: AnyView observable payload switching
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 007 AnyView type churn follows the live observable payload")
+  func observationEffects007AnyViewTypeChurnFollowsLiveObservablePayload() throws {
+    // Hypothesis: AnyView memoization may preserve the observation pass from
+    // the erased payload type that previously occupied the stable slot.
+    let model = ObservationEffects007Model()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects007"),
+      size: .init(width: 58, height: 6)
+    ) {
+      ObservationEffects007Root(model: model)
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...12 {
+      model.showsPrimary.toggle()
+      if model.showsPrimary {
+        model.primary = generation
+      } else {
+        model.secondary = generation
+      }
+      let frame = try harness.render()
+      #expect(frame.contains("007 live \(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects007Root: View {
+  let model: ObservationEffects007Model
+
+  var body: some View {
+    if model.showsPrimary {
+      AnyView(ObservationEffects007Primary(model: model))
+    } else {
+      AnyView(ObservationEffects007Secondary(model: model))
+    }
+  }
+}
+
+@Observable
+private final class ObservationEffects007Model {
+  var showsPrimary = true
+  var primary = 0
+  var secondary = 0
+}
+
+private struct ObservationEffects007Primary: View {
+  let model: ObservationEffects007Model
+
+  var body: some View {
+    Text("007 live \(model.primary)")
+  }
+}
+
+private struct ObservationEffects007Secondary: View {
+  let model: ObservationEffects007Model
+
+  var body: some View {
+    Text("007 live \(model.secondary)")
+  }
+}
