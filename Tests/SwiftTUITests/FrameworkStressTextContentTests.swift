@@ -1123,3 +1123,45 @@ private struct TextContent029Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 030: secure grapheme selection replacement
+
+extension FrameworkStressTextContentTests {
+  @Test("stress text content 030 secure select-all replaces graphemes once")
+  func textContent030SecureSelectAllReplacesGraphemesOnce() throws {
+    // Hypothesis: secure projection can make select-all replacement count masked cells instead of
+    // source grapheme clusters, causing partial deletion or duplicate binding writes.
+    let text = TextContentBox("A👨‍👩‍👧‍👦界")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TextContent030Root"),
+      size: .init(width: 28, height: 3)
+    ) {
+      TextContent030Fixture(text: text)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(TextContent030Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("a"), modifiers: .ctrl))
+    _ = try harness.paste("👋🏿Z")
+
+    #expect(text.value == "👋🏿Z")
+    #expect(text.writeCount == 1)
+    #expect(harness.frame.contains("••"))
+    #expect(!harness.frame.contains("👨‍👩‍👧‍👦"))
+    #expect(!harness.frame.contains("👋🏿"))
+    #expect(!harness.frame.contains("界"))
+  }
+}
+
+@MainActor
+private struct TextContent030Fixture: View {
+  static let fieldIdentity = testIdentity("TextContent030", "Field")
+
+  let text: TextContentBox<String>
+
+  var body: some View {
+    SecureField("Secret", text: text.binding())
+      .id(Self.fieldIdentity)
+      .textFieldStyle(.plain)
+  }
+}
