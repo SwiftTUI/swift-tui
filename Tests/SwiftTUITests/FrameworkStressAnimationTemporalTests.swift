@@ -47,86 +47,6 @@ extension FrameworkStressAnimationTemporalTests {
   }
 }
 
-// MARK: - Attempt 011: custom-state continuity after retarget
-
-extension FrameworkStressAnimationTemporalTests {
-  @Test("stress animation temporal 011 custom state survives into retarget replacement")
-  func animationTemporal011CustomStateSurvivesIntoRetargetReplacement() throws {
-    // Hypothesis: retarget sampling reads the old custom state but the newly
-    // installed ActiveAnimation silently starts with an empty state buffer.
-    let probe = AnimationTemporalCustomStateProbe()
-    let animation = Animation(AnimationTemporalStatefulCurve(id: "011", probe: probe))
-    let controller = AnimationController()
-    controller.register(animation)
-    let identity = testIdentity("AnimationTemporal011", "Leaf")
-    let start = MonotonicInstant(offset: .seconds(30))
-    controller.processResolvedTree(
-      animationTemporalNode(identity: identity, opacity: 0),
-      transaction: .init(),
-      timestamp: start
-    )
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    var firstTarget = animationTemporalNode(identity: identity, opacity: 1)
-    controller.processResolvedTree(firstTarget, transaction: transaction, timestamp: start)
-    _ = controller.applyInterpolations(
-      to: &firstTarget,
-      at: start.advanced(by: .milliseconds(100))
-    )
-
-    let replacement = animationTemporalNode(identity: identity, opacity: 0.4)
-    controller.processResolvedTree(
-      replacement,
-      transaction: transaction,
-      timestamp: start.advanced(by: .milliseconds(200))
-    )
-    var replacementTick = replacement
-    _ = controller.applyInterpolations(
-      to: &replacementTick,
-      at: start.advanced(by: .milliseconds(300))
-    )
-
-    withKnownIssue("Retarget replacement resets CustomAnimation state after sampling it") {
-      #expect((probe.observations.last ?? -1) >= 2)
-    }
-  }
-}
-
-private final class AnimationTemporalCustomStateProbe: Sendable {
-  private let storage = Mutex<[Int]>([])
-
-  var observations: [Int] {
-    storage.withLock { $0 }
-  }
-
-  func record(_ value: Int) {
-    storage.withLock { $0.append(value) }
-  }
-}
-
-private struct AnimationTemporalStatefulCurve: CustomAnimation {
-  let id: String
-  let probe: AnimationTemporalCustomStateProbe
-
-  func animate<V: VectorArithmetic>(
-    value: V,
-    time: Duration,
-    context: inout AnimationContext<V>
-  ) -> V? {
-    let count: Int = context.state["animation-temporal-state"] ?? 0
-    probe.record(count)
-    context.state["animation-temporal-state"] = count + 1
-    guard time < .seconds(10) else { return nil }
-    var result = value
-    result.scale(by: min(max(time.totalSeconds / 10, 0), 1))
-    return result
-  }
-
-  static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
-
-  func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
 @MainActor
 private func animationTemporal001View(opacity: Double, watchedValue: Int) -> some View {
   Text("animation temporal 001")
@@ -613,4 +533,140 @@ extension FrameworkStressAnimationTemporalTests {
     #expect(controller.activeAnimationCount == 0)
     #expect(finalTree.drawMetadata.baseStyle.explicitOpacity == latestTarget)
   }
+}
+
+// MARK: - Attempt 011: custom-state continuity after retarget
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 011 custom state survives into retarget replacement")
+  func animationTemporal011CustomStateSurvivesIntoRetargetReplacement() throws {
+    // Hypothesis: retarget sampling reads the old custom state but the newly
+    // installed ActiveAnimation silently starts with an empty state buffer.
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "011", probe: probe))
+    let controller = AnimationController()
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal011", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(30))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    var firstTarget = animationTemporalNode(identity: identity, opacity: 1)
+    controller.processResolvedTree(firstTarget, transaction: transaction, timestamp: start)
+    _ = controller.applyInterpolations(
+      to: &firstTarget,
+      at: start.advanced(by: .milliseconds(100))
+    )
+
+    let replacement = animationTemporalNode(identity: identity, opacity: 0.4)
+    controller.processResolvedTree(
+      replacement,
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(200))
+    )
+    var replacementTick = replacement
+    _ = controller.applyInterpolations(
+      to: &replacementTick,
+      at: start.advanced(by: .milliseconds(300))
+    )
+
+    withKnownIssue("Retarget replacement resets CustomAnimation state after sampling it") {
+      #expect((probe.observations.last ?? -1) >= 2)
+    }
+  }
+}
+
+// MARK: - Attempt 012: custom merge consultation
+
+extension FrameworkStressAnimationTemporalTests {
+  @Test("stress animation temporal 012 retarget consults custom merge policy")
+  func animationTemporal012RetargetConsultsCustomMergePolicy() throws {
+    // Hypothesis: property retargeting replaces a custom curve without ever
+    // consulting its public shouldMerge handoff policy.
+    let probe = AnimationTemporalCustomStateProbe()
+    let animation = Animation(AnimationTemporalStatefulCurve(id: "012", probe: probe))
+    let controller = AnimationController()
+    controller.register(animation)
+    let identity = testIdentity("AnimationTemporal012", "Leaf")
+    let start = MonotonicInstant(offset: .seconds(40))
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0),
+      transaction: .init(),
+      timestamp: start
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 1),
+      transaction: transaction,
+      timestamp: start
+    )
+    controller.processResolvedTree(
+      animationTemporalNode(identity: identity, opacity: 0.4),
+      transaction: transaction,
+      timestamp: start.advanced(by: .milliseconds(100))
+    )
+
+    withKnownIssue("AnimationController retargeting never calls CustomAnimation.shouldMerge") {
+      #expect(probe.mergeCallCount > 0)
+    }
+  }
+}
+
+private final class AnimationTemporalCustomStateProbe: Sendable {
+  private let storage = Mutex<[Int]>([])
+  private let merges = Atomic<Int>(0)
+
+  var observations: [Int] {
+    storage.withLock { $0 }
+  }
+
+  var mergeCallCount: Int {
+    merges.load(ordering: .relaxed)
+  }
+
+  func record(_ value: Int) {
+    storage.withLock { $0.append(value) }
+  }
+
+  func recordMerge() {
+    merges.wrappingAdd(1, ordering: .relaxed)
+  }
+}
+
+private struct AnimationTemporalStatefulCurve: CustomAnimation {
+  let id: String
+  let probe: AnimationTemporalCustomStateProbe
+
+  func animate<V: VectorArithmetic>(
+    value: V,
+    time: Duration,
+    context: inout AnimationContext<V>
+  ) -> V? {
+    let count: Int = context.state["animation-temporal-state"] ?? 0
+    probe.record(count)
+    context.state["animation-temporal-state"] = count + 1
+    guard time < .seconds(10) else { return nil }
+    var result = value
+    result.scale(by: min(max(time.totalSeconds / 10, 0), 1))
+    return result
+  }
+
+  func shouldMerge<V: VectorArithmetic>(
+    previous: Animation,
+    value: V,
+    time: Duration,
+    context: inout AnimationContext<V>
+  ) -> Bool {
+    probe.recordMerge()
+    return true
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+
+  func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
