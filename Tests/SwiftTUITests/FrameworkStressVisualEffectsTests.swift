@@ -553,3 +553,53 @@ extension FrameworkStressVisualEffectsTests {
     }
   }
 }
+
+// MARK: - Attempt 011: linear-gradient direction churn
+
+extension FrameworkStressVisualEffectsTests {
+  @Test("stress visual effects 011 linear gradient follows current endpoints")
+  func visualEffects011LinearGradientFollowsCurrentEndpoints() {
+    // Hypothesis: retained shape-style extraction can update gradient stops without replacing the
+    // endpoint pair, leaving the fill oriented along an earlier generation's direction vector.
+    struct Root: View {
+      let generation: Int
+
+      var endpoints: (UnitPoint, UnitPoint) {
+        switch generation % 4 {
+        case 0: (.topLeading, .bottomTrailing)
+        case 1: (.topTrailing, .bottomLeading)
+        case 2: (.leading, .trailing)
+        default: (.bottom, .top)
+        }
+      }
+
+      var body: some View {
+        Rectangle()
+          .fill(
+            LinearGradient(
+              colors: [.red, .yellow, .blue],
+              startPoint: endpoints.0,
+              endPoint: endpoints.1
+            )
+          )
+          .frame(width: 25, height: 9)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("VisualEffects011")
+
+    for generation in 0..<28 {
+      let root = Root(generation: generation)
+      let retained = visualEffectsRetainedFrame(
+        root,
+        renderer: renderer,
+        identity: identity,
+        generation: generation
+      )
+      let fresh = visualEffectsFreshFrame(root, identity: identity)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+    }
+  }
+}
