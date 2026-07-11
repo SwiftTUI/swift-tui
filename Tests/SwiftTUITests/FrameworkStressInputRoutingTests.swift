@@ -559,3 +559,67 @@ private struct StressInput009Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 010: remove the top stacked key handler
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Removing the top stacked key handler exposes only the live inner handler")
+  func stressInputRouting010RemovingTopHandlerExposesInnerHandler() throws {
+    // Hypothesis: a departed top bucket may remain restored at the stable
+    // identity and continue consuming keys after its modifier disappears.
+    let events = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput010Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressInput010Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput010Fixture.focusIdentity)
+    _ = try harness.pressKey(KeyPress(.character("x")))
+    #expect(events.value == ["outer"])
+
+    _ = try harness.clickText("Remove outer handler")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput010Fixture.focusIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("x")))
+
+    #expect(events.value == ["outer", "inner"])
+    #expect(harness.keyPressHandlerCount == 1)
+  }
+}
+
+private struct StressInput010Fixture: View {
+  static let focusIdentity = testIdentity("StressInput010", "Focus")
+
+  let events: StressInputBox<[String]>
+  @State private var hasOuterHandler = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Remove outer handler") { hasOuterHandler = false }
+      if hasOuterHandler {
+        Text("Removable key target")
+          .id(Self.focusIdentity)
+          .focusable()
+          .onKeyPress(.character("x")) { _ in
+            events.value.append("inner")
+            return .handled
+          }
+          .onKeyPress(.character("x")) { _ in
+            events.value.append("outer")
+            return .handled
+          }
+      } else {
+        Text("Removable key target")
+          .id(Self.focusIdentity)
+          .focusable()
+          .onKeyPress(.character("x")) { _ in
+            events.value.append("inner")
+            return .handled
+          }
+      }
+    }
+  }
+}
