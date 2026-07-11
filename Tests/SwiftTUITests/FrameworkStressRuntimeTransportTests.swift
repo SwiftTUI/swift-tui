@@ -36,6 +36,23 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 015: malformed CSI recovery
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 015 malformed CSI leaves following unicode scalar intact")
+  func runtimeTransport015MalformedCSILeavesFollowingUnicodeScalarIntact() {
+    // Hypothesis: consuming an unsupported CSI envelope can overrun its final
+    // byte and discard the first multibyte scalar that follows it.
+    var parser = TerminalInputParser()
+    let malformed = Array("\u{001B}[999;999z".utf8)
+    let unicode = Array("界".utf8)
+
+    let events = parser.feed(malformed + unicode)
+    #expect(events.last == .key(.character("界")))
+    #expect(events.filter { $0 == .key(.character("界")) }.count == 1)
+  }
+}
+
 // MARK: - Attempt 014: split CSI modifier envelope
 
 extension FrameworkStressRuntimeTransportTests {
