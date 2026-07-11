@@ -272,3 +272,58 @@ private struct StressAF005Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 006: hidden-descendant summary reset
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 006 ancestor hidden summary clears after descendant returns")
+  func stress006AncestorHiddenSummaryClearsAfterDescendantReturns() throws {
+    // Hypothesis: the retained accessibility subtree summary can keep an ancestor marked as
+    // containing hidden content after the only hidden descendant returns with newer metadata.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF006", "Root"),
+      size: .init(width: 58, height: 8)
+    ) {
+      StressAF006Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<10 {
+      _ = try harness.clickText("Toggle nested hidden child")
+    }
+
+    let container = try #require(
+      accessibilityFocusNodes(in: harness).first { $0.label == "Nested semantic container" }
+    )
+    #expect(!container.hidden)
+    #expect(
+      accessibilityFocusNodes(in: harness).contains {
+        $0.label == "Nested child generation 10"
+      })
+    #expect(
+      !accessibilityFocusNodes(in: harness).contains {
+        $0.label == "Nested child generation 9"
+      })
+  }
+}
+
+@MainActor
+private struct StressAF006Fixture: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle nested hidden child") {
+        generation += 1
+      }
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Nested visible content")
+          .accessibilityRole(.status)
+          .accessibilityLabel("Nested child generation \(generation)")
+          .accessibilityHidden(!generation.isMultiple(of: 2))
+      }
+      .id("stress-af-006-container")
+      .accessibilityLabel("Nested semantic container")
+    }
+  }
+}
