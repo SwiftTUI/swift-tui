@@ -270,4 +270,18 @@ extension FrameworkStressCacheStateMachineTests {
   }
 }
 
+extension FrameworkStressCacheStateMachineTests {
+  @Test("stress cache state machine 016 zero and one line limits remain separate keys")
+  func cacheState016ZeroAndOneLineLimitsRemainSeparateKeys() {
+    // Hypothesis: equal clamped output can collapse distinct authored option keys.
+    let cache = TextLayoutCache(capacity: 4)
+    let content = "alpha beta gamma"
+    let zero = cache.layout(for: content, options: .init(width: 5, lineLimit: 0))
+    let one = cache.layout(for: content, options: .init(width: 5, lineLimit: 1))
+    #expect(zero == one)
+    #expect(cache.metrics.entries == 2)
+    #expect(cache.metrics.misses == 2)
+  }
+}
+
 // NEXT CACHE STRESS TEST
