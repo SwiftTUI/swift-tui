@@ -443,3 +443,59 @@ private struct StressAF008Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 009: duplicate exact semantic identity isolation
+
+extension FrameworkStressAccessibilityFocusTests {
+  @Test("stress accessibility focus 009 duplicate exact identities keep current semantics")
+  func stress009DuplicateExactIdentitiesKeepCurrentSemantics() throws {
+    // Hypothesis: semantic extraction keyed by Identity can collapse or cross-wire two live nodes
+    // that intentionally share an exact identity while their order and metadata swap repeatedly.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressAF009", "Root"),
+      size: .init(width: 54, height: 8)
+    ) {
+      StressAF009Fixture()
+    }
+    defer { harness.shutdown() }
+
+    for _ in 0..<9 {
+      _ = try harness.clickText("Swap duplicate semantics")
+    }
+
+    let duplicates = accessibilityFocusNodes(in: harness).filter {
+      $0.label?.hasPrefix("Duplicate owner") == true
+    }
+    #expect(duplicates.map(\.label) == ["Duplicate owner B 9", "Duplicate owner A 9"])
+    #expect(duplicates.map(\.role) == [.link, .button])
+  }
+}
+
+@MainActor
+private struct StressAF009Fixture: View {
+  static let duplicateIdentity = testIdentity("StressAF009", "Duplicate")
+
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Swap duplicate semantics") {
+        generation += 1
+      }
+      if generation.isMultiple(of: 2) {
+        target("A", role: .button)
+        target("B", role: .link)
+      } else {
+        target("B", role: .link)
+        target("A", role: .button)
+      }
+    }
+  }
+
+  private func target(_ owner: String, role: AccessibilityRole) -> some View {
+    Text("Duplicate visible \(owner)")
+      .id(Self.duplicateIdentity)
+      .accessibilityRole(role)
+      .accessibilityLabel("Duplicate owner \(owner) \(generation)")
+  }
+}
