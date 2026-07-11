@@ -771,3 +771,51 @@ private struct ObservationEffects013View: View {
     .environment(\.observationEffectsAux, "aux-\(unrelated)")
   }
 }
+
+// MARK: - Attempt 014: duplicate identities with distinct environment overrides
+
+extension FrameworkStressObservationEffectsTests {
+  @Test("stress observation effects 014 duplicate identities retain distinct environment snapshots")
+  func observationEffects014DuplicateIdentitiesRetainDistinctEnvironmentSnapshots() throws {
+    // Hypothesis: dependency indexing by runtime identity can collapse direct
+    // duplicate siblings and publish one sibling's override to both readers.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ObservationEffects014"),
+      size: .init(width: 62, height: 7)
+    ) {
+      ObservationEffects014View()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 1...16 {
+      let frame = try harness.clickText("Advance Duplicates 014")
+      #expect(frame.contains("014 first A-\(generation)"))
+      #expect(frame.contains("014 second B-\(generation)"))
+    }
+  }
+}
+
+private struct ObservationEffects014Reader: View {
+  let label: String
+  @Environment(\.observationEffectsString) private var value
+
+  var body: some View {
+    Text("014 \(label) \(value)")
+  }
+}
+
+private struct ObservationEffects014View: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Advance Duplicates 014") { generation += 1 }
+      ObservationEffects014Reader(label: "first")
+        .environment(\.observationEffectsString, "A-\(generation)")
+        .id("observation-effects-014-duplicate")
+      ObservationEffects014Reader(label: "second")
+        .environment(\.observationEffectsString, "B-\(generation)")
+        .id("observation-effects-014-duplicate")
+    }
+  }
+}
