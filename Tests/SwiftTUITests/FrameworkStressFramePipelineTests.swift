@@ -1038,3 +1038,77 @@ extension FrameworkStressFramePipelineTests {
     #expect(replay.rasterSurface == sibling.rasterSurface)
   }
 }
+
+// MARK: - Attempt 017: consecutive stale candidates
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 017 consecutive stale candidates preserve one latest commit")
+  func framePipeline017ConsecutiveStaleCandidatesPreserveOneLatestCommit() async {
+    // Hypothesis: discarding the first stale candidate can perturb checkpoint
+    // state so a second stale discard restores the original, older baseline.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("FramePipeline017", "Root")
+    let proposal = ProposedSize(width: 42, height: 4)
+    _ = renderer.render(
+      FramePipelineSiblingView(first: "baseline-a", second: "baseline-b"),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let firstStale = renderer.prepareFrameHeadForCancellationTesting(
+      FramePipelineSiblingView(first: "stale-first-a", second: "stale-first-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let secondStale = renderer.prepareFrameHeadForCancellationTesting(
+      FramePipelineSiblingView(first: "stale-second-a", second: "stale-second-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let latest = renderer.render(
+      FramePipelineSiblingView(first: "latest-a", second: "latest-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    let committedGraph = renderer.viewGraph.debugTotalStateSnapshot()
+    let committedDrawn = renderer.frameTailRenderer.previousDrawnIdentities
+    let committedMetric = renderer.frameTailRenderer.memoryMetricSnapshot
+
+    let skippedFirst = await renderer.resolveCompletedFrameCandidateForTesting(firstStale)
+    #expect(skippedFirst)
+    #expect(renderer.viewGraph.debugTotalStateSnapshot() == committedGraph)
+    #expect(
+      renderer.frameTailRenderer.retainedInput(invalidatedIdentities: []).previousRasterSurface
+        == latest.rasterSurface
+    )
+
+    let skippedSecond = await renderer.resolveCompletedFrameCandidateForTesting(secondStale)
+    #expect(skippedSecond)
+    #expect(renderer.viewGraph.debugTotalStateSnapshot() == committedGraph)
+    #expect(
+      renderer.frameTailRenderer.retainedInput(invalidatedIdentities: []).previousRasterSurface
+        == latest.rasterSurface
+    )
+    #expect(renderer.frameTailRenderer.previousDrawnIdentities == committedDrawn)
+    #expect(renderer.frameTailRenderer.memoryMetricSnapshot == committedMetric)
+
+    let replay = renderer.render(
+      FramePipelineSiblingView(first: "latest-a", second: "latest-b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: proposal
+    )
+    #expect(replay.rasterSurface == latest.rasterSurface)
+  }
+}
