@@ -1255,4 +1255,42 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 030: Focusable metadata churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 030 focus regions follow current focusability")
+  func renderReconciliation030FocusRegionsFollowCurrentFocusability() {
+    // Hypothesis: retained semantic metadata synchronization may preserve the previous focus role
+    // when a stable node toggles focusability without changing its bounds or draw payload.
+    struct Root: View {
+      let focusable: Bool
+
+      var body: some View {
+        Text("Focus target")
+          .frame(width: 12, height: 2)
+          .focusable(focusable)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation030")
+
+    for generation in 0..<20 {
+      let focusable = generation.isMultiple(of: 2)
+      let root = Root(focusable: focusable)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(retained.semanticSnapshot.focusRegions.isEmpty != focusable)
+    }
+  }
+}
+
 // MARK: - End
