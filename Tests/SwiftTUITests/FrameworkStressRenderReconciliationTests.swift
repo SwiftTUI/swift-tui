@@ -553,4 +553,46 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 013: Combining and precomposed scalar churn
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 013 combining forms stay distinct in retained text")
+  func renderReconciliation013CombiningFormsStayDistinctInRetainedText() {
+    // Hypothesis: text cache equality or retained draw equivalence may normalize canonically
+    // equivalent graphemes, replaying the earlier scalar spelling despite a new authored value.
+    struct Root: View {
+      let content: String
+
+      var body: some View {
+        Text(content)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation013")
+    let contents = ["e\u{301}X", "éX", "o\u{308}Y", "öY"]
+
+    for generation in 0..<20 {
+      let content = contents[generation % contents.count]
+      let root = Root(content: content)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      #expect(retained.rasterSurface.lines == [content])
+      #expect(
+        retained.rasterSurface
+          == DefaultRenderer().render(
+            root,
+            context: .init(identity: rootIdentity)
+          ).rasterSurface
+      )
+    }
+  }
+}
+
 // MARK: - End
