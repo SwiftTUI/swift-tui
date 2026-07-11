@@ -921,6 +921,49 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 024: nested sheet presentation ordering
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 024 nested sheet publishes its tip above the sheet")
+  func popoverTip024NestedSheetPublishesTipAboveSheet() throws {
+    // Hypothesis: a tip declared inside a sheet can register below its owning
+    // sheet or lose its dismiss route when both coordinators are active.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PopoverTipStress024", "Root"),
+      size: .init(width: 72, height: 20)
+    ) {
+      PopoverTipNestedPresentationStressRoot()
+    }
+    defer { harness.shutdown() }
+
+    var frame = try harness.clickText("Open nested tip sheet")
+    #expect(frame.contains("Nested sheet body"))
+    #expect(popoverTipStressEntryCount(in: harness) == 1)
+
+    frame = try harness.clickText("Open nested tip", chooseLast: true)
+    #expect(frame.contains("nested tip presented true"))
+    let nestedTipOpened =
+      frame.contains("Nested presentation tip")
+      && popoverTipStressEntryCount(in: harness) == 2
+    withKnownIssue("PopoverTip declarations inside detached sheet content do not reach the portal")
+    {
+      #expect(nestedTipOpened)
+    }
+
+    if nestedTipOpened {
+      frame = try harness.pressKey(KeyPress(.escape))
+      #expect(frame.contains("Nested sheet body"))
+      #expect(!frame.contains("Nested presentation tip"))
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+    }
+
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Open nested tip sheet"))
+    #expect(!frame.contains("Nested sheet body"))
+    #expect(popoverTipStressEntryCount(in: harness) == 0)
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
@@ -1126,7 +1169,7 @@ private struct PopoverTipDuplicateStressRoot: View {
 
 private struct PopoverTipNestedPresentationStressRoot: View {
   @State private var presentsSheet = false
-  @State private var presentsTip = true
+  @State private var presentsTip = false
 
   var body: some View {
     Button("Open nested tip sheet") {
@@ -1135,6 +1178,10 @@ private struct PopoverTipNestedPresentationStressRoot: View {
     .sheet("Nested tip sheet", isPresented: $presentsSheet) {
       VStack(alignment: .leading, spacing: 1) {
         Text("Nested sheet body")
+        Text("nested tip presented \(presentsTip)")
+        Button("Open nested tip") {
+          presentsTip = true
+        }
         Text("Nested tip anchor")
           .popoverTip(
             PopoverTipStressTip(
