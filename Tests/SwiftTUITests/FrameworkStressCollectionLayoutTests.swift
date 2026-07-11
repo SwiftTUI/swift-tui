@@ -1645,3 +1645,64 @@ private struct CollectionLayout026Root: View {
     }
   }
 }
+
+// MARK: - Attempt 027: HStack cross-axis alignment churn
+
+extension FrameworkStressCollectionLayoutTests {
+  @Test("stress collection layout 027 HStack alignment relocates collection children")
+  func collectionLayout027HStackAlignmentRelocatesCollectionChildren() {
+    // Hypothesis: retained cross-axis metrics may preserve the prior vertical
+    // guide after heterogeneous ForEach children reorder and alignment flips.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("CollectionLayout027")
+
+    for generation in 0..<24 {
+      let bottom = !generation.isMultiple(of: 2)
+      let root = CollectionLayout027Root(bottom: bottom)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: 18, height: 4)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: 18, height: 4)
+      )
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
+private struct CollectionLayout027Row: Identifiable {
+  let id: Int
+  let height: Int
+}
+
+@MainActor
+private struct CollectionLayout027Root: View {
+  let bottom: Bool
+
+  private var rows: [CollectionLayout027Row] {
+    let values = [
+      CollectionLayout027Row(id: 1, height: 1),
+      CollectionLayout027Row(id: 2, height: 3),
+      CollectionLayout027Row(id: 3, height: 2),
+    ]
+    return bottom ? [values[2], values[0], values[1]] : values
+  }
+
+  var body: some View {
+    HStack(alignment: bottom ? .bottom : .top, spacing: 1) {
+      ForEach(rows) { row in
+        Text("\(row.id)")
+          .frame(width: 4, height: row.height, alignment: .topLeading)
+      }
+    }
+  }
+}
