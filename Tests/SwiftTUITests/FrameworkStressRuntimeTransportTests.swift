@@ -36,6 +36,23 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 012: terminal-looking bytes inside paste
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 012 paste payload keeps embedded terminal envelopes inert")
+  func runtimeTransport012PastePayloadKeepsEmbeddedTerminalEnvelopesInert() {
+    // Hypothesis: once bracketed paste starts, an embedded mouse or key CSI
+    // envelope can escape paste mode and dispatch as live terminal input.
+    var parser = TerminalInputParser()
+    let content = "before\u{001B}[<0;5;7M\u{001B}[1;5Aafter"
+    let events = parser.feed(
+      Array("\u{001B}[200~\(content)\u{001B}[201~".utf8)
+    )
+
+    #expect(events == [.paste(.init(content: content))])
+  }
+}
+
 // MARK: - Attempt 011: bytewise bracketed paste framing
 
 extension FrameworkStressRuntimeTransportTests {
