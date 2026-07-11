@@ -320,6 +320,54 @@ private struct EnvironmentStyle007Root: View {
   }
 }
 
+// MARK: - Attempt 008: cross-type erased button-style replacement
+
+extension FrameworkStressEnvironmentStyleTests {
+  @Test("stress environment style 008 erased button style replaces concrete family and action")
+  func environmentStyle008ErasedButtonStyleReplacesConcreteFamilyAndAction() throws {
+    // Hypothesis: AnyButtonStyle can retain a prior concrete box when its environment slot keeps
+    // one erased static type, leaving stale chrome or dropping the current Button action.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("EnvironmentStyle008"),
+      size: .init(width: 76, height: 8)
+    ) {
+      EnvironmentStyle008Root()
+    }
+    defer { harness.shutdown() }
+
+    var expectedTotal = 0
+    for generation in 1...12 {
+      var frame = try harness.clickText("Toggle Style Family 008")
+      if generation.isMultiple(of: 2) {
+        #expect(!frame.contains("custom-\(generation) Styled Target 008"))
+      } else {
+        #expect(frame.contains("custom-\(generation) Styled Target 008"))
+      }
+      frame = try harness.clickText("Styled Target 008")
+      expectedTotal += generation
+      #expect(frame.contains("008 generation \(generation) total \(expectedTotal)"))
+    }
+  }
+}
+
+private struct EnvironmentStyle008Root: View {
+  @State private var generation = 0
+  @State private var total = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Style Family 008") { generation += 1 }
+      Text("008 generation \(generation) total \(total)")
+      Button("Styled Target 008") { total += generation }
+        .buttonStyle(
+          generation.isMultiple(of: 2)
+            ? AnyButtonStyle.plain
+            : AnyButtonStyle(EnvironmentStyle007ButtonStyle(marker: "custom-\(generation)"))
+        )
+    }
+  }
+}
+
 private struct EnvironmentStyle001Reader: View {
   @Environment(\.environmentStyleString) private var value
 
