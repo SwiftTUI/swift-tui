@@ -474,4 +474,39 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 011: Measurement-cache proposal LRU revisit
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 011 evicted proposal revisit matches a fresh layout")
+  func renderReconciliation011EvictedProposalRevisitMatchesFreshLayout() {
+    // Hypothesis: MeasurementCache keeps four proposals per node and uses a generational access
+    // deque; repeated hits plus eviction can leave a stale generation record that evicts the
+    // newly stored value when an old width is revisited.
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation011")
+    let widths = [2, 7, 3, 8, 4, 9, 2, 8, 3, 9, 4, 7, 2]
+
+    for generation in widths.indices {
+      let width = widths[generation]
+      let root = Text("proposal cache revisit")
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        ),
+        proposal: .init(width: width, height: nil)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: rootIdentity),
+        proposal: .init(width: width, height: nil)
+      )
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
+    }
+  }
+}
+
 // MARK: - End
