@@ -36,6 +36,29 @@ extension FrameworkStressRuntimeTransportTests {
   }
 }
 
+// MARK: - Attempt 003: pointer modifier boundary
+
+extension FrameworkStressRuntimeTransportTests {
+  @Test("stress runtime transport 003 pointer modifier changes split coalesced runs")
+  func runtimeTransport003PointerModifierChangesSplitCoalescedRuns() {
+    // Hypothesis: moved events can merge across a modifier transition and erase
+    // the last unmodified location or the first modified event.
+    let events = coalescedInputEvents([
+      .mouse(.init(kind: .moved, location: .init(x: 1, y: 1))),
+      .mouse(.init(kind: .moved, location: .init(x: 2, y: 1))),
+      .mouse(.init(kind: .moved, location: .init(x: 3, y: 1), modifiers: .shift)),
+      .mouse(.init(kind: .moved, location: .init(x: 4, y: 1), modifiers: .shift)),
+    ])
+
+    #expect(
+      events == [
+        .mouse(.init(kind: .moved, location: .init(x: 2, y: 1))),
+        .mouse(.init(kind: .moved, location: .init(x: 4, y: 1), modifiers: .shift)),
+      ]
+    )
+  }
+}
+
 // MARK: - Attempt 002: zero-sum scroll coalescing
 
 extension FrameworkStressRuntimeTransportTests {
