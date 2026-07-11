@@ -1397,3 +1397,63 @@ private struct StressInput025Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 026: spatial drop overrides focus scope
+
+extension FrameworkStressInputRoutingTests {
+  @Test("A spatial drop on Panel B routes to B instead of focused Panel A")
+  func stressInputRouting026SpatialDropUsesHitPanelNotFocusedPanel() throws {
+    // Hypothesis: blank/interior spatial hit testing may fail to recover B's
+    // action scope and fall back to the currently focused scope in Panel A.
+    let destinations = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput026Root"),
+      size: .init(width: 64, height: 10)
+    ) {
+      StressInput026Fixture(destinations: destinations)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("Panel A drop zone")
+    let point = try #require(harness.point(forText: "Panel B drop zone"))
+    _ = try harness.drop(
+      paths: [DroppedPath("/tmp/stress-input-026")],
+      context: DropContext(location: point)
+    )
+
+    #expect(destinations.value == ["B"])
+  }
+}
+
+private struct StressInput026Fixture: View {
+  static let aIdentity = testIdentity("StressInput026", "A")
+  static let bIdentity = testIdentity("StressInput026", "B")
+
+  let destinations: StressInputBox<[String]>
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 1) {
+      Panel(id: "stress-input-026-a") {
+        Text("Panel A drop zone")
+          .id(Self.aIdentity)
+          .focusable()
+      }
+      .dropDestination { _ in
+        destinations.value.append("A")
+        return true
+      }
+      .frame(width: 28, height: 6)
+
+      Panel(id: "stress-input-026-b") {
+        Text("Panel B drop zone")
+          .id(Self.bIdentity)
+          .focusable()
+      }
+      .dropDestination { _ in
+        destinations.value.append("B")
+        return true
+      }
+      .frame(width: 28, height: 6)
+    }
+  }
+}
