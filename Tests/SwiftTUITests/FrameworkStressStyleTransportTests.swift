@@ -110,4 +110,16 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 012 nested objects retain siblings around null")
+  func styleTransport012NestedObjectsRetainSiblingsAroundNull() {
+    // Hypothesis: returning from a nested object can consume its parent's comma.
+    var parser = StyleTransportJSONParser(#"{"a":{"x":"1"},"b":null,"c":{"y":"2"}}"#)
+    let object = parser.parse()?.objectValue
+    #expect(object?["a"]?.objectValue?["x"]?.stringValue == "1")
+    if case .null = object?["b"] { } else { Issue.record("expected null sibling") }
+    #expect(object?["c"]?.objectValue?["y"]?.stringValue == "2")
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
