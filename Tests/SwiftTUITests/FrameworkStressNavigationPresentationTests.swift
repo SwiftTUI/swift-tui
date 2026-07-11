@@ -265,3 +265,68 @@ private struct StressNP004Destination: View {
     }
   }
 }
+
+// MARK: - Attempt 005: active NavigationStack scope identity churn
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 005 stack scope ID churn preserves destination pop")
+  func stress005StackScopeIDChurnPreservesDestinationPop() throws {
+    // Hypothesis: changing a NavigationStack's command-scope ID while its
+    // destination is active can reset the structural lifetime or strand pop.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP005", "Root"),
+      size: .init(width: 50, height: 10)
+    ) {
+      StressNP005Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Stack Destination")
+    for generation in 1...8 {
+      _ = try harness.clickText("Increment Stack Local")
+      let frame = try harness.clickText("Remint Navigation Stack")
+      #expect(frame.contains("stack generation \(generation) local \(generation)"))
+      #expect(harness.actionRegistrationCount <= 3)
+    }
+
+    let frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("root stack generation 8"))
+    #expect(!frame.contains("stack generation 8 local"))
+  }
+}
+
+@MainActor
+private struct StressNP005Fixture: View {
+  @State private var isPresented = false
+  @State private var generation = 0
+
+  var body: some View {
+    NavigationStack(id: "stress-np-005-stack-\(generation)") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("root stack generation \(generation)")
+        Button("Open Stack Destination") { isPresented = true }
+      }
+      .navigationDestination(isPresented: $isPresented) {
+        StressNP005Destination(
+          generation: generation,
+          stackGeneration: $generation
+        )
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP005Destination: View {
+  let generation: Int
+  @Binding var stackGeneration: Int
+  @State private var local = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("stack generation \(generation) local \(local)")
+      Button("Increment Stack Local") { local += 1 }
+      Button("Remint Navigation Stack") { stackGeneration += 1 }
+    }
+  }
+}
