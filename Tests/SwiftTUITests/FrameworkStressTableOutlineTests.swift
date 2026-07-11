@@ -249,3 +249,52 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 005: table empty-to-scrollable cardinality
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 005 table zero to many rows rebuilds scroll extent")
+  func tableOutline005TableZeroToManyRowsRebuildsScrollExtent() {
+    // Hypothesis: a table crossing zero rows can retain stale selection,
+    // viewport, or scroll-indicator fields in its collapsed payload.
+    struct Root: View {
+      let count: Int
+      let generation: Int
+
+      var body: some View {
+        Table(selection: .constant(4), columns: [.init("Rows", width: 12)]) {
+          ForEach(0..<count) { row in
+            TableRow { Text("r\(row)-g\(generation)") }.tag(row)
+          }
+        }
+        .frame(width: 18, height: 6, alignment: .topLeading)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline005")
+    for generation in 0..<20 {
+      let count = generation.isMultiple(of: 2) ? 0 : 12
+      let root = Root(count: count, generation: generation)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 18, height: 6)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 18, height: 6)
+      )
+      let rendered = tableOutlineText(retained)
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      #expect(rendered.contains("r4-g\(generation)") == (count > 0))
+      #expect((rendered.contains("↑") || rendered.contains("↓")) == (count > 0))
+    }
+  }
+}
