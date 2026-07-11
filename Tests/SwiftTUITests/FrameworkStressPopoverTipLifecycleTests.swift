@@ -479,6 +479,52 @@ extension FrameworkStressPopoverTipLifecycleTests {
   }
 }
 
+// MARK: - Attempt 013: bindingless dismissal across nil gaps
+
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("stress popover tip 013 bindingless dismissal survives nil round trips")
+  func popoverTip013BindinglessDismissalSurvivesNilRoundTrips() throws {
+    // Hypothesis: temporarily removing a bindingless tip can discard its
+    // one-shot dismissed ID and allow the same tip to resurrect.
+    let rootIdentity = testIdentity("PopoverTipStress013", "Root")
+    let model = PopoverTipStressModel()
+    model.tipID = "bindingless-nil"
+    model.title = "Bindingless nil tip"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "acknowledge", title: "Dismiss bindingless tip")]
+
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity,
+      model: model,
+      bindingless: true
+    )
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Dismiss bindingless tip", chooseLast: true)
+    #expect(model.actionLog == ["acknowledge@0"])
+    var dismissalStayedSuppressed = popoverTipStressEntryCount(in: harness) == 0
+
+    for generation in 1...12 {
+      model.hasTip = false
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      model.generation = generation
+      model.title = "Bindingless nil tip \(generation)"
+      model.hasTip = true
+      let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+
+      dismissalStayedSuppressed =
+        dismissalStayedSuppressed
+        && !frame.contains("Bindingless nil tip \(generation)")
+        && popoverTipStressEntryCount(in: harness) == 0
+    }
+
+    withKnownIssue("Bindingless tip actions do not persist their internal dismissed tip ID") {
+      #expect(dismissalStayedSuppressed)
+    }
+  }
+}
+
 @MainActor
 private final class PopoverTipStressModel {
   var generation = 0
