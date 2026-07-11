@@ -547,3 +547,96 @@ private struct StressNP008Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 009: three-level mixed destination chain
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 009 Escape unwinds mixed destination chain")
+  func stress009EscapeUnwindsMixedDestinationChain() throws {
+    // Hypothesis: Boolean and item activations nested three levels deep can
+    // publish pop entries out of order or tear down an ancestor's local state.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP009", "Root"),
+      size: .init(width: 52, height: 11)
+    ) {
+      StressNP009Fixture()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Open Outer Destination")
+    _ = try harness.clickText("Increment Outer Local")
+    _ = try harness.clickText("Open Middle Item")
+    _ = try harness.clickText("Increment Middle Local")
+    _ = try harness.clickText("Open Inner Destination")
+    _ = try harness.focusText("Inner Focus Target")
+
+    var frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("middle item middle local 1"))
+    #expect(!frame.contains("Inner Focus Target"))
+
+    _ = try harness.focusText("Middle Focus Target")
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("outer destination local 1"))
+    #expect(!frame.contains("middle item middle"))
+
+    _ = try harness.focusText("Outer Focus Target")
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Open Outer Destination"))
+    #expect(!frame.contains("outer destination local"))
+  }
+}
+
+private struct StressNP009Item: Identifiable, Sendable {
+  let id = "middle"
+}
+
+@MainActor
+private struct StressNP009Fixture: View {
+  @State private var outer = false
+
+  var body: some View {
+    NavigationStack(id: "stress-np-009-stack") {
+      Button("Open Outer Destination") { outer = true }
+        .navigationDestination(isPresented: $outer) {
+          StressNP009OuterDestination()
+        }
+    }
+  }
+}
+
+@MainActor
+private struct StressNP009OuterDestination: View {
+  @State private var local = 0
+  @State private var middleItem: StressNP009Item?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("outer destination local \(local)")
+      Button("Outer Focus Target") { local += 1 }
+      Button("Increment Outer Local") { local += 1 }
+      Button("Open Middle Item") { middleItem = StressNP009Item() }
+    }
+    .navigationDestination(item: $middleItem) { item in
+      StressNP009MiddleDestination(item: item)
+    }
+  }
+}
+
+@MainActor
+private struct StressNP009MiddleDestination: View {
+  let item: StressNP009Item
+  @State private var local = 0
+  @State private var inner = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("middle item \(item.id) local \(local)")
+      Button("Middle Focus Target") { local += 1 }
+      Button("Increment Middle Local") { local += 1 }
+      Button("Open Inner Destination") { inner = true }
+    }
+    .navigationDestination(isPresented: $inner) {
+      Button("Inner Focus Target") {}
+    }
+  }
+}
