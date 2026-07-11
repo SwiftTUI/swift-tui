@@ -715,3 +715,64 @@ extension FrameworkStressTableOutlineTests {
     }
   }
 }
+
+// MARK: - Attempt 013: recursively hosted table rows
+
+extension FrameworkStressTableOutlineTests {
+  @Test("stress table outline 013 grouped table rows flatten in current authored order")
+  func tableOutline013GroupedTableRowsFlattenInCurrentAuthoredOrder() {
+    // Hypothesis: recursive table-row collection can reuse the previous Group
+    // traversal and strand rows when nested indexed sources reorder.
+    struct Item: Identifiable { let id: Int }
+    struct Root: View {
+      let generation: Int
+      let items: [Item]
+
+      var body: some View {
+        Table(selection: .constant(2), columns: [.init("Rows", width: 12)]) {
+          Group {
+            TableRow { Text("start-\(generation)") }.tag(0)
+            ForEach(items) { item in
+              Group {
+                TableRow { Text("item-\(item.id)-g\(generation)") }.tag(item.id)
+              }
+            }
+            Group {
+              TableRow { Text("end-\(generation)") }.tag(9)
+            }
+          }
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("TableOutline013")
+    for generation in 0..<18 {
+      let ids = generation.isMultiple(of: 2) ? [1, 2, 3] : [3, 1, 2]
+      let root = Root(generation: generation, items: ids.map(Item.init(id:)))
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: identity,
+          invalidatedIdentities: generation == 0 ? [] : [identity]
+        ),
+        proposal: .init(width: 20, height: 12)
+      )
+      let fresh = DefaultRenderer().render(
+        root,
+        context: .init(identity: identity),
+        proposal: .init(width: 20, height: 12)
+      )
+      let tokens = ["start-\(generation)"]
+        + ids.map { "item-\($0)-g\(generation)" }
+        + ["end-\(generation)"]
+      guard case .table(let payload) = retained.resolvedTree.drawPayload else {
+        Issue.record("expected grouped table payload")
+        return
+      }
+
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(payload.rows.compactMap { $0.cells.first?.text } == tokens)
+    }
+  }
+}
