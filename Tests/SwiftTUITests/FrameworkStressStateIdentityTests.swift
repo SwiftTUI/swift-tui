@@ -1178,6 +1178,93 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 019: Duplicate entity occurrence cardinality
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 019 duplicate occurrences keep independent lifetimes")
+  func stateIdentity019DuplicateOccurrencesKeepIndependentLifetimes() throws {
+    // Hypothesis: duplicate occurrences share the runtime identity index, so removing and
+    // recreating occurrence one can alias occurrence zero's state or keep its retired node.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity019"),
+      size: .init(width: 64, height: 12)
+    ) {
+      StateIdentity019Root()
+    }
+    defer { harness.shutdown() }
+
+    var occurrencesStayedIndependent = true
+    for primaryCount in 1...4 {
+      var frame = try harness.clickText("Increment Primary 019")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("019 Primary Count \(primaryCount)")
+        && frame.contains("019 Secondary Count 0")
+      frame = try harness.clickText("Increment Secondary 019")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("019 Primary Count \(primaryCount)")
+        && frame.contains("019 Secondary Count 1")
+
+      frame = try harness.clickText("Remove Secondary 019")
+      #expect(!frame.contains("019 Secondary Count"))
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("019 Primary Count \(primaryCount)")
+      frame = try harness.clickText("Insert Secondary 019")
+      occurrencesStayedIndependent =
+        occurrencesStayedIndependent
+        && frame.contains("019 Secondary Count 0")
+        && frame.contains("019 Primary Count \(primaryCount)")
+      #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
+    }
+
+    withKnownIssue("Duplicate-ID row actions dispatch into the wrong occurrence owner") {
+      #expect(occurrencesStayedIndependent)
+    }
+  }
+
+  private struct StateIdentity019Item: Identifiable {
+    let id = 7
+    let label: String
+  }
+
+  private struct StateIdentity019Root: View {
+    @State private var includesSecondary = true
+
+    private var items: [StateIdentity019Item] {
+      var result = [StateIdentity019Item(label: "Primary")]
+      if includesSecondary {
+        result.append(.init(label: "Secondary"))
+      }
+      return result
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(includesSecondary ? "Remove Secondary 019" : "Insert Secondary 019") {
+          includesSecondary.toggle()
+        }
+        ForEach(items) { item in
+          StateIdentity019Row(label: item.label)
+        }
+      }
+    }
+  }
+
+  private struct StateIdentity019Row: View {
+    let label: String
+    @State private var count = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("019 \(label) Count \(count)")
+        Button("Increment \(label) 019") { count += 1 }
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
