@@ -970,3 +970,58 @@ private struct StressInput017Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 018: stable TextField identity retargeted to another binding
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Retargeting a stable TextField does not leak the old caret into the new binding")
+  func stressInputRouting018TextFieldRetargetDropsOldCaretState() throws {
+    // Hypothesis: editor state keyed only by view identity may retain A's caret
+    // after the same TextField identity begins editing binding B.
+    let first = StressInputBox("abcd")
+    let second = StressInputBox("wxyz")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput018Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressInput018Fixture(first: first, second: second)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput018Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    _ = try harness.clickText("Retarget text binding")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput018Fixture.fieldIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.character("Z")))
+
+    #expect(first.value == "abcd")
+    withKnownIssue("A retargeted TextField carries the prior binding's caret position") {
+      #expect(second.value == "wxyzZ")
+    }
+  }
+}
+
+private struct StressInput018Fixture: View {
+  static let fieldIdentity = testIdentity("StressInput018", "Field")
+
+  let first: StressInputBox<String>
+  let second: StressInputBox<String>
+  @State private var usesSecond = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Retarget text binding") { usesSecond = true }
+      if usesSecond {
+        TextField("Retargeted value", text: second.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+      } else {
+        TextField("Retargeted value", text: first.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+      }
+    }
+  }
+}
