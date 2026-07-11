@@ -530,3 +530,44 @@ extension FrameworkStressFramePipelineTests {
     )
   }
 }
+
+// MARK: - Attempt 009: latest drawn-identity generation
+
+extension FrameworkStressFramePipelineTests {
+  @Test("stress frame pipeline 009 drawn identities replace instead of accumulate")
+  func framePipeline009DrawnIdentitiesReplaceInsteadOfAccumulate() {
+    // Hypothesis: committed visibility can union across generations, causing
+    // later offscreen-elision checks to treat long-departed nodes as visible.
+    let state = FrameTailRetainedState()
+    let root = framePipelineArtifactTree(prefix: "FramePipeline009", childCount: 3)
+    let proposal = ProposedSize(width: 12, height: 3)
+    let firstIdentity = root.children[0].identity
+    let secondIdentity = root.children[1].identity
+    let thirdIdentity = root.children[2].identity
+
+    let first = framePipelineArtifacts(
+      root: root,
+      rasterLine: "first",
+      drawnIdentities: [firstIdentity, secondIdentity]
+    )
+    state.storeCommittedFrame(first, baselinePlacedTree: first.placedTree, proposal: proposal)
+    #expect(state.previousDrawnIdentities == [firstIdentity, secondIdentity])
+
+    let second = framePipelineArtifacts(
+      root: root,
+      rasterLine: "second",
+      drawnIdentities: [secondIdentity, thirdIdentity]
+    )
+    state.storeCommittedFrame(second, baselinePlacedTree: second.placedTree, proposal: proposal)
+    #expect(state.previousDrawnIdentities == [secondIdentity, thirdIdentity])
+    #expect(!state.previousDrawnIdentities.contains(firstIdentity))
+
+    let third = framePipelineArtifacts(
+      root: root,
+      rasterLine: "third",
+      drawnIdentities: [thirdIdentity]
+    )
+    state.storeCommittedFrame(third, baselinePlacedTree: third.placedTree, proposal: proposal)
+    #expect(state.previousDrawnIdentities == [thirdIdentity])
+  }
+}
