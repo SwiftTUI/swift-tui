@@ -208,6 +208,64 @@ extension EnvironmentValues {
   }
 }
 
+// MARK: - Attempt 005: Dynamic-member Binding across owner churn
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 005 dynamic member binding follows the live owner")
+  func stateIdentity005DynamicMemberBindingFollowsLiveOwner() throws {
+    // Hypothesis: a derived Binding closes over the pre-churn graph location and can either
+    // write a retired node or overwrite unrelated fields when its owner is re-minted.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity005"),
+      size: .init(width: 58, height: 10)
+    ) {
+      StateIdentity005Root()
+    }
+    defer { harness.shutdown() }
+
+    for generation in 0..<4 {
+      _ = try harness.focus(StateIdentity005Root.fieldIdentity)
+      var frame = try harness.paste("x")
+      #expect(frame.contains("005 Value \(String(repeating: "x", count: generation + 1))"))
+      #expect(frame.contains("005 Marker 41"))
+
+      frame = try harness.clickText("Churn 005")
+      #expect(frame.contains("005 Generation \(generation + 1)"))
+      #expect(frame.contains("005 Marker 41"))
+    }
+  }
+
+  private struct StateIdentity005Root: View {
+    static let fieldIdentity = testIdentity("StateIdentity005", "field")
+
+    struct Profile {
+      var name = ""
+    }
+
+    struct Form {
+      var profile = Profile()
+      var marker = 41
+    }
+
+    @State private var form = Form()
+    @State private var generation = 0
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("005 Generation \(generation)")
+        Text("005 Value \(form.profile.name)")
+        Text("005 Marker \(form.marker)")
+        Button("Churn 005") { generation += 1 }
+        Group {
+          TextField("Name 005", text: $form.profile.name)
+            .id(Self.fieldIdentity)
+        }
+        .id(testIdentity("StateIdentity005", "owner", "\(generation)"))
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0
