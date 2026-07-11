@@ -56,4 +56,54 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+
+// MARK: - Attempt 002: Recreated closure canvas capture
+
+extension FrameworkStressRenderReconciliationTests {
+  @Test("stress render reconciliation 002 closure canvas uses its current capture")
+  func renderReconciliation002ClosureCanvasUsesCurrentCapture() {
+    // Hypothesis: closure-backed Canvas payloads intentionally compare by storage identity, but
+    // retained draw substitution may still replay the first closure after repeated reconstruction.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        Canvas { context in
+          context.setCell(
+            at: CellPoint(x: generation % 4, y: 0),
+            character: Character(String(generation % 10)),
+            foreground: .blue
+          )
+        }
+        .frame(width: 4, height: 1)
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation002")
+
+    for generation in 0..<16 {
+      let frame = renderer.render(
+        Root(generation: generation),
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let expectedColumn = generation % 4
+      #expect(
+        frame.rasterSurface.cells[0][expectedColumn].character
+          == Character(String(generation % 10))
+      )
+      #expect(
+        frame.rasterSurface
+          == DefaultRenderer().render(
+            Root(generation: generation),
+            context: .init(identity: rootIdentity)
+          ).rasterSurface
+      )
+    }
+  }
+}
+
 // MARK: - End
