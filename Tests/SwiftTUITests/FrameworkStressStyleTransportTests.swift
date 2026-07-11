@@ -143,4 +143,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 015 surrogate pairs combine into one scalar")
+  func styleTransport015SurrogatePairsCombineIntoOneScalar() {
+    // Hypothesis: the low surrogate can remain in the stream after pair combination.
+    var parser = StyleTransportJSONParser(#"{"v":"\uD83D\uDE80x"}"#)
+    #expect(parser.parse()?.objectValue?["v"]?.stringValue == "🚀x")
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
