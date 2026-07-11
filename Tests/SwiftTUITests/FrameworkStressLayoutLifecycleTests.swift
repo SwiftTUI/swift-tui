@@ -1901,3 +1901,57 @@ extension ResolvedNode {
     return nil
   }
 }
+
+// MARK: - Attempt 032: transition resurrection
+
+extension FrameworkStressLayoutLifecycleTests {
+  @Test("stress 032 rapid reinsertion cancels the matching removal overlay")
+  func stress032RapidReinsertionCancelsMatchingRemovalOverlay() throws {
+    // Hypothesis: a same-identity insertion that races its in-flight removal
+    // may leave the captured removal subtree alive beside the current subtree.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressLL032", "Root"),
+      size: .init(width: 46, height: 8)
+    ) {
+      StressLL032Fixture()
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+
+    try withAnimationSinks(controller) {
+      for _ in 1...8 {
+        _ = try harness.clickText("Toggle Transition Resurrection")
+        #expect(!controller.debugStateSnapshot().removingIdentities.isEmpty)
+
+        let frame = try harness.clickText("Toggle Transition Resurrection")
+        let occurrences =
+          frame.components(separatedBy: "transition resurrection probe").count - 1
+        #expect(occurrences == 1)
+        withKnownIssue("Reinsertion does not cancel the same identity's removal overlay") {
+          #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+        }
+        #expect(controller.activeAnimationCount <= 1)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct StressLL032Fixture: View {
+  @State private var isVisible = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Toggle Transition Resurrection") {
+        withAnimation(.linear(duration: .milliseconds(500))) {
+          isVisible.toggle()
+        }
+      }
+      if isVisible {
+        Text("transition resurrection probe")
+          .id("transition-resurrection-probe")
+          .transition(.opacity)
+      }
+    }
+  }
+}
