@@ -109,6 +109,54 @@ extension FrameworkStressSafeAreaGeometryTests {
   }
 }
 
+// MARK: - Attempt 019: GeometryReader cell-pixel metric churn
+
+extension FrameworkStressSafeAreaGeometryTests {
+  @Test("stress safe area geometry 019 geometry adopts every cell metric")
+  func safeAreaGeometry019GeometryAdoptsEveryCellMetric() {
+    // Hypothesis: a layout-realized GeometryReader can retain the first host cell-pixel metadata
+    // when its cell bounds and authored content topology remain unchanged.
+    struct Root: View {
+      let generation: Int
+
+      var body: some View {
+        GeometryReader { proxy in
+          Text(
+            "019 g\(generation) px\(proxy.cellPixelMetrics.width)x"
+              + "\(proxy.cellPixelMetrics.height) source \(proxy.cellPixelMetrics.source)"
+          )
+        }
+      }
+    }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let identity = testIdentity("SafeAreaGeometry019")
+    let metrics = [
+      CellPixelMetrics.estimated,
+      CellPixelMetrics(width: 10, height: 20, source: .reported),
+      CellPixelMetrics(width: 12, height: 18, source: .reported),
+      CellPixelMetrics(width: 8, height: 16, source: .reported),
+    ]
+
+    for generation in 0..<20 {
+      let metric = metrics[generation % metrics.count]
+      let frames = safeAreaGeometryFrames(
+        Root(generation: generation),
+        renderer: renderer,
+        identity: identity,
+        generation: generation,
+        cellPixelMetrics: metric
+      )
+
+      let text = safeAreaGeometryText(frames.retained)
+      #expect(frames.retained.rasterSurface == frames.fresh.rasterSurface)
+      #expect(frames.retained.measuredTree == frames.fresh.measuredTree)
+      #expect(frames.retained.placedTree == frames.fresh.placedTree)
+      #expect(text.contains("019 g\(generation) px\(metric.width)x\(metric.height)"))
+    }
+  }
+}
+
 // MARK: - Attempt 018: GeometryReader host proposal oscillation
 
 extension FrameworkStressSafeAreaGeometryTests {
