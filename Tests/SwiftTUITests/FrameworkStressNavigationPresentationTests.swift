@@ -838,3 +838,64 @@ private struct StressNP012Fixture: View {
     }
   }
 }
+
+// MARK: - Attempt 013: active sibling stack removal
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("stress navigation presentation 013 removed sibling stack prunes pop entry")
+  func stress013RemovedSiblingStackPrunesPopEntry() throws {
+    // Hypothesis: removing one of two active sibling stacks can leave its pop
+    // closure in the aggregate preference and intercept the survivor's Escape.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressNP013", "Root"),
+      size: .init(width: 72, height: 10)
+    ) {
+      StressNP013Fixture()
+    }
+    defer { harness.shutdown() }
+
+    var frame = try harness.clickText("Remove Left Active Stack")
+    #expect(!frame.contains("Left Removed Destination"))
+    #expect(frame.contains("left binding true"))
+    #expect(frame.contains("Right Surviving Destination"))
+
+    _ = try harness.focusText("Right Surviving Destination")
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Right Surviving Root"))
+    #expect(frame.contains("left binding true"))
+    #expect(!frame.contains("Right Surviving Destination"))
+    #expect(harness.actionRegistrationCount <= 2)
+  }
+}
+
+@MainActor
+private struct StressNP013Fixture: View {
+  @State private var showsLeft = true
+  @State private var left = true
+  @State private var right = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(spacing: 1) {
+        Button("Remove Left Active Stack") { showsLeft = false }
+        Text("left binding \(left)")
+      }
+      HStack(alignment: .top, spacing: 2) {
+        if showsLeft {
+          NavigationStack(id: "stress-np-013-left") {
+            Button("Left Removed Root") { left = true }
+              .navigationDestination(isPresented: $left) {
+                Button("Left Removed Destination") {}
+              }
+          }
+        }
+        NavigationStack(id: "stress-np-013-right") {
+          Button("Right Surviving Root") { right = true }
+            .navigationDestination(isPresented: $right) {
+              Button("Right Surviving Destination") {}
+            }
+        }
+      }
+    }
+  }
+}
