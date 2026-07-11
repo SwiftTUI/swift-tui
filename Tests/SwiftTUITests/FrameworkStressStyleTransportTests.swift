@@ -73,4 +73,13 @@ extension FrameworkStressStyleTransportTests {
   }
 }
 
+extension FrameworkStressStyleTransportTests {
+  @Test("stress style transport 008 leading padding never decodes")
+  func styleTransport008LeadingPaddingNeverDecodes() {
+    // Hypothesis: padding in the first or second slot can underflow chunk assembly.
+    #expect(StyleTransportBase64.decode("=AAA") == nil)
+    #expect(StyleTransportBase64.decode("A=AA") == nil)
+  }
+}
+
 // NEXT STYLE TRANSPORT STRESS TEST
