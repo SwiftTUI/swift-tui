@@ -227,9 +227,7 @@ struct FrameworkStressAnimatedImageCodecTests {
     }
     let decoded = try Self.gifRoundTrip(Self.sequence(pixels: pixels))
 
-    withKnownIssue("The GIF encoder reserves a palette slot and quantizes the 256th opaque color") {
-      #expect(decoded.frames[0].pixels == pixels)
-    }
+    #expect(decoded.frames[0].pixels == pixels)
   }
 
   @Test("stress animated image codec 022 repeated GIF encoding is byte deterministic")

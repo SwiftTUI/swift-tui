@@ -134,9 +134,7 @@ struct FrameworkStressTerminalBoundaryTests {
     )
 
     #expect(result.payload == Array("q".utf8))
-    withKnownIssue("A repeated control introducer does not resynchronize to the later frame") {
-      #expect(result.messages == [.resize(.init(width: 84, height: 28))])
-    }
+    #expect(result.messages == [.resize(.init(width: 84, height: 28))])
   }
 
   @Test("stress terminal boundary 011 BEL terminated OSC reply is inert keyboard input")
@@ -146,9 +144,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}]10;rgb:ffff/ffff/ffff\u{0007}q".utf8))
 
-    withKnownIssue("A BEL-terminated OSC reply leaks its body into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 012 ST terminated OSC reply is inert keyboard input")
@@ -158,9 +154,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}]11;rgb:0/0/0\u{001B}\\q".utf8))
 
-    withKnownIssue("An ST-terminated OSC reply leaks its body and terminator into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 013 primary device attributes reply is inert keyboard input")
@@ -170,9 +164,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[?62;4;22cq".utf8))
 
-    withKnownIssue("A primary device-attributes reply leaks as Escape and literal key input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 014 DEC private mode reply is inert keyboard input")
@@ -182,9 +174,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[?1016;2$yq".utf8))
 
-    withKnownIssue("A DEC private-mode report leaks its state as keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 015 window size reply is inert keyboard input")
@@ -194,9 +184,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[4;720;1280tq".utf8))
 
-    withKnownIssue("A terminal window-size reply leaks its dimensions into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 016 XTSM graphics reply is inert keyboard input")
@@ -206,9 +194,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[?2;0;800;600Sq".utf8))
 
-    withKnownIssue("An XTSM graphics reply leaks its values into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 017 kitty flags report is inert keyboard input")
@@ -218,9 +204,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[?5uq".utf8))
 
-    withKnownIssue("A Kitty flags capability report leaks as keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 018 kitty graphics APC reply is inert keyboard input")
@@ -230,9 +214,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}_Gi=42;OK\u{001B}\\q".utf8))
 
-    withKnownIssue("A Kitty APC response leaks its body and terminator into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 019 DCS response is inert keyboard input")
@@ -242,9 +224,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}P1+r5463=31\u{001B}\\q".utf8))
 
-    withKnownIssue("A DCS response leaks its body and terminator into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 020 privacy message is inert keyboard input")
@@ -254,9 +234,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}^host-message\u{001B}\\q".utf8))
 
-    withKnownIssue("A privacy-message string leaks its body and terminator into keyboard input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 021 split OSC reply waits for its terminator")
@@ -267,10 +245,8 @@ struct FrameworkStressTerminalBoundaryTests {
     let partial = parser.feed(Array("\u{001B}]10;rgb:ff/".utf8))
     let completed = parser.feed(Array("ff/ff\u{0007}q".utf8))
 
-    withKnownIssue("A split OSC reply emits both partial and completed payload bytes as keys") {
-      #expect(partial.isEmpty)
-      #expect(completed == [.key(KeyPress(.character("q")))])
-    }
+    #expect(partial.isEmpty)
+    #expect(completed == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 022 eight bit CSI reply is inert keyboard input")
@@ -281,9 +257,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(bytes)
 
-    withKnownIssue("An eight-bit CSI reply drops its introducer but leaks its body as key input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 023 eight bit OSC reply is inert keyboard input")
@@ -294,9 +268,7 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(bytes)
 
-    withKnownIssue("An eight-bit OSC reply drops its introducer but leaks its body as key input") {
-      #expect(events == [.key(KeyPress(.character("q")))])
-    }
+    #expect(events == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 024 incomplete CSI reply remains buffered")
@@ -307,10 +279,8 @@ struct FrameworkStressTerminalBoundaryTests {
     let partial = parser.feed(Array("\u{001B}[?62;4".utf8))
     let completed = parser.feed(Array("cq".utf8))
 
-    withKnownIssue("An incomplete CSI reply emits partial state before its final byte arrives") {
-      #expect(partial.isEmpty)
-      #expect(completed == [.key(KeyPress(.character("q")))])
-    }
+    #expect(partial.isEmpty)
+    #expect(completed == [.key(KeyPress(.character("q")))])
   }
 
   @Test("stress terminal boundary 025 adjacent replies preserve trailing Unicode input")
@@ -323,8 +293,6 @@ struct FrameworkStressTerminalBoundaryTests {
 
     let events = parser.feed(bytes)
 
-    withKnownIssue("Adjacent OSC and CSI replies leak before the trailing Unicode key") {
-      #expect(events == [.key(KeyPress(.character("\u{1F642}")))])
-    }
+    #expect(events == [.key(KeyPress(.character("\u{1F642}")))])
   }
 }

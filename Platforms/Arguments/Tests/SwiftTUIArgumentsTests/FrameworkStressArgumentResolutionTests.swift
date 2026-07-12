@@ -47,9 +47,7 @@ struct FrameworkStressArgumentResolutionTests {
 
   @Test("stress argument resolution 007 out-of-range TCP ports are rejected")
   func argumentResolution007OutOfRangeTCPPortsAreRejected() {
-    withKnownIssue("The argument surface accepts TCP ports above 65535") {
-      #expect(throws: (any Error).self) { _ = try SwiftTUIOptions.parse(["--port", "65536"]) }
-    }
+    #expect(throws: (any Error).self) { _ = try SwiftTUIOptions.parse(["--port", "65536"]) }
   }
 
   @Test("stress argument resolution 008 empty bind addresses are rejected")
@@ -172,9 +170,7 @@ struct FrameworkStressArgumentResolutionTests {
     let options = try SwiftTUIOptions.parse(["--linear", "--json"])
     let config = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(config.output == .json)
-    withKnownIssue("JSON output wins the mode but retains the conflicting CLI linear policy bit") {
-      #expect(config.linear == false)
-    }
+    #expect(config.linear == false)
   }
 
   @Test("stress argument resolution 025 plain policy remains explicit in JSON mode")

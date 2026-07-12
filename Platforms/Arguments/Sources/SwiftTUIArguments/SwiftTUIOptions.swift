@@ -92,7 +92,13 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
 
   @Option(
     name: .customLong("port"),
-    help: "Port for --web. 0 = auto-assign. [env: SWIFTTUI_PORT]"
+    help: "Port for --web. 0 = auto-assign. [env: SWIFTTUI_PORT]",
+    transform: { argument in
+      guard let port = Int(argument), (0...65_535).contains(port) else {
+        throw ValidationError("--port must be between 0 and 65535")
+      }
+      return port
+    }
   )
   public var port: Int = 0
 

@@ -23,6 +23,8 @@ package struct ControlMessageParser {
             messages.append(message)
           }
           bufferedCommand = nil
+        } else if byte == Self.introducer {
+          bufferedCommand = []
         } else {
           bufferedCommand?.append(byte)
         }

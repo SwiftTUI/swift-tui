@@ -288,9 +288,7 @@ extension ResolvedNode {
     _ entityIdentity: EntityIdentity,
     at entityStructuralPath: StructuralPath
   ) {
-    if identity == entityStructuralPath.identityProjection,
-      kind == .view("Group")
-    {
+    if kind == .view("Group") {
       for index in children.indices {
         children[index].attachingEntityIdentity(
           entityIdentity,

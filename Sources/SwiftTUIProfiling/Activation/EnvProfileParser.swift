@@ -153,7 +153,7 @@ package enum EnvProfileParser {
       }
       sawComponent = true
     }
-    return sawComponent ? total : nil
+    return sawComponent && total > .zero ? total : nil
   }
 
   private static func trimmed(_ string: String) -> String {

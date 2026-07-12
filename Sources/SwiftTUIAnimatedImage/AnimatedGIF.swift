@@ -35,7 +35,10 @@ public enum AnimatedGIF {
     _ sequence: AnimatedImageSequence,
     loopCount: Int = 0
   ) throws -> [UInt8] {
-    var palette = GIFPalette()
+    let reservesTransparency = sequence.frames.contains { frame in
+      frame.pixels.contains { $0.alpha == 0 }
+    }
+    var palette = GIFPalette(reservesTransparency: reservesTransparency)
     let frames = sequence.frames.enumerated().map { index, frame in
       var hasTransparentPixels = false
       let indices = frame.pixels.map { pixel in
@@ -107,8 +110,14 @@ private struct GIFRGBKey: Equatable, Hashable {
 }
 
 private struct GIFPalette {
-  var colors: [(r: UInt8, g: UInt8, b: UInt8)] = [(r: 0, g: 0, b: 0)]
+  var colors: [(r: UInt8, g: UInt8, b: UInt8)]
   private var colorIndices: [GIFRGBKey: UInt8] = [:]
+  private let firstOpaqueIndex: Int
+
+  init(reservesTransparency: Bool) {
+    colors = reservesTransparency ? [(r: 0, g: 0, b: 0)] : []
+    firstOpaqueIndex = reservesTransparency ? 1 : 0
+  }
 
   mutating func index(
     for pixel: AnimatedImagePixel
@@ -135,9 +144,9 @@ private struct GIFPalette {
   private func nearestPaletteIndex(
     to color: GIFRGBKey
   ) -> UInt8 {
-    var bestIndex = 1
+    var bestIndex = firstOpaqueIndex
     var bestDistance = Int.max
-    for index in 1..<colors.count {
+    for index in firstOpaqueIndex..<colors.count {
       let candidate = colors[index]
       let redDelta = Int(color.red) - Int(candidate.r)
       let greenDelta = Int(color.green) - Int(candidate.g)

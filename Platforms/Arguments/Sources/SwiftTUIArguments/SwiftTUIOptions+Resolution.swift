@@ -87,6 +87,8 @@ extension SwiftTUIOptions {
       motion = .reduced
       noProgress = true
       linear = true
+    } else if output == .json {
+      linear = false
     }
 
     // Web: present iff --web or env var set; CLI values override env var values.

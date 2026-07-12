@@ -218,7 +218,17 @@ enum ViewGraphLifecyclePlanner {
         disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
         tasks: node.lifecycleMetadata.tasks
       )
-      let previousNode = viewportLifecycleNodesByKey[key]
+      let previousNode: LifecycleStateNode?
+      if case .viewNode = key,
+        viewportLifecycleNodesByKey[key] == nil,
+        let identityNode = viewportLifecycleNodesByKey.removeValue(
+          forKey: .identity(node.identity)
+        )
+      {
+        previousNode = identityNode
+      } else {
+        previousNode = viewportLifecycleNodesByKey[key]
+      }
       seenKeys.insert(key)
       order.append(key)
 

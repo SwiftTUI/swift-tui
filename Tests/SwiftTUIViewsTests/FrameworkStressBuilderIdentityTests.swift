@@ -174,9 +174,7 @@ struct FrameworkStressBuilderIdentityTests {
     let resolved = resolveBuilder(Builder020Probe())
     let survivor = try #require(builderTextNodes(resolved).first)
     #expect(builderText(survivor) == "visible")
-    withKnownIssue("An omitted duplicate-ID row collapses the survivor to occurrence zero") {
-      #expect(survivor.entityIdentity?.occurrence == 1)
-    }
+    #expect(survivor.entityIdentity?.occurrence == 1)
   }
 
   @Test("stress builder identity 021 group row attaches entity to every child")
@@ -184,12 +182,10 @@ struct FrameworkStressBuilderIdentityTests {
     let resolved = resolveBuilder(Builder021Probe())
     let nodes = builderTextNodes(resolved)
     #expect(nodes.count == 2)
-    withKnownIssue("Spliced Group row children lose their ForEach entity metadata") {
-      #expect(
-        nodes.allSatisfy { $0.entityIdentity != nil }
-          && Set(nodes.compactMap(\.entityIdentity)).count == 1
-      )
-    }
+    #expect(
+      nodes.allSatisfy { $0.entityIdentity != nil }
+        && Set(nodes.compactMap(\.entityIdentity)).count == 1
+    )
   }
 
   @Test("stress builder identity 022 tuple row shares entity but keeps distinct paths")
@@ -197,9 +193,7 @@ struct FrameworkStressBuilderIdentityTests {
     let resolved = resolveBuilder(Builder022Probe())
     let nodes = builderTextNodes(resolved)
     #expect(nodes.count == 2)
-    withKnownIssue("Tuple row children lose their shared ForEach entity metadata") {
-      #expect(Set(nodes.compactMap(\.entityIdentity)).count == 1)
-    }
+    #expect(Set(nodes.compactMap(\.entityIdentity)).count == 1)
     #expect(Set(nodes.map(\.structuralPath)).count == 2)
   }
 

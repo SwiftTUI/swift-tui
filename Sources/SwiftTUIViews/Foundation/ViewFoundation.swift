@@ -128,7 +128,10 @@ package func assignEntityIdentityOccurrences(to resolved: inout [ResolvedNode]) 
       continue
     }
 
-    let occurrence = counts[entityIdentity.value, default: 0]
+    let occurrence = max(
+      entityIdentity.occurrence,
+      counts[entityIdentity.value, default: 0]
+    )
     counts[entityIdentity.value] = occurrence + 1
     resolved[index].entityIdentity = entityIdentity.withOccurrence(occurrence)
   }

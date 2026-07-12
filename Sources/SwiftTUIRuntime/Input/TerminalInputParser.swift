@@ -111,6 +111,10 @@ extension TerminalInputParser {
       return .key(KeyPress(.return))
     case 0x1B:
       return parseEscapeSequence()
+    case 0x9B:
+      return parseEightBitCSI()
+    case 0x9D:
+      return discardControlString(prefixLength: 1, terminatesWithBEL: true)
     case 0x20:
       bufferedBytes.removeFirst()
       return .key(KeyPress(.space))
@@ -176,6 +180,17 @@ extension TerminalInputParser {
       return nil
     }
 
+    switch bufferedBytes[1] {
+    case 0x5D:
+      return discardControlString(prefixLength: 2, terminatesWithBEL: true)
+    case 0x50, 0x5E, 0x5F:
+      if controlStringEnd(prefixLength: 2, terminatesWithBEL: false) != nil {
+        return discardControlString(prefixLength: 2, terminatesWithBEL: false)
+      }
+    default:
+      break
+    }
+
     // SS3 sequences: ESC O <final>. xterm-family terminals send F1–F4 this
     // way (and arrows/Home/End in application-cursor mode). This must be
     // matched before the Alt+key fall-through: without it, ESC O P parsed as
@@ -222,6 +237,10 @@ extension TerminalInputParser {
 
     guard bufferedBytes.count > 2 else {
       return nil
+    }
+
+    if bufferedBytes[2] == 0x3F {
+      return discardCSI(prefixLength: 2)
     }
 
     // Bracketed-paste start: ESC [ 2 0 0 ~ ... ESC [ 2 0 1 ~
@@ -273,6 +292,10 @@ extension TerminalInputParser {
         // code). Keep draining the buffer.
         return parseNextEvent()
       }
+      if bufferedBytes[index] == 0x74 {
+        bufferedBytes.removeFirst(index + 1)
+        return parseNextEvent()
+      }
       // Letter-terminated parameterized sequence (e.g. ESC[1;5A): fall through
       // to the existing modifier handling below.
     }
@@ -308,6 +331,77 @@ extension TerminalInputParser {
       bufferedBytes.removeFirst(3)
       return .key(KeyPress(.escape))
     }
+  }
+
+  private mutating func parseEightBitCSI() -> InputEvent? {
+    guard bufferedBytes.count > 1 else {
+      return nil
+    }
+    guard bufferedBytes[1] == 0x3F else {
+      bufferedBytes.removeFirst()
+      return parseNextEvent()
+    }
+    return discardCSI(prefixLength: 1)
+  }
+
+  private mutating func discardCSI(prefixLength: Int) -> InputEvent? {
+    var index = prefixLength
+    while index < bufferedBytes.count, (0x30...0x3F).contains(bufferedBytes[index]) {
+      index += 1
+    }
+    while index < bufferedBytes.count, (0x20...0x2F).contains(bufferedBytes[index]) {
+      index += 1
+    }
+    guard index < bufferedBytes.count else {
+      return nil
+    }
+    guard (0x40...0x7E).contains(bufferedBytes[index]) else {
+      bufferedBytes.removeFirst()
+      return parseNextEvent()
+    }
+    bufferedBytes.removeFirst(index + 1)
+    return parseNextEvent()
+  }
+
+  private mutating func discardControlString(
+    prefixLength: Int,
+    terminatesWithBEL: Bool
+  ) -> InputEvent? {
+    guard
+      let end = controlStringEnd(
+        prefixLength: prefixLength,
+        terminatesWithBEL: terminatesWithBEL
+      )
+    else {
+      return nil
+    }
+    bufferedBytes.removeFirst(end)
+    return parseNextEvent()
+  }
+
+  private func controlStringEnd(
+    prefixLength: Int,
+    terminatesWithBEL: Bool
+  ) -> Int? {
+    var index = prefixLength
+    while index < bufferedBytes.count {
+      if terminatesWithBEL, bufferedBytes[index] == 0x07 {
+        return index + 1
+      }
+      if bufferedBytes[index] == 0x9C {
+        return index + 1
+      }
+      if bufferedBytes[index] == 0x1B {
+        guard index + 1 < bufferedBytes.count else {
+          return nil
+        }
+        if bufferedBytes[index + 1] == 0x5C {
+          return index + 2
+        }
+      }
+      index += 1
+    }
+    return nil
   }
 
   /// Parses CSI sequences with modifier parameters: `ESC[1;{mod}{key}`

@@ -81,23 +81,17 @@ struct FrameworkStressProfilingGrammarTests {
 
   @Test("stress profiling grammar 013 zero millisecond intervals are rejected")
   func profilingGrammar013ZeroMillisecondIntervalsAreRejected() {
-    withKnownIssue("Zero memory intervals are accepted and can create an unbounded sampling loop") {
-      #expect(EnvProfileParser.parse("memory@0ms") == nil)
-    }
+    #expect(EnvProfileParser.parse("memory@0ms") == nil)
   }
 
   @Test("stress profiling grammar 014 zero second intervals are rejected")
   func profilingGrammar014ZeroSecondIntervalsAreRejected() {
-    withKnownIssue("Zero CPU intervals are accepted and can create an unbounded sampling loop") {
-      #expect(EnvProfileParser.parse("cpu@0s") == nil)
-    }
+    #expect(EnvProfileParser.parse("cpu@0s") == nil)
   }
 
   @Test("stress profiling grammar 015 mixed durations cannot hide a zero total")
   func profilingGrammar015MixedDurationsCannotHideZeroTotal() {
-    withKnownIssue("The duration grammar accepts a multi-component duration whose total is zero") {
-      #expect(EnvProfileParser.parseDuration("0s0ms") == nil)
-    }
+    #expect(EnvProfileParser.parseDuration("0s0ms") == nil)
   }
 
   @Test("stress profiling grammar 016 leading zeroes preserve duration value")

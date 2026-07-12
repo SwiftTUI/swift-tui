@@ -14,6 +14,11 @@ package enum MatchedGeometryNamespaceAllocator {
   }
 }
 
+private enum NamespaceStorageKey: Hashable {
+  case unmounted
+  case mounted(StructuralPath)
+}
+
 /// A property wrapper that allocates a stable, opaque namespace ID
 /// scoped to the enclosing view's identity.
 ///
@@ -36,23 +41,25 @@ public struct Namespace: Sendable {
   /// module's matched-geometry machinery.
   public typealias ID = MatchedGeometryNamespace
 
-  private let state: State<ID>
+  private let state: State<[NamespaceStorageKey: ID]>
 
   public init(line: UInt = #line, column: UInt = #column) {
-    // Each Namespace allocates a fresh seed ID via the monotonic
-    // allocator.  On the FIRST render at a given view identity the
-    // seed is stored; on subsequent renders State's identity-scoped
-    // storage returns the stored value and the freshly-allocated
-    // seed is discarded.  This is why the allocator increment is
-    // safe as a side effect of every re-construction.
     state = State(
-      wrappedValue: MatchedGeometryNamespaceAllocator.next(),
+      wrappedValue: [:],
       line: line,
       column: column
     )
   }
 
   public var wrappedValue: ID {
-    state.wrappedValue
+    let key =
+      currentAuthoringContext().map { NamespaceStorageKey.mounted($0.structuralPath) }
+      ?? .unmounted
+    if let existing = state.wrappedValue[key] {
+      return existing
+    }
+    let allocated = MatchedGeometryNamespaceAllocator.next()
+    state.wrappedValue[key] = allocated
+    return allocated
   }
 }

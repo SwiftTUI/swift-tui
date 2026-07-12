@@ -552,11 +552,7 @@ struct FrameworkStressViewportLifecyclePlanningTests {
       nodeIDs: [identity: nodeID]
     )
 
-    withKnownIssue(
-      "Viewport lifecycle key migration from identity to ViewNodeID synthesizes departure and re-entry"
-    ) {
-      #expect(plan.events.isEmpty)
-    }
+    #expect(plan.events.isEmpty)
     #expect(plan.viewportLifecycleOrder == [.viewNode(nodeID)])
     #expect(Set(plan.viewportLifecycleNodesByKey.keys) == [.viewNode(nodeID)])
   }

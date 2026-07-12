@@ -39,11 +39,7 @@ struct FrameworkStressStateFocusAuthoringTests {
       identity: testIdentity("StateFocus004")
     )
     #expect(capture.values.count == 2)
-    withKnownIssue(
-      "A shared Namespace-owning view value publishes one namespace across distinct mounts"
-    ) {
-      #expect(Set(capture.values).count == 2)
-    }
+    #expect(Set(capture.values).count == 2)
   }
 
   @Test("stress state focus 005 separate graphs isolate namespace storage")
