@@ -275,6 +275,43 @@ package final class LocalDefaultFocusRegistry: Equatable {
   }
 }
 
+/// A binding `.defaultFocus` whose owner subtree arrived this frame (fresh
+/// seed slot) while another control already held focus at resolve time. The
+/// modifier cannot arbitrate that conflict — it records the arrival here and
+/// focus-sync arms it only when no authored focus request and no namespace
+/// default claimed the frame. One-frame one-shot: deliberately excluded from
+/// `snapshot()`/`restore()` so a retained-subtree restore can never replay a
+/// consumed arrival and re-steal focus.
+package struct DefaultFocusArrivalSnapshot: Sendable {
+  package var bindingKey: FocusBindingKey
+  /// Identity of the authoring view node — inside the arriving subtree, so a
+  /// mid-frame subtree removal prunes the arrival before it can arm. `nil`
+  /// for chain positions that resolve without an authoring node (the
+  /// outermost modifier of a chain); those arrivals dedupe on
+  /// `contextIdentity` instead.
+  package var ownerIdentity: Identity?
+  /// The resolve-context identity of the modifier position. Embeds the
+  /// enclosing `.id` value and conditional branch, so it is fresh exactly
+  /// when the authored shape re-arrives — the arrival one-shot for
+  /// owner-less positions.
+  package var contextIdentity: Identity
+  /// Arms the default via an authored-request write. Returns false when a
+  /// live authored request already supersedes the default.
+  package var armDefault: @MainActor @Sendable () -> Bool
+
+  package init(
+    bindingKey: FocusBindingKey,
+    ownerIdentity: Identity?,
+    contextIdentity: Identity,
+    armDefault: @escaping @MainActor @Sendable () -> Bool
+  ) {
+    self.bindingKey = bindingKey
+    self.ownerIdentity = ownerIdentity
+    self.contextIdentity = contextIdentity
+    self.armDefault = armDefault
+  }
+}
+
 package struct FocusBindingRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var bindingKey: FocusBindingKey
@@ -327,6 +364,13 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
 @MainActor
 package final class LocalFocusBindingRegistry: Equatable {
   private var registrations: [FocusBindingRegistrationSnapshot] = []
+  private var pendingArrivalDefaults: [DefaultFocusArrivalSnapshot] = []
+  /// Context identities whose owner-less arrival was already recorded. An
+  /// owner-less position has no seed slot, so this set is its one-shot:
+  /// entries prune with their subtree (`removeSubtrees`), letting a genuine
+  /// re-arrival of the same identity record again. Identities embed the
+  /// enclosing `.id` value, so churned generations never collide.
+  private var seenOwnerlessArrivalContexts: Set<Identity> = []
 
   package init() {}
 
@@ -408,6 +452,43 @@ package final class LocalFocusBindingRegistry: Equatable {
     return .none
   }
 
+  package func recordArrivalDefault(
+    _ arrival: DefaultFocusArrivalSnapshot
+  ) {
+    if arrival.ownerIdentity == nil {
+      guard seenOwnerlessArrivalContexts.insert(arrival.contextIdentity).inserted else {
+        return
+      }
+    }
+    pendingArrivalDefaults.append(arrival)
+  }
+
+  /// Arms the first recorded arrival default whose binding group still has a
+  /// live `.focused` registration (resolve visits outermost modifiers first,
+  /// so list order reproduces the outermost-wins order the immediate-write
+  /// path produces through its value veto). The rest are dropped — arrivals
+  /// are one-frame one-shots. Returns whether a default was armed.
+  package func consumeArrivalDefaults() -> Bool {
+    guard !pendingArrivalDefaults.isEmpty else {
+      return false
+    }
+    let arrivals = pendingArrivalDefaults
+    pendingArrivalDefaults.removeAll(keepingCapacity: true)
+    let liveBindingKeys = Set(registrations.map(\.bindingKey))
+    for arrival in arrivals where liveBindingKeys.contains(arrival.bindingKey) {
+      if arrival.armDefault() {
+        return true
+      }
+    }
+    return false
+  }
+
+  /// Drops the frame's arrival defaults without arming — an authored focus
+  /// request or a namespace default claimed the frame.
+  package func discardArrivalDefaults() {
+    pendingArrivalDefaults.removeAll(keepingCapacity: true)
+  }
+
   package func sync(
     actualFocusedIdentity: Identity?
   ) -> Bool {
@@ -431,6 +512,10 @@ package final class LocalFocusBindingRegistry: Equatable {
 
   package func reset() {
     registrations.removeAll(keepingCapacity: true)
+    // `pendingArrivalDefaults` deliberately survives: publication resets the
+    // live registry between resolve and focus-sync, and an arrival recorded
+    // during this frame's resolve must still reach this frame's arbitration.
+    // Arrivals drain every focus-sync iteration (consume or discard).
   }
 
   package func removeSubtrees(
@@ -444,6 +529,20 @@ package final class LocalFocusBindingRegistry: Equatable {
       focusRegistrationMatchesAnySubtreeRoot(
         identity: registration.identity,
         ownerIdentity: registration.ownerIdentity,
+        roots: roots
+      )
+    }
+    pendingArrivalDefaults.removeAll { arrival in
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: arrival.contextIdentity,
+        ownerIdentity: arrival.ownerIdentity,
+        roots: roots
+      )
+    }
+    seenOwnerlessArrivalContexts = seenOwnerlessArrivalContexts.filter { identity in
+      !focusRegistrationMatchesAnySubtreeRoot(
+        identity: identity,
+        ownerIdentity: nil,
         roots: roots
       )
     }

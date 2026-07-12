@@ -428,13 +428,13 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.pressKey(KeyPress(.escape))
     #expect(stressPresentationEntryCount(in: harness) == 2)
-    withKnownIssue("A three-to-two overlay transition leaves the dismissed sheet visible") {
-      #expect(!harness.frame.contains("Sheet layer body"))
-    }
+    #expect(!harness.frame.contains("Sheet layer body"))
+    #expect(harness.frame.contains("Open sheet layer"))
 
     _ = try harness.pressKey(KeyPress(.escape))
     #expect(stressPresentationEntryCount(in: harness) == 1)
     #expect(!harness.frame.contains("Open sheet layer"))
+    #expect(harness.frame.contains("Open popover layer"))
 
     _ = try harness.pressKey(KeyPress(.escape))
     #expect(stressPresentationEntryCount(in: harness) == 0)

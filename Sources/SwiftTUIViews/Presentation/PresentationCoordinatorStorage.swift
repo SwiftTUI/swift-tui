@@ -2,6 +2,22 @@ package import SwiftTUICore
 
 // MARK: - Shared Item Storage
 
+/// Monotonic cross-family mint for presentation activation ordinals. Escape
+/// dismissal unwinds by activation recency across coordinator families
+/// (menu vs popover vs sheet), so ordinals must be comparable between
+/// families — a per-store counter would tie every family's first entry.
+@MainActor
+package enum PresentationActivationOrdinalMint {
+  private static var nextOrdinal = 0
+
+  package static func next() -> Int {
+    // Deliberately unbounded for the process lifetime: only relative order
+    // matters, and an aborted frame's restore may skip minted values.
+    nextOrdinal &+= 1
+    return nextOrdinal
+  }
+}
+
 package struct TrackedPresentationItem<Item: Identifiable & Sendable>: Sendable
 where Item.ID: Sendable {
   var item: Item
@@ -15,13 +31,11 @@ where Item.ID: Sendable {
     fileprivate var declarativeItemsBySource: [Identity: [Item.ID: TrackedPresentationItem<Item>]]
     fileprivate var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>]
     fileprivate var seenSources: Set<Identity>
-    fileprivate var nextActivationOrdinal: Int
   }
 
   private var declarativeItemsBySource: [Identity: [Item.ID: TrackedPresentationItem<Item>]] = [:]
   private var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>] = [:]
   private var seenSources: Set<Identity> = []
-  private var nextActivationOrdinal = 0
 
   package init() {}
 
@@ -29,8 +43,7 @@ where Item.ID: Sendable {
     Checkpoint(
       declarativeItemsBySource: declarativeItemsBySource,
       imperativeItemsByID: imperativeItemsByID,
-      seenSources: seenSources,
-      nextActivationOrdinal: nextActivationOrdinal
+      seenSources: seenSources
     )
   }
 
@@ -38,7 +51,6 @@ where Item.ID: Sendable {
     declarativeItemsBySource = checkpoint.declarativeItemsBySource
     imperativeItemsByID = checkpoint.imperativeItemsByID
     seenSources = checkpoint.seenSources
-    nextActivationOrdinal = checkpoint.nextActivationOrdinal
   }
 
   package func beginSynchronizing() {
@@ -199,8 +211,7 @@ where Item.ID: Sendable {
   }
 
   private func allocateActivationOrdinal() -> Int {
-    nextActivationOrdinal += 1
-    return nextActivationOrdinal
+    PresentationActivationOrdinalMint.next()
   }
 }
 

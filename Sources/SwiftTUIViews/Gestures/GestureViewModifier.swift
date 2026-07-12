@@ -50,8 +50,18 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
       scheduleDeadline?(instant)
     }
 
+    // Key registration and routing on the nearest entity-rerooted
+    // descendant: a `.id(_:)` below the chain re-roots the interactive
+    // content's identity space, and keying on it keeps an active gesture
+    // routed across a conditional-branch re-resolve that re-mints the chain
+    // node (the branch is part of the chain's structural identity; the
+    // entity is not). `node.identity` stays the record-replacement site key
+    // so a per-generation entity below a surviving site cannot accumulate
+    // one registration per generation.
+    let routeIdentity = gestureRouteIdentity(for: node)
+
     let buildContext = GestureRecognizerBuildContext(
-      attachingIdentity: node.identity,
+      attachingIdentity: routeIdentity,
       gestureStateRegistry: context.localGestureStateRegistry,
       requestDeadline: requestDeadline
     )
@@ -62,8 +72,8 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // `.gesture(_:)` rebuilds the tree on every resolve — without
     // this clear, the per-identity bindings array grows unboundedly
     // across frames, retaining discarded `GestureStateBox` instances.
-    if !gestureRegistry.hasCurrentPassRecognizer(for: node.identity) {
-      context.localGestureStateRegistry?.clearBindings(for: node.identity)
+    if !gestureRegistry.hasCurrentPassRecognizer(for: routeIdentity) {
+      context.localGestureStateRegistry?.clearBindings(for: routeIdentity)
     }
 
     // The combinator decorators (`onEnded`/`onChanged`/`map`/`updating`)
@@ -75,7 +85,11 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     let recognizer = intake.withRegistrationEnvironmentScope {
       gesture._makeRecognizer(context: buildContext)
     }
-    gestureRegistry.registerStacked(identity: node.identity, recognizer: recognizer)
+    gestureRegistry.registerStacked(
+      identity: routeIdentity,
+      structuralKey: node.identity,
+      recognizer: recognizer
+    )
 
     // Forward pointer events through the recognizer. The handler
     // closure looks up the *current* recognizer from
@@ -85,10 +99,10 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // preserves an `isActive` recognizer across rebuilds — so the
     // recognizer resolved here on one resolve may end up being kept
     // across the next, and we must route events to whichever wins.
-    let routeID = runtimePrimaryRouteID(for: node.identity)
+    let routeID = runtimePrimaryRouteID(for: routeIdentity)
     let gestureRegistryRef = gestureRegistry
-    let handlerIdentity = node.identity
-    pointerRegistry.register(routeID: routeID) { event in
+    let handlerIdentity = routeIdentity
+    pointerRegistry.register(routeID: routeID, structuralKey: node.identity) { event in
       guard let current = gestureRegistryRef.recognizer(for: handlerIdentity) else {
         return false
       }
@@ -99,15 +113,40 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // Stamp semantic metadata: must hit-test; captureOnPress when the
     // gesture needs drag continuation (resolved via static protocol hook).
     let capture = gestureNeedsCapture(gesture)
-    node.semanticMetadata = node.semanticMetadata.merging(
-      SemanticMetadata(
-        participatesInPointerHitTesting: true,
-        captureOnPress: capture,
-        allowsHitTesting: true
-      )
+    var gestureMetadata = SemanticMetadata(
+      participatesInPointerHitTesting: true,
+      captureOnPress: capture,
+      allowsHitTesting: true
     )
+    if routeIdentity != node.identity {
+      gestureMetadata.explicitRouteIdentity = routeIdentity
+    }
+    node.semanticMetadata = node.semanticMetadata.merging(gestureMetadata)
     return [node]
   }
+}
+
+/// The identity gesture routing keys on: the nearest entity-rerooted
+/// descendant reachable through single-child structure, or the node's own
+/// identity when none exists. The descent stops at any node that hit-tests
+/// or focuses on its own — an outer gesture must not claim an inner
+/// control's route space.
+@MainActor
+private func gestureRouteIdentity(for node: ResolvedNode) -> Identity {
+  if node.entityIdentity != nil {
+    return node.identity
+  }
+  var cursor = node
+  while cursor.entityIdentity == nil, cursor.children.count == 1 {
+    let child = cursor.children[0]
+    if child.semanticMetadata.participatesInPointerHitTesting
+      || child.semanticMetadata.isFocusable
+    {
+      return node.identity
+    }
+    cursor = child
+  }
+  return cursor.entityIdentity != nil ? cursor.identity : node.identity
 }
 
 // MARK: - View.contentShape(_:)

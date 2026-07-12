@@ -64,6 +64,14 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var explicitInteractionPath: Path?
   public var namedCoordinateSpaceName: String?
   package var interactionAvailability: InteractionAvailability
+  /// When set, the semantics walk mints this node's pointer route from this
+  /// identity instead of the node's structural identity. Stamped by gesture
+  /// attachment when the gesture keys its registration on an entity-rerooted
+  /// descendant (`.id` below the chain): the region's route and the
+  /// registration then share one identity, so pointer capture survives a
+  /// conditional-branch re-resolve that re-mints the chain node. Region
+  /// identity, rect, and focus stay structural.
+  package var explicitRouteIdentity: Identity?
 
   package var focusScopeBoundary: Bool {
     get { flag(Self.focusScopeBoundaryFlag) }
@@ -253,7 +261,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   }
 
   public func merging(_ other: Self) -> Self {
-    Self(
+    var merged = Self(
       isFocusable: other.explicitFocusability ?? explicitFocusability,
       focusScopeBoundary: other.focusScopeBoundary || focusScopeBoundary,
       focusScopeIdentity: other.focusScopeIdentity ?? focusScopeIdentity,
@@ -288,6 +296,8 @@ public struct SemanticMetadata: Equatable, Sendable {
         other.interactionAvailability
       )
     )
+    merged.explicitRouteIdentity = other.explicitRouteIdentity ?? explicitRouteIdentity
+    return merged
   }
 
   private static let explicitFocusabilityHasValueFlag: UInt16 = 1 << 0

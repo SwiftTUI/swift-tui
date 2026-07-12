@@ -527,19 +527,12 @@ extension FrameworkStressStateIdentityTests {
     defer { harness.shutdown() }
 
     #expect(harness.frame.contains("009 Focus first"))
-    var defaultsFollowedModifierShape = true
     for generation in 1...4 {
       let frame = try harness.clickText("Churn 009")
       #expect(frame.contains("009 Generation \(generation)"))
       let field = generation.isMultiple(of: 2) ? "first" : "second"
-      defaultsFollowedModifierShape =
-        defaultsFollowedModifierShape
-        && frame.contains("009 Focus \(field)")
+      #expect(frame.contains("009 Focus \(field)"))
       #expect(harness.defaultFocusRegistrationCount <= 2)
-    }
-
-    withKnownIssue("Default-focus ordinal churn clears the requested replacement focus") {
-      #expect(defaultsFollowedModifierShape)
     }
   }
 

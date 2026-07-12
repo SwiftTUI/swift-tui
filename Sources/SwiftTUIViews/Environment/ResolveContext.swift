@@ -121,6 +121,21 @@ public struct ResolveContext: Equatable, Sendable {
   package var scrollCommandRegistry: LocalScrollPositionRegistry? {
     liveScrollPositionRegistry ?? localScrollPositionRegistry
   }
+  /// The pre-draft ("live") focus-binding registry, surviving the frame
+  /// head's draft-registry replacement like ``liveScrollPositionRegistry``.
+  /// Default-focus ARRIVAL records must reach the instance focus-sync
+  /// arbitrates — the frame-head draft is discarded, and arrivals are
+  /// deliberately not node-recorded (a retained-subtree restore must never
+  /// replay a consumed arrival). Registration writes stay on
+  /// ``localFocusBindingRegistry``.
+  package var liveFocusBindingRegistry: LocalFocusBindingRegistry? {
+    get { propagated.liveFocusBindingRegistry }
+    set { propagated.liveFocusBindingRegistry = newValue }
+  }
+  /// The registry default-focus arrivals should be recorded into.
+  package var focusArrivalRegistry: LocalFocusBindingRegistry? {
+    liveFocusBindingRegistry ?? localFocusBindingRegistry
+  }
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry? {
     get { propagated.localPreferenceObservationRegistry }
     set { propagated.localPreferenceObservationRegistry = newValue }
@@ -600,6 +615,9 @@ extension ResolveContext {
     /// member of ``RuntimeRegistrationSet``: `replacingRuntimeRegistrations`
     /// must leave it untouched so it survives frame-draft replacement.
     package var liveScrollPositionRegistry: LocalScrollPositionRegistry?
+    /// See ``ResolveContext/liveFocusBindingRegistry``. Same draft-survival
+    /// contract as `liveScrollPositionRegistry`.
+    package var liveFocusBindingRegistry: LocalFocusBindingRegistry?
     package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
     package var commandRegistry: CommandRegistry?
     package var dropDestinationRegistry: DropDestinationRegistry?
@@ -795,6 +813,7 @@ extension ResolveContext {
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
       && lhs.localScrollPositionRegistry == rhs.localScrollPositionRegistry
       && lhs.liveScrollPositionRegistry == rhs.liveScrollPositionRegistry
+      && lhs.liveFocusBindingRegistry == rhs.liveFocusBindingRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry

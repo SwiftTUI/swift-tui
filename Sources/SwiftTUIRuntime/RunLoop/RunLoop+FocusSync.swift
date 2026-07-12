@@ -227,6 +227,21 @@ extension RunLoop {
       shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
     )
     let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
+    // Binding `.defaultFocus` arrivals — fresh subtrees whose default lost
+    // the resolve-time race to an already-focused control — arbitrate
+    // strictly below authored requests and namespace defaults: either of
+    // those claiming the frame discards the arrivals. Arming writes an
+    // authored-style request whose generation bump shields it from the
+    // binding sync below (registrations captured the pre-arm generation);
+    // the request's owner invalidation rides the eager re-render, and the
+    // re-registered site's pending request moves the tracker next iteration.
+    let armedArrivalDefault: Bool
+    if desiredFocusRequest == .none, defaultFocusRequest == .none {
+      armedArrivalDefault = localFocusBindingRegistry.consumeArrivalDefaults()
+    } else {
+      localFocusBindingRegistry.discardArrivalDefaults()
+      armedArrivalDefault = false
+    }
     let focusStateChanged = localFocusBindingRegistry.sync(
       actualFocusedIdentity: focusTracker.currentFocusIdentity
     )
@@ -254,14 +269,14 @@ extension RunLoop {
     convergence.focusGraphChanged = convergence.focusGraphChanged || focusChanged
     convergence.focusBindingChanged =
       convergence.focusBindingChanged || appliedFocusRequest || appliedDefaultFocusRequest
-      || focusStateChanged
+      || armedArrivalDefault || focusStateChanged
     convergence.focusedValuesChanged =
       convergence.focusedValuesChanged || focusedValuesChanged
     convergence.scrollPositionChanged =
       convergence.scrollPositionChanged || scrollPositionChanged
 
-    if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || focusStateChanged
-      || focusedValuesChanged || scrollPositionChanged
+    if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || armedArrivalDefault
+      || focusStateChanged || focusedValuesChanged || scrollPositionChanged
     {
       appendLifecycleCarryForward(
         renderedArtifacts.commitPlan.lifecycle,
@@ -280,7 +295,8 @@ extension RunLoop {
       // change after it lags a frame.
       let focusLocationChanged =
         focusChanged || focusJustEstablished || appliedFocusRequest
-        || appliedDefaultFocusRequest || focusStateChanged || scrollPositionChanged
+        || appliedDefaultFocusRequest || armedArrivalDefault || focusStateChanged
+        || scrollPositionChanged
       if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
         convergence.didEagerFocusLocationRerender = true
         convergence.rerenderedForFocusSync = true

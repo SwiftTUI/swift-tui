@@ -57,7 +57,7 @@ package struct SemanticExtractor: Sendable {
           && node.semanticMetadata.interactionAvailability.isEnabled
         let hitsAllowed = node.semanticMetadata.allowsHitTesting
         let routeID = primaryRouteID(
-          for: node.identity,
+          for: node.semanticMetadata.explicitRouteIdentity ?? node.identity,
           ownerNodeID: node.viewNodeID
         )
 

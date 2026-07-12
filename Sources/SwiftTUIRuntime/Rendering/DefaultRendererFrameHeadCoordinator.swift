@@ -66,11 +66,17 @@ struct DefaultRendererFrameHeadCoordinator {
     // stored evaluator contexts replayed frames later. Stash it before the
     // draft replacement hides it (see `ResolveContext.liveScrollPositionRegistry`).
     let preDraftScrollPositionRegistry = resolveContext.localScrollPositionRegistry
+    // Default-focus arrivals need the same pre-draft survival: focus-sync
+    // arbitrates them on the live registry after the draft is discarded.
+    let preDraftFocusBindingRegistry = resolveContext.localFocusBindingRegistry
     resolveContext = resolveContext.replacingRuntimeRegistrations(
       registrationDraft.draftRegistrations
     )
     if resolveContext.liveScrollPositionRegistry == nil {
       resolveContext.liveScrollPositionRegistry = preDraftScrollPositionRegistry
+    }
+    if resolveContext.liveFocusBindingRegistry == nil {
+      resolveContext.liveFocusBindingRegistry = preDraftFocusBindingRegistry
     }
     resolveContext.imageAssetResolver = imageRepository.resolver()
 

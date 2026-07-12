@@ -102,10 +102,23 @@ public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
     guard value else {
       return
     }
-    guard context.environmentValues.focusedIdentity == nil else {
+    // Consume the seed before reading the focus environment: a claim gated on
+    // transient focus state would drift sibling modifiers' slot ordinals
+    // between frames.
+    let seed = consumeDefaultFocusSeed(in: context)
+    guard seed.isFresh else {
       return
     }
-    guard consumeDefaultFocusSeed(in: context), !binding.wrappedValue else {
+    guard context.environmentValues.focusedIdentity == nil else {
+      recordArrivalDefault(
+        binding: binding,
+        value: true,
+        ownerIdentity: seed.ownerIdentity,
+        in: context
+      )
+      return
+    }
+    guard !binding.wrappedValue else {
       return
     }
     binding.wrappedValue = true
@@ -113,13 +126,13 @@ public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
 
   private func consumeDefaultFocusSeed(
     in context: ResolveContext
-  ) -> Bool {
+  ) -> (isFresh: Bool, ownerIdentity: Identity?) {
     guard
       let authoringContext = currentAuthoringContext(),
       let modifierOrdinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
-      return true
+      return (true, nil)
     }
     let ordinal = StateSlotOrdinals.defaultFocus(modifierOrdinal)
 
@@ -128,10 +141,10 @@ public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
       seed: false
     )
     guard !hasSeeded else {
-      return false
+      return (false, viewNode.identity)
     }
     viewNode.setStateSlot(ordinal: ordinal, value: true)
-    return true
+    return (true, viewNode.identity)
   }
 }
 
@@ -150,10 +163,22 @@ public struct OptionalDefaultFocusModifier<Value: Hashable>: PrimitiveViewModifi
   private func applyDefaultFocus(
     in context: ResolveContext
   ) {
-    guard context.environmentValues.focusedIdentity == nil else {
+    // Consume the seed before reading the focus environment — see
+    // `BoolDefaultFocusModifier.applyDefaultFocus`.
+    let seed = consumeDefaultFocusSeed(in: context)
+    guard seed.isFresh else {
       return
     }
-    guard consumeDefaultFocusSeed(in: context), binding.wrappedValue == nil else {
+    guard context.environmentValues.focusedIdentity == nil else {
+      recordArrivalDefault(
+        binding: binding,
+        value: value,
+        ownerIdentity: seed.ownerIdentity,
+        in: context
+      )
+      return
+    }
+    guard binding.wrappedValue == nil else {
       return
     }
     binding.wrappedValue = value
@@ -161,13 +186,13 @@ public struct OptionalDefaultFocusModifier<Value: Hashable>: PrimitiveViewModifi
 
   private func consumeDefaultFocusSeed(
     in context: ResolveContext
-  ) -> Bool {
+  ) -> (isFresh: Bool, ownerIdentity: Identity?) {
     guard
       let authoringContext = currentAuthoringContext(),
       let modifierOrdinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
-      return true
+      return (true, nil)
     }
     let ordinal = StateSlotOrdinals.defaultFocus(modifierOrdinal)
 
@@ -176,9 +201,41 @@ public struct OptionalDefaultFocusModifier<Value: Hashable>: PrimitiveViewModifi
       seed: false
     )
     guard !hasSeeded else {
-      return false
+      return (false, viewNode.identity)
     }
     viewNode.setStateSlot(ordinal: ordinal, value: true)
-    return true
+    return (true, viewNode.identity)
   }
+}
+
+/// Records a binding `.defaultFocus` whose fresh subtree resolved while
+/// another control already held focus. The stale binding value deliberately
+/// does not veto — a departed generation's value must not pin the arriving
+/// shape's default; a live authored request does veto, at arm time.
+/// Owner-backed positions gate on their seed slot (the caller); owner-less
+/// positions (the outermost modifier of a chain never mints an authoring
+/// node) dedupe on the resolve-context identity in the registry — without
+/// one of those lifetimes, re-recording every resolve would re-steal focus
+/// each frame.
+@MainActor
+private func recordArrivalDefault<Value: Equatable>(
+  binding: FocusState<Value>.Binding,
+  value: Value,
+  ownerIdentity: Identity?,
+  in context: ResolveContext
+) {
+  context.focusArrivalRegistry?.recordArrivalDefault(
+    DefaultFocusArrivalSnapshot(
+      bindingKey: binding.bindingKey,
+      ownerIdentity: ownerIdentity,
+      contextIdentity: context.identity,
+      armDefault: {
+        guard !binding.hasPendingRequest else {
+          return false
+        }
+        binding.wrappedValue = value
+        return true
+      }
+    )
+  )
 }

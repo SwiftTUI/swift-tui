@@ -142,6 +142,13 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   // level. The capture-session reset keeps the append idempotent per pass.
   package var hoverHandlers: [RouteID: [LocalPointerHandlerRegistry.HoverHandler]] = [:]
   package var hoverOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  /// Latest route recorded per authored site (the registering modifier's
+  /// structural identity). A derived (entity-keyed) gesture route changes
+  /// value when the entity below the site re-mints; out-of-session record
+  /// refreshes then land under a NEW dictionary key while the old entry
+  /// stays — this map lets a site's re-registration replace its previous
+  /// route instead of accumulating one per generation.
+  package var structuralRoutes: [Identity: RouteID] = [:]
 
   package init() {}
 
@@ -154,13 +161,30 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
     handlerOwners.merge(departing.handlerOwners, uniquingKeysWith: mergeKeepingCurrent)
     hoverHandlers.merge(departing.hoverHandlers, uniquingKeysWith: mergeKeepingCurrent)
     hoverOwners.merge(departing.hoverOwners, uniquingKeysWith: mergeKeepingCurrent)
+    // A departing route superseded by this record's same-site registration
+    // must not re-enter through the merge above.
+    for (site, departingRoute) in departing.structuralRoutes {
+      if let currentRoute = structuralRoutes[site], currentRoute != departingRoute {
+        handlers.removeValue(forKey: departingRoute)
+        handlerOwners.removeValue(forKey: departingRoute)
+      }
+    }
+    structuralRoutes.merge(departing.structuralRoutes, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
   package mutating func record(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
+    if let structuralKey {
+      if let previousRoute = structuralRoutes[structuralKey], previousRoute != routeID {
+        handlers.removeValue(forKey: previousRoute)
+        handlerOwners.removeValue(forKey: previousRoute)
+      }
+      structuralRoutes[structuralKey] = routeID
+    }
     handlerOwners[routeID] = .current(identity: routeID.identity)
     handlers[routeID] = handler
   }
@@ -178,6 +202,9 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
 package struct GestureNodeRecord: RuntimeNodeRecord {
   package var recognizers: [Identity: AnyGestureRecognizer] = [:]
   package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
+  /// Latest registry key recorded per authored site — same replacement
+  /// contract as ``PointerNodeRecord/structuralRoutes``.
+  package var structuralKeys: [Identity: Identity] = [:]
 
   package init() {}
 
@@ -188,13 +215,28 @@ package struct GestureNodeRecord: RuntimeNodeRecord {
   package mutating func absorbAdopted(_ departing: GestureNodeRecord) {
     recognizers.merge(departing.recognizers, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
+    for (site, departingKey) in departing.structuralKeys {
+      if let currentKey = structuralKeys[site], currentKey != departingKey {
+        recognizers.removeValue(forKey: departingKey)
+        owners.removeValue(forKey: departingKey)
+      }
+    }
+    structuralKeys.merge(departing.structuralKeys, uniquingKeysWith: mergeKeepingCurrent)
   }
 
   @MainActor
   package mutating func record(
     identity: Identity,
+    structuralKey: Identity? = nil,
     recognizer: AnyGestureRecognizer
   ) {
+    if let structuralKey {
+      if let previousIdentity = structuralKeys[structuralKey], previousIdentity != identity {
+        recognizers.removeValue(forKey: previousIdentity)
+        owners.removeValue(forKey: previousIdentity)
+      }
+      structuralKeys[structuralKey] = identity
+    }
     owners[identity] = .current(identity: identity)
     recognizers[identity] = recognizer
   }
@@ -596,9 +638,10 @@ package struct NodeHandlers {
 
   package mutating func recordPointerHandler(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
-    pointer.record(routeID: routeID, handler: handler)
+    pointer.record(routeID: routeID, structuralKey: structuralKey, handler: handler)
   }
 
   package mutating func recordPointerHoverHandler(
@@ -610,9 +653,10 @@ package struct NodeHandlers {
 
   package mutating func recordGesture(
     identity: Identity,
+    structuralKey: Identity? = nil,
     recognizer: AnyGestureRecognizer
   ) {
-    gesture.record(identity: identity, recognizer: recognizer)
+    gesture.record(identity: identity, structuralKey: structuralKey, recognizer: recognizer)
   }
 
   package mutating func recordGestureStateBinding(

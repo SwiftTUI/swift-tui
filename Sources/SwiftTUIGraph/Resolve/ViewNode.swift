@@ -1220,11 +1220,13 @@ package final class ViewNode {
 
   package func recordPointerHandlerRegistration(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordPointerHandler(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: handler
     )
   }
@@ -1242,11 +1244,13 @@ package final class ViewNode {
 
   package func recordGestureRegistration(
     identity: Identity,
+    structuralKey: Identity? = nil,
     recognizer: AnyGestureRecognizer
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordGesture(
       identity: identity,
+      structuralKey: structuralKey,
       recognizer: recognizer
     )
   }

@@ -1093,10 +1093,13 @@ extension FrameworkStressInputRoutingTests {
     )
     _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 6, y: start.y))
 
+    // The first change (the `.down` fires `onChanged` at zero translation)
+    // lands on the original binding and flips the branch; every subsequent
+    // change in the same drag must land on the re-targeted binding — the
+    // stable `.id` entity keeps the capture and the registration routed
+    // across the branch flip.
     #expect(firstChanges.value == 1)
-    withKnownIssue("An active drag keeps writing the binding captured before retargeting") {
-      #expect(secondChanges.value == 1)
-    }
+    #expect(secondChanges.value >= 1)
   }
 }
 
@@ -1266,9 +1269,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 4, y: start.y))
     _ = try harness.clickText("Dynamic gesture")
 
-    withKnownIssue("A gesture added while a drag is active is discarded after release") {
-      #expect(taps.value == 1)
-    }
+    #expect(taps.value == 1)
   }
 }
 

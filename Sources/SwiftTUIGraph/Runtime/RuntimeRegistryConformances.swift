@@ -169,7 +169,9 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
     }
     restore(
       registrations,
-      ownersByRouteID: handlers.pointer.handlerOwners
+      ownersByRouteID: handlers.pointer.handlerOwners,
+      structuralRoutes: handlers.pointer.structuralRoutes,
+      recency: context.recency
     )
     restoreHover(
       handlers.pointer.hoverHandlers,

@@ -22,29 +22,58 @@ package final class LocalGestureRegistry: Equatable {
   /// keeps its state (and adopts the fresh registration's authored
   /// callbacks) while inactive positions are rebuilt fresh — the entry
   /// never nests stacks across passes.
-  private var passAuthoredRecognizers: [Identity: [AnyGestureRecognizer]] = [:]
+  ///
+  /// The same-pass signal is `(recency, firstNode)`: chain levels sharing a
+  /// derived registration key can record on DIFFERENT nodes (an inner level
+  /// under the entity-rerooted node, the outer under the enclosing chain
+  /// node), so checking `ViewNodeContext.current`'s record would reset the
+  /// stack mid-chain. The recency stamp rejects a stale list from an
+  /// earlier frame; the FIRST registering node's record — reset when its
+  /// capture session begins — rejects a stale list from an earlier pass of
+  /// the same frame.
+  private struct PassAuthoredList {
+    var recency: UInt64
+    weak var firstNode: ViewNode?
+    var recognizers: [AnyGestureRecognizer]
+  }
+
+  private var passAuthoredRecognizers: [Identity: PassAuthoredList] = [:]
+  /// The registering site's structural identity per registration key —
+  /// threaded into the committed record so a site whose derived key changed
+  /// replaces its previous record entry (see
+  /// ``GestureNodeRecord/structuralKeys``).
+  private var structuralKeysByIdentity: [Identity: Identity] = [:]
 
   package func register(
     identity: Identity,
+    structuralKey: Identity? = nil,
     recognizer: AnyGestureRecognizer
   ) {
-    passAuthoredRecognizers[identity] = [recognizer]
+    passAuthoredRecognizers[identity] = PassAuthoredList(
+      recency: ViewNodeContext.current?.runtimeRegistrationRecency ?? 0,
+      firstNode: ViewNodeContext.current,
+      recognizers: [recognizer]
+    )
+    if let structuralKey {
+      structuralKeysByIdentity[identity] = structuralKey
+    }
     applyPassRegistrations(for: identity)
   }
 
   package func registerStacked(
     identity: Identity,
+    structuralKey: Identity? = nil,
     recognizer: AnyGestureRecognizer
   ) {
-    guard
-      ViewNodeContext.current?.gestureRegistration(for: identity) != nil,
-      var authored = passAuthoredRecognizers[identity]
+    guard var authored = passAuthoredRecognizers[identity],
+      authored.recency == (ViewNodeContext.current?.runtimeRegistrationRecency ?? 0),
+      authored.firstNode?.gestureRegistration(for: identity) != nil
     else {
-      register(identity: identity, recognizer: recognizer)
+      register(identity: identity, structuralKey: structuralKey, recognizer: recognizer)
       return
     }
 
-    authored.append(recognizer)
+    authored.recognizers.append(recognizer)
     passAuthoredRecognizers[identity] = authored
     applyPassRegistrations(for: identity)
   }
@@ -60,7 +89,7 @@ package final class LocalGestureRegistry: Equatable {
   /// A gesture *added* mid-interaction lands in a fresh position and joins
   /// the entry immediately instead of being discarded.
   private func applyPassRegistrations(for identity: Identity) {
-    let authored = passAuthoredRecognizers[identity] ?? []
+    let authored = passAuthoredRecognizers[identity]?.recognizers ?? []
     let previousElements = recognizers[identity].map(stackElements(of:)) ?? []
 
     var result: [AnyGestureRecognizer] = []
@@ -104,8 +133,13 @@ package final class LocalGestureRegistry: Equatable {
       : AnyGestureRecognizer(StackedGestureRecognizer(recognizers: result))
     recognizers[identity] = entry
     ownersByIdentity[identity] = .current(identity: identity)
-    ViewNodeContext.current?.recordGestureRegistration(
+    // Record on the pass's FIRST registering node: stacked levels can run
+    // under different node contexts, and splitting one entry across two
+    // records would double-restore it.
+    let recordingNode = passAuthoredRecognizers[identity]?.firstNode ?? ViewNodeContext.current
+    recordingNode?.recordGestureRegistration(
       identity: identity,
+      structuralKey: structuralKeysByIdentity[identity],
       recognizer: entry
     )
   }
@@ -124,7 +158,11 @@ package final class LocalGestureRegistry: Equatable {
   }
 
   package func hasCurrentPassRecognizer(for identity: Identity) -> Bool {
-    ViewNodeContext.current?.gestureRegistration(for: identity) != nil
+    guard let authored = passAuthoredRecognizers[identity] else {
+      return false
+    }
+    return authored.recency == (ViewNodeContext.current?.runtimeRegistrationRecency ?? 0)
+      && authored.firstNode?.gestureRegistration(for: identity) != nil
   }
 
   package func reset() {
@@ -189,6 +227,7 @@ package final class LocalGestureRegistry: Equatable {
       recognizers.removeValue(forKey: identity)?.tearDown()
       ownersByIdentity.removeValue(forKey: identity)
       passAuthoredRecognizers.removeValue(forKey: identity)
+      structuralKeysByIdentity.removeValue(forKey: identity)
     }
   }
 

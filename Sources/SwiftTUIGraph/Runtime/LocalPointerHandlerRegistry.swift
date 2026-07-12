@@ -105,14 +105,52 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func register(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping Handler
   ) {
+    if structuralKey != nil {
+      let recency = ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
+      guard evictingCollidingGestureRoutes(for: routeID, recency: recency) else {
+        return
+      }
+    }
     handlers[routeID] = handler
     handlerOwners[routeID] = .current(identity: routeID.identity)
     ViewNodeContext.current?.recordPointerHandlerRegistration(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: handler
     )
+  }
+
+  /// Recency stamps for gesture-family routes (registrations that carried a
+  /// `structuralKey`). A gesture route derives its identity from the entity
+  /// below its authored site, so one authored gesture yields at most one
+  /// meaningful handler per paired `(identity, kind)` — but a departed
+  /// generation's detached entity home stays live and re-restores its stale
+  /// record every frame, and subtree removal cannot reach a detached route
+  /// by prefix. Freshest-recency pairing eviction (the hover registry's
+  /// model) keeps exactly the live authored handler.
+  private var gestureRouteRecencies: [RouteID: UInt64] = [:]
+
+  /// Returns whether `routeID` should install: drops the incoming route when
+  /// a strictly fresher paired route is live; otherwise evicts every staler
+  /// or equal-recency paired route and stamps the incoming recency.
+  private func evictingCollidingGestureRoutes(
+    for routeID: RouteID,
+    recency: UInt64
+  ) -> Bool {
+    for existing in handlers.keys
+    where existing != routeID && existing.pairsIgnoringOwner(with: routeID) {
+      if (gestureRouteRecencies[existing] ?? 0) > recency {
+        return false
+      }
+      handlers.removeValue(forKey: existing)
+      handlerOwners.removeValue(forKey: existing)
+      gestureRouteRecencies.removeValue(forKey: existing)
+    }
+    gestureRouteRecencies[routeID] = max(recency, gestureRouteRecencies[routeID] ?? 0)
+    return true
   }
 
   package func registerHover(
@@ -289,6 +327,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerRecencies.removeAll(keepingCapacity: true)
+    gestureRouteRecencies.removeAll(keepingCapacity: true)
   }
 
   package func reset(
@@ -306,6 +345,9 @@ package final class LocalPointerHandlerRegistry: Equatable {
     hoverHandlers.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerRecencies.removeAll(keepingCapacity: true)
+    gestureRouteRecencies = gestureRouteRecencies.filter { routeID, _ in
+      preservedIdentities.contains(routeID.identity)
+    }
   }
 
   package func removeSubtrees(
@@ -322,6 +364,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }) {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
+      gestureRouteRecencies.removeValue(forKey: routeID)
     }
     for routeID in hoverHandlers.keys.filter({
       (hoverHandlerOwners[$0] ?? .init(identity: $0.identity)).matchesAnySubtreeRoot(roots)
@@ -343,13 +386,26 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func restore(
     _ snapshot: [RouteID: Handler],
-    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:],
+    structuralRoutes: [Identity: RouteID] = [:],
+    recency: UInt64 = 0
   ) {
     guard !snapshot.isEmpty else {
       return
     }
 
+    // Gesture-family routes (the record's replacement-map values) restore
+    // through recency-gated pairing eviction: a stale detached node's
+    // re-restore must not resurrect a superseded generation's route over the
+    // live one, and a fresh restore evicts the stale generations it
+    // supersedes.
+    let gestureRoutes = Set(structuralRoutes.values)
     for (routeID, handler) in snapshot {
+      if gestureRoutes.contains(routeID) {
+        guard evictingCollidingGestureRoutes(for: routeID, recency: recency) else {
+          continue
+        }
+      }
       handlers[routeID] = handler
       handlerOwners[routeID] = ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
     }
