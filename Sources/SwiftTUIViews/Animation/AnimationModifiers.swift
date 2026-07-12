@@ -148,7 +148,25 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     } else {
       childContext.transaction.animationRequest = .disabled
     }
-    return content.resolveElements(in: childContext)
+    var resolved = content.resolveElements(in: childContext)
+    // The narrowed request is placed in `childContext`, but a nested
+    // `resolveView` inside the resolved content re-applies the frame-level
+    // resolve inputs (`applyingCurrentFrameResolveInputs`), which overwrites
+    // the subtree transaction with the frame-root transaction and discards
+    // the request this modifier just established. Re-stamp the narrowed
+    // request onto the resolved subtree roots so the animation controller
+    // observes the value-gated intent rather than the inherited frame
+    // transaction. Gated on a real prior baseline: a first appearance (no
+    // stored previous value) never animates — the controller's first-sight
+    // guard already suppresses it — so leaving those roots inheriting keeps
+    // the established first-appearance contract.
+    if previousValue != nil {
+      let request = childContext.transaction.animationRequest
+      for index in resolved.indices {
+        resolved[index].transactionSnapshot.animationRequest = request
+      }
+    }
+    return resolved
   }
 
   private func previousValueAndOrdinal(

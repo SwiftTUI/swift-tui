@@ -81,11 +81,7 @@ extension FrameworkStressAnimationTemporalTests {
       context: .init(identity: identity, transaction: transaction),
       proposal: proposal
     )
-    withKnownIssue(
-      "`.animation(nil,value:)` does not suppress an inherited animation when its value changes"
-    ) {
-      #expect(controller.activeAnimationCount == 0)
-    }
+    #expect(controller.activeAnimationCount == 0)
 
     _ = renderer.render(
       animationTemporal002View(opacity: 0.9, watchedValue: 1),
@@ -140,9 +136,7 @@ extension FrameworkStressAnimationTemporalTests {
       context: .init(identity: identity),
       proposal: proposal
     )
-    withKnownIssue("A reordered ForEach entity loses its value-animation baseline") {
-      #expect(controller.activeAnimationCount == 1)
-    }
+    #expect(controller.activeAnimationCount == 1)
   }
 }
 
@@ -186,9 +180,7 @@ extension FrameworkStressAnimationTemporalTests {
       proposal: proposal
     )
 
-    withKnownIssue("Duplicate ForEach occurrences lose independent value-animation baselines") {
-      #expect(controller.activeAnimationCount == 1)
-    }
+    #expect(controller.activeAnimationCount == 1)
   }
 }
 
@@ -405,9 +397,7 @@ extension FrameworkStressAnimationTemporalTests {
     let reducedPayload = try #require(
       animationTemporalDescendant(in: reduced.resolvedTree, text: "animation temporal 008")
     )
-    withKnownIssue("Reduced motion does not disable a changed value-animation modifier") {
-      #expect(reducedPayload.transactionSnapshot.animationRequest == .disabled)
-    }
+    #expect(reducedPayload.transactionSnapshot.animationRequest == .disabled)
 
     let restored = renderer.render(
       animationTemporal008View(value: 2, reducedMotion: false, animation: animation),
@@ -417,10 +407,8 @@ extension FrameworkStressAnimationTemporalTests {
     let restoredPayload = try #require(
       animationTemporalDescendant(in: restored.resolvedTree, text: "animation temporal 008")
     )
-    withKnownIssue("Value-animation intent does not recover after reduce motion is disabled") {
-      #expect(
-        restoredPayload.transactionSnapshot.animationRequest == .animate(animation.animationBox))
-    }
+    #expect(
+      restoredPayload.transactionSnapshot.animationRequest == .animate(animation.animationBox))
   }
 }
 
