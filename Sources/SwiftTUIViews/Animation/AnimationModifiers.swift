@@ -134,7 +134,17 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     if context.environmentValues.accessibilityReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else if let animation {
-      childContext.transaction.animationRequest = .animate(animation.animationBox)
+      // Deliver the concrete animation to the renderer-owned sink (the
+      // `withAnimation` contract): the controller purges any active
+      // animation whose box carries no registration in the same render
+      // pass, so an unregistered value-animation curve dies before its
+      // first tick.
+      let box = animation.animationBox
+      AnimationRegistrationStorage.effectiveSink?.registerAnimationBox(
+        box,
+        payload: animation
+      )
+      childContext.transaction.animationRequest = .animate(box)
     } else {
       childContext.transaction.animationRequest = .disabled
     }
