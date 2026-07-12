@@ -15,6 +15,8 @@ extension ViewGraph {
     package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>]
     package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID]
     package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+    package var activeNavigationSurfaceContentNodeIDsByHost: [ViewNodeID: Set<ViewNodeID>]
+    package var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID>
     package var rootEvaluator: Bool
     package var evaluationRootIdentity: Identity?
     package var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]

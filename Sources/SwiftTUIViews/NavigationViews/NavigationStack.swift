@@ -57,6 +57,20 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
       )
     }
 
+    // Record the pushed-destination surface content nodes this stack resolved
+    // so the finalize barrier can retire a surface the stack minted last frame
+    // but reminted this frame (a `.id("…-\(gen)")` folded onto this stack node
+    // bumps its declaration root each generation). Such a surface's content is
+    // orphaned by the fold's chain collapse — parented by neither a committed
+    // child nor a detached-hosted edge — so only this diff finds it. Keyed by
+    // the host node's stable ViewNodeID across the churn.
+    if let hostNodeID = ViewNodeContext.current?.viewNodeID {
+      context.viewGraph?.recordActiveNavigationSurfaces(
+        hostNodeID: hostNodeID,
+        contentNodeIDs: Set(resolution.activeSurfaceContentNodeIDs)
+      )
+    }
+
     // A NavigationStack is a command host (Role A): a focus scope, not a focus
     // target. Tab passes through to the focusable item leaves of the visible
     // destination; the stack itself is never a Tab stop.
@@ -285,6 +299,13 @@ private struct NavigationChainResolution {
   var visibleNode: ResolvedNode
   var accumulatedPreferences: PreferenceValues
   var popEntries: [NavigationDestinationPopEntry]
+  // The out-of-band pushed-destination surface CONTENT-node IDs minted this
+  // resolve (one per active `NavigationDestinationInstance`). The resolving
+  // host node records these so a per-generation declaration-root churn — which
+  // mints a fresh surface while orphaning the previous one's content node — is
+  // torn down at the frame barrier (see
+  // `ViewGraph.recordActiveNavigationSurfaces`).
+  var activeSurfaceContentNodeIDs: [ViewNodeID]
 }
 
 @MainActor
@@ -295,6 +316,7 @@ private func resolveActiveDestinationChain(
   var visibleNode = rootNode
   var accumulatedPreferences = PreferenceValues()
   var popEntries: [NavigationDestinationPopEntry] = []
+  var activeSurfaceContentNodeIDs: [ViewNodeID] = []
 
   for _ in 0..<32 {
     let declarations = visibleNode.preferenceValues[
@@ -308,7 +330,8 @@ private func resolveActiveDestinationChain(
       return NavigationChainResolution(
         visibleNode: visibleNode,
         accumulatedPreferences: accumulatedPreferences,
-        popEntries: popEntries
+        popEntries: popEntries,
+        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
       )
     }
 
@@ -322,13 +345,21 @@ private func resolveActiveDestinationChain(
 
     visibleNode = NavigationDestinationSurface(instance: instance)
       .resolve(in: context.replacingIdentity(with: instance.identity))
+    // The surface's own node collapses onto the reused stack node under a
+    // folded `.id`; its payload content node stays distinct per generation and
+    // is the leak-bearing subtree, so track that. `NavigationDestinationSurface`
+    // resolves its payload as the single child of the surface node.
+    if let contentNodeID = visibleNode.children.first?.viewNodeID {
+      activeSurfaceContentNodeIDs.append(contentNodeID)
+    }
   }
 
   visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
   return NavigationChainResolution(
     visibleNode: visibleNode,
     accumulatedPreferences: accumulatedPreferences,
-    popEntries: popEntries
+    popEntries: popEntries,
+    activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
   )
 }
 

@@ -1630,27 +1630,24 @@ extension FrameworkStressNavigationPresentationTests {
     _ = try harness.clickText("Open Nested Navigation Sheet")
     for generation in 1...6 {
       let frame = try harness.clickText("Remint Inner Sheet Stack")
-      withKnownIssue("Reminting an .id-churned nested stack resets the enclosing sheet's @State") {
-        // Root cause (probed 2026-07-12): `.id("...host-\(generation)")` is the
-        // public `IDModifier`, a *host-descending* entity route — by design its
-        // entity "state legitimately folds into the enclosing node" (see
-        // `ResolveEntityRoute.entityRouteIdentity`). StressNP024Sheet's body is a
-        // single `.id`'d expression, so single-child flattening fuses that entity
-        // onto StressNP024Sheet's OWN node, which also holds its `@State`
-        // (`generation`, `inner`). When `generation` bumps, the entity flips
-        // host-0 -> host-1; `ViewGraph.prepareEntityRoutedOwner` sees a different
-        // committed entity on the fused node and calls `resetStateSlots()`,
-        // wiping `generation` back to seed 0. That flips the `.id` back to host-0
-        // and re-fires the reset next frame, so `generation` oscillates 0<->1 and
-        // never advances: the pushed destination paints "generation 0" forever
-        // and the churned host-0/host-1 registrations coexist (count 6, not <=5).
-        // A correct fix must stop the entity-churn reset from clearing the
-        // enclosing view's own @State without regressing the deliberate
-        // transparent-chain-collapse fold, so it lives at the
-        // flattening/entity-routing layer, not here.
-        #expect(frame.contains("inner sheet stack generation \(generation)"))
-        #expect(harness.actionRegistrationCount <= 5)
-      }
+      // Paint half: `.id("...host-\(generation)")` is the public `IDModifier`, a
+      // host-descending entity route whose entity folds onto StressNP024Sheet's
+      // OWN node (its body is a single `.id`'d expression, so single-child
+      // flattening fuses the entity onto the node that also holds `@State
+      // generation`/`inner`). A `generation` bump flips the entity host-N ->
+      // host-(N+1); `prepareEntityRoutedOwner` now resets only the fused node's
+      // NOT-read-this-frame slots (`resetStateSlotsSparingReadThisFrame`), so
+      // `generation` — read pre-`.id`-resolve to build the `.id` value — is
+      // spared and advances instead of oscillating back to seed 0.
+      #expect(frame.contains("inner sheet stack generation \(generation)"))
+      // Count half: each generation mints a fresh pushed-destination surface out
+      // of band; the departed generation's content node is orphaned by the
+      // fold's chain collapse (parented by neither a committed child nor a
+      // detached-hosted edge), so neither the structural child diff nor the RC-3
+      // stale sweep retires it. The NavigationStack records its active surface
+      // content nodes per host; the finalize barrier tears down the departed one
+      // (`recordActiveNavigationSurfaces` / `tearDownDepartedNavigationSurfaces`).
+      #expect(harness.actionRegistrationCount <= 5)
     }
 
     var frame = try harness.pressKey(KeyPress(.escape))

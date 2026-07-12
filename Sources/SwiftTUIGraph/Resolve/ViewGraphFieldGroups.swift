@@ -43,6 +43,31 @@ extension ViewGraph {
     // owner's lifetime anchors to the absorber's hosted-detached edge) and
     // `liveStateOwnerNode`.
     package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
+    // Per-NavigationStack-host set of the CONTENT-subtree node IDs of the
+    // pushed-destination surfaces `resolveActiveDestinationChain` minted this
+    // frame — the out-of-band `NavigationDestinationSurface` payload roots (one
+    // per active `NavigationDestinationInstance`). Node IDs, not identities:
+    // the surface's own identity collapses onto the reused stack node under a
+    // `.id("owner-\(gen)")` fold (the identity index re-points to the live
+    // host), so an identity lookup at the barrier would land on the live host,
+    // whereas the payload content node stays distinct per generation. Keyed by
+    // the resolving host node's stable `ViewNodeID` so the previous-frame set
+    // survives the host's per-generation resolved-identity churn. A frame's
+    // active set is diffed against the previous frame's; a departed content
+    // node (its declaration root reminted the surface at a new identity — a
+    // leak the structural child diff never sees, since the content node is not
+    // a parented child) is queued in `departedNavigationSurfaceContentNodeIDs`.
+    // Entries drop when the host node leaves the graph. See
+    // `recordActiveNavigationSurfaces` / `tearDownDepartedNavigationSurfaces`.
+    package var activeNavigationSurfaceContentNodeIDsByHost: [ViewNodeID: Set<ViewNodeID>] = [:]
+    // Pushed-destination surface content nodes that departed a host's active
+    // set this frame, owed a dedicated teardown at the finalize barrier.
+    // Consumed (and cleared) by `tearDownDepartedNavigationSurfaces`, which
+    // `removeSubtree`s each departed content subtree — cascading its
+    // detached-hosted Button base/overlay. Checkpoint-covered so a discarded
+    // frame draft rolls the queue back with the rest of the prepared frame
+    // state.
+    package var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID> = []
   }
 
   /// The root evaluator closure and the identity it re-roots from.

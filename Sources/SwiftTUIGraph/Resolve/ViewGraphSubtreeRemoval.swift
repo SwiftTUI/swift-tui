@@ -307,6 +307,7 @@ extension ViewGraph {
       nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
     }
     entityRoutingTable.release(node.viewNodeID)
+    activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
   }

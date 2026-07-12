@@ -202,6 +202,14 @@ package final class ViewGraph {
     get { index.flattenedStateOwnerNodeIDByIdentity }
     set { index.flattenedStateOwnerNodeIDByIdentity = newValue }
   }
+  var activeNavigationSurfaceContentNodeIDsByHost: [ViewNodeID: Set<ViewNodeID>] {
+    get { index.activeNavigationSurfaceContentNodeIDsByHost }
+    set { index.activeNavigationSurfaceContentNodeIDsByHost = newValue }
+  }
+  var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID> {
+    get { index.departedNavigationSurfaceContentNodeIDs }
+    set { index.departedNavigationSurfaceContentNodeIDs = newValue }
+  }
   private var rootEvaluator: (@MainActor () -> Void)? {
     get { rootEvaluation.rootEvaluator }
     set { rootEvaluation.rootEvaluator = newValue }
@@ -605,6 +613,8 @@ package final class ViewGraph {
       detachedHostedSubtreeRootsByHost: detachedHostedSubtreeRootsByHost,
       detachedHostedSubtreeHostByRoot: detachedHostedSubtreeHostByRoot,
       flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity,
+      activeNavigationSurfaceContentNodeIDsByHost: activeNavigationSurfaceContentNodeIDsByHost,
+      departedNavigationSurfaceContentNodeIDs: departedNavigationSurfaceContentNodeIDs,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
       viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
@@ -1767,7 +1777,7 @@ package final class ViewGraph {
     if let existingEntityIdentity,
       existingEntityIdentity != entityIdentity
     {
-      node.resetStateSlots()
+      node.resetStateSlotsSparingReadThisFrame()
     }
     entityRoutingTable.bind(entityIdentity, to: node.viewNodeID)
   }
@@ -1922,6 +1932,70 @@ package final class ViewGraph {
       return
     }
     recordDetachedHostedNode(rootNodeID, hostedByNodeID: host.viewNodeID)
+  }
+
+  /// Records the content-subtree node IDs of the pushed-destination surfaces a
+  /// `NavigationStack` resolved this frame, keyed by the resolving host node,
+  /// and queues any content node that departed the host's active set since last
+  /// frame for a dedicated teardown at the finalize barrier.
+  ///
+  /// A `NavigationStack` mints each active destination surface out of band
+  /// (`NavigationDestinationSurface(instance).resolve(...)`), and when the
+  /// source's declaration root churns per generation (a `.id("…-\(gen)")`
+  /// folded onto the stack node), each generation mints a NEW surface while the
+  /// DEPARTED one is reachable through neither a committed child (its content
+  /// node ends up parent-detached under the fold's chain collapse) nor a
+  /// detached-hosted edge — so neither the structural child diff nor the RC-3
+  /// stale sweep ever retires it, and its registrations leak. Diffing the
+  /// host's active content-node set frame-over-frame finds exactly those
+  /// departed nodes; `tearDownDepartedNavigationSurfaces` retires each at the
+  /// barrier. Keyed by the host's stable `ViewNodeID` (not identity, which
+  /// churns with the folded `.id`), so the previous-frame set survives the
+  /// churn.
+  package func recordActiveNavigationSurfaces(
+    hostNodeID: ViewNodeID,
+    contentNodeIDs: Set<ViewNodeID>
+  ) {
+    let previous = activeNavigationSurfaceContentNodeIDsByHost[hostNodeID] ?? []
+    let departed = previous.subtracting(contentNodeIDs)
+    if !departed.isEmpty {
+      departedNavigationSurfaceContentNodeIDs.formUnion(departed)
+    }
+    if contentNodeIDs.isEmpty {
+      activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: hostNodeID)
+    } else {
+      activeNavigationSurfaceContentNodeIDsByHost[hostNodeID] = contentNodeIDs
+    }
+  }
+
+  /// Finalize-barrier teardown of pushed-destination surface content subtrees
+  /// that departed a `NavigationStack` host's active set this frame (see
+  /// `recordActiveNavigationSurfaces`). Runs the SAME `removeSubtree` cascade a
+  /// host departure uses (`sparingVisitedNodes: true`), so a live descendant
+  /// the arriving generation re-adopted at a re-rooted identity is spared while
+  /// the departed content root and its detached-hosted Button base/overlay are
+  /// retired. Self-consuming: the queue is drained here, and a re-run in the
+  /// same barrier (the preview/finalize pair) is a no-op.
+  ///
+  /// A departed content node is skipped when it is visited this frame — a node
+  /// re-entered some host's active set is live, never a leak. Departed content
+  /// nodes are, by construction, not visited: their host reminted a fresh
+  /// surface whose content is a distinct node.
+  private func tearDownDepartedNavigationSurfaces() {
+    guard !departedNavigationSurfaceContentNodeIDs.isEmpty else {
+      return
+    }
+    let departed = departedNavigationSurfaceContentNodeIDs
+    departedNavigationSurfaceContentNodeIDs.removeAll(keepingCapacity: false)
+    for nodeID in departed {
+      guard let node = nodeIfExists(for: nodeID) else {
+        continue
+      }
+      if node.visitedThisFrame(currentFrameID) {
+        continue
+      }
+      removeSubtree(rootedAt: node, sparingVisitedNodes: true)
+    }
   }
 
   private func recordDetachedHostedNode(
@@ -2611,6 +2685,7 @@ package final class ViewGraph {
     )
     pruneAbsorbedShadowedNodes()
     sweepStaleDetachedHostedRoots()
+    tearDownDepartedNavigationSurfaces()
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2628,6 +2703,7 @@ package final class ViewGraph {
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     pruneAbsorbedShadowedNodes()
     sweepStaleDetachedHostedRoots()
+    tearDownDepartedNavigationSurfaces()
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {

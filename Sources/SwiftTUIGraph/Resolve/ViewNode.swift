@@ -584,6 +584,37 @@ package final class ViewNode {
     stateSlots.removeAll(keepingCapacity: false)
   }
 
+  /// Like ``resetStateSlots()`` but preserves the slots this node has already
+  /// *read* during the current frame's evaluation.
+  ///
+  /// Entity-routing's foreign-occupant reset
+  /// (``ViewGraph/prepareEntityRoutedOwner(_:for:)``) fires mid-resolve when a
+  /// collapsed `.id("owner-\(generation)")` chain fuses its churning entity
+  /// onto the ENCLOSING view's own node — the node that also holds that view's
+  /// authored `@State`. That authored state was read to build the `.id` value
+  /// (and the rest of the body) *before* the `.id` modifier resolved, so it is
+  /// present in `dependencyTracker.currentDependencies.stateSlotReads` keyed to
+  /// this node; the re-identified content's own slots are read strictly *after*
+  /// this runs (the content resolves in `content.resolveOwned`, downstream of
+  /// the reset). A full ``resetStateSlots()`` would wipe the enclosing state and
+  /// oscillate it back to its seed every frame. Sparing the already-read,
+  /// self-owned slots keeps the enclosing `@State` alive while still freshening
+  /// the arriving content's slots. When no self-owned slot has been read yet
+  /// (the churning entity folded onto a genuinely separate content node — the
+  /// deliberate transparent-chain-collapse fold), this is a full reset.
+  package func resetStateSlotsSparingReadThisFrame() {
+    let readOrdinalsOwnedBySelf = Set(
+      dependencyTracker.currentDependencies.stateSlotReads.lazy
+        .filter { $0.owner == self.viewNodeID }
+        .map(\.ordinal)
+    )
+    guard !readOrdinalsOwnedBySelf.isEmpty else {
+      resetStateSlots()
+      return
+    }
+    stateSlots = stateSlots.filter { readOrdinalsOwnedBySelf.contains($0.key) }
+  }
+
   package func markDirty() {
     let wasDirty = isDirty
     isDirty = true
