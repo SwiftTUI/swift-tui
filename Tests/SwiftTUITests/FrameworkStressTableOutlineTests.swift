@@ -1454,9 +1454,7 @@ extension FrameworkStressTableOutlineTests {
       #expect(incremented.contains("A count \(expectedCount + 1)"))
       let reordered = try harness.clickText("Reverse outline roots")
       #expect(reordered.contains("A count \(expectedCount + 1)"))
-      withKnownIssue("Reordered OutlineGroup rows share one row-local State slot") {
-        #expect(reordered.contains("B count 0"))
-      }
+      #expect(reordered.contains("B count 0"))
     }
   }
 }

@@ -403,9 +403,50 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, Resolvable
   func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    withAuthoringContext(authoringScope) {
-      content.resolveElements(in: context)
+    // Mint a per-row owner for the row content by routing through
+    // `resolveView`, so each outline row's row-local `@State` binds to its own
+    // node keyed on `context.identity` — already the per-row explicit-ID
+    // identity carried down by `OutlineTree`'s `ForEach`. The generic
+    // `content.resolveElements(in:)` path this replaced never called
+    // `beginEvaluation`/`makeAuthoringContext`, so it re-used the single
+    // `authoringScope` owner captured once at `OutlineGroup.init` for every
+    // row, collapsing all rows' row-local state onto one shared slot.
+    //
+    // Captures of the ENCLOSING view's `@State` stay correct independently of
+    // this per-row owner: control handlers dispatch under their
+    // construction-time scope (`HandlerDescriptorIntake.preferringAuthoringScope`),
+    // and the row content is still built under `authoringScope` in
+    // `OutlineTree.rowView(for:)`, so a row button that mutates enclosing state
+    // still routes to the enclosing owner.
+    let resolved = withAuthoringContext(authoringScope) {
+      resolveView(content, in: context)
     }
+    if resolved.identity == context.identity,
+      resolved.kind == .view("EmptyView")
+    {
+      // A dropped value still minted a stored node that lives in no children
+      // array; anchor it to the resolving host so an enclosing teardown can
+      // reclaim it (mirrors `appendDeclaredChildNodes`' EmptyView arm).
+      context.viewGraph?.recordDetachedHostedSubtree(
+        resolved,
+        hostedBy: ViewNodeContext.current
+      )
+      return []
+    }
+    if resolved.identity == context.identity,
+      resolved.kind == .view("Group")
+    {
+      // Splicing lifts the row content's children into the enclosing outline
+      // container, so the group's own minted node — this row's `@State` owner
+      // — lives in no children slot. Anchor it before splicing so teardown
+      // reaches it (mirrors `ForEach`'s element-Group arm).
+      context.viewGraph?.recordDetachedHostedSubtree(
+        resolved,
+        hostedBy: ViewNodeContext.current
+      )
+      return resolved.children
+    }
+    return [resolved]
   }
 }
 
