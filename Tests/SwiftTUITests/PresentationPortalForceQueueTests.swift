@@ -436,6 +436,7 @@ private func runPortalForceQueueScenario<V: View>(
   let inputReader = PortalForceQueueAwaitedInputReader(
     frameSignal: terminal.frameSignal,
     timeoutLog: timeoutLog,
+    frameCount: { terminal.frames.count },
     steps: steps(terminal)
   )
   let runLoop = RunLoop(
@@ -783,7 +784,8 @@ private final class PortalForceQueueTimeoutLog {
 
   func note(_ message: String) {
     let elapsed = start.duration(to: .now)
-    let milliseconds = elapsed.components.seconds * 1000
+    let milliseconds =
+      elapsed.components.seconds * 1000
       + elapsed.components.attoseconds / 1_000_000_000_000_000
     events.append("+\(milliseconds)ms \(message)")
   }
@@ -793,14 +795,17 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
   private let steps: [PortalForceQueueInputStep]
   private let frameSignal: MainActorConditionSignal
   private let timeoutLog: PortalForceQueueTimeoutLog
+  private let frameCount: @MainActor () -> Int
 
   init(
     frameSignal: MainActorConditionSignal,
     timeoutLog: PortalForceQueueTimeoutLog,
+    frameCount: @escaping @MainActor () -> Int,
     steps: [PortalForceQueueInputStep]
   ) {
     self.frameSignal = frameSignal
     self.timeoutLog = timeoutLog
+    self.frameCount = frameCount
     self.steps = steps
   }
 
@@ -809,6 +814,7 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
       let steps = self.steps
       let frameSignal = self.frameSignal
       let timeoutLog = self.timeoutLog
+      let frameCount = self.frameCount
       let task = Task { @MainActor in
         for (index, step) in steps.enumerated() {
           switch step {
@@ -817,26 +823,40 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
             continuation.yield(event)
           case .awaitCondition(let predicate):
             timeoutLog.note("step \(index): await start")
-            // Deadline, then one short drain-grace retry. The gate runs 228
-            // suites concurrently on the MainActor; a multi-second stretch of
-            // synchronous actor occupancy freezes this reader's whole event
-            // chain (yield -> adapter -> pump -> frame) together with the
-            // deadline's own sleep continuation, so on a starved runner the
-            // deadline fires exactly when the queue starts draining — and the
-            // awaited frame can land milliseconds behind it (observed on the
-            // 2026-07-07 Linux gate: a 35 s freeze, then the frame 4 ms after
-            // the deadline). Because the deadline cannot fire mid-freeze, a
-            // short second wait after expiry is enough to let the queued
-            // chain drain no matter how long the freeze lasted; a genuinely
-            // dead scenario still records a diagnosable timeout within
-            // deadline + grace.
+            // Progress-gated wait. The gate runs 260+ suites concurrently on
+            // the MainActor; a multi-second stretch of synchronous actor
+            // occupancy freezes this reader's whole event chain (yield ->
+            // adapter -> pump -> frame) together with the deadline's own sleep
+            // continuation. A fixed wall-clock budget cannot bound that — the
+            // awaited frame can always land just past the last deadline
+            // (2026-07-07 Linux gate: 4 ms late after a 35 s freeze; 2026-07-12:
+            // 17 ms late after a second freeze inside the grace window). So
+            // rather than a fixed number of fixed-length deadlines, treat the
+            // run as alive while it keeps presenting frames: re-arm on any
+            // forward progress and fail only after `maxIdleWindows` consecutive
+            // windows present no new frame. A starved-but-progressing run waits
+            // as long as it needs; a dead or mispredicated scenario goes
+            // frame-idle and still records a diagnosable timeout within
+            // idleWindow * maxIdleWindows.
             var satisfied = false
-            for deadline in [Duration.seconds(20), Duration.seconds(5)] {
+            let idleWindow = Duration.seconds(20)
+            let maxIdleWindows = 3
+            // Absolute termination guard: a legitimately progressing run
+            // satisfies in one or two windows, so this only bites a pathological
+            // perpetual-frame livelock (which would otherwise reset the idle
+            // count forever and hang the serialized gate). Well clear of any
+            // real starved-but-progressing run.
+            let maxTotalWindows = 20
+            var idleWindows = 0
+            var totalWindows = 0
+            while totalWindows < maxTotalWindows {
+              totalWindows += 1
+              let framesBefore = frameCount()
               let waitTask = Task { @MainActor in
                 await frameSignal.wait(until: predicate)
               }
               let timeoutTask = Task { @MainActor in
-                try? await Task.sleep(for: deadline)
+                try? await Task.sleep(for: idleWindow)
                 waitTask.cancel()
               }
               await waitTask.value
@@ -846,7 +866,23 @@ private final class PortalForceQueueAwaitedInputReader: InputReading {
                 timeoutLog.note("step \(index): await satisfied")
                 break
               }
-              timeoutLog.note("step \(index): deadline \(deadline) hit")
+              let framesAfter = frameCount()
+              if framesAfter != framesBefore {
+                // Starved but alive: frames were presented this window, the
+                // predicate just is not satisfied yet. Reset and keep waiting.
+                idleWindows = 0
+                timeoutLog.note(
+                  "step \(index): window presented \(framesAfter - framesBefore) frame(s)"
+                )
+                continue
+              }
+              idleWindows += 1
+              timeoutLog.note(
+                "step \(index): idle window \(idleWindows)/\(maxIdleWindows), no new frame"
+              )
+              if idleWindows >= maxIdleWindows {
+                break
+              }
             }
             if !satisfied {
               timeoutLog.recordTimeout(step: index)
