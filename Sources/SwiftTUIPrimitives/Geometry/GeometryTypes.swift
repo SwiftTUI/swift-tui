@@ -639,6 +639,33 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
     return child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))#\(occurrence)]")
   }
 
+  /// The identity with duplicate-occurrence qualifiers stripped from
+  /// explicit-ID components (`ID[x#2]` → `ID[x]`). Caller-facing semantic
+  /// surfaces (accessibility nodes) report this form so duplicate siblings
+  /// compare equal, as authored; runtime isolation rides the
+  /// occurrence-qualified node lifetimes, not the reported identity. A `#`
+  /// authored inside a user id is safe: `String(reflecting:)` quotes
+  /// strings, so the trailing characters are never all digits.
+  package var strippingEntityOccurrences: Self {
+    var changed = false
+    let stripped = components.map { component -> String in
+      guard component.hasPrefix("ID["), component.hasSuffix("]") else {
+        return component
+      }
+      let interior = component.dropFirst(3).dropLast(1)
+      guard let hashIndex = interior.lastIndex(of: "#") else {
+        return component
+      }
+      let digits = interior[interior.index(after: hashIndex)...]
+      guard !digits.isEmpty, digits.allSatisfy(\.isNumber) else {
+        return component
+      }
+      changed = true
+      return "ID[\(interior[..<hashIndex])]"
+    }
+    return changed ? Self(components: stripped) : self
+  }
+
   public func isAncestor(of other: Self) -> Bool {
     guard components.count <= other.components.count else {
       return false

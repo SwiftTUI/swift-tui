@@ -29,6 +29,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   /// shadows the graph's node class.
   private weak var mintHost: SwiftTUIGraph.ViewNode?
   private var cache: [Int: ResolvedNode] = [:]
+  private var elementsCache: [Int: [ResolvedNode]] = [:]
 
   package init(
     data: Data,
@@ -133,6 +134,37 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       )
       cache[index] = normalized
       return normalized
+    }
+  }
+
+  nonisolated package func childElements(at index: Int) -> [ResolvedNode] {
+    withCheckedMainActorAccess("IndexedChildSource.childElements(at:)") {
+      if let cached = elementsCache[index] {
+        return cached
+      }
+
+      // `child(at:)` realizes, entity-attaches, and hosted-detached-anchors
+      // the element mint; splicing here only decides how many stack cells it
+      // contributes (mirroring `ForEach.resolveElements`' EmptyView-drop and
+      // group-splice arms, which the eager path applies at the same seam).
+      let realized = child(at: index)
+      let dataIndex = data.index(data.startIndex, offsetBy: index)
+      let element = data[dataIndex]
+      let elementIdentity = childContext.identity.explicitID(element[keyPath: id])
+      let flattened: [ResolvedNode]
+      if realized.identity == elementIdentity,
+        realized.kind == .view("EmptyView")
+      {
+        flattened = []
+      } else if realized.identity == elementIdentity,
+        realized.kind == .view("Group")
+      {
+        flattened = realized.children
+      } else {
+        flattened = [realized]
+      }
+      elementsCache[index] = flattened
+      return flattened
     }
   }
 }

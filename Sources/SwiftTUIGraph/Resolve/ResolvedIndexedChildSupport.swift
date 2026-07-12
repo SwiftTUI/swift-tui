@@ -7,11 +7,22 @@ package protocol IndexedChildSource: Sendable {
   var workerResolvedChildren: [ResolvedNode]? { get }
 
   func child(at index: Int) -> ResolvedNode
+
+  /// The stack cells one element contributes: a multi-view element (a
+  /// TupleView row, a nested ForEach) realizes as a synthesized Group whose
+  /// children must join the enclosing stack as individual cells — exactly
+  /// the eager path's group-splice arm. Elements that realize to a single
+  /// view contribute themselves (the default).
+  func childElements(at index: Int) -> [ResolvedNode]
 }
 
 extension IndexedChildSource {
   package var canRunOnWorker: Bool { false }
   package var workerResolvedChildren: [ResolvedNode]? { nil }
+
+  package func childElements(at index: Int) -> [ResolvedNode] {
+    [child(at: index)]
+  }
 }
 
 /// Resolve-time aggregate of every layout-offload disqualifier in a subtree.

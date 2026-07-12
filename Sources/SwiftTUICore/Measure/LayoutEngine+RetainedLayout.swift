@@ -39,6 +39,14 @@ extension LayoutEngine {
     if viewportContext != nil, case .lazyStack = resolved.layoutBehavior {
       return nil
     }
+    // Indexed containers compare by the ID-only measurement signature, so a
+    // payload-only row change is invisible to `placementEquivalence`; when
+    // the invalidation summary marked a source at or below this node,
+    // retained placement must yield (the count-mismatch metadata-sync skip
+    // below would otherwise serve stale placed children silently).
+    if retainedLayout?.affectsIndexedChildSource(within: resolved.identity) == true {
+      return nil
+    }
 
     guard
       let retainedLayout,
@@ -167,15 +175,20 @@ extension LayoutEngine {
     for resolved: ResolvedNode,
     passContext: LayoutPassContext?
   ) -> Bool {
-    guard let source = resolved.indexedChildSource else {
-      return false
-    }
-
     guard let retainedLayout = passContext?.retainedLayout else {
       return false
     }
 
-    return retainedLayout.affectsIndexedChildSource(root: source.identityRoot)
+    if let source = resolved.indexedChildSource,
+      retainedLayout.affectsIndexedChildSource(root: source.identityRoot)
+    {
+      return true
+    }
+    // Ancestors of an affected source must refuse subtree reuse too: their
+    // retained comparison is signature-blind inside the indexed container,
+    // so an enclosing reuse would serve the stale allocation without the
+    // container's own gate ever running.
+    return retainedLayout.affectsIndexedChildSource(within: resolved.identity)
   }
 
   internal func supportsRetainedLayoutReuse(

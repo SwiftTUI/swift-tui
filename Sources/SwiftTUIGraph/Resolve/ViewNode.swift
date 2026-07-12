@@ -348,6 +348,36 @@ package final class ViewNode {
     evaluationDepth += 1
   }
 
+  /// Per-frame tally of exact-identity entity claims, so duplicate
+  /// `.id(exact)` SIBLINGS resolved under one body claim DISTINCT occurrence
+  /// lifetimes at resolve time — the post-resolution occurrence stamp
+  /// (`assignEntityIdentityOccurrences`) is too late for the runtime node
+  /// claims, and two occurrence-0 claims of one entity thrash the shared
+  /// home (re-minted every frame; both rows report one `viewNodeID`).
+  /// Keyed by the claiming chain's structural position and reset per frame:
+  /// deferred chain realizations re-enter evaluation per sibling, and a
+  /// second resolve pass re-claims the same positions — both must see the
+  /// same occurrence, so the binding is idempotent within the frame.
+  /// Assignment is first-claim order, matching the post-pass sibling order.
+  private var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]] = [:]
+  private var exactIdentityOccurrenceTallyFrameID: UInt64 = 0
+
+  package func claimExactIdentityOccurrence(
+    for identity: Identity,
+    at structuralPath: StructuralPath
+  ) -> Int {
+    if exactIdentityOccurrenceTallyFrameID != preparedFrameID {
+      exactIdentityOccurrenceTally.removeAll(keepingCapacity: true)
+      exactIdentityOccurrenceTallyFrameID = preparedFrameID
+    }
+    if let bound = exactIdentityOccurrenceTally[identity]?[structuralPath] {
+      return bound
+    }
+    let occurrence = exactIdentityOccurrenceTally[identity]?.count ?? 0
+    exactIdentityOccurrenceTally[identity, default: [:]][structuralPath] = occurrence
+    return occurrence
+  }
+
   package func beginReuse(
     frameID: UInt64,
     invalidator: (any Invalidating)?

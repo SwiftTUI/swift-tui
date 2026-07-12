@@ -92,15 +92,7 @@ extension FrameworkStressCollectionLayoutTests {
         retained.rasterSurface == fresh.rasterSurface
         && retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize
         && collectionLayoutText(retained).contains("002 tail")
-      if root.expanded {
-        withKnownIssue(
-          "Lazy indexed allocation reuses the prior same-ID row measurement after payload growth"
-        ) {
-          #expect(matchesFreshGeometry)
-        }
-      } else {
-        #expect(matchesFreshGeometry)
-      }
+      #expect(matchesFreshGeometry)
     }
   }
 }
@@ -281,11 +273,7 @@ extension FrameworkStressCollectionLayoutTests {
       let flattenedEveryChild =
         Array(snapshot.rasterSurface.lines.prefix(6)) == expected
         && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == 6
-      withKnownIssue(
-        "Indexed LazyVStack treats a multi-view ForEach row as one overlapping Group"
-      ) {
-        #expect(flattenedEveryChild)
-      }
+      #expect(flattenedEveryChild)
     }
   }
 }
@@ -338,15 +326,7 @@ extension FrameworkStressCollectionLayoutTests {
         && retained.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == expectedHeight
         && collectionLayoutText(retained).contains("006 stable tail")
 
-      if root.expanded {
-        withKnownIssue(
-          "Lazy indexed allocation retains zero-height rows after their conditional content appears"
-        ) {
-          #expect(matchesCurrentEmptyRows)
-        }
-      } else {
-        #expect(matchesCurrentEmptyRows)
-      }
+      #expect(matchesCurrentEmptyRows)
     }
   }
 }
@@ -521,11 +501,7 @@ extension FrameworkStressCollectionLayoutTests {
         Array(snapshot.rasterSurface.lines.prefix(6)) == expected
         && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.height == 6
 
-      withKnownIssue(
-        "Indexed LazyVStack overlaps each inner ForEach as one Group-valued outer row"
-      ) {
-        #expect(expandedEveryNestedChild)
-      }
+      #expect(expandedEveryNestedChild)
     }
   }
 }
@@ -639,11 +615,7 @@ extension FrameworkStressCollectionLayoutTests {
         values.allSatisfy { rendered.contains("A\($0)") && rendered.contains("B\($0)") }
         && snapshot.semanticSnapshot.scrollRoutes.first?.contentBounds.size.width == 17
 
-      withKnownIssue(
-        "Indexed LazyHStack treats a multi-view ForEach row as one overlapping Group"
-      ) {
-        #expect(flattenedEveryChild)
-      }
+      #expect(flattenedEveryChild)
     }
   }
 }
@@ -759,15 +731,7 @@ extension FrameworkStressCollectionLayoutTests {
         retained.rasterSurface == fresh.rasterSurface
         && retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes
 
-      if root.expanded {
-        withKnownIssue(
-          "Lazy indexed allocation retains the scalar extent after an ID-stable row becomes a stack"
-        ) {
-          #expect(matchesCurrentTopology)
-        }
-      } else {
-        #expect(matchesCurrentTopology)
-      }
+      #expect(matchesCurrentTopology)
     }
   }
 }

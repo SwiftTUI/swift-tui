@@ -87,10 +87,14 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    if let source = resolved.indexedChildSource,
+    if resolved.indexedChildSource != nil,
       let allocation = measured.containerAllocationSnapshot,
       let snapshot = allocation.lazyStack,
-      allocation.childSizes.count == source.count
+      // Flattened cells: a multi-view element contributes one cell per
+      // spliced child, so the allocation arrays index the flattened list,
+      // not the element list.
+      case let flattenedChildren = stackChildren(for: resolved),
+      allocation.childSizes.count == flattenedChildren.count
     {
       let visibleRange =
         viewportContext.flatMap {
@@ -99,10 +103,10 @@ extension LayoutEngine {
             viewportContext: $0,
             overscan: 0
           )
-        } ?? (0..<source.count)
+        } ?? (0..<flattenedChildren.count)
 
       return indexedLazyStackPlacementRequests(
-        source: source,
+        children: flattenedChildren,
         childSizes: allocation.childSizes,
         measured: measured,
         in: bounds,
@@ -185,7 +189,7 @@ extension LayoutEngine {
   }
 
   private func indexedLazyStackPlacementRequests(
-    source: any IndexedChildSource,
+    children: [ResolvedNode],
     childSizes: [ChildAllocation],
     measured: MeasuredNode,
     in bounds: CellRect,
@@ -197,7 +201,7 @@ extension LayoutEngine {
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
     visibleRange.map { index in
-      let child = source.child(at: index)
+      let child = children[index]
       let childSize = childSizes[index].size
       var childMeasurement = measure(
         child,

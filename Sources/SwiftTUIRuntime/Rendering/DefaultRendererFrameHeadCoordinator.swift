@@ -649,8 +649,8 @@ struct DefaultRendererFrameHeadCoordinator {
       return node
     }
 
-    let children = (0..<source.count).map { index in
-      indexedChildSourceWorkerSnapshot(of: source.child(at: index))
+    let children = (0..<source.count).flatMap { index in
+      source.childElements(at: index).map(indexedChildSourceWorkerSnapshot(of:))
     }
     node.indexedChildSource = IndexedChildSourceSnapshot(
       identityRoot: source.identityRoot,

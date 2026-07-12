@@ -234,9 +234,7 @@ extension FrameworkStressToastLifecycleTests {
     for generation in 1...12 {
       let frame = try harness.clickText("Advance Toast Environment 005")
       #expect(frame.contains("source environment value-\(generation)"))
-      withKnownIssue("Toast content loses the source environment at the portal boundary") {
-        #expect(frame.contains("toast environment value-\(generation)"))
-      }
+      #expect(frame.contains("toast environment value-\(generation)"))
       #expect(toastLifecycleEntryCount(in: harness) == 1)
     }
   }
@@ -484,7 +482,10 @@ extension FrameworkStressToastLifecycleTests {
     await AsyncEvent.firing(after: .milliseconds(140)).wait()
     let frame = try harness.render()
 
-    withKnownIssue("Nil duration does not cancel the toast's active finite deadline") {
+    // Intermittent: under parallel-suite load the 140ms wait can elapse
+    // before the finite deadline fires, so the stale-deadline dismissal —
+    // the pinned defect — does not always reproduce.
+    withKnownIssue("Nil duration does not cancel the toast's active finite deadline", isIntermittent: true) {
       #expect(
         presented.value && frame.contains("finite to nil toast")
           && toastLifecycleEntryCount(in: harness) == 1

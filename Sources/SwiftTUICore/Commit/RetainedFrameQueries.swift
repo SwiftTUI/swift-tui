@@ -335,6 +335,20 @@ package struct RetainedInvalidationSummary: Sendable {
             && base.intersectsSubtree(at: source.identityRoot))
         {
           affectedIndexedChildSourceRoots.insert(source.identityRoot)
+          continue
+        }
+        // An invalidated ANCESTOR means the container's body may have re-run
+        // with new per-ID payloads. The indexed measurement signature is the
+        // ordered ID list — payload changes under a stable ID list are
+        // invisible to every equivalence comparator for indexed containers —
+        // so the source must yield reuse whenever an ancestor re-resolved.
+        var ancestor: StructuralPath? = StructuralPath(identity: source.identityRoot)
+        while let current = ancestor {
+          if invalidatedIdentities.contains(current.identityProjection) {
+            affectedIndexedChildSourceRoots.insert(source.identityRoot)
+            break
+          }
+          ancestor = current.parent
         }
       }
     }
@@ -371,6 +385,20 @@ package struct RetainedInvalidationSummary: Sendable {
     root identityRoot: Identity
   ) -> Bool {
     affectedIndexedChildSourceRoots.contains(identityRoot)
+  }
+
+  /// Whether any affected indexed source lives at or inside `identity`'s
+  /// subtree. Ancestor reuse gates need the subtree form: retained
+  /// measurement can reuse a whole enclosing subtree (ScrollView, frame)
+  /// whose comparator is signature-blind inside the indexed container, so
+  /// the container's own gate never runs unless every ancestor asks this.
+  package func affectsIndexedChildSource(
+    within identity: Identity
+  ) -> Bool {
+    !affectedIndexedChildSourceRoots.isEmpty
+      && affectedIndexedChildSourceRoots.contains {
+        $0 == identity || $0.isDescendant(of: identity)
+      }
   }
 
   package func intersectsSubtree(
@@ -464,5 +492,11 @@ package struct RetainedLayoutSession: Sendable {
     root identityRoot: Identity
   ) -> Bool {
     invalidationSummary.affectsIndexedChildSource(root: identityRoot)
+  }
+
+  package func affectsIndexedChildSource(
+    within identity: Identity
+  ) -> Bool {
+    invalidationSummary.affectsIndexedChildSource(within: identity)
   }
 }

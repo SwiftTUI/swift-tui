@@ -1653,9 +1653,7 @@ extension FrameworkStressSceneHostTests {
       initialStates.append(initialState)
     }
 
-    withKnownIssue("Replacement SceneSession run loops retain live-region @State") {
-      #expect(initialStates == Array(repeating: 0, count: 8))
-    }
+    #expect(initialStates == Array(repeating: 0, count: 8))
   }
 }
 

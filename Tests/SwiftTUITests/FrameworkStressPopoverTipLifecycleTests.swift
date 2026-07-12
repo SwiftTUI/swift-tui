@@ -871,9 +871,7 @@ extension FrameworkStressPopoverTipLifecycleTests {
         && model.primaryPresented
     }
 
-    withKnownIssue("Popover-tip action payloads ignore the source disabled environment") {
-      #expect(disabledActionsStayedInert)
-    }
+    #expect(disabledActionsStayedInert)
   }
 }
 

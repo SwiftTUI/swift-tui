@@ -186,8 +186,12 @@ extension SemanticExtractor {
 
     return AccessibilityNode(
       viewNodeID: node.viewNodeID,
-      identity: node.identity,
-      parentIdentity: parentIdentity,
+      // Reported identity is occurrence-free: duplicate siblings compare
+      // equal, as authored, and per-owner attribution rides `viewNodeID`.
+      // Internal lookups (cursor anchors, focus relevance) stay on the raw
+      // occurrence-qualified identity.
+      identity: node.identity.strippingEntityOccurrences,
+      parentIdentity: parentIdentity?.strippingEntityOccurrences,
       rect: semanticBounds(for: node),
       role: role,
       label: accessibilityLabel(for: node, role: role),

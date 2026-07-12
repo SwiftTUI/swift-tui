@@ -235,9 +235,18 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let entityIdentity = EntityIdentity(identity)
-    var routedContext = context.replacingIdentity(with: identity)
     let slotNode = ViewNodeContext.current
+    // Duplicate `.id(exact)` siblings under one body are distinct runtime
+    // lifetimes: claim this chain's occurrence BEFORE the entity claim so
+    // the second sibling routes to its own home (the co-resident escape +
+    // the duplicate-occurrence mint) instead of thrashing the primary's.
+    let occurrence =
+      slotNode?.claimExactIdentityOccurrence(
+        for: identity,
+        at: context.structuralPath
+      ) ?? 0
+    let entityIdentity = EntityIdentity(identity, occurrence: occurrence)
+    var routedContext = context.replacingIdentity(with: identity)
     // Identity churn: the structural slot at this position resolved to a
     // *different* explicit identity last frame (e.g. `.id("owner-\(gen)")` with a
     // bumped generation). The committed reuse-containment checks key on

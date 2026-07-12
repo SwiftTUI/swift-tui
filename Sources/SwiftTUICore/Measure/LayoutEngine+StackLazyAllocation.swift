@@ -10,7 +10,7 @@ extension LayoutEngine {
       return resolved.children
     }
 
-    return (0..<source.count).map { source.child(at: $0) }
+    return (0..<source.count).flatMap { source.childElements(at: $0) }
   }
 
   package func lazyStackAllocationSnapshot(
