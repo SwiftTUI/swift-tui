@@ -89,13 +89,24 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     // stay read here (moving a `@State` read to the leaf would rebind its
     // slot; dismissal is rare, so one background re-resolve on dismiss
     // matches the previous behavior).
-    guard let tip, tip.isEligible else {
-      return [content.resolve(in: context)]
-    }
-
-    let tipID = String(reflecting: tip.id)
-    if isPresented == nil, dismissedTipID == tipID {
-      return [content.resolve(in: context)]
+    //
+    // Suppressed states (no tip, ineligible, bindingless-dismissed) resolve
+    // through the same wrapper topology as the active state. An early
+    // `content.resolve(in: context)` return would flip the resolved kind at
+    // this identity ("Presentation" ↔ the content's own kind) whenever
+    // `tip`/eligibility churns, tearing down the subtree — including the
+    // `@State` slot holding `dismissedTipID`, which must survive
+    // `tip == nil` round trips so a dismissed tip stays suppressed when the
+    // same tip ID returns.
+    let tip = tip
+    let suppressed: Bool
+    let tipID: String
+    if let tip, tip.isEligible {
+      tipID = String(reflecting: tip.id)
+      suppressed = isPresented == nil && dismissedTipID == tipID
+    } else {
+      tipID = ""
+      suppressed = true
     }
 
     let isPresented = isPresented
@@ -106,11 +117,24 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     let dismissAuthoringContext = dismissAuthoringContext
     let dismissedTipID = $dismissedTipID
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let isActive: @MainActor @Sendable () -> Bool
+    if suppressed {
+      isActive = { false }
+    } else {
+      isActive = { isPresented?.wrappedValue ?? true }
+    }
     return resolvePresentationModifier(
       content: content,
-      isActive: { isPresented?.wrappedValue ?? true },
+      isActive: isActive,
       in: context
     ) { background, triggerIdentity in
+      // Defensive: the leaf only requests a declaration while active, and a
+      // suppressed resolve installs `isActive: { false }` — but a spared
+      // leaf could still hold a declaration closure from the last active
+      // resolve, so re-check here.
+      guard !suppressed, let tip else {
+        return .init(declarations: [])
+      }
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,

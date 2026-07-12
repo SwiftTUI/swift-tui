@@ -231,6 +231,25 @@ package final class LocalGestureRegistry: Equatable {
     }
   }
 
+  /// Tears down recognizers the caller determined have genuinely departed
+  /// the rendered tree (no paired interaction region — see the focus-sync
+  /// region-liveness pass). Every structural teardown layer deliberately
+  /// spares ACTIVE recognizers (a mid-interaction re-mint must not cancel a
+  /// live capture), and the owner key can be a live ancestor (the
+  /// registering body's node), so `prune(keeping:)` cannot distinguish a
+  /// branch-removed active recognizer either — without this backstop it
+  /// stays event- and deadline-eligible forever.
+  package func removeDepartedRecognizers(
+    _ identities: [Identity]
+  ) {
+    for identity in identities {
+      recognizers.removeValue(forKey: identity)?.tearDown()
+      ownersByIdentity.removeValue(forKey: identity)
+      passAuthoredRecognizers.removeValue(forKey: identity)
+      structuralKeysByIdentity.removeValue(forKey: identity)
+    }
+  }
+
   package func prune(
     keeping liveNodeIDs: Set<ViewNodeID>
   ) {

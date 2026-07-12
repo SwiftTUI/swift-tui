@@ -319,16 +319,6 @@ package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableV
 }
 
 @MainActor
-private func reconcilePresentationDeclarations(
-  from baseNode: ResolvedNode,
-  into portalState: PresentationPortalDraft
-) -> Bool {
-  let declarations = baseNode.preferenceValues[
-    PresentationCoordinatorDeclarationPreferenceKey.self]
-  return portalState.reconcile(declarations.declarations)
-}
-
-@MainActor
 package func composePresentationPortalTree(
   baseNode: ResolvedNode,
   portalState: PresentationPortalDraft,
@@ -337,13 +327,88 @@ package func composePresentationPortalTree(
   // The portal root is a graph-owned wrapper. Reconcile from the
   // current base snapshot before choosing the wrapper children so stale
   // declarations are removed through ordinary structural child diffing.
-  let declarationsRefreshed = reconcilePresentationDeclarations(
-    from: baseNode,
-    into: portalState
-  )
-  let overlayEntries = portalState.overlayEntries()
+  //
+  // Declarations emitted inside detached overlay content (a tip declared in
+  // sheet content) never bubble into `baseNode` — they surface on the
+  // overlay subtree, which only exists *after* composing. Seed the first
+  // reconcile with the committed overlay host's declarations so steady
+  // frames keep overlay-declared sources without re-minting them (activation
+  // ordinals decide escape recency; a drop-and-re-add would make the entry
+  // newest every escalated frame), then iterate to a bounded fixpoint: a
+  // compose whose overlay subtree carries different declarations than the
+  // reconcile consumed re-reconciles and recomposes. Activation, dismissal,
+  // and content-refresh frames converge on the second compose; steady
+  // frames exit after the first.
+  let baseDeclarations = baseNode.preferenceValues[
+    PresentationCoordinatorDeclarationPreferenceKey.self
+  ].declarations
+  let overlaysIdentity =
+    context
+    .child(component: .named("PortalHost"))
+    .child(component: .named("overlays"))
+    .identity
+  let seedOverlayDeclarations =
+    context.viewGraph?.nodeForIdentity(overlaysIdentity)?.committed.preferenceValues[
+      PresentationCoordinatorDeclarationPreferenceKey.self
+    ].declarations ?? []
 
-  guard !overlayEntries.isEmpty else {
+  var reconciledMints = declarationMints(baseDeclarations + seedOverlayDeclarations)
+  var declarationsRefreshed = portalState.reconcile(baseDeclarations + seedOverlayDeclarations)
+  var composed = composePortalRootTree(
+    baseNode: baseNode,
+    entries: portalState.overlayEntries(),
+    in: context,
+    forceEntryRefresh: declarationsRefreshed
+  )
+
+  for _ in 0..<3 {
+    let composedDeclarations = composed.preferenceValues[
+      PresentationCoordinatorDeclarationPreferenceKey.self
+    ].declarations
+    let composedMints = declarationMints(composedDeclarations)
+    guard composedMints != reconciledMints else {
+      break
+    }
+    reconciledMints = composedMints
+    let refreshed = portalState.reconcile(composedDeclarations)
+    declarationsRefreshed = declarationsRefreshed || refreshed
+    composed = composePortalRootTree(
+      baseNode: baseNode,
+      entries: portalState.overlayEntries(),
+      in: context,
+      forceEntryRefresh: declarationsRefreshed
+    )
+  }
+
+  return composed
+}
+
+/// The (source, mint-generation) fingerprint of a declaration list — the
+/// fixpoint's convergence currency. Declarations are closure payloads, so
+/// content cannot be compared; a rebuilt declaration mints a new generation.
+private func declarationMints(
+  _ declarations: [PresentationCoordinatorDeclaration]
+) -> Set<DeclarationMint> {
+  Set(
+    declarations.map {
+      DeclarationMint(sourceIdentity: $0.sourceIdentity, mintGeneration: $0.mintGeneration)
+    }
+  )
+}
+
+private struct DeclarationMint: Hashable {
+  var sourceIdentity: Identity
+  var mintGeneration: UInt64
+}
+
+@MainActor
+private func composePortalRootTree(
+  baseNode: ResolvedNode,
+  entries: [OverlayStackEntry],
+  in context: ResolveContext,
+  forceEntryRefresh: Bool
+) -> ResolvedNode {
+  guard !entries.isEmpty else {
     return ResolvedNode(
       identity: context.identity,
       structuralPath: context.structuralPath,
@@ -362,8 +427,8 @@ package func composePresentationPortalTree(
 
   return composeOverlayStackTree(
     baseNode: baseNode,
-    entries: overlayEntries,
+    entries: entries,
     in: context,
-    forceEntryRefresh: declarationsRefreshed
+    forceEntryRefresh: forceEntryRefresh
   )
 }

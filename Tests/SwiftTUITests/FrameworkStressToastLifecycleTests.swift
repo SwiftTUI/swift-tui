@@ -1012,12 +1012,8 @@ extension FrameworkStressToastLifecycleTests {
     for generation in 1...8 {
       let frame = try harness.clickText("Refresh Chained Toasts 020")
       #expect(frame.contains("outer chained toast \(generation)"))
-      withKnownIssue("Chained toast modifiers overwrite the inner item for one source identity") {
-        #expect(
-          frame.contains("inner chained toast \(generation)")
-            && frame.components(separatedBy: "chained toast").count - 1 == 2
-        )
-      }
+      #expect(frame.contains("inner chained toast \(generation)"))
+      #expect(frame.components(separatedBy: "chained toast").count - 1 == 2)
       #expect(toastLifecycleEntryCount(in: harness) == 1)
     }
   }

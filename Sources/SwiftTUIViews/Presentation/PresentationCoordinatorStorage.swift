@@ -37,6 +37,18 @@ where Item.ID: Sendable {
   private var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>] = [:]
   private var seenSources: Set<Identity> = []
 
+  /// Within-pass sync buffer. Chained modifiers on one chain node share a
+  /// source identity but emit separate declarations, each calling `sync`
+  /// once during a reconcile pass — applying eagerly would let the later
+  /// declaration replace the earlier one's items wholesale. Buffering and
+  /// applying once at `endSynchronizing()` merges them, and keeps
+  /// activation-ordinal continuity reading the pre-pass entries. Transient
+  /// between `beginSynchronizing()`/`endSynchronizing()` (reconcile runs
+  /// synchronously between them), so none of this is checkpointed.
+  private var isSynchronizing = false
+  private var pendingPassItemsBySource: [Identity: [Item]] = [:]
+  private var pendingPassSources: [Identity] = []
+
   package init() {}
 
   package func makeCheckpoint() -> Checkpoint {
@@ -55,14 +67,32 @@ where Item.ID: Sendable {
 
   package func beginSynchronizing() {
     seenSources.removeAll(keepingCapacity: true)
+    isSynchronizing = true
+    pendingPassItemsBySource.removeAll(keepingCapacity: true)
+    pendingPassSources.removeAll(keepingCapacity: true)
   }
 
   package func sync(
     sourceIdentity: Identity,
     items: [Item]
   ) {
-    seenSources.insert(sourceIdentity)
+    guard isSynchronizing else {
+      seenSources.insert(sourceIdentity)
+      applySync(sourceIdentity: sourceIdentity, items: items)
+      return
+    }
 
+    if !seenSources.contains(sourceIdentity) {
+      pendingPassSources.append(sourceIdentity)
+    }
+    seenSources.insert(sourceIdentity)
+    pendingPassItemsBySource[sourceIdentity, default: []].append(contentsOf: items)
+  }
+
+  private func applySync(
+    sourceIdentity: Identity,
+    items: [Item]
+  ) {
     guard !items.isEmpty else {
       declarativeItemsBySource[sourceIdentity] = [:]
       return
@@ -84,6 +114,16 @@ where Item.ID: Sendable {
   }
 
   package func endSynchronizing() {
+    for sourceIdentity in pendingPassSources {
+      applySync(
+        sourceIdentity: sourceIdentity,
+        items: pendingPassItemsBySource[sourceIdentity] ?? []
+      )
+    }
+    pendingPassItemsBySource.removeAll(keepingCapacity: true)
+    pendingPassSources.removeAll(keepingCapacity: true)
+    isSynchronizing = false
+
     let staleSources = declarativeItemsBySource.keys.filter { !seenSources.contains($0) }
     for sourceIdentity in staleSources {
       declarativeItemsBySource.removeValue(forKey: sourceIdentity)

@@ -517,9 +517,7 @@ extension FrameworkStressPopoverTipLifecycleTests {
         && popoverTipStressEntryCount(in: harness) == 0
     }
 
-    withKnownIssue("Bindingless tip actions do not persist their internal dismissed tip ID") {
-      #expect(dismissalStayedSuppressed)
-    }
+    #expect(dismissalStayedSuppressed)
   }
 }
 
@@ -936,20 +934,13 @@ extension FrameworkStressPopoverTipLifecycleTests {
 
     frame = try harness.clickText("Open nested tip", chooseLast: true)
     #expect(frame.contains("nested tip presented true"))
-    let nestedTipOpened =
-      frame.contains("Nested presentation tip")
-      && popoverTipStressEntryCount(in: harness) == 2
-    withKnownIssue("PopoverTip declarations inside detached sheet content do not reach the portal")
-    {
-      #expect(nestedTipOpened)
-    }
+    #expect(frame.contains("Nested presentation tip"))
+    #expect(popoverTipStressEntryCount(in: harness) == 2)
 
-    if nestedTipOpened {
-      frame = try harness.pressKey(KeyPress(.escape))
-      #expect(frame.contains("Nested sheet body"))
-      #expect(!frame.contains("Nested presentation tip"))
-      #expect(popoverTipStressEntryCount(in: harness) == 1)
-    }
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(frame.contains("Nested sheet body"))
+    #expect(!frame.contains("Nested presentation tip"))
+    #expect(popoverTipStressEntryCount(in: harness) == 1)
 
     frame = try harness.pressKey(KeyPress(.escape))
     #expect(frame.contains("Open nested tip sheet"))

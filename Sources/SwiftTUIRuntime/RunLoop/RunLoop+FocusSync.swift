@@ -178,6 +178,23 @@ extension RunLoop {
     // Re-hit-test the stored pointer location so a region that departed the
     // pointer's cell delivers its balanced `.exited`.
     reconcilePointerHover()
+    // Gesture-family twin of the capture-release policy above: every
+    // structural teardown layer spares ACTIVE recognizers (a mid-interaction
+    // re-mint must not cancel a live gesture), and the recognizer's owner
+    // key can be a live ancestor (the registering body's node), so
+    // `pruneOrphanedGestures` cannot see a branch-removed active recognizer
+    // either. An active recognizer with no paired interaction region in the
+    // rendered tree has genuinely departed — release it so it stops
+    // receiving events and its armed deadline cannot fire.
+    let departedActiveGestureIdentities = localGestureRegistry.activeRecognizers()
+      .filter { identity, recognizer in
+        recognizer.isActive
+          && pairedInteractionRegion(for: primaryRouteID(for: identity)) == nil
+      }
+      .map { $0.0 }
+    if !departedActiveGestureIdentities.isEmpty {
+      localGestureRegistry.removeDepartedRecognizers(departedActiveGestureIdentities)
+    }
 
     let previousModalFocusScopePath = currentModalFocusScopePath()
     let nextModalFocusScopePath = activeModalFocusScopePath(

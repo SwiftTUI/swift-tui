@@ -275,7 +275,20 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     }
 
     let sourceIdentity = node.identity
-    let portalEntryID = presentationAttachment(for: node, token: "toast")
+    // Chained `.toast` modifiers collapse onto one chain node and share its
+    // source identity; the inner modifier's declaration is already merged on
+    // the flowing node when the outer resolves, so counting same-source
+    // declarations claims the next attachment ordinal — distinct portal
+    // tokens ("toast", "toast[1]", …) keep chained items from overwriting
+    // each other in the family store. The ordinal counts *active* inner
+    // declarations only, so an inner toggle can shift an outer token; the
+    // re-minted entry then re-arms its dismissal deadline, which is
+    // acceptable for transient toasts.
+    let attachmentOrdinal = node.preferenceValues[
+      PresentationCoordinatorDeclarationPreferenceKey.self
+    ].declarations.count { $0.sourceIdentity == sourceIdentity }
+    let token = attachmentOrdinal == 0 ? "toast" : "toast[\(attachmentOrdinal)]"
+    let portalEntryID = presentationAttachment(for: node, token: token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = ToastPresentationItem(
       id: portalEntryID.description,

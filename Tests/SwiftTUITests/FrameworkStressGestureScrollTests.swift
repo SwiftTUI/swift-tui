@@ -167,9 +167,7 @@ extension FrameworkStressGestureScrollTests {
 
     _ = try harness.clickText("Exclusive parent gesture")
 
-    withKnownIssue("GestureMask.gesture does not suppress descendant recognizers") {
-      #expect(events.value == ["parent"])
-    }
+    #expect(events.value == ["parent"])
   }
 }
 
@@ -407,10 +405,8 @@ extension FrameworkStressGestureScrollTests {
     harness.runLoop.drainGestureDeadlines(at: .now().advanced(by: .seconds(2)))
     _ = try harness.render()
 
-    withKnownIssue("A removed active long press remains deadline-eligible") {
-      #expect(fires.value == 0)
-      #expect(harness.gestureRecognizerCount == 0)
-    }
+    #expect(fires.value == 0)
+    #expect(harness.gestureRecognizerCount == 0)
   }
 }
 

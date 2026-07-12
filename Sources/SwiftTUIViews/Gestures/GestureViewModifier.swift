@@ -27,11 +27,27 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    // A mask without `.subviews` (`.gesture`, `.none`) disables descendant
+    // gesture attachments: record this chain node's suppression scope
+    // before resolving the content so every subview attachment sees it.
+    // Chain levels stacked on this same node share `context.identity` and
+    // stay exempt — see `PropagatedRegistries.gestureSuppressionScopes`.
+    var contentContext = context
+    if !mask.contains(.subviews) {
+      contentContext.gestureSuppressionScopes.append(context.identity)
+    }
     // Resolve the content first so its identity and region exist.
-    var node = content.resolve(in: context)
+    var node = content.resolve(in: contentContext)
 
     // If the mask excludes this gesture, short-circuit.
     guard mask.contains(.gesture) else {
+      return [node]
+    }
+
+    // An ancestor attachment's mask excluded its subview hierarchy — this
+    // attachment never registers (no recognizer, pointer route, or
+    // hit-test stamp, so events fall through to the masking ancestor).
+    guard !context.gestureSuppressionScopes.contains(where: { $0 != context.identity }) else {
       return [node]
     }
 

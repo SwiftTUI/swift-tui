@@ -53,7 +53,13 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
   }
 
   package func beginSynchronizing() {
-    coordinator?.beginSynchronizing()
+    // Eagerly instantiate: the coordinator's store tracks the open pass
+    // (`sync` buffers within one, so same-source declarations merge). A
+    // lazily-created coordinator whose first `sync` arrives mid-pass would
+    // miss the begin and fall back to eager per-call application — on a
+    // family's first activation frame, chained same-source declarations
+    // would overwrite each other again. An empty store is inactive.
+    instance().beginSynchronizing()
   }
 
   package func sync(

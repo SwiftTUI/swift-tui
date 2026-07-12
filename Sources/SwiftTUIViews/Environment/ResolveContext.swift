@@ -180,6 +180,10 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.requestDeadline }
     set { propagated.requestDeadline = newValue }
   }
+  package var gestureSuppressionScopes: [Identity] {
+    get { propagated.gestureSuppressionScopes }
+    set { propagated.gestureSuppressionScopes = newValue }
+  }
   package var presentationTriggerObserver: PresentationTriggerObservationLog? {
     get { propagated.presentationTriggerObserver }
     set { propagated.presentationTriggerObserver = newValue }
@@ -647,6 +651,19 @@ extension ResolveContext {
     /// focus/press into captured contexts; keys marked here are exempt because
     /// the authored value must keep winning below its modifier.
     package var authoredFocusPressOverrides: AuthoredFocusPressOverrides
+    /// Chain-node identities of `.gesture(_:including:)` attachments whose
+    /// mask excludes `.subviews`, in force over this context's subtree
+    /// (SwiftUI's `GestureMask` contract: `.gesture` and `.none` disable
+    /// subview gestures). Chained modifier levels share their resolve
+    /// context's identity, so an attachment is suppressed exactly when some
+    /// scope entry differs from its own `context.identity` — stacked
+    /// gestures on the masking chain node stay exempt while genuine subview
+    /// attachments (including nested masking nodes) are suppressed.
+    /// Registration-time suppression: a suppressed attachment never
+    /// registers its recognizer, pointer route, or hit-test metadata. A
+    /// mask *flip* over a spared gesture-bearing subtree is therefore not
+    /// retro-applied until that subtree re-resolves.
+    package var gestureSuppressionScopes: [Identity] = []
     /// Forwards deadline requests to the frame scheduler.
     /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
     package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
