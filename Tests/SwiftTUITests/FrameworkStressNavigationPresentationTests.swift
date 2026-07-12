@@ -432,16 +432,11 @@ extension FrameworkStressNavigationPresentationTests {
         )
       }
       // Identity-replacement teardown (removalPlan) tears down the departed
-      // destination surface, but a cardinality-churn residual in the
-      // hosted-detached ledger still evicts a frame late under parallel-gate
-      // load, so the registration count lands at 3 or 4 depending on timing.
-      // Intermittent until the ledger sweep (RC-3) lands.
-      withKnownIssue(
-        "Source cardinality churn retains departed action registrations",
-        isIntermittent: true
-      ) {
-        #expect(harness.actionRegistrationCount <= 3)
-      }
+      // destination surface; the RC-3 finalize-barrier sweep of stale
+      // detached-hosted roots (`sweepStaleDetachedHostedRoots`) then retires the
+      // superseded source generation whose action registration otherwise
+      // lingered in `liveNodeIDs`, so the count is now deterministically <= 3.
+      #expect(harness.actionRegistrationCount <= 3)
     }
   }
 }

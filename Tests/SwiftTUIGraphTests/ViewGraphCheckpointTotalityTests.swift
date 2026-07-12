@@ -64,7 +64,11 @@ struct ViewGraphCheckpointTotalityTests {
     // ViewGraph stores exactly `root` plus one property per field group, plus
     // the F29 `nodeCheckpointImageStore` — derived cache, not graph state: it
     // is reset wholesale by every restore, never checkpointed itself, and its
-    // coherence is enforced by makeCheckpoint's restore-no-op oracle.
+    // coherence is enforced by makeCheckpoint's restore-no-op oracle — and the
+    // RC-3 `detachedHostedRootsRecordedThisFrame` — transient per-frame liveness
+    // signal cleared in `beginFrame`, consumed by the finalize-barrier stale
+    // sweep, carrying no state across frames (so deliberately outside the
+    // checkpoint totality contract).
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -78,7 +82,9 @@ struct ViewGraphCheckpointTotalityTests {
     ]
     #expect(
       Set(viewGraphGroupFields)
-        == groupPropertyNames.union(["root", "nodeCheckpointImageStore"])
+        == groupPropertyNames.union([
+          "root", "nodeCheckpointImageStore", "detachedHostedRootsRecordedThisFrame",
+        ])
     )
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
     #expect(

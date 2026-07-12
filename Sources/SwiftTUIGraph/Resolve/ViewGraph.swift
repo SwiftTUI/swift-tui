@@ -342,6 +342,18 @@ package final class ViewGraph {
   /// Coherence is enforced by the restore-no-op oracle in `makeCheckpoint()`.
   private var nodeCheckpointImageStore = NodeCheckpointImageStore()
 
+  /// Detached-hosted roots freshly (re-)recorded THIS frame (RC-3). Transient
+  /// per-frame state, cleared in ``beginFrame()`` and consumed by
+  /// ``sweepStaleDetachedHostedRoots()`` at the finalize barrier. Deliberately
+  /// NOT a checkpointed field group and NOT mirrored in the debug snapshot: it
+  /// carries no state across frames (a stale value can only fail to spare a
+  /// re-record, and the next `beginFrame` clears it before any new record), so
+  /// keeping it out of the checkpoint totality contract is sound. The
+  /// `ViewGraphCheckpointTotalityTests` ViewGraph-stored-var guard lists this
+  /// name alongside `nodeCheckpointImageStore` as the sanctioned non-group
+  /// meta-state.
+  private var detachedHostedRootsRecordedThisFrame: Set<ViewNodeID> = []
+
   /// Whether a previous `onChange` value has been recorded for this
   /// `(identity, ordinal)` — i.e. "this is not the first observation," a signal
   /// that survives node re-minting because it is keyed by the stable identity.
@@ -1642,6 +1654,7 @@ package final class ViewGraph {
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
     absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
+    detachedHostedRootsRecordedThisFrame.removeAll(keepingCapacity: true)
   }
 
   package func beginEvaluation(
@@ -1915,6 +1928,11 @@ package final class ViewGraph {
     _ rootNodeID: ViewNodeID,
     hostedByNodeID hostID: ViewNodeID
   ) {
+    // Mark the root as (re-)recorded this frame so the finalize-barrier stale
+    // sweep spares it. Recorded even when the ledger edge is already present
+    // (early-return below): "recorded this frame" is a liveness signal, not a
+    // mutation signal.
+    detachedHostedRootsRecordedThisFrame.insert(rootNodeID)
     if detachedHostedSubtreeHostByRoot[rootNodeID] == hostID {
       return
     }
@@ -1956,6 +1974,75 @@ package final class ViewGraph {
         }
       }
     #endif
+  }
+
+  /// RC-3 finalize-barrier sweep of stale detached-hosted roots. The ledger
+  /// (`recordDetachedHostedSubtree` and the value-only interior anchors) keeps
+  /// a resolved-but-uncommitted subtree alive until its HOST departs, because
+  /// resolution is that subtree's only lifetime anchor. When source-cardinality
+  /// churn re-records a NEW detached-hosted root under a still-live host, the
+  /// SUPERSEDED prior root is reachable through neither committed children nor
+  /// the arriving resolution, yet it lingers in `liveNodeIDs` (a union that
+  /// only shrinks through `removeSubtree`) and keeps republishing its runtime
+  /// registrations every frame — the host never departs, so the ledger's own
+  /// host-departure teardown never fires. (Its identity-keyed registration is
+  /// masked whenever a live twin under the same identity coexists, and exposed —
+  /// a stray action — whenever it does not: the FrameworkStress-007 3/4 flip.)
+  ///
+  /// This sweep retires such roots at the frame barrier through the SAME
+  /// `removeSubtree` cascade the host-departure descent uses, but only when the
+  /// root is unambiguously superseded, gated on four conditions that ALL hold:
+  ///
+  ///   1. not (re-)recorded this frame — the host's resolution did not re-declare
+  ///      it as detached content;
+  ///   2. not visited this frame — neither re-evaluated NOR reused into a live
+  ///      position (`beginEvaluation`/`beginReuse` both stamp the visit), so it
+  ///      is absent from the frame's live tree;
+  ///   3. not an entity's routed home — an entity may re-home it elsewhere, which
+  ///      the frame barrier's `prunePendingEntityRoutedRemovals` owns;
+  ///   4. its HOST was EVALUATED this frame (`evaluatedNodeIDsThisFrame`).
+  ///
+  /// Condition 4 is the load-bearing discriminator and replaces the tempting
+  /// parent/evaluation-host anchor-survival check (which is UNSOUND here: a
+  /// superseded root retains a weak back-reference to a live ancestor — the
+  /// teardown-coherence oracle even counts it "anchored" — so an anchor test can
+  /// never fire on the leak). Both recording sites run only inside a host's body
+  /// evaluation, so a host that evaluated this frame necessarily re-declared its
+  /// CURRENT detached content; any ledger root under it left un-re-recorded is
+  /// therefore genuinely superseded. Conversely an idle-but-live active nav root
+  /// (host not re-evaluated this frame) is spared because its host is absent from
+  /// `evaluatedNodeIDsThisFrame` — the case the anchor check was meant to protect,
+  /// covered precisely. Descent spares visited nodes so a live descendant the
+  /// arriving tree re-adopted is never torn down.
+  private func sweepStaleDetachedHostedRoots() {
+    guard !detachedHostedSubtreeHostByRoot.isEmpty else {
+      return
+    }
+    // Snapshot: `removeSubtree` mutates the ledger mid-sweep.
+    let candidates = detachedHostedSubtreeHostByRoot.map { ($0.key, $0.value) }
+    for (root, host) in candidates {
+      // A departed host already owns its hosted subtree's teardown.
+      guard nodeIfExists(for: host) != nil else {
+        continue
+      }
+      // A prior candidate's cascade may already have removed this root.
+      guard let rootNode = nodeIfExists(for: root) else {
+        continue
+      }
+      if detachedHostedRootsRecordedThisFrame.contains(root) {
+        continue
+      }
+      if rootNode.visitedThisFrame(currentFrameID) {
+        continue
+      }
+      if entityRoutingTable.entityByNodeID[root] != nil {
+        continue
+      }
+      guard evaluatedNodeIDsThisFrame.contains(host) else {
+        continue
+      }
+      removeSubtree(rootedAt: rootNode, sparingVisitedNodes: true)
+    }
   }
 
   package func installLayoutRealizedChildren(
@@ -2523,6 +2610,7 @@ package final class ViewGraph {
       activeEntities: entityIdentities(in: resolved)
     )
     pruneAbsorbedShadowedNodes()
+    sweepStaleDetachedHostedRoots()
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2539,6 +2627,7 @@ package final class ViewGraph {
     let activeEntities = entityIdentities(in: resolved)
     prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     pruneAbsorbedShadowedNodes()
+    sweepStaleDetachedHostedRoots()
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
