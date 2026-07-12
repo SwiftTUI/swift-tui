@@ -93,9 +93,7 @@ struct FrameworkStressKittyCommandEnvelopeTests {
       sourceRect: nil
     )
 
-    withKnownIssue("Kitty serialization emits a transmit command with zero columns") {
-      #expect(commands.isEmpty)
-    }
+    #expect(commands.isEmpty)
   }
 
   @Test("stress kitty command envelope 006 zero rows emit no transmission")
@@ -109,9 +107,7 @@ struct FrameworkStressKittyCommandEnvelopeTests {
       sourceRect: nil
     )
 
-    withKnownIssue("Kitty serialization emits a transmit command with zero rows") {
-      #expect(commands.isEmpty)
-    }
+    #expect(commands.isEmpty)
   }
 
   @Test("stress kitty command envelope 007 empty encoded chunks emit no transmission")
@@ -125,9 +121,7 @@ struct FrameworkStressKittyCommandEnvelopeTests {
       sourceRect: nil
     )
 
-    withKnownIssue("Kitty serialization emits a transmit command for an empty encoded chunk") {
-      #expect(commands.isEmpty)
-    }
+    #expect(commands.isEmpty)
   }
 
   @Test("stress kitty command envelope 008 source namespaces produce distinct image ids")

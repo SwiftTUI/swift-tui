@@ -36,14 +36,20 @@ enum TerminalAppearanceQuery {
       return nil
     }
 
-    let suffix = response[range.upperBound...]
-    if let bellIndex = suffix.firstIndex(of: "\u{0007}") {
-      return String(suffix[..<bellIndex])
+    let suffixText = String(response[range.upperBound...])
+    // A reply must be terminated (BEL or ST) before the next OSC introducer
+    // begins a new reply; scanning past it would let an unterminated reply
+    // borrow the following reply's terminator.
+    let boundary =
+      suffixText.firstLiteralRange(of: "\u{001B}]")?.lowerBound ?? suffixText.endIndex
+    let bounded = String(suffixText[..<boundary])
+
+    if let bellIndex = bounded.firstIndex(of: "\u{0007}") {
+      return String(bounded[..<bellIndex])
     }
 
-    let suffixText = String(suffix)
-    if let stRange = suffixText.firstLiteralRange(of: "\u{001B}\\") {
-      return String(suffixText[..<stRange.lowerBound])
+    if let stRange = bounded.firstLiteralRange(of: "\u{001B}\\") {
+      return String(bounded[..<stRange.lowerBound])
     }
 
     return nil
@@ -162,6 +168,12 @@ private func parseHexSpec(
 private func parseHexComponentNormalized(
   _ raw: Substring
 ) -> Double? {
+  // `Int(_, radix:)` admits a leading sign, so a component like "-1" would
+  // parse to a negative channel value. A hex color component is unsigned:
+  // reject anything that is not purely hex digits.
+  guard !raw.isEmpty, raw.allSatisfy(\.isHexDigit) else {
+    return nil
+  }
   let text = String(raw)
   guard let value = Int(text, radix: 16) else {
     return nil

@@ -119,6 +119,23 @@ func terminalStrictUTF8String(
   return Array(decoded.utf8) == bytes ? decoded : nil
 }
 
+/// Parses a `;`-separated integer parameter list, rejecting the whole list if
+/// any parameter is not a valid integer. Terminal reply parsers must reject a
+/// corrupt reply atomically rather than compacting invalid parameters, which
+/// would silently shift the surviving values into the wrong positions.
+private func strictSemicolonInts(
+  _ text: Substring
+) -> [Int]? {
+  var values = [Int]()
+  for token in text.split(separator: ";") {
+    guard let value = Int(token) else {
+      return nil
+    }
+    values.append(value)
+  }
+  return values
+}
+
 func parseKittySupportResponse(
   in bytes: [UInt8],
   id: UInt32
@@ -130,11 +147,14 @@ func parseKittySupportResponse(
   guard let range = response.firstLiteralRange(of: prefix) else {
     return nil
   }
-  let suffix = response[range.upperBound...]
-  if suffix.hasPrefix("OK") {
-    return true
+  let suffix = String(response[range.upperBound...])
+  // The reply is conclusive only once its ST terminator (ESC \) has arrived. A
+  // split read ending at the query prefix is indeterminate — reporting it as
+  // unsupported would abandon a terminal that simply had not answered yet.
+  guard let terminator = suffix.firstLiteralRange(of: "\u{001B}\\") else {
+    return nil
   }
-  return false
+  return suffix[..<terminator.lowerBound].hasPrefix("OK")
 }
 
 func parsePrimaryDeviceAttributes(
@@ -152,9 +172,7 @@ func parsePrimaryDeviceAttributes(
     return nil
   }
 
-  return String(suffix[..<terminator])
-    .split(separator: ";")
-    .compactMap { Int($0) }
+  return strictSemicolonInts(suffix[..<terminator])
 }
 
 func parseXTSMGraphicsResponse(
@@ -174,10 +192,9 @@ func parseXTSMGraphicsResponse(
     return nil
   }
 
-  let values = String(suffix[..<terminator])
-    .split(separator: ";")
-    .compactMap { Int($0) }
-  guard let status = values.first else {
+  guard let values = strictSemicolonInts(suffix[..<terminator]),
+    let status = values.first
+  else {
     return nil
   }
   return (status, Array(values.dropFirst()))
@@ -200,10 +217,12 @@ func parseWindowSizeResponse(
     return nil
   }
 
-  let values = String(suffix[..<terminator])
-    .split(separator: ";")
-    .compactMap { Int($0) }
-  guard values.count >= 2 else {
+  guard let values = strictSemicolonInts(suffix[..<terminator]), values.count >= 2 else {
+    return nil
+  }
+  // Negative pixel dimensions are outside the geometry domain; a corrupt reply
+  // must not be trusted as a real window size.
+  guard values[0] >= 0, values[1] >= 0 else {
     return nil
   }
 

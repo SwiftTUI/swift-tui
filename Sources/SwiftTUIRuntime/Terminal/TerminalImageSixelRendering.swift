@@ -4,10 +4,16 @@ func sixelOutputSize(
   for visibleBounds: CellRect,
   graphicsCapabilities: TerminalGraphicsCapabilities
 ) -> PixelSize {
+  // An empty clip has no pixel footprint; clamping either axis up to one would
+  // manufacture a phantom one-pixel Sixel for a fully off-screen image.
+  guard visibleBounds.size.width > 0, visibleBounds.size.height > 0 else {
+    return .zero
+  }
+
   let cellPixelSize = graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)
   return PixelSize(
-    width: max(1, visibleBounds.size.width * max(1, cellPixelSize.width)),
-    height: max(1, visibleBounds.size.height * max(1, cellPixelSize.height))
+    width: visibleBounds.size.width * max(1, cellPixelSize.width),
+    height: visibleBounds.size.height * max(1, cellPixelSize.height)
   )
 }
 
@@ -26,7 +32,9 @@ func sixelPaletteBudget(
     }
 
   if let sixelColorRegisters = graphicsCapabilities.sixelColorRegisters {
-    return max(2, min(requestedBudget, sixelColorRegisters))
+    // Honor the terminal's reported register bank exactly; a minimum-two floor
+    // would promise more registers than an under-provisioned terminal reported.
+    return min(requestedBudget, sixelColorRegisters)
   }
   return requestedBudget
 }
@@ -36,6 +44,10 @@ func makeSixelPayload(
   outputSize: PixelSize,
   paletteBudget: Int
 ) -> String? {
+  guard outputSize.width > 0, outputSize.height > 0 else {
+    return nil
+  }
+
   let scaledPixels = scaledPixels(
     from: image,
     outputSize: outputSize
@@ -236,8 +248,8 @@ private func adaptivePalette(
       )
     }
 
-  if palette.isEmpty {
-    return [.black]
-  }
+  // An input with no opaque pixels (a fully transparent or empty image) yields
+  // no buckets. Returning a synthetic color here would paint a phantom Sixel;
+  // an empty palette lets the caller emit no payload instead.
   return palette
 }

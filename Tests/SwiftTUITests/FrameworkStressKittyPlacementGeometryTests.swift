@@ -63,12 +63,10 @@ struct FrameworkStressKittyPlacementGeometryTests {
       visibleBounds: .init(origin: .init(x: 8, y: 0), size: .init(width: 2, height: 4))
     )
 
-    withKnownIssue("A disjoint right-side Kitty clip becomes a phantom one-cell placement") {
-      #expect(
-        kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
-          == nil
-      )
-    }
+    #expect(
+      kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
+        == nil
+    )
   }
 
   @Test("stress kitty placement geometry 005 visibility wholly left produces no placement")
@@ -79,12 +77,10 @@ struct FrameworkStressKittyPlacementGeometryTests {
       visibleBounds: .init(origin: .zero, size: .init(width: 2, height: 4))
     )
 
-    withKnownIssue("A disjoint left-side Kitty clip becomes a phantom one-cell placement") {
-      #expect(
-        kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
-          == nil
-      )
-    }
+    #expect(
+      kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
+        == nil
+    )
   }
 
   @Test("stress kitty placement geometry 006 visibility wholly below produces no placement")
@@ -95,12 +91,10 @@ struct FrameworkStressKittyPlacementGeometryTests {
       visibleBounds: .init(origin: .init(x: 0, y: 8), size: .init(width: 4, height: 2))
     )
 
-    withKnownIssue("A disjoint lower Kitty clip becomes a phantom one-cell placement") {
-      #expect(
-        kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
-          == nil
-      )
-    }
+    #expect(
+      kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
+        == nil
+    )
   }
 
   @Test("stress kitty placement geometry 007 visibility wholly above produces no placement")
@@ -111,12 +105,10 @@ struct FrameworkStressKittyPlacementGeometryTests {
       visibleBounds: .init(origin: .zero, size: .init(width: 4, height: 2))
     )
 
-    withKnownIssue("A disjoint upper Kitty clip becomes a phantom one-cell placement") {
-      #expect(
-        kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
-          == nil
-      )
-    }
+    #expect(
+      kittyPlacement(for: attachment, imagePixelSize: .init(width: 40, height: 40))
+        == nil
+    )
   }
 
   @Test("stress kitty placement geometry 008 oversized visibility stays within logical bounds")

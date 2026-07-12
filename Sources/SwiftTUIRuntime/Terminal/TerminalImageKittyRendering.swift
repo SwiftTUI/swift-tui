@@ -194,13 +194,23 @@ func kittyPlacement(
       - (visibleBounds.origin.y + visibleBounds.size.height)
   )
 
-  let placement = KittyPlacement(
+  // A clip that leaves no visible cells on either axis (the visible rect is
+  // wholly outside the logical rect) must produce no placement. Computing the
+  // visible extent BEFORE any minimum clamp keeps a genuine one-cell overlap
+  // (a positive extent) distinct from a disjoint clip (a non-positive extent).
+  let visibleColumns = logicalBounds.size.width - hiddenLeft - hiddenRight
+  let visibleRows = logicalBounds.size.height - hiddenTop - hiddenBottom
+  guard visibleColumns > 0, visibleRows > 0 else {
+    return nil
+  }
+
+  return KittyPlacement(
     origin: .init(
       x: logicalBounds.origin.x + hiddenLeft,
       y: logicalBounds.origin.y + hiddenTop
     ),
-    cellColumns: max(1, logicalBounds.size.width - hiddenLeft - hiddenRight),
-    cellRows: max(1, logicalBounds.size.height - hiddenTop - hiddenBottom),
+    cellColumns: visibleColumns,
+    cellRows: visibleRows,
     sourceRect: kittySourceRect(
       hiddenLeftCells: hiddenLeft,
       hiddenTopCells: hiddenTop,
@@ -210,7 +220,6 @@ func kittyPlacement(
       imagePixelSize: imagePixelSize
     )
   )
-  return placement.cellColumns > 0 && placement.cellRows > 0 ? placement : nil
 }
 
 private func kittySourceRect(
@@ -278,7 +287,13 @@ func kittyTransmitAndPlaceCommands(
 ) -> [String] {
   let chunks = payload.encodedChunks
 
-  guard !chunks.isEmpty else {
+  // A degenerate placement (no visible cells) or a payload carrying no encoded
+  // bytes must not be serialized: an empty chunk would transmit a zero-length
+  // image and a zero-cell rectangle would reserve a phantom placement in the
+  // terminal's protocol state.
+  guard cellColumns > 0, cellRows > 0,
+    !chunks.isEmpty, !chunks.contains(where: { $0.isEmpty })
+  else {
     return []
   }
 

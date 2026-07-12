@@ -19,9 +19,7 @@ struct FrameworkStressTerminalGraphicsResponseTests {
     // Hypothesis: a split read ending immediately after the query prefix is classified unsupported.
     let bytes = Array("\u{001B}_Gi=42;".utf8)
 
-    withKnownIssue("An incomplete Kitty probe reply is classified as unsupported") {
-      #expect(parseKittySupportResponse(in: bytes, id: 42) == nil)
-    }
+    #expect(parseKittySupportResponse(in: bytes, id: 42) == nil)
   }
 
   @Test("stress terminal graphics response 003 device attributes skip unrelated CSI traffic")
@@ -37,11 +35,7 @@ struct FrameworkStressTerminalGraphicsResponseTests {
     // Hypothesis: compacting invalid parameters can turn a corrupt DA reply into supported features.
     let bytes = Array("\u{001B}[?62;bogus;4c".utf8)
 
-    withKnownIssue(
-      "Device-attributes parsing drops malformed parameters instead of rejecting the reply"
-    ) {
-      #expect(parsePrimaryDeviceAttributes(from: bytes) == nil)
-    }
+    #expect(parsePrimaryDeviceAttributes(from: bytes) == nil)
   }
 
   @Test("stress terminal graphics response 005 XTSM selection uses the requested item")
@@ -59,9 +53,7 @@ struct FrameworkStressTerminalGraphicsResponseTests {
     // Hypothesis: dropping one invalid dimension can shift the surviving XTSM value positions.
     let bytes = Array("\u{001B}[?2;0;800;bogus;600S".utf8)
 
-    withKnownIssue("XTSM graphics parsing drops malformed values instead of rejecting the reply") {
-      #expect(parseXTSMGraphicsResponse(from: bytes, item: 2) == nil)
-    }
+    #expect(parseXTSMGraphicsResponse(from: bytes, item: 2) == nil)
   }
 
   @Test("stress terminal graphics response 007 window pixels preserve height width ordering")
@@ -78,8 +70,6 @@ struct FrameworkStressTerminalGraphicsResponseTests {
     // Hypothesis: signed integers from a corrupt reply can become a trusted pixel geometry.
     let bytes = Array("\u{001B}[4;-720;1280t".utf8)
 
-    withKnownIssue("Window-size parsing accepts negative terminal pixel dimensions") {
-      #expect(parseWindowSizeResponse(from: bytes, expectedCode: 4) == nil)
-    }
+    #expect(parseWindowSizeResponse(from: bytes, expectedCode: 4) == nil)
   }
 }

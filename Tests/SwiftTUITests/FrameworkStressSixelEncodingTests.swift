@@ -35,9 +35,7 @@ struct FrameworkStressSixelEncodingTests {
       graphicsCapabilities: .init(cellPixelSize: .init(width: 9, height: 18))
     )
 
-    withKnownIssue("Empty Sixel visibility is clamped to a phantom one-pixel footprint") {
-      #expect(size == .init(width: 0, height: 0))
-    }
+    #expect(size == .init(width: 0, height: 0))
   }
 
   @Test("stress sixel encoding 004 ANSI terminals retain the sixteen color ceiling")
@@ -70,9 +68,7 @@ struct FrameworkStressSixelEncodingTests {
       graphicsCapabilities: .init(sixelColorRegisters: 1)
     )
 
-    withKnownIssue("Sixel palette budgeting exceeds an invalid one-register terminal report") {
-      #expect(budget <= 1)
-    }
+    #expect(budget <= 1)
   }
 
   @Test("stress sixel encoding 007 transparent images produce no terminal payload")
@@ -84,15 +80,13 @@ struct FrameworkStressSixelEncodingTests {
       pixels: [RGBAImagePixel(red: 20, green: 40, blue: 60, alpha: 0)]
     )
 
-    withKnownIssue("A fully transparent image emits an empty Sixel envelope") {
-      #expect(
-        makeSixelPayload(
-          for: image,
-          outputSize: .init(width: 1, height: 1),
-          paletteBudget: 16
-        ) == nil
-      )
-    }
+    #expect(
+      makeSixelPayload(
+        for: image,
+        outputSize: .init(width: 1, height: 1),
+        paletteBudget: 16
+      ) == nil
+    )
   }
 
   @Test("stress sixel encoding 008 zero output geometry produces no payload")
@@ -104,15 +98,13 @@ struct FrameworkStressSixelEncodingTests {
       pixels: [RGBAImagePixel(red: 255, green: 0, blue: 0, alpha: 255)]
     )
 
-    withKnownIssue("Zero output geometry emits an empty Sixel envelope") {
-      #expect(
-        makeSixelPayload(
-          for: image,
-          outputSize: .zero,
-          paletteBudget: 16
-        ) == nil
-      )
-    }
+    #expect(
+      makeSixelPayload(
+        for: image,
+        outputSize: .zero,
+        paletteBudget: 16
+      ) == nil
+    )
   }
 }
 

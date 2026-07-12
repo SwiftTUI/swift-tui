@@ -35,9 +35,7 @@ struct FrameworkStressTerminalAppearanceQueryTests {
     // Hypothesis: a missing terminator on the selected reply can borrow the next reply's BEL.
     let bytes = Array("\u{001B}]10;rgb:f/f/f\u{001B}]11;rgb:0/0/0\u{0007}".utf8)
 
-    withKnownIssue("An unterminated OSC appearance reply borrows the next reply's terminator") {
-      #expect(TerminalAppearanceQuery.foreground.extractResponse(from: bytes) == nil)
-    }
+    #expect(TerminalAppearanceQuery.foreground.extractResponse(from: bytes) == nil)
   }
 
   @Test("stress terminal appearance query 005 one digit RGB components normalize independently")
@@ -81,8 +79,6 @@ struct FrameworkStressTerminalAppearanceQueryTests {
   @Test("stress terminal appearance query 009 signed RGB components are rejected")
   func appearanceQuery009SignedRGBComponentsAreRejected() {
     // Hypothesis: radix parsing can admit negative channel values into terminal appearance state.
-    withKnownIssue("Terminal RGB parsing accepts signed components outside the color domain") {
-      #expect(TerminalAppearanceQuery.foreground.parseColor(from: "rgb:-1/0/0") == nil)
-    }
+    #expect(TerminalAppearanceQuery.foreground.parseColor(from: "rgb:-1/0/0") == nil)
   }
 }
