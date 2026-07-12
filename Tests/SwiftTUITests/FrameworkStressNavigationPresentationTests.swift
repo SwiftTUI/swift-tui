@@ -88,9 +88,7 @@ extension FrameworkStressNavigationPresentationTests {
       let frame = try harness.clickText("Replace Item ID")
       let expectedID = version.isMultiple(of: 2) ? "a" : "b"
       #expect(frame.contains("item \(expectedID) version \(version) local 0"))
-      withKnownIssue("Item destination ID replacement retains departed action registrations") {
-        #expect(harness.actionRegistrationCount <= 3)
-      }
+      #expect(harness.actionRegistrationCount <= 3)
     }
   }
 }
@@ -225,9 +223,7 @@ extension FrameworkStressNavigationPresentationTests {
       #expect(
         frame.components(separatedBy: "reminted generation").count - 1 == 1
       )
-      withKnownIssue("Source remint retains departed destination action registrations") {
-        #expect(harness.actionRegistrationCount <= 3)
-      }
+      #expect(harness.actionRegistrationCount <= 3)
     }
   }
 }
@@ -435,7 +431,15 @@ extension FrameworkStressNavigationPresentationTests {
           )
         )
       }
-      withKnownIssue("Source cardinality churn retains departed action registrations") {
+      // Identity-replacement teardown (removalPlan) tears down the departed
+      // destination surface, but a cardinality-churn residual in the
+      // hosted-detached ledger still evicts a frame late under parallel-gate
+      // load, so the registration count lands at 3 or 4 depending on timing.
+      // Intermittent until the ledger sweep (RC-3) lands.
+      withKnownIssue(
+        "Source cardinality churn retains departed action registrations",
+        isIntermittent: true
+      ) {
         #expect(harness.actionRegistrationCount <= 3)
       }
     }

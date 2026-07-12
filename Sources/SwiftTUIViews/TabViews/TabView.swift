@@ -37,11 +37,30 @@ extension TabView {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
     let options = resolvedOptions(in: context.child(component: .named("TabOptions")))
+    let optionSignature = TabOptionSignature(
+      tags: options.map(\.tag),
+      labels: options.map(\.label)
+    )
+    let previousOptionSignature =
+      ownerNode?.stateSlot(
+        ordinal: tabOptionSignatureStateSlot,
+        seed: nil as TabOptionSignature?
+      ) ?? nil
+    let optionsChurned =
+      previousOptionSignature != nil && previousOptionSignature != optionSignature
+    if previousOptionSignature != optionSignature {
+      ownerNode?.setStateSlotSilently(
+        ordinal: tabOptionSignatureStateSlot,
+        value: optionSignature as TabOptionSignature?
+      )
+    }
     let orderedTags = options.map(\.tag)
     let selectedIndex =
       options.firstIndex { option in
@@ -342,9 +361,17 @@ extension TabView {
         controlIdentity: context.identity
       )
     )
+    var tabBodyContext = context.child(component: .named("TabBody"))
+    if optionsChurned {
+      // The options changed value across a re-resolve. Force the style body to
+      // recompute even if the TabView node reused across an `.id`-island seam,
+      // so the rendered chrome (route/label bindings) follows the new options
+      // instead of being served stale by value-blind Layer-A reuse.
+      tabBodyContext.withinChurnedSubtree = true
+    }
     let child = tabStyle.resolveBody(
       configuration: bodyConfiguration,
-      in: context.child(component: .named("TabBody"))
+      in: tabBodyContext
     )
 
     return ResolvedNode(
@@ -774,6 +801,17 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
 
 private let tabFocusedIndexStateSlot = StateSlotOrdinals.tabFocusedIndex
 private let tabOverflowMenuExpandedStateSlot = StateSlotOrdinals.tabOverflowMenuExpanded
+private let tabOptionSignatureStateSlot = StateSlotOrdinals.tabOptionSignature
+
+/// The value-identity of a TabView's resolved options (selection tags + item
+/// labels). When it changes across a re-resolve, the style body must recompute
+/// even though the TabView node reused across an `.id`-island seam — otherwise
+/// value-blind Layer-A reuse serves stale tab chrome (index-keyed route/label
+/// skew) while the handlers refresh underneath it.
+private struct TabOptionSignature: Equatable, Sendable {
+  var tags: [SelectionTag]
+  var labels: [TabItemLabel]
+}
 
 /// What the strip focus remembers: the focused option's strip position plus
 /// its selection tag. The tag is authoritative when the option order changes

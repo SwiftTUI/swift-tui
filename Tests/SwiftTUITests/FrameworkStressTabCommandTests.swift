@@ -144,10 +144,8 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.clickText("Insert prefix")
     let frame = try harness.clickText("C")
 
-    withKnownIssue("Inserting a leading tab leaves the visible C route bound to B") {
-      #expect(frame.contains("C current content"))
-      #expect(!frame.contains("B current content"))
-    }
+    #expect(frame.contains("C current content"))
+    #expect(!frame.contains("B current content"))
   }
 }
 
@@ -193,9 +191,7 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.clickText("Remove prefix")
     let frame = try harness.clickText("C")
 
-    withKnownIssue("Removing a leading tab leaves the visible C route inert") {
-      #expect(frame.contains("C current content"))
-    }
+    #expect(frame.contains("C current content"))
     #expect(!frame.contains("B current content"))
   }
 }
@@ -348,10 +344,8 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.pressKey(KeyPress(.character("r"), modifiers: .ctrl))
     let frame = try harness.clickText("Four")
 
-    withKnownIssue("Reordered overflow label Four remains bound to the old Three route") {
-      #expect(frame.contains("Four active content"))
-      #expect(!frame.contains("Three active content"))
-    }
+    #expect(frame.contains("Four active content"))
+    #expect(!frame.contains("Three active content"))
   }
 }
 
@@ -402,10 +396,8 @@ extension FrameworkStressTabCommandTests {
     let frame = try harness.pressKey(KeyPress(.character("x"), modifiers: .ctrl))
 
     #expect(frame.contains("includes B false"))
-    withKnownIssue("A departed selected tab keeps its stale declaration and active payload") {
-      #expect(frame.contains("A live payload"))
-      #expect(!frame.contains("B live payload"))
-    }
+    #expect(frame.contains("A live payload"))
+    #expect(!frame.contains("B live payload"))
     #expect(!frame.contains("C live payload"))
   }
 }
