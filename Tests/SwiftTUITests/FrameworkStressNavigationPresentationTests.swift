@@ -346,13 +346,11 @@ extension FrameworkStressNavigationPresentationTests {
     for generation in 1...8 {
       _ = try harness.clickText("Increment Reorder Local")
       let frame = try harness.clickText("Reorder Destination Source")
-      withKnownIssue("Reordered destination source splits local state by structural slot") {
-        #expect(
-          frame.contains(
-            "source reversed \(!generation.isMultiple(of: 2)) local \(generation)"
-          )
+      #expect(
+        frame.contains(
+          "source reversed \(!generation.isMultiple(of: 2)) local \(generation)"
         )
-      }
+      )
       #expect(harness.actionRegistrationCount <= 3)
     }
   }
@@ -424,13 +422,11 @@ extension FrameworkStressNavigationPresentationTests {
     for generation in 1...8 {
       _ = try harness.clickText("Increment Cardinality Local")
       let frame = try harness.clickText("Toggle Source Cardinality")
-      withKnownIssue("Source cardinality churn splits destination state lifetimes") {
-        #expect(
-          frame.contains(
-            "source expanded \(!generation.isMultiple(of: 2)) local \(generation)"
-          )
+      #expect(
+        frame.contains(
+          "source expanded \(!generation.isMultiple(of: 2)) local \(generation)"
         )
-      }
+      )
       // Identity-replacement teardown (removalPlan) tears down the departed
       // destination surface; the RC-3 finalize-barrier sweep of stale
       // detached-hosted roots (`sweepStaleDetachedHostedRoots`) then retires the

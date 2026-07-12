@@ -27,7 +27,18 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
   }
 
   private func resolvedNode(in context: ResolveContext) -> ResolvedNode {
-    let rootNode = root.resolve(in: context.child(component: .named("Root")))
+    // Publish this stack's identity as the declaration scope for the
+    // `navigationDestination(...)` modifiers resolving in its subtree. The
+    // stack's identity is structural (position-based, independent of the `id`
+    // parameter) and sits outside any branch its root toggles, so it is stable
+    // per stack and unique across sibling stacks — the branch-independent,
+    // per-stack-unique root a stable-`.id` source needs for its pushed surface
+    // (see `navigationDestinationDeclarationRoot`).
+    let rootContext =
+      context
+      .child(component: .named("Root"))
+      .settingEnvironment(\.navigationDestinationDeclarationScope, to: context.identity)
+    let rootNode = root.resolve(in: rootContext)
     let resolution = resolveActiveDestinationChain(
       from: rootNode,
       in: context
@@ -133,7 +144,9 @@ public struct BooleanNavigationDestinationModifier<Destination: View>: Primitive
     let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
     let declarationIdentity = navigationDestinationDeclarationIdentity(
       sourceIdentity: sourceIdentity,
-      modifierOrdinal: modifierOrdinal
+      sourceEntity: node.entityIdentity,
+      modifierOrdinal: modifierOrdinal,
+      scope: context.environmentValues.navigationDestinationDeclarationScope
     )
     let activationOrdinal = updateNavigationDestinationActivation(
       sourceIdentity: sourceIdentity,
@@ -194,7 +207,9 @@ where Item.ID: Sendable {
     let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
     let declarationIdentity = navigationDestinationDeclarationIdentity(
       sourceIdentity: sourceIdentity,
-      modifierOrdinal: modifierOrdinal
+      sourceEntity: node.entityIdentity,
+      modifierOrdinal: modifierOrdinal,
+      scope: context.environmentValues.navigationDestinationDeclarationScope
     )
     let currentItem = item.wrappedValue
     let activeKey = currentItem.map { NavigationDestinationActivationKey($0.id) }
@@ -379,9 +394,65 @@ private func navigationDestinationModifierOrdinal(
 
 private func navigationDestinationDeclarationIdentity(
   sourceIdentity: Identity,
-  modifierOrdinal: Int
+  sourceEntity: EntityIdentity?,
+  modifierOrdinal: Int,
+  scope: Identity?
 ) -> Identity {
-  sourceIdentity.child("NavigationDestination[\(modifierOrdinal)]")
+  navigationDestinationDeclarationRoot(
+    sourceIdentity: sourceIdentity,
+    sourceEntity: sourceEntity,
+    scope: scope
+  )
+  .child("NavigationDestination[\(modifierOrdinal)]")
+}
+
+/// The branch-independent root the pushed destination surface's identity is
+/// built on.
+///
+/// The declaration, activation, and pushed-surface identities are all derived
+/// from this root, so it decides whether the surface's `@State` survives a
+/// change in the *source*'s structural identity. A source whose structural
+/// `node.identity` flips every frame while its activation stays live — a
+/// sibling reorder (a `ConditionalContent` branch swap) or a child-cardinality
+/// toggle (a single resolved child vs a synthesized `Group` node) — would
+/// otherwise re-mint the surface node and reset its `@State`.
+///
+/// When the source carries a stable entity (`.id(...)`) *and* resolves inside a
+/// `NavigationStack`, root on the enclosing stack's identity plus the source
+/// entity: the stack identity is outside the toggled branch (stable and
+/// per-stack-unique) and the entity value is branch-independent, so the surface
+/// identity is stable across the flip yet cannot collide with another stack's
+/// same-`.id` source (their stack scopes differ). Without a stable entity or an
+/// enclosing scope there is no branch-independent key, so fall back to the
+/// source's structural identity — matching a source that legitimately loses
+/// state when its identity changes.
+private func navigationDestinationDeclarationRoot(
+  sourceIdentity: Identity,
+  sourceEntity: EntityIdentity?,
+  scope: Identity?
+) -> Identity {
+  guard let sourceEntity, let scope else {
+    return sourceIdentity
+  }
+  return
+    scope
+    .child("NavigationDestinationSource")
+    .explicitID(sourceEntity.description)
+}
+
+private enum NavigationDestinationDeclarationScopeKey: EnvironmentKey {
+  static let defaultValue: Identity? = nil
+}
+
+extension EnvironmentValues {
+  /// The identity of the nearest enclosing `NavigationStack`, published so a
+  /// `navigationDestination(...)` modifier can root a stable-`.id` source's
+  /// pushed surface on a branch-independent, per-stack-unique key. See
+  /// ``navigationDestinationDeclarationRoot``.
+  package var navigationDestinationDeclarationScope: Identity? {
+    get { self[NavigationDestinationDeclarationScopeKey.self] }
+    set { self[NavigationDestinationDeclarationScopeKey.self] = newValue }
+  }
 }
 
 @MainActor
