@@ -24,6 +24,10 @@ package final class AnimationController: Sendable {
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
   package private(set) var lastTickResult: AnimationTickResult = .init()
+  /// Monotonic generation bumped by ``reset()``. A frame draft captures this at
+  /// creation; if it advances before the draft commits, the reset happened
+  /// mid-flight and the draft's pre-reset state must not be republished.
+  fileprivate private(set) var resetEpoch = 0
 
   // Computed accessors forwarding to the clustered sub-structs.  These keep the
   // per-tick animation logic below reading and writing the original field names
@@ -733,18 +737,28 @@ package final class AnimationController: Sendable {
       _ rhs: ResolvedNode,
       path: String
     ) -> String {
-      if lhs.identity != rhs.identity { return "\(path): identity \(lhs.identity.path) vs \(rhs.identity.path)" }
+      if lhs.identity != rhs.identity {
+        return "\(path): identity \(lhs.identity.path) vs \(rhs.identity.path)"
+      }
       if lhs.structuralPath != rhs.structuralPath { return "\(path): structuralPath" }
       if lhs.structuralEdgeRole != rhs.structuralEdgeRole { return "\(path): structuralEdgeRole" }
       if lhs.entityIdentity != rhs.entityIdentity { return "\(path): entityIdentity" }
-      if lhs.entityStructuralPath != rhs.entityStructuralPath { return "\(path): entityStructuralPath" }
-      if lhs.declarationOwnerEdge != rhs.declarationOwnerEdge { return "\(path): declarationOwnerEdge" }
+      if lhs.entityStructuralPath != rhs.entityStructuralPath {
+        return "\(path): entityStructuralPath"
+      }
+      if lhs.declarationOwnerEdge != rhs.declarationOwnerEdge {
+        return "\(path): declarationOwnerEdge"
+      }
       if lhs.kind != rhs.kind { return "\(path): kind \(lhs.kind) vs \(rhs.kind)" }
       if !ResolvedNode.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator) {
         return "\(path): typeDiscriminator"
       }
-      if lhs.environmentSnapshot != rhs.environmentSnapshot { return "\(path): environmentSnapshot" }
-      if lhs.transactionSnapshot != rhs.transactionSnapshot { return "\(path): transactionSnapshot" }
+      if lhs.environmentSnapshot != rhs.environmentSnapshot {
+        return "\(path): environmentSnapshot"
+      }
+      if lhs.transactionSnapshot != rhs.transactionSnapshot {
+        return "\(path): transactionSnapshot"
+      }
       if lhs.layoutBehavior != rhs.layoutBehavior { return "\(path): layoutBehavior" }
       if lhs.layoutMetadata != rhs.layoutMetadata { return "\(path): layoutMetadata" }
       if lhs.layoutRealizedContent?.equivalenceSignature
@@ -765,7 +779,9 @@ package final class AnimationController: Sendable {
         return "\(path): indexedChildSource"
       }
       if lhs.preferenceValues != rhs.preferenceValues { return "\(path): preferenceValues" }
-      if lhs.supportsRetainedReuse != rhs.supportsRetainedReuse { return "\(path): supportsRetainedReuse" }
+      if lhs.supportsRetainedReuse != rhs.supportsRetainedReuse {
+        return "\(path): supportsRetainedReuse"
+      }
       if lhs.matchedGeometry != rhs.matchedGeometry { return "\(path): matchedGeometry" }
       if lhs.isTransient != rhs.isTransient { return "\(path): isTransient" }
       if lhs.children.count != rhs.children.count {
@@ -1731,6 +1747,7 @@ package final class AnimationController: Sendable {
     activeAnimations.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
     lastTickResult = .init()
+    resetEpoch &+= 1
   }
 }
 
@@ -1739,6 +1756,7 @@ package final class AnimationFrameDraft {
   private let liveController: AnimationController
   package let controller: AnimationController
   private let transactionCheckpoint: AnimationController.Checkpoint
+  private let capturedResetEpoch: Int
   private var didCommit = false
   private var didDiscard = false
 
@@ -1749,6 +1767,7 @@ package final class AnimationFrameDraft {
     self.liveController = liveController
     controller = draftController
     transactionCheckpoint = draftController.beginFrameHeadTransaction()
+    capturedResetEpoch = liveController.resetEpoch
   }
 
   package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
@@ -1758,11 +1777,18 @@ package final class AnimationFrameDraft {
   package func commit() {
     precondition(!didCommit && !didDiscard)
     let completions = controller.finishFrameHeadTransaction(transactionCheckpoint)
+    didCommit = true
+    guard liveController.resetEpoch == capturedResetEpoch else {
+      // The live controller was reset after this draft began. Publishing the
+      // draft's pre-reset state would resurrect it, so the reset dominates:
+      // abandon the draft (mirroring discard()) and drop its deferred
+      // completions rather than firing them into a torn-down frame.
+      return
+    }
     liveController.publishCommittedState(
       from: controller,
       preservingConcurrentRegistrationsSince: transactionCheckpoint
     )
-    didCommit = true
     for completion in completions {
       completion()
     }

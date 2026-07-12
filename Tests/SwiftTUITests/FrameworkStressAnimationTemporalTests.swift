@@ -891,9 +891,7 @@ extension FrameworkStressAnimationTemporalTests {
     #expect(controller.debugStateSnapshot().registeredAnimationCount == 0)
     draft.commit()
 
-    withKnownIssue("An in-flight AnimationFrameDraft commit resurrects state after reset") {
-      #expect(controller.debugStateSnapshot().registeredAnimationCount == 0)
-    }
+    #expect(controller.debugStateSnapshot().registeredAnimationCount == 0)
   }
 }
 
@@ -1730,9 +1728,7 @@ extension FrameworkStressAnimationTemporalTests {
     _ = try harness.clickText("Replace NonHashable Schedule")
     await animationTemporalDrainTasks()
 
-    withKnownIssue("A non-Hashable TimelineSchedule replacement keeps the original task") {
-      #expect(probe.events.last?.token == 1)
-    }
+    #expect(probe.events.last?.token == 1)
     #expect(harness.activeTaskCount == 1)
     #expect(harness.activeTaskDescriptorCount == 1)
   }
@@ -1776,9 +1772,7 @@ extension FrameworkStressAnimationTemporalTests {
     _ = try harness.clickText("Replace Colliding Schedule")
     await animationTemporalDrainTasks()
 
-    withKnownIssue("Unequal TimelineSchedule values with one hash keep the original task") {
-      #expect(probe.events.last?.token == 1)
-    }
+    #expect(probe.events.last?.token == 1)
     #expect(harness.activeTaskCount == 1)
     #expect(harness.activeTaskDescriptorCount == 1)
   }

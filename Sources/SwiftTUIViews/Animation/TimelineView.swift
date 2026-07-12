@@ -365,7 +365,7 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
     // than the global seed.
     _ = hasAdvanced
     content(context)
-      .task(id: TaskKey(scheduleHash: scheduleHash(), mode: mode)) {
+      .task(id: TaskKey(schedule: schedule, mode: mode)) {
         await run(mode: mode)
       }
   }
@@ -408,24 +408,30 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
 
   /// Stable identity for the `.task(id:)` so changing the schedule
   /// (or the cadence mode) cleanly cancels the prior loop.
-  private func scheduleHash() -> Int {
-    // We don't require `Schedule: Hashable` at the protocol level —
-    // some custom schedules may want richer state than a Hashable
-    // signature can express.  Combine the type identifier with a
-    // safe fallback so two distinct schedule values still trigger a
-    // task restart when wrapped in a Hashable type, and never crash
-    // when not.
-    var hasher = Hasher()
-    hasher.combine(ObjectIdentifier(Schedule.self as Any.Type))
-    if let hashable = schedule as? any Hashable {
-      hasher.combine(AnyHashable(hashable))
-    }
-    return hasher.finalize()
-  }
-
-  private struct TaskKey: Hashable, Sendable {
-    let scheduleHash: Int
+  ///
+  /// The key compares schedules by their own value equality rather than a
+  /// hashed `Int`: a hash conflates distinct values (a constant/colliding
+  /// `hash(into:)`) and cannot represent a non-Hashable schedule at all, so a
+  /// replacement schedule would silently keep the original task. `.task(id:)`
+  /// requires only `Equatable`, so the key can hold the schedule value.
+  private struct TaskKey: Equatable, Sendable {
+    let schedule: Schedule
     let mode: TimelineScheduleMode
+
+    static func == (lhs: TaskKey, rhs: TaskKey) -> Bool {
+      guard lhs.mode == rhs.mode else {
+        return false
+      }
+      guard let lhsHashable = lhs.schedule as? any Hashable,
+        let rhsHashable = rhs.schedule as? any Hashable
+      else {
+        // A non-Hashable schedule cannot be compared by value; treat every
+        // re-resolution as a change so a replacement restarts the driver task
+        // instead of silently retaining the original schedule's loop.
+        return false
+      }
+      return AnyHashable(lhsHashable) == AnyHashable(rhsHashable)
+    }
   }
 }
 
