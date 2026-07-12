@@ -37,6 +37,32 @@ public struct TerminalInputParser: Sendable {
     }
     return events
   }
+
+  /// True when the buffer holds only a lone ESC that cannot yet be
+  /// disambiguated between a bare Escape keypress and the first byte of a
+  /// longer escape sequence. The run loop arms an idle escape-timeout whenever
+  /// this is set and calls ``flush()`` on expiry; an arriving continuation
+  /// byte clears it by completing (or advancing) the sequence instead.
+  package var isAwaitingEscapeDisambiguation: Bool {
+    bufferedBytes.count == 1 && bufferedBytes[0] == 0x1B
+  }
+
+  /// Drains a lingering lone ESC as an Escape key press.
+  ///
+  /// A bare ESC stays buffered by ``parseNextEvent()`` because it is
+  /// byte-identical to the first byte of a real Escape keypress and of every
+  /// escape sequence. The run loop calls this on a short idle timeout (the vim
+  /// `ttimeoutlen` model) to commit a bare Escape once no continuation byte has
+  /// followed. Returns `[.key(.escape)]` when a lone ESC was pending, otherwise
+  /// an empty array — a continuation byte already completed or advanced the
+  /// buffer, so there is nothing to flush.
+  public mutating func flush() -> [InputEvent] {
+    guard isAwaitingEscapeDisambiguation else {
+      return []
+    }
+    bufferedBytes.removeFirst()
+    return [.key(KeyPress(.escape))]
+  }
 }
 
 /// A keyboard-only view of ``TerminalInputParser``.
@@ -138,10 +164,16 @@ extension TerminalInputParser {
 
   private mutating func parseEscapeSequence() -> InputEvent? {
     guard bufferedBytes.count > 1 else {
-      // Lone ESC — emit a bare escape key press so consumers receive
-      // the keystroke instead of stalling until the next byte arrives.
-      bufferedBytes.removeFirst()
-      return .key(KeyPress(.escape))
+      // Lone ESC — byte-identical to the first byte of a real Escape keypress
+      // AND of every escape sequence (arrows, function keys, bracketed paste).
+      // Byte-wise the parser cannot yet tell them apart, so keep the ESC
+      // buffered like every other incomplete prefix instead of committing it
+      // to Escape early (which byte-wise leaked bracketed-paste framing as key
+      // events). Disambiguation lives out of band: the run loop arms a short
+      // idle "escape timeout" — the vim `ttimeoutlen` model — and calls
+      // ``flush()`` to commit a bare Escape once no continuation byte follows.
+      // See ``isAwaitingEscapeDisambiguation``.
+      return nil
     }
 
     // SS3 sequences: ESC O <final>. xterm-family terminals send F1–F4 this

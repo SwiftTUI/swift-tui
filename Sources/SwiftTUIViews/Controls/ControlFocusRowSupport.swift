@@ -14,6 +14,13 @@ package import SwiftTUICore
 
 package let controlFocusRailGlyph = "▌"
 
+/// Total horizontal cells `textEditorBody` reserves for its chrome — the
+/// `.padding(.init(horizontal: 1, …))` below contributes one cell on each side.
+/// The editor threads this into its movement layout map so vertical (Up/Down)
+/// caret motion wraps at the same visible width the inner `Text` renders at.
+/// Keep in sync with the padding literal in ``textEditorBody(…)``.
+package let textEditorContentHorizontalReserve = 2
+
 @MainActor
 @ViewBuilder
 package func controlFocusRail(

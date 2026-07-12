@@ -15,6 +15,8 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var pendingMouseEvents: [InputEvent] = []
     var activeMouseFlushToken: UInt64?
     var nextMouseFlushToken: UInt64 = 0
+    var activeEscapeFlushToken: UInt64?
+    var nextEscapeFlushToken: UInt64 = 0
     var directHandler: (@Sendable (InputEvent) -> Void)?
     var finished = false
   }
@@ -36,17 +38,19 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   package func send(
     _ bytes: [UInt8]
   ) {
-    let (messages, bufferedEvents, continuation, directHandler):
+    let (messages, bufferedEvents, continuation, directHandler, escapeFlushToken):
       (
         [TerminalControlMessage],
         [InputEvent],
         AsyncStream<InputEvent>.Continuation?,
-        (@Sendable (InputEvent) -> Void)?
+        (@Sendable (InputEvent) -> Void)?,
+        UInt64?
       ) = state.withLock { state in
         guard !state.finished else {
           return (
             [],
             [],
+            nil,
             nil,
             nil
           )
@@ -58,17 +62,22 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
         if directHandler == nil && state.continuation == nil {
           state.pendingEvents.append(contentsOf: events)
         }
+        let hasConsumer = directHandler != nil || state.continuation != nil
+        let escapeFlushToken = armEscapeFlush(&state, hasConsumer: hasConsumer)
         return (
           filtered.messages,
           events,
           directHandler == nil ? state.continuation : nil,
-          directHandler
+          directHandler,
+          escapeFlushToken
         )
       }
 
     for message in messages {
       controlHandler(message)
     }
+
+    defer { scheduleEscapeFlush(escapeFlushToken) }
 
     if let directHandler {
       for event in bufferedEvents {
@@ -171,6 +180,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
         let pendingMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
         state.pendingMouseEvents.removeAll(keepingCapacity: true)
         state.activeMouseFlushToken = nil
+        state.activeEscapeFlushToken = nil
         return (continuation, pendingMouseEvents)
       }
 
@@ -292,6 +302,79 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
       state.pendingMouseEvents.removeAll(keepingCapacity: true)
       state.activeMouseFlushToken = nil
       return (continuation, flushedMouseEvents)
+    }
+  }
+
+  // MARK: - Escape disambiguation (vim `ttimeoutlen`)
+
+  /// Mints an escape-flush token when the parser is holding a lone ESC and a
+  /// consumer is attached; returns `nil` (and releases any pending token) once
+  /// a continuation byte has completed or advanced the sequence. Mirrors the
+  /// mouse-flush schedule-once invariant so a token is only re-armed after the
+  /// previous one resolves. Must be called with `state` locked.
+  private func armEscapeFlush(
+    _ state: inout State,
+    hasConsumer: Bool
+  ) -> UInt64? {
+    guard state.parser.isAwaitingEscapeDisambiguation, hasConsumer else {
+      state.activeEscapeFlushToken = nil
+      return nil
+    }
+    guard state.activeEscapeFlushToken == nil else {
+      return nil
+    }
+    state.nextEscapeFlushToken += 1
+    let token = state.nextEscapeFlushToken
+    state.activeEscapeFlushToken = token
+    return token
+  }
+
+  private func scheduleEscapeFlush(
+    _ token: UInt64?
+  ) {
+    guard let token, mouseFlushScheduling == .automatic else {
+      return
+    }
+
+    Task { [weak self] in
+      try? await Task.sleep(
+        nanoseconds: UInt64(InputReaderTiming.escapeDisambiguationDelayMilliseconds) * 1_000_000
+      )
+      self?.flushEscape(matching: token)
+    }
+  }
+
+  private func flushEscape(
+    matching token: UInt64
+  ) {
+    let (continuation, directHandler, events):
+      (
+        AsyncStream<InputEvent>.Continuation?,
+        (@Sendable (InputEvent) -> Void)?,
+        [InputEvent]
+      ) = state.withLock { state in
+        guard state.activeEscapeFlushToken == token else {
+          return (nil, nil, [])
+        }
+        state.activeEscapeFlushToken = nil
+        // A continuation byte may have completed the sequence after the token
+        // was minted; `flush()` returns empty in that case.
+        return (state.continuation, state.directHandler, state.parser.flush())
+      }
+
+    guard !events.isEmpty else {
+      return
+    }
+
+    if let directHandler {
+      for event in events {
+        directHandler(event)
+      }
+      return
+    }
+
+    for event in events {
+      continuation?.yield(event)
     }
   }
 }

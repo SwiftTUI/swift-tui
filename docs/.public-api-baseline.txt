@@ -3062,6 +3062,7 @@ SwiftTUIRuntime.TerminalHostError.failedToWrite(errno:)
 SwiftTUIRuntime.TerminalHostError.notATTY(fileDescriptor:)
 SwiftTUIRuntime.TerminalInputParser
 SwiftTUIRuntime.TerminalInputParser.feed(_:)
+SwiftTUIRuntime.TerminalInputParser.flush()
 SwiftTUIRuntime.TerminalInputParser.init()
 SwiftTUIRuntime.TerminalInputReading
 SwiftTUIRuntime.TerminalInputReading.inputEvents()

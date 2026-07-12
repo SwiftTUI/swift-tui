@@ -1185,9 +1185,7 @@ extension FrameworkStressTextContentTests {
     _ = try harness.pressKey(KeyPress(.character("!")))
 
     #expect(text.writeCount == 1)
-    withKnownIssue("TextEditor vertical movement ignores its rendered wrapping width") {
-      #expect(text.value == "ABCDEFG!HIJKL")
-    }
+    #expect(text.value == "ABCDEFG!HIJKL")
   }
 }
 

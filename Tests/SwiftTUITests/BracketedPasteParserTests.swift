@@ -29,16 +29,19 @@ struct BracketedPasteParserTests {
     #expect(events == [.paste(PasteEvent(content: "/a\n/b"))])
   }
 
-  @Test("Non-paste escape sequences are unaffected")
+  @Test("A bare ESC stays buffered until an idle flush commits it to Escape")
   func nonPasteEscape() {
     var parser = TerminalInputParser()
-    // A bare ESC-key press
-    let events = parser.feed([0x1B])
-    #expect(events.count == 1)
-    if case .key(let keyPress) = events[0] {
-      #expect(keyPress.key == .escape)
-    } else {
-      Issue.record("expected .key(.escape)")
-    }
+    // A bare ESC is byte-identical to the first byte of every escape sequence
+    // (arrows, function keys, bracketed paste), so byte-wise the parser cannot
+    // yet tell an Escape keypress from the start of a longer sequence. It keeps
+    // the ESC buffered; the run loop's idle escape-timeout resolves it out of
+    // band via `flush()` (the vim `ttimeoutlen` model).
+    #expect(parser.feed([0x1B]).isEmpty)
+    #expect(parser.isAwaitingEscapeDisambiguation)
+    #expect(parser.flush() == [.key(KeyPress(.escape))])
+    #expect(!parser.isAwaitingEscapeDisambiguation)
+    // Flushing again with nothing pending yields nothing.
+    #expect(parser.flush().isEmpty)
   }
 }

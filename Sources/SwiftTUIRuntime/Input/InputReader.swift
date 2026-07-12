@@ -71,14 +71,24 @@ public final class InputReader: InputReading, TerminalInputReading,
 
   /// Reads keyboard-only events.
   public func events() -> AsyncStream<KeyPress> {
-    makeEventStream { parser, input in
-      parser.feed(input).compactMap {
-        guard case .key(let keyPress) = $0 else {
-          return nil
+    makeEventStream(
+      transform: { parser, input in
+        parser.feed(input).compactMap {
+          guard case .key(let keyPress) = $0 else {
+            return nil
+          }
+          return keyPress
         }
-        return keyPress
+      },
+      flushTransform: { parser in
+        parser.flush().compactMap {
+          guard case .key(let keyPress) = $0 else {
+            return nil
+          }
+          return keyPress
+        }
       }
-    }
+    )
   }
 
   /// Reads keyboard and mouse events.
@@ -102,10 +112,10 @@ extension InputReader {
         }
       ) { continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
-          mouseCoordinateMode: mouseCoordinateMode
-        ) { parser, input in
-          parser.feed(input)
-        }
+          mouseCoordinateMode: mouseCoordinateMode,
+          transform: { parser, input in parser.feed(input) },
+          flushTransform: { parser in parser.flush() }
+        )
         var pendingMouseEvents: [InputEvent] = []
 
         func flushPendingMouseEvents() {
@@ -147,6 +157,13 @@ extension InputReader {
             if !pendingMouseEvents.isEmpty {
               flushPendingMouseEvents()
             }
+            // An idle poll is the WASI equivalent of the escape-disambiguation
+            // timeout: a lone ESC that has not been followed by a continuation
+            // byte is committed to a bare Escape. `flushEscape()` is a no-op
+            // unless the parser is holding one.
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
             try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
             backoff.recordIdlePoll()
             continue
@@ -160,7 +177,8 @@ extension InputReader {
     }
 
     private func makeEventStream<Event: Sendable>(
-      transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
+      transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
+      flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
@@ -175,7 +193,8 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
-          transform: transform
+          transform: transform,
+          flushTransform: flushTransform
         )
         var backoff = InputPollBackoff()
 
@@ -195,6 +214,11 @@ extension InputReader {
             await Task.yield()
             continue
           case .wouldBlock:
+            // An idle poll is the WASI escape-disambiguation timeout: commit a
+            // lone buffered ESC to a bare Escape (no-op unless one is pending).
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
             try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
             backoff.recordIdlePoll()
             continue
@@ -215,12 +239,13 @@ extension InputReader {
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<InputEvent>(
-          mouseCoordinateMode: mouseCoordinateMode
-        ) { parser, input in
-          parser.feed(input)
-        }
+          mouseCoordinateMode: mouseCoordinateMode,
+          transform: { parser, input in parser.feed(input) },
+          flushTransform: { parser in parser.flush() }
+        )
         let coalescingState = MouseEventCoalescingState()
         var scheduledFlush: DispatchWorkItem?
+        var scheduledEscapeFlush: DispatchWorkItem?
 
         let flushPendingMouseEvents = {
           scheduledFlush?.cancel()
@@ -235,6 +260,41 @@ extension InputReader {
           for event in flushedEvents {
             continuation.yield(event)
           }
+        }
+
+        // Escape-disambiguation timer (vim `ttimeoutlen`): a lone ESC is
+        // buffered by the parser because byte-wise it is indistinguishable from
+        // the start of an escape sequence. Arm a short idle timer whenever the
+        // decoder is holding one; a continuation byte arriving first cancels it
+        // (see `reconcileEscapeDisambiguation`), otherwise it fires and commits
+        // the bare Escape. Both closures run on `queue`, so the shared `decoder`
+        // and `scheduledEscapeFlush` need no extra synchronization.
+        let flushPendingEscape = {
+          scheduledEscapeFlush?.cancel()
+          scheduledEscapeFlush = nil
+          for event in decoder.flushEscape() {
+            continuation.yield(event)
+          }
+        }
+
+        let reconcileEscapeDisambiguation = {
+          guard decoder.isAwaitingEscapeDisambiguation else {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
+            return
+          }
+          guard scheduledEscapeFlush == nil else {
+            return
+          }
+          let workItem = DispatchWorkItem {
+            flushPendingEscape()
+          }
+          scheduledEscapeFlush = workItem
+          queue.asyncAfter(
+            deadline: .now()
+              + .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds),
+            execute: workItem
+          )
         }
 
         let appendMouseEventAndArmFlushIfNeeded = { (event: InputEvent) in
@@ -263,6 +323,8 @@ extension InputReader {
             maxBytesPerRead: 256
           )
           if drainResult.failureErrno != nil {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
             flushPendingMouseEvents()
             continuation.finish()
             source.cancel()
@@ -285,9 +347,12 @@ extension InputReader {
                 continuation.yield(event)
               }
             }
+            reconcileEscapeDisambiguation()
           }
 
           if drainResult.shouldFinish {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
             flushPendingMouseEvents()
             continuation.finish()
             source.cancel()
@@ -297,6 +362,7 @@ extension InputReader {
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
           scheduledFlush?.cancel()
+          scheduledEscapeFlush?.cancel()
           flushPendingMouseEvents()
           continuation.finish()
         }
@@ -310,7 +376,8 @@ extension InputReader {
     }
 
     private func makeEventStream<Event: Sendable>(
-      transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
+      transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
+      flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
@@ -321,8 +388,37 @@ extension InputReader {
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
-          transform: transform
+          transform: transform,
+          flushTransform: flushTransform
         )
+        var scheduledEscapeFlush: DispatchWorkItem?
+
+        // Escape-disambiguation timer (vim `ttimeoutlen`): commit a lone
+        // buffered ESC to a bare Escape after a quiet window unless a
+        // continuation byte completes the sequence first. Both closures run on
+        // `queue`, so the shared `decoder`/`scheduledEscapeFlush` need no lock.
+        let reconcileEscapeDisambiguation = {
+          guard decoder.isAwaitingEscapeDisambiguation else {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
+            return
+          }
+          guard scheduledEscapeFlush == nil else {
+            return
+          }
+          let workItem = DispatchWorkItem {
+            scheduledEscapeFlush = nil
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
+          }
+          scheduledEscapeFlush = workItem
+          queue.asyncAfter(
+            deadline: .now()
+              + .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds),
+            execute: workItem
+          )
+        }
 
         source.setEventHandler {
           let drainResult = drainAvailableTerminalInput(
@@ -330,6 +426,8 @@ extension InputReader {
             maxBytesPerRead: 256
           )
           if drainResult.failureErrno != nil {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
             continuation.finish()
             source.cancel()
             return
@@ -344,9 +442,12 @@ extension InputReader {
             for event in decoded.events {
               continuation.yield(event)
             }
+            reconcileEscapeDisambiguation()
           }
 
           if drainResult.shouldFinish {
+            scheduledEscapeFlush?.cancel()
+            scheduledEscapeFlush = nil
             continuation.finish()
             source.cancel()
           }
@@ -354,6 +455,7 @@ extension InputReader {
 
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
+          scheduledEscapeFlush?.cancel()
           continuation.finish()
         }
 

@@ -495,9 +495,7 @@ extension FrameworkStressRuntimeTransportTests {
       events.append(contentsOf: parser.feed([byte]))
     }
 
-    withKnownIssue("A bytewise bracketed-paste envelope leaks its framing as key events") {
-      #expect(events == [.paste(.init(content: "alpha beta"))])
-    }
+    #expect(events == [.paste(.init(content: "alpha beta"))])
   }
 }
 

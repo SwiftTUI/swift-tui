@@ -60,6 +60,11 @@ package struct WebSurfaceInputParser {
       events.append(contentsOf: terminalInputParser.feed(payload))
     }
 
+    // The web surface delivers input as complete messages, so a lone ESC the
+    // byte parser is holding for escape disambiguation is a finished Escape
+    // keypress — flush it now rather than stranding it until the next message.
+    events.append(contentsOf: terminalInputParser.flush())
+
     return (events, controlMessages)
   }
 
