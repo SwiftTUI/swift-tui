@@ -1736,6 +1736,11 @@ extension ViewNode {
     package var evaluationState: EvaluationState
     package var evaluator: (@MainActor () -> Void)?
     package var memoViewValue: Any?
+    /// Frame-scoped duplicate-`.id` claim scratch. Restoring a stale image is
+    /// self-healing (the frame-ID guard resets the tally on the next claim in
+    /// a newer frame) and same-frame re-claims are position-idempotent.
+    package var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]]
+    package var exactIdentityOccurrenceTallyFrameID: UInt64
     /// Capture metadata, not restored state: the node's checkpoint-mutation
     /// generation at the moment this image was taken. ``restoreCheckpoint(_:)``
     /// never writes it back — live generations are monotonic (every restore
@@ -1760,6 +1765,8 @@ extension ViewNode {
       evaluationState: evaluationState,
       evaluator: evaluator,
       memoViewValue: memoViewValue,
+      exactIdentityOccurrenceTally: exactIdentityOccurrenceTally,
+      exactIdentityOccurrenceTallyFrameID: exactIdentityOccurrenceTallyFrameID,
       checkpointMutationGeneration: checkpointMutationGeneration
     )
   }
@@ -1782,6 +1789,8 @@ extension ViewNode {
     evaluationState = checkpoint.evaluationState
     evaluator = checkpoint.evaluator
     memoViewValue = checkpoint.memoViewValue
+    exactIdentityOccurrenceTally = checkpoint.exactIdentityOccurrenceTally
+    exactIdentityOccurrenceTallyFrameID = checkpoint.exactIdentityOccurrenceTallyFrameID
   }
 }
 
