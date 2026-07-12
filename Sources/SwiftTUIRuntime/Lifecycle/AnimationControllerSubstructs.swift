@@ -27,6 +27,13 @@ extension AnimationController {
     package var parentByIdentity: [Identity: Identity] = [:]
     package var childIndexByIdentity: [Identity: Int] = [:]
     package var identities: Set<Identity> = []
+    /// Every `ViewNodeID` that resolved into a live node last frame. Persisted
+    /// so removal detection can find a departed **occurrence** — a ViewNodeID
+    /// that left the tree even while its `Identity` is still live (a duplicate
+    /// `.id` shedding one of several occurrences) — and so a reparented
+    /// ViewNodeID (same node, new parent Identity) is recognized as a survivor
+    /// rather than a removal-plus-insertion.
+    package var liveNodeIDs: Set<ViewNodeID> = []
 
     package init() {}
 
@@ -41,6 +48,7 @@ extension AnimationController {
       parentByIdentity.removeAll(keepingCapacity: true)
       childIndexByIdentity.removeAll(keepingCapacity: true)
       identities.removeAll(keepingCapacity: true)
+      liveNodeIDs.removeAll(keepingCapacity: true)
     }
   }
 

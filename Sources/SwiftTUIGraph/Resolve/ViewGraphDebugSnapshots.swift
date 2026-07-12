@@ -20,6 +20,7 @@ extension ViewGraph {
     package var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode]
     package var viewportLifecycleOrder: [ViewportLifecycleKey]
     package var frameOrder: [ViewNodeID]
+    package var evaluatedNodeIDsThisFrame: Set<ViewNodeID>
     package var stableTaskCancelEvents: [LifecycleEvent]
     package var stableTaskStartEvents: [LifecycleEvent]
     package var structuralAppearEvents: [LifecycleEvent]

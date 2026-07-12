@@ -1030,9 +1030,7 @@ extension FrameworkStressAnimationTemporalTests {
       transaction: .init(),
       timestamp: start.advanced(by: .milliseconds(20))
     )
-    withKnownIssue("A removed transition modifier remains registered on its live node") {
-      #expect(controller.debugStateSnapshot().transitionNodeIDs.isEmpty)
-    }
+    #expect(controller.debugStateSnapshot().transitionNodeIDs.isEmpty)
 
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
@@ -1043,9 +1041,7 @@ extension FrameworkStressAnimationTemporalTests {
       transaction: transaction,
       timestamp: start.advanced(by: .milliseconds(40))
     )
-    withKnownIssue("A stale transition registration animates a later removal") {
-      #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
-    }
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
   }
 }
 
@@ -1211,10 +1207,8 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(40))
     )
 
-    withKnownIssue("A reparented ViewNodeID is treated as transition removal and insertion") {
-      #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
-      #expect(controller.activeAnimationCount == 0)
-    }
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(controller.activeAnimationCount == 0)
   }
 }
 
@@ -1276,9 +1270,7 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(40))
     )
 
-    withKnownIssue("Duplicate Identity diffing misses a departed ViewNodeID occurrence") {
-      #expect(controller.debugStateSnapshot().removingNodeIDs.count == 1)
-    }
+    #expect(controller.debugStateSnapshot().removingNodeIDs.count == 1)
   }
 }
 

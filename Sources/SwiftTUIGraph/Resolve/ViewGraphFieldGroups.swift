@@ -62,6 +62,13 @@ extension ViewGraph {
   /// lifecycle events persist until the next frame replaces them.
   package struct LifecycleEventBuffers {
     package var frameOrder: [ViewNodeID] = []
+    // ViewNodeIDs whose view body was *freshly evaluated* this frame (a
+    // `beginEvaluation` visit), as distinct from `frameOrder`, which also
+    // includes reused subtree roots grafted by value (`recordReusedSubtree`).
+    // The animation controller's transition-collection prune consults exactly
+    // this set so a re-evaluated node that dropped its `.transition()` modifier
+    // is unregistered, while a reused node's registration is preserved.
+    package var evaluatedNodeIDsThisFrame: Set<ViewNodeID> = []
     package var stableTaskCancelEvents: [LifecycleEvent] = []
     package var stableTaskStartEvents: [LifecycleEvent] = []
     package var structuralAppearEvents: [LifecycleEvent] = []

@@ -61,6 +61,24 @@ enum AnimationTreeQueries {
     findResolvedSubtree(in: root, identity: identity)
   }
 
+  /// Recursively searches a resolved tree for the node carrying `viewNodeID`
+  /// and returns a copy of it. Removal detection keys on occurrences
+  /// (`ViewNodeID`), not `Identity`, so a departed occurrence of a still-live
+  /// duplicate `.id` and a reparented node can be told apart. Returns the
+  /// first match in pre-order; distinct nodes never share a `ViewNodeID`.
+  static func findResolvedNode(
+    in root: ResolvedNode,
+    viewNodeID: ViewNodeID
+  ) -> ResolvedNode? {
+    if root.viewNodeID == viewNodeID { return root }
+    for child in root.children {
+      if let match = findResolvedNode(in: child, viewNodeID: viewNodeID) {
+        return match
+      }
+    }
+    return nil
+  }
+
   /// Recursively searches a placed tree for the subtree rooted at
   /// `identity` and returns a copy of it. Used to capture the frozen
   /// bounds of a disappearing subtree for draw-only overlay injection.

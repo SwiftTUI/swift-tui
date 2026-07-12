@@ -83,6 +83,14 @@ package final class AnimationController: Sendable {
     get { previousFrame.identities }
     set { previousFrame.identities = newValue }
   }
+  /// The set of `ViewNodeID`s that were live at the end of the previous frame.
+  /// Removal detection subtracts this frame's live set from it to find departed
+  /// occurrences (a ViewNodeID that left even while its Identity survives), and
+  /// insertion detection consults it to recognize reparented nodes.
+  private var previousLiveNodeIDs: Set<ViewNodeID> {
+    get { previousFrame.liveNodeIDs }
+    set { previousFrame.liveNodeIDs = newValue }
+  }
 
   /// Completion closures registered by ``withAnimation`` overloads.
   /// The controller fires and removes the entry once every animation
@@ -651,7 +659,14 @@ package final class AnimationController: Sendable {
     pendingTransitionIdentitiesByNodeID.removeAll(keepingCapacity: true)
   }
 
-  package func finishTransitionCollection() {
+  /// Finishes the frame's `.transition()` collection.
+  ///
+  /// `reEvaluatedNodeIDs` is the set of ViewNodeIDs whose declarations were
+  /// freshly re-evaluated this frame (the renderer threads
+  /// ``ViewGraph/evaluatedNodeIDsThisFrame``). `nil` means "every live node was
+  /// re-evaluated" (a full evaluation, and the shape a direct test drives),
+  /// which prunes any registration not re-collected this frame.
+  package func finishTransitionCollection(reEvaluatedNodeIDs: Set<ViewNodeID>? = nil) {
     // Merge newly registered transitions into the existing map so
     // that registrations for non-re-evaluated subtrees survive
     // across selective-evaluation frames.  Without this, a
@@ -661,6 +676,25 @@ package final class AnimationController: Sendable {
       transitionsByNodeID[viewNodeID] = transition
       transitionIdentitiesByNodeID[viewNodeID] =
         pendingTransitionIdentitiesByNodeID[viewNodeID]
+    }
+
+    // Prune registrations whose owner node was re-evaluated this frame but
+    // declared no `.transition()` (its pending entry is absent). A live node
+    // that drops its transition modifier — while keeping its ViewNodeID — would
+    // otherwise retain the stale registration and mis-animate a *later*
+    // removal. A node that was reused (not in `reEvaluatedNodeIDs`) is left
+    // alone: the merge above preserved its registration and it did not re-run
+    // its declaration this frame. `nil` treats the whole current map as
+    // re-evaluated (full evaluation), so every un-re-collected entry is dropped.
+    let staleNodeIDs: [ViewNodeID]
+    if let reEvaluatedNodeIDs {
+      staleNodeIDs = reEvaluatedNodeIDs.filter { pendingTransitionsByNodeID[$0] == nil }
+    } else {
+      staleNodeIDs = transitionsByNodeID.keys.filter { pendingTransitionsByNodeID[$0] == nil }
+    }
+    for viewNodeID in staleNodeIDs {
+      transitionsByNodeID.removeValue(forKey: viewNodeID)
+      transitionIdentitiesByNodeID.removeValue(forKey: viewNodeID)
     }
   }
 
@@ -847,7 +881,14 @@ package final class AnimationController: Sendable {
     )
     let newIdentities = resolvedDiff.newIdentities
     let insertedIdentities = resolvedDiff.insertedIdentities
-    let removedIdentities = resolvedDiff.removedIdentities
+    // Removal detection keys on ViewNodeID occurrences, not Identity. A node
+    // that departed the live tree is one whose ViewNodeID was live last frame
+    // and is not live now — this catches a departed occurrence of a still-live
+    // duplicate `.id` (Identity survives, one occurrence left) that pure
+    // Identity-set subtraction misses, and it does *not* flag a reparented node
+    // (same ViewNodeID under a new parent Identity) whose ViewNodeID is still
+    // live, so a stable entity changing parents produces no false removal.
+    let departedNodeIDs = previousLiveNodeIDs.subtracting(newLiveNodeIDs)
 
     // A same-identity reinsertion supersedes that identity's in-flight
     // removal overlay: the live node owns the visual from this frame on, so
@@ -924,6 +965,14 @@ package final class AnimationController: Sendable {
       guard let viewNodeID = newNodeIDByIdentity[identity],
         let transition = transitionsByNodeID[viewNodeID]
       else { continue }
+      // Reparent suppression: a newly-inserted Identity whose ViewNodeID was
+      // live last frame is a node that changed parents (same ViewNodeID, new
+      // Identity), not a conditional first-appearance. SwiftUI fires
+      // `.transition()` only when a view's conditional presence changes, so a
+      // surviving-but-reparented node must not play an insertion transition.
+      if previousLiveNodeIDs.contains(viewNodeID) {
+        continue
+      }
       enqueueInsertionAnimation(
         identity: identity,
         transition: transition,
@@ -946,15 +995,15 @@ package final class AnimationController: Sendable {
     // ancestor that is still in the new tree — that's the insertion
     // point — and capture the deepest disappearing ancestor as the
     // subtree to inject.  This way the entire wrapped unit fades out.
-    for identity in removedIdentities {
+    for removedNodeID in departedNodeIDs {
       guard let previousRoot = previousTreeRoot,
         let previousNode = AnimationTreeQueries.findResolvedNode(
           in: previousRoot,
-          identity: identity
+          viewNodeID: removedNodeID
         ),
-        let removedNodeID = previousNode.viewNodeID,
         removingNodes[removedNodeID] == nil
       else { continue }
+      let identity = previousNode.identity
 
       // If the removed identity's matched-geometry key was
       // consumed by a match on this frame, the counterpart insertion
@@ -1110,6 +1159,7 @@ package final class AnimationController: Sendable {
 
     previousSnapshots = newSnapshots
     previousIdentities = newIdentities
+    previousLiveNodeIDs = newLiveNodeIDs
     previousTreeRoot = node
     previousParentByIdentity = newParentByIdentity
     previousChildIndexByIdentity = newChildIndexByIdentity

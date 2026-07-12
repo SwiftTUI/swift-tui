@@ -222,6 +222,14 @@ package final class ViewGraph {
     get { eventBuffers.frameOrder }
     set { eventBuffers.frameOrder = newValue }
   }
+  /// ViewNodeIDs freshly evaluated (not reused) this frame. Read by the
+  /// renderer's transition-collection window to prune registrations for nodes
+  /// that were re-evaluated but dropped their `.transition()` declaration,
+  /// without disturbing registrations on reused subtrees.
+  package var evaluatedNodeIDsThisFrame: Set<ViewNodeID> {
+    get { eventBuffers.evaluatedNodeIDsThisFrame }
+    set { eventBuffers.evaluatedNodeIDsThisFrame = newValue }
+  }
   private var stableTaskCancelEvents: [LifecycleEvent] {
     get { eventBuffers.stableTaskCancelEvents }
     set { eventBuffers.stableTaskCancelEvents = newValue }
@@ -590,6 +598,7 @@ package final class ViewGraph {
       viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
       viewportLifecycleOrder: viewportLifecycleOrder,
       frameOrder: frameOrder,
+      evaluatedNodeIDsThisFrame: evaluatedNodeIDsThisFrame,
       stableTaskCancelEvents: stableTaskCancelEvents,
       stableTaskStartEvents: stableTaskStartEvents,
       structuralAppearEvents: structuralAppearEvents,
@@ -1624,6 +1633,7 @@ package final class ViewGraph {
     // monotonic frame counter (no clock/RNG). Cheap when the probe is off.
     SoundnessProbeConfiguration.beginFrame(frameID: currentFrameID)
     frameOrder.removeAll(keepingCapacity: true)
+    evaluatedNodeIDsThisFrame.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
     stableTaskStartEvents.removeAll(keepingCapacity: true)
     structuralAppearEvents.removeAll(keepingCapacity: true)
@@ -1648,6 +1658,11 @@ package final class ViewGraph {
     if !node.wasVisitedThisFrame {
       frameOrder.append(node.viewNodeID)
     }
+    // Record the fresh evaluation. Unlike `frameOrder` (which also gains reused
+    // roots via `recordReusedSubtree`), this set gathers only nodes whose body
+    // is actually recomputed this frame, so the transition-collection prune can
+    // tell a re-evaluated dropped declaration from an untouched reused one.
+    evaluatedNodeIDsThisFrame.insert(node.viewNodeID)
     node.beginEvaluation(
       frameID: currentFrameID,
       invalidator: invalidator,

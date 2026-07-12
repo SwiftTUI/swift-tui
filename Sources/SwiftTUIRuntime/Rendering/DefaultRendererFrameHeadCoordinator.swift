@@ -553,7 +553,13 @@ struct DefaultRendererFrameHeadCoordinator {
         }
       }
     }
-    animationDraft.controller.finishTransitionCollection()
+    // Prune transition registrations for nodes that were freshly re-evaluated
+    // this frame yet declared no `.transition()` (they dropped the modifier).
+    // Only the *evaluated* set is passed — reused subtrees are untouched, so
+    // their still-valid registrations are preserved across selective frames.
+    animationDraft.controller.finishTransitionCollection(
+      reEvaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame
+    )
 
     let resolved = wrapInContainerSafeArea(
       renderPipelineContentTree(viewGraph.snapshot()),
