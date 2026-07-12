@@ -574,9 +574,7 @@ extension FrameworkStressAnimationTemporalTests {
       at: start.advanced(by: .milliseconds(300))
     )
 
-    withKnownIssue("Retarget replacement resets CustomAnimation state after sampling it") {
-      #expect((probe.observations.last ?? -1) >= 2)
-    }
+    #expect((probe.observations.last ?? -1) >= 2)
   }
 }
 
@@ -611,9 +609,7 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(100))
     )
 
-    withKnownIssue("AnimationController retargeting never calls CustomAnimation.shouldMerge") {
-      #expect(probe.mergeCallCount > 0)
-    }
+    #expect(probe.mergeCallCount > 0)
   }
 }
 
@@ -720,9 +716,7 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(200))
     )
 
-    withKnownIssue("AnimationController interruption never calls CustomAnimation.velocity") {
-      #expect(probe.velocityCallCount > 0)
-    }
+    #expect(probe.velocityCallCount > 0)
   }
 }
 

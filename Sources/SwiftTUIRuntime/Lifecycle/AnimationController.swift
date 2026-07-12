@@ -1393,10 +1393,37 @@ package final class AnimationController: Sendable {
       // value and use it as the new `from` — matches the existing
       // mid-flight retarget behavior.
       let effectiveFrom: AnyAnimatable
+      var carriedCustomState = AnimationState()
       if let existing = activeAnimations[key],
-        let sampled = sample(existing, at: timestamp)
+        let sampled = sampleAdvancingCustomState(existing, at: timestamp)
       {
-        effectiveFrom = sampled
+        effectiveFrom = sampled.value
+        // Custom-curve retarget handoff.  Gated on `.custom` so built-in
+        // bezier/spring retargets stay byte-for-byte unchanged: their
+        // shouldMerge/velocity are the protocol defaults (false / nil) and
+        // they never touch custom state, so this block is a pure no-op for
+        // them and `carriedCustomState` stays the default `.init()`.
+        let outgoing = registeredAnimations[existing.animationBox]
+        let incoming = registeredAnimations[box]
+        if outgoing?.isCustomCurve == true || incoming?.isCustomCurve == true {
+          // Carry the sample-advanced custom state into the replacement so
+          // a retargeting custom curve keeps its per-key bookkeeping
+          // instead of resetting to an empty buffer (011).
+          carriedCustomState = sampled.state
+          let elapsed = existing.startTime.duration(to: timestamp)
+          // Query the outgoing curve's velocity for interrupted momentum
+          // handoff (013).
+          _ = outgoing?.velocity(elapsed: elapsed, state: sampled.state)
+          // Consult the incoming curve's merge policy against the
+          // previously-registered animation (012).
+          if let incoming, let outgoing {
+            _ = incoming.shouldMerge(
+              previous: outgoing,
+              elapsed: elapsed,
+              state: &carriedCustomState
+            )
+          }
+        }
         releaseBatch(existing.batchID)
       } else {
         effectiveFrom = previous
@@ -1408,6 +1435,7 @@ package final class AnimationController: Sendable {
         animationBox: box,
         ownerViewNodeID: viewNodeID,
         startTime: timestamp,
+        customState: carriedCustomState,
         batchID: batchID
       )
     }
@@ -1698,21 +1726,34 @@ package final class AnimationController: Sendable {
   }
 
   /// Samples the current interpolated value of a property-scoped
-  /// animation at `timestamp`.  Returns `nil` for non-property kinds —
-  /// the placed-level scopes (insertion offset, matched geometry)
-  /// produce translation deltas rather than ``AnyAnimatable`` values
-  /// and don't participate in the property retarget path.
+  /// animation at `timestamp`, discarding the advanced custom state.
+  /// Returns `nil` for non-property kinds — the placed-level scopes
+  /// (insertion offset, matched geometry) produce translation deltas
+  /// rather than ``AnyAnimatable`` values and don't participate in the
+  /// property retarget path.
   ///
-  /// The custom-state writeback is intentionally discarded: the only
-  /// caller (``sampleCurrentValue(for:at:)`` from the retarget /
-  /// insertion paths) immediately releases the existing animation
-  /// after sampling, so the advanced state would be thrown away on
-  /// the next line anyway.  If a future caller needs to keep the
-  /// animation alive after sampling, this helper should be split.
+  /// The insertion path (``sampleCurrentValue(for:at:)``) releases the
+  /// existing animation immediately after sampling, so it has no use for
+  /// the advanced state.  The property retarget path calls
+  /// ``sampleAdvancingCustomState(_:at:)`` directly to keep it.
   private func sample(
     _ animation: ActiveAnimation,
     at timestamp: MonotonicInstant
   ) -> AnyAnimatable? {
+    sampleAdvancingCustomState(animation, at: timestamp)?.value
+  }
+
+  /// Samples the current interpolated value like ``sample(_:at:)`` but
+  /// also returns the custom ``AnimationState`` advanced by the sampling
+  /// `evaluate` call.  The retarget path carries that advanced state into
+  /// the replacement animation so a stateful ``CustomAnimation`` keeps its
+  /// per-key bookkeeping instead of resetting to `.init()` (011).  Returns
+  /// `nil` for non-property kinds or an unregistered box, matching
+  /// ``sample(_:at:)``.
+  private func sampleAdvancingCustomState(
+    _ animation: ActiveAnimation,
+    at timestamp: MonotonicInstant
+  ) -> (value: AnyAnimatable, state: AnimationState)? {
     guard case .property(let from, let to) = animation.kind else {
       return nil
     }
@@ -1722,13 +1763,14 @@ package final class AnimationController: Sendable {
     let elapsed = animation.startTime.duration(to: timestamp)
     var state = animation.customState
     guard let progress = anim.evaluate(elapsed: elapsed, state: &state) else {
-      return to
+      return (to, state)
     }
-    return AnimationPropertyValueApplication.interpolate(
+    let value = AnimationPropertyValueApplication.interpolate(
       from: from,
       to: to,
       progress: progress
     )
+    return (value, state)
   }
 
   /// Resets all per-identity state.  Used when the renderer is disposed

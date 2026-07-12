@@ -321,6 +321,41 @@ public struct Animation: Equatable, Hashable, Sendable {
   package var animationBox: AnimationBox {
     AnimationBox(self)
   }
+
+  /// `true` when this animation is backed by a user ``CustomAnimation``
+  /// (as opposed to a built-in bezier or spring curve).  The controller
+  /// gates its retarget-handoff hooks on this so built-in retargets stay
+  /// byte-for-byte unchanged.
+  package var isCustomCurve: Bool {
+    if case .custom = curve { return true }
+    return false
+  }
+
+  /// Consults a custom curve's ``CustomAnimation/shouldMerge`` handoff
+  /// policy on retarget.  Built-in bezier/spring curves have no merge
+  /// policy and return `false` (the protocol default) without allocating
+  /// a context.  `elapsed` is the outgoing animation's running time; the
+  /// mutated ``AnimationState`` is threaded back so a policy that records
+  /// bookkeeping is preserved.
+  package func shouldMerge(
+    previous: Animation,
+    elapsed: Duration,
+    state: inout AnimationState
+  ) -> Bool {
+    guard case .custom(let box) = curve else { return false }
+    return box.shouldMerge(previous, adjustedTime(elapsed), &state)
+  }
+
+  /// Queries a custom curve's ``CustomAnimation/velocity`` hook for an
+  /// interrupted handoff.  Built-in bezier/spring curves return `nil`
+  /// (the protocol default) — they carry no user-defined momentum.
+  package func velocity(
+    elapsed: Duration,
+    state: AnimationState
+  ) -> Double? {
+    guard case .custom(let box) = curve else { return nil }
+    return box.velocity(adjustedTime(elapsed), state)
+  }
 }
 
 // MARK: - Internal Types
@@ -348,6 +383,17 @@ struct CustomAnimationBox: Equatable, Hashable, Sendable {
   private let _hashValue: Int
   private let _isEqual: @Sendable (CustomAnimationBox) -> Bool
   let evaluate: @Sendable (Duration, inout AnimationState) -> Double?
+  /// Call-through to the user curve's ``CustomAnimation/shouldMerge``
+  /// handoff policy, consulted by the controller when a mid-flight custom
+  /// animation is retargeted.  Mirrors ``evaluate``: the value axis is
+  /// `Double` (1.0) and the mutated context state is threaded back so a
+  /// policy that records per-key bookkeeping is preserved.
+  let shouldMerge: @Sendable (Animation, Duration, inout AnimationState) -> Bool
+  /// Call-through to the user curve's ``CustomAnimation/velocity`` hook,
+  /// queried on an interrupted handoff so momentum can carry into the
+  /// replacement.  The protocol hook receives its context by value (it is
+  /// non-mutating), so no state writeback occurs here.
+  let velocity: @Sendable (Duration, AnimationState) -> Double?
 
   init<A: CustomAnimation>(_ animation: A) {
     _hashValue = animation.hashValue
@@ -359,6 +405,18 @@ struct CustomAnimationBox: Equatable, Hashable, Sendable {
       let result = animation.animate(value: 1.0, time: time, context: &context)
       state = context.state
       return result
+    }
+    shouldMerge = { previous, time, state in
+      var context = AnimationContext<Double>(state: state)
+      let result = animation.shouldMerge(
+        previous: previous, value: 1.0, time: time, context: &context
+      )
+      state = context.state
+      return result
+    }
+    velocity = { time, state in
+      let context = AnimationContext<Double>(state: state)
+      return animation.velocity(value: 1.0, time: time, context: context)
     }
   }
 
