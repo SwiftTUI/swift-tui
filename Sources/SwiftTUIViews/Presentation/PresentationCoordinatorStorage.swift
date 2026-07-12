@@ -168,6 +168,16 @@ where Item.ID: Sendable {
       .map(\.item)
   }
 
+  /// The currently-active item for `id`, if any. Deadline tasks armed at
+  /// activation consult this at fire time so a re-synced item (same id, new
+  /// dismissal target) dismisses through its current closure, not the one
+  /// captured when the deadline started.
+  package func activeItem(
+    id: Item.ID
+  ) -> Item? {
+    activeEntry(for: id)?.item
+  }
+
   private func mergedActiveItems() -> [Item.ID: TrackedPresentationItem<Item>] {
     var merged: [Item.ID: TrackedPresentationItem<Item>] = [:]
 
@@ -294,6 +304,12 @@ where Item.ID: Sendable {
 
   package var itemsOldestFirst: [Item] {
     itemStore.oldestFirst
+  }
+
+  package func activeItem(
+    id: Item.ID
+  ) -> Item? {
+    itemStore.activeItem(id: id)
   }
 
   package func present(

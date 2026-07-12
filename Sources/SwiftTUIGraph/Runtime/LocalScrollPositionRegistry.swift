@@ -125,10 +125,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     scopeIdentity: Identity?
   ) -> Bool {
     guard
-      let target = latestScrollTargets.first(where: {
-        targetMatches($0, query: query)
-          && routeMatchesScope($0.scrollIdentity, scopeIdentity: scopeIdentity)
-      }),
+      let target = firstTarget(matching: query, scopeIdentity: scopeIdentity),
       let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
       let registration = registrations[target.scrollIdentity]
     else {
@@ -485,8 +482,40 @@ package final class LocalScrollPositionRegistry: Equatable {
   private func firstRoute(
     matching scopeIdentity: Identity?
   ) -> ScrollRoute? {
-    latestScrollRoutes.first {
+    if let direct = latestScrollRoutes.first(where: {
       routeMatchesScope($0.identity, scopeIdentity: scopeIdentity)
+    }) {
+      return direct
+    }
+    // An explicit `.id(_:)` re-roots a route's identity space out of the
+    // reader's structural scope, so the identity-prefix check above can never
+    // match it. Fall back to the walk-recorded structural host chain — and
+    // only then, so co-scoped routes in the scope's own identity space keep
+    // winning.
+    return latestScrollRoutes.first {
+      hostChainMatchesScope($0, scopeIdentity: scopeIdentity)
+    }
+  }
+
+  private func firstTarget(
+    matching query: ScrollTargetQuery,
+    scopeIdentity: Identity?
+  ) -> ScrollTarget? {
+    if let direct = latestScrollTargets.first(where: {
+      targetMatches($0, query: query)
+        && routeMatchesScope($0.scrollIdentity, scopeIdentity: scopeIdentity)
+    }) {
+      return direct
+    }
+    // Same re-root fallback as `firstRoute(matching:)`, keyed through the
+    // target's containing route.
+    return latestScrollTargets.first { target in
+      guard targetMatches(target, query: query),
+        let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity })
+      else {
+        return false
+      }
+      return hostChainMatchesScope(route, scopeIdentity: scopeIdentity)
     }
   }
 
@@ -498,6 +527,18 @@ package final class LocalScrollPositionRegistry: Equatable {
       return true
     }
     return routeIdentity == scopeIdentity || routeIdentity.isDescendant(of: scopeIdentity)
+  }
+
+  private func hostChainMatchesScope(
+    _ route: ScrollRoute,
+    scopeIdentity: Identity?
+  ) -> Bool {
+    guard let scopeIdentity else {
+      return false
+    }
+    return route.structuralHostChain.contains {
+      $0 == scopeIdentity || $0.isDescendant(of: scopeIdentity)
+    }
   }
 
   private func targetMatches(

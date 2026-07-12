@@ -53,8 +53,8 @@ public struct SpatialTapGesture: Gesture {
 final class SpatialTapGestureRecognizer: GestureRecognizer {
   typealias Value = SpatialTapGesture.Value
 
-  let requiredCount: Int
-  let coordinateSpace: CoordinateSpace
+  private(set) var requiredCount: Int
+  private(set) var coordinateSpace: CoordinateSpace
   private(set) var phase: GestureRecognizerPhase = .possible
   private var completedTaps = 0
   private var pressStart: Point?
@@ -115,6 +115,17 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+
+  /// Adopts re-authored value parameters alongside the preserved partial
+  /// sequence — `TapGesture`/`DragGesture` parity.
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? SpatialTapGestureRecognizer else {
+      return false
+    }
+    requiredCount = other.requiredCount
+    coordinateSpace = other.coordinateSpace
+    return true
+  }
 
   func currentValue() -> SpatialTapGesture.Value? {
     guard let loc = lastTerminalLocation,

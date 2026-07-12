@@ -303,9 +303,7 @@ extension FrameworkStressToastLifecycleTests {
       !first.value || !second.value
     }
     _ = try harness.render()
-    withKnownIssue("Active toast timer retains its activation binding after source retarget") {
-      #expect(first.value && !second.value)
-    }
+    #expect(first.value && !second.value)
   }
 }
 
@@ -421,7 +419,8 @@ extension FrameworkStressToastLifecycleTests {
   func toastLifecycle008FiniteDurationStartsAfterNilDuration() async throws {
     // Hypothesis: a nil-duration toast's task completes while its descriptor remains committed, so
     // changing the active item to a finite duration may never start a new timer.
-    let presented = ToastLifecycleBox(true)
+    let dismissalWrites = MainActorConditionSignal()
+    let presented = ToastLifecycleBox(true, signal: dismissalWrites)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("ToastLifecycle008"),
       size: .init(width: 62, height: 10)
@@ -434,12 +433,13 @@ extension FrameworkStressToastLifecycleTests {
     #expect(armed.contains("duration armed true"))
     #expect(armed.contains("nil to finite toast"))
 
-    await AsyncEvent.firing(after: .milliseconds(140)).wait()
-    _ = try harness.render()
-    let dismissed = !presented.value
-    withKnownIssue("Finite duration does not restart a completed nil-duration toast task") {
-      #expect(dismissed && toastLifecycleEntryCount(in: harness) == 0)
+    // Condition-wait, not a fixed window: under parallel-suite load the
+    // re-keyed deadline's 50ms sleep can outlast any fixed probe delay.
+    await dismissalWrites.wait {
+      !presented.value
     }
+    _ = try harness.render()
+    #expect(!presented.value && toastLifecycleEntryCount(in: harness) == 0)
   }
 }
 
@@ -482,15 +482,10 @@ extension FrameworkStressToastLifecycleTests {
     await AsyncEvent.firing(after: .milliseconds(140)).wait()
     let frame = try harness.render()
 
-    // Intermittent: under parallel-suite load the 140ms wait can elapse
-    // before the finite deadline fires, so the stale-deadline dismissal —
-    // the pinned defect — does not always reproduce.
-    withKnownIssue("Nil duration does not cancel the toast's active finite deadline", isIntermittent: true) {
-      #expect(
-        presented.value && frame.contains("finite to nil toast")
-          && toastLifecycleEntryCount(in: harness) == 1
-      )
-    }
+    #expect(
+      presented.value && frame.contains("finite to nil toast")
+        && toastLifecycleEntryCount(in: harness) == 1
+    )
   }
 }
 
@@ -519,7 +514,8 @@ extension FrameworkStressToastLifecycleTests {
   func toastLifecycle010ShorterDurationReplacesTheActiveDeadline() async throws {
     // Hypothesis: changing duration does not change the task descriptor, so a one-second timer can
     // survive after the active toast requests a near-immediate replacement deadline.
-    let presented = ToastLifecycleBox(true)
+    let dismissalWrites = MainActorConditionSignal()
+    let presented = ToastLifecycleBox(true, signal: dismissalWrites)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("ToastLifecycle010"),
       size: .init(width: 64, height: 10)
@@ -530,13 +526,13 @@ extension FrameworkStressToastLifecycleTests {
 
     let shortened = try harness.clickText("Shorten Toast Timer 010")
     #expect(shortened.contains("timer shortened true"))
-    await AsyncEvent.firing(after: .milliseconds(140)).wait()
-    _ = try harness.render()
-    let dismissed = !presented.value
-
-    withKnownIssue("Shorter duration does not replace the toast's active long deadline") {
-      #expect(dismissed && toastLifecycleEntryCount(in: harness) == 0)
+    // Condition-wait, not a fixed window — see toast 008.
+    await dismissalWrites.wait {
+      !presented.value
     }
+    _ = try harness.render()
+
+    #expect(!presented.value && toastLifecycleEntryCount(in: harness) == 0)
   }
 }
 
@@ -579,17 +575,10 @@ extension FrameworkStressToastLifecycleTests {
     await AsyncEvent.firing(after: .milliseconds(150)).wait()
     let frame = try harness.render()
 
-    // Under a contended executor the stale short task can be scheduled after this probe, so the
-    // defect is observable but not guaranteed to reproduce in every parallel suite run.
-    withKnownIssue(
-      "Longer duration does not retire the toast's active short deadline",
-      isIntermittent: true
-    ) {
-      #expect(
-        presented.value && frame.contains("short to long toast")
-          && toastLifecycleEntryCount(in: harness) == 1
-      )
-    }
+    #expect(
+      presented.value && frame.contains("short to long toast")
+        && toastLifecycleEntryCount(in: harness) == 1
+    )
   }
 }
 

@@ -46,6 +46,12 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     coordinator?.latestItem
   }
 
+  package func activeItem(
+    id: C.Item.ID
+  ) -> C.Item? {
+    coordinator?.activeItem(id: id)
+  }
+
   package func beginSynchronizing() {
     coordinator?.beginSynchronizing()
   }

@@ -32,7 +32,12 @@ public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let routeID = runtimePrimaryRouteID(for: node.identity)
+    // Key the hover route on the nearest entity-rerooted descendant, like
+    // `.gesture(_:)`: the chain node's structural identity embeds enclosing
+    // conditional branches, so a branch flip at a stable `.id` would re-key
+    // the route and fabricate a fresh enter instead of continuing the hover.
+    let routeIdentity = gestureRouteIdentity(for: node)
+    let routeID = runtimePrimaryRouteID(for: routeIdentity)
     // Restore the imperative authoring scope when dispatching, matching
     // `Button`/`onKeyPress`: without it a `@State` mutation inside the hover
     // handler is not attributed to an owner node, so it never schedules a frame
@@ -43,14 +48,17 @@ public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
     )
     intake.registerPointerHoverHandler(
       routeID: routeID,
+      structuralKey: node.identity,
       handler: action
     )
-    node.semanticMetadata = node.semanticMetadata.merging(
-      SemanticMetadata(
-        participatesInPointerHitTesting: true,
-        allowsHitTesting: true
-      )
+    var hoverMetadata = SemanticMetadata(
+      participatesInPointerHitTesting: true,
+      allowsHitTesting: true
     )
+    if routeIdentity != node.identity {
+      hoverMetadata.explicitRouteIdentity = routeIdentity
+    }
+    node.semanticMetadata = node.semanticMetadata.merging(hoverMetadata)
     return [node]
   }
 }

@@ -136,7 +136,8 @@ package struct SemanticExtractor: Sendable {
               identity: node.identity,
               viewNodeID: node.viewNodeID,
               viewportRect: node.bounds,
-              contentBounds: node.contentBounds
+              contentBounds: node.contentBounds,
+              structuralHostChain: context.structuralHostChain
             )
           )
           selectionRoutes.append(
@@ -249,6 +250,12 @@ extension SemanticExtractor {
     /// itself is emitted normally.
     let sealingParentOnChain: Bool
     let interactionsDisabledOnChain: Bool
+    /// The walk-parent identities recorded at each identity re-root boundary
+    /// (`.id(_:)` entity hosts, portal-hosted content) above this node,
+    /// outermost first. Identity-prefix containment checks cannot cross a
+    /// re-root; this chain preserves the placed tree's structural containment
+    /// for scope matching (scroll reader scopes are the consumer).
+    var structuralHostChain: [Identity] = []
   }
 
   private func walk(
@@ -318,7 +325,8 @@ extension SemanticExtractor {
           modalFocusScopePath: nodeModalFocusScopePath,
           clipRect: nodeClipRect,
           sealingParentOnChain: frame.context.sealingParentOnChain,
-          interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
+          interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain,
+          structuralHostChain: frame.context.structuralHostChain
         )
         let nodeHitTestOrder = hitTestOrder
         hitTestOrder += 1
@@ -346,13 +354,23 @@ extension SemanticExtractor {
           sealingParentOnChain: frame.context.sealingParentOnChain
             || frame.node.semanticMetadata.sealsFocusDescendants,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
-            || !frame.node.semanticMetadata.interactionAvailability.isEnabled
+            || !frame.node.semanticMetadata.interactionAvailability.isEnabled,
+          structuralHostChain: frame.context.structuralHostChain
         )
         for child in frame.node.children.reversed() {
+          var context = childContext
+          // A child whose identity does not extend this node's is an
+          // identity re-root boundary; record this node as its structural
+          // host so containment queries can cross the boundary.
+          if child.identity != frame.node.identity,
+            !child.identity.isDescendant(of: frame.node.identity)
+          {
+            context.structuralHostChain.append(frame.node.identity)
+          }
           stack.append(
             Frame(
               node: child,
-              context: childContext,
+              context: context,
               phase: .enter
             )
           )

@@ -323,9 +323,7 @@ extension FrameworkStressPopoverTipLifecycleTests {
       #expect(model.actionLog.last == "modal@\(generation)")
     }
 
-    withKnownIssue("Read-only popover tips suppress base focus and interaction in the runtime") {
-      #expect(readOnlyTipPreservedBaseInteraction)
-    }
+    #expect(readOnlyTipPreservedBaseInteraction)
   }
 }
 
@@ -823,9 +821,7 @@ extension FrameworkStressPopoverTipLifecycleTests {
       #expect(popoverTipStressEntryCount(in: harness) == 1)
     }
 
-    withKnownIssue("Read-only popover tips keep suppressing base focus after actions are removed") {
-      #expect(removalRestoredBaseFocus)
-    }
+    #expect(removalRestoredBaseFocus)
   }
 }
 

@@ -130,9 +130,10 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
 /// descendant reachable through single-child structure, or the node's own
 /// identity when none exists. The descent stops at any node that hit-tests
 /// or focuses on its own — an outer gesture must not claim an inner
-/// control's route space.
+/// control's route space. Shared with the pointer-hover modifier, whose
+/// routes survive the same conditional-branch re-mints.
 @MainActor
-private func gestureRouteIdentity(for node: ResolvedNode) -> Identity {
+func gestureRouteIdentity(for node: ResolvedNode) -> Identity {
   if node.entityIdentity != nil {
     return node.identity
   }

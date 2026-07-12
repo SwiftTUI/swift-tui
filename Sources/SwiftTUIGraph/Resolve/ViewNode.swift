@@ -1263,11 +1263,13 @@ package final class ViewNode {
 
   package func recordPointerHoverHandlerRegistration(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordPointerHoverHandler(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: handler
     )
   }

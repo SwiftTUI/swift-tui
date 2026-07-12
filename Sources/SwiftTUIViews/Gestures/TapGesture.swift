@@ -39,7 +39,7 @@ public struct TapGesture: Gesture {
 final class TapGestureRecognizer: GestureRecognizer {
   typealias Value = Void
 
-  let requiredCount: Int
+  private(set) var requiredCount: Int
   private(set) var phase: GestureRecognizerPhase = .possible
   private var completedTaps: Int = 0
   private var pressStart: Point?
@@ -98,6 +98,17 @@ final class TapGestureRecognizer: GestureRecognizer {
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+
+  /// Adopts a re-authored tap count alongside the preserved partial
+  /// sequence: a re-resolve between taps must retune the requirement for
+  /// the sequence in flight.
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? TapGestureRecognizer else {
+      return false
+    }
+    requiredCount = other.requiredCount
+    return true
+  }
 
   func currentValue() -> Void? {
     phase == .ended ? () : nil

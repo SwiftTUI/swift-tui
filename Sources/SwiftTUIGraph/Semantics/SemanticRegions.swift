@@ -62,6 +62,13 @@ public struct ScrollRoute: Equatable, Sendable {
   /// while the region can still scroll in that direction). See
   /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
   public var contentOffset: CellPoint
+  /// Walk-parent identities recorded at each identity re-root boundary above
+  /// this route in the placed tree, outermost first (empty when the route
+  /// lives in its ancestors' identity space). An explicit `.id(_:)` re-roots
+  /// the route's identity out of structural scopes like a `ScrollViewReader`'s;
+  /// scope matching falls back to this chain when no identity-prefix route
+  /// matched.
+  package var structuralHostChain: [Identity]
 
   public init(
     identity: Identity,
@@ -74,6 +81,7 @@ public struct ScrollRoute: Equatable, Sendable {
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
     self.contentOffset = contentOffset
+    structuralHostChain = []
   }
 
   package init(
@@ -81,13 +89,15 @@ public struct ScrollRoute: Equatable, Sendable {
     viewNodeID: ViewNodeID?,
     viewportRect: CellRect,
     contentBounds: CellRect,
-    contentOffset: CellPoint = .zero
+    contentOffset: CellPoint = .zero,
+    structuralHostChain: [Identity] = []
   ) {
     self.identity = identity
     self.viewNodeID = viewNodeID
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
     self.contentOffset = contentOffset
+    self.structuralHostChain = structuralHostChain
   }
 }
 

@@ -243,6 +243,11 @@ package enum HostWireSchema {
         android: .derived("content = contentBounds.size")
       ),
       .init("contentOffset", web: .key("offset"), android: .key("offset")),
+      .init(
+        "structuralHostChain",
+        web: .notSerialized("package-internal scope-containment routing"),
+        android: .notSerialized("package-internal scope-containment routing")
+      ),
     ],
     "FocusPresentation": [
       .init("focusedIdentity", web: .key("focusedIdentity"), android: .key("focusedIdentity")),

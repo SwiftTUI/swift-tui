@@ -155,6 +155,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func registerHover(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping HoverHandler
   ) {
     let recency = ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
@@ -176,10 +177,14 @@ package final class LocalPointerHandlerRegistry: Equatable {
     } else {
       hoverHandlers[routeID] = [handler]
     }
-    hoverHandlerOwners[routeID] = .current(identity: routeID.identity)
+    // Owner under the authored (structural) identity when supplied: a derived
+    // entity route's own identity lives in a re-rooted space that
+    // subtree-removal prefixes never reach.
+    hoverHandlerOwners[routeID] = .current(identity: structuralKey ?? routeID.identity)
     hoverHandlerRecencies[routeID] = recency
     ViewNodeContext.current?.recordPointerHoverHandlerRegistration(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: handler
     )
   }

@@ -105,6 +105,9 @@ package final class PresentationPortalState {
       },
       dismiss: { [weak self] itemID in
         self?.dismissImperatively(id: itemID, on: \.toast)
+      },
+      activeItem: { [weak self] itemID in
+        self?.registry.toast.activeItem(id: itemID)
       }
     )
   }

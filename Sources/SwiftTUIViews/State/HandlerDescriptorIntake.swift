@@ -230,11 +230,13 @@ package struct HandlerDescriptorIntake {
 
   package func registerPointerHoverHandler(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping @MainActor @Sendable (HoverPhase) -> Void
   ) {
     let scope = dispatchScope
     context.localPointerHandlerRegistry?.registerHover(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: { phase in
         withImperativeAuthoringContext(scope) {
           handler(phase)

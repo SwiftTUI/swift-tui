@@ -114,7 +114,11 @@ extension GestureRecognizer {
   package func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     // Callback-free recognizers (the primitive state machines) adopt
     // successfully from any same-type replacement: their interaction state
-    // is theirs to keep and there are no closures to refresh.
+    // is theirs to keep and there are no closures to refresh. Primitives
+    // with authored VALUE parameters (thresholds, counts, coordinate
+    // spaces) override to copy them — a preserved mid-interaction
+    // recognizer must honor the re-authored tuning, not the one captured
+    // when the interaction began.
     replacement is Self
   }
 }

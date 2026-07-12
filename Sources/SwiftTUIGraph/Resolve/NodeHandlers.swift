@@ -149,6 +149,10 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   /// stays — this map lets a site's re-registration replace its previous
   /// route instead of accumulating one per generation.
   package var structuralRoutes: [Identity: RouteID] = [:]
+  /// Hover twin of ``structuralRoutes`` — hover routes derive from the same
+  /// entity descent, so a churned entity below a surviving hover site needs
+  /// the same per-site replacement.
+  package var hoverStructuralRoutes: [Identity: RouteID] = [:]
 
   package init() {}
 
@@ -170,6 +174,16 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
       }
     }
     structuralRoutes.merge(departing.structuralRoutes, uniquingKeysWith: mergeKeepingCurrent)
+    for (site, departingRoute) in departing.hoverStructuralRoutes {
+      if let currentRoute = hoverStructuralRoutes[site], currentRoute != departingRoute {
+        hoverHandlers.removeValue(forKey: departingRoute)
+        hoverOwners.removeValue(forKey: departingRoute)
+      }
+    }
+    hoverStructuralRoutes.merge(
+      departing.hoverStructuralRoutes,
+      uniquingKeysWith: mergeKeepingCurrent
+    )
   }
 
   @MainActor
@@ -192,9 +206,21 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   @MainActor
   package mutating func recordHover(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
-    hoverOwners[routeID] = .current(identity: routeID.identity)
+    if let structuralKey {
+      if let previousRoute = hoverStructuralRoutes[structuralKey], previousRoute != routeID {
+        hoverHandlers.removeValue(forKey: previousRoute)
+        hoverOwners.removeValue(forKey: previousRoute)
+      }
+      hoverStructuralRoutes[structuralKey] = routeID
+    }
+    // Owner the record under the authored (structural) identity: a derived
+    // entity route lives in a re-rooted identity space that subtree-removal
+    // prefixes never reach, while the authored site's identity is inside the
+    // removable subtree.
+    hoverOwners[routeID] = .current(identity: structuralKey ?? routeID.identity)
     hoverHandlers[routeID, default: []].append(handler)
   }
 }
@@ -646,9 +672,10 @@ package struct NodeHandlers {
 
   package mutating func recordPointerHoverHandler(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
-    pointer.recordHover(routeID: routeID, handler: handler)
+    pointer.recordHover(routeID: routeID, structuralKey: structuralKey, handler: handler)
   }
 
   package mutating func recordGesture(

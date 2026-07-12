@@ -48,17 +48,20 @@ where Item.ID: Sendable {
   package let isAvailable: Bool
   private let presentHandler: @MainActor @Sendable (Item) -> Void
   private let dismissHandler: @MainActor @Sendable (Item.ID) -> Void
+  private let activeItemHandler: (@MainActor @Sendable (Item.ID) -> Item?)?
 
   package init(
     snapshotLabel: String,
     isAvailable: Bool = true,
     present: @escaping @MainActor @Sendable (Item) -> Void,
-    dismiss: @escaping @MainActor @Sendable (Item.ID) -> Void
+    dismiss: @escaping @MainActor @Sendable (Item.ID) -> Void,
+    activeItem: (@MainActor @Sendable (Item.ID) -> Item?)? = nil
   ) {
     self.snapshotLabel = snapshotLabel
     self.isAvailable = isAvailable
     presentHandler = present
     dismissHandler = dismiss
+    activeItemHandler = activeItem
   }
 
   @MainActor
@@ -73,6 +76,18 @@ where Item.ID: Sendable {
     id: Item.ID
   ) {
     dismissHandler(id)
+  }
+
+  /// The live registry's currently-active item for `id`, if the handle is
+  /// bound to a portal state. Deadline tasks consult this at fire time so a
+  /// re-synced item dismisses through its current closure — the handle
+  /// outlives per-frame draft registries, which are replaced wholesale at
+  /// every commit.
+  @MainActor
+  package func activeItem(
+    id: Item.ID
+  ) -> Item? {
+    activeItemHandler?(id)
   }
 
   package static func unavailable(
@@ -112,7 +127,12 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
   var declaredSourceIdentities: Set<Identity> { get }
   var latestItem: Item? { get }
   var latestActivationOrdinal: Int? { get }
+  func activeItem(id: Item.ID) -> Item?
   func dismissAction(for item: Item) -> (@MainActor @Sendable () -> Void)?
+  // Requirement (not just the extension default) so per-item policies like the
+  // popover tip's read-only `.nonModal` dispatch dynamically through generic
+  // coordinator boxes.
+  func modalPolicy(for item: Item) -> PortalModalPolicy
 
   func beginSynchronizing()
   func sync(sourceIdentity: Identity, items: [Item])

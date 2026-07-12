@@ -340,9 +340,14 @@ package struct ToastCoordinatorBodyView: View {
 
 private struct ToastPresentationView: View {
   var item: ToastPresentationItem
+  @Environment(\.toastPresentationCoordinator) private var coordinatorHandle
 
   var body: some View {
-    HStack(alignment: .center, spacing: 1) {
+    // Read during body evaluation: environment storage is ambient only while
+    // resolving, so the task closure must capture the handle value, not the
+    // property (an in-task read would see defaults).
+    let handle = coordinatorHandle
+    return HStack(alignment: .center, spacing: 1) {
       if let icon = item.presentation.icon {
         Text(icon)
           .foregroundStyle(item.presentation.iconStyle)
@@ -371,7 +376,9 @@ private struct ToastPresentationView: View {
       maxHeight: .finite(item.presentation.maxHeight),
       alignment: .leading
     )
-    .task {
+    // Keyed on duration so replacing the active deadline (nil<->finite,
+    // shorter/longer) cancels the running sleep and arms the current one.
+    .task(id: item.duration) {
       guard let duration = item.duration, duration > 0 else {
         return
       }
@@ -379,7 +386,11 @@ private struct ToastPresentationView: View {
       guard !Task.isCancelled else {
         return
       }
-      item.dismiss()
+      // Fire-time lookup through the live portal state: a re-synced item
+      // (same id, retargeted binding) must dismiss through its current
+      // closure, not the one captured when this deadline was armed.
+      let activeItem = handle.activeItem(id: item.id)
+      (activeItem ?? item).dismiss()
     }
   }
 }

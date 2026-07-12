@@ -99,8 +99,8 @@ final class DragGestureRecognizer: GestureRecognizer {
     let pointer: PointerLocation
   }
 
-  let minimumDistance: Double
-  let coordinateSpace: CoordinateSpace
+  private(set) var minimumDistance: Double
+  private(set) var coordinateSpace: CoordinateSpace
   private(set) var phase: GestureRecognizerPhase = .possible
   private var startLocation: Point?
   private var startTime: MonotonicInstant?
@@ -198,6 +198,18 @@ final class DragGestureRecognizer: GestureRecognizer {
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+
+  /// Adopts re-authored value parameters alongside the interaction state the
+  /// registry preserves: a mid-drag re-resolve that authors a new threshold
+  /// or coordinate space must apply to the drag in flight.
+  func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
+    guard let other = replacement as? DragGestureRecognizer else {
+      return false
+    }
+    minimumDistance = other.minimumDistance
+    coordinateSpace = other.coordinateSpace
+    return true
+  }
 
   func currentValue() -> DragGesture.Value? {
     guard let value = lastValue else { return nil }

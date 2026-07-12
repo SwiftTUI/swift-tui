@@ -315,9 +315,7 @@ extension FrameworkStressGestureScrollTests {
       x: floor(start.x + 4) + 0.5,
       y: floor(start.y) + 0.5
     )
-    withKnownIssue("An active DragGesture retains its original coordinate space") {
-      #expect(latest.location == expectedGlobal)
-    }
+    #expect(latest.location == expectedGlobal)
   }
 }
 
@@ -362,9 +360,7 @@ extension FrameworkStressGestureScrollTests {
     _ = try harness.movePointer(to: start)
     _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 2, y: start.y))
 
-    withKnownIssue("Active DragGesture retains its press-time minimum distance") {
-      #expect(changes.value == 1)
-    }
+    #expect(changes.value == 1)
     _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 2, y: start.y))
   }
 }
@@ -461,9 +457,7 @@ extension FrameworkStressGestureScrollTests {
     _ = try harness.movePointer(to: point)
     _ = try harness.click(point)
 
-    withKnownIssue("A partial TapGesture retains its original required count") {
-      #expect(fires.value == 1)
-    }
+    #expect(fires.value == 1)
   }
 }
 
@@ -506,9 +500,7 @@ extension FrameworkStressGestureScrollTests {
     _ = try harness.movePointer(to: point)
     _ = try harness.movePointer(to: Point(x: point.x + 1, y: point.y))
 
-    withKnownIssue("Replacing a hovered callback fabricates a second enter") {
-      #expect(events.value == ["old-enter", "new-move"])
-    }
+    #expect(events.value == ["old-enter", "new-move"])
     #expect(harness.pointerHoverHandlerCount == 1)
   }
 }
@@ -955,9 +947,7 @@ extension FrameworkStressGestureScrollTests {
 
     #expect(first.value == .zero)
     #expect(harness.scrollPositionRegistrationCount == 1)
-    withKnownIssue("Reader commands lose the current binding after replacement") {
-      #expect(second.value.y == 9)
-    }
+    #expect(second.value.y == 9)
   }
 }
 
