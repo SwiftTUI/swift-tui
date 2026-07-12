@@ -1057,9 +1057,7 @@ extension FrameworkStressTextContentTests {
       text.value == expected
       && !text.value.unicodeScalars.contains { $0.value == 0x0A || $0.value == 0x0D }
       && harness.frame.contains(expected)
-    withKnownIssue("Single-line paste preserves CRLF as one extended grapheme cluster") {
-      #expect(isSanitized)
-    }
+    #expect(isSanitized)
   }
 }
 

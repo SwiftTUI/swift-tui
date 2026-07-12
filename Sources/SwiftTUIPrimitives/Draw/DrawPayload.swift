@@ -36,8 +36,8 @@ extension DrawPayload {
       return lhsPayload == rhsPayload
     case (.canvas(let lhsPayload), .canvas(let rhsPayload)):
       return lhsPayload == rhsPayload
-    case (.foreignSurface, .foreignSurface):
-      return true
+    case (.foreignSurface(let lhsPayload), .foreignSurface(let rhsPayload)):
+      return lhsPayload.grid == rhsPayload.grid
     default:
       return false
     }

@@ -107,9 +107,13 @@ extension Stepper {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isPressed =
+      context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)
     let canDecrement = stepperCanAdjust(
@@ -201,24 +205,30 @@ extension Stepper {
           return false
         }
 
-        return updateBoundControlValue(
+        // Claim the press whether or not the value can move. A click on the
+        // decrement affordance is a gesture owned by this route even at a
+        // bound; returning false would let the press bubble to the Stepper's
+        // root keyboard-activation action, which increments.
+        _ = updateBoundControlValue(
           binding,
           delta: -1,
           step: step,
           bounds: bounds
         )
+        return true
       }
       intake.registerPointerHandler(routeID: incrementRouteID) { event in
         guard case .down(.primary) = event.kind else {
           return false
         }
 
-        return updateBoundControlValue(
+        _ = updateBoundControlValue(
           binding,
           delta: 1,
           step: step,
           bounds: bounds
         )
+        return true
       }
     }
 

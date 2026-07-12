@@ -55,6 +55,21 @@ package struct AnyAnimatable: Equatable, Sendable {
   }
 }
 
+/// Reports whether two animatable values are gradients whose stop counts
+/// differ, which makes their `animatableData` structurally non-interpolable.
+private func gradientStopCountDiffers<T>(_ lhs: T, _ rhs: T) -> Bool {
+  if let lhs = lhs as? LinearGradient, let rhs = rhs as? LinearGradient {
+    return lhs.gradient.stops.count != rhs.gradient.stops.count
+  }
+  if let lhs = lhs as? RadialGradient, let rhs = rhs as? RadialGradient {
+    return lhs.gradient.stops.count != rhs.gradient.stops.count
+  }
+  if let lhs = lhs as? Gradient, let rhs = rhs as? Gradient {
+    return lhs.stops.count != rhs.stops.count
+  }
+  return false
+}
+
 private protocol _AnyAnimatableBox: Sendable {
   func isEqual(to other: any _AnyAnimatableBox) -> Bool
   func unwrap<T>(as _: T.Type) -> T?
@@ -107,6 +122,15 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
       return AnyAnimatable(
         selfTile.interpolated(to: otherTile, progress: t)
       )
+    }
+
+    // Gradients are variant in stop count: interpolating between differing
+    // stop counts collapses the stops-array subtraction to empty, and the
+    // ``Gradient`` setter then silently drops it (its own count guard), which
+    // would leave a malformed old-stops + interpolated-endpoints gradient.
+    // Snap to the target instead, mirroring the ``TileStyle`` handling above.
+    if gradientStopCountDiffers(value, other.value) {
+      return AnyAnimatable(other.value)
     }
 
     // Generic interpolation via animatableData arithmetic.

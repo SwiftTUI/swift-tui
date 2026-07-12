@@ -792,17 +792,15 @@ extension FrameworkStressComponentCompositionTests {
     }
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let identity = testIdentity("ComponentComposition023")
-    withKnownIssue("ForeignSurface retains its first same-size payload across invalidations") {
-      for generation in 0..<18 {
-        let frames = componentCompositionFrames(
-          Root(generation: generation), renderer: renderer, identity: identity,
-          generation: generation
-        )
-        #expect(
-          frames.retained.rasterSurface == frames.fresh.rasterSurface
-            && componentCompositionText(frames.retained).contains(String(generation % 10))
-        )
-      }
+    for generation in 0..<18 {
+      let frames = componentCompositionFrames(
+        Root(generation: generation), renderer: renderer, identity: identity,
+        generation: generation
+      )
+      #expect(
+        frames.retained.rasterSurface == frames.fresh.rasterSurface
+          && componentCompositionText(frames.retained).contains(String(generation % 10))
+      )
     }
   }
 }

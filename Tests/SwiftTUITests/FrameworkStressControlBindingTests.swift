@@ -836,9 +836,7 @@ extension FrameworkStressControlBindingTests {
     _ = try harness.clickText("Raise stepper minimum 018")
     _ = try harness.clickText("◁")
 
-    withKnownIssue("An inactive Stepper decrement falls through to the root increment action") {
-      #expect(value.value == 5 && value.writes.isEmpty)
-    }
+    #expect(value.value == 5 && value.writes.isEmpty)
   }
 }
 

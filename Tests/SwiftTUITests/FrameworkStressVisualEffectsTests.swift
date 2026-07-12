@@ -897,11 +897,7 @@ extension FrameworkStressVisualEffectsTests {
         at: frameStart.advanced(by: .milliseconds(500))
       )
 
-      withKnownIssue(
-        "Unequal-count gradient animation retains prior stops while interpolating current endpoints"
-      ) {
-        #expect(fillGradient(in: targetNode) == targetGradient)
-      }
+      #expect(fillGradient(in: targetNode) == targetGradient)
     }
   }
 }

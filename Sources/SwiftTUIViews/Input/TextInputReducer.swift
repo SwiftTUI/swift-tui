@@ -313,9 +313,13 @@ package struct TextInputReducer: Sendable {
     guard !traits.isMultiline else {
       return text
     }
-    return String(
-      text.filter { character in
-        character != "\n" && character != "\r"
-      })
+    // Filter at scalar granularity: a CR+LF pair coalesces into a single
+    // Character ("\r\n") that compares unequal to both "\n" and "\r", so a
+    // Character-level filter would leave the newline scalars embedded in the
+    // single-line field. CR/LF never occur inside a multi-scalar grapheme
+    // (emoji ZWJ/skin-tone/regional-indicator runs), so no glyph is split.
+    var scalars = text.unicodeScalars
+    scalars.removeAll { $0.value == 0x0A || $0.value == 0x0D }
+    return String(scalars)
   }
 }
