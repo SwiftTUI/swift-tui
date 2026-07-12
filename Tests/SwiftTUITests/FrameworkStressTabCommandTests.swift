@@ -1062,9 +1062,11 @@ extension FrameworkStressTabCommandTests {
     _ = try harness.clickText("Enable palette command")
     _ = try harness.clickText("Mutable palette action")
 
-    withKnownIssue("Reenabled palette row dispatches the disabled generation-zero action") {
-      #expect(probe.events == ["generation-1"])
-    }
+    // The reenabled row's deferred action captures the enclosing view's
+    // `@State`; dispatching it under the construction-time authoring scope
+    // (the fixture that owns `generation`) reads the live generation, so the
+    // current generation's action fires.
+    #expect(probe.events == ["generation-1"])
   }
 }
 

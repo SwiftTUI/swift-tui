@@ -1630,10 +1630,24 @@ extension FrameworkStressNavigationPresentationTests {
     _ = try harness.clickText("Open Nested Navigation Sheet")
     for generation in 1...6 {
       let frame = try harness.clickText("Remint Inner Sheet Stack")
-      withKnownIssue("Reminted nested stack retains departed actions until sheet teardown") {
-        // The strand family also keeps the departed generation's committed
-        // children painted, so the reminted stack's fresh generation label
-        // does not reach the frame.
+      withKnownIssue("Reminting an .id-churned nested stack resets the enclosing sheet's @State") {
+        // Root cause (probed 2026-07-12): `.id("...host-\(generation)")` is the
+        // public `IDModifier`, a *host-descending* entity route — by design its
+        // entity "state legitimately folds into the enclosing node" (see
+        // `ResolveEntityRoute.entityRouteIdentity`). StressNP024Sheet's body is a
+        // single `.id`'d expression, so single-child flattening fuses that entity
+        // onto StressNP024Sheet's OWN node, which also holds its `@State`
+        // (`generation`, `inner`). When `generation` bumps, the entity flips
+        // host-0 -> host-1; `ViewGraph.prepareEntityRoutedOwner` sees a different
+        // committed entity on the fused node and calls `resetStateSlots()`,
+        // wiping `generation` back to seed 0. That flips the `.id` back to host-0
+        // and re-fires the reset next frame, so `generation` oscillates 0<->1 and
+        // never advances: the pushed destination paints "generation 0" forever
+        // and the churned host-0/host-1 registrations coexist (count 6, not <=5).
+        // A correct fix must stop the entity-churn reset from clearing the
+        // enclosing view's own @State without regressing the deliberate
+        // transparent-chain-collapse fold, so it lives at the
+        // flattening/entity-routing layer, not here.
         #expect(frame.contains("inner sheet stack generation \(generation)"))
         #expect(harness.actionRegistrationCount <= 5)
       }

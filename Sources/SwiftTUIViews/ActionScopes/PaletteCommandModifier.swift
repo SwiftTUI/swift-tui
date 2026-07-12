@@ -92,7 +92,7 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     var node = content.resolve(in: context)
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     let contribution = ActivePaletteCommand(
       name: name,
