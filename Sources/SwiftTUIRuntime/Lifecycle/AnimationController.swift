@@ -413,6 +413,13 @@ package final class AnimationController: Sendable {
         releaseBatch(entry.batchID)
       }
     }
+    // The placed pass owns placed-removal completion (016): purge each removal
+    // whose exit curve finished this pass. Removals carry no batch refcount, so
+    // there is nothing to release — the resolved tick already kept the frame
+    // alive for this removal, so no extra redraw signal is owed here.
+    for viewNodeID in result.completedRemovalNodeIDs {
+      removingNodes.removeValue(forKey: viewNodeID)
+    }
 
     return result.snapshot
   }
@@ -1564,6 +1571,12 @@ package final class AnimationController: Sendable {
     // activeAnimations and invalidate the dictionary traversal.
     var completedBatches: [AnimationBatchID] = []
 
+    // Boxes of property animations that ran to completion this tick. After the
+    // active/removal maps are finalized below, each such box whose LAST live
+    // reference is gone is dropped from the append-only registration ledger so
+    // it stays bounded across a run of unique finite curves (009).
+    var completedAnimationBoxes: Set<AnimationBox> = []
+
     // Walk every active animation regardless of scope.  Property
     // scopes are sampled here and write into ``interpolated`` for
     // application by ``applyInterpolatedValues`` below.  Placed-level
@@ -1595,6 +1608,7 @@ package final class AnimationController: Sendable {
             interpolatedByIdentity[key.identity, default: [:]][slot] = to
           }
           keysToRemove.append(key)
+          completedAnimationBoxes.insert(animation.animationBox)
           if let batchID = animation.batchID { completedBatches.append(batchID) }
           redrawIdentities.insert(key.identity)
           continue
@@ -1648,6 +1662,30 @@ package final class AnimationController: Sendable {
     var injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
 
     for (viewNodeID, entry) in removingNodes {
+      // A placed-level removal (a captured `placedSnapshot`) whose curve is
+      // registered is evaluated, custom-state-advanced, overlaid, and purged
+      // solely by the placed overlay pass (`sampleRemovalOverlays`). Evaluating
+      // the curve here too double-samples a stateful `CustomAnimation` once per
+      // frame — the resolved tick and the placed overlay would each call
+      // `evaluate` (016). Mirror the insertion-offset / matched-geometry placed
+      // scopes handled in the active-animation loop above: keep the frame
+      // ticking so the scheduler reaches the placed pass, but do not evaluate,
+      // advance custom state, build modifiers, or purge here — the placed pass
+      // owns the single evaluation and the completion/purge. The condition
+      // mirrors `sampleRemovalOverlays`' ownership guards exactly, so removals
+      // it does not own (no placed snapshot, no parent, or no registered curve)
+      // still fall through to the resolved handling below.
+      if entry.placedSnapshot != nil,
+        entry.parentIdentity != nil,
+        let box = entry.animationBox,
+        registeredAnimations[box] != nil
+      {
+        redrawIdentities.insert(entry.identity)
+        latestDeadline = timestamp.advanced(by: frameInterval)
+        hasPendingWork = true
+        continue
+      }
+
       let modifiers: TransitionModifiers
       var animationComplete = false
 
@@ -1717,6 +1755,31 @@ package final class AnimationController: Sendable {
 
     for viewNodeID in removalsToPurge {
       removingNodes.removeValue(forKey: viewNodeID)
+    }
+
+    // Prune registration-ledger entries for property curves that just completed
+    // and whose box no longer backs any live consumer (009). The box→animation
+    // ledger is otherwise append-only, so a run of unique finite curves grows it
+    // without bound. A box can back several active slots and any in-flight
+    // removal overlay, so drop it only once its LAST live reference is gone: a
+    // still-running or `.repeatForever` animation keeps its box in
+    // `activeAnimations` (its curve never returns `nil`, so it is never in
+    // `completedAnimationBoxes`) and is never pruned. Dropping a box a live
+    // animation still needs would break the retarget / velocity / merge
+    // handoff and the placed-overlay lookups that key on `registeredAnimations`.
+    if !completedAnimationBoxes.isEmpty {
+      var liveBoxes = Set<AnimationBox>()
+      for animation in activeAnimations.values {
+        liveBoxes.insert(animation.animationBox)
+      }
+      for entry in removingNodes.values {
+        if let box = entry.animationBox {
+          liveBoxes.insert(box)
+        }
+      }
+      for box in completedAnimationBoxes where !liveBoxes.contains(box) {
+        registeredAnimations.removeValue(forKey: box)
+      }
     }
 
     // Apply interpolated values for in-tree animations.

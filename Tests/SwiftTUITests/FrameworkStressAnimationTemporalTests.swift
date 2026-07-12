@@ -468,9 +468,7 @@ extension FrameworkStressAnimationTemporalTests {
       #expect(controller.activeAnimationCount == 0)
     }
 
-    withKnownIssue("Completed unique animations remain in the controller registration ledger") {
-      #expect(controller.debugStateSnapshot().registeredAnimationCount <= 2)
-    }
+    #expect(controller.debugStateSnapshot().registeredAnimationCount <= 2)
   }
 }
 
@@ -852,9 +850,7 @@ extension FrameworkStressAnimationTemporalTests {
         at: sampleTime,
         surfaceSize: .init(width: 40, height: 6)
       )
-      withKnownIssue("Placed removal CustomAnimation is evaluated twice per frame") {
-        #expect(probe.observations.count - callsBefore == 1)
-      }
+      #expect(probe.observations.count - callsBefore == 1)
     }
   }
 }

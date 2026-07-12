@@ -12,16 +12,22 @@ package struct PlacedAnimationOverlaySamplingResult: Sendable {
   package var removalCustomStates: [ViewNodeID: AnimationState]
   package var activeAnimationCustomStates: [AnimationKey: AnimationState]
   package var completedAnimationKeys: [AnimationKey]
+  /// Placed-removal `ViewNodeID`s whose exit curve finished this pass. The
+  /// controller purges these from `removingNodes`; the placed pass owns placed
+  /// removal completion so the resolved tick does not double-evaluate the curve.
+  package var completedRemovalNodeIDs: [ViewNodeID]
 
   package init(
     snapshot: PlacedAnimationOverlaySnapshot,
     removalCustomStates: [ViewNodeID: AnimationState] = [:],
     activeAnimationCustomStates: [AnimationKey: AnimationState] = [:],
-    completedAnimationKeys: [AnimationKey] = []
+    completedAnimationKeys: [AnimationKey] = [],
+    completedRemovalNodeIDs: [ViewNodeID] = []
   ) {
     self.snapshot = snapshot
     self.removalCustomStates = removalCustomStates
     self.activeAnimationCustomStates = activeAnimationCustomStates
     self.completedAnimationKeys = completedAnimationKeys
+    self.completedRemovalNodeIDs = completedRemovalNodeIDs
   }
 }

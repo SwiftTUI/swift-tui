@@ -43,13 +43,15 @@ package enum PlacedAnimationOverlaySampling {
       ),
       removalCustomStates: removalResult.customStates,
       activeAnimationCustomStates: activeCustomStates,
-      completedAnimationKeys: insertionResult.completedKeys + matchedResult.completedKeys
+      completedAnimationKeys: insertionResult.completedKeys + matchedResult.completedKeys,
+      completedRemovalNodeIDs: removalResult.completedNodeIDs
     )
   }
 
   private struct RemovalSamplingResult {
     var overlays: [PlacedRemovalOverlaySnapshot] = []
     var customStates: [ViewNodeID: AnimationState] = [:]
+    var completedNodeIDs: [ViewNodeID] = []
   }
 
   private struct OffsetSamplingResult {
@@ -85,6 +87,11 @@ package enum PlacedAnimationOverlaySampling {
       result.customStates[viewNodeID] = state
 
       guard let progress = evaluated else {
+        // The exit curve finished. The placed pass owns this removal's single
+        // evaluation and completion (the resolved tick no longer evaluates or
+        // purges placed removals — 016), so record the node for the controller
+        // to purge from `removingNodes`.
+        result.completedNodeIDs.append(viewNodeID)
         continue
       }
 
