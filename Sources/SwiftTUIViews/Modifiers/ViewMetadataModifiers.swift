@@ -278,6 +278,55 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
         routedContext.withinChurnedSubtree = true
       }
     }
+    let route = ResolveEntityRoute(
+      identity: entityIdentity,
+      structuralPath: context.structuralPath,
+      escapesHostingBoundary: true
+    )
+    // Co-resident escape: an enclosing identity modifier already claimed this
+    // slot node for a DIFFERENT entity (`.id(stable)` collapsing inside
+    // `.id("owner-\(gen)")` with no builder boundary between them). Fusing
+    // both entities onto the one slot node makes the one-entity-per-node
+    // routing claims fight, the foreign occupant check in
+    // `prepareEntityRoutedOwner` wipes the stable chain's state slots on
+    // every re-resolve, and the owner churn's occupant eviction destroys the
+    // stable entity's home (structural task cancel + state reset). Give the
+    // re-rooted chain its own node boundary instead: resolve the content
+    // through `resolveView` at the explicit identity — the interior node owns
+    // the state slots, the task label slots, and the entity route — and
+    // present it as a real CHILD of a host shell keyed by the enclosing
+    // identity. The child keeps the entity in the committed tree (so the
+    // route survives the barrier's inactive-entity release), the shell keeps
+    // the slot node's resolved identity in the enclosing entity's namespace
+    // (so its reindex never steals the interior's identity index entry), and
+    // an owner churn's occupant eviction reaches the interior as an
+    // entity-routed child — deferred to the frame barrier, where the arriving
+    // generation's re-adoption keeps it alive.
+    if !context.entityHosting,
+      let slotNode,
+      let occupant = context.viewGraph?.entityOccupant(of: slotNode),
+      occupant != entityIdentity
+    {
+      let hosted = withResolveEntityRoute(route) {
+        resolveView(
+          EntityRootedChainContent(
+            content: content,
+            entityIdentity: entityIdentity,
+            entityStructuralPath: context.structuralPath
+          ),
+          in: routedContext
+        )
+      }
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("ExplicitIdentityHost"),
+          children: [hosted],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+    }
     // Mirror `IDModifier`: attach the entity so the churn is visible to
     // `ChildDescriptor` diffing and the entity routing table, and pre-bind the
     // slot node as the entity's owner so interior same-path resolution routes
@@ -292,17 +341,37 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
         for: slotNode
       )
     }
-    let route = ResolveEntityRoute(
-      identity: entityIdentity,
-      structuralPath: context.structuralPath,
-      escapesHostingBoundary: true
-    )
     var resolved = withResolveEntityRoute(route) {
       content.resolveOwned(in: routedContext)
     }
     resolved.attachingEntityIdentity(
       entityIdentity,
       at: context.structuralPath
+    )
+    return [resolved]
+  }
+}
+
+/// The content of a co-resident `ExactIdentityModifier` chain resolved through
+/// its own node boundary (see the escape branch in
+/// `ExactIdentityModifier.resolve`). The entity attaches BEFORE the enclosing
+/// `resolveView` applies the value, so the interior node's committed value
+/// carries it — that stamp is what defers the node's removal to the frame
+/// barrier when an enclosing owner churn evicts its absorber.
+private struct EntityRootedChainContent<Base: View>: PrimitiveView, ResolvableView {
+  let content: ModifierContentInputs<Base>
+  let entityIdentity: EntityIdentity
+  let entityStructuralPath: StructuralPath
+
+  var body: Never {
+    fatalError("EntityRootedChainContent is resolved directly.")
+  }
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var resolved = content.resolveOwned(in: context)
+    resolved.attachingEntityIdentity(
+      entityIdentity,
+      at: entityStructuralPath
     )
     return [resolved]
   }

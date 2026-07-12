@@ -276,24 +276,17 @@ extension FrameworkStressStateIdentityTests {
       harness.shutdown()
     }
 
-    var taskStayedLive = true
     #expect(harness.activeTaskCount == 1)
     for generation in 0..<4 {
       clock.send(1)
       let processed = await clock.waitUntilProcessedOrStopped(generation + 1)
       let frame = try harness.render()
-      taskStayedLive =
-        taskStayedLive
-        && processed
-        && frame.contains("006 Ticks \(generation + 1)")
+      #expect(processed)
+      #expect(frame.contains("006 Ticks \(generation + 1)"))
 
       let churnedFrame = try harness.clickText("Churn 006")
       #expect(churnedFrame.contains("006 Generation \(generation + 1)"))
       #expect(harness.activeTaskCount == 1)
-    }
-
-    withKnownIssue("A persistent task loses its live state owner across outer identity churn") {
-      #expect(taskStayedLive)
     }
   }
 
@@ -1513,29 +1506,18 @@ extension FrameworkStressStateIdentityTests {
     }
     defer { harness.shutdown() }
 
-    var stableChildSurvivedCardinalityChurn = true
     for _ in 0..<4 {
       var frame = try harness.clickText("Next Shape 023")
-      stableChildSurvivedCardinalityChurn =
-        stableChildSurvivedCardinalityChurn
-        && frame.contains("023 Stable Count 0")
+      #expect(frame.contains("023 Stable Count 0"))
       frame = try harness.clickText("Increment Stable 023")
-      stableChildSurvivedCardinalityChurn =
-        stableChildSurvivedCardinalityChurn
-        && frame.contains("023 Stable Count 1")
+      #expect(frame.contains("023 Stable Count 1"))
       frame = try harness.clickText("Next Shape 023")
-      stableChildSurvivedCardinalityChurn =
-        stableChildSurvivedCardinalityChurn
-        && frame.contains("023 Stable Count 1")
-        && frame.contains("023 Optional Child")
+      #expect(frame.contains("023 Stable Count 1"))
+      #expect(frame.contains("023 Optional Child"))
       frame = try harness.clickText("Next Shape 023")
       #expect(!frame.contains("023 Stable Count"))
       #expect(!frame.contains("023 Optional Child"))
       #expect(harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation() == nil)
-    }
-
-    withKnownIssue("AnyView one-to-many payload churn drops part of the stable child subtree") {
-      #expect(stableChildSurvivedCardinalityChurn)
     }
   }
 

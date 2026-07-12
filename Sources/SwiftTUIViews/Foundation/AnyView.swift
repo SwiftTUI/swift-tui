@@ -46,6 +46,32 @@ public struct AnyView: PrimitiveView, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let payloadContext = context.child(component: storage.typeID.identityComponent)
+    // The payload's stored view resolves through this Content node — a
+    // non-transparent hosting boundary. Host-escaping entity routes must not
+    // be claimed here (see `ResolveContext.entityHosting`).
+    let contentContext = payloadContext.child(component: .named("Content")).asEntityHost()
+    let content = storage.resolve(contentContext)
+
+    if content.kind == .view("Group"), content.identity == contentContext.identity {
+      // A multi-element erased payload normalized to a synthesized group at
+      // the content identity. Hoist the elements: the enclosing `resolveView`
+      // re-normalizes them into a group at this AnyView's own identity, which
+      // the container child walk splices into its declared children — so the
+      // erased content lays out exactly like the same elements authored
+      // inline (a two-element payload inside a VStack occupies two stack
+      // slots, not one overlaid box). The hoisted elements keep their
+      // type-keyed content identities, so a payload type swap still replaces
+      // the whole subtree. The group's minted content node is spliced out of
+      // every children array; anchor it to the evaluating host so teardown
+      // can reach it (`appendDeclaredChildNodes`' group-splice stranding
+      // shape).
+      context.viewGraph?.recordDetachedHostedSubtree(
+        content,
+        hostedBy: ViewNodeContext.current
+      )
+      return content.children
+    }
+
     let payloadShell = ResolvedNode(
       identity: payloadContext.identity,
       kind: .view("AnyViewPayload"),
@@ -61,7 +87,7 @@ public struct AnyView: PrimitiveView, ResolvableView {
       identity: payloadContext.identity,
       kind: .view("AnyViewPayload"),
       typeDiscriminator: storage.typeID.typeDiscriminator,
-      children: AnyViewPayload(storage: storage).resolveElements(in: payloadContext),
+      children: [content],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction
     )
@@ -106,22 +132,4 @@ private struct AnyViewStorage {
   let typeID: ErasedViewTypeID
   let authoringContext: AuthoringContext?
   let resolve: @MainActor (ResolveContext) -> ResolvedNode
-}
-
-private struct AnyViewPayload: PrimitiveView, ResolvableView {
-  let storage: AnyViewStorage
-
-  var body: Never {
-    fatalError("AnyViewPayload is resolved directly.")
-  }
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    // The payload's stored view resolves through this Content node — a
-    // non-transparent hosting boundary. Host-escaping entity routes must not
-    // be claimed here (see `ResolveContext.entityHosting`).
-    let contentContext = context.child(component: .named("Content")).asEntityHost()
-    return [
-      storage.resolve(contentContext)
-    ]
-  }
 }

@@ -303,6 +303,43 @@ struct AnyViewResilienceTests {
     #expect(reordered.resolvedTree.descendant(withText: "Row 2 count 1") != nil)
     #expect(reordered.resolvedTree.descendant(withText: "Row 3 count 0") != nil)
   }
+
+  @Test("multi-element AnyView payload flattens into the enclosing stack")
+  func multiElementAnyViewPayloadFlattensIntoEnclosingStack() throws {
+    // A two-element erased payload must occupy two vertical stack slots, like
+    // the same elements authored inline — not one overlaid box whose second
+    // element paints over the first (the pre-fix cold-start shape).
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnyViewFlatten"),
+      size: .init(width: 40, height: 8)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Flatten header")
+        AnyView(AnyViewFlattenPair())
+        Text("Flatten footer")
+      }
+    }
+    defer { harness.shutdown() }
+
+    let frame = try harness.render()
+    #expect(frame.contains("Flatten first"))
+    #expect(frame.contains("Flatten second"))
+    let headerRow = try #require(harness.point(forText: "Flatten header")).containingCell.y
+    let firstRow = try #require(harness.point(forText: "Flatten first")).containingCell.y
+    let secondRow = try #require(harness.point(forText: "Flatten second")).containingCell.y
+    let footerRow = try #require(harness.point(forText: "Flatten footer")).containingCell.y
+    #expect(headerRow < firstRow)
+    #expect(firstRow < secondRow)
+    #expect(secondRow < footerRow)
+  }
+}
+
+private struct AnyViewFlattenPair: View {
+  @ViewBuilder
+  var body: some View {
+    Text("Flatten first")
+    Text("Flatten second")
+  }
 }
 
 private enum AnyViewCounterKind {

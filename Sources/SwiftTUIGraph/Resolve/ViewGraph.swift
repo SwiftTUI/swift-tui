@@ -1701,6 +1701,17 @@ package final class ViewGraph {
     entityRoutingTable.route(entityIdentity) == node.viewNodeID
   }
 
+  /// The entity currently claiming `node`: its committed value's attached
+  /// entity, or the routing table's binding for it — the same derivation
+  /// `prepareEntityRoutedOwner` uses to detect a foreign occupant. The
+  /// explicit-identity modifier reads this to detect co-residency (an
+  /// enclosing identity modifier's entity already on the slot node this
+  /// chain would otherwise collapse onto).
+  package func entityOccupant(of node: ViewNode) -> EntityIdentity? {
+    node.committed.entityIdentity
+      ?? entityRoutingTable.entityByNodeID[node.viewNodeID]
+  }
+
   package func prepareEntityRoutedOwner(
     _ entityIdentity: EntityIdentity,
     for node: ViewNode?
