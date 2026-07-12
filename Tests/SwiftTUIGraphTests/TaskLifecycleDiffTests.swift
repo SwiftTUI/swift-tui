@@ -45,6 +45,24 @@ struct TaskLifecycleDiffTests {
     #expect(!diff.cancelsKeyToCurrentIdentity)
   }
 
+  @Test("identity churn with no previous tasks still starts a genuine first appearance")
+  func identityChurnWithEmptyPreviousStartsFreshTask() {
+    // A node that held no tasks while its resolved identity churned (the
+    // reduce-motion → restore transition of PhaseAnimator: the loop task is
+    // absent while reduced, then reappears under a churned conditional-branch
+    // identity when motion returns) must still start a task that appears this
+    // frame. Nothing persisted across the relabel, so the restart suppression
+    // that protects long-lived relabeled tasks does not apply.
+    let diff = TaskLifecycleDiff.between(
+      previous: [],
+      current: [task("a")],
+      identityChanged: true
+    )
+    #expect(diff.cancels.isEmpty)
+    #expect(diff.starts == [task("a")])
+    #expect(!diff.cancelsKeyToCurrentIdentity)
+  }
+
   @Test("identity churn removing every task cancels keyed to the current identity")
   func identityChurnRemovingEveryTaskCancelsToCurrentIdentity() {
     let diff = TaskLifecycleDiff.between(

@@ -275,9 +275,7 @@ extension FrameworkStressAnimationTemporalTests {
       _ = try harness.clickText("Toggle Suppressor 006")
       _ = try harness.clickText("Animate Opacity 006")
     }
-    withKnownIssue("A departed value-animation modifier suppresses later outer animation") {
-      #expect(missedGenerations.isEmpty)
-    }
+    #expect(missedGenerations.isEmpty)
   }
 }
 
@@ -1905,9 +1903,7 @@ extension FrameworkStressAnimationTemporalTests {
       }
     }
 
-    withKnownIssue("PhaseAnimator does not reinstall its loop task after reduce motion clears") {
-      #expect(missedRestorations.isEmpty)
-    }
+    #expect(missedRestorations.isEmpty)
   }
 }
 

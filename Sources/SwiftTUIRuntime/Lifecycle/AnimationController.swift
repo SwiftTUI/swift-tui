@@ -845,16 +845,22 @@ package final class AnimationController: Sendable {
   ) {
     lastFrameHeadCompletionCount = 0
     // If the incoming transaction carries an animation box, make sure
-    // the controller has the concrete Animation registered.  In normal
-    // flow ``DefaultRenderer.register(animation:)`` already registered
-    // it at withAnimation-time, but guard here in case the caller
-    // constructed the transaction directly.
+    // the controller has the concrete Animation registered. In normal
+    // flow the View-layer `withAnimation`/`.animation(_:value:)` sink
+    // already registered it at withAnimation-time, but a `withAnimation`
+    // dispatched outside the run loop's installed registration-sink scope
+    // (an event handler driven directly, not through `RunLoop.run()`)
+    // threads the box onto the transaction without ever registering the
+    // concrete curve. The box itself carries that curve, so recover and
+    // register it here: an `.animate(box)` request means "animate with
+    // this animation", and an unregistered box would otherwise be purged
+    // on the next tick (its `evaluate` finds no registration), silently
+    // dropping the requested animation.
     if case .animate(let box) = transaction.animationRequest,
-      registeredAnimations[box] == nil
+      registeredAnimations[box] == nil,
+      let animation = box.unwrap(as: Animation.self)
     {
-      // Box without registration — tick sampling will no-op for this
-      // batch but the controller will still record snapshots so
-      // future changes can animate.
+      registeredAnimations[box] = animation
     }
 
     var newSnapshots: [Identity: AnimatableSnapshot] = [:]

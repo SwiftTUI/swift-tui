@@ -9,6 +9,14 @@
 /// keyed to the *current* resolved identity (`cancelsKeyToCurrentIdentity`),
 /// because the previous identity has already left the registries.
 ///
+/// The restart suppression is scoped to nodes that *had* tasks to carry across
+/// the relabel. When the node held no tasks previously (`previous.isEmpty`)
+/// nothing persists, so a task that appears this frame is a genuine first
+/// start and must run even though the resolved identity also churned — the
+/// reduce-motion → restore transition of `PhaseAnimator` is exactly this shape
+/// (the loop task is absent while reduced, then reappears under a churned
+/// conditional-branch identity when motion returns).
+///
 /// Callers own event construction and identity/node keying; this type is the
 /// shared pure policy that was previously hand-mirrored across
 /// `ViewGraph.finishEvaluation`, `ViewGraph.recordReusedSubtree`, and the
@@ -53,7 +61,7 @@ package struct TaskLifecycleDiff: Equatable, Sendable {
         []
       }
     let starts: [TaskDescriptor] =
-      if identityChanged {
+      if identityChanged && !previous.isEmpty {
         []
       } else {
         current.filter { !previous.contains($0) }
