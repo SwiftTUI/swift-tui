@@ -125,12 +125,41 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
       node.setStateSlotSilently(ordinal: ordinal, value: value)
     }
 
-    guard valueChanged else {
-      // Value unchanged — pass through the parent transaction as-is.
-      return content.resolveElements(in: context)
-    }
+    // First-appearance baseline reservation. When the identity's node does not
+    // yet exist pre-resolve (a replacement `.id`, a freshly inserted entity),
+    // `previousValueAndOrdinal` returns `(nil, nil)` and no baseline is stored:
+    // the node mints deeper inside `content.resolveElements`, after this read.
+    // The next frame then re-seeds the still-empty slot with the *current*
+    // value, so a genuine change is never detected and the replacement owner
+    // never animates. Reserve this modifier's slot ordinal now from the
+    // identity-scoped context cursor — which advances OUTER-first, exactly
+    // mirroring the per-node `claimValueAnimationModifierOrdinal` order the
+    // steady-state read uses — and store the baseline post-resolve once the
+    // node exists. Claiming from the node counter post-resolve instead would
+    // reverse stacked modifiers' ordinals (post-resolve unwinds inner-first),
+    // desyncing the next frame's read; the pre-resolve cursor cannot.
+    let firstAppearanceOrdinal: Int? =
+      ordinal == nil
+      ? StateSlotOrdinals.valueAnimation(context.valueAnimationOrdinalCursor)
+      : nil
 
     var childContext = context
+    // Advance the cursor so a stacked inner `.animation(_, value:)` at this
+    // same identity reserves the next index, matching the per-node counter's
+    // outer-first claim sequence. Reset to 0 across every identity boundary
+    // (the cursor is a direct `ResolveContext` field, so `child` /
+    // `replacingIdentity` drop it) — one identity is one node, one counter.
+    childContext.valueAnimationOrdinalCursor = context.valueAnimationOrdinalCursor + 1
+
+    guard valueChanged else {
+      // Value unchanged — pass through the parent transaction as-is (the only
+      // difference between `childContext` and `context` here is the cursor,
+      // which is excluded from reuse-gating equality).
+      let resolved = content.resolveElements(in: childContext)
+      storeFirstAppearanceBaseline(firstAppearanceOrdinal, in: context)
+      return resolved
+    }
+
     if context.environmentValues.accessibilityReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else if let animation {
@@ -166,7 +195,31 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
         resolved[index].transactionSnapshot.animationRequest = request
       }
     }
+    storeFirstAppearanceBaseline(firstAppearanceOrdinal, in: context)
     return resolved
+  }
+
+  /// Stores the reserved first-appearance baseline on the now-minted node.
+  /// Skips a slot already holding a *different* type: the outer-first cursor
+  /// keeps stacked modifiers' ordinals distinct so this cannot arise from a
+  /// well-formed chain, but leaving a foreign occupant untouched keeps the
+  /// slot's stored-type invariant (`AnyStateSlot.set`) trap-free regardless.
+  private func storeFirstAppearanceBaseline(
+    _ ordinal: Int?,
+    in context: ResolveContext
+  ) {
+    guard let ordinal,
+      let node = context.viewGraph?.nodeForIdentity(context.identity)
+    else {
+      return
+    }
+    if let existing = node.stateSlotStorage(ordinal: ordinal),
+      existing.isInitialized,
+      !existing.stores(Value.self)
+    {
+      return
+    }
+    node.setStateSlotSilently(ordinal: ordinal, value: value)
   }
 
   private func previousValueAndOrdinal(

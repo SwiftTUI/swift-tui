@@ -53,6 +53,18 @@ public struct ResolveContext: Equatable, Sendable {
   /// suppressed; adopting the prior entity node as the host-content node is the
   /// entity-routing collapse that keeps `@State` alive across wrapper toggles.
   package var entityHosting: Bool = false
+  /// Outer-first index a `.animation(_, value:)` modifier reserves for its
+  /// baseline state slot when the identity's node does not yet exist during
+  /// resolve (a first-appearing `.id` replacement or inserted entity). It is a
+  /// direct field — `child` / `replacingIdentity` rebuild the context and drop
+  /// it, so it resets to 0 at every identity boundary (one identity is one
+  /// node), while a modifier chain's `var childContext = context` copy carries
+  /// it forward so stacked `.animation` modifiers at one identity reserve
+  /// distinct, ascending indices. This mirrors ``ViewNode``'s per-node
+  /// `claimValueAnimationModifierOrdinal` counter for exactly the frame where
+  /// that counter is unreachable (no node yet). Deliberately excluded from
+  /// ``ResolveContext``'s `Equatable` conformance so it never gates reuse.
+  package var valueAnimationOrdinalCursor: Int = 0
   package var localActionRegistry: LocalActionRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?

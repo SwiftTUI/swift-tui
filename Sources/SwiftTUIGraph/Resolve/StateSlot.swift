@@ -73,6 +73,16 @@ package struct AnyStateSlot {
     return valueType == T.self
   }
 
+  /// Whether the slot has been given a value. A fresh slot is uninitialized
+  /// until its first store; distinguishing the two lets callers store into an
+  /// empty slot while leaving a foreign-typed occupant untouched.
+  package var isInitialized: Bool {
+    if case .value = storage {
+      return true
+    }
+    return false
+  }
+
   package var storedTypeDescription: String {
     switch storage {
     case .uninitialized:

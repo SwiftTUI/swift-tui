@@ -236,9 +236,7 @@ extension FrameworkStressAnimationTemporalTests {
       context: .init(identity: identity),
       proposal: proposal
     )
-    withKnownIssue("A replacement owner does not establish a live value-animation baseline") {
-      #expect(controller.activeAnimationCount == 1)
-    }
+    #expect(controller.activeAnimationCount == 1)
   }
 }
 
