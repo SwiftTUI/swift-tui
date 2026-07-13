@@ -45,7 +45,7 @@ func columnChartFilledHeight(
   maximumValue: Double,
   chartHeight: Int
 ) -> Int {
-  guard maximumValue > 0 else {
+  guard maximumValue > 0, chartHeight > 0 else {
     return 0
   }
 

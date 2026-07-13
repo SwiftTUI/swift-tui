@@ -216,9 +216,7 @@ struct FrameworkStressChartAllocationBoundaryTests {
   @Test("stress chart allocation 019 negative chart height never produces negative fill")
   func negativeChartHeightNeverProducesNegativeFill() {
     // Hypothesis: a negative authored height can leak through the fill-height clamp.
-    withKnownIssue("negative chart heights leak through column fill clamping") {
-      #expect(columnChartFilledHeight(value: 5, maximumValue: 10, chartHeight: -3) == 0)
-    }
+    #expect(columnChartFilledHeight(value: 5, maximumValue: 10, chartHeight: -3) == 0)
   }
 
   @Test("stress chart allocation 020 negative heat values use magnitude")
