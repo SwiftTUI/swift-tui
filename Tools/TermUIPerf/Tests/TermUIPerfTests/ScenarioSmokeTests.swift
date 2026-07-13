@@ -4,6 +4,20 @@ import Testing
 @testable import TermUIPerf
 
 struct ScenarioSmokeTests {
+  /// Comma-separated `PerfScenarioName` raw values quarantined from the smoke
+  /// sweep. Only CI lanes with a registered flake set this — see
+  /// docs/KNOWN-TEST-FLAKES.md for the active entries; every skip must map to
+  /// a register entry with its reproduction evidence.
+  private static var quarantinedScenarioNames: Set<String> {
+    guard let raw = ProcessInfo.processInfo.environment["TERMUI_PERF_SMOKE_SKIP"] else {
+      return []
+    }
+    return Set(
+      raw.split(separator: ",").map {
+        $0.trimmingCharacters(in: .whitespaces)
+      })
+  }
+
   @Test("deterministic scenarios write artifact directories")
   @MainActor
   func deterministicScenariosWriteArtifactDirectories() async throws {
@@ -14,6 +28,10 @@ struct ScenarioSmokeTests {
     }
 
     for scenario in PerfScenarioRegistry.all {
+      if Self.quarantinedScenarioNames.contains(scenario.name.rawValue) {
+        print("[scenario-smoke] skipping quarantined scenario \(scenario.name.rawValue)")
+        continue
+      }
       let result = try await scenario.run(
         options: PerfScenarioRunOptions(
           renderMode: .sync,

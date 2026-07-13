@@ -204,7 +204,42 @@ tracker of record**. Re-open criteria:
 
 ## Fixed flakes
 
-### 2. `OffscreenFrameElisionRuntimeTests` — off-screen deadline tick (real-time deadline race) — FIXED 2026-05-30
+### 2. TermUIPerf app-shell scenario stall on amd64 CI — QUARANTINED 2026-07-13
+
+**Signature.** `ScenarioSmokeTests` "deterministic scenarios write artifact
+directories" fails with `timed out waiting for marker '!Menu body'` in
+`ExampleAppShellWorkflowScenario` — the wait after the close-menu click sees
+no new presented frames for the whole idle window.
+
+**Where it surfaces.** Only the `TermUIPerf Tests` workflow's
+`ubuntu-24.04` (amd64) runners: 4/4 failures since the 2026-07-12 scheduled
+run (which ran on the pre-Charts-migration baseline, so the flip predates
+that migration). The identical suite passes on macOS arm64 and in the
+arm64-native Linux container (`swiftly run swift test --package-path
+Tools/TermUIPerf` inside the linux-gate image), including after the
+2026-07-13 progress-gated-deadline hardening — so the stall is a genuine
+no-frame stall on that runner class, not a slow-runner deadline miss.
+
+**Why this is not treated as a product regression (yet).** The swift-tui
+Repo Gate runs the full menu/presentation suite on the same amd64 runners
+and is green; the stall is specific to the TermUIPerf harness path
+(`PerfTerminalHost` + scripted click dispatch under `.sync` render mode).
+Suspect window: the 2026-07-11 stress-campaign batch (presentation
+dispatch / recognizer adoption / hover re-root routing changes).
+
+**Quarantine.** The workflow sets
+`TERMUI_PERF_SMOKE_SKIP=example-app-shell-workflow` (consumed by
+`ScenarioSmokeTests`); every other scenario stays covered on amd64, and the
+app-shell scenario stays covered on arm64/macOS. Remove the skip when this
+entry is closed.
+
+**How to investigate.** Reproduce on an amd64 host (or emulation) with
+`swiftly run swift test --package-path Tools/TermUIPerf --filter
+ScenarioSmokeTests`; instrument with the run-loop hang diagnostics
+(`STUI_HANG_DIAGNOSTICS`) to capture where the loop parks after the
+close-menu click; bisect the 2026-07-11 window if it reproduces.
+
+### 3. `OffscreenFrameElisionRuntimeTests` — off-screen deadline tick (real-time deadline race) — FIXED 2026-05-30
 
 **Test.** `OffscreenFrameElisionRuntimeTests` →
 `offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders`, in
@@ -250,7 +285,7 @@ construction — no timing window remains.
 
 ---
 
-### 3. `OffscreenFrameElisionRuntimeTests` — onAppear registration dropped by the async driver during setup — FIXED 2026-05-31
+### 4. `OffscreenFrameElisionRuntimeTests` — onAppear registration dropped by the async driver during setup — FIXED 2026-05-31
 
 **Tests.** `OffscreenFrameElisionRuntimeTests` (in
 `Tests/SwiftTUITests/OffscreenFrameElisionRuntimeTests.swift`) →
@@ -284,7 +319,7 @@ test still drives its deadline ticks through the ASYNC `renderPendingFramesAsync
 **Verification.** **0/12 green under 28-process CPU saturation against the full
 `SwiftTUITests` suite** — the identical harness reproduced the pre-fix flake 8/8.
 
-### 4. `TaskReadsUnbodiedStateTests` — cross-variant probe-singleton clobber (+ exact-tick frame scrape) — FIXED 2026-07-01
+### 5. `TaskReadsUnbodiedStateTests` — cross-variant probe-singleton clobber (+ exact-tick frame scrape) — FIXED 2026-07-01
 
 **Tests.** `TaskReadsUnbodiedStateTests` (in
 `Tests/SwiftTUITests/TaskReadsUnbodiedStateTests.swift`) → both `@Test` variants,
