@@ -116,6 +116,14 @@ struct FrameworkStressColorManagementTests {
     }
   }
 
+  @Test("stress color management 010 CIEDE2000 hue-wrap reference stays exact")
+  func colorManagement010CIEDE2000HueWrapReferenceStaysExact() {
+    let lhs = LabColor(l: 50, a: -0.0010, b: 2.4900, whitePoint: .d50)
+    let rhs = LabColor(l: 50, a: 0.0009, b: -2.4900, whitePoint: .d50)
+
+    #expect(abs(_deltaE2000(lhs, rhs) - 4.8045) < 0.0001)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
