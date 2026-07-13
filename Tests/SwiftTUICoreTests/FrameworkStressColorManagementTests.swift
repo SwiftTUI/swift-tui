@@ -71,6 +71,18 @@ struct FrameworkStressColorManagementTests {
     #expect(clipped != preserved)
   }
 
+  @Test("stress color management 006 lightness compression contains extreme Rec. 2020 color")
+  func colorManagement006LightnessCompressionContainsExtremeRec2020Color() {
+    let source = Color(red: 1.4, green: -0.3, blue: 0.9, profile: .rec2020)
+    let compressed = source.converted(to: .sRGB, gamutMapping: .compressLightness)
+
+    #expect(compressed.profile == .sRGB)
+    #expect(compressed.red >= -1e-9 && compressed.red <= 1 + 1e-9)
+    #expect(compressed.green >= -1e-9 && compressed.green <= 1 + 1e-9)
+    #expect(compressed.blue >= -1e-9 && compressed.blue <= 1 + 1e-9)
+    #expect(compressed.alpha == source.alpha)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
