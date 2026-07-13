@@ -94,6 +94,17 @@ struct FrameworkStressColorManagementTests {
     #expect(midpoint.profile == .sRGB)
   }
 
+  @Test("stress color management 008 cross-profile endpoint reaches target appearance")
+  func colorManagement008CrossProfileEndpointReachesTargetAppearance() {
+    let source = Color(red: 0.12, green: 0.45, blue: 0.81, alpha: 0.2, profile: .sRGB)
+    let target = Color(red: 0.78, green: 0.34, blue: 0.16, alpha: 0.9, profile: .displayP3)
+    let endpoint = source.interpolated(to: target, progress: 1, method: .perceptual)
+
+    #expect(endpoint.profile == source.profile)
+    #expect(abs(endpoint.alpha - target.alpha) < 1e-12)
+    #expect(endpoint.deltaE(to: target) < 1e-7)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
