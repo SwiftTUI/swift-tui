@@ -83,6 +83,17 @@ struct FrameworkStressColorManagementTests {
     #expect(compressed.alpha == source.alpha)
   }
 
+  @Test("stress color management 007 linear-light midpoint remains physically linear")
+  func colorManagement007LinearLightMidpointRemainsPhysicallyLinear() {
+    let midpoint = Color.black.interpolated(to: .white, progress: 0.5, method: .linearLight)
+    let expected = TransferFunction.sRGB.encode(0.5)
+
+    #expect(abs(midpoint.red - expected) < 1e-10)
+    #expect(abs(midpoint.green - expected) < 1e-10)
+    #expect(abs(midpoint.blue - expected) < 1e-10)
+    #expect(midpoint.profile == .sRGB)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
