@@ -60,7 +60,6 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUIViews",
   "SwiftTUITestSupport",
   "SwiftTUIAnimatedImage",
-  "SwiftTUICharts",
   "SwiftTUIVendorJPEG",
   "SwiftTUIVendorPNG",
 ]
