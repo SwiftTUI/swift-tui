@@ -105,15 +105,28 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
     _ marker: String,
     afterFrame frameNumber: Int,
     in driver: PerfScenarioDriver,
-    timeout: Duration = .seconds(2)
+    timeout: Duration = .seconds(2),
+    hardCap: Duration = .seconds(30)
   ) async throws -> PerfPresentedFrame {
     let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: timeout)
-    while clock.now < deadline {
+    let hardDeadline = clock.now.advanced(by: hardCap)
+    var deadline = clock.now.advanced(by: timeout)
+    var newestObserved = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
+    while clock.now < deadline && clock.now < hardDeadline {
       if let frame = driver.terminalHost.presentedFrames.last(where: {
         $0.frameNumber > frameNumber && !$0.text.contains(marker)
       }) {
         return frame
+      }
+      // Progress-gated deadline (never fixed wall-clock): while the run loop
+      // keeps presenting new frames the scenario is advancing — just slowly,
+      // e.g. on a loaded CI runner — so re-arm the idle window. The hard cap
+      // bounds the wait even when continuous animation frames keep arriving.
+      if let newest = driver.terminalHost.presentedFrames.last?.frameNumber,
+        newest > newestObserved
+      {
+        newestObserved = newest
+        deadline = clock.now.advanced(by: timeout)
       }
       try await Task.sleep(nanoseconds: 1_000_000)
     }
