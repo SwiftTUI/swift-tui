@@ -46,6 +46,18 @@ struct FrameworkStressColorManagementTests {
     #expect(cycled.deltaE(to: original) < 1e-8)
   }
 
+  @Test("stress color management 004 absolute conversion preserves source white luminance")
+  func colorManagement004AbsoluteConversionPreservesSourceWhiteLuminance() {
+    let sourceWhite = Color(white: 1, profile: .proPhotoRGB)
+    let relative = sourceWhite.converted(to: .sRGB, gamutMapping: .relativeColorimetric)
+    let absolute = sourceWhite.converted(to: .sRGB, gamutMapping: .absoluteColorimetric)
+
+    #expect(relative.deltaE(to: .white) < 1e-4)
+    withKnownIssue("Absolute and relative colorimetric policies currently share one clip path") {
+      #expect(absolute.deltaE(to: relative) > 0.5)
+    }
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
