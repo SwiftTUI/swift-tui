@@ -17,6 +17,18 @@ struct FrameworkStressColorManagementTests {
     expectXYZ(cycled, equals: original, tolerance: 1e-10)
   }
 
+  @Test("stress color management 002 repeated CAT02 adaptation remains reversible")
+  func colorManagement002RepeatedCAT02AdaptationRemainsReversible() {
+    let original = XYZColor(x: 0.73, y: 0.11, z: 0.09, whitePoint: .d60)
+    var cycled = original
+
+    for _ in 0..<256 {
+      cycled = adapt(adapt(cycled, to: .d75, method: .cat02), to: .d60, method: .cat02)
+    }
+
+    expectXYZ(cycled, equals: original, tolerance: 1e-10)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
