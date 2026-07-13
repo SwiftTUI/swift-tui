@@ -58,6 +58,19 @@ struct FrameworkStressColorManagementTests {
     }
   }
 
+  @Test("stress color management 005 preserve and clip diverge for P3-only green")
+  func colorManagement005PreserveAndClipDivergeForP3OnlyGreen() {
+    let p3Green = Color(red: 0, green: 1, blue: 0, profile: .displayP3)
+    let preserved = p3Green.converted(to: .sRGB, gamutMapping: .preserve)
+    let clipped = p3Green.converted(to: .sRGB, gamutMapping: .clip)
+
+    #expect(!preserved.isInGamut(for: .sRGB))
+    #expect(clipped.red >= 0 && clipped.red <= 1)
+    #expect(clipped.green >= 0 && clipped.green <= 1)
+    #expect(clipped.blue >= 0 && clipped.blue <= 1)
+    #expect(clipped != preserved)
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
