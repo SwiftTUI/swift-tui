@@ -768,7 +768,7 @@ module_defaults:
   SwiftTUITerminal: canonical
   SwiftTUITerminalWorkspace: canonical
   SwiftTUICLI: canonical
-  WASISurfaceBridge: package-only-seam
+  SwiftTUIWASISurfaceBridge: package-only-seam
   SwiftTUIWASI: canonical
   SwiftTUIWebHost: canonical
   SwiftTUIWebHostCLI: canonical

@@ -1,6 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUIRuntime
-import WASISurfaceBridge
+import SwiftTUIWASISurfaceBridge
 
 #if canImport(Darwin)
   import Darwin

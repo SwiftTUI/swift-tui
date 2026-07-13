@@ -138,7 +138,8 @@ Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
 - **no-foundation-in-library-products** — blocks `import Foundation` (including
   `@_implementationOnly` / `@_exported` / `@preconcurrency` and `Foundation.*`
   submodule forms) in the Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and
-  `SwiftTUI` layers and the vendored `EmbeddedFonts`/`SwiftFiglet` runtime they
+  `SwiftTUI` layers and the vendored `SwiftTUIVendorFiglet` /
+  `SwiftTUIVendorFigletEmbeddedFonts` runtime they
   re-export. The repo gate additionally runs `Scripts/check_foundation_free_layers.sh`,
   which follows package resolution (via `-emit-loaded-module-trace`) to catch
   Foundation reaching `SwiftTUICore`/`SwiftTUIViews` through any transitive

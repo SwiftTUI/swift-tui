@@ -1,5 +1,5 @@
-import EmbeddedFonts
-import SwiftFiglet
+import SwiftTUIVendorFiglet
+import SwiftTUIVendorFigletEmbeddedFonts
 import Testing
 
 private let repositoryRoot =

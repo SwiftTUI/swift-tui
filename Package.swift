@@ -47,9 +47,9 @@ let packageDependencies: [Package.Dependency] = [
 let swiftTUIRuntimeDependencies: [Target.Dependency] = [
   "SwiftTUICore",
   "SwiftTUIViews",
-  "EmbeddedFonts",
-  "JPEG",
-  "PNG",
+  "SwiftTUIVendorFigletEmbeddedFonts",
+  "SwiftTUIVendorJPEG",
+  "SwiftTUIVendorPNG",
 ]
 
 let swiftTUITestDependencies: [Target.Dependency] = [
@@ -60,8 +60,9 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUIViews",
   "SwiftTUITestSupport",
   "SwiftTUIAnimatedImage",
-  "JPEG",
-  "PNG",
+  "SwiftTUICharts",
+  "SwiftTUIVendorJPEG",
+  "SwiftTUIVendorPNG",
 ]
 
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
@@ -109,7 +110,7 @@ let package = Package(
     .target(
       name: "SwiftTUIPrimitives",
       dependencies: [
-        "EmbeddedFonts"
+        "SwiftTUIVendorFigletEmbeddedFonts"
       ],
       swiftSettings: swiftSettings()
     ),
@@ -128,8 +129,8 @@ let package = Package(
         "SwiftTUIPrimitives",
         "SwiftTUIGraph",
         .product(name: "DequeModule", package: "swift-collections"),
-        "SwiftFiglet",
-        "EmbeddedFonts",
+        "SwiftTUIVendorFiglet",
+        "SwiftTUIVendorFigletEmbeddedFonts",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -138,7 +139,7 @@ let package = Package(
       name: "SwiftTUIViews",
       dependencies: [
         "SwiftTUICore",
-        "EmbeddedFonts",
+        "SwiftTUIVendorFigletEmbeddedFonts",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -148,7 +149,7 @@ let package = Package(
       dependencies: [
         "SwiftTUICore",
         "SwiftTUIViews",
-        "GIF",
+        "SwiftTUIVendorGIF",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -239,14 +240,14 @@ let package = Package(
         "SwiftTUIRuntime",
         "SwiftTUIArguments",
         "SwiftTUIPTYPrimitives",
-        "UnixSignals",
+        "SwiftTUIVendorUnixSignals",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Platforms/CLI/Sources/SwiftTUICLI",
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "WASISurfaceBridge",
+      name: "SwiftTUIWASISurfaceBridge",
       dependencies: [
         "SwiftTUIRuntime"
       ],
@@ -257,7 +258,7 @@ let package = Package(
       name: "SwiftTUIWASI",
       dependencies: [
         "SwiftTUIRuntime",
-        "WASISurfaceBridge",
+        "SwiftTUIWASISurfaceBridge",
       ],
       path: "Platforms/WASI/Sources/SwiftTUIWASI",
       swiftSettings: swiftSettings()
@@ -266,7 +267,7 @@ let package = Package(
       name: "SwiftTUIWebHost",
       dependencies: [
         "SwiftTUIRuntime",
-        "WASISurfaceBridge",
+        "SwiftTUIWASISurfaceBridge",
         .product(name: "FlyingFox", package: "FlyingFox"),
         .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
@@ -315,8 +316,27 @@ let package = Package(
     // files have been deleted. swift-tui now owns these modules as first-class
     // targets, so the package has no local-path subpackage dependencies and
     // can be consumed by external SwiftPM clients.
+    //
+    // Every absorbed target is named `SwiftTUIVendor<Upstream>`. SwiftPM
+    // requires target names to be unique across the *whole* package graph, and
+    // any target reachable from one of our products enters every consumer's
+    // graph. Under their upstream names these modules are landmines: a consumer
+    // that also depends on swift-service-lifecycle (which ships `UnixSignals`)
+    // fails resolution outright with
+    //
+    //   error: multiple packages ('swift-service-lifecycle', 'swift-tui')
+    //   declare targets with a conflicting name: 'UnixSignals'
+    //
+    // — and `GIF` / `JPEG` / `PNG` / `SwiftFiglet` are no safer. The prefix
+    // makes a collision essentially impossible and makes the vendoring
+    // decision legible at every use site: an `import SwiftTUIVendorPNG` is
+    // self-evidently our copy, not upstream swift-png.
+    //
+    // Consequence for use sites: only the `import` line carries the vendored
+    // name. `GIF`/`JPEG`/`PNG` each declare a `public enum` matching their old
+    // module name, so `PNG.Image` and friends keep resolving to the enum.
     .target(
-      name: "UnixSignals",
+      name: "SwiftTUIVendorUnixSignals",
       dependencies: [
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
       ],
@@ -324,34 +344,34 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "SwiftFiglet",
+      name: "SwiftTUIVendorFiglet",
       path: "Vendor/swift-figlet/Sources/SwiftFiglet",
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "EmbeddedFonts",
-      dependencies: ["SwiftFiglet"],
+      name: "SwiftTUIVendorFigletEmbeddedFonts",
+      dependencies: ["SwiftTUIVendorFiglet"],
       path: "Vendor/swift-figlet/Sources/EmbeddedFonts",
       swiftSettings: swiftSettings()
     ),
     .executableTarget(
-      name: "figlet",
-      dependencies: ["SwiftFiglet", "EmbeddedFonts"],
+      name: "SwiftTUIVendorFigletCLI",
+      dependencies: ["SwiftTUIVendorFiglet", "SwiftTUIVendorFigletEmbeddedFonts"],
       path: "Vendor/swift-figlet/Sources/figlet",
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "GIF",
+      name: "SwiftTUIVendorGIF",
       path: "Vendor/swift-gif/Sources/GIF",
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "JPEG",
+      name: "SwiftTUIVendorJPEG",
       path: "Vendor/swift-jpeg/Sources/JPEG",
       swiftSettings: swiftSettings()
     ),
     .target(
-      name: "PNG",
+      name: "SwiftTUIVendorPNG",
       path: "Vendor/swift-png/Sources/PNG",
       swiftSettings: swiftSettings()
     ),
@@ -491,10 +511,10 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "WASISurfaceBridgeTests",
+      name: "SwiftTUIWASISurfaceBridgeTests",
       dependencies: [
         "SwiftTUI",
-        "WASISurfaceBridge",
+        "SwiftTUIWASISurfaceBridge",
       ],
       path: "Platforms/WASI/Tests/WASISurfaceBridgeTests",
       swiftSettings: swiftSettings()
@@ -562,36 +582,36 @@ let package = Package(
 
     // -- Absorbed Vendor test targets --
     .testTarget(
-      name: "UnixSignalsTests",
+      name: "SwiftTUIVendorUnixSignalsTests",
       dependencies: [
-        "UnixSignals",
+        "SwiftTUIVendorUnixSignals",
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
       ],
       path: "Vendor/UnixSignals/Tests/UnixSignalsTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "SwiftFigletTests",
-      dependencies: ["SwiftFiglet", "EmbeddedFonts"],
+      name: "SwiftTUIVendorFigletTests",
+      dependencies: ["SwiftTUIVendorFiglet", "SwiftTUIVendorFigletEmbeddedFonts"],
       path: "Vendor/swift-figlet/Tests/SwiftFigletTests",
       exclude: ["Fixtures"],
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "GIFTests",
-      dependencies: ["GIF"],
+      name: "SwiftTUIVendorGIFTests",
+      dependencies: ["SwiftTUIVendorGIF"],
       path: "Vendor/swift-gif/Sources/GIFTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "JPEGTests",
-      dependencies: ["JPEG"],
+      name: "SwiftTUIVendorJPEGTests",
+      dependencies: ["SwiftTUIVendorJPEG"],
       path: "Vendor/swift-jpeg/Sources/JPEGTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "PNGTests",
-      dependencies: ["PNG"],
+      name: "SwiftTUIVendorPNGTests",
+      dependencies: ["SwiftTUIVendorPNG"],
       path: "Vendor/swift-png/Sources/PNGTests",
       swiftSettings: swiftSettings()
     ),

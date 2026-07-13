@@ -17,7 +17,7 @@
 #if !os(Windows)
 
   import Testing
-  import UnixSignals
+  import SwiftTUIVendorUnixSignals
   #if canImport(Darwin)
     import Darwin
   #elseif canImport(Glibc)

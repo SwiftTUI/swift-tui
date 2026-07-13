@@ -1,6 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUIRuntime
-import UnixSignals
+import SwiftTUIVendorUnixSignals
 
 #if canImport(Darwin)
   import Darwin

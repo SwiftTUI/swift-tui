@@ -1,6 +1,6 @@
 @_spi(Runners) import SwiftTUIRuntime
+import SwiftTUIWASISurfaceBridge
 import Synchronization
-import WASISurfaceBridge
 
 package protocol WebHostByteSink: Sendable {
   func send(_ bytes: [UInt8]) async throws

@@ -1,6 +1,6 @@
 import DequeModule
-import EmbeddedFonts
-import SwiftFiglet
+import SwiftTUIVendorFiglet
+import SwiftTUIVendorFigletEmbeddedFonts
 import Synchronization
 
 package struct TextFigureLayoutMetrics: Equatable, Sendable {

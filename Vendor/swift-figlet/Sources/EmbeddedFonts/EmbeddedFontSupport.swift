@@ -1,4 +1,4 @@
-public import SwiftFiglet
+public import SwiftTUIVendorFiglet
 
 enum EmbeddedFontStorage {
   static func decode(_ encodedFontData: String, fontName: String) -> [UInt8] {

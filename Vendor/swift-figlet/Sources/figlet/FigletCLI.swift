@@ -1,5 +1,5 @@
 import Foundation
-public import SwiftFiglet
+public import SwiftTUIVendorFiglet
 
 #if canImport(Darwin)
   import Darwin

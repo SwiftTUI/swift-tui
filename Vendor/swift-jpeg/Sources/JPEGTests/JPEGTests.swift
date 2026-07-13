@@ -1,6 +1,6 @@
 import Testing
 
-@testable import JPEG
+@testable import SwiftTUIVendorJPEG
 
 /// Helper: feed a fixed byte array through a `JPEG.BytestreamSource`.
 private struct ArraySource: JPEG.BytestreamSource {

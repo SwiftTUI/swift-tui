@@ -120,7 +120,7 @@ frontend's damage consumer.
   `baselineGraphicsCapabilities` re-reads the cell pixel size via
   `ioctl(TIOCGWINSZ)`, so a resize is picked up without a separate query.
 - **Crash safety** is the runner's job, not the framework's. `CrashSignalHandler`
-  (from the vendored `UnixSignals`) is installed by the CLI runner so a crash
+  (from the vendored `SwiftTUIVendorUnixSignals`) is installed by the CLI runner so a crash
   restores the terminal; `SwiftTUICore` and `SwiftTUIRuntime` install no signal
   handlers.
 

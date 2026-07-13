@@ -1,6 +1,6 @@
 import Testing
 
-@testable import PNG
+@testable import SwiftTUIVendorPNG
 
 /// Helper: feed a fixed byte array through a `PNG.BytestreamSource`. The
 /// shape matches the GIF/JPEG test sources in this repo.

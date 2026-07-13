@@ -1,5 +1,5 @@
 @_spi(Runners) import SwiftTUIRuntime
-import WASISurfaceBridge
+import SwiftTUIWASISurfaceBridge
 
 package protocol WebHostByteSource: Sendable {
   func chunks() -> AsyncStream<[UInt8]>

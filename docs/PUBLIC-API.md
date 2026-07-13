@@ -187,7 +187,7 @@ public surface is the activation entry point and the reusable CPU sampler:
   `ProcessCPUReading`, `CPUSamplerError`.
 
 The record/derivation/TSV types it consumes stay in `SwiftTUIRuntime` (they are
-also used by `WASISurfaceBridge` and the runners), so the runtime never depends
+also used by `SwiftTUIWASISurfaceBridge` and the runners), so the runtime never depends
 on the product. The sink and record-envelope types are package-internal for now;
 the environment grammar builds them.
 

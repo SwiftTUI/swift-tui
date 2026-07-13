@@ -1,5 +1,5 @@
-#if canImport(UnixSignals)
-  public import UnixSignals
+#if canImport(SwiftTUIVendorUnixSignals)
+  public import SwiftTUIVendorUnixSignals
 
   /// Reads Unix signals and exposes them as strings for the runtime.
   public final class SignalReader: SignalReading {
@@ -17,7 +17,7 @@
 #endif
 
 @_spi(Runners) public func defaultSignalReader() -> (any SignalReading)? {
-  #if canImport(UnixSignals)
+  #if canImport(SwiftTUIVendorUnixSignals)
     SignalReader()
   #else
     nil

@@ -1,6 +1,6 @@
-import EmbeddedFonts
 import Foundation
 @_spi(Testing) import SwiftTUITestSupport
+import SwiftTUIVendorFigletEmbeddedFonts
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore

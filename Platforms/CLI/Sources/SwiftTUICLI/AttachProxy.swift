@@ -1,6 +1,6 @@
 #if !canImport(WASILibc)
 
-  import UnixSignals
+  import SwiftTUIVendorUnixSignals
 
   #if canImport(Darwin)
     import Darwin

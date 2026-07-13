@@ -1,4 +1,4 @@
-@_exported import EmbeddedFonts
+@_exported import SwiftTUIVendorFigletEmbeddedFonts
 
 public typealias TextFigureFont = EmbeddedFigletFont
 

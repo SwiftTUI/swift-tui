@@ -10,7 +10,7 @@ this product in the Swift app, then package the resulting WASI build with the
 repository.
 
 The shared web-surface transport target remains package-only plumbing; external
-apps should depend on `SwiftTUIWASI`, not `WASISurfaceBridge`.
+apps should depend on `SwiftTUIWASI`, not `SwiftTUIWASISurfaceBridge`.
 
 ## Topics
 

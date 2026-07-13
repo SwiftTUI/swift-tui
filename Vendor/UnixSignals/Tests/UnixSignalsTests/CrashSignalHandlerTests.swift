@@ -3,7 +3,7 @@
 #if !os(Windows) && !os(WASI)
 
   import Testing
-  import UnixSignals
+  import SwiftTUIVendorUnixSignals
 
   #if canImport(Darwin)
     import Darwin

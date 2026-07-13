@@ -1,6 +1,6 @@
 import Foundation
-import PNG
 import SwiftTUIAnimatedImage
+import SwiftTUIVendorPNG
 import Testing
 
 @testable import SwiftTUICore

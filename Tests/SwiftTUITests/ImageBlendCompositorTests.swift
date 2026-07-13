@@ -1,4 +1,4 @@
-import PNG
+import SwiftTUIVendorPNG
 import Testing
 
 @testable import SwiftTUICore

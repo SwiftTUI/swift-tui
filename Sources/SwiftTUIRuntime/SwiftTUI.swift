@@ -1,5 +1,5 @@
-@_exported import EmbeddedFonts
 @_exported import SwiftTUICore
+@_exported import SwiftTUIVendorFigletEmbeddedFonts
 @_exported import SwiftTUIViews
 
 /// Renders authored terminal views through the full frame pipeline.

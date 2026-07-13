@@ -1,4 +1,4 @@
-import EmbeddedFonts
+import SwiftTUIVendorFigletEmbeddedFonts
 
 @main
 struct FigletEmbeddedMain {

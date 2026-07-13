@@ -1,5 +1,5 @@
 import Foundation
-import GIF
+import SwiftTUIVendorGIF
 
 /// GIF import and export for finite animated image sequences.
 public enum AnimatedGIF {

@@ -1,11 +1,11 @@
 import SwiftTUICore
 
-#if canImport(PNG)
-  import PNG
+#if canImport(SwiftTUIVendorPNG)
+  import SwiftTUIVendorPNG
 #endif
 
-#if canImport(JPEG)
-  import JPEG
+#if canImport(SwiftTUIVendorJPEG)
+  import SwiftTUIVendorJPEG
 #endif
 
 #if canImport(Darwin)
@@ -65,7 +65,7 @@ extension ImageLookupKey: Hashable {
   }
 }
 
-#if canImport(PNG)
+#if canImport(SwiftTUIVendorPNG)
   private struct InMemoryPNGSource: PNG.BytestreamSource {
     private let buffer: [UInt8]
     private var index = 0
@@ -89,7 +89,7 @@ extension ImageLookupKey: Hashable {
   }
 #endif
 
-#if canImport(JPEG)
+#if canImport(SwiftTUIVendorJPEG)
   private struct InMemoryJPEGSource: JPEG.BytestreamSource {
     private let buffer: [UInt8]
     private var index = 0
@@ -268,7 +268,7 @@ final class ImageAssetRepository: Sendable {
   /// the bytes are neither format, or the matching decoder fails.
   private func decodeImageBytes(_ bytes: [UInt8]) -> DecodedImage? {
     if isJPEGBytes(bytes) {
-      #if canImport(JPEG)
+      #if canImport(SwiftTUIVendorJPEG)
         var source = InMemoryJPEGSource(bytes)
         guard let image = try? JPEG.Image.decompress(stream: &source) else {
           return nil
@@ -285,7 +285,7 @@ final class ImageAssetRepository: Sendable {
       #endif
     }
     if isPNGBytes(bytes) {
-      #if canImport(PNG)
+      #if canImport(SwiftTUIVendorPNG)
         var source = InMemoryPNGSource(bytes)
         guard let image = try? PNG.Image.decompress(stream: &source) else {
           return nil

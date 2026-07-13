@@ -1,6 +1,6 @@
 import Testing
 
-@testable import GIF
+@testable import SwiftTUIVendorGIF
 
 private struct ArraySource: GIF.BytestreamSource {
   var bytes: [UInt8]

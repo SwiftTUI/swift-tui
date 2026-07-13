@@ -1,6 +1,6 @@
 import Testing
 
-@testable import EmbeddedFonts
+@testable import SwiftTUIVendorFigletEmbeddedFonts
 
 @Suite("EmbeddedFonts base64 decoding")
 struct EmbeddedFontBase64Tests {

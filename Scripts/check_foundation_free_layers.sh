@@ -13,7 +13,8 @@
 #
 # Scope: SwiftTUICore and SwiftTUIViews — the layers that are Foundation-free
 # through their *entire* transitive graph. Checking them also covers the vendored
-# EmbeddedFonts / SwiftFiglet modules they depend on. The `SwiftTUI` convenience
+# SwiftTUIVendorFiglet / SwiftTUIVendorFigletEmbeddedFonts modules they depend
+# on (sources still live under Vendor/swift-figlet/). The `SwiftTUI` convenience
 # product is intentionally NOT checked here: it re-exports the terminal/WebHost
 # runner products, which legitimately use Foundation, so it is Foundation-free
 # only at the source level (the no-foundation hook covers that).

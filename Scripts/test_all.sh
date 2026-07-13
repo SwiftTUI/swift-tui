@@ -181,7 +181,7 @@ Runs the exhaustive checked-in repo verification surface:
   - focused SwiftTUIArguments tests
   - focused SwiftTUICLI tests
   - focused SwiftTUITerminal / PTY primitive tests
-  - focused SwiftTUIWASI / WASISurfaceBridge tests
+  - focused SwiftTUIWASI / SwiftTUIWASISurfaceBridge tests
   - focused SwiftTUIWebHost tests
   - focused SwiftTUIAndroidHost tests
   - Tools/TermUIPerf tests
@@ -892,9 +892,9 @@ run_function_step \
   run_swift test --filter SwiftTUIPTYPrimitivesTests
 
 run_function_step \
-  "Run WASISurfaceBridge tests" \
-  "$(swift_command_text test --filter WASISurfaceBridgeTests)" \
-  run_swift test --filter WASISurfaceBridgeTests
+  "Run SwiftTUIWASISurfaceBridge tests" \
+  "$(swift_command_text test --filter SwiftTUIWASISurfaceBridgeTests)" \
+  run_swift test --filter SwiftTUIWASISurfaceBridgeTests
 
 run_function_step \
   "Run SwiftTUIWASI tests" \
@@ -938,29 +938,29 @@ run_function_step \
 # Absorbed Vendor test targets (sources under Vendor/<pkg>/, targets first-class
 # inside swift-tui's Package.swift since the Vendor sub-packages were absorbed).
 run_function_step \
-  "Run UnixSignals tests" \
-  "$(swift_command_text test --filter UnixSignalsTests)" \
-  run_swift test --filter UnixSignalsTests
+  "Run vendored UnixSignals tests" \
+  "$(swift_command_text test --filter SwiftTUIVendorUnixSignalsTests)" \
+  run_swift test --filter SwiftTUIVendorUnixSignalsTests
 
 run_function_step \
-  "Run SwiftFiglet tests" \
-  "$(swift_command_text test --filter SwiftFigletTests)" \
-  run_swift test --filter SwiftFigletTests
+  "Run vendored SwiftFiglet tests" \
+  "$(swift_command_text test --filter SwiftTUIVendorFigletTests)" \
+  run_swift test --filter SwiftTUIVendorFigletTests
 
 run_function_step \
-  "Run GIF tests" \
-  "$(swift_command_text test --filter GIFTests)" \
-  run_swift test --filter GIFTests
+  "Run vendored GIF tests" \
+  "$(swift_command_text test --filter SwiftTUIVendorGIFTests)" \
+  run_swift test --filter SwiftTUIVendorGIFTests
 
 run_function_step \
-  "Run JPEG tests" \
-  "$(swift_command_text test --filter JPEGTests)" \
-  run_swift test --filter JPEGTests
+  "Run vendored JPEG tests" \
+  "$(swift_command_text test --filter SwiftTUIVendorJPEGTests)" \
+  run_swift test --filter SwiftTUIVendorJPEGTests
 
 run_function_step \
-  "Run PNG tests" \
-  "$(swift_command_text test --filter PNGTests)" \
-  run_swift test --filter PNGTests
+  "Run vendored PNG tests" \
+  "$(swift_command_text test --filter SwiftTUIVendorPNGTests)" \
+  run_swift test --filter SwiftTUIVendorPNGTests
 
 if [ "${STUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
   skip_step \

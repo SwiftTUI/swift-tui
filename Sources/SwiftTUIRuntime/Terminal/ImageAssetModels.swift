@@ -1,11 +1,11 @@
 import SwiftTUICore
 
-#if canImport(PNG)
-  import PNG
+#if canImport(SwiftTUIVendorPNG)
+  import SwiftTUIVendorPNG
 #endif
 
-#if canImport(JPEG)
-  import JPEG
+#if canImport(SwiftTUIVendorJPEG)
+  import SwiftTUIVendorJPEG
 #endif
 
 struct RGBAImagePixel: Equatable, Hashable, Sendable {
@@ -41,7 +41,7 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
     storedAlpha = UInt8(min(255, max(0, alpha)))
   }
 
-  #if canImport(PNG)
+  #if canImport(SwiftTUIVendorPNG)
     init(
       _ pixel: PNG.RGBA<UInt8>
     ) {
@@ -54,7 +54,7 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
     }
   #endif
 
-  #if canImport(JPEG)
+  #if canImport(SwiftTUIVendorJPEG)
     init(
       _ pixel: JPEG.RGBA<UInt8>
     ) {

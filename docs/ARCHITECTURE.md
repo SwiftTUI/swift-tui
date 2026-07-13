@@ -84,7 +84,7 @@ re-exported (`@_exported`) through `SwiftTUICore` and then `SwiftTUIRuntime`.
   and color-science values, the draw/layout metadata value types (`DrawPayload`
   and its payload cluster, `LayoutBehavior`, `LayoutMetadata`), the pointer and
   semantic value types, and the `Animatable` math stack. Foundation-free;
-  depends on nothing but the stdlib (plus `EmbeddedFonts` for the figlet payload
+  depends on nothing but the stdlib (plus `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload
   value). It builds standalone.
 - **`SwiftTUIGraph`** — the reconciliation engine (the AttributeGraph analog).
   The retained `ViewGraph`/`ViewNode`/`ResolvedNode` graph, state slots,
@@ -188,6 +188,44 @@ Tools/TermUIPerf/      Performance scenario harness
 
 Runnable example apps live in the sibling `SwiftTUI/swift-tui-examples`
 repository; they are demos and regression coverage, not published products.
+
+### Vendored target naming
+
+Sources under `Vendor/` keep their upstream directory names, but the SwiftPM
+**targets** they declare are all prefixed `SwiftTUIVendor…`:
+
+| Upstream module | swift-tui target | Sources |
+| --- | --- | --- |
+| `UnixSignals` | `SwiftTUIVendorUnixSignals` | `Vendor/UnixSignals/` |
+| `SwiftFiglet` | `SwiftTUIVendorFiglet` | `Vendor/swift-figlet/` |
+| `EmbeddedFonts` | `SwiftTUIVendorFigletEmbeddedFonts` | `Vendor/swift-figlet/` |
+| `GIF` | `SwiftTUIVendorGIF` | `Vendor/swift-gif/` |
+| `JPEG` | `SwiftTUIVendorJPEG` | `Vendor/swift-jpeg/` |
+| `PNG` | `SwiftTUIVendorPNG` | `Vendor/swift-png/` |
+
+SwiftPM requires target names to be unique across the **entire** package graph,
+and any target reachable from one of our products enters every consumer's graph.
+Under their upstream names these modules break consumers outright: a package that
+depends on both swift-tui and swift-service-lifecycle (which ships its own
+`UnixSignals`) fails resolution with
+
+```
+error: multiple packages ('swift-service-lifecycle', 'swift-tui') declare
+targets with a conflicting name: 'UnixSignals'
+```
+
+`GIF` / `JPEG` / `PNG` / `SwiftFiglet` are no safer — they are exactly the names
+an image or text package would reach for. The prefix removes the hazard and makes
+the vendoring legible at the use site: `import SwiftTUIVendorPNG` is obviously our
+absorbed copy, not upstream swift-png.
+
+The same reasoning covers first-party `SwiftTUIWASISurfaceBridge` (sources at
+`Platforms/WASI/Sources/WASISurfaceBridge/`), which is reachable from the
+`SwiftTUIWASI` and `SwiftTUIWebHost` products.
+
+Only the `import` line carries the vendored name. `GIF`, `JPEG`, and `PNG` each
+declare a `public enum` matching their old module name, so use sites such as
+`PNG.Image` continue to resolve against the enum and are unaffected.
 
 ## The frame pipeline, in one paragraph
 
