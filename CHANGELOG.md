@@ -38,6 +38,15 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- The absorbed Vendor targets are renamed with a `SwiftTUIVendor` prefix
+  (`UnixSignals` → `SwiftTUIVendorUnixSignals`, `SwiftFiglet` →
+  `SwiftTUIVendorFiglet`, `EmbeddedFonts` → `SwiftTUIVendorFigletEmbeddedFonts`,
+  `GIF`/`JPEG`/`PNG` → `SwiftTUIVendor{GIF,JPEG,PNG}`, the `figlet` executable →
+  `SwiftTUIVendorFigletCLI`). SwiftPM requires target names to be unique across
+  the whole package graph, so under their upstream names these targets collided
+  with packages that ship the originals (e.g. swift-service-lifecycle's
+  `UnixSignals`). No public product changes name; the vendored modules were
+  never importable by consumers.
 - Documented that `DefaultRenderer.render(_:)` is a one-shot snapshot/preview
   entry point and is **not** focus/press-reuse-safe across successive calls
   (focus/press state is excluded from the reuse snapshot and protected by the
