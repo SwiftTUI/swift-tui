@@ -105,6 +105,17 @@ struct FrameworkStressColorManagementTests {
     #expect(endpoint.deltaE(to: target) < 1e-7)
   }
 
+  @Test("stress color management 009 built-in ACEScg profile is constructible")
+  func colorManagement009BuiltInACEScgProfileIsConstructible() async {
+    await withKnownIssue(
+      "ACEScg's legitimate AP1 red primary is rejected as an invalid chromaticity"
+    ) {
+      await #expect(processExitsWith: .success) {
+        _ = RGBColorProfile.acescg
+      }
+    }
+  }
+
   private func expectXYZ(_ actual: XYZColor, equals expected: XYZColor, tolerance: Double) {
     #expect(actual.whitePoint == expected.whitePoint)
     #expect(abs(actual.x - expected.x) < tolerance)
