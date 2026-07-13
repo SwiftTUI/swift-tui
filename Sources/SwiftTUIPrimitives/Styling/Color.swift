@@ -216,6 +216,13 @@ extension Color {
     return Self._fromXYZPreservingGamut(xyz, alpha: alpha, profile: profile)
   }
 
+  internal func _convertedPreservingAbsoluteColorimetry(to profile: RGBColorProfile) -> Color {
+    if self.profile == profile { return self }
+    let xyz = self.xyz()
+    let linear = profile.xyzToRGBMatrix * Vector3(x: xyz.x, y: xyz.y, z: xyz.z)
+    return Self._fromLinearRGB(linear, alpha: alpha, profile: profile)
+  }
+
   internal func _clippedChannels() -> Color {
     Color(
       red: _PrismNumeric.clamp(red, 0, 1),

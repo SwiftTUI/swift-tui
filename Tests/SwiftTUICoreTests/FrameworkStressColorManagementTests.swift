@@ -53,9 +53,7 @@ struct FrameworkStressColorManagementTests {
     let absolute = sourceWhite.converted(to: .sRGB, gamutMapping: .absoluteColorimetric)
 
     #expect(relative.deltaE(to: .white) < 1e-4)
-    withKnownIssue("Absolute and relative colorimetric policies currently share one clip path") {
-      #expect(absolute.deltaE(to: relative) > 0.5)
-    }
+    #expect(absolute.deltaE(to: relative, method: .ciede2000) > 0.5)
   }
 
   @Test("stress color management 005 preserve and clip diverge for P3-only green")
@@ -107,12 +105,8 @@ struct FrameworkStressColorManagementTests {
 
   @Test("stress color management 009 built-in ACEScg profile is constructible")
   func colorManagement009BuiltInACEScgProfileIsConstructible() async {
-    await withKnownIssue(
-      "ACEScg's legitimate AP1 red primary is rejected as an invalid chromaticity"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = RGBColorProfile.acescg
-      }
+    await #expect(processExitsWith: .success) {
+      _ = RGBColorProfile.acescg
     }
   }
 

@@ -19,7 +19,8 @@ public struct Chromaticity: Hashable, Sendable, Codable {
   public init(x: Double, y: Double) {
     precondition(x.isFinite && y.isFinite, "Chromaticity components must be finite")
     precondition(
-      x > 0 && y > 0 && x + y <= 1.0 + 1e-12, "Chromaticity must satisfy x > 0, y > 0, x + y <= 1")
+      x > 0 && y > 0,
+      "Chromaticity must satisfy x > 0, y > 0")
     self.x = x
     self.y = y
   }

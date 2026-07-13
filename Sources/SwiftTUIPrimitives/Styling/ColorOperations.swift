@@ -45,7 +45,12 @@ extension Color {
   public func converted(to profile: RGBColorProfile, gamutMapping: GamutMappingPolicy = .default)
     -> Color
   {
-    let preserved = _convertedPreservingGamut(to: profile)
+    let preserved =
+      if gamutMapping == .absoluteColorimetric {
+        _convertedPreservingAbsoluteColorimetry(to: profile)
+      } else {
+        _convertedPreservingGamut(to: profile)
+      }
     return _mappedPreservedColor(preserved, from: self, to: profile, policy: gamutMapping)
   }
 
