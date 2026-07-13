@@ -98,7 +98,9 @@ package struct TextInputPresentation: Equatable, Sendable {
       return TextInputProjectedCluster(
         textRange: TextRange(TextOffset(offset)..<TextOffset(offset + 1)),
         display: display,
-        isNewline: character == "\n"
+        isNewline: character.unicodeScalars.allSatisfy {
+          $0.value == 0x0A || $0.value == 0x0D
+        }
       )
     }
   }

@@ -81,14 +81,7 @@ private func percentDecode(_ input: String) -> String {
 
   func flushBytes() {
     guard !byteBuffer.isEmpty else { return }
-    if let decoded = String(validating: byteBuffer, as: UTF8.self) {
-      output.append(decoded)
-    } else {
-      // Lossy fallback: emit each byte as its Latin-1 scalar.
-      for byte in byteBuffer {
-        output.unicodeScalars.append(UnicodeScalar(byte))
-      }
-    }
+    appendMixedUTF8AndLatin1(byteBuffer, to: &output)
     byteBuffer.removeAll(keepingCapacity: true)
   }
 
@@ -121,6 +114,63 @@ private func percentDecode(_ input: String) -> String {
   }
   flushBytes()
   return output
+}
+
+/// Decodes every well-formed UTF-8 subsequence while preserving each malformed
+/// byte as its corresponding Latin-1 scalar. A single bad byte must not force
+/// otherwise valid neighboring multibyte sequences through the fallback path.
+private func appendMixedUTF8AndLatin1(
+  _ bytes: [UInt8],
+  to output: inout String
+) {
+  var index = 0
+  while index < bytes.count {
+    if let length = validUTF8SequenceLength(in: bytes, at: index) {
+      let end = index + length
+      if let decoded = String(validating: Array(bytes[index..<end]), as: UTF8.self) {
+        output.append(decoded)
+        index = end
+        continue
+      }
+    }
+
+    output.unicodeScalars.append(UnicodeScalar(bytes[index]))
+    index += 1
+  }
+}
+
+private func validUTF8SequenceLength(
+  in bytes: [UInt8],
+  at index: Int
+) -> Int? {
+  let lead = bytes[index]
+  if lead < 0x80 {
+    return 1
+  }
+
+  func continuation(_ offset: Int, in range: ClosedRange<UInt8> = 0x80...0xBF) -> Bool {
+    let position = index + offset
+    return position < bytes.count && range.contains(bytes[position])
+  }
+
+  switch lead {
+  case 0xC2...0xDF:
+    return continuation(1) ? 2 : nil
+  case 0xE0:
+    return continuation(1, in: 0xA0...0xBF) && continuation(2) ? 3 : nil
+  case 0xE1...0xEC, 0xEE...0xEF:
+    return continuation(1) && continuation(2) ? 3 : nil
+  case 0xED:
+    return continuation(1, in: 0x80...0x9F) && continuation(2) ? 3 : nil
+  case 0xF0:
+    return continuation(1, in: 0x90...0xBF) && continuation(2) && continuation(3) ? 4 : nil
+  case 0xF1...0xF3:
+    return continuation(1) && continuation(2) && continuation(3) ? 4 : nil
+  case 0xF4:
+    return continuation(1, in: 0x80...0x8F) && continuation(2) && continuation(3) ? 4 : nil
+  default:
+    return nil
+  }
 }
 
 private func hexValue(_ scalar: UnicodeScalar) -> UInt8? {

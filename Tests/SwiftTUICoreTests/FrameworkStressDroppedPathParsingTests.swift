@@ -106,20 +106,12 @@ struct FrameworkStressDroppedPathParsingTests {
 
   @Test("stress dropped path parsing 021 invalid byte after valid UTF-8 preserves valid prefix")
   func droppedPathParsing021InvalidByteAfterValidUTF8PreservesValidPrefix() {
-    withKnownIssue(
-      "Percent decoding falls back to Latin-1 for the whole byte run after one invalid byte"
-    ) {
-      #expect(parseDroppedPaths("file:///tmp/%E2%82%AC%FF") == [DroppedPath("/tmp/€ÿ")])
-    }
+    #expect(parseDroppedPaths("file:///tmp/%E2%82%AC%FF") == [DroppedPath("/tmp/€ÿ")])
   }
 
   @Test("stress dropped path parsing 022 invalid byte before valid UTF-8 preserves valid suffix")
   func droppedPathParsing022InvalidByteBeforeValidUTF8PreservesValidSuffix() {
-    withKnownIssue(
-      "Percent decoding falls back to Latin-1 for the whole byte run before valid UTF-8"
-    ) {
-      #expect(parseDroppedPaths("file:///tmp/%FF%E2%82%AC") == [DroppedPath("/tmp/ÿ€")])
-    }
+    #expect(parseDroppedPaths("file:///tmp/%FF%E2%82%AC") == [DroppedPath("/tmp/ÿ€")])
   }
 
   @Test("stress dropped path parsing 023 malformed escape does not poison a later valid escape")

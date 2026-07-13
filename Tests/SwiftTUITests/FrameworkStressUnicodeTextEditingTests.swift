@@ -117,11 +117,9 @@ extension FrameworkStressUnicodeTextEditingTests {
     // in-line control cluster instead of one visual line break.
     let presentation = unicodePresentation(text: "界\r\nB", caret: 2, width: nil)
 
-    withKnownIssue("CRLF is projected as an inline control grapheme instead of a line break") {
-      #expect(presentation.layoutMap.lines.count == 2)
-      #expect(presentation.layoutMap.caretPoint(for: TextOffset(2)) == CellPoint(x: 0, y: 1))
-      #expect(presentation.layoutMap.contentSize == CellSize(width: 2, height: 2))
-    }
+    #expect(presentation.layoutMap.lines.count == 2)
+    #expect(presentation.layoutMap.caretPoint(for: TextOffset(2)) == CellPoint(x: 0, y: 1))
+    #expect(presentation.layoutMap.contentSize == CellSize(width: 2, height: 2))
   }
 
   @Test("stress Unicode editing 007 carriage return produces a multiline break")
@@ -130,11 +128,9 @@ extension FrameworkStressUnicodeTextEditingTests {
     // though multiline input should treat it as a line separator.
     let presentation = unicodePresentation(text: "A\r界", caret: 2, width: nil)
 
-    withKnownIssue("Lone carriage return is projected inline instead of as a line break") {
-      #expect(presentation.layoutMap.lines.count == 2)
-      #expect(presentation.layoutMap.caretPoint(for: TextOffset(2)) == CellPoint(x: 0, y: 1))
-      #expect(presentation.layoutMap.contentSize == CellSize(width: 2, height: 2))
-    }
+    #expect(presentation.layoutMap.lines.count == 2)
+    #expect(presentation.layoutMap.caretPoint(for: TextOffset(2)) == CellPoint(x: 0, y: 1))
+    #expect(presentation.layoutMap.contentSize == CellSize(width: 2, height: 2))
   }
 
   @Test("stress Unicode editing 008 word movement recognizes a Devanagari grapheme")
@@ -235,10 +231,8 @@ extension FrameworkStressUnicodeTextEditingTests {
     let textStyle = unicodePresentation(text: "©︎A", caret: 1, width: nil)
     let emojiStyle = unicodePresentation(text: "©️A", caret: 1, width: nil)
 
-    withKnownIssue("VS15 text presentation is charged the emoji symbol's two-cell width") {
-      #expect(textStyle.caretAnchor == CellPoint(x: 1, y: 0))
-      #expect(textStyle.layoutMap.contentSize.width == 2)
-    }
+    #expect(textStyle.caretAnchor == CellPoint(x: 1, y: 0))
+    #expect(textStyle.layoutMap.contentSize.width == 2)
     #expect(emojiStyle.caretAnchor == CellPoint(x: 2, y: 0))
     #expect(emojiStyle.layoutMap.contentSize.width == 3)
   }
@@ -275,9 +269,7 @@ extension FrameworkStressUnicodeTextEditingTests {
     let rightCell = presentation.layoutMap.nearestOffset(to: CellPoint(x: 2, y: 0))
 
     #expect(leftCell == TextOffset(1))
-    withKnownIssue("Both integer cells of a two-cell grapheme hit-test to its leading offset") {
-      #expect(rightCell == TextOffset(2))
-    }
+    #expect(rightCell == TextOffset(2))
   }
 
   @Test("stress Unicode editing 017 family selection rect spans full glyph")

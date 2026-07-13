@@ -17,6 +17,7 @@ package func cellWidth(of character: Character) -> Int {
   var scalarCount = 0
   var containsEmojiPresentation = false
   var containsEmoji = false
+  var containsTextPresentation = false
   var containsVS16 = false
   var containsWide = false
   var allZeroWidth = true
@@ -29,6 +30,9 @@ package func cellWidth(of character: Character) -> Int {
     if scalar.properties.isEmoji {
       containsEmoji = true
     }
+    if scalar.value == 0xFE0E {
+      containsTextPresentation = true
+    }
     if scalar.value == 0xFE0F {
       containsVS16 = true
     }
@@ -40,6 +44,12 @@ package func cellWidth(of character: Character) -> Int {
     }
   }
 
+  if containsTextPresentation {
+    if containsWide {
+      return 2
+    }
+    return allZeroWidth ? 0 : 1
+  }
   if containsEmojiPresentation || (scalarCount > 1 && containsEmoji) {
     return 2
   }

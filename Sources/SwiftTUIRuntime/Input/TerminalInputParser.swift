@@ -260,14 +260,29 @@ extension TerminalInputParser {
     // navigation) and leaves the trailing '~' to be inserted as literal text.
     if (0x30...0x39).contains(bufferedBytes[2]) {
       var index = 2
-      while index < bufferedBytes.count, (0x30...0x3B).contains(bufferedBytes[index]) {
+      while index < bufferedBytes.count, (0x30...0x3F).contains(bufferedBytes[index]) {
         index += 1
       }
       guard index < bufferedBytes.count else {
         return nil  // terminator not buffered yet — wait for more bytes
       }
+      let parameterBytes = Array(bufferedBytes[2..<index])
+
+      // A malformed Kitty event subparameter can put an alphabetic byte where
+      // a number belongs immediately before the `u` terminator. Treat that as
+      // one rejected Kitty envelope instead of leaking both its CSI prefix and
+      // terminator as user input. Wait across a read boundary so the recovery
+      // remains atomic when the `u` has not arrived yet.
+      if parameterBytes.contains(0x3A), bufferedBytes[index] != 0x75 {
+        guard index + 1 < bufferedBytes.count else {
+          return nil
+        }
+        if bufferedBytes[index + 1] == 0x75 {
+          bufferedBytes.removeFirst(index + 2)
+          return parseNextEvent()
+        }
+      }
       if bufferedBytes[index] == 0x7E {
-        let parameterBytes = Array(bufferedBytes[2..<index])
         bufferedBytes.removeFirst(index + 1)
         if let event = tildeKeyEvent(parameterBytes: parameterBytes) {
           return event
@@ -282,7 +297,6 @@ extension TerminalInputParser {
       // envelopes unprompted, and consuming them whole means a stray envelope
       // can never mangle into an Escape plus literal parameter text.
       if bufferedBytes[index] == 0x75 {
-        let parameterBytes = Array(bufferedBytes[2..<index])
         bufferedBytes.removeFirst(index + 1)
         if let event = kittyKeyEvent(parameterBytes: parameterBytes) {
           return event
@@ -328,8 +342,7 @@ extension TerminalInputParser {
       bufferedBytes.removeFirst(3)
       return .key(KeyPress(.tab, modifiers: .shift))
     default:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.escape))
+      return discardCSI(prefixLength: 2)
     }
   }
 
@@ -435,7 +448,7 @@ extension TerminalInputParser {
     let modifiers = csiModifiers(from: modifierBytes)
 
     guard let key = csiTerminalKey(from: terminalByte) else {
-      return .key(KeyPress(.escape, modifiers: modifiers))
+      return parseNextEvent()
     }
 
     return .key(KeyPress(key, modifiers: modifiers))
@@ -447,7 +460,13 @@ extension TerminalInputParser {
   /// pre-F14 fall-through corrupted input with a stray Escape plus a literal
   /// '~', so consuming whole envelopes is load-bearing either way.
   private func tildeKeyEvent(parameterBytes: [UInt8]) -> InputEvent? {
-    let groups = parameterBytes.split(separator: 0x3B)  // ';'
+    let groups = parameterBytes.split(
+      separator: 0x3B,  // ';'
+      omittingEmptySubsequences: false
+    )
+    guard groups.count <= 2 else {
+      return nil
+    }
     guard let keyGroup = groups.first, let keyID = asciiInteger(from: keyGroup) else {
       return nil
     }
@@ -528,11 +547,18 @@ extension TerminalInputParser {
       // Event-type subparameter: 1 = press, 2 = repeat, 3 = release.
       // Releases arrive only under enhancement flags this host never
       // requests; swallow them so a stray one can never double-fire.
-      if modifierParts.count > 1,
-        let eventType = asciiInteger(from: modifierParts[1]),
-        eventType == 3
-      {
-        return nil
+      if modifierParts.count > 1 {
+        guard let eventType = asciiInteger(from: modifierParts[1]) else {
+          return nil
+        }
+        switch eventType {
+        case 1, 2:
+          break
+        case 3:
+          return nil
+        default:
+          return nil
+        }
       }
       // Kitty encodes the modifier parameter as 1 + bitmask: shift=1,
       // alt=2, ctrl=4, super=8, hyper=16, meta=32, caps_lock=64,

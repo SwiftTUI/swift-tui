@@ -108,11 +108,7 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[97;1:xuZ".utf8))
 
-    withKnownIssue(
-      "Nonnumeric kitty event types break envelope recognition and leak as literal key input"
-    ) {
-      #expect(events == [.key(KeyPress(.character("Z")))])
-    }
+    #expect(events == [.key(KeyPress(.character("Z")))])
   }
 
   @Test("stress terminal protocol 011 unknown kitty event types never synthesize presses")
@@ -122,11 +118,7 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[97;1:4uZ".utf8))
 
-    withKnownIssue(
-      "Unknown kitty event types are currently treated as key presses"
-    ) {
-      #expect(events == [.key(KeyPress(.character("Z")))])
-    }
+    #expect(events == [.key(KeyPress(.character("Z")))])
   }
 
   @Test("stress terminal protocol 012 VT220 tilde keys retain all representable modifiers")
@@ -174,11 +166,7 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[3;5;9~Z".utf8))
 
-    withKnownIssue(
-      "VT220 decoding currently ignores parameter groups after the modifier field"
-    ) {
-      #expect(events == [.key(KeyPress(.character("Z")))])
-    }
+    #expect(events == [.key(KeyPress(.character("Z")))])
   }
 
   @Test("stress terminal protocol 016 unknown modified CSI finals never synthesize Escape")
@@ -188,11 +176,7 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
 
     let events = parser.feed(Array("\u{001B}[1;5XZ".utf8))
 
-    withKnownIssue(
-      "Unknown modified CSI finals currently synthesize an Escape key press"
-    ) {
-      #expect(events == [.key(KeyPress(.character("Z")))])
-    }
+    #expect(events == [.key(KeyPress(.character("Z")))])
   }
 
   @Test("stress terminal protocol 017 VT220 sequences survive a split after Escape")

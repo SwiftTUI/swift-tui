@@ -55,8 +55,10 @@ package struct TextInputLayoutMap: Equatable, Sendable {
       guard localX < endX else {
         continue
       }
-      let midpoint = startX + max(1, cluster.cellWidth) / 2
-      return localX <= midpoint ? cluster.textRange.lowerBound : cluster.textRange.upperBound
+      let cellOffset = localX - startX
+      return cellOffset * 2 < max(1, cluster.cellWidth)
+        ? cluster.textRange.lowerBound
+        : cluster.textRange.upperBound
     }
     return line.sourceRange.upperBound
   }
@@ -158,8 +160,10 @@ package struct TextInputLayoutLine: Equatable, Sendable {
       guard clampedColumn < endX else {
         continue
       }
-      let midpoint = cluster.originX + max(1, cluster.cellWidth) / 2
-      return clampedColumn <= midpoint ? cluster.textRange.lowerBound : cluster.textRange.upperBound
+      let cellOffset = clampedColumn - cluster.originX
+      return cellOffset * 2 < max(1, cluster.cellWidth)
+        ? cluster.textRange.lowerBound
+        : cluster.textRange.upperBound
     }
     return sourceRange.upperBound
   }
