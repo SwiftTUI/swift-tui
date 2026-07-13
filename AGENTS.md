@@ -50,7 +50,9 @@ SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUI
 - **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.
 - **SwiftTUI** — the batteries-included convenience product; re-exports the
   combined terminal/WebHost runner and `SwiftTUIAnimatedImage`.
-- **SwiftTUICharts** — peer product for charting/graph views.
+- **SwiftTUICharts** — chart/graph views; ships from the peer repository
+  [`SwiftTUI/swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts),
+  composed on the public `SwiftTUIViews` surface.
 
 `DefaultRenderer` runs one composed runtime stage pipeline:
 

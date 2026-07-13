@@ -18,4 +18,3 @@ SwiftTUIWASI|Platforms/WASI/Sources/SwiftTUIWASI/SwiftTUIWASI.docc
 SwiftTUIWebHost|Platforms/WebHost/Sources/SwiftTUIWebHost/SwiftTUIWebHost.docc
 SwiftTUIWebHostCLI|Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.docc
 SwiftTUIAnimatedImage|Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc
-SwiftTUICharts|Sources/SwiftTUICharts/SwiftTUICharts.docc

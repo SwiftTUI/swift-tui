@@ -60,7 +60,6 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUIViews",
   "SwiftTUITestSupport",
   "SwiftTUIAnimatedImage",
-  "SwiftTUICharts",
   "JPEG",
   "PNG",
 ]
@@ -86,7 +85,6 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
     .library(name: "SwiftTUIProfiling", targets: ["SwiftTUIProfiling"]),
     .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
-    .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
     .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
     .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
     .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
@@ -142,12 +140,6 @@ let package = Package(
         "SwiftTUICore",
         "EmbeddedFonts",
       ],
-      swiftSettings: swiftSettings()
-    ),
-
-    .target(
-      name: "SwiftTUICharts",
-      dependencies: ["SwiftTUIViews"],
       swiftSettings: swiftSettings()
     ),
 

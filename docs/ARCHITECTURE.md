@@ -67,7 +67,6 @@ flowchart TD
     SwiftTUIWebHostCLI --> SwiftTUIArguments
     SwiftTUITerminal --> SwiftTUIRuntime
     SwiftTUITerminalWorkspace --> SwiftTUITerminal
-    SwiftTUICharts --> SwiftTUIViews
     SwiftTUIAnimatedImage --> SwiftTUIViews
     SwiftTUIProfiling["SwiftTUIProfiling<br/>(optional, opt-in)"] --> SwiftTUIRuntime
 ```
@@ -120,9 +119,10 @@ re-exported (`@_exported`) through `SwiftTUICore` and then `SwiftTUIRuntime`.
   support.
 - **`SwiftTUIRuntime`**, **`SwiftTUIViews`** — usable directly by hosts and
   custom launchers that do not want the convenience product.
-- **`SwiftTUICharts`** — `LineChart`, `CalendarHeatmap`, `Sparkline`, and
-  related dashboard views. Charting is not included in the default `SwiftTUI`
-  import.
+- **`SwiftTUICharts`** (external) — `LineChart`, `CalendarHeatmap`,
+  `Sparkline`, and related dashboard views now ship from the peer repository
+  [`SwiftTUI/swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts),
+  composed on the public `SwiftTUIViews` surface.
 - **`SwiftTUIAnimatedImage`** — finite, pre-composed animated-image playback and
   GIF import/export. It is available as a standalone product for narrow
   compositions and is included by the `SwiftTUI` convenience product.
@@ -175,7 +175,6 @@ Sources/
                        Animation, Environment, GeometryReading  + .docc
   SwiftTUIRuntime/     RunLoop, Rendering, Scenes, Terminal, Lifecycle, Input,
                        Accessibility, Configuration, Diagnostics  + .docc
-  SwiftTUICharts/      Chart views  + SwiftTUICharts.docc
   SwiftTUIAnimatedImage/  Animated image playback  + .docc
   SwiftTUI/            Convenience re-export target  + SwiftTUI.docc
   SwiftTUIProfiling/   Activation, Sinks, CPU, Memory, Progress  + .docc

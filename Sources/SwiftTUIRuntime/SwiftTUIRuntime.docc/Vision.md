@@ -24,7 +24,8 @@ SwiftTUI provides:
 - PNG and baseline JPEG image presentation
 - GIF import/export and finite animation through `SwiftTUIAnimatedImage`, which
   is included by the `SwiftTUI` convenience product
-- Compact charts and metric components through the peer `SwiftTUICharts` product
+- Compact charts and metric components through the peer
+  [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package
 - Terminal-native presentation through alerts, confirmation dialogs, sheets,
   popovers, popover tips, menus, and toasts
 - Binding-driven `NavigationStack` destination presentation

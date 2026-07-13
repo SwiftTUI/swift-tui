@@ -64,7 +64,6 @@ Per-symbol API documentation is authored as DocC catalogs alongside the source:
 - `Sources/SwiftTUICore/SwiftTUICore.docc` — geometry, phase products, cell/pixel metrics.
 - `Sources/SwiftTUIViews/SwiftTUIViews.docc` — authoring views, state, focus, gestures, drawing.
 - `Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc` — the runtime, runtime render pipeline, hosting, running apps.
-- `Sources/SwiftTUICharts/SwiftTUICharts.docc` — charts and dashboards.
 - `Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc` — animated image playback.
 - `Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc` — optional profiling: `.profiling()`, the `SWIFTTUI_PROFILE` grammar, and the frame/memory/CPU signals.
 - `Sources/SwiftTUI/SwiftTUI.docc` — the batteries-included convenience product.

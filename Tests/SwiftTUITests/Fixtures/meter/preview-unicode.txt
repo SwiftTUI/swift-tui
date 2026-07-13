@@ -1,7 +1,0 @@
-fixture meter
-configuration preview-unicode
-surface 26x2
-capability glyph=unicode color=none styles=false
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
-01│Budget·················84%
-02│██████████──

@@ -82,8 +82,8 @@ build, then depend on the batteries-included `SwiftTUI` product:
 screen until you exit, then restores your shell. Add `--web` to run the exact
 same app through the localhost WebHost in a browser — no code change. That single
 `SwiftTUI` import re-exports the platform-neutral runtime, argument parsing, the
-combined terminal/WebHost runner, and animated GIF/image playback; charts stay
-opt-in via `SwiftTUICharts`.
+combined terminal/WebHost runner, and animated GIF/image playback; charts ship
+separately from [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
 
 <details>
 <summary>Full <code>Package.swift</code>, platform requirements, standard CLI flags, and lower-level rendering</summary>

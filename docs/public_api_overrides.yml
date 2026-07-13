@@ -417,36 +417,6 @@ classifications:
     - SwiftTUIViews.VerticalEdge
     - SwiftTUIViews.ViewSpacing
 
-    # ─── SwiftTUICharts ───────────────────────────────────────────────────
-    - SwiftTUICharts.BannerTone
-    - SwiftTUICharts.BarChart
-    - SwiftTUICharts.BarChartEntry
-    - SwiftTUICharts.BulletChart
-    - SwiftTUICharts.CalendarHeatmap
-    - SwiftTUICharts.CalendarHeatmapWeekStart
-    - SwiftTUICharts.ColumnChart
-    - SwiftTUICharts.ComparisonChart
-    - SwiftTUICharts.ComparisonEntry
-    - SwiftTUICharts.DateAxisStride
-    - SwiftTUICharts.DateValue
-    - SwiftTUICharts.HeatStrip
-    - SwiftTUICharts.Legend
-    - SwiftTUICharts.LegendItem
-    - SwiftTUICharts.LineChart
-    - SwiftTUICharts.LineChartBaseline
-    - SwiftTUICharts.LineChartLegendConfig
-    - SwiftTUICharts.LineChartPoint
-    - SwiftTUICharts.LineChartSeries
-    - SwiftTUICharts.LineChartSeriesStyle
-    - SwiftTUICharts.LineChartXAxis
-    - SwiftTUICharts.LineChartYAxis
-    - SwiftTUICharts.Meter
-    - SwiftTUICharts.Sparkline
-    - SwiftTUICharts.StackedBarChart
-    - SwiftTUICharts.ThresholdBand
-    - SwiftTUICharts.ThresholdGauge
-    - SwiftTUICharts.Timeline
-    - SwiftTUICharts.TimelineEntry
 
 
     # ─── SwiftTUICore (pipeline + supporting types) ───────────────────────

@@ -67,7 +67,7 @@ SwiftTUICore   (engine: geometry + pipeline + typed products; no terminal IO, Fo
            -> SwiftTUI   (batteries-included convenience re-export)
 ```
 
-Peer products (`SwiftTUICharts`, `SwiftTUIAnimatedImage`, `SwiftTUIProfiling`) and
+Peer products (`SwiftTUIAnimatedImage`, `SwiftTUIProfiling`) and
 the host runners under `Platforms/` hang off the side of this spine — none of them
 are *in* the spine.
 
@@ -81,7 +81,6 @@ SwiftTUICore
   -> SwiftTUIViews            (Views depends on Core)
   -> SwiftTUIRuntime          (Runtime depends on Core + Views)
      -> SwiftTUI              (convenience product re-exports Runtime + WebHostCLI + AnimatedImage)
-SwiftTUICharts        -> SwiftTUIViews          (peer product)
 SwiftTUIAnimatedImage -> SwiftTUIViews          (peer product, bundled into SwiftTUI)
 SwiftTUIProfiling     -> SwiftTUIRuntime        (optional, opt-in; nothing in the default graph depends on it)
 Platforms/CLI         (SwiftTUICLI / TerminalRunner)          -> SwiftTUIRuntime
@@ -107,7 +106,6 @@ consumes it ships from `swift-tui-android`.
 | **SwiftTUIViews** | `Sources/SwiftTUIViews/` | The authoring surface: `View`/`ViewModifier`/`ViewBuilder`, controls, stacks, the `Layout` protocol, `@State`/`@Binding`/`@FocusState`/`@Environment`, gestures, presentation, scrolling, shapes. | **Foundation-free.** `View` is body-only, `@MainActor`-isolated; lowering to primitives is package-internal. `@_exported`-imports Core (which re-exports Graph + Primitives) so the published `SwiftTUIViews` product is a self-sufficient authoring surface for external view libraries. |
 | **SwiftTUIRuntime** | `Sources/SwiftTUIRuntime/` | `RunLoop`, `DefaultRenderer`, the runtime stage pipeline, scenes (`App`/`Scene`/`WindowGroup`), terminal hosting, host-frame contracts, input, animation controller, lifecycle, diagnostics emission. | The first layer allowed to touch terminal IO and Foundation. |
 | **SwiftTUI** | `Sources/SwiftTUI/` | Convenience re-export: `App.main()`, standard flags, `--web` launch, animated-image support. | Also kept **Foundation-free** (writes UTF-8 to stdout without Foundation). |
-| **SwiftTUICharts** | `Sources/SwiftTUICharts/` | `LineChart`, `CalendarHeatmap`, `Sparkline`, gauges, etc. | Peer product; **not** in the default `SwiftTUI` import. |
 | **SwiftTUIAnimatedImage** | `Sources/SwiftTUIAnimatedImage/` | Finite pre-composed animated-image playback, GIF/PNG import-export. | Peer product; bundled into `SwiftTUI`. |
 | **SwiftTUIProfiling** | `Sources/SwiftTUIProfiling/` | `.profiling()` scene modifier; per-frame timing, memory, CPU/RSS signals routed to TSV/JSONL/summary sinks. | Opt-in, env-gated (`SWIFTTUI_PROFILE`); the runtime never depends on it — it consumes the neutral `FrameDiagnosticSink`/`RuntimeFrameSample` contract. |
 | **Platforms/** runners | `Platforms/{CLI,WASI,WebHost,Android,Embedding,Arguments}/Sources/` | One host runner or transport each. **No nested Swift packages** — every target is declared in the root `Package.swift`. | Hosts sit *below* the committed-frame boundary; they consume committed contracts, not renderer-private state. |
@@ -964,7 +962,7 @@ A suggested first-week reading order, each tied to a section above:
    hosts are in [docs/DEVELOPMENT.md](DEVELOPMENT.md).
 
 Good first changes live at the edges where the contract is narrow: a new
-`SwiftTUICharts` view (peer product, no engine risk), a new key binding in the
+chart view in the external `swift-tui-charts` package (no engine risk), a new key binding in the
 `handleKeyPress` ladder, or a new field on the web wire frame (touches exactly
 `WebSurfaceFrameEncoder` and the `swift-tui-web` parser). Avoid the resolve planner,
 the actor split in the fused tail, and reuse suppression until you have traced a frame

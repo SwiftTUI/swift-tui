@@ -120,7 +120,6 @@ const PRIMARY_MODULES = [
   "SwiftTUIProfiling",
   "SwiftTUIViews",
   "SwiftTUIAnimatedImage",
-  "SwiftTUICharts",
   "SwiftTUIArguments",
   "SwiftTUIPTYPrimitives",
   "SwiftTUITerminal",

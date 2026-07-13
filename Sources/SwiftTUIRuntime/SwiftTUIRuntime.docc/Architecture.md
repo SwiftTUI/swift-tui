@@ -23,11 +23,12 @@ boundaries, the runtime pipeline, and the phase products that connect them.
 - Resolves authored views into core nodes
 - Provides property wrappers, environment plumbing, focus APIs, layouts, and controls
 
-### `SwiftTUICharts`
+### `SwiftTUICharts` (external)
 
-- Builds compact chart and metric views on top of `SwiftTUIViews`
-- Reuses the same layout, semantic, draw, and raster pipeline
-- Remains a separate track so charting does not distort the core library surface
+- Ships from the peer repository
+  [`SwiftTUI/swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts)
+- Builds compact chart and metric views on the public `SwiftTUIViews` surface
+- Remains a separate package so charting does not distort the core library surface
 
 ### `SwiftTUIAnimatedImage`
 

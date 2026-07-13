@@ -8,6 +8,34 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING: the `SwiftTUICharts` product moved to its own repository,
+  [`SwiftTUI/swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).**
+  `swift-tui` no longer declares a `SwiftTUICharts` product or target. Keep
+  your `import SwiftTUICharts` lines as they are, add the new package
+  dependency, and change the product's `package:` identity:
+
+  ```swift
+  dependencies: [
+    .package(url: "https://github.com/SwiftTUI/swift-tui.git", exact: "<version>"),
+    .package(url: "https://github.com/SwiftTUI/swift-tui-charts.git", exact: "<version>"),
+  ],
+  // in the target:
+  .product(name: "SwiftTUICharts", package: "swift-tui-charts"),
+  ```
+
+### Added
+
+- `AccessibilityVisualContent` is now public, and the public
+  `SemanticMetadata` initializer accepts `accessibilityVisualContent:`, so
+  external view libraries can participate in the missing-label accessibility
+  diagnostics contract.
+- The published `SwiftTUIViews` product re-exports `SwiftTUICore` (which
+  re-exports `SwiftTUIGraph` and `SwiftTUIPrimitives`), making
+  `import SwiftTUIViews` a self-sufficient authoring surface for external
+  view libraries — the same re-export shape `SwiftTUIRuntime` already had.
+
 ### Changed
 
 - Documented that `DefaultRenderer.render(_:)` is a one-shot snapshot/preview

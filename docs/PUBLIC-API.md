@@ -48,8 +48,9 @@ The canonical public surface is the API ordinary app code uses first:
   `RuntimeConfiguration`, `App`, `Scene`, `WindowGroup`, the scene builder
   artifacts, `RenderSnapshot`, `HostedSceneSession`, `HostedRasterSurface`,
   `SemanticHostFrame`, and the `PresentationSurface` roles.
-- The default animated-image surface from `SwiftTUIAnimatedImage`, plus the
-  explicit `SwiftTUICharts` charting product.
+- The default animated-image surface from `SwiftTUIAnimatedImage`. Charting
+  ships separately from
+  [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
 
 If a feature can be expressed on this surface, it should be documented there
 first.
@@ -159,7 +160,8 @@ The full ActionScope/commands surface is public:
 combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, so an
 ordinary app writes only `import SwiftTUI` and gets standard flags, the default
 terminal `App.main()`, `--web` localhost launch, and animated GIF/image support.
-It does not include `SwiftTUICharts`; charting/graph views remain explicit.
+Charting/graph views live in the external
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package.
 
 `SwiftTUIRuntime` is the platform-neutral runtime import for host products and
 custom launchers that do not want the convenience product.

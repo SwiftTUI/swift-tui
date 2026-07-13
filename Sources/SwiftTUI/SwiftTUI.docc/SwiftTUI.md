@@ -54,8 +54,9 @@ The default `App.main()` (bound by `@main`) uses the terminal runner unless the
 parsed configuration requests `--web`, in which case it launches the localhost
 WebHost bridge. Use `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWebHost`, or
 `SwiftTUIWebHostCLI` directly when building a narrower custom graph. Add peer
-products such as `SwiftTUICharts`, `SwiftTUITerminal`, or
-`SwiftTUITerminalWorkspace` only when that surface is part of your app.
+products such as `SwiftTUITerminal` or `SwiftTUITerminalWorkspace` only when
+that surface is part of your app; charts ship separately from
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
 Import `SwiftTUIRuntime` directly for host-managed app declarations that should
 not conform to `SwiftTUICommand`.
 

@@ -42,15 +42,16 @@ sibling root-package products directly.
 | One binary that supports terminal launch and `--web` | `SwiftTUIWebHostCLI` | `import SwiftTUIWebHostCLI` |
 | Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
 | Tabbed/split terminal workspaces | `SwiftTUITerminalWorkspace` | `import SwiftTUITerminalWorkspace` |
-| Charts and compact metrics | `SwiftTUICharts` | `import SwiftTUICharts` |
+| Charts and compact metrics | `SwiftTUICharts` (from the separate [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package) | `import SwiftTUICharts` |
 | Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
 `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and
 `SwiftTUIWebHostCLI` all re-export the authoring surface, so an executable
 usually imports one launch product. `SwiftTUI` additionally includes
-`SwiftTUIAnimatedImage` by default. Add peer products such as `SwiftTUICharts`,
-`SwiftTUITerminal`, and `SwiftTUITerminalWorkspace` alongside your launch
-product only when you use those views.
+`SwiftTUIAnimatedImage` by default. Add peer products such as
+`SwiftTUITerminal` and `SwiftTUITerminalWorkspace` alongside your launch
+product only when you use those views; charts come from the separate
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package.
 
 ## Common Compositions
 
@@ -78,8 +79,10 @@ directly when you want a terminal-only graph that rejects `--web`.
 
 ### Terminal App With Charts
 
-Add charting as a peer product. The chart module reuses the same view and
-runtime pipeline; it is not a separate app framework.
+Add charting from the separate
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package
+(product `SwiftTUICharts`, `package: "swift-tui-charts"`). The chart module
+reuses the same view and runtime pipeline; it is not a separate app framework.
 
 ```swift
 import SwiftTUI

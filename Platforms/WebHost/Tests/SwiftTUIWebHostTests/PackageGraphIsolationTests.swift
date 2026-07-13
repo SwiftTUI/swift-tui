@@ -15,7 +15,6 @@ struct PackageGraphIsolationTests {
     #expect(swiftTUITargetBlock.contains("\"SwiftTUIArguments\""))
     #expect(swiftTUITargetBlock.contains("\"SwiftTUIRuntime\""))
     #expect(!swiftTUITargetBlock.contains("\"SwiftTUICLI\""))
-    #expect(!swiftTUITargetBlock.contains("\"SwiftTUICharts\""))
     #expect(!swiftTUITargetBlock.contains("Flying" + "Fox"))
   }
 

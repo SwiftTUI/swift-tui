@@ -74,12 +74,6 @@ case "$swift_tui_target_block" in
     ;;
 esac
 
-case "$swift_tui_target_block" in
-  *SwiftTUICharts*)
-    fail 'The SwiftTUI convenience target must not depend on SwiftTUICharts.'
-    ;;
-esac
-
 arguments_target_block=$(target_block SwiftTUIArguments)
 
 case "$arguments_target_block" in

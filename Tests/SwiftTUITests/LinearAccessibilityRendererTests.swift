@@ -1,6 +1,5 @@
 import Testing
 
-@testable import SwiftTUICharts
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
@@ -168,52 +167,6 @@ struct LinearAccessibilityRendererTests {
       output
         == "warning: Canvas omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true).\n"
     )
-  }
-
-  @Test("default chart summaries provide image accessibility labels")
-  func defaultChartSummariesProvideImageAccessibilityLabels() {
-    let artifacts = DefaultRenderer().render(
-      VStack(alignment: .leading, spacing: 0) {
-        Sparkline("Trend", values: [1, 3, 2])
-        BarChart(
-          "Queues",
-          entries: [
-            .init("api", value: 8),
-            .init("jobs", value: 4),
-          ]
-        )
-      },
-      context: ResolveContext(identity: testIdentity("ChartAccessibilityRoot")),
-      proposal: .init(width: 40, height: 8)
-    )
-
-    let output = LinearAccessibilityRenderer().render(artifacts.semanticSnapshot)
-
-    #expect(output.contains("image: Trend: lo 1 hi 3"))
-    #expect(output.contains("image: Queues: max 8"))
-    #expect(!output.contains("warning:"))
-  }
-
-  @Test("custom chart content without accessibility label emits a warning")
-  func customChartWithoutAccessibilityLabelEmitsWarning() {
-    let artifacts = DefaultRenderer().render(
-      Sparkline(
-        values: [1, 3, 2],
-        label: { Text("Trend") },
-        summary: { EmptyView() }
-      ),
-      context: ResolveContext(identity: testIdentity("CustomChartAccessibilityRoot")),
-      proposal: .init(width: 40, height: 4)
-    )
-
-    let output = LinearAccessibilityRenderer().render(artifacts.semanticSnapshot)
-
-    #expect(
-      output.contains(
-        "warning: Sparkline omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
-      )
-    )
-    #expect(!output.contains("image:"))
   }
 
   @Test("accessible runtime writes linear output instead of presenting raster frames")

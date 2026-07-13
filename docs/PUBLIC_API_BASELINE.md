@@ -22,7 +22,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 269 | 1441 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
-| `SwiftTUICharts` | 29 | 219 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminal` | 13 | 126 |
@@ -406,40 +405,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `AnimatedImageFrame` — struct — 5 members
 - `AnimatedImagePixel` — struct — 5 members
 - `AnimatedImageSequence` — struct — 4 members
-
-## SwiftTUICharts
-
-### Canonical surface (29)
-
-- `BannerTone` — struct — 5 members
-- `BarChart` — struct — 7 members
-- `BarChartEntry` — struct — 4 members
-- `BulletChart` — struct — 9 members
-- `CalendarHeatmap` — struct — 14 members
-- `CalendarHeatmapWeekStart` — enum — 2 members
-- `ColumnChart` — struct — 7 members
-- `ComparisonChart` — struct — 7 members
-- `ComparisonEntry` — struct — 6 members
-- `DateAxisStride` — enum — 5 members
-- `DateValue` — struct — 3 members
-- `HeatStrip` — struct — 6 members
-- `Legend` — struct — 6 members
-- `LegendItem` — struct — 3 members
-- `LineChart` — struct — 15 members
-- `LineChartBaseline` — enum — 2 members
-- `LineChartLegendConfig` — struct — 10 members
-- `LineChartPoint` — struct — 4 members
-- `LineChartSeries` — struct — 5 members
-- `LineChartSeriesStyle` — enum — 3 members
-- `LineChartXAxis` — struct — 17 members
-- `LineChartYAxis` — struct — 11 members
-- `Meter` — struct — 8 members
-- `Sparkline` — struct — 6 members
-- `StackedBarChart` — struct — 7 members
-- `ThresholdBand` — struct — 3 members
-- `ThresholdGauge` — struct — 8 members
-- `Timeline` — struct — 3 members
-- `TimelineEntry` — struct — 4 members
 
 ## SwiftTUIArguments
 
