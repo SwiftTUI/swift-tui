@@ -103,8 +103,8 @@ consumes it ships from `swift-tui-android`.
 
 | Module | Home | Owns | Hard boundary |
 | --- | --- | --- | --- |
-| **SwiftTUICore** | `Sources/SwiftTUICore/` | Geometry, `LayoutEngine`, the seven phase products + their types, semantic/draw extractors, rasterizer, commit planner, scheduler, the runtime data model (graph, state, registries), diagnostics contract. | **Foundation-free** and **terminal-IO-free**. Internal target — reaches consumers only re-exported through Runtime. Not a published product. |
-| **SwiftTUIViews** | `Sources/SwiftTUIViews/` | The authoring surface: `View`/`ViewModifier`/`ViewBuilder`, controls, stacks, the `Layout` protocol, `@State`/`@Binding`/`@FocusState`/`@Environment`, gestures, presentation, scrolling, shapes. | **Foundation-free.** `View` is body-only, `@MainActor`-isolated; lowering to primitives is package-internal. |
+| **SwiftTUICore** | `Sources/SwiftTUICore/` | Geometry, `LayoutEngine`, the seven phase products + their types, semantic/draw extractors, rasterizer, commit planner, scheduler, the runtime data model (graph, state, registries), diagnostics contract. | **Foundation-free** and **terminal-IO-free**. Internal target — reaches consumers only re-exported through Views or Runtime. Not a published product. |
+| **SwiftTUIViews** | `Sources/SwiftTUIViews/` | The authoring surface: `View`/`ViewModifier`/`ViewBuilder`, controls, stacks, the `Layout` protocol, `@State`/`@Binding`/`@FocusState`/`@Environment`, gestures, presentation, scrolling, shapes. | **Foundation-free.** `View` is body-only, `@MainActor`-isolated; lowering to primitives is package-internal. `@_exported`-imports Core (which re-exports Graph + Primitives) so the published `SwiftTUIViews` product is a self-sufficient authoring surface for external view libraries. |
 | **SwiftTUIRuntime** | `Sources/SwiftTUIRuntime/` | `RunLoop`, `DefaultRenderer`, the runtime stage pipeline, scenes (`App`/`Scene`/`WindowGroup`), terminal hosting, host-frame contracts, input, animation controller, lifecycle, diagnostics emission. | The first layer allowed to touch terminal IO and Foundation. |
 | **SwiftTUI** | `Sources/SwiftTUI/` | Convenience re-export: `App.main()`, standard flags, `--web` launch, animated-image support. | Also kept **Foundation-free** (writes UTF-8 to stdout without Foundation). |
 | **SwiftTUICharts** | `Sources/SwiftTUICharts/` | `LineChart`, `CalendarHeatmap`, `Sparkline`, gauges, etc. | Peer product; **not** in the default `SwiftTUI` import. |
@@ -244,8 +244,8 @@ what happens below this line.
   tag is cut. New files touching C stdio/POSIX must be WASI-safe; cross-build before
   tagging. This gotcha recurs in three flows below — internalize it now.
 - **`SwiftTUICore` is internal.** Not a published product; consumers reach it only
-  re-exported through `SwiftTUIRuntime`. Public API you add in Core becomes visible
-  only if a higher layer re-exports it.
+  re-exported through `SwiftTUIViews` or `SwiftTUIRuntime`. Public API you add in
+  Core becomes visible only if a higher layer re-exports it.
 
 ---
 

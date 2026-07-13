@@ -44,7 +44,9 @@ SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUI
   the graph's `ResolvedNode` snapshots; `@_exported`-imports Graph + Primitives so
   `import SwiftTUICore` is unchanged. Terminal-IO-free.
 - **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
-  layout, state, focus, gestures).
+  layout, state, focus, gestures). `@_exported`-imports Core so the published
+  `SwiftTUIViews` product is a self-sufficient authoring surface for external
+  view libraries (SwiftTUICharts consumes exactly this).
 - **SwiftTUIRuntime** — the run loop, renderer, scenes, and host integration.
 - **SwiftTUI** — the batteries-included convenience product; re-exports the
   combined terminal/WebHost runner and `SwiftTUIAnimatedImage`.

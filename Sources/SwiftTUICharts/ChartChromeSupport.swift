@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// Semantic tone used by chart banners, badges, and accent surfaces.

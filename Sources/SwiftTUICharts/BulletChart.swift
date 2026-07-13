@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A bullet chart that compares a current value against a target or range.
-public struct BulletChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct BulletChart<Label: View, Summary: View>: View {
   public var value: Double
   public var target: Double
   public var total: Double
@@ -53,32 +52,25 @@ public struct BulletChart<Label: View, Summary: View>: PrimitiveView, Resolvable
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let accentStyle = metricAccentStyle(for: tone)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          bulletChartTrackView(
-            value: value,
-            target: target,
-            total: total,
-            barWidth: barWidth,
-            accentStyle: accentStyle
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "BulletChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      bulletChartTrackView(
+        value: value,
+        target: target,
+        total: total,
+        barWidth: barWidth,
+        accentStyle: accentStyle
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "BulletChart",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

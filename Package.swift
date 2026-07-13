@@ -147,7 +147,7 @@ let package = Package(
 
     .target(
       name: "SwiftTUICharts",
-      dependencies: ["SwiftTUICore", "SwiftTUIViews"],
+      dependencies: ["SwiftTUIViews"],
       swiftSettings: swiftSettings()
     ),
 

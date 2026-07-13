@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact strip of heat-style cells for relative intensity data.
-public struct HeatStrip<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct HeatStrip<Label: View, Summary: View>: View {
   public var entries: [BarChartEntry]
   public var cellWidth: Int
   private let label: Label
@@ -38,30 +37,23 @@ public struct HeatStrip<Label: View, Summary: View>: PrimitiveView, ResolvableVi
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let maximumValue = max(1, entries.map { abs($0.value) }.max() ?? 1)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          heatStripBody(
-            entries: entries,
-            maximumValue: maximumValue,
-            cellWidth: cellWidth
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "HeatStrip",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      heatStripBody(
+        entries: entries,
+        maximumValue: maximumValue,
+        cellWidth: cellWidth
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "HeatStrip",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

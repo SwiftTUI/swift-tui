@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A horizontal bar chart for comparing labeled values.
-public struct BarChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct BarChart<Label: View, Summary: View>: View {
   public var entries: [BarChartEntry]
   public var barWidth: Int
   public var labelWidth: Int
@@ -43,33 +42,26 @@ public struct BarChart<Label: View, Summary: View>: PrimitiveView, ResolvableVie
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let maximumValue = max(1, entries.map { abs($0.value) }.max() ?? 1)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          ForEach(entries.indices, id: \.self) { index in
-            barChartRow(
-              entries[index],
-              maximumValue: maximumValue,
-              barWidth: barWidth,
-              labelWidth: labelWidth
-            )
-          }
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "BarChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      ForEach(entries.indices, id: \.self) { index in
+        barChartRow(
+          entries[index],
+          maximumValue: maximumValue,
+          barWidth: barWidth,
+          labelWidth: labelWidth
+        )
+      }
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "BarChart",
+        label: accessibilitySummary
       )
-    ]
+    )
   }
 }
 

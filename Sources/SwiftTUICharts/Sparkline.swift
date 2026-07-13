@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact trend line rendered in terminal cells.
-public struct Sparkline<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct Sparkline<Label: View, Summary: View>: View {
   public var tone: BannerTone
   public var values: [Double]
   private let label: Label
@@ -38,25 +37,18 @@ public struct Sparkline<Label: View, Summary: View>: PrimitiveView, ResolvableVi
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: trailing)
-          Text(sparklineGlyphString(values))
-            .foregroundStyle(metricAccentStyle(for: tone))
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "Sparkline",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+  public var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: trailing)
+      Text(sparklineGlyphString(values))
+        .foregroundStyle(metricAccentStyle(for: tone))
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "Sparkline",
+        label: accessibilitySummary
       )
-    ]
+    )
   }
 }
 

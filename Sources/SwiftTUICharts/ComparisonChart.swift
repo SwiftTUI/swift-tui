@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A chart that shows current values against baselines.
-public struct ComparisonChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct ComparisonChart<Label: View, Summary: View>: View {
   public var entries: [ComparisonEntry]
   public var barWidth: Int
   public var labelWidth: Int
@@ -43,33 +42,26 @@ public struct ComparisonChart<Label: View, Summary: View>: PrimitiveView, Resolv
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let maximumValue = comparisonChartMaximumValue(entries)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          ForEach(entries.indices, id: \.self) { index in
-            comparisonChartRow(
-              entries[index],
-              maximumValue: maximumValue,
-              barWidth: barWidth,
-              labelWidth: labelWidth
-            )
-          }
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "ComparisonChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      ForEach(entries.indices, id: \.self) { index in
+        comparisonChartRow(
+          entries[index],
+          maximumValue: maximumValue,
+          barWidth: barWidth,
+          labelWidth: labelWidth
+        )
+      }
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "ComparisonChart",
+        label: accessibilitySummary
       )
-    ]
+    )
   }
 }
 

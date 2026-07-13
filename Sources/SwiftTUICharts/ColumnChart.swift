@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A vertical column chart for comparing labeled values.
-public struct ColumnChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct ColumnChart<Label: View, Summary: View>: View {
   public var entries: [BarChartEntry]
   public var chartHeight: Int
   public var columnWidth: Int
@@ -43,31 +42,24 @@ public struct ColumnChart<Label: View, Summary: View>: PrimitiveView, Resolvable
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let maximumValue = max(1, entries.map { abs($0.value) }.max() ?? 1)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          columnChartBody(
-            entries: entries,
-            maximumValue: maximumValue,
-            chartHeight: chartHeight,
-            columnWidth: columnWidth
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "ColumnChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      columnChartBody(
+        entries: entries,
+        maximumValue: maximumValue,
+        chartHeight: chartHeight,
+        columnWidth: columnWidth
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "ColumnChart",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

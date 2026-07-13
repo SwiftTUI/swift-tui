@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 // Bullet-chart helpers: the target summary string and the segmented track

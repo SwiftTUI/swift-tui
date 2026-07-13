@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 @MainActor

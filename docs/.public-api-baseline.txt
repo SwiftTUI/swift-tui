@@ -290,6 +290,7 @@ SwiftTUICharts.BannerTone.success
 SwiftTUICharts.BannerTone.warning
 SwiftTUICharts.BarChart
 SwiftTUICharts.BarChart.barWidth
+SwiftTUICharts.BarChart.body
 SwiftTUICharts.BarChart.entries
 SwiftTUICharts.BarChart.init(_:entries:barWidth:labelWidth:)
 SwiftTUICharts.BarChart.init(entries:barWidth:labelWidth:)
@@ -302,6 +303,7 @@ SwiftTUICharts.BarChartEntry.tone
 SwiftTUICharts.BarChartEntry.value
 SwiftTUICharts.BulletChart
 SwiftTUICharts.BulletChart.barWidth
+SwiftTUICharts.BulletChart.body
 SwiftTUICharts.BulletChart.init(_:value:target:total:tone:barWidth:)
 SwiftTUICharts.BulletChart.init(value:target:total:tone:barWidth:)
 SwiftTUICharts.BulletChart.init(value:target:total:tone:barWidth:label:summary:)
@@ -310,6 +312,7 @@ SwiftTUICharts.BulletChart.tone
 SwiftTUICharts.BulletChart.total
 SwiftTUICharts.BulletChart.value
 SwiftTUICharts.CalendarHeatmap
+SwiftTUICharts.CalendarHeatmap.body
 SwiftTUICharts.CalendarHeatmap.calendar
 SwiftTUICharts.CalendarHeatmap.cellWidth
 SwiftTUICharts.CalendarHeatmap.chartLegend(_:)
@@ -327,6 +330,7 @@ SwiftTUICharts.CalendarHeatmapWeekStart
 SwiftTUICharts.CalendarHeatmapWeekStart.monday
 SwiftTUICharts.CalendarHeatmapWeekStart.sunday
 SwiftTUICharts.ColumnChart
+SwiftTUICharts.ColumnChart.body
 SwiftTUICharts.ColumnChart.chartHeight
 SwiftTUICharts.ColumnChart.columnWidth
 SwiftTUICharts.ColumnChart.entries
@@ -335,6 +339,7 @@ SwiftTUICharts.ColumnChart.init(entries:chartHeight:columnWidth:)
 SwiftTUICharts.ColumnChart.init(entries:chartHeight:columnWidth:label:summary:)
 SwiftTUICharts.ComparisonChart
 SwiftTUICharts.ComparisonChart.barWidth
+SwiftTUICharts.ComparisonChart.body
 SwiftTUICharts.ComparisonChart.entries
 SwiftTUICharts.ComparisonChart.init(_:entries:barWidth:labelWidth:)
 SwiftTUICharts.ComparisonChart.init(entries:barWidth:labelWidth:)
@@ -358,12 +363,14 @@ SwiftTUICharts.DateValue.date
 SwiftTUICharts.DateValue.init(_:value:)
 SwiftTUICharts.DateValue.value
 SwiftTUICharts.HeatStrip
+SwiftTUICharts.HeatStrip.body
 SwiftTUICharts.HeatStrip.cellWidth
 SwiftTUICharts.HeatStrip.entries
 SwiftTUICharts.HeatStrip.init(_:entries:cellWidth:)
 SwiftTUICharts.HeatStrip.init(entries:cellWidth:)
 SwiftTUICharts.HeatStrip.init(entries:cellWidth:label:summary:)
 SwiftTUICharts.Legend
+SwiftTUICharts.Legend.body
 SwiftTUICharts.Legend.init(_:items:itemSpacing:)
 SwiftTUICharts.Legend.init(items:itemSpacing:)
 SwiftTUICharts.Legend.init(items:itemSpacing:label:)
@@ -375,6 +382,7 @@ SwiftTUICharts.LegendItem.label
 SwiftTUICharts.LegendItem.tone
 SwiftTUICharts.LineChart
 SwiftTUICharts.LineChart.baseline
+SwiftTUICharts.LineChart.body
 SwiftTUICharts.LineChart.chartBaseline(_:)
 SwiftTUICharts.LineChart.chartLegend(_:)
 SwiftTUICharts.LineChart.chartXAxis(_:)
@@ -449,6 +457,7 @@ SwiftTUICharts.LineChartYAxis.ticks
 SwiftTUICharts.LineChartYAxis.values(count:format:)
 SwiftTUICharts.Meter
 SwiftTUICharts.Meter.barWidth
+SwiftTUICharts.Meter.body
 SwiftTUICharts.Meter.init(_:value:total:tone:barWidth:)
 SwiftTUICharts.Meter.init(value:total:tone:barWidth:)
 SwiftTUICharts.Meter.init(value:total:tone:barWidth:label:currentValueLabel:)
@@ -456,6 +465,7 @@ SwiftTUICharts.Meter.tone
 SwiftTUICharts.Meter.total
 SwiftTUICharts.Meter.value
 SwiftTUICharts.Sparkline
+SwiftTUICharts.Sparkline.body
 SwiftTUICharts.Sparkline.init(_:values:tone:)
 SwiftTUICharts.Sparkline.init(values:tone:)
 SwiftTUICharts.Sparkline.init(values:tone:label:summary:)
@@ -463,6 +473,7 @@ SwiftTUICharts.Sparkline.tone
 SwiftTUICharts.Sparkline.values
 SwiftTUICharts.StackedBarChart
 SwiftTUICharts.StackedBarChart.barWidth
+SwiftTUICharts.StackedBarChart.body
 SwiftTUICharts.StackedBarChart.entries
 SwiftTUICharts.StackedBarChart.init(_:entries:total:barWidth:)
 SwiftTUICharts.StackedBarChart.init(entries:total:barWidth:)
@@ -475,12 +486,14 @@ SwiftTUICharts.ThresholdBand.upperBound
 SwiftTUICharts.ThresholdGauge
 SwiftTUICharts.ThresholdGauge.bands
 SwiftTUICharts.ThresholdGauge.barWidth
+SwiftTUICharts.ThresholdGauge.body
 SwiftTUICharts.ThresholdGauge.init(_:value:total:bands:barWidth:)
 SwiftTUICharts.ThresholdGauge.init(value:total:bands:barWidth:)
 SwiftTUICharts.ThresholdGauge.init(value:total:bands:barWidth:label:summary:)
 SwiftTUICharts.ThresholdGauge.total
 SwiftTUICharts.ThresholdGauge.value
 SwiftTUICharts.Timeline
+SwiftTUICharts.Timeline.body
 SwiftTUICharts.Timeline.entries
 SwiftTUICharts.Timeline.init(_:)
 SwiftTUICharts.TimelineEntry
@@ -810,6 +823,9 @@ SwiftTUIGraph.AccessibilityRole.textEditor
 SwiftTUIGraph.AccessibilityRole.textField
 SwiftTUIGraph.AccessibilityRole.timer
 SwiftTUIGraph.AccessibilityRole.toggle
+SwiftTUIGraph.AccessibilityVisualContent
+SwiftTUIGraph.AccessibilityVisualContent.init(kind:)
+SwiftTUIGraph.AccessibilityVisualContent.kind
 SwiftTUIGraph.ActionScope
 SwiftTUIGraph.Anchor
 SwiftTUIGraph.AnchorSource
@@ -1035,7 +1051,7 @@ SwiftTUIGraph.SemanticMetadata.captureOnPress
 SwiftTUIGraph.SemanticMetadata.explicitInteractionPath
 SwiftTUIGraph.SemanticMetadata.explicitInteractionRect
 SwiftTUIGraph.SemanticMetadata.focusInteractions
-SwiftTUIGraph.SemanticMetadata.init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)
+SwiftTUIGraph.SemanticMetadata.init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)
 SwiftTUIGraph.SemanticMetadata.isFocusable
 SwiftTUIGraph.SemanticMetadata.merging(_:)
 SwiftTUIGraph.SemanticMetadata.namedCoordinateSpaceName

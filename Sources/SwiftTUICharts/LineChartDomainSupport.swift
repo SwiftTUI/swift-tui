@@ -1,4 +1,4 @@
-import SwiftTUICore
+import SwiftTUIViews
 
 struct LineChartDomain: Equatable, Sendable {
   var x: ClosedRange<Double>

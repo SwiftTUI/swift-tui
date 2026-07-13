@@ -31,10 +31,17 @@ public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
 }
 
 /// Marker for visual-only content that needs an accessibility label or hidden policy.
-package struct AccessibilityVisualContent: Equatable, Sendable {
-  package var kind: String
+///
+/// Attach through ``SemanticMetadata/init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)``
+/// so accessibility renderers can diagnose visual views that reach users
+/// without a label. The `kind` names the visual family (for example
+/// `"BarChart"` or `"Image"`) in those diagnostics.
+public struct AccessibilityVisualContent: Equatable, Sendable {
+  /// The visual family named in missing-label diagnostics.
+  public var kind: String
 
-  package init(kind: String) {
+  /// Creates a marker for a visual family such as `"BarChart"`.
+  public init(kind: String) {
     self.kind = kind
   }
 }
@@ -171,6 +178,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     accessibilityHint: String? = nil,
     accessibilityHidden: Bool = false,
     accessibilityLiveRegion: AccessibilityPoliteness? = nil,
+    accessibilityVisualContent: AccessibilityVisualContent? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
@@ -194,6 +202,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       accessibilityHint: accessibilityHint,
       accessibilityHidden: accessibilityHidden,
       accessibilityLiveRegion: accessibilityLiveRegion,
+      accessibilityVisualContent: accessibilityVisualContent,
       selectionTag: selectionTag,
       tabItemLabel: tabItemLabel,
       explicitInteractionRect: explicitInteractionRect,

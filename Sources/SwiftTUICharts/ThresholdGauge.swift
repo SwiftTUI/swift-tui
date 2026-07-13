@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A gauge that changes tone across authored threshold bands.
-public struct ThresholdGauge<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct ThresholdGauge<Label: View, Summary: View>: View {
   public var value: Double
   public var total: Double
   public var bands: [ThresholdBand]
@@ -48,29 +47,22 @@ public struct ThresholdGauge<Label: View, Summary: View>: PrimitiveView, Resolva
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          thresholdGaugeTrackView(
-            value: value,
-            total: total,
-            bands: bands,
-            barWidth: barWidth
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "ThresholdGauge",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+  public var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      thresholdGaugeTrackView(
+        value: value,
+        total: total,
+        bands: bands,
+        barWidth: barWidth
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "ThresholdGauge",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

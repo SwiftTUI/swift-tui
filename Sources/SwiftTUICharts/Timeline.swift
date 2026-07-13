@@ -1,26 +1,18 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact textual timeline for ordered events or releases.
-public struct Timeline: PrimitiveView, ResolvableView {
+public struct Timeline: View {
   public var entries: [TimelineEntry]
 
   public init(_ entries: [TimelineEntry]) {
     self.entries = entries
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(entries.indices, id: \.self) { index in
-            timelineEntryView(entries[index], isLast: index == entries.count - 1)
-          }
-        },
-        in: context
-      )
-    ]
+  public var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(entries.indices, id: \.self) { index in
+        timelineEntryView(entries[index], isLast: index == entries.count - 1)
+      }
+    }
   }
 }

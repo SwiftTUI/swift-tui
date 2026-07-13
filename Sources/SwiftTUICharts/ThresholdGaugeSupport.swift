@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 // Threshold-gauge helpers: band normalization/sorting, per-value band tone

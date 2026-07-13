@@ -1,5 +1,4 @@
 public import Foundation
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A single entry in a compact timeline view.

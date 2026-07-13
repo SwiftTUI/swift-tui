@@ -1,9 +1,8 @@
 public import Foundation
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A GitHub-style weekday × week intensity grid for daily activity data.
-public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct CalendarHeatmap<Label: View, Summary: View>: View {
   public var days: [DateValue]
   public var range: ClosedRange<Date>?
   public var weekStart: CalendarHeatmapWeekStart
@@ -80,32 +79,27 @@ public struct CalendarHeatmap<Label: View, Summary: View>: PrimitiveView, Resolv
     self.summary = summary()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  public var body: some View {
     let effectiveRange = range ?? inferDateRange(days) ?? calendarHeatmapFallbackRange()
     let bucket = bucketDays(days, range: effectiveRange, calendar: calendar, weekStart: weekStart)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          calendarHeatmapBody(
-            bucket: bucket,
-            cellWidth: cellWidth,
-            tone: tone,
-            showsMonthHeader: showsMonthHeader,
-            showsDayLabels: showsDayLabels,
-            showsScaleLegend: showsScaleLegend
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "CalendarHeatmap",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      calendarHeatmapBody(
+        bucket: bucket,
+        cellWidth: cellWidth,
+        tone: tone,
+        showsMonthHeader: showsMonthHeader,
+        showsDayLabels: showsDayLabels,
+        showsScaleLegend: showsScaleLegend
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "CalendarHeatmap",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

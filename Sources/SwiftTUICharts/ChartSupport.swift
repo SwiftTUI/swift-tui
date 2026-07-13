@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 // Shared chart helpers and the timeline/legend renderers live in

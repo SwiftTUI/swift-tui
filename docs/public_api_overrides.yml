@@ -455,6 +455,7 @@ classifications:
     - SwiftTUIGraph.AccessibilityNode
     - SwiftTUIGraph.AccessibilityPoliteness
     - SwiftTUIGraph.AccessibilityRole
+    - SwiftTUIGraph.AccessibilityVisualContent
     - "SwiftTUIPrimitives.adapt(_:to:method:)"
     - SwiftTUIPrimitives.Alignment
     - SwiftTUIPrimitives.AlignmentID

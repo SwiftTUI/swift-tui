@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact meter for displaying a single fractional value.
-public struct Meter<Label: View, CurrentValueLabel: View>: PrimitiveView, ResolvableView {
+public struct Meter<Label: View, CurrentValueLabel: View>: View {
   public var tone: BannerTone
   public var value: Double
   public var total: Double
@@ -48,34 +47,27 @@ public struct Meter<Label: View, CurrentValueLabel: View>: PrimitiveView, Resolv
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let track = metricTrackString(
       fraction: progressFraction(value: value, total: total),
       barWidth: barWidth
     )
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: currentValueLabel)
-          HStack(alignment: .center, spacing: 0) {
-            Text(track.filled)
-              .foregroundStyle(metricAccentStyle(for: tone))
-            Text(track.empty)
-              .foregroundStyle(.separator)
-          }
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "Meter",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: currentValueLabel)
+      HStack(alignment: .center, spacing: 0) {
+        Text(track.filled)
+          .foregroundStyle(metricAccentStyle(for: tone))
+        Text(track.empty)
+          .foregroundStyle(.separator)
+      }
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "Meter",
+        label: accessibilitySummary
       )
-    ]
+    )
   }
 }
 

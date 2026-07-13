@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 // Cross-cutting chart helpers shared by every chart family, plus the two

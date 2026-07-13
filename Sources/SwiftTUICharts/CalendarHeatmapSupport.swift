@@ -1,5 +1,4 @@
 import Foundation
-import SwiftTUICore
 import SwiftTUIViews
 
 /// The range used when a `CalendarHeatmap` has neither an explicit `range`

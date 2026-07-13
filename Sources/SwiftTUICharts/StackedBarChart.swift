@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A stacked bar chart for segmented totals.
-public struct StackedBarChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct StackedBarChart<Label: View, Summary: View>: View {
   public var entries: [BarChartEntry]
   public var total: Double?
   public var barWidth: Int
@@ -43,30 +42,23 @@ public struct StackedBarChart<Label: View, Summary: View>: PrimitiveView, Resolv
     self.accessibilitySummary = accessibilitySummary
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
+  public var body: some View {
     let effectiveTotal = stackedBarEffectiveTotal(entries, total: total)
 
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          stackedBarTrackView(
-            entries,
-            total: effectiveTotal,
-            barWidth: barWidth
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "StackedBarChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      stackedBarTrackView(
+        entries,
+        total: effectiveTotal,
+        barWidth: barWidth
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "StackedBarChart",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

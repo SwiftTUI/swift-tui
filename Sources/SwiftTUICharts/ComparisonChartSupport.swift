@@ -1,4 +1,3 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 // Comparison-chart helpers: maximum-value and summary derivation, automatic

@@ -1,10 +1,9 @@
 import Foundation
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A multi-series continuous plot supporting `.line`, `.area`, and
 /// `.step` series styles, with Date- or numeric-aware axis modifiers.
-public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableView {
+public struct LineChart<Label: View, Summary: View>: View {
   public var series: [LineChartSeries]
   public var height: Int
   public var width: Int?
@@ -67,31 +66,26 @@ public struct LineChart<Label: View, Summary: View>: PrimitiveView, ResolvableVi
     self.summary = summary()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  public var body: some View {
     let effectiveWidth = max(20, width ?? 60)  // assume an 80-col terminal minus padding
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: summary)
-          lineChartBody(
-            series: series,
-            height: height,
-            width: effectiveWidth,
-            xAxis: xAxis,
-            yAxis: yAxis,
-            legend: legend,
-            baseline: baseline
-          )
-        }
-        .semanticMetadata(
-          chartAccessibilityMetadata(
-            kind: "LineChart",
-            label: accessibilitySummary
-          )
-        ),
-        in: context
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: summary)
+      lineChartBody(
+        series: series,
+        height: height,
+        width: effectiveWidth,
+        xAxis: xAxis,
+        yAxis: yAxis,
+        legend: legend,
+        baseline: baseline
       )
-    ]
+    }
+    .semanticMetadata(
+      chartAccessibilityMetadata(
+        kind: "LineChart",
+        label: accessibilitySummary
+      )
+    )
   }
 }
 

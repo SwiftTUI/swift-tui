@@ -1,8 +1,7 @@
-import SwiftTUICore
 import SwiftTUIViews
 
 /// A compact legend that pairs labels with semantic tones.
-public struct Legend<Label: View>: PrimitiveView, ResolvableView {
+public struct Legend<Label: View>: View {
   public var items: [LegendItem]
   public var itemSpacing: Int
   private let label: Label
@@ -17,22 +16,15 @@ public struct Legend<Label: View>: PrimitiveView, ResolvableView {
     self.label = label()
   }
 
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    return [
-      resolveView(
-        VStack(alignment: .leading, spacing: 0) {
-          chartHeader(label: label, summary: EmptyView())
-          HStack(alignment: .center, spacing: itemSpacing) {
-            ForEach(items.indices, id: \.self) { index in
-              legendItemView(items[index])
-            }
-          }
-        },
-        in: context
-      )
-    ]
+  public var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      chartHeader(label: label, summary: EmptyView())
+      HStack(alignment: .center, spacing: itemSpacing) {
+        ForEach(items.indices, id: \.self) { index in
+          legendItemView(items[index])
+        }
+      }
+    }
   }
 }
 
