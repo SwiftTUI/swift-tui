@@ -333,7 +333,14 @@ extension FrameworkStressAnimationTemporalTests {
       if suppressed {
         #expect(payload.transactionSnapshot.animationRequest == .disabled)
       } else {
-        #expect(payload.transactionSnapshot.animationRequest == .inherit)
+        // The outer `.transaction { $0.animation = animation }` reaches the
+        // leaf (F137): descendants previously reported `.inherit` only
+        // because the frame-input refresh clobbered the authored request at
+        // every nested resolveView — the "restored outer transaction" IS
+        // the outer modifier's animate request.
+        #expect(
+          payload.transactionSnapshot.animationRequest == .animate(animation.animationBox)
+        )
       }
     }
   }

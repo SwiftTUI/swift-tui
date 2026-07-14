@@ -197,6 +197,11 @@ struct ResolveContextStorageTotalityTests {
         + "only steers the frame-input refresh",
       draft: .survives("resolve-scope marker, not a registration")
     ),
+    "authoredTransactionOverride": notEquated(
+      "steers the frame-input refresh only (F137); the transaction it protects is "
+        + "itself equated",
+      draft: .survives("resolve-scope marker, not a registration")
+    ),
     "gestureSuppressionScopes": notEquated(
       "registration-time suppression currency; documented as not retro-applied "
         + "without re-resolve",
@@ -365,6 +370,7 @@ struct ResolveContextStorageTotalityTests {
     context.suppressesStructuralLifecycle = true
     context.withinChurnedSubtree = true
     context.propagated.authoredFocusPressOverrides = [.focusedIdentity]
+    context.propagated.authoredTransactionOverride = true
     context.gestureSuppressionScopes = [scopeIdentity]
 
     let replacement = RuntimeRegistrationSet.scratch()
@@ -414,7 +420,8 @@ struct ResolveContextStorageTotalityTests {
           #expect(unwrappedObject(value) === log, "\(name) must survive the draft swap")
         case "imageAssetResolver", "requestDeadline":
           #expect(unwrappedOptional(value) != nil, "\(name) must survive the draft swap")
-        case "suppressesStructuralLifecycle", "withinChurnedSubtree":
+        case "suppressesStructuralLifecycle", "withinChurnedSubtree",
+          "authoredTransactionOverride":
           #expect(value as? Bool == true, "\(name) must survive the draft swap")
         case "authoredFocusPressOverrides":
           #expect(

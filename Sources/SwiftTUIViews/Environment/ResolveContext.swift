@@ -456,7 +456,13 @@ public struct ResolveContext: Equatable, Sendable {
       for: refreshed.identity
     )
     refreshed.focusedValues = inputs.focusedValues
-    refreshed.transaction = inputs.transaction
+    // An authored transaction (a `.animation(_:value:)` / `.transaction(_:)`
+    // modifier above this context) must keep winning below its modifier —
+    // for that subtree the captured transaction IS the current value (F137,
+    // the transaction analog of the authored focus/press exemption above).
+    if !propagated.authoredTransactionOverride {
+      refreshed.transaction = inputs.transaction
+    }
     refreshed.resolveWorkTracker = inputs.resolveWorkTracker
     return refreshed
   }
@@ -667,6 +673,14 @@ extension ResolveContext {
     /// focus/press into captured contexts; keys marked here are exempt because
     /// the authored value must keep winning below its modifier.
     package var authoredFocusPressOverrides: AuthoredFocusPressOverrides
+    /// True below a transaction-authoring modifier (`.animation(_:value:)`,
+    /// `.transaction(_:)`): the authored transaction must keep winning below
+    /// its modifier, so `applyingCurrentFrameResolveInputs` skips the
+    /// frame-root transaction re-stamp for the subtree (F137) — the skip is
+    /// what lets the authored request survive nested `resolveView`
+    /// boundaries. Inner authoring modifiers still overwrite the transaction
+    /// below themselves, preserving SwiftUI's inner-edits-win semantics.
+    package var authoredTransactionOverride: Bool = false
     /// Chain-node identities of `.gesture(_:including:)` attachments whose
     /// mask excludes `.subviews`, in force over this context's subtree
     /// (SwiftUI's `GestureMask` contract: `.gesture` and `.none` disable
