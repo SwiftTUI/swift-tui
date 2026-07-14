@@ -96,6 +96,145 @@ struct LifecycleCoordinatorSkipTests {
     #expect(issues.isEmpty)
   }
 
+  @Test("an .appear handler missing from the current registry is counted and reported")
+  func appearHandlerMissingIsCountedAndReported() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: testIdentity("Root", "appearing"),
+          operation: .appear(handlerIDs: ["missing-appear"])
+        )
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(coordinator.appearHandlerSkipCount == 1)
+    #expect(issues.count == 1)
+    #expect(issues.first?.code == "lifecycle.appearHandlerSkipped")
+    #expect(issues.first?.severity == .warning)
+    #expect(issues.first?.identity == testIdentity("Root", "appearing"))
+  }
+
+  @Test("a .disappear handler missing from the previous snapshot is counted and reported")
+  func disappearHandlerMissingIsCountedAndReported() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: testIdentity("Root", "departing"),
+          operation: .disappear(handlerIDs: ["missing-disappear"])
+        )
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(coordinator.disappearHandlerSkipCount == 1)
+    #expect(issues.count == 1)
+    #expect(issues.first?.code == "lifecycle.disappearHandlerSkipped")
+  }
+
+  @Test("an .onChange handler missing from the current registry is counted and reported")
+  func changeHandlerMissingIsCountedAndReported() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: testIdentity("Root", "changing"),
+          operation: .change(handlerIDs: ["missing-change"])
+        )
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(coordinator.changeHandlerSkipCount == 1)
+    #expect(issues.count == 1)
+    #expect(issues.first?.code == "lifecycle.changeHandlerSkipped")
+  }
+
+  @Test("healthy appear, disappear, and change handlers fire and report nothing")
+  func healthyHandlersFireAndReportNothing() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let identity = testIdentity("Root", "member")
+    var appearFired = 0
+    var disappearFired = 0
+    var changeFired = 0
+
+    // Frame 1: appear + change fire from the current registry; the same
+    // registry's disappear handler is snapshotted for the next frame.
+    let firstRegistry = LocalLifecycleRegistry()
+    let appearID = firstRegistry.registerAppear(identity: identity, ordinal: 0) {
+      appearFired += 1
+    }
+    let changeID = firstRegistry.registerChange(identity: identity, ordinal: 0) {
+      changeFired += 1
+    }
+    let disappearID = firstRegistry.registerDisappear(identity: identity, ordinal: 0) {
+      disappearFired += 1
+    }
+    let firstIssues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .appear(handlerIDs: [appearID])
+          ),
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          ),
+        ]
+      ),
+      currentLifecycleRegistry: firstRegistry,
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    // Frame 2: the node departed; its disappear handler resolves through the
+    // previous frame's snapshot.
+    let secondIssues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .disappear(handlerIDs: [disappearID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(appearFired == 1)
+    #expect(changeFired == 1)
+    #expect(disappearFired == 1)
+    #expect(firstIssues.isEmpty)
+    #expect(secondIssues.isEmpty)
+    #expect(coordinator.appearHandlerSkipCount == 0)
+    #expect(coordinator.disappearHandlerSkipCount == 0)
+    #expect(coordinator.changeHandlerSkipCount == 0)
+  }
+
   @Test("a .taskStart whose lookups succeed runs the task and reports nothing")
   func healthyTaskStartReportsNothing() {
     let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)

@@ -20,6 +20,18 @@ package final class LifecycleCoordinator {
   /// cancel that finds nothing is the expected steady state under churn.
   package private(set) var taskCancelSkipCount = 0
 
+  /// Cumulative counts of committed appear/disappear/change handler IDs whose
+  /// lookup failed at commit time (F163). Mirrors ``taskStartSkipCount``: the
+  /// commit plan only carries handler IDs the graph decided must fire, so
+  /// every miss is a committed lifecycle callback that silently never ran —
+  /// the same publication-loss class the task path instruments. Read by tests
+  /// as zero-oracles. Every skip is counted and reported; if a benign class
+  /// ever surfaces (the taskCancel departed-node analog), carve it out with
+  /// the calibration evidence, don't stop reporting the rest.
+  package private(set) var appearHandlerSkipCount = 0
+  package private(set) var disappearHandlerSkipCount = 0
+  package private(set) var changeHandlerSkipCount = 0
+
   // `assertsOnTaskStartSkip` defaults OFF. The one live skip the first armed
   // run found (TermUIPerf's synthetic-text-shimmer `…/Group[1]#task[id:1]`,
   // "no task registration at commit") is root-caused and fixed: the `.task`
@@ -91,15 +103,27 @@ package final class LifecycleCoordinator {
     switch entry.operation {
     case .appear(let handlerIDs):
       for handlerID in handlerIDs {
-        currentLifecycleRegistry.appearHandler(for: handlerID)?()
+        guard let handler = currentLifecycleRegistry.appearHandler(for: handlerID) else {
+          recordHandlerSkip(.appear, entry: entry, handlerID: handlerID, into: &skipIssues)
+          continue
+        }
+        handler()
       }
     case .disappear(let handlerIDs):
       for handlerID in handlerIDs {
-        previousLifecycleHandlers.disappearHandlers[handlerID]?()
+        guard let handler = previousLifecycleHandlers.disappearHandlers[handlerID] else {
+          recordHandlerSkip(.disappear, entry: entry, handlerID: handlerID, into: &skipIssues)
+          continue
+        }
+        handler()
       }
     case .change(let handlerIDs):
       for handlerID in handlerIDs {
-        currentLifecycleRegistry.changeHandler(for: handlerID)?()
+        guard let handler = currentLifecycleRegistry.changeHandler(for: handlerID) else {
+          recordHandlerSkip(.change, entry: entry, handlerID: handlerID, into: &skipIssues)
+          continue
+        }
+        handler()
       }
     case .taskStart(let descriptor):
       let registration = currentTaskRegistry.registration(
@@ -127,6 +151,41 @@ package final class LifecycleCoordinator {
       }
       taskRunner.cancel(viewNodeID: viewNodeID, matching: descriptor)
     }
+  }
+
+  private enum LifecycleHandlerSkipKind: String {
+    case appear
+    case disappear
+    case change
+  }
+
+  private func recordHandlerSkip(
+    _ kind: LifecycleHandlerSkipKind,
+    entry: LifecycleCommitEntry,
+    handlerID: String,
+    into skipIssues: inout [RuntimeIssue]
+  ) {
+    switch kind {
+    case .appear:
+      appearHandlerSkipCount += 1
+    case .disappear:
+      disappearHandlerSkipCount += 1
+    case .change:
+      changeHandlerSkipCount += 1
+    }
+    let issue = RuntimeIssue(
+      severity: .warning,
+      code: "lifecycle.\(kind.rawValue)HandlerSkipped",
+      message:
+        "committed \(kind.rawValue) handler '\(handlerID)' never fired: "
+        + "no registered handler at commit",
+      identity: entry.identity,
+      source: "LifecycleCoordinator"
+    )
+    skipIssues.append(issue)
+    SoundnessProbeConfiguration.recordLifecycleHandlerSkip(
+      "\(kind.rawValue) handler '\(handlerID)' missing at commit for \(entry.identity)"
+    )
   }
 
   private func recordTaskStartSkip(

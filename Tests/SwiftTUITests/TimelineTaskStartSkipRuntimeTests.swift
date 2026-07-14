@@ -54,6 +54,9 @@ struct TimelineTaskStartSkipRuntimeTests {
       harness.activeDescriptorIDs == firstFrameDescriptors,
       "a stable .task(id:) must keep its descriptor across re-resolves; was \(firstFrameDescriptors), now \(harness.activeDescriptorIDs)"
     )
+    // F163 zero-oracle: the handler legs share the task path's contract — no
+    // committed appear/disappear/change handler may be dropped at commit.
+    #expect(harness.lifecycleHandlerSkipCounts == [0, 0, 0])
   }
 }
 
@@ -112,6 +115,14 @@ private final class ShimmerSkipHarness {
   var frame: String { terminal.frames.last ?? "" }
 
   var taskStartSkipCount: Int { runLoop.lifecycleCoordinator.taskStartSkipCount }
+
+  var lifecycleHandlerSkipCounts: [Int] {
+    [
+      runLoop.lifecycleCoordinator.appearHandlerSkipCount,
+      runLoop.lifecycleCoordinator.disappearHandlerSkipCount,
+      runLoop.lifecycleCoordinator.changeHandlerSkipCount,
+    ]
+  }
 
   var activeTaskCount: Int { runLoop.lifecycleCoordinator.activeTaskCount }
 

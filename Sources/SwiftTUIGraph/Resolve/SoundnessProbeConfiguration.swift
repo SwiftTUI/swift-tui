@@ -63,6 +63,7 @@ package enum SoundnessProbeConfiguration {
   package static var duplicateRegistrationOverwriteCount = 0
   package static var stateSlotRestorationDropCount = 0
   package static var plannerTargetlessFrontierEscalationCount = 0
+  package static var lifecycleHandlerSkipCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -193,6 +194,20 @@ package enum SoundnessProbeConfiguration {
     plannerTargetlessFrontierEscalationCount += 1
     lastViolationDetail = detail()
     emitTrace("planner-targetless-frontier")
+  }
+
+  /// Records one committed lifecycle handler (appear/disappear/change) whose
+  /// lookup failed at commit time (F163) — a committed callback that silently
+  /// never fired, the task path's publication-loss class extended to the
+  /// handler legs. Recorded unconditionally: the path should be rare and the
+  /// per-kind instance counters live on `LifecycleCoordinator`; this static
+  /// mirrors them onto the probe's trace channel for calibration sweeps.
+  package static func recordLifecycleHandlerSkip(
+    _ detail: @autoclosure () -> String
+  ) {
+    lifecycleHandlerSkipCount += 1
+    lastViolationDetail = detail()
+    emitTrace("lifecycle-handler-skip")
   }
 
   /// Records one dropped in-flight state-slot restoration (F93): a
