@@ -9,22 +9,22 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
   func graphPlanning001DirtyWorkRequiresRootedGraph() {
     let node = planningNode(1, "Leaf", evaluator: true)
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: false, dirty: [node], nodes: [node])
     )
 
-    #expect(plan == nil)
+    #expect(planning.plan == nil)
   }
 
   @Test("stress graph planning 002 empty dirty queue produces no target plan")
   func graphPlanning002EmptyDirtyQueueProducesNoTargetPlan() {
     let node = planningNode(1, "Root", evaluator: true)
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [], nodes: [node])
     )
 
-    #expect(plan == nil)
+    #expect(planning.plan == nil)
   }
 
   @Test("stress graph planning 003 unknown dirty ID cannot suppress live target")
@@ -37,9 +37,9 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
       lifecycleEvaluationOwnersByNodeID: [:]
     )
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [node.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [node.viewNodeID])
   }
 
   @Test("stress graph planning 004 queued clean node is ignored")
@@ -47,11 +47,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let node = planningNode(1, "Clean", evaluator: true)
     node.isDirty = false
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [node], nodes: [node])
     )
 
-    #expect(plan == nil)
+    #expect(planning.plan == nil)
   }
 
   @Test("stress graph planning 005 queued dirty ancestor collapses descendant frontier")
@@ -62,11 +62,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     parent.markDirty()
     child.markDirty()
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [parent, child], nodes: [parent, child])
     )
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [parent.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [parent.viewNodeID])
   }
 
   @Test("stress graph planning 006 unqueued dirty ancestor cannot strand descendant")
@@ -77,11 +77,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     parent.markDirty()
     child.markDirty()
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [child], nodes: [parent, child])
     )
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [child.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [child.viewNodeID])
   }
 
   @Test("stress graph planning 007 parentless island walks through evaluation host")
@@ -91,11 +91,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     establishEvaluationHost(host: host, island: island)
     island.markDirty()
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [island], nodes: [host, island])
     )
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
   }
 
   @Test("stress graph planning 008 evaluator below island seam is not stitchable")
@@ -107,11 +107,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     establishEvaluationHost(host: host, island: islandRoot)
     leaf.markDirty()
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [leaf], nodes: [host, islandRoot, leaf])
     )
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
   }
 
   @Test("stress graph planning 009 lifecycle ownership redirects evaluation")
@@ -126,9 +126,9 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
       lifecycleOwners: [dirty.viewNodeID: owner.viewNodeID]
     )
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [owner.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [owner.viewNodeID])
   }
 
   @Test("stress graph planning 010 lifecycle owner below seam hoists above host")
@@ -146,9 +146,9 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
       lifecycleOwners: [dirty.viewNodeID: owner.viewNodeID]
     )
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(input: input)
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [host.viewNodeID])
   }
 
   @Test("stress graph planning 011 shared evaluator is emitted once")
@@ -160,11 +160,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     left.markDirty()
     right.markDirty()
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [left, right], nodes: [parent, left, right])
     )
 
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [parent.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [parent.viewNodeID])
   }
 
   @Test("stress graph planning 012 target ordering is depth then identity")
@@ -173,7 +173,7 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let shallowZ = planningNode(2, "Root", "Z", evaluator: true)
     let shallowA = planningNode(3, "Root", "A", evaluator: true)
 
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(
         hasRoot: true,
         dirty: [deep, shallowZ, shallowA],
@@ -182,7 +182,7 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     )
 
     #expect(
-      plan?.targetNodes.map(\.identity) == [shallowA.identity, shallowZ.identity, deep.identity]
+      planning.plan?.targetNodes.map(\.identity) == [shallowA.identity, shallowZ.identity, deep.identity]
     )
   }
 
@@ -236,7 +236,7 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
       graphLocalDirtyNodeIDs: &queued,
       nodesByNodeID: [live.viewNodeID: live]
     )
-    let plan = ViewGraphDirtyEvaluationPlanner.targetPlan(
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: ViewGraphDirtyEvaluationPlanningInput(
         hasRoot: true,
         graphLocalDirtyNodeIDs: queued,
@@ -246,7 +246,7 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     )
 
     #expect(queued == [live.viewNodeID, missing])
-    #expect(plan?.targetNodes.map(\.viewNodeID) == [live.viewNodeID])
+    #expect(planning.plan?.targetNodes.map(\.viewNodeID) == [live.viewNodeID])
   }
 
   @Test("stress graph planning 016 environment fanout unions disjoint roots and keys")
@@ -429,6 +429,36 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     #expect(plan.removedChildren.count == 1)
     #expect(plan.removedChildren.first?.oldIndex == 0)
     #expect(plan.removedChildren.first?.committedSnapshot == nil)
+  }
+
+  @Test("stress graph planning 026 target-less frontier node cannot form a silent partial plan")
+  func graphPlanning026TargetlessFrontierNodeCannotFormSilentPartialPlan() {
+    // A dirty frontier node with no stitchable evaluator anywhere on its
+    // chain has no target. Dropping just that node forms a plan covering
+    // LESS than the queued dirty work — `finalizeFrame` then wipes the
+    // dirty rails and the orphan's re-evaluation is silently lost for the
+    // session (F160). The plan must escalate (nil → root evaluation), never
+    // proceed partially.
+    let live = planningNode(1, "Root", "Live", evaluator: true)
+    let orphan = planningNode(2, "Orphan", evaluator: false)
+    live.markDirty()
+    orphan.markDirty()
+    let escalationsBefore =
+      SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount
+
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
+      input: planningInput(hasRoot: true, dirty: [live, orphan], nodes: [live, orphan])
+    )
+
+    #expect(
+      planning.plan == nil,
+      "a target-less frontier node must escalate the whole plan to root evaluation, not drop the node from a partial plan"
+    )
+    #expect(planning.droppedTargetlessNodeCount == 1)
+    #expect(
+      SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount
+        == escalationsBefore + 1
+    )
   }
 }
 

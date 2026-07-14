@@ -62,6 +62,7 @@ package enum SoundnessProbeConfiguration {
   package static var memoUnsoundSkipCount = 0
   package static var duplicateRegistrationOverwriteCount = 0
   package static var stateSlotRestorationDropCount = 0
+  package static var plannerTargetlessFrontierEscalationCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -174,6 +175,24 @@ package enum SoundnessProbeConfiguration {
     duplicateRegistrationOverwriteCount += 1
     lastViolationDetail = detail()
     emitTrace("duplicate-registration")
+  }
+
+  /// Records one dirty-plan escalation caused by a target-less frontier node
+  /// (F160): a queued dirty node had no stitchable evaluator anywhere on its
+  /// chain. Before F160 the planner silently dropped just that node from the
+  /// plan and `finalizeFrame` wiped the dirty rails — the node's
+  /// re-evaluation was lost for the session. The planner now escalates the
+  /// whole plan to a root evaluation (safe), and this counter makes the
+  /// class watchable: a nonzero steady-state count means selective
+  /// evaluation is being defeated by an unplannable dirty source. Recorded
+  /// unconditionally: the path is rare and every hit was previously a
+  /// silently lost re-evaluation.
+  package static func recordPlannerTargetlessFrontierEscalation(
+    _ detail: @autoclosure () -> String
+  ) {
+    plannerTargetlessFrontierEscalationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("planner-targetless-frontier")
   }
 
   /// Records one dropped in-flight state-slot restoration (F93): a

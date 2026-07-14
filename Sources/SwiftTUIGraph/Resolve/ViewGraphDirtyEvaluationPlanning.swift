@@ -11,13 +11,19 @@ struct ViewGraphDirtyEvaluationTargetPlan {
 
 @MainActor
 enum ViewGraphDirtyEvaluationPlanner {
+  /// `plan` is `nil` when there is no plannable dirty work — or when any
+  /// frontier node was target-less (`droppedTargetlessNodeCount > 0`), in
+  /// which case the caller must escalate to a full root evaluation: a plan
+  /// covering less than the queued dirty work would strand the dropped
+  /// node's re-evaluation, and `finalizeFrame` wipes the dirty rails
+  /// afterwards, losing the work for the session (F160).
   static func targetPlan(
     input: ViewGraphDirtyEvaluationPlanningInput
-  ) -> ViewGraphDirtyEvaluationTargetPlan? {
+  ) -> (plan: ViewGraphDirtyEvaluationTargetPlan?, droppedTargetlessNodeCount: Int) {
     guard input.hasRoot,
       !input.graphLocalDirtyNodeIDs.isEmpty
     else {
-      return nil
+      return (nil, 0)
     }
 
     // Live invalidated nodes are unioned into `graphLocalDirtyNodeIDs` by
@@ -29,26 +35,39 @@ enum ViewGraphDirtyEvaluationPlanner {
     )
 
     guard !dirtyFrontier.isEmpty else {
-      return nil
+      return (nil, 0)
     }
 
     var targetNodes: [ViewNode] = []
     var targetIdentities: Set<Identity> = []
+    var droppedTargetlessNodeCount = 0
     for node in dirtyFrontier {
       let target = evaluatorTarget(
         for: node,
         nodesByNodeID: input.nodesByNodeID,
         lifecycleEvaluationOwnersByNodeID: input.lifecycleEvaluationOwnersByNodeID
       )
-      guard let target,
-        targetIdentities.insert(target.identity).inserted
-      else {
+      guard let target else {
+        // No stitchable evaluator anywhere on this node's chain. Count it
+        // (recorded unconditionally — the path should be rare and every hit
+        // was, pre-F160, a silently lost re-evaluation) and escalate below.
+        droppedTargetlessNodeCount += 1
+        SoundnessProbeConfiguration.recordPlannerTargetlessFrontierEscalation(
+          "dirty frontier node \(node.identity) has no stitchable evaluator target"
+        )
+        continue
+      }
+      guard targetIdentities.insert(target.identity).inserted else {
+        // Deduplicated onto an already-planned target — covered, not dropped.
         continue
       }
       targetNodes.append(target)
     }
 
-    return ViewGraphDirtyEvaluationTargetPlan(targetNodes: targetNodes)
+    guard droppedTargetlessNodeCount == 0 else {
+      return (nil, droppedTargetlessNodeCount)
+    }
+    return (ViewGraphDirtyEvaluationTargetPlan(targetNodes: targetNodes), 0)
   }
 
   /// The next node on the evaluation-ancestry walk. Capture-hosted island

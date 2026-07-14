@@ -1546,16 +1546,26 @@ package final class ViewGraph {
       )
     }
 
-    guard
-      let targetPlan = ViewGraphDirtyEvaluationPlanner.targetPlan(
-        input: ViewGraphDirtyEvaluationPlanningInput(
-          hasRoot: root != nil,
-          graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
-          nodesByNodeID: nodesByNodeID,
-          lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
-        )
+    let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
+      input: ViewGraphDirtyEvaluationPlanningInput(
+        hasRoot: root != nil,
+        graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
+        nodesByNodeID: nodesByNodeID,
+        lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
       )
-    else {
+    )
+    guard planning.droppedTargetlessNodeCount == 0 else {
+      // A target-less frontier node means the plan cannot cover all queued
+      // dirty work — escalate to a full root evaluation instead of losing
+      // the dropped node's re-evaluation (F160; the planner recorded the
+      // probe signal at the drop site).
+      var diagnostics = baseDiagnostics(
+        "nil_targetless_frontier", planning.droppedTargetlessNodeCount
+      )
+      diagnostics.reconciledInvalidatedNodeCount = unqueuedInvalidated.count
+      return (nil, diagnostics)
+    }
+    guard let targetPlan = planning.plan else {
       var diagnostics = baseDiagnostics("nil_no_frontier", 0)
       diagnostics.reconciledInvalidatedNodeCount = unqueuedInvalidated.count
       return (nil, diagnostics)
