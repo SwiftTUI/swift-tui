@@ -75,6 +75,14 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
     (pressStart != nil || completedTaps > 0) && !phase.isTerminal
   }
 
+  func reArm() {
+    guard phase.isTerminal else { return }
+    phase = .possible
+    completedTaps = 0
+    pressStart = nil
+    lastTerminalLocation = nil
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     let location = event.location.location

@@ -2286,6 +2286,8 @@ private final class RuntimeRegistrationProbeGesture: GestureRecognizer {
   }
 
   func tearDown() {}
+
+  func reArm() {}
 }
 
 @MainActor

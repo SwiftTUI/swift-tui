@@ -217,4 +217,6 @@ final class TotalityProbeGesture: GestureRecognizer {
   }
 
   func tearDown() {}
+
+  func reArm() {}
 }

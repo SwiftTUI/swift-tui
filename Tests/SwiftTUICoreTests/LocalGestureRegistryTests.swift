@@ -236,6 +236,8 @@ private final class NoopRecognizer: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() {}
+
+  func reArm() {}
 }
 
 @MainActor
@@ -263,6 +265,8 @@ private final class CallbackRecognizer: GestureRecognizer {
   func currentValue() -> Int? { nil }
   func tearDown() {}
 
+  func reArm() {}
+
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     guard let other = replacement as? CallbackRecognizer else { return false }
     action = other.action
@@ -280,4 +284,6 @@ private final class TearDownTracker: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() { tornDown = true }
+
+  func reArm() {}
 }

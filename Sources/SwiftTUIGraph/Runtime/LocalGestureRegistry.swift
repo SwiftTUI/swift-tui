@@ -349,6 +349,12 @@ private final class StackedGestureRecognizer: GestureRecognizer {
     return adoptedAll
   }
 
+  func reArm() {
+    for recognizer in recognizers {
+      recognizer.reArm()
+    }
+  }
+
   var phase: GestureRecognizerPhase {
     if recognizers.contains(where: { $0.phase == .changed }) {
       return .changed

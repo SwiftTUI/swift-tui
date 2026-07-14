@@ -25,6 +25,12 @@ final class OnEndedDecorator<V>: GestureRecognizer {
   private(set) var action: @MainActor (V) -> Void
   private var didFire = false
 
+  func reArm() {
+    guard inner.phase.isTerminal else { return }
+    inner.reArm()
+    didFire = false
+  }
+
   init(
     inner: AnyGestureRecognizer,
     authoringContext: ImperativeAuthoringContextSnapshot?,
@@ -87,6 +93,12 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
   private(set) var action: @MainActor (V) -> Void
   private var lastValue: V?
 
+  func reArm() {
+    guard inner.phase.isTerminal else { return }
+    inner.reArm()
+    lastValue = nil
+  }
+
   init(
     inner: AnyGestureRecognizer,
     authoringContext: ImperativeAuthoringContextSnapshot?,
@@ -146,6 +158,10 @@ final class MapDecorator<From, To>: GestureRecognizer {
   let inner: AnyGestureRecognizer
   private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
   private(set) var transform: @MainActor (From) -> To
+
+  func reArm() {
+    inner.reArm()
+  }
 
   init(
     inner: AnyGestureRecognizer,
@@ -210,6 +226,12 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   /// still write to the `@GestureState` slot every frame, dirtying the
   /// owning view and scheduling another resolve pass ad infinitum.
   private var didFire = false
+
+  func reArm() {
+    guard inner.phase.isTerminal else { return }
+    inner.reArm()
+    didFire = false
+  }
 
   init(
     inner: AnyGestureRecognizer,

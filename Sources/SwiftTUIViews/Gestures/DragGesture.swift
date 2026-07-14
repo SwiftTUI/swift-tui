@@ -109,6 +109,15 @@ final class DragGestureRecognizer: GestureRecognizer {
   private var samples: [Sample] = []
   private var lastValue: DragGesture.Value?
 
+  func reArm() {
+    guard phase.isTerminal else { return }
+    phase = .possible
+    startLocation = nil
+    startTime = nil
+    samples = []
+    lastValue = nil
+  }
+
   init(minimumDistance: Double, coordinateSpace: CoordinateSpace) {
     self.minimumDistance = minimumDistance
     self.coordinateSpace = coordinateSpace

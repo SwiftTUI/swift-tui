@@ -55,6 +55,11 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     self.second = second
   }
 
+  func reArm() {
+    first.reArm()
+    second.reArm()
+  }
+
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     guard let other = replacement as? ExclusiveGestureRecognizer<V> else {
       return false

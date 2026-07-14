@@ -121,6 +121,8 @@ private final class TearDownTracker: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() { tornDown = true }
+
+  func reArm() {}
 }
 
 @MainActor
@@ -133,4 +135,6 @@ private final class ActiveTracker: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() { tornDown = true }
+
+  func reArm() {}
 }

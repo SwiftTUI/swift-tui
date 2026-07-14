@@ -56,6 +56,14 @@ final class LongPressGestureRecognizer: GestureRecognizer {
   private var deadline: MonotonicInstant?
   private var endedValue: Bool?
 
+  func reArm() {
+    guard phase.isTerminal else { return }
+    phase = .possible
+    pressStart = nil
+    deadline = nil
+    endedValue = nil
+  }
+
   init(
     minimumDuration: Duration,
     maximumDistance: Double,

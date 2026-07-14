@@ -38,4 +38,6 @@ private final class NoopRecognizer: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() {}
+
+  func reArm() {}
 }

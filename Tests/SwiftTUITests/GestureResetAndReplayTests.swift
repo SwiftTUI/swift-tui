@@ -133,6 +133,8 @@ private final class TearDownTracker: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() { tornDown = true }
+
+  func reArm() {}
 }
 
 /// Reports `isActive == true` to simulate a recognizer that has
@@ -147,4 +149,6 @@ private final class ActiveTracker: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
   func tearDown() { tornDown = true }
+
+  func reArm() {}
 }

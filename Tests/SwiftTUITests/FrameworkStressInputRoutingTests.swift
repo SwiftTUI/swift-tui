@@ -1043,7 +1043,11 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.clickText("Double tap remint")
     _ = try harness.clickText("Double tap remint")
 
-    #expect(departedFires.value == [1])
+    // Both taps fire the single-tap handler (the fired recognizer re-arms on
+    // the next `.down` — F128), so `generation` is 2 when the double-tap
+    // completes. The adoption property this test pins is unchanged: a STALE
+    // captured closure would append the construction-time 0.
+    #expect(departedFires.value == [2])
   }
 }
 

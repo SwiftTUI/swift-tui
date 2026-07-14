@@ -104,6 +104,16 @@ package protocol GestureRecognizer: AnyObject {
   /// the view has since re-authored. Returns `false` when the trees'
   /// types/shapes diverge; the preserved recognizer then keeps its closures.
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool
+
+  /// Resets a TERMINAL recognizer to its initial state so the next
+  /// interaction can begin (F128). One-shot recognizers park in absorbing
+  /// terminal phases after firing or failing; when the fired action mutates
+  /// no state, no re-resolve re-authors a fresh recognizer and the view
+  /// would otherwise stay gesture-dead. The dispatch site calls this on a
+  /// fresh `.down`. Implementations MUST no-op while non-terminal — an
+  /// active interaction's state is never discarded — and wrappers forward
+  /// to their wrapped recognizers.
+  func reArm()
 }
 
 extension GestureRecognizer {
@@ -136,6 +146,7 @@ public final class AnyGestureRecognizer {
   /// expected type via `currentValue(as:)`.
   private let _currentValue: () -> Any?
   private let _adoptAuthoredCallbacks: (AnyObject) -> Bool
+  private let _reArm: () -> Void
   /// The wrapped recognizer instance, exposed so a preserved recognizer can
   /// adopt authored callbacks from a discarded replacement's base.
   package let base: AnyObject
@@ -163,6 +174,7 @@ public final class AnyGestureRecognizer {
     self._tearDown = { recognizer.tearDown() }
     self._currentValue = { recognizer.currentValue() }
     self._adoptAuthoredCallbacks = { recognizer.adoptAuthoredCallbacks(from: $0) }
+    self._reArm = { recognizer.reArm() }
     self.base = recognizer
     self.valueType = R.Value.self
     // 64-bit wraparound is deliberately unguarded (F122): unreachable in
@@ -186,6 +198,11 @@ public final class AnyGestureRecognizer {
 
   package func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     _handleEvent(event)
+  }
+
+  /// See ``GestureRecognizer/reArm()``.
+  package func reArm() {
+    _reArm()
   }
 
   package func handleDeadline(at instant: MonotonicInstant) -> Bool {

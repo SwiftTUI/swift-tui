@@ -61,6 +61,13 @@ final class TapGestureRecognizer: GestureRecognizer {
     (pressStart != nil || completedTaps > 0) && !phase.isTerminal
   }
 
+  func reArm() {
+    guard phase.isTerminal else { return }
+    phase = .possible
+    completedTaps = 0
+    pressStart = nil
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     let location = event.location.location
@@ -84,9 +91,13 @@ final class TapGestureRecognizer: GestureRecognizer {
       }
     case .dragged(.primary):
       if let start = pressStart {
+        // Sub-cell slop (F128): pixel-precision pointers report fractional
+        // jitter for any human press — failing on ANY movement made taps
+        // unlandable on precise hosts. Movement inside one cell is a tap;
+        // a full cell of travel is a drag.
         let dx = abs(location.x - start.x)
         let dy = abs(location.y - start.y)
-        if dx > 0 || dy > 0 {
+        if dx >= 1 || dy >= 1 {
           phase = .failed
           return .failed
         }

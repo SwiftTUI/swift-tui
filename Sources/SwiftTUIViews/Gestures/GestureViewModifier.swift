@@ -122,6 +122,15 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
       guard let current = gestureRegistryRef.recognizer(for: handlerIdentity) else {
         return false
       }
+      // One-shot recognizers park in absorbing terminal phases; when the
+      // fired action mutates no state, no re-resolve re-authors a fresh
+      // recognizer and the parked terminal would swallow every later
+      // interaction (F128). A fresh press is unambiguously a new
+      // interaction: re-arm terminal recognizers first. `reArm` no-ops
+      // while non-terminal, so active interactions are never disturbed.
+      if case .down = event.kind {
+        current.reArm()
+      }
       let disposition = current.handle(event: event)
       return disposition == .handled
     }
