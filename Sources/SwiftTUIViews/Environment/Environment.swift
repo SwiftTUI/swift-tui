@@ -210,7 +210,22 @@ public struct Environment<Value: Sendable> {
 
   public var wrappedValue: Value {
     EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
-    return (EnvironmentValuesStorage.current ?? EnvironmentValues())[keyPath: keyPath]
+    guard let current = EnvironmentValuesStorage.current else {
+      // The silent-default class (F136): inside an authoring/dispatch scope
+      // the registration-time environment should have been established
+      // around this read (`HandlerDescriptorIntake` stamps it over every
+      // wrapped dispatch) — falling back to defaults there is the
+      // observable signature of a capture seam that dodged the intake.
+      // Reads with no authoring scope at all are the documented default
+      // behavior and stay uncounted.
+      if currentAuthoringContext() != nil {
+        SoundnessProbeConfiguration.recordAmbientEnvironmentFallbackRead(
+          "@Environment(\(keyPath)) read default values inside an authoring scope"
+        )
+      }
+      return EnvironmentValues()[keyPath: keyPath]
+    }
+    return current[keyPath: keyPath]
   }
 }
 

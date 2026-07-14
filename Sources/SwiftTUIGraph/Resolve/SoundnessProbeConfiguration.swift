@@ -64,6 +64,7 @@ package enum SoundnessProbeConfiguration {
   package static var stateSlotRestorationDropCount = 0
   package static var plannerTargetlessFrontierEscalationCount = 0
   package static var lifecycleHandlerSkipCount = 0
+  package static var ambientEnvironmentFallbackReadCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -208,6 +209,23 @@ package enum SoundnessProbeConfiguration {
     lifecycleHandlerSkipCount += 1
     lastViolationDetail = detail()
     emitTrace("lifecycle-handler-skip")
+  }
+
+  /// Records one `@Environment` read that fell back to default values while
+  /// an authoring/dispatch scope was bound (F136): the scope that dispatched
+  /// the read failed to establish the registration-time environment, so the
+  /// read silently produced `EnvironmentValues()` defaults — the
+  /// "`@Environment` in action closures sees DEFAULTS" family. Reads with no
+  /// authoring scope at all (direct construction outside a scene, unit
+  /// tests) are deliberately not counted: defaults are the documented
+  /// behavior there. Recorded unconditionally: an in-scope hit was
+  /// previously a silent wrong value.
+  package static func recordAmbientEnvironmentFallbackRead(
+    _ detail: @autoclosure () -> String
+  ) {
+    ambientEnvironmentFallbackReadCount += 1
+    lastViolationDetail = detail()
+    emitTrace("ambient-environment-fallback")
   }
 
   /// Records one dropped in-flight state-slot restoration (F93): a
