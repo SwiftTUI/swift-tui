@@ -112,9 +112,14 @@ extension View {
   /// view builders. The contributed item is delivered to the nearest
   /// enclosing ActionScope with a `.toolbar(style:)` modifier.
   ///
-  /// The current implementation stores a text title extracted from the
-  /// label builder. A richer label/icon render path lands once toolbar
-  /// rendering grows beyond a plain-text strip.
+  /// Deprecated: the `icon` builder is evaluated and discarded — it never
+  /// renders. The toolbar strip renders `Image` icons supplied through
+  /// ``ToolbarItemConfig/init(title:icon:position:isEnabled:systemHint:action:)``;
+  /// use ``toolbarItem(_:)`` with a config instead.
+  @available(
+    *, deprecated,
+    message: "the icon builder is not rendered; use toolbarItem(_:) with a ToolbarItemConfig carrying an icon Image"
+  )
   @MainActor
   public func toolbarItem<Label: View, Icon: View>(
     position: ToolbarItemConfig.Position = .automatic,

@@ -323,20 +323,36 @@ private func resolvedToolbarItemsStrip<S: ToolbarStyle>(
       transaction: context.transaction
     )
   {
-    context.viewGraph?.recordReusedSubtree(
-      reused,
-      invalidator: context.invalidationProxy?.invalidator,
-      retained: true
-    )
-    context.viewGraph?.restoreRuntimeRegistrations(
-      for: reused,
-      into: context.runtimeRegistrations
-    )
-    refreshToolbarItemActionRegistrations(items, in: context)
-    context.recordResolvedReuse(count: reused.subtreeNodeCount)
-    var structurallyStamped = reused
-    structurallyStamped.structuralPath = context.structuralPath
-    return structurallyStamped
+    // The cached tree's restored handlers close over the RESOLVE-TIME item
+    // closures, so the reuse leg must re-point them at the current items.
+    // The target identities are discovered from the reused subtree's own
+    // node records — the same records `restoreRuntimeRegistrations` replays
+    // — so they track the strip's real lowering by construction (F175: a
+    // hand-mirrored identity mint silently stranded the refresh on any
+    // lowering change). Disabled items never register an action (Button
+    // gates registration on `isEnabled`) and the cache signature includes
+    // `isEnabled`, so the discovered identities pair positionally with the
+    // enabled items; on any count mismatch fall through to a fresh resolve
+    // instead of refreshing blindly.
+    let enabledItems = items.filter(\.isEnabled)
+    let refreshIdentities =
+      context.viewGraph?.actionRegistrationIdentities(inReusedSubtree: reused) ?? []
+    if refreshIdentities.count == enabledItems.count {
+      context.viewGraph?.recordReusedSubtree(
+        reused,
+        invalidator: context.invalidationProxy?.invalidator,
+        retained: true
+      )
+      context.viewGraph?.restoreRuntimeRegistrations(
+        for: reused,
+        into: context.runtimeRegistrations
+      )
+      refreshToolbarItemActionRegistrations(enabledItems, at: refreshIdentities, in: context)
+      context.recordResolvedReuse(count: reused.subtreeNodeCount)
+      var structurallyStamped = reused
+      structurallyStamped.structuralPath = context.structuralPath
+      return structurallyStamped
+    }
   }
 
   let resolved = ToolbarItemsStrip(items: items, style: style).resolve(in: context)
@@ -351,11 +367,11 @@ private func resolvedToolbarItemsStrip<S: ToolbarStyle>(
 
 @MainActor
 private func refreshToolbarItemActionRegistrations(
-  _ items: [ToolbarItemConfig],
+  _ enabledItems: [ToolbarItemConfig],
+  at identities: [Identity],
   in stripContext: ResolveContext
 ) {
-  for (index, item) in items.enumerated() where item.isEnabled {
-    let identity = toolbarItemButtonIdentity(in: stripContext, index: index)
+  for (item, identity) in zip(enabledItems, identities) {
     stripContext.viewGraph?.refreshActionRegistration(
       identity: identity,
       handler: {
@@ -366,17 +382,6 @@ private func refreshToolbarItemActionRegistrations(
       in: stripContext.localActionRegistry
     )
   }
-}
-
-private func toolbarItemButtonIdentity(
-  in stripContext: ResolveContext,
-  index: Int
-) -> Identity {
-  stripContext
-    .child(component: .named("base"))
-    .child(component: .named("content"))
-    .indexedChild(kind: .init(rawValue: "Layout"), index: index)
-    .identity
 }
 
 private struct ToolbarStripSignature: Hashable {

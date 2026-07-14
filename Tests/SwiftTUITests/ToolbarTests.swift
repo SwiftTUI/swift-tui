@@ -46,6 +46,7 @@ struct ToolbarTests {
   }
 
   @Test("Builder toolbarItem variant registers its label text as the title")
+  @available(*, deprecated, message: "exercises the deprecated toolbarItem(label:icon:) overload")
   func builderVariantRegisters() {
     let view = Text("X").toolbarItem(action: {}) {
       Text("Copy")
@@ -59,6 +60,7 @@ struct ToolbarTests {
   }
 
   @Test("Builder toolbarItem variant extracts text from composed label views")
+  @available(*, deprecated, message: "exercises the deprecated toolbarItem(label:icon:) overload")
   func builderVariantExtractsComposedLabelText() {
     let view = Text("X").toolbarItem(action: {}) {
       HStack(spacing: 1) {
@@ -305,6 +307,66 @@ struct ToolbarTests {
     #expect(second.diagnostics.work.resolvedNodesReused > 0)
     #expect(actionRegistry.dispatch(identity: button.identity))
     #expect(dispatchedMarkers == ["second"])
+  }
+
+  @Test("Strip reuse refresh pairs discovered identities with enabled items only")
+  func toolbarStripReuseRefreshPairsEnabledItems() throws {
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    var dispatchedMarkers: [String] = []
+
+    // Three items with the middle one disabled: a disabled Button never
+    // registers an action, so the discovered refresh identities must pair
+    // positionally with the ENABLED items — a whole-items zip would
+    // re-point "Third"'s registration at "Second"'s (disabled) closure.
+    func panel(generation: String) -> some View {
+      func item(_ title: String, isEnabled: Bool = true) -> ToolbarItemConfig {
+        .init(
+          title: title,
+          icon: nil,
+          position: .top,
+          isEnabled: isEnabled,
+          action: { dispatchedMarkers.append("\(title)-\(generation)") }
+        )
+      }
+      return Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(item("First"))
+          .toolbarItem(item("Second", isEnabled: false))
+          .toolbarItem(item("Third"))
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+      .frame(width: 40, height: 5)
+    }
+
+    _ = renderer.render(
+      panel(generation: "g1"),
+      context: .init(
+        identity: testIdentity("toolbar-reuse-enabled-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let second = renderer.render(
+      panel(generation: "g2"),
+      context: .init(
+        identity: testIdentity("toolbar-reuse-enabled-root"),
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(second.diagnostics.work.resolvedNodesReused > 0)
+    for title in ["First", "Third"] {
+      let button = try #require(
+        second.semanticSnapshot.accessibilityNodes.first { node in
+          node.role == .button && node.label == title
+        },
+        "no button node for \(title)"
+      )
+      #expect(actionRegistry.dispatch(identity: button.identity))
+    }
+    #expect(dispatchedMarkers == ["First-g2", "Third-g2"])
   }
 
   @Test("Toolbar strip reuse is frame-product equivalent to fresh resolve")

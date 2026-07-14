@@ -3026,6 +3026,17 @@ package final class ViewGraph {
     )
   }
 
+  /// See ``ViewGraphRuntimeRegistrationRestorer/actionRegistrationIdentities(in:nodesByNodeID:nodeIDsByStructuralPath:)``.
+  package func actionRegistrationIdentities(
+    inReusedSubtree resolved: ResolvedNode
+  ) -> [Identity] {
+    ViewGraphRuntimeRegistrationRestorer.actionRegistrationIdentities(
+      in: resolved,
+      nodesByNodeID: nodesByNodeID,
+      nodeIDsByStructuralPath: nodeIDsByStructuralPath
+    )
+  }
+
   package func restoreCurrentFrameRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
