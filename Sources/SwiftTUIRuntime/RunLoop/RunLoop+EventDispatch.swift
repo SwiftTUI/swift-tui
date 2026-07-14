@@ -264,27 +264,52 @@ extension RunLoop {
     // SecureField, REPL-style consumers) continue to see pasted
     // text. This preserves pre-bracketed-paste behavior for the
     // non-drop case.
+    //
+    // Gated on a focused consumer that can treat the keys as TEXT — an
+    // editing region or a key handler on the focus bubble path. Without
+    // the gate, pasted bytes became control events on whatever was
+    // focused: a multi-line paste with a destructive button focused
+    // fired it once per newline (F164). `.return`/`.tab` are never
+    // synthesized from pasted content even for eligible consumers —
+    // activation and traversal must not be forgeable from a paste;
+    // faithful multi-line insertion is the paste-HANDLER path above.
+    guard focusedRegionAcceptsSynthesizedPasteText() else { return }
     // Iterate grapheme clusters, not scalars: multi-scalar characters
     // (ZWJ emoji, combining sequences) must arrive as one key event.
     for character in pasteEvent.content {
-      // Skip control characters except common whitespace. Multi-scalar
-      // clusters are never control characters.
+      // Skip control characters (including \n and \t — see the gate
+      // comment above). Multi-scalar clusters are never control
+      // characters.
       if character.unicodeScalars.count == 1,
         let scalar = character.unicodeScalars.first,
-        scalar.value < 0x20, scalar != "\n", scalar != "\t"
+        scalar.value < 0x20 || scalar.value == 0x7F
       {
         continue
       }
-      let key: KeyEvent
-      switch character {
-      case "\n", "\r", "\r\n": key = .return
-      case "\t": key = .tab
-      case " ": key = .space
-      default:
-        key = .character(character)
-      }
+      let key: KeyEvent =
+        switch character {
+        case " ": .space
+        default: .character(character)
+        }
       _ = handleKeyPress(KeyPress(key, modifiers: []))
     }
+  }
+
+  /// Whether the current focus can consume synthesized paste characters as
+  /// text: the focused region declares editing interactions, or an identity
+  /// on its key-event bubble path has a key handler (REPL-style consumers).
+  private func focusedRegionAcceptsSynthesizedPasteText() -> Bool {
+    guard let focusedIdentity = focusTracker.currentFocusIdentity else {
+      return false
+    }
+    for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
+    where localKeyHandlerRegistry.hasHandler(identity: identity) {
+      return true
+    }
+    let region = focusTracker.focusRegions.first { region in
+      region.identity == focusedIdentity
+    }
+    return region?.focusInteractions == .edit
   }
 
   package func signalDisposition(for name: String) -> RuntimeSignalDisposition {
