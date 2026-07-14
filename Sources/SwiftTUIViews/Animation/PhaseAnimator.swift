@@ -48,8 +48,12 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   private let phases: [Phase]
   private let content: @MainActor (Phase) -> Content
   private let animation: @Sendable (Phase) -> Animation?
-  // nil → loop mode; concrete hash → trigger mode keyed on this value.
-  private let triggerHash: Int?
+  // nil → loop mode; concrete key → trigger mode keyed on this value.
+  // The key stores the trigger VALUE and compares by opened equality: a
+  // hash would conflate distinct values on collision, so a changed trigger
+  // whose hash collided with the previous value would silently never
+  // restart the phase cycle (F176).
+  private let trigger: PhaseAnimatorTriggerKey?
 
   @State private var currentPhase: Phase
   // Set to true the first time the trigger-mode task fires so we
@@ -69,7 +73,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     self.phases = phases
     self.content = content
     self.animation = animation
-    self.triggerHash = nil
+    self.trigger = nil
     _currentPhase = State(wrappedValue: phases[0])
   }
 
@@ -86,9 +90,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     self.phases = phases
     self.content = content
     self.animation = animation
-    var hasher = Hasher()
-    hasher.combine(trigger)
-    self.triggerHash = hasher.finalize()
+    self.trigger = PhaseAnimatorTriggerKey(base: trigger)
     _currentPhase = State(wrappedValue: phases[0])
   }
 
@@ -102,7 +104,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   private func phaseAnimatorBody(accessibilityReduceMotion: Bool) -> some View {
     if accessibilityReduceMotion {
       content(phases[0])
-    } else if let triggerHash {
+    } else if let trigger {
       // Touch `didSeeInitialTrigger` in body so `State.remember(...)`
       // registers a per-instance location for it during the normal
       // `withAuthoringContext` body evaluation. Without this read, the
@@ -113,7 +115,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
       // this PhaseAnimator instance.
       _ = didSeeInitialTrigger
       content(currentPhase)
-        .task(id: triggerHash) { @MainActor in
+        .task(id: trigger) { @MainActor in
           // .task(id:) fires on initial appearance too, so skip the
           // first invocation — trigger mode should only advance
           // phases on subsequent changes.
@@ -213,5 +215,25 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     } onCancel: {
       completionGate.resume()
     }
+  }
+}
+
+/// Value-equality key for trigger-mode's `.task(id:)` (F176). Stores the
+/// trigger VALUE and compares by opening the concrete type: a stored hash
+/// would conflate distinct trigger values whose hashes collide, so a real
+/// trigger change could silently keep the original task and never re-run
+/// the phase cycle. Type mismatch compares unequal (a changed trigger type
+/// is a changed trigger).
+struct PhaseAnimatorTriggerKey: Equatable, Sendable {
+  let base: any Hashable & Sendable
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    func open<T: Equatable>(_ lhsBase: T) -> Bool {
+      guard let rhsBase = rhs.base as? T else {
+        return false
+      }
+      return lhsBase == rhsBase
+    }
+    return open(lhs.base)
   }
 }

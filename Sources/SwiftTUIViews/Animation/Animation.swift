@@ -381,6 +381,11 @@ enum RepeatBehavior: Equatable, Hashable, Sendable {
 /// about the controller's value types.
 struct CustomAnimationBox: Equatable, Hashable, Sendable {
   private let _hashValue: Int
+  /// The user's concrete curve, retained so `==` can compare VALUES via a
+  /// dynamic-cast open (F176). Equality previously compared stored
+  /// `hashValue`s, so two distinct curves whose hashes collide compared
+  /// equal — and hash-as-identity fed retarget/merge decisions.
+  private let _base: any CustomAnimation
   private let _isEqual: @Sendable (CustomAnimationBox) -> Bool
   let evaluate: @Sendable (Duration, inout AnimationState) -> Double?
   /// Call-through to the user curve's ``CustomAnimation/shouldMerge``
@@ -397,8 +402,12 @@ struct CustomAnimationBox: Equatable, Hashable, Sendable {
 
   init<A: CustomAnimation>(_ animation: A) {
     _hashValue = animation.hashValue
+    _base = animation
     _isEqual = { other in
-      other._hashValue == animation.hashValue
+      guard let otherAnimation = other._base as? A else {
+        return false
+      }
+      return otherAnimation == animation
     }
     evaluate = { time, state in
       var context = AnimationContext<Double>(state: state)

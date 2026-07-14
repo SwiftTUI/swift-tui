@@ -411,10 +411,13 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
   ///
   /// The key compares schedules by their own value equality rather than a
   /// hashed `Int`: a hash conflates distinct values (a constant/colliding
-  /// `hash(into:)`) and cannot represent a non-Hashable schedule at all, so a
-  /// replacement schedule would silently keep the original task. `.task(id:)`
-  /// requires only `Equatable`, so the key can hold the schedule value.
-  private struct TaskKey: Equatable, Sendable {
+  /// `hash(into:)`), so a replacement schedule could silently keep the
+  /// original task. `.task(id:)` requires only `Equatable`, so the key holds
+  /// the schedule value and opens `Equatable` directly — an Equatable but
+  /// non-Hashable schedule compares by value and SURVIVES unrelated
+  /// re-resolves (F176; the previous `as? any Hashable` comparison treated
+  /// every such re-resolve as a schedule change and restarted the driver).
+  struct TaskKey: Equatable, Sendable {
     let schedule: Schedule
     let mode: TimelineScheduleMode
 
@@ -422,15 +425,20 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
       guard lhs.mode == rhs.mode else {
         return false
       }
-      guard let lhsHashable = lhs.schedule as? any Hashable,
-        let rhsHashable = rhs.schedule as? any Hashable
-      else {
-        // A non-Hashable schedule cannot be compared by value; treat every
-        // re-resolution as a change so a replacement restarts the driver task
-        // instead of silently retaining the original schedule's loop.
+      guard let lhsEquatable = lhs.schedule as? any Equatable else {
+        // A schedule with no Equatable conformance has no basis for value
+        // comparison; treat every re-resolution as a change so a replacement
+        // restarts the driver task instead of silently retaining the
+        // original schedule's loop.
         return false
       }
-      return AnyHashable(lhsHashable) == AnyHashable(rhsHashable)
+      func open<T: Equatable>(_ lhsBase: T) -> Bool {
+        guard let rhsBase = rhs.schedule as? T else {
+          return false
+        }
+        return lhsBase == rhsBase
+      }
+      return open(lhsEquatable)
     }
   }
 }

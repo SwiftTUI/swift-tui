@@ -473,3 +473,72 @@ struct LinearRoundTripAnimation: CustomAnimation {
     lhs.id == rhs.id
   }
 }
+
+// MARK: - F176: hash-collision identity
+
+/// Two DISTINCT curve values whose `hash(into:)` deliberately collides —
+/// the box's equality previously compared stored hashes, so these compared
+/// equal and a retarget between them was silently treated as a no-op.
+private struct CollidingHashCurve: CustomAnimation {
+  let id: Int
+
+  func animate<V: VectorArithmetic>(
+    value: V, time: Duration, context: inout AnimationContext<V>
+  ) -> V? {
+    value
+  }
+
+  func hash(into hasher: inout Hasher) {
+    // Constant on purpose: every value of this type shares one hash.
+  }
+}
+
+@MainActor
+@Suite("Hash-collision animation identity (F176)")
+struct HashCollisionAnimationIdentityTests {
+  @Test("distinct custom animations with colliding hashes compare unequal")
+  func collidingHashCurvesCompareUnequal() {
+    let first = CustomAnimationBox(CollidingHashCurve(id: 1))
+    let second = CustomAnimationBox(CollidingHashCurve(id: 2))
+    #expect(first != second)
+  }
+
+  @Test("value-equal custom animations still compare equal")
+  func valueEqualCurvesCompareEqual() {
+    let first = CustomAnimationBox(CollidingHashCurve(id: 7))
+    let second = CustomAnimationBox(CollidingHashCurve(id: 7))
+    #expect(first == second)
+  }
+
+  @Test("different curve types with colliding hashes compare unequal")
+  func differentTypesCompareUnequal() {
+    let colliding = CustomAnimationBox(CollidingHashCurve(id: 1))
+    let linear = CustomAnimationBox(LinearRoundTripAnimation(id: "x"))
+    #expect(colliding != linear)
+  }
+
+  @Test("distinct phase-animator triggers with colliding hashes mint distinct task keys")
+  func collidingTriggerValuesMintDistinctKeys() {
+    #expect(
+      PhaseAnimatorTriggerKey(base: CollidingHashTrigger(id: 1))
+        != PhaseAnimatorTriggerKey(base: CollidingHashTrigger(id: 2))
+    )
+    #expect(
+      PhaseAnimatorTriggerKey(base: CollidingHashTrigger(id: 3))
+        == PhaseAnimatorTriggerKey(base: CollidingHashTrigger(id: 3))
+    )
+    // A changed trigger TYPE is a changed trigger.
+    #expect(
+      PhaseAnimatorTriggerKey(base: CollidingHashTrigger(id: 1))
+        != PhaseAnimatorTriggerKey(base: 1)
+    )
+  }
+}
+
+private struct CollidingHashTrigger: Hashable, Sendable {
+  let id: Int
+
+  func hash(into hasher: inout Hasher) {
+    // Constant on purpose.
+  }
+}

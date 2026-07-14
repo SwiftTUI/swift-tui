@@ -217,3 +217,94 @@ struct TimelineViewTests {
     #expect(timelineTickPlan(delay: .seconds(-5)) == .renderNowAndReanchor)
   }
 }
+
+// MARK: - F176: TaskKey value-equality replacement detection
+
+/// An Equatable but deliberately NOT Hashable schedule — legal input
+/// (`TimelineSchedule` requires only `Sendable`), previously restarted the
+/// driver task on EVERY re-resolve because the key's comparison required
+/// `Hashable`.
+private struct EquatableOnlySchedule: TimelineSchedule, Equatable {
+  let period: Duration
+
+  func entries(
+    from startInstant: MonotonicInstant,
+    mode: TimelineScheduleMode
+  ) -> [MonotonicInstant] {
+    [startInstant]
+  }
+}
+
+/// A schedule with no Equatable conformance at all: no basis for value
+/// comparison exists, so replacement detection must keep the documented
+/// restart-on-every-re-resolve policy.
+private struct OpaqueSchedule: TimelineSchedule {
+  let period: Duration
+
+  func entries(
+    from startInstant: MonotonicInstant,
+    mode: TimelineScheduleMode
+  ) -> [MonotonicInstant] {
+    [startInstant]
+  }
+}
+
+@MainActor
+@Suite("TimelineView task-key replacement detection (F176)")
+struct TimelineViewTaskKeyTests {
+  private typealias EquatableKey =
+    TimelineView<EquatableOnlySchedule, Text>.TaskKey
+  private typealias OpaqueKey = TimelineView<OpaqueSchedule, Text>.TaskKey
+  private typealias PeriodicKey =
+    TimelineView<PeriodicTimelineSchedule, Text>.TaskKey
+
+  @Test("an Equatable non-Hashable schedule survives unrelated re-resolves")
+  func equatableOnlyScheduleSurvivesReResolves() {
+    let schedule = EquatableOnlySchedule(period: .seconds(1))
+    #expect(
+      EquatableKey(schedule: schedule, mode: .normal)
+        == EquatableKey(schedule: schedule, mode: .normal)
+    )
+  }
+
+  @Test("an Equatable non-Hashable schedule replacement is detected by value")
+  func equatableOnlyScheduleReplacementDetected() {
+    #expect(
+      EquatableKey(schedule: .init(period: .seconds(1)), mode: .normal)
+        != EquatableKey(schedule: .init(period: .seconds(2)), mode: .normal)
+    )
+  }
+
+  @Test("a cadence mode change restarts the driver")
+  func modeChangeRestartsDriver() {
+    let schedule = EquatableOnlySchedule(period: .seconds(1))
+    #expect(
+      EquatableKey(schedule: schedule, mode: .normal)
+        != EquatableKey(schedule: schedule, mode: .lowFrequency)
+    )
+  }
+
+  @Test("a non-Equatable schedule keeps the restart-every-re-resolve policy")
+  func nonEquatableScheduleRestartsEveryReResolve() {
+    let schedule = OpaqueSchedule(period: .seconds(1))
+    #expect(
+      OpaqueKey(schedule: schedule, mode: .normal)
+        != OpaqueKey(schedule: schedule, mode: .normal)
+    )
+  }
+
+  @Test("Hashable schedules keep value-equality semantics")
+  func hashableSchedulesCompareByValue() {
+    let start = MonotonicInstant(offset: .zero)
+    let a = PeriodicTimelineSchedule(from: start, by: .seconds(1))
+    #expect(
+      PeriodicKey(schedule: a, mode: .normal)
+        == PeriodicKey(schedule: a, mode: .normal)
+    )
+    let b = PeriodicTimelineSchedule(from: start, by: .seconds(2))
+    #expect(
+      PeriodicKey(schedule: a, mode: .normal)
+        != PeriodicKey(schedule: b, mode: .normal)
+    )
+  }
+}
