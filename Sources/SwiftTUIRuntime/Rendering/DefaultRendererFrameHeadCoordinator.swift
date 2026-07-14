@@ -283,10 +283,11 @@ struct DefaultRendererFrameHeadCoordinator {
     resolveInputs.invalidationSummary = .init(
       invalidatedIdentities: translatedIdentities
     )
-    resolveInputs.usesSelectiveEvaluation =
-      frameState.selectiveEvaluationEnabled
-      && !resolveInputs.environmentRequiresRootEvaluation
-      && !translatedIdentities.contains(contentRootIdentity)
+    resolveInputs.usesSelectiveEvaluation = FrameResolveState.selectiveEvaluationDecision(
+      enabled: frameState.selectiveEvaluationEnabled,
+      environmentRequiresRoot: resolveInputs.environmentRequiresRootEvaluation,
+      rootInvalidated: translatedIdentities.contains(contentRootIdentity)
+    )
     if resolveInputs.usesSelectiveEvaluation {
       resolveInputs.selectiveEvaluationDisabledReasons = []
     } else if !translatedIdentities.contains(contentRootIdentity) {

@@ -134,18 +134,8 @@ package final class FrameHeadTransaction {
   /// Commits the rendered-frame draft transaction: fires deferred animation
   /// completions, publishes advanced animation/observation/portal/graph state
   /// to live, and returns registration diagnostics.
-  ///
-  /// - SeeAlso: ``commitElided()`` — an intentionally identical sibling for the
-  ///   elision path; keep both in sync until they intentionally diverge.
   package func commit() -> RuntimeRegistrationDiagnostics {
-    precondition(!didCommit && !didDiscard)
-    let diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)
-    observationDraft?.commit()
-    presentationPortalDraft.commit()
-    animationDraft.commit()
-    didCommit = true
-    commitSequence.bump()
-    return diagnostics
+    commitSubDrafts(measuringWith: nil)
   }
 
   /// Commits the frame-head draft transaction for an ELIDED frame — fires
@@ -153,20 +143,37 @@ package final class FrameHeadTransaction {
   /// animation/observation/portal/graph state to live — WITHOUT a rendering
   /// tail or presentation.
   ///
-  /// Commits the same four sub-drafts as ``commit()`` and is byte-identical
-  /// to it; the distinct name makes the elision intent explicit and reserves a
-  /// future seam. Precondition: the caller must NOT run
-  /// finalizeFrame/commitPlanner/present afterward.
+  /// Same single commit body as ``commit()``, with the elided-frame timing
+  /// recorder measuring the two heavyweight steps. Precondition: the caller
+  /// must NOT run finalizeFrame/commitPlanner/present afterward.
   package func commitElided() -> RuntimeRegistrationDiagnostics {
+    commitSubDrafts(measuringWith: elidedFrameTimingRecorder)
+  }
+
+  /// The one commit body behind ``commit()`` and ``commitElided()`` (F177):
+  /// the four sub-drafts publish in a load-bearing order (graph
+  /// registrations → observation → portal → animation). `recorder` is
+  /// non-nil only on the elided path, which wraps the two heavyweight steps
+  /// in its timing measurements.
+  private func commitSubDrafts(
+    measuringWith recorder: ElidedFrameTimingRecorder?
+  ) -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
-    let diagnostics = elidedFrameTimingRecorder.measure(
-      .commitRuntimeRegistrations
-    ) {
-      graphDraft.commitRuntimeRegistrations(from: viewGraph)
+    let diagnostics: RuntimeRegistrationDiagnostics
+    if let recorder {
+      diagnostics = recorder.measure(.commitRuntimeRegistrations) {
+        graphDraft.commitRuntimeRegistrations(from: viewGraph)
+      }
+    } else {
+      diagnostics = graphDraft.commitRuntimeRegistrations(from: viewGraph)
     }
     observationDraft?.commit()
     presentationPortalDraft.commit()
-    elidedFrameTimingRecorder.measure(.animationCommit) {
+    if let recorder {
+      recorder.measure(.animationCommit) {
+        animationDraft.commit()
+      }
+    } else {
       animationDraft.commit()
     }
     didCommit = true

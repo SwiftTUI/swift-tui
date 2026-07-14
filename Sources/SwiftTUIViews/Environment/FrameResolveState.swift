@@ -365,6 +365,21 @@ package final class FrameResolveState {
     selectiveEvaluationEnabled = false
   }
 
+  /// The single selective-evaluation eligibility formula (F177). Both the
+  /// frame-head input preparation below and the portal-translation recompute
+  /// (`DefaultRendererFrameHeadCoordinator.translatePresentationPortalInvalidations`)
+  /// must agree on these three terms; hand-duplication let them drift
+  /// silently. `rootInvalidated` is the caller's root-membership check
+  /// against ITS invalidation currency — the raw set at prepare time, the
+  /// portal-translated set at recompute time.
+  package static func selectiveEvaluationDecision(
+    enabled: Bool,
+    environmentRequiresRoot: Bool,
+    rootInvalidated: Bool
+  ) -> Bool {
+    enabled && !environmentRequiresRoot && !rootInvalidated
+  }
+
   package func prepareInputs(
     from context: ResolveContext,
     proposal: ProposedSize
@@ -406,10 +421,11 @@ package final class FrameResolveState {
     forceRootEvaluationSources.removeAll()
     retainedReuseSuppressionScope = .none
 
-    let usesSelectiveEvaluation =
-      selectiveEvaluationEnabled
-      && !environmentRequiresRootEvaluation
-      && !rootInvalidated
+    let usesSelectiveEvaluation = Self.selectiveEvaluationDecision(
+      enabled: selectiveEvaluationEnabled,
+      environmentRequiresRoot: environmentRequiresRootEvaluation,
+      rootInvalidated: rootInvalidated
+    )
 
     var disabledReasons: [SelectiveEvaluationDisabledReason] = []
     if !selectiveEvaluationEnabled {

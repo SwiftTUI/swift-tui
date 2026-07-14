@@ -311,3 +311,32 @@ private func resolveContext(
     applyEnvironmentValues: true
   )
 }
+
+// MARK: - F177: the single selective-evaluation formula
+
+@MainActor
+@Suite("Selective-evaluation decision formula (F177)")
+struct SelectiveEvaluationDecisionTests {
+  @Test(
+    "the shared formula is the conjunction of enabled and the two root vetoes",
+    arguments: [
+      // (enabled, environmentRequiresRoot, rootInvalidated, expected)
+      (true, false, false, true),
+      (true, true, false, false),
+      (true, false, true, false),
+      (true, true, true, false),
+      (false, false, false, false),
+      (false, true, false, false),
+      (false, false, true, false),
+      (false, true, true, false),
+    ])
+  func decisionTruthTable(row: (Bool, Bool, Bool, Bool)) {
+    #expect(
+      FrameResolveState.selectiveEvaluationDecision(
+        enabled: row.0,
+        environmentRequiresRoot: row.1,
+        rootInvalidated: row.2
+      ) == row.3
+    )
+  }
+}
