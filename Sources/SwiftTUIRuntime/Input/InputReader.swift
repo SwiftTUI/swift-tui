@@ -12,6 +12,7 @@ public final class InputReader: InputReading, TerminalInputReading,
   private let fileDescriptor: Int32
   private let mouseCoordinateMode: Mutex<MouseCoordinateMode>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
+  private let controlChannelEnabled: Bool
 
   #if !canImport(WASILibc)
     /// Live dispatch read-sources, registered so ``withInputSuspended(_:)``
@@ -59,6 +60,18 @@ public final class InputReader: InputReading, TerminalInputReading,
       )
     )
     self.controlHandler = controlHandler
+    // The in-band 0x1E control channel is written only by embedded-host
+    // transports (the WebHost browser transport feeding a hosted binary's
+    // stdin, WASI stdin records). A real interactive TTY never emits the
+    // introducer — but with the channel armed, a typed Ctrl+^ silently
+    // diverts all input into the control buffer until the next newline
+    // (F138). Gate on the descriptor itself: TTY → off, pipe/WASI → on
+    // (the pre-F138 behavior, which hosted transports rely on for resize).
+    #if canImport(WASILibc)
+      self.controlChannelEnabled = true
+    #else
+      self.controlChannelEnabled = !POSIXTerminalController().isATTY(fileDescriptor)
+    #endif
   }
 
   package func updateInputCapabilities(
@@ -102,6 +115,7 @@ extension InputReader {
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
+      let controlChannelEnabled = self.controlChannelEnabled
       let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
 
       return makeTaskBackedAsyncStream(
@@ -113,6 +127,7 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
           transform: { parser, input in parser.feed(input) },
           flushTransform: { parser in parser.flush() }
         )
@@ -182,6 +197,7 @@ extension InputReader {
     ) -> AsyncStream<Event> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
+      let controlChannelEnabled = self.controlChannelEnabled
       let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
 
       return makeTaskBackedAsyncStream(
@@ -193,6 +209,7 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
           transform: transform,
           flushTransform: flushTransform
         )
@@ -234,12 +251,14 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
+        let controlChannelEnabled = self.controlChannelEnabled
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
           transform: { parser, input in parser.feed(input) },
           flushTransform: { parser in parser.flush() }
         )
@@ -382,12 +401,14 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
+        let controlChannelEnabled = self.controlChannelEnabled
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
           transform: transform,
           flushTransform: flushTransform
         )
