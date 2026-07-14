@@ -279,8 +279,18 @@ public struct FocusState<Value: Equatable> {
       let seedValue = seedSnapshot.value
       let seedHasPendingRequest = seedSnapshot.hasPendingRequest
       let seedRequestGeneration = seedSnapshot.requestGeneration
+      // Storage resolution is additionally identity-aware, mirroring
+      // `@State` (F135): when the registration-time node was displaced by a
+      // fresh mint at the same identity, a runtime focus flip must reach the
+      // live occupant's slot, not the orphaned node's.
+      let liveStorageIdentity = viewNode.identity
       let liveStorage: @MainActor () -> FocusStateStorage<Value> = {
-        viewNode.primedStateSlot(
+        let liveViewNode =
+          viewNode.ownerGraph?.liveStateOwnerNode(
+            registeredOwner: viewNode.viewNodeID,
+            identity: liveStorageIdentity
+          ) ?? viewNode
+        return liveViewNode.primedStateSlot(
           ordinal: ordinal,
           seed: FocusStateStorage(
             value: seedValue,

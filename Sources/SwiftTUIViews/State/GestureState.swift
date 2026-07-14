@@ -275,28 +275,56 @@ public struct GestureState<Value> {
       )
     }
 
+    // Access-time re-resolution is identity-aware, mirroring `@State`
+    // (F135): if the registration-time node was displaced by a fresh mint
+    // at the same identity (a lazy-tab revisit, a mid-frame eviction), the
+    // closures follow the identity to the live occupant. The previous
+    // node-ID-only lookup kept recognizer updates writing the orphaned
+    // node's slots. Weak capture matches `@State`: a dead registration
+    // falls back to the local box.
+    let invalidationIdentity = context.viewIdentity
     return GestureStateLocation(
-      getValue: {
+      getValue: { [weak viewNode, weak box] in
+        guard let viewNode else {
+          return box?.currentValue() ?? trueSeed
+        }
         let liveViewNode =
-          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+          viewNode.ownerGraph?.liveStateOwnerNode(
+            registeredOwner: viewNode.viewNodeID,
+            identity: invalidationIdentity
+          ) ?? viewNode
         return liveViewNode.stateSlot(ordinal: ordinal, seed: trueSeed)
       },
-      setValue: { newValue in
+      setValue: { [weak viewNode, weak box] newValue in
+        guard let viewNode else {
+          box?.setValue(newValue)
+          return
+        }
         let liveViewNode =
-          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+          viewNode.ownerGraph?.liveStateOwnerNode(
+            registeredOwner: viewNode.viewNodeID,
+            identity: invalidationIdentity
+          ) ?? viewNode
         liveViewNode.setStateSlot(
           ordinal: ordinal,
           value: newValue,
-          invalidationIdentity: context.viewIdentity
+          invalidationIdentity: invalidationIdentity
         )
       },
-      resetToSeed: {
+      resetToSeed: { [weak viewNode, weak box] in
+        guard let viewNode else {
+          box?.setValue(trueSeed)
+          return
+        }
         let liveViewNode =
-          viewNode.ownerGraph?.nodeForViewNodeID(viewNode.viewNodeID) ?? viewNode
+          viewNode.ownerGraph?.liveStateOwnerNode(
+            registeredOwner: viewNode.viewNodeID,
+            identity: invalidationIdentity
+          ) ?? viewNode
         liveViewNode.setStateSlot(
           ordinal: ordinal,
           value: trueSeed,
-          invalidationIdentity: context.viewIdentity
+          invalidationIdentity: invalidationIdentity
         )
       }
     )
