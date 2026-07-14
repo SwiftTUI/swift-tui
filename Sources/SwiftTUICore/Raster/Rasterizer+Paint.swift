@@ -898,12 +898,25 @@ extension Rasterizer {
                 presentationEffects: presentationEffects
               )
             } else {
-              cells[y][x] = sourceCell
+              // The source grid's continuation back-pointers are in
+              // SOURCE-grid columns; translate them to destination columns
+              // (F167) — span normalization and damage repair follow
+              // `continuationLeadX`, and an untranslated pointer made them
+              // clear the wrong cell at a non-zero origin. And a verbatim
+              // copy over part of an existing wide glyph must clear the
+              // rest of that glyph's span first, or a stale orphaned
+              // continuation survives beside the copy.
+              var copied = sourceCell
+              if let leadX = copied.continuationLeadX {
+                copied.continuationLeadX = bounds.origin.x + leadX
+              }
+              clearExistingGlyph(atX: x, y: y, cells: &cells)
+              cells[y][x] = copied
               presentationRecorder?.appendCellFragment(
                 from: cells,
                 x: x,
                 y: y,
-                width: max(1, sourceCell.spanWidth),
+                width: max(1, copied.spanWidth),
                 effects: presentationEffects
               )
             }
