@@ -179,6 +179,60 @@ struct RetainedPhaseExtractionTests {
     #expect(extracted.children[0] == DrawExtractor().extract(from: dirty))
   }
 
+  @Test("phase signature distinguishes lazy child scroll estimates (F133)")
+  func phaseSignatureDistinguishesLazyChildScrollEstimates() {
+    // A lazy container's never-placed children surface only through
+    // `lazyChildScrollEstimates` — the semantic phase derives out-of-window
+    // `scrollTo` targets from them. Changing an out-of-window row identity
+    // leaves every signature-visible field (geometry, payloads, metadata)
+    // byte-identical, so a signature blind to the estimates would prove
+    // `.wholeTreeIdentical` and serve a stale SemanticSnapshot in which
+    // `scrollTo(newID)` resolves nothing.
+    var container = PlacedNode(
+      identity: testIdentity("lazy"),
+      bounds: .init(origin: .zero, size: .init(width: 10, height: 4))
+    )
+    container.lazyChildScrollEstimates = [
+      .init(
+        identity: testIdentity("lazy", "row-7"),
+        rect: .init(origin: .init(x: 0, y: 28), size: .init(width: 10, height: 4))
+      )
+    ]
+    var changed = container
+    changed.lazyChildScrollEstimates = [
+      .init(
+        identity: testIdentity("lazy", "row-8"),
+        rect: .init(origin: .init(x: 0, y: 28), size: .init(width: 10, height: 4))
+      )
+    ]
+
+    let signature = RetainedPhaseExtractionSignature.make(from: container)
+    let changedSignature = RetainedPhaseExtractionSignature.make(from: changed)
+    #expect(signature != nil)
+    #expect(signature != changedSignature)
+  }
+
+  @Test("placed node equality distinguishes lazy child scroll estimates (F133)")
+  func placedNodeEqualityDistinguishesLazyChildScrollEstimates() {
+    // `PlacedNode.==` backs the retained-baseline match in the frame tail;
+    // estimate-blind equality would treat an out-of-window identity churn as
+    // a byte-identical baseline.
+    var container = PlacedNode(
+      identity: testIdentity("lazy"),
+      bounds: .init(origin: .zero, size: .init(width: 10, height: 4))
+    )
+    container.lazyChildScrollEstimates = [
+      .init(
+        identity: testIdentity("lazy", "row-7"),
+        rect: .init(origin: .init(x: 0, y: 28), size: .init(width: 10, height: 4))
+      )
+    ]
+    var changed = container
+    changed.lazyChildScrollEstimates = nil
+
+    #expect(container != changed)
+  }
+
   @Test("retained phase signature rejects type-erased draw payloads")
   func retainedPhaseSignatureRejectsTypeErasedDrawPayloads() {
     struct Dots: CanvasDrawing, Equatable {

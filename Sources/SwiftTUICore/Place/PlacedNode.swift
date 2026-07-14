@@ -404,5 +404,6 @@ extension PlacedNode {
       && lhs.subtreeNodeCount == rhs.subtreeNodeCount
       && lhs.isTransient == rhs.isTransient
       && lhs.matchedGeometry == rhs.matchedGeometry
+      && lhs.lazyChildScrollEstimates == rhs.lazyChildScrollEstimates
   }
 }
