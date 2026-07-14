@@ -3597,6 +3597,8 @@ SwiftTUIViews.Gesture.exclusively(before:)
 SwiftTUIViews.Gesture.map(_:)
 SwiftTUIViews.Gesture.onChanged(_:)
 SwiftTUIViews.Gesture.onEnded(_:)
+SwiftTUIViews.Gesture.sequenced(before:)
+SwiftTUIViews.Gesture.simultaneously(with:)
 SwiftTUIViews.Gesture.updating(_:body:)
 SwiftTUIViews.GestureAttachmentModifier
 SwiftTUIViews.GestureBuilder
@@ -4023,6 +4025,15 @@ SwiftTUIViews.SegmentedPickerStyle.makeBody(configuration:)
 SwiftTUIViews.SegmentedPickerStyle.selectionDelta(for:)
 SwiftTUIViews.SegmentedPickerStyle.snapshotLabel
 SwiftTUIViews.SemanticMetadataModifier
+SwiftTUIViews.SequenceGesture
+SwiftTUIViews.SequenceGesture.Body
+SwiftTUIViews.SequenceGesture.Value
+SwiftTUIViews.SequenceGesture.Value.first(_:)
+SwiftTUIViews.SequenceGesture.Value.second(_:_:)
+SwiftTUIViews.SequenceGesture.body
+SwiftTUIViews.SequenceGesture.first
+SwiftTUIViews.SequenceGesture.init(_:_:)
+SwiftTUIViews.SequenceGesture.second
 SwiftTUIViews.Shape
 SwiftTUIViews.Shape.body
 SwiftTUIViews.Shape.fill()
@@ -4043,6 +4054,16 @@ SwiftTUIViews.ShapeStyle.linearGradient(colors:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.linearGradient(stops:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.radialGradient(colors:center:startRadius:endRadius:)
 SwiftTUIViews.ShapeStyle.radialGradient(stops:center:startRadius:endRadius:)
+SwiftTUIViews.SimultaneousGesture
+SwiftTUIViews.SimultaneousGesture.Body
+SwiftTUIViews.SimultaneousGesture.Value
+SwiftTUIViews.SimultaneousGesture.Value.first
+SwiftTUIViews.SimultaneousGesture.Value.init(first:second:)
+SwiftTUIViews.SimultaneousGesture.Value.second
+SwiftTUIViews.SimultaneousGesture.body
+SwiftTUIViews.SimultaneousGesture.first
+SwiftTUIViews.SimultaneousGesture.init(_:_:)
+SwiftTUIViews.SimultaneousGesture.second
 SwiftTUIViews.Slider
 SwiftTUIViews.Slider.init(_:value:in:step:)
 SwiftTUIViews.Slider.init(_:value:in:step:)
@@ -4237,6 +4258,7 @@ SwiftTUIViews.TapGesture.Value
 SwiftTUIViews.TapGesture.body
 SwiftTUIViews.TapGesture.count
 SwiftTUIViews.TapGesture.init(count:)
+SwiftTUIViews.TapGesture.interTapWindow
 SwiftTUIViews.TaskLifecycleModifier
 SwiftTUIViews.TerminationRequestModifier
 SwiftTUIViews.Text
@@ -4530,6 +4552,7 @@ SwiftTUIViews.View.scrollIndicators(_:)
 SwiftTUIViews.View.semanticMetadata(_:)
 SwiftTUIViews.View.sheet(_:isPresented:content:)
 SwiftTUIViews.View.sheet(isPresented:content:)
+SwiftTUIViews.View.simultaneousGesture(_:including:)
 SwiftTUIViews.View.strikethrough(_:color:)
 SwiftTUIViews.View.strikethrough(_:pattern:color:)
 SwiftTUIViews.View.tabViewStyle(_:)

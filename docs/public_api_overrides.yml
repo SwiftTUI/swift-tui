@@ -309,6 +309,8 @@ classifications:
     - SwiftTUIViews.CustomAnimation
     - SwiftTUIViews.DropDestinationRegistrationModifier
     - SwiftTUIViews.ExclusiveGesture
+    - SwiftTUIViews.SimultaneousGesture
+    - SwiftTUIViews.SequenceGesture
     - SwiftTUIViews.Gesture
     - SwiftTUIViews.GestureAttachmentModifier
     - SwiftTUIViews.GestureBuilder

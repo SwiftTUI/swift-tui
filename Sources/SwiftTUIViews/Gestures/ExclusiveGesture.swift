@@ -49,6 +49,14 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
 
   let first: AnyGestureRecognizer
   let second: AnyGestureRecognizer
+  /// The events delivered to `first` while it was still deciding (F158).
+  /// `second` sees events only from `first`'s failure onward, so without a
+  /// replay the fallback can never recognize anything whose evidence
+  /// arrived earlier — the canonical double-tap-timeout hand-off delivers
+  /// NO event at all (the failure is deadline-driven). Cleared once handed
+  /// off, when `first` ends (no hand-off can happen), and on re-arm.
+  private var bufferedPrefix: [LocalPointerEvent] = []
+  private var didReplay = false
 
   init(first: AnyGestureRecognizer, second: AnyGestureRecognizer) {
     self.first = first
@@ -58,6 +66,20 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
   func reArm() {
     first.reArm()
     second.reArm()
+    bufferedPrefix.removeAll(keepingCapacity: true)
+    didReplay = false
+  }
+
+  /// Hands the buffered prefix to `second` exactly once, at the moment
+  /// `first` gives up.
+  private func replayPrefixIntoSecond() {
+    guard !didReplay else { return }
+    didReplay = true
+    let prefix = bufferedPrefix
+    bufferedPrefix.removeAll(keepingCapacity: true)
+    for buffered in prefix where !second.phase.isTerminal {
+      _ = second.handle(event: buffered)
+    }
   }
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
@@ -89,16 +111,21 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
       let d = first.handle(event: event)
       switch first.phase {
       case .ended:
+        bufferedPrefix.removeAll(keepingCapacity: true)
         return .handled
       case .failed, .cancelled:
-        // First gave up on this event — feed the same event to second.
+        // First gave up on this event — replay everything it consumed,
+        // then feed the same event to second.
+        replayPrefixIntoSecond()
         return second.handle(event: event)
       case .possible, .began, .changed:
+        bufferedPrefix.append(event)
         return d
       }
     }
     // First already terminal (typically .failed from a prior event):
     // deliver to second.
+    replayPrefixIntoSecond()
     return second.handle(event: event)
   }
 
@@ -107,8 +134,12 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     // Only forward to second if first has failed/cancelled — second is the
     // fallback that only runs when first gives up.
     let firstGaveUp = first.phase == .failed || first.phase == .cancelled
-    let b = firstGaveUp ? second.handleDeadline(at: instant) : false
-    return a || b
+    guard firstGaveUp else { return a }
+    // A deadline-driven failure (the double-tap window expiring) delivers
+    // NO event — the replayed prefix is the fallback's whole input.
+    replayPrefixIntoSecond()
+    let b = second.handleDeadline(at: instant)
+    return a || b || second.phase == .ended
   }
 
   func currentValue() -> V? {

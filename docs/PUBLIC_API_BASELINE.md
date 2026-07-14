@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 61 | 533 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 270 | 1446 |
+| `SwiftTUIViews` | 272 | 1469 |
 | `SwiftTUIAnimatedImage` | 5 | 29 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -124,7 +124,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (270)
+### Canonical surface (272)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -216,7 +216,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FrameModifier` — struct
 - `GeometryProxy` — struct — 8 members
 - `GeometryReader` — struct — 1 member
-- `Gesture` — protocol — 8 members
+- `Gesture` — protocol — 10 members
 - `GestureAttachmentModifier` — struct
 - `GestureBuilder` — enum — 1 member
 - `GestureMask` — struct — 6 members
@@ -322,8 +322,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `SecureField` — struct — 4 members
 - `SegmentedPickerStyle` — struct — 4 members
 - `SemanticMetadataModifier` — struct
+- `SequenceGesture` — struct — 8 members
 - `Shape` — protocol — 15 members
 - `ShapeStyle` — extension — 4 members
+- `SimultaneousGesture` — struct — 9 members
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members
 - `SpatialTapGesture` — struct — 9 members
@@ -346,7 +348,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TabViewStyleOption` — struct — 2 members
 - `TabViewStylePresentation` — struct — 4 members
 - `TagValueModifier` — struct
-- `TapGesture` — struct — 5 members
+- `TapGesture` — struct — 6 members
 - `TaskLifecycleModifier` — struct
 - `TerminationRequestModifier` — struct
 - `Text` — struct — 33 members
@@ -382,7 +384,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 139 members
+- `View` — protocol — 140 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

@@ -239,6 +239,12 @@ struct GestureRunLoopDispatchTests {
     }
 
     let counts = Counts()
+    // This harness processes scripted events at DEBUG frame cadence (a
+    // first render alone can exceed the real inter-tap window), so widen
+    // the window: the test exercises dispatch plumbing, not tap timing —
+    // the timing behavior is pinned by the recognizer unit tests.
+    TapGesture.interTapWindowOverride = .seconds(120)
+    defer { TapGesture.interTapWindowOverride = nil }
     let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopExclusiveTap")])
     let view = Text("Tap")

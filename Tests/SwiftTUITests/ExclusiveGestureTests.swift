@@ -43,26 +43,87 @@ struct ExclusiveGestureTests {
     #expect(singleCount == 0)
   }
 
-  @Test("Second wins when first fails on movement")
-  func secondWinsAfterFirstFails() {
+  @Test("A drag that fails the first tap fails a tap fallback too — the hand-off replays the evidence")
+  func dragFailsBothTapsThroughReplay() {
     var firstCount = 0
     var secondCount = 0
-    // Both are TapGesture, but force first to fail via a drag event.
+    // Both are TapGesture. Before the F158 replay, `second` "won" here only
+    // because it never saw the disqualifying drag — the fallback received
+    // events from the failure onward, so it recognized a tap the user never
+    // performed. With the buffered-prefix replay, the drag that fails the
+    // first tap fails the fallback tap too; the composite is failed until
+    // dispatch re-arms it, after which `first` (not the fallback) takes a
+    // clean tap.
     let g = TapGesture().onEnded { firstCount += 1 }
       .exclusively(before: TapGesture().onEnded { secondCount += 1 })
     let rec = g._makeRecognizer(context: ctx())
     _ = rec.handle(event: event(.down(.primary)))
-    // A drag kills the first's completion (moves outside target), but
-    // a second clean down+up tries the second.
     _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 100, y: 100)))
-    // First should have transitioned to .failed. Now feed clean events
-    // — second should recognize.
+    #expect(rec.phase == .failed)
     _ = rec.handle(event: event(.down(.primary)))
     _ = rec.handle(event: event(.up(.primary)))
-    // First .failed before it could end; second recognizes the
-    // clean down+up as a tap.
     #expect(firstCount == 0)
-    #expect(secondCount == 1)
+    #expect(secondCount == 0)
+
+    rec.reArm()
+    _ = rec.handle(event: event(.down(.primary)))
+    _ = rec.handle(event: event(.up(.primary)))
+    #expect(firstCount == 1)
+    #expect(secondCount == 0)
+  }
+
+  @Test("Single tap falls through to second after the inter-tap window expires")
+  func singleTapFallsThroughOnTimeout() throws {
+    var singleCount = 0
+    var doubleCount = 0
+    var armed: [MonotonicInstant] = []
+    let context = GestureRecognizerBuildContext(
+      attachingIdentity: identity("r"),
+      gestureStateRegistry: nil,
+      requestDeadline: { armed.append($0) }
+    )
+    // The canonical composition (F158): double-tap exclusively before
+    // single-tap. The first tap arms the inter-tap window; when it expires
+    // the double-tap FAILS, and the buffered first-tap events replay into
+    // the single-tap fallback.
+    let g = TapGesture(count: 2).onEnded { doubleCount += 1 }
+      .exclusively(before: TapGesture().onEnded { singleCount += 1 })
+    let rec = g._makeRecognizer(context: context)
+    _ = rec.handle(event: event(.down(.primary)))
+    _ = rec.handle(event: event(.up(.primary)))
+    #expect(armed.count == 1)
+
+    let expiry = try #require(armed.first)
+    _ = rec.handleDeadline(at: expiry)
+    #expect(doubleCount == 0)
+    #expect(singleCount == 1)
+  }
+
+  @Test("A second tap inside the window still wins the double-tap")
+  func secondTapInsideWindowWins() throws {
+    var singleCount = 0
+    var doubleCount = 0
+    var armed: [MonotonicInstant] = []
+    let context = GestureRecognizerBuildContext(
+      attachingIdentity: identity("r"),
+      gestureStateRegistry: nil,
+      requestDeadline: { armed.append($0) }
+    )
+    let g = TapGesture(count: 2).onEnded { doubleCount += 1 }
+      .exclusively(before: TapGesture().onEnded { singleCount += 1 })
+    let rec = g._makeRecognizer(context: context)
+    _ = rec.handle(event: event(.down(.primary)))
+    _ = rec.handle(event: event(.up(.primary)))
+    _ = rec.handle(event: event(.down(.primary)))
+    _ = rec.handle(event: event(.up(.primary)))
+    #expect(doubleCount == 1)
+    #expect(singleCount == 0)
+
+    // The armed window firing after completion must not disturb anything.
+    let expiry = try #require(armed.first)
+    _ = rec.handleDeadline(at: expiry)
+    #expect(doubleCount == 1)
+    #expect(singleCount == 0)
   }
 
   @Test("ExclusiveGesture gates second deadline on first phase")

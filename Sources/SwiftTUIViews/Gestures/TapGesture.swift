@@ -7,13 +7,32 @@ public import SwiftTUICore
 ///
 /// ## Terminal-faithful semantics
 ///
-/// Unlike SwiftUI on iOS/macOS, there is no inter-tap timeout:
-/// two `.up` events on-target count as a double-tap regardless of
-/// elapsed time between them. Terminals have no OS-level tap
-/// coalescing, so this is the faithful translation of the recognizer
-/// to a discrete-event environment. If your use case requires a
-/// bounded interval, compose with your own timer externally.
+/// A single tap (`count: 1`) has no timing component: one on-target
+/// down+up fires it regardless of press duration — terminals have no
+/// OS-level tap coalescing, so this is the faithful translation to a
+/// discrete-event environment.
+///
+/// A multi-tap sequence (`count >= 2`) bounds the gap BETWEEN taps with
+/// ``interTapWindow`` (F158): a sequence whose next tap does not arrive
+/// inside the window transitions to `.failed`. Without a failure path,
+/// `TapGesture(count: 2).exclusively(before: TapGesture())` — the
+/// canonical double-vs-single disambiguation — could never hand off to
+/// its fallback.
 public struct TapGesture: Gesture {
+  /// The maximum gap between taps of a multi-tap sequence before the
+  /// sequence fails. Matches the conventional desktop double-click
+  /// interval closely enough for terminal input cadences.
+  public static let interTapWindow: Duration = .milliseconds(350)
+
+  /// Test seam: real-run-loop harnesses process scripted events far slower
+  /// than interactive cadence (a DEBUG first render alone can exceed the
+  /// window), so gesture-dispatch tests widen the window instead of
+  /// depending on wall-clock timing. `nil` uses ``interTapWindow``.
+  @MainActor package static var interTapWindowOverride: Duration?
+
+  @MainActor static var effectiveInterTapWindow: Duration {
+    interTapWindowOverride ?? interTapWindow
+  }
   public typealias Value = Void
   public typealias Body = Never
 
@@ -31,7 +50,13 @@ public struct TapGesture: Gesture {
   public func _makeRecognizer(
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer {
-    AnyGestureRecognizer(TapGestureRecognizer(count: count))
+    AnyGestureRecognizer(
+      TapGestureRecognizer(
+        count: count,
+        interTapWindow: TapGesture.effectiveInterTapWindow,
+        requestDeadline: context.requestDeadline
+      )
+    )
   }
 }
 
@@ -43,9 +68,24 @@ final class TapGestureRecognizer: GestureRecognizer {
   private(set) var phase: GestureRecognizerPhase = .possible
   private var completedTaps: Int = 0
   private var pressStart: Point?
+  private let requestDeadline: @MainActor @Sendable (MonotonicInstant) -> Void
+  /// Resolved at construction (from `TapGesture.effectiveInterTapWindow` in
+  /// `_makeRecognizer`) so a mid-interaction recognizer keeps one window
+  /// even if the test-seam override changes around it.
+  private let interTapWindow: Duration
+  /// The inter-tap window's expiry, armed after each completed tap of a
+  /// multi-tap sequence that still needs more taps (F158). `nil` while no
+  /// gap is being timed; single-tap recognizers never arm it.
+  private var interTapDeadline: MonotonicInstant?
 
-  init(count: Int) {
+  init(
+    count: Int,
+    interTapWindow: Duration = TapGesture.interTapWindow,
+    requestDeadline: @escaping @MainActor @Sendable (MonotonicInstant) -> Void = { _ in }
+  ) {
     self.requiredCount = count
+    self.interTapWindow = interTapWindow
+    self.requestDeadline = requestDeadline
   }
 
   /// A `.down` event sets `pressStart` but `phase` stays `.possible`
@@ -66,6 +106,7 @@ final class TapGestureRecognizer: GestureRecognizer {
     phase = .possible
     completedTaps = 0
     pressStart = nil
+    interTapDeadline = nil
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
@@ -74,6 +115,15 @@ final class TapGestureRecognizer: GestureRecognizer {
 
     switch event.kind {
     case .down(.primary):
+      // Deadline wakes are scheduler-driven, so the next tap's `.down` can
+      // arrive before the pending deadline frame drains. Honor the event
+      // timestamp (the LongPress release pattern): a down outside the
+      // inter-tap window fails the sequence at event time.
+      if let interTapDeadline, event.timestamp >= interTapDeadline {
+        phase = .failed
+        return .failed
+      }
+      interTapDeadline = nil
       pressStart = location
       return .handled
     case .up(.primary):
@@ -83,6 +133,13 @@ final class TapGestureRecognizer: GestureRecognizer {
         pressStart = nil
         if completedTaps >= requiredCount {
           phase = .ended
+        } else {
+          // More taps required: bound the gap to the next one (F158) so a
+          // partial sequence can FAIL — the hand-off `ExclusiveGesture`'s
+          // fallback depends on.
+          let expiry = event.timestamp.advanced(by: interTapWindow)
+          interTapDeadline = expiry
+          requestDeadline(expiry)
         }
         return .handled
       } else {
@@ -108,7 +165,14 @@ final class TapGestureRecognizer: GestureRecognizer {
     }
   }
 
-  func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+  func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    guard !phase.isTerminal,
+      let interTapDeadline,
+      instant >= interTapDeadline
+    else { return false }
+    phase = .failed
+    return true
+  }
 
   /// Adopts a re-authored tap count alongside the preserved partial
   /// sequence: a re-resolve between taps must retune the requirement for

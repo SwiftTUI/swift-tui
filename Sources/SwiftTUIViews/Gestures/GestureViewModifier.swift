@@ -14,6 +14,26 @@ extension View {
       )
     )
   }
+
+  /// Attaches a gesture that recognizes alongside the view's other
+  /// gestures, matching SwiftUI's `simultaneousGesture(_:including:)`.
+  ///
+  /// This framework's gesture dispatch broadcasts every event to all
+  /// recognizers attached at an identity (there is no implicit exclusivity
+  /// to opt out of), so the attachment itself is identical to
+  /// ``gesture(_:including:)`` — the modifier exists for SwiftUI source
+  /// compatibility and reads as a statement of intent.
+  public func simultaneousGesture<G: Gesture>(
+    _ gesture: G,
+    including mask: GestureMask = .all
+  ) -> some View {
+    modifier(
+      GestureAttachmentModifier(
+        gesture: gesture,
+        mask: mask
+      )
+    )
+  }
 }
 
 // MARK: - GestureAttachmentModifier
