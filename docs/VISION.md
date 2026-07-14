@@ -8,10 +8,6 @@ body-only, state-driven API; SwiftTUI resolves them through a typed rendering
 pipeline and presents the result as terminal text, a browser canvas, or a
 raster surface inside a host application.
 
-The framework is a pre-1.0, single-maintainer, AI-assisted package. The `0.x`
-line is usable for real terminal interfaces, but minor releases may still make
-source-breaking adjustments while the public surface is being proven.
-
 ## The guiding principle: SwiftUI faithfulness
 
 SwiftTUI mirrors SwiftUI's *shape*, not just its names. The goal is that
@@ -49,8 +45,23 @@ makes a small number of intentional departures:
   integer cell grid (`CellPoint`) the terminal actually addresses.
 - **Terminal-program embedding as authored content.** A real child terminal
   program can be embedded in the view tree through `TerminalView`.
-- **Restrained chrome.** Defaults favor calm, low-noise output appropriate to a
+- **Restrained chrome.** Defaults favor low-noise output appropriate to a
   terminal rather than maximal decoration.
+
+## Principled deviations
+
+- **Strictly data-driven navigation and dismissal — no `NavigationLink`, no
+  `\.dismiss`.** These two SwiftUI APIs are omitted on principle, not as gaps.
+  `NavigationLink` subverts data-driven UI: it fuses a control to a navigation
+  side effect, so navigation state stops being derivable from (and mutable
+  through) the app's data. `@Environment(\.dismiss)` is an antipattern: a view
+  inherently cannot know the context in which it is displayed, so a
+  self-dismissal command couples reusable content to an assumed presenter.
+  Navigation and presentation are driven by bindings to data — pushing is
+  mutating the data that declares a destination, and dismissal is clearing the
+  binding (or item) that presents the surface. Presenter-side observation
+  (e.g. an `onDismiss:` callback) is compatible with this stance; child-side
+  dismissal commands are not.
 
 ## In scope today
 
@@ -60,8 +71,7 @@ makes a small number of intentional departures:
   stages.
 - Four execution modes: terminal-native, WASI/browser, host-managed embedding,
   and a localhost-browser WebHost.
-- A semantic accessibility substrate feeding terminal, web, and SwiftUI-host
-  consumers.
+- A semantic accessibility substrate feeding each consumer.
 - Animated-image playback in the default `SwiftTUI` convenience product, with
   charts and terminal-program embedding as peer products.
 
