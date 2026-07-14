@@ -6,7 +6,7 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
-## [Unreleased]
+## [0.1.6] - 2026-07-13
 
 ### Removed
 
