@@ -65,6 +65,9 @@ package func composeOverlayStackTree(
   let disablesBaseInteraction = sortedEntries.contains {
     $0.modalPolicy == .disablesBaseInteraction
   }
+  // "PortalHost"/"overlays" must stay byte-identical to
+  // `PresentationOverlayEntryIdentityScheme` (`.named` requires literals;
+  // the scheme's structural test locks these).
   let hostContext = context.child(component: .named("PortalHost"))
   var overlayContext = hostContext.child(component: .named("overlays"))
   // Retained-subtree reuse is value-blind: it serves the committed overlays
@@ -80,7 +83,9 @@ package func composeOverlayStackTree(
   // so the host re-resolves fresh; surviving entries keep their runtime
   // state (slots key off their stable identities).
   let desiredEntryIdentities = sortedEntries.map { entry in
-    overlayContext.identity.child("entry:\(entry.id)")
+    overlayContext.identity.child(
+      PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
+    )
   }
   // `forceEntryRefresh` covers the same-entry-list staleness the identity
   // compare cannot see: a reconcile that re-synced a *re-built* declaration
@@ -138,7 +143,9 @@ private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let children = entries.map { entry in
       let entryContext = context.child(
-        component: .init(rawValue: "entry:\(entry.id)")
+        component: .init(
+          rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
+        )
       )
       return resolveView(
         OverlayStackEntryHost(entry: entry),

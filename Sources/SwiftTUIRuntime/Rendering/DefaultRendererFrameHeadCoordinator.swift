@@ -302,10 +302,10 @@ struct DefaultRendererFrameHeadCoordinator {
   ) -> Set<Identity> {
     Set(
       presentationPortalState.overlayEntries().map { entry in
-        portalRootIdentity
-          .child("PortalHost")
-          .child("overlays")
-          .child("entry:\(entry.id)")
+        PresentationOverlayEntryIdentityScheme.entryIdentity(
+          portalRootIdentity: portalRootIdentity,
+          entryID: "\(entry.id)"
+        )
       }
     )
   }

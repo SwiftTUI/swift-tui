@@ -966,13 +966,21 @@ package final class ViewGraph {
     portalRootIdentity: Identity,
     activeOverlayEntryIdentities: Set<Identity> = []
   ) -> Set<Identity> {
-    let activeEntryIdentities = activeOverlayEntryIdentities.union(
-      presentationOverlayEntryIdentities(portalRootIdentity: portalRootIdentity)
-    )
+    // The live-entry census scans every graph identity; mapped identities
+    // never consult it, so defer the union until the FIRST unmapped
+    // identity actually needs a translation target (F168).
+    var activeEntryIdentities = activeOverlayEntryIdentities
+    var censusComputed = false
     return Set(
       identities.map { identity in
         guard nodeIfExists(for: identity) == nil else {
           return identity
+        }
+        if !censusComputed {
+          censusComputed = true
+          activeEntryIdentities.formUnion(
+            presentationOverlayEntryIdentities(portalRootIdentity: portalRootIdentity)
+          )
         }
         return presentationPortalInvalidationTarget(
           for: identity,
@@ -1048,28 +1056,19 @@ package final class ViewGraph {
     _ identity: Identity,
     portalRootIdentity: Identity
   ) -> Bool {
-    guard identity.isDescendant(of: portalRootIdentity) else {
-      return false
-    }
-
-    let suffix = Array(
-      identity.components.dropFirst(portalRootIdentity.components.count)
+    PresentationOverlayEntryIdentityScheme.isEntryIdentity(
+      identity,
+      portalRootIdentity: portalRootIdentity,
+      entryRootOnly: false
     )
-    guard suffix.count >= 3 else {
-      return false
-    }
-
-    return suffix[0] == "PortalHost"
-      && suffix[1] == "overlays"
-      && suffix[2].hasPrefix("entry:")
   }
 
   private func presentationOverlayHostIdentity(
     portalRootIdentity: Identity
   ) -> Identity {
-    portalRootIdentity
-      .child("PortalHost")
-      .child("overlays")
+    PresentationOverlayEntryIdentityScheme.hostIdentity(
+      portalRootIdentity: portalRootIdentity
+    )
   }
 
   private func presentationOverlayEntryIdentities(
@@ -1089,20 +1088,11 @@ package final class ViewGraph {
     _ identity: Identity,
     portalRootIdentity: Identity
   ) -> Bool {
-    guard identity.isDescendant(of: portalRootIdentity) else {
-      return false
-    }
-
-    let suffix = Array(
-      identity.components.dropFirst(portalRootIdentity.components.count)
+    PresentationOverlayEntryIdentityScheme.isEntryIdentity(
+      identity,
+      portalRootIdentity: portalRootIdentity,
+      entryRootOnly: true
     )
-    guard suffix.count == 3 else {
-      return false
-    }
-
-    return suffix[0] == "PortalHost"
-      && suffix[1] == "overlays"
-      && suffix[2].hasPrefix("entry:")
   }
 
   /// Invalidates identities AND queues them as graph-local dirty so that
