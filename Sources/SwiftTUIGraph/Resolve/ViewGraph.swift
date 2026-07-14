@@ -2680,12 +2680,19 @@ package final class ViewGraph {
     // committed one. Both prunes are self-consuming — the later
     // `finalizeFrame` re-run is a no-op — and an aborted candidate rolls the
     // mutations back with the rest of the prepared frame state.
-    prunePendingEntityRoutedRemovals(
-      activeEntities: entityIdentities(in: resolved)
-    )
+    let activeEntities = entityIdentities(in: resolved)
+    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     pruneAbsorbedShadowedNodes()
     sweepStaleDetachedHostedRoots()
     tearDownDepartedNavigationSurfaces()
+    // The three teardown stages above run `removeSubtree` cascades whose
+    // descents can DEFER entity-routed descendants into the pending set —
+    // after the drain above already ran. Nothing else consumes the set this
+    // frame and `beginFrame` clears it silently, so a late deferral must be
+    // decided here (the TabView overflow-menu collapse strands its ForEach
+    // rows otherwise: the menu subtree is torn down by the stale
+    // detached-hosted sweep, not the structural diff).
+    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2704,6 +2711,8 @@ package final class ViewGraph {
     pruneAbsorbedShadowedNodes()
     sweepStaleDetachedHostedRoots()
     tearDownDepartedNavigationSurfaces()
+    // Late-deferral drain — see `previewLifecycleEventPlan` for the rationale.
+    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
