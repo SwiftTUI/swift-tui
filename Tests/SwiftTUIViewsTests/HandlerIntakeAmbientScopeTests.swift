@@ -36,8 +36,12 @@ struct AmbientEnvironmentFallbackProbeTests {
     }
     #expect(roots == [])
     #expect(SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount == baseline + 1)
+    // The detail's key-path interpolation renders the property name on Darwin
+    // only (Linux prints an opaque key-path form) — assert the stable text.
     #expect(
-      SoundnessProbeConfiguration.lastViolationDetail?.contains("imageResourceRoots") == true
+      SoundnessProbeConfiguration.lastViolationDetail?.contains(
+        "read default values inside an authoring scope"
+      ) == true
     )
   }
 
