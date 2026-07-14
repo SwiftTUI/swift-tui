@@ -33,7 +33,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIAndroidHost` | 32 | 181 |
 | `SwiftTUICore` | 39 | 267 |
 | `SwiftTUIPrimitives` | 166 | 1423 |
-| `SwiftTUIGraph` | 54 | 336 |
+| `SwiftTUIGraph` | 55 | 337 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 
 ## SwiftTUI
@@ -767,7 +767,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (51)
+### Canonical surface (52)
 
 - `AccessibilityNode` — struct — 10 members
 - `AccessibilityPoliteness` — enum — 4 members
@@ -818,6 +818,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TaskPriority` — enum — 6 members
 - `TerminationDisposition` — enum — 2 members
 - `TerminationRequest` — enum — 3 members
+- `ThreadSafeInvalidating` — protocol
 - `TransactionSnapshot` — struct — 2 members
 - `WakeCause` — enum — 6 members
 

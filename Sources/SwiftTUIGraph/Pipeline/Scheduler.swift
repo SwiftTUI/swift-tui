@@ -83,6 +83,12 @@ public protocol Invalidating: AnyObject {
   func requestInvalidation(of identities: Set<Identity>)
 }
 
+/// An ``Invalidating`` conformer whose `requestInvalidation` is safe to call
+/// from any executor. ``FrameScheduler`` opts in; the Observation bridge's
+/// off-main change marshal (F162) narrows its attached invalidator to this
+/// so a background mutation can wake a sleeping run loop directly.
+public protocol ThreadSafeInvalidating: Invalidating, Sendable {}
+
 package protocol WakeNotifyingFrameScheduling: AnyObject {
   func setWakeHandler(_ handler: (@Sendable () -> Void)?)
 }
@@ -166,7 +172,7 @@ public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
 /// coalescing sets lock-free and safe only "by convention" (every caller on the
 /// main actor), which raced the run loop's `consumeReadyFrame` when that
 /// convention was broken.
-public final class FrameScheduler: FrameScheduling, Sendable {
+public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Sendable {
   /// The coalescing state mutated by every `request*` call and drained by
   /// `consumeReadyFrame`. Held behind `coalescingLock` so requests from any
   /// thread cannot race the main-actor run loop.

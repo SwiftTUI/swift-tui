@@ -1,4 +1,5 @@
 import Observation
+import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -299,15 +300,19 @@ private struct LifecycleSelectiveOptionalTaskProbe: View {
   }
 }
 
-private final class LifecycleSelectiveRecordingInvalidator: Invalidating {
-  var requests: [Set<Identity>] = []
+private final class LifecycleSelectiveRecordingInvalidator: ThreadSafeInvalidating {
+  private let storage = Mutex<[Set<Identity>]>([])
+
+  var requests: [Set<Identity>] {
+    storage.withLock { $0 }
+  }
 
   func requestInvalidation(of identities: Set<Identity>) {
-    requests.append(identities)
+    storage.withLock { $0.append(identities) }
   }
 
   func clear() {
-    requests.removeAll(keepingCapacity: true)
+    storage.withLock { $0.removeAll(keepingCapacity: true) }
   }
 }
 

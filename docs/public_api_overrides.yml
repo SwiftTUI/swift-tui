@@ -529,6 +529,7 @@ classifications:
     - SwiftTUICore.InteractionRegion
     - "SwiftTUIPrimitives.interpolateHue(from:to:t:path:)"
     - SwiftTUIGraph.Invalidating
+    - SwiftTUIGraph.ThreadSafeInvalidating
     - SwiftTUIGraph.KeyEvent
     - SwiftTUIGraph.KeyPress
     - SwiftTUIGraph.KeyPressResult

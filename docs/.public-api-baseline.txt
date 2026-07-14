@@ -873,6 +873,7 @@ SwiftTUIGraph.TerminationRequest
 SwiftTUIGraph.TerminationRequest.inputEnded
 SwiftTUIGraph.TerminationRequest.signal(_:)
 SwiftTUIGraph.TerminationRequest.userExit(_:)
+SwiftTUIGraph.ThreadSafeInvalidating
 SwiftTUIGraph.TransactionSnapshot
 SwiftTUIGraph.TransactionSnapshot.debugSignature
 SwiftTUIGraph.TransactionSnapshot.init(debugSignature:)
