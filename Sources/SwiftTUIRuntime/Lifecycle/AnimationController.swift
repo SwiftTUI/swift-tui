@@ -1009,12 +1009,22 @@ package final class AnimationController: Sendable {
     // point — and capture the deepest disappearing ancestor as the
     // subtree to inject.  This way the entire wrapped unit fades out.
     for removedNodeID in departedNodeIDs {
-      guard let previousRoot = previousTreeRoot,
+      // O(1) dictionary guards run before the O(tree) previous-frame node
+      // search: bulk teardown departs many nodes at once, and most carry no
+      // transition registration and are not already animating out.
+      //
+      // Removal look-up uses the PREVIOUS frame's registrations: the
+      // disappearing view's `.transition()` modifier isn't evaluated in
+      // the current frame (its branch is gone), so `transitionsByNodeID`
+      // no longer contains an entry for it.  The previous frame captured
+      // the registration while the view was still present.
+      guard removingNodes[removedNodeID] == nil,
+        let transition = previousTransitionsByNodeID[removedNodeID],
+        let previousRoot = previousTreeRoot,
         let previousNode = AnimationTreeQueries.findResolvedNode(
           in: previousRoot,
           viewNodeID: removedNodeID
-        ),
-        removingNodes[removedNodeID] == nil
+        )
       else { continue }
       let identity = previousNode.identity
 
@@ -1025,14 +1035,6 @@ package final class AnimationController: Sendable {
       if let removedConfig = previousNode.matchedGeometry,
         matchedKeysConsumedByMatch.contains(removedConfig.key)
       {
-        continue
-      }
-      // Removal look-up uses the PREVIOUS frame's registrations: the
-      // disappearing view's `.transition()` modifier isn't evaluated in
-      // the current frame (its branch is gone), so `transitionsByNodeID`
-      // no longer contains an entry for it.  The previous frame captured
-      // the registration while the view was still present.
-      guard let transition = previousTransitionsByNodeID[removedNodeID] else {
         continue
       }
 
