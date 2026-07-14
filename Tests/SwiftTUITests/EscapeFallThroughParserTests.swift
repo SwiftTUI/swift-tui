@@ -91,3 +91,64 @@ struct EscapeFallThroughParserTests {
     #expect(events == [.key(KeyPress(.arrowUp, modifiers: .ctrl))])
   }
 }
+
+/// F139: incomplete DCS/PM/APC control strings buffer until their ST
+/// terminator, exactly like OSC. The old fall-through parsed a split-read
+/// introducer as Alt+letter and typed the entire late payload (kitty
+/// graphics reply, tmux passthrough) into the focused field. Typed
+/// Alt+letter chords are committed by the idle escape-timeout flush.
+@MainActor
+@Suite
+struct ControlStringBufferingParserTests {
+  @Test("a split-read DCS payload emits nothing", arguments: [0x50, 0x5E, 0x5F] as [UInt8])
+  func splitControlStringEmitsNothing(introducer: UInt8) {
+    var parser = TerminalInputParser()
+    #expect(parser.feed([0x1B, introducer]).isEmpty)
+    // The payload arrives on a later read — previously it typed as text.
+    #expect(parser.feed(Array("q;payload=1".utf8)).isEmpty)
+  }
+
+  @Test("a late ST terminator discards the whole control string")
+  func lateTerminatorDiscardsWholeString() {
+    var parser = TerminalInputParser()
+    _ = parser.feed([0x1B, 0x50])
+    _ = parser.feed(Array("kitty-reply".utf8))
+    // ST (ESC \) followed by a real keystroke in the same chunk.
+    let events = parser.feed([0x1B, 0x5C, 0x78])
+    #expect(events == [.key(KeyPress(.character("x")))])
+  }
+
+  @Test("a typed Alt+P chord commits on the idle escape-timeout flush")
+  func typedAltPCommitsOnFlush() {
+    var parser = TerminalInputParser()
+    #expect(parser.feed([0x1B, 0x50]).isEmpty)
+    #expect(parser.isAwaitingEscapeDisambiguation)
+    #expect(parser.flush() == [.key(KeyPress(.character("P"), modifiers: .alt))])
+    #expect(!parser.isAwaitingEscapeDisambiguation)
+  }
+
+  @Test("an unterminated control string discards on flush instead of typing its payload")
+  func unterminatedStringDiscardsOnFlush() {
+    var parser = TerminalInputParser()
+    _ = parser.feed([0x1B, 0x50] + Array("half a reply".utf8))
+    #expect(parser.isAwaitingEscapeDisambiguation)
+    #expect(parser.flush().isEmpty)
+    // The parser is clean afterwards: the next keystroke types normally.
+    #expect(parser.feed([0x79]) == [.key(KeyPress(.character("y")))])
+  }
+
+  @Test("a complete single-chunk DCS still discards whole")
+  func completeSingleChunkDCSDiscards() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([0x1B, 0x50] + Array("payload".utf8) + [0x1B, 0x5C, 0x7A])
+    #expect(events == [.key(KeyPress(.character("z")))])
+  }
+
+  @Test("a lone ESC still flushes to Escape")
+  func loneEscapeStillFlushes() {
+    var parser = TerminalInputParser()
+    #expect(parser.feed([0x1B]).isEmpty)
+    #expect(parser.isAwaitingEscapeDisambiguation)
+    #expect(parser.flush() == [.key(KeyPress(.escape))])
+  }
+}

@@ -44,7 +44,34 @@ public struct TerminalInputParser: Sendable {
   /// this is set and calls ``flush()`` on expiry; an arriving continuation
   /// byte clears it by completing (or advancing) the sequence instead.
   package var isAwaitingEscapeDisambiguation: Bool {
-    bufferedBytes.count == 1 && bufferedBytes[0] == 0x1B
+    if bufferedBytes.count == 1 && bufferedBytes[0] == 0x1B {
+      return true
+    }
+    // An unterminated control string (OSC/DCS/PM/APC) is also byte-wise
+    // ambiguous: two bytes may be a typed Alt+letter chord, and a longer
+    // prefix may be a control string whose writer died before the ST
+    // terminator (F139). The idle flush resolves both; without it the
+    // parser would buffer — and eat — all input forever.
+    return unterminatedControlStringIntroducer != nil
+  }
+
+  /// The control-string introducer byte when the buffer holds an
+  /// unterminated OSC/DCS/PM/APC prefix, else `nil`.
+  private var unterminatedControlStringIntroducer: UInt8? {
+    guard bufferedBytes.count >= 2, bufferedBytes[0] == 0x1B else {
+      return nil
+    }
+    let introducer = bufferedBytes[1]
+    switch introducer {
+    case 0x5D:
+      return controlStringEnd(prefixLength: 2, terminatesWithBEL: true) == nil
+        ? introducer : nil
+    case 0x50, 0x5E, 0x5F:
+      return controlStringEnd(prefixLength: 2, terminatesWithBEL: false) == nil
+        ? introducer : nil
+    default:
+      return nil
+    }
   }
 
   /// Drains a lingering lone ESC as an Escape key press.
@@ -59,6 +86,19 @@ public struct TerminalInputParser: Sendable {
   public mutating func flush() -> [InputEvent] {
     guard isAwaitingEscapeDisambiguation else {
       return []
+    }
+    if let introducer = unterminatedControlStringIntroducer {
+      // Exactly ESC + introducer is a typed Alt+letter chord — a real
+      // control string's payload follows in the same read. Anything longer
+      // is a control string whose terminator never arrived: discard it
+      // whole rather than typing the payload as literal text (F139).
+      let isBareChord = bufferedBytes.count == 2
+      bufferedBytes.removeAll(keepingCapacity: true)
+      guard isBareChord else {
+        return []
+      }
+      let character = Character(UnicodeScalar(introducer))
+      return [.key(KeyPress(.character(character), modifiers: .alt))]
     }
     bufferedBytes.removeFirst()
     return [.key(KeyPress(.escape))]
@@ -184,9 +224,15 @@ extension TerminalInputParser {
     case 0x5D:
       return discardControlString(prefixLength: 2, terminatesWithBEL: true)
     case 0x50, 0x5E, 0x5F:
-      if controlStringEnd(prefixLength: 2, terminatesWithBEL: false) != nil {
-        return discardControlString(prefixLength: 2, terminatesWithBEL: false)
-      }
+      // DCS/PM/APC control strings buffer until their ST terminator
+      // arrives, exactly like OSC (F139). The old fall-through parsed a
+      // split-read introducer as an Alt+letter chord and then typed the
+      // entire late payload (a kitty graphics reply, a tmux passthrough)
+      // into the focused field. A genuinely TYPED Alt+P/Alt+^/Alt+_ chord
+      // ends its read at two bytes and is committed by the idle
+      // escape-timeout ``flush()`` — the same out-of-band disambiguation
+      // the lone ESC uses.
+      return discardControlString(prefixLength: 2, terminatesWithBEL: false)
     default:
       break
     }
