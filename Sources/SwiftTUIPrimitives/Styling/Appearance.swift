@@ -1,3 +1,14 @@
+import Synchronization
+
+/// Single-slot memo for ``TerminalAppearance/synthesizedTheme()``. The
+/// derivation is pure but expensive (~13 theme entries behind contrast-safety
+/// searches), and resolve re-runs it every time a style-key environment edit
+/// re-mints `StyleEnvironmentSnapshot` — dozens of times per frame with an
+/// identical appearance. One slot suffices: a session presents one live
+/// appearance at a time (light/dark flips replace it wholesale), and bounded
+/// storage cannot grow under palette-animating hosts.
+private let synthesizedThemeMemo = Mutex<(appearance: TerminalAppearance, theme: Theme)?>(nil)
+
 /// The effective contrast level of the terminal appearance.
 public enum ColorSchemeContrast: String, Equatable, Sendable, Codable {
   case standard
@@ -336,7 +347,21 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
   public static let defaultPalette = TerminalPalette.default
 
   /// Derives the semantic theme exposed to higher-level styling APIs.
+  ///
+  /// Memoized on appearance value equality: the derivation is pure, so the
+  /// last-synthesized theme is returned whenever the appearance is unchanged
+  /// (the steady state — style-key environment edits re-mint snapshots far
+  /// more often than the appearance itself changes).
   public func synthesizedTheme() -> Theme {
+    if let cached = synthesizedThemeMemo.withLock({ $0 }), cached.appearance == self {
+      return cached.theme
+    }
+    let theme = deriveSynthesizedTheme()
+    synthesizedThemeMemo.withLock { $0 = (appearance: self, theme: theme) }
+    return theme
+  }
+
+  private func deriveSynthesizedTheme() -> Theme {
     let separator = backgroundColor.mixed(with: foregroundColor, amount: separatorMixAmount)
     let fill = elevatedSurface(
       from: backgroundColor,
