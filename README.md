@@ -21,6 +21,24 @@ through a strict, inspectable pipeline — resolve → measure → place → sem
 draw → raster → commit — so layout is deterministic and every frame is
 snapshot-testable.
 
+## Pre-release
+
+> [!IMPORTANT]
+> SwiftTUI is actively being developed and is currently both _pre-release_ and _pre-SemVer-1.0.0_.  
+> I strongly caution against using SwiftTUI for anything mission critical at the moment, but bug reports and contributions are warmly welcomed!
+>
+> Current state: **_pre-release_**
+> * The framework has not yet been publicised because its shape is undecided. It should be considered a research project. 
+> * CI stability is not yet a goal.
+> * Supporting external consumers is not yet a goal.
+> * Stable APIs are an active non-goal.
+> * The [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md) is not yet reliable.
+>
+> Next milestone: **_pre-SemVer-1.0.0_**
+> 
+> The first 'released' version considered to support external consumers will be `0.9.0`.
+> Breaking changes may still happen until `1.0.0`, but a full CHANGELOG and migration guide will be published.
+
 ## Why SwiftTUI
 
 - **Your SwiftUI knowledge ports unchanged.** Stacks, frames, `@State`,
