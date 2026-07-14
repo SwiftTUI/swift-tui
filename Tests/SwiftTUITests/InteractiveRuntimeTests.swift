@@ -5385,19 +5385,25 @@ private struct LifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   let focusable: Bool
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let appearHandlerID = "\(context.identity)/appear"
-    let disappearHandlerID = "\(context.identity)/disappear"
     let descriptor = TaskDescriptor(
       id: "\(context.identity)/task",
       priority: .medium
     )
 
-    context.localLifecycleRegistry?.registerAppear(handlerID: appearHandlerID) {
-      recorder.record("appear:\(context.identity)")
-    }
-    context.localLifecycleRegistry?.registerDisappear(handlerID: disappearHandlerID) {
-      recorder.record("disappear:\(context.identity)")
-    }
+    let appearHandlerID =
+      context.localLifecycleRegistry?.registerAppear(
+        identity: context.identity,
+        ordinal: 0
+      ) {
+        recorder.record("appear:\(context.identity)")
+      } ?? ""
+    let disappearHandlerID =
+      context.localLifecycleRegistry?.registerDisappear(
+        identity: context.identity,
+        ordinal: 0
+      ) {
+        recorder.record("disappear:\(context.identity)")
+      } ?? ""
     context.localTaskRegistry?.register(
       identity: context.identity,
       registration: TaskRegistration(
@@ -5429,19 +5435,25 @@ private struct ScrollLifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   let recorder: RuntimeLifecycleRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let appearHandlerID = "\(context.identity)/appear"
-    let disappearHandlerID = "\(context.identity)/disappear"
     let descriptor = TaskDescriptor(
       id: "\(context.identity)/task",
       priority: .medium
     )
 
-    context.localLifecycleRegistry?.registerAppear(handlerID: appearHandlerID) {
-      recorder.record("appear:\(label)")
-    }
-    context.localLifecycleRegistry?.registerDisappear(handlerID: disappearHandlerID) {
-      recorder.record("disappear:\(label)")
-    }
+    let appearHandlerID =
+      context.localLifecycleRegistry?.registerAppear(
+        identity: context.identity,
+        ordinal: 0
+      ) {
+        recorder.record("appear:\(label)")
+      } ?? ""
+    let disappearHandlerID =
+      context.localLifecycleRegistry?.registerDisappear(
+        identity: context.identity,
+        ordinal: 0
+      ) {
+        recorder.record("disappear:\(label)")
+      } ?? ""
     context.localTaskRegistry?.register(
       identity: context.identity,
       registration: TaskRegistration(

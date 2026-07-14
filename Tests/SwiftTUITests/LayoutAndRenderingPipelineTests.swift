@@ -236,7 +236,10 @@ struct LayoutAndRenderingPipelineTests {
 
     let counters = CounterBox()
     let lifecycleRegistry = LocalLifecycleRegistry()
-    lifecycleRegistry.registerChange(handlerID: "Root#change[0]") {
+    let changeHandlerID = lifecycleRegistry.registerChange(
+      identity: testIdentity("Root"),
+      ordinal: 0
+    ) {
       counters.changeCount += 1
     }
 
@@ -245,7 +248,7 @@ struct LayoutAndRenderingPipelineTests {
         lifecycle: [
           .init(
             identity: testIdentity("Root"),
-            operation: .change(handlerIDs: ["Root#change[0]"])
+            operation: .change(handlerIDs: [changeHandlerID])
           )
         ]
       ),
