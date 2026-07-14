@@ -58,6 +58,21 @@ extension RunLoop {
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     if runtimeConfiguration.motion == .reduced {
+      // SwiftUI's reduced-motion contract: the state change applies
+      // instantly AND the `withAnimation(_:completion:)` closure still
+      // fires. Nil-ing the batch ID below means no animation will ever
+      // retain the batch, so park its completion exactly like a
+      // superseded batch (immediate deadline — fires on the next
+      // controller tick). Without the park the registered completion was
+      // orphaned: a live awaiter hung forever and the non-empty ledger
+      // raised the `.animationCompletion` frame-drop blocker for the
+      // whole session (F134).
+      if let reducedBatchID = scheduledFrame.animationBatchID {
+        renderer.internalAnimationController.parkSupersededBatchCompletions(
+          [reducedBatchID],
+          at: .now()
+        )
+      }
       transactionSnapshot.animationRequest = .disabled
       transactionSnapshot.animationBatchID = nil
     } else {

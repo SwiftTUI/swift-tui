@@ -360,3 +360,87 @@ private final class MotionPolicyInputReader: TerminalInputReading {
     }
   }
 }
+
+/// F134: reduced motion must keep SwiftUI's completion contract — the state
+/// change applies instantly AND the `withAnimation(_:completion:)` closure
+/// still fires. The resolve-context construction nils the batch ID under
+/// `motion == .reduced`, so no animation ever retains the batch; before the
+/// fix the registered completion was orphaned (a live awaiter hung forever)
+/// and the non-empty completion ledger raised the `.animationCompletion`
+/// frame-drop blocker for the whole session.
+@MainActor
+@Suite
+struct ReducedMotionCompletionDeliveryTests {
+  @MainActor
+  private final class CompletionCounter {
+    private(set) var count = 0
+    func increment() { count += 1 }
+  }
+
+  @Test("reduced motion still delivers withAnimation completions and clears the drop blocker")
+  func reducedMotionDeliversWithAnimationCompletions() throws {
+    let rootIdentity = testIdentity("ReducedMotionCompletionRoot")
+    let scheduler = FrameScheduler()
+    let animation = Animation.linear(duration: .milliseconds(400))
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: MotionPolicyTestSurface(),
+      terminalInputReader: MotionPolicyInputReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      runtimeConfiguration: RuntimeConfiguration(motion: .reduced),
+      viewBuilder: ScopedMapper { _ in
+        Text("Ready")
+      }
+    )
+    let controller = runLoop.renderer.internalAnimationController
+    controller.register(animation)
+    let batchID = AnimationBatchID(13_401)
+    let counter = CompletionCounter()
+    controller.registerCompletion(batchID: batchID) {
+      MainActor.assumeIsolated {
+        counter.increment()
+      }
+    }
+
+    scheduler.requestInvalidation(
+      of: [rootIdentity],
+      animation: .animate(animation.animationBox),
+      batchID: batchID
+    )
+    let frame = try #require(scheduler.consumeReadyFrame())
+    _ = runLoop.resolveContext(for: frame)
+
+    // The reduced-motion transaction nils the batch, so no animation will
+    // ever retain it. The completion must be parked (the superseded-batch
+    // machinery: immediate deadline) and fire on the next controller tick.
+    var leaf = ResolvedNode(
+      identity: testIdentity("ReducedMotionCompletionLeaf"),
+      kind: .view("Leaf")
+    )
+    _ = controller.applyInterpolations(
+      to: &leaf,
+      at: .now().advanced(by: .milliseconds(1))
+    )
+
+    #expect(
+      counter.count == 1,
+      "the withAnimation completion never fired under reduced motion"
+    )
+
+    // The fired completion deliberately holds the `.animationCompletion`
+    // blocker for ONE frame (its state writes still need presenting). The
+    // next frame head resets that hold; after it, no ledger may keep the
+    // blocker raised for the session.
+    controller.processResolvedTree(
+      leaf,
+      transaction: .init(),
+      timestamp: .now().advanced(by: .milliseconds(2))
+    )
+    #expect(
+      !controller.frameDropEligibilityBlockers.contains(.animationCompletion),
+      "the orphaned completion ledger blocked frame drops for the session"
+    )
+  }
+}
