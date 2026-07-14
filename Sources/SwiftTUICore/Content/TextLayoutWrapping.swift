@@ -1,18 +1,58 @@
+/// The cluster surface the wrapping algorithm reads. `TextCluster` is the
+/// rendered conformer; `TextInputLayoutMapBuilder` (SwiftTUIViews) wraps
+/// source-indexed clusters through the SAME algorithm so the caret movement
+/// map and the rendered rows can never disagree on wrap points (F140 — the
+/// map previously re-implemented wrapping at character granularity, so
+/// Up/Down and click-to-caret targeted rows the renderer never drew).
+package protocol TextWrappableCluster {
+  var character: Character { get }
+  var cellWidth: Int { get }
+  /// The marker glyph synthesized when an over-wide word-like token is split
+  /// mid-word. Synthesized clusters have no source position; conformers that
+  /// carry source indices must mint these index-free.
+  static func continuationMarker(character: Character, cellWidth: Int) -> Self
+}
+
+extension TextCluster: TextWrappableCluster {
+  package static func continuationMarker(
+    character: Character,
+    cellWidth: Int
+  ) -> TextCluster {
+    TextCluster(character: character, cellWidth: cellWidth)
+  }
+}
+
 func wrapTextLine(
   _ line: [TextCluster],
   width: Int?,
   wrappingStrategy: TextWrappingStrategy
 ) -> [TextLayoutLine] {
+  wrapTextLineClusters(
+    line,
+    width: width,
+    wrappingStrategy: wrappingStrategy
+  ).map(TextLayoutLine.init(clusters:))
+}
+
+/// The single wrapping implementation, generic over the cluster payload so
+/// every consumer wraps identically. Returns the wrapped rows as cluster
+/// arrays; rows may contain synthesized continuation markers, and separator
+/// whitespace at a wrap point is dropped (not represented in any row).
+package func wrapTextLineClusters<Cluster: TextWrappableCluster>(
+  _ line: [Cluster],
+  width: Int?,
+  wrappingStrategy: TextWrappingStrategy
+) -> [[Cluster]] {
   guard let width else {
-    return [TextLayoutLine(clusters: line)]
+    return [line]
   }
 
   guard width > 0 else {
-    return [.init()]
+    return [[]]
   }
 
   guard !line.isEmpty else {
-    return [.init()]
+    return [[]]
   }
 
   switch wrappingStrategy {
@@ -24,38 +64,38 @@ func wrapTextLine(
   }
 }
 
-private struct TextWrapRun: Sendable {
-  enum Kind: Sendable {
+private struct TextWrapRun<Cluster: TextWrappableCluster> {
+  enum Kind {
     case whitespace
     case token(isWordLike: Bool)
   }
 
   var kind: Kind
-  var clusters: [TextCluster]
+  var clusters: [Cluster]
 
   var cellWidth: Int {
     clusters.reduce(0) { $0 + $1.cellWidth }
   }
 }
 
-private func wrapTextLineOnWordBoundaries(
-  _ clusters: [TextCluster],
+private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
+  _ clusters: [Cluster],
   width: Int
-) -> [TextLayoutLine] {
+) -> [[Cluster]] {
   let runs = textWrapRuns(in: clusters)
-  var result: [TextLayoutLine] = []
-  var currentClusters: [TextCluster] = []
+  var result: [[Cluster]] = []
+  var currentClusters: [Cluster] = []
   var currentWidth = 0
-  var pendingSeparator: [TextCluster]?
+  var pendingSeparator: [Cluster]?
   var isAtSourceLineStart = true
 
   func flushCurrentLine() {
-    result.append(TextLayoutLine(clusters: currentClusters))
+    result.append(currentClusters)
     currentClusters = []
     currentWidth = 0
   }
 
-  func appendClusters(_ clusters: [TextCluster]) {
+  func appendClusters(_ clusters: [Cluster]) {
     for cluster in clusters {
       let clusterWidth = cluster.cellWidth
 
@@ -83,7 +123,7 @@ private func wrapTextLineOnWordBoundaries(
     }
   }
 
-  func adoptWrappedLines(_ lines: [TextLayoutLine]) {
+  func adoptWrappedLines(_ lines: [[Cluster]]) {
     guard !lines.isEmpty else {
       return
     }
@@ -97,15 +137,15 @@ private func wrapTextLineOnWordBoundaries(
     }
 
     let lastLine = lines.last!
-    currentClusters = lastLine.clusters
-    currentWidth = lastLine.cellWidth
+    currentClusters = lastLine
+    currentWidth = lastLine.reduce(0) { $0 + $1.cellWidth }
     if currentWidth >= width {
       flushCurrentLine()
     }
   }
 
   func appendTokenRun(
-    _ clusters: [TextCluster],
+    _ clusters: [Cluster],
     isWordLike: Bool
   ) {
     let tokenWidth = clusters.reduce(0) { $0 + $1.cellWidth }
@@ -175,13 +215,15 @@ private func wrapTextLineOnWordBoundaries(
   return result
 }
 
-private func textWrapRuns(in clusters: [TextCluster]) -> [TextWrapRun] {
+private func textWrapRuns<Cluster: TextWrappableCluster>(
+  in clusters: [Cluster]
+) -> [TextWrapRun<Cluster>] {
   guard let firstCluster = clusters.first else {
     return []
   }
 
-  var result: [TextWrapRun] = []
-  var currentClusters: [TextCluster] = [firstCluster]
+  var result: [TextWrapRun<Cluster>] = []
+  var currentClusters: [Cluster] = [firstCluster]
   var currentIsWhitespace = isWhitespaceCluster(firstCluster)
 
   func flushCurrentRun() {
@@ -215,15 +257,15 @@ private func textWrapRuns(in clusters: [TextCluster]) -> [TextWrapRun] {
   return result
 }
 
-private func wrapWordLikeClusters(
-  _ clusters: [TextCluster],
+private func wrapWordLikeClusters<Cluster: TextWrappableCluster>(
+  _ clusters: [Cluster],
   width: Int
-) -> [TextLayoutLine] {
+) -> [[Cluster]] {
   guard width >= 3 else {
     return clusterWrappedLines(for: clusters, width: width)
   }
 
-  let continuationMarker = TextCluster(character: "–", cellWidth: 1)
+  let continuationMarker = Cluster.continuationMarker(character: "–", cellWidth: 1)
   let firstLineContentWidth = width - continuationMarker.cellWidth
   let middleLineContentWidth = width - (continuationMarker.cellWidth * 2)
 
@@ -233,7 +275,7 @@ private func wrapWordLikeClusters(
 
   var remaining = clusters[...]
   var remainingCellWidth = sliceCellWidth(remaining)
-  var lines: [TextLayoutLine] = []
+  var lines: [[Cluster]] = []
 
   while !remaining.isEmpty {
     if lines.isEmpty {
@@ -242,19 +284,15 @@ private func wrapWordLikeClusters(
       remaining = remaining.dropFirst(content.count)
       remainingCellWidth -= contentCellWidth
       guard !remaining.isEmpty else {
-        lines.append(.init(clusters: content))
+        lines.append(content)
         break
       }
-      lines.append(
-        .init(clusters: content + [continuationMarker])
-      )
+      lines.append(content + [continuationMarker])
       continue
     }
 
     if remainingCellWidth + continuationMarker.cellWidth <= width {
-      lines.append(
-        .init(clusters: [continuationMarker] + Array(remaining))
-      )
+      lines.append([continuationMarker] + Array(remaining))
       remaining = []
       remainingCellWidth = 0
       continue
@@ -267,9 +305,7 @@ private func wrapWordLikeClusters(
     guard !content.isEmpty else {
       return clusterWrappedLines(for: clusters, width: width)
     }
-    lines.append(
-      .init(clusters: [continuationMarker] + content + [continuationMarker])
-    )
+    lines.append([continuationMarker] + content + [continuationMarker])
   }
 
   return lines
@@ -279,18 +315,18 @@ func wrapWordLikeClustersForTesting(
   _ clusters: [TextCluster],
   width: Int
 ) -> [TextLayoutLine] {
-  wrapWordLikeClusters(clusters, width: width)
+  wrapWordLikeClusters(clusters, width: width).map(TextLayoutLine.init(clusters:))
 }
 
-private func prefixByCellWidth(
-  _ clusters: ArraySlice<TextCluster>,
+private func prefixByCellWidth<Cluster: TextWrappableCluster>(
+  _ clusters: ArraySlice<Cluster>,
   maxWidth: Int
-) -> [TextCluster] {
+) -> [Cluster] {
   guard maxWidth > 0 else {
     return []
   }
 
-  var result: [TextCluster] = []
+  var result: [Cluster] = []
   var usedWidth = 0
 
   for cluster in clusters {
@@ -304,22 +340,22 @@ private func prefixByCellWidth(
   return result
 }
 
-private func sliceCellWidth(
-  _ clusters: ArraySlice<TextCluster>
+private func sliceCellWidth<Cluster: TextWrappableCluster>(
+  _ clusters: ArraySlice<Cluster>
 ) -> Int {
   clusters.reduce(0) { $0 + $1.cellWidth }
 }
 
-private func clusterWrappedLines(
-  for clusters: [TextCluster],
+private func clusterWrappedLines<Cluster: TextWrappableCluster>(
+  for clusters: [Cluster],
   width: Int
-) -> [TextLayoutLine] {
-  var result: [TextLayoutLine] = []
-  var currentClusters: [TextCluster] = []
+) -> [[Cluster]] {
+  var result: [[Cluster]] = []
+  var currentClusters: [Cluster] = []
   var currentWidth = 0
 
   func flushCurrentLine() {
-    result.append(TextLayoutLine(clusters: currentClusters))
+    result.append(currentClusters)
     currentClusters = []
     currentWidth = 0
   }
@@ -357,11 +393,15 @@ private func clusterWrappedLines(
   return result
 }
 
-private func isWhitespaceCluster(_ cluster: TextCluster) -> Bool {
+private func isWhitespaceCluster<Cluster: TextWrappableCluster>(
+  _ cluster: Cluster
+) -> Bool {
   cluster.character.unicodeScalars.allSatisfy { $0.properties.isWhitespace }
 }
 
-private func isWordLikeToken(_ clusters: [TextCluster]) -> Bool {
+private func isWordLikeToken<Cluster: TextWrappableCluster>(
+  _ clusters: [Cluster]
+) -> Bool {
   guard !clusters.isEmpty else {
     return false
   }

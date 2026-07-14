@@ -137,17 +137,21 @@ package struct TextInputLayoutLine: Equatable, Sendable {
     guard !clusters.isEmpty else {
       return 0
     }
-    var cellOffset = 0
+    // Cell positions come from each cluster's `originX`, not a running sum:
+    // on a continuation row the first content cluster sits AFTER the leading
+    // wrap marker, which occupies a cell but owns no source offset.
     for cluster in clusters {
       if offset <= cluster.textRange.lowerBound {
-        return cellOffset
+        return cluster.originX
       }
       if offset <= cluster.textRange.upperBound {
-        return cellOffset + cluster.cellWidth
+        return cluster.originX + cluster.cellWidth
       }
-      cellOffset += cluster.cellWidth
     }
-    return cellWidth
+    // Offsets past the last content cluster (separator whitespace swallowed
+    // at the wrap point) render at the end of the row's content, before any
+    // trailing wrap marker.
+    return clusters.last.map { $0.originX + $0.cellWidth } ?? cellWidth
   }
 
   package func offset(atCellColumn column: Int) -> TextOffset {
@@ -189,72 +193,102 @@ package struct TextInputLayoutCluster: Equatable, Sendable {
 }
 
 package enum TextInputLayoutMapBuilder {
+  /// Source-indexed cluster payload run through the SHARED text-wrapping
+  /// algorithm (`wrapTextLineClusters`), so the movement map's rows are the
+  /// renderer's rows by construction (F140 — this builder previously
+  /// re-implemented wrapping at character granularity, so Up/Down and
+  /// click-to-caret targeted rows the renderer never drew). Synthesized
+  /// continuation markers carry `sourceIndex == nil`: they occupy cells (the
+  /// per-row `originX` accounting includes them) but own no source offsets.
+  private struct IndexedWrapCluster: TextWrappableCluster {
+    var character: Character
+    var cellWidth: Int
+    var sourceIndex: Int?
+
+    static func continuationMarker(
+      character: Character,
+      cellWidth: Int
+    ) -> IndexedWrapCluster {
+      IndexedWrapCluster(character: character, cellWidth: cellWidth, sourceIndex: nil)
+    }
+  }
+
   package static func build(
     for clusters: [TextInputProjectedCluster],
     width: Int?
   ) -> TextInputLayoutMap {
-    var lines: [TextInputLayoutLine] = []
-    var currentClusters: [TextInputLayoutCluster] = []
-    var currentStart: TextOffset?
-    var currentWidth = 0
-    var y = 0
     let maximumWidth = width.map { max(1, $0) }
+    var lines: [TextInputLayoutLine] = []
+    var y = 0
 
-    func finishLine(nextStart: TextOffset?) {
-      let sourceRange: TextRange
-      if let first = currentStart {
-        sourceRange = TextRange(
-          lowerBound: first,
-          upperBound: currentClusters.last?.textRange.upperBound ?? first
+    func appendVisualRows(
+      for lineClusters: [TextInputProjectedCluster],
+      lineStart: TextOffset
+    ) {
+      let lineEnd = lineClusters.last?.textRange.upperBound ?? lineStart
+      let indexed = lineClusters.enumerated().map { index, projected in
+        IndexedWrapCluster(
+          character: projected.display,
+          cellWidth: cellWidth(of: projected.display),
+          sourceIndex: index
         )
-      } else {
-        let offset = nextStart ?? TextOffset(0)
-        sourceRange = TextRange(offset..<offset)
       }
-      lines.append(
-        TextInputLayoutLine(
-          sourceRange: sourceRange,
-          clusters: currentClusters,
-          origin: CellPoint(x: 0, y: y),
-          cellWidth: currentWidth
-        )
+      let rows = wrapTextLineClusters(
+        indexed,
+        width: maximumWidth,
+        wrappingStrategy: .wordBoundary
       )
-      currentClusters.removeAll(keepingCapacity: true)
-      currentStart = nextStart
-      currentWidth = 0
-      y += 1
+
+      for row in rows {
+        var rowClusters: [TextInputLayoutCluster] = []
+        var x = 0
+        for wrapped in row {
+          if let sourceIndex = wrapped.sourceIndex {
+            let projected = lineClusters[sourceIndex]
+            rowClusters.append(
+              TextInputLayoutCluster(
+                textRange: projected.textRange,
+                display: projected.display,
+                cellWidth: wrapped.cellWidth,
+                originX: x
+              )
+            )
+          }
+          x += wrapped.cellWidth
+        }
+
+        // A row's range covers its own content only. Separator whitespace
+        // swallowed at a wrap point falls between rows — `caretPoint`'s
+        // previous-row fallback renders such offsets at the end of the row
+        // the separator followed, matching the newline-gap policy (and the
+        // renderer, which draws nothing for the swallowed separator).
+        let lowerBound = rowClusters.first?.textRange.lowerBound ?? lineStart
+        let upperBound = rowClusters.last?.textRange.upperBound ?? lineEnd
+        lines.append(
+          TextInputLayoutLine(
+            sourceRange: TextRange(lowerBound: lowerBound, upperBound: upperBound),
+            clusters: rowClusters,
+            origin: CellPoint(x: 0, y: y),
+            cellWidth: x
+          )
+        )
+        y += 1
+      }
     }
 
+    var currentLine: [TextInputProjectedCluster] = []
+    var currentLineStart = TextOffset(0)
     for projected in clusters {
       if projected.isNewline {
-        finishLine(nextStart: projected.textRange.upperBound)
+        appendVisualRows(for: currentLine, lineStart: currentLineStart)
+        currentLine = []
+        currentLineStart = projected.textRange.upperBound
         continue
       }
-
-      let cellWidth = cellWidth(of: projected.display)
-      if let maximumWidth,
-        currentWidth > 0,
-        currentWidth + cellWidth > maximumWidth
-      {
-        finishLine(nextStart: projected.textRange.lowerBound)
-      }
-
-      if currentStart == nil {
-        currentStart = projected.textRange.lowerBound
-      }
-      currentClusters.append(
-        TextInputLayoutCluster(
-          textRange: projected.textRange,
-          display: projected.display,
-          cellWidth: cellWidth,
-          originX: currentWidth
-        )
-      )
-      currentWidth += cellWidth
+      currentLine.append(projected)
     }
-
-    if !currentClusters.isEmpty || lines.isEmpty || clusters.last?.isNewline == true {
-      finishLine(nextStart: TextOffset(clusters.last?.textRange.upperBound.rawValue ?? 0))
+    if !currentLine.isEmpty || lines.isEmpty || clusters.last?.isNewline == true {
+      appendVisualRows(for: currentLine, lineStart: currentLineStart)
     }
 
     let contentSize = CellSize(

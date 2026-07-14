@@ -1185,7 +1185,12 @@ extension FrameworkStressTextContentTests {
     _ = try harness.pressKey(KeyPress(.character("!")))
 
     #expect(text.writeCount == 1)
-    #expect(text.value == "ABCDEFG!HIJKL")
+    // The rendered rows at content width 5 are the word-wrap continuation
+    // rows "ABCD–/–EFG–/–HIJ–/–KL" (F140: the movement map wraps with the
+    // renderer's algorithm, markers included). The caret starts after 'L'
+    // at rendered column 3; Up preserves that rendered column on "–HIJ–",
+    // landing before 'J' (offset 9).
+    #expect(text.value == "ABCDEFGHI!JKL")
   }
 }
 
