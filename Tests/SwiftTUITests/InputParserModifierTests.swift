@@ -288,3 +288,59 @@ struct InputParserModifierTests {
       ])
   }
 }
+
+/// F78 rider: SGR extended buttons 8-11 (back/forward and beyond) set bit
+/// 128. Masking only the low two bits made button 8 masquerade as a PRIMARY
+/// click — a back-button press activated the focused control. The framework's
+/// MouseButton vocabulary has no back/forward, so the family is rejected
+/// explicitly (envelope consumed, no event).
+@MainActor
+@Suite
+struct SGRExtendedButtonTests {
+  private func sgr(_ button: String, terminator: UInt8) -> [UInt8] {
+    [0x1B, 0x5B, 0x3C] + Array("\(button);5;7".utf8) + [terminator]
+  }
+
+  @Test("button 8 (back) press and release are rejected, not primary clicks")
+  func button8Rejected() {
+    var parser = TerminalInputParser()
+    #expect(parser.feed(sgr("128", terminator: 0x4D)).isEmpty)
+    #expect(parser.feed(sgr("128", terminator: 0x6D)).isEmpty)
+  }
+
+  @Test("button 9 (forward) press and release are rejected, not middle clicks")
+  func button9Rejected() {
+    var parser = TerminalInputParser()
+    #expect(parser.feed(sgr("129", terminator: 0x4D)).isEmpty)
+    #expect(parser.feed(sgr("129", terminator: 0x6D)).isEmpty)
+  }
+
+  @Test("buttons 10 and 11 are rejected")
+  func buttons10And11Rejected() {
+    var parser = TerminalInputParser()
+    #expect(parser.feed(sgr("130", terminator: 0x4D)).isEmpty)
+    #expect(parser.feed(sgr("131", terminator: 0x4D)).isEmpty)
+  }
+
+  @Test("an extended-button drag is rejected")
+  func extendedButtonDragRejected() {
+    var parser = TerminalInputParser()
+    // 128 + 32 (motion) = 160.
+    #expect(parser.feed(sgr("160", terminator: 0x4D)).isEmpty)
+  }
+
+  @Test("a rejected extended button does not disturb a following primary click")
+  func rejectionConsumesExactlyTheEnvelope() {
+    var parser = TerminalInputParser()
+    let events = parser.feed(sgr("128", terminator: 0x4D) + sgr("0", terminator: 0x4D))
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary),
+            location: .cellFallback(CellPoint(x: 4, y: 6))
+          )
+        )
+      ])
+  }
+}

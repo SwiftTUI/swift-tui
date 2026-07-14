@@ -753,7 +753,7 @@ extension TerminalInputParser {
       let byte = bufferedBytes[index]
       guard (0x30...0x39).contains(byte) || byte == 0x2D || byte == 0x3B else {
         bufferedBytes.removeFirst(index + 1)
-        return nil
+        return parseNextEvent()
       }
       index += 1
     }
@@ -767,12 +767,25 @@ extension TerminalInputParser {
     bufferedBytes.removeFirst(index + 1)
 
     let parameters = parameterBytes.split(separator: 0x3B)
+    // Every rejection below the removeFirst above has consumed the whole
+    // envelope — keep draining the buffer so a following event in the same
+    // chunk is not stranded until the next read.
     guard parameters.count == 3,
       let encodedButton = asciiInteger(from: parameters[0]),
       let encodedX = asciiSignedInteger(from: parameters[1]),
       let encodedY = asciiSignedInteger(from: parameters[2])
     else {
-      return nil
+      return parseNextEvent()
+    }
+
+    // SGR extended buttons 8-11 (back/forward and beyond) set bit 128. The
+    // framework's MouseButton vocabulary has no back/forward, and masking
+    // only the low bits made button 8 masquerade as a PRIMARY click
+    // (128 & 0b11 == 0) — a back-button press activated the focused control
+    // (F78). Reject the whole family explicitly; the envelope is already
+    // consumed, so nothing leaks as text.
+    guard encodedButton & 128 == 0 else {
+      return parseNextEvent()
     }
 
     let location = pointerLocation(encodedX: encodedX, encodedY: encodedY)
@@ -797,7 +810,7 @@ extension TerminalInputParser {
       }
 
       guard let delta else {
-        return nil
+        return parseNextEvent()
       }
 
       return .mouse(
@@ -834,7 +847,7 @@ extension TerminalInputParser {
     }
 
     guard let button = mouseButton(from: baseCode) else {
-      return nil
+      return parseNextEvent()
     }
 
     let kind: MouseEvent.Kind =
