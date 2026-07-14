@@ -164,13 +164,17 @@ private func resolveStyleColorResult(
       depth: depth + 1,
       depthLimit: depthLimit
     )
-  case .opacity(let inner, _):
+  case .opacity(let inner, let amount):
+    // Apply the wrap's amount to the resolved color, matching the
+    // rasterizer's resolver. Color/Gradient fold `.opacity()` eagerly at
+    // construction, so the live inputs here are the residual style shapes
+    // (`.semantic`, `.terminalChrome`, `.tileStyle` wrapped in opacity).
     return resolveStyleColorResult(
       style: inner,
       theme: theme,
       appearance: appearance,
       depth: depth + 1,
       depthLimit: depthLimit
-    )
+    ).map { $0.opacity(amount) }
   }
 }

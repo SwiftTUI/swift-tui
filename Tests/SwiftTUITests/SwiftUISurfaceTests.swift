@@ -1649,6 +1649,47 @@ struct SwiftUISurfaceTests {
     )
   }
 
+  @Test("opacity-wrapped styles resolve with the amount applied (F172)")
+  func opacityWrappedStylesResolveWithAmountApplied() {
+    // Color/Gradient fold `.opacity()` eagerly at construction, so the
+    // residual `.opacity` shapes reaching the resolver wrap `.semantic`,
+    // `.terminalChrome`, and `.tileStyle`. The Primitives resolver
+    // previously discarded the amount (the rasterizer's resolver applied
+    // it), so `contrastingForegroundStyle` and the text-figure color
+    // pipeline saw full-alpha colors for faded styles.
+    let theme = Theme(foreground: try! .hex("#102030"))
+
+    let semantic = resolveStyleColorResult(
+      style: .opacity(.semantic(.foreground), 0.5),
+      theme: theme
+    )
+    #expect(semantic == .success(try! Color.hex("#102030").opacity(0.5)))
+
+    // Nested wraps compound multiplicatively, matching `Color.opacity`.
+    let nested = resolveStyleColorResult(
+      style: .opacity(.opacity(.semantic(.foreground), 0.5), 0.5),
+      theme: theme
+    )
+    #expect(nested == .success(try! Color.hex("#102030").opacity(0.25)))
+
+    // The chrome leg resolves through the synthesized appearance and then
+    // applies the amount to the resolved tone.
+    let appearance = TerminalAppearance(
+      foregroundColor: .black,
+      backgroundColor: .white,
+      tintColor: .blue,
+      source: .override
+    )
+    let chromeTheme = appearance.synthesizedTheme()
+    let chromeStyle = AnyShapeStyle(.terminalAccent(.warning))
+    let chromeBase = resolveStyleColorResult(style: chromeStyle, theme: chromeTheme)
+    let chromeFaded = resolveStyleColorResult(
+      style: .opacity(chromeStyle, 0.5),
+      theme: chromeTheme
+    )
+    #expect(chromeFaded == chromeBase.map { $0.opacity(0.5) })
+  }
+
   @Test("terminal chrome shape styles resolve through synthesized appearances")
   func terminalChromeShapeStylesResolveToConcreteColors() {
     let appearance = TerminalAppearance(
