@@ -65,10 +65,6 @@ public struct ResolveContext: Equatable, Sendable {
   /// that counter is unreachable (no node yet). Deliberately excluded from
   /// ``ResolveContext``'s `Equatable` conformance so it never gates reuse.
   package var valueAnimationOrdinalCursor: Int = 0
-  package var localActionRegistry: LocalActionRegistry?
-  package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
-  package var localLifecycleRegistry: LocalLifecycleRegistry?
-  package var localTaskRegistry: LocalTaskRegistry?
 
   /// Runtime registries and lowering seams propagated unchanged from a parent
   /// context to its `child` / `replacingIdentity` derivations. Grouping them in
@@ -81,6 +77,22 @@ public struct ResolveContext: Equatable, Sendable {
   package var resolveWorkTracker: ResolveWorkTracker? {
     get { propagated.resolveWorkTracker }
     set { propagated.resolveWorkTracker = newValue }
+  }
+  package var localActionRegistry: LocalActionRegistry? {
+    get { propagated.localActionRegistry }
+    set { propagated.localActionRegistry = newValue }
+  }
+  package var localKeyHandlerRegistry: LocalKeyHandlerRegistry? {
+    get { propagated.localKeyHandlerRegistry }
+    set { propagated.localKeyHandlerRegistry = newValue }
+  }
+  package var localLifecycleRegistry: LocalLifecycleRegistry? {
+    get { propagated.localLifecycleRegistry }
+    set { propagated.localLifecycleRegistry = newValue }
+  }
+  package var localTaskRegistry: LocalTaskRegistry? {
+    get { propagated.localTaskRegistry }
+    set { propagated.localTaskRegistry = newValue }
   }
   package var localGestureRegistry: LocalGestureRegistry? {
     get { propagated.localGestureRegistry }
@@ -259,10 +271,6 @@ public struct ResolveContext: Equatable, Sendable {
       environmentValues: environmentValues,
       transaction: transaction,
       invalidatedIdentities: invalidatedIdentities,
-      localActionRegistry: nil,
-      localKeyHandlerRegistry: nil,
-      localLifecycleRegistry: nil,
-      localTaskRegistry: nil,
       applyEnvironmentValues: true
     )
   }
@@ -277,10 +285,6 @@ public struct ResolveContext: Equatable, Sendable {
       invalidatedIdentities: invalidatedIdentities,
       invalidationSummary: invalidationSummary,
       forceRootEvaluation: forceRootEvaluation,
-      localActionRegistry: localActionRegistry,
-      localKeyHandlerRegistry: localKeyHandlerRegistry,
-      localLifecycleRegistry: localLifecycleRegistry,
-      localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
     childContext.propagated = propagated
@@ -306,10 +310,6 @@ public struct ResolveContext: Equatable, Sendable {
       invalidatedIdentities: invalidatedIdentities,
       invalidationSummary: invalidationSummary,
       forceRootEvaluation: forceRootEvaluation,
-      localActionRegistry: localActionRegistry,
-      localKeyHandlerRegistry: localKeyHandlerRegistry,
-      localLifecycleRegistry: localLifecycleRegistry,
-      localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
     replacedContext.propagated = propagated
@@ -619,6 +619,10 @@ extension ResolveContext {
   /// sites continue to use the flat names.
   package struct PropagatedRegistries: Sendable {
     package var resolveWorkTracker: ResolveWorkTracker?
+    package var localActionRegistry: LocalActionRegistry?
+    package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
+    package var localLifecycleRegistry: LocalLifecycleRegistry?
+    package var localTaskRegistry: LocalTaskRegistry?
     package var localGestureRegistry: LocalGestureRegistry?
     package var localGestureStateRegistry: LocalGestureStateRegistry?
     package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
@@ -687,6 +691,10 @@ extension ResolveContext {
 
     package init(
       resolveWorkTracker: ResolveWorkTracker? = nil,
+      localActionRegistry: LocalActionRegistry? = nil,
+      localKeyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+      localLifecycleRegistry: LocalLifecycleRegistry? = nil,
+      localTaskRegistry: LocalTaskRegistry? = nil,
       localGestureRegistry: LocalGestureRegistry? = nil,
       localGestureStateRegistry: LocalGestureStateRegistry? = nil,
       localPointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
@@ -709,6 +717,10 @@ extension ResolveContext {
       requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)? = nil
     ) {
       self.resolveWorkTracker = resolveWorkTracker
+      self.localActionRegistry = localActionRegistry
+      self.localKeyHandlerRegistry = localKeyHandlerRegistry
+      self.localLifecycleRegistry = localLifecycleRegistry
+      self.localTaskRegistry = localTaskRegistry
       self.localGestureRegistry = localGestureRegistry
       self.localGestureStateRegistry = localGestureStateRegistry
       self.localPointerHandlerRegistry = localPointerHandlerRegistry
@@ -813,12 +825,12 @@ extension ResolveContext {
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
     self.forceRootEvaluation = forceRootEvaluation
-    self.localActionRegistry = localActionRegistry
-    self.localKeyHandlerRegistry = localKeyHandlerRegistry
-    self.localLifecycleRegistry = localLifecycleRegistry
-    self.localTaskRegistry = localTaskRegistry
     self.propagated = PropagatedRegistries(
       resolveWorkTracker: .init(),
+      localActionRegistry: localActionRegistry,
+      localKeyHandlerRegistry: localKeyHandlerRegistry,
+      localLifecycleRegistry: localLifecycleRegistry,
+      localTaskRegistry: localTaskRegistry,
       localFocusedValuesRegistry: localFocusedValuesRegistry
     )
   }
