@@ -22,6 +22,72 @@ struct AnimationSolverTests {
     #expect(settled == nil)
   }
 
+  @Test("interpolatingSpring threads initialVelocity into the curve (F157)")
+  func interpolatingSpringThreadsInitialVelocity() throws {
+    // The parameter existed but was silently dropped: two animations
+    // differing only in initialVelocity compared equal.
+    let still = Animation.interpolatingSpring(stiffness: 100, damping: 10)
+    let kicked = Animation.interpolatingSpring(
+      stiffness: 100, damping: 10, initialVelocity: 5
+    )
+    #expect(still != kicked)
+  }
+
+  @Test(
+    "initialVelocity kicks the spring toward its target across damping regimes",
+    arguments: [
+      (stiffness: 100.0, damping: 10.0),  // underdamped (z = 0.5)
+      (stiffness: 100.0, damping: 20.0),  // critically damped (z = 1)
+      (stiffness: 100.0, damping: 40.0),  // overdamped (z = 2)
+    ])
+  func initialVelocityKicksTowardTarget(spring: (stiffness: Double, damping: Double)) throws {
+    let still = SpringSolver(
+      mass: 1, stiffness: spring.stiffness, damping: spring.damping
+    )
+    let kicked = SpringSolver(
+      mass: 1, stiffness: spring.stiffness, damping: spring.damping, initialVelocity: 4
+    )
+
+    // Both start at full displacement.
+    #expect(abs(try #require(still.value(at: 0)) - 1.0) < 0.001)
+    #expect(abs(try #require(kicked.value(at: 0)) - 1.0) < 0.001)
+
+    // A positive initial velocity moves toward the target: the remaining
+    // displacement shortly after t=0 must be smaller than the still
+    // spring's, and the initial slope must equal -initialVelocity.
+    let t = 0.02
+    let stillValue = try #require(still.value(at: t))
+    let kickedValue = try #require(kicked.value(at: t))
+    #expect(kickedValue < stillValue)
+    #expect(abs(kicked.velocity(at: 0) - (-4)) < 0.001)
+    #expect(abs(still.velocity(at: 0)) < 0.001)
+  }
+
+  @Test("withTransaction scopes animation intent like withAnimation (F157)")
+  @MainActor
+  func withTransactionScopesAnimationIntent() {
+    var animated = Transaction()
+    animated.animation = .linear(duration: .seconds(1))
+    withTransaction(animated) {
+      let scoped = Transaction(request: AnimationContextStorage.currentRequest)
+      #expect(scoped.animation == .linear(duration: .seconds(1)))
+    }
+
+    var disabled = Transaction()
+    disabled.disablesAnimations = true
+    withTransaction(disabled) {
+      #expect(Transaction(request: AnimationContextStorage.currentRequest).disablesAnimations)
+    }
+
+    // A default transaction inherits the enclosing scope's intent.
+    withAnimation(.easeIn(duration: .seconds(2))) {
+      withTransaction(Transaction()) {
+        let scoped = Transaction(request: AnimationContextStorage.currentRequest)
+        #expect(scoped.animation == .easeIn(duration: .seconds(2)))
+      }
+    }
+  }
+
   @Test("underdamped spring oscillates before settling")
   func underdampedSpringOscillates() throws {
     let solver = SpringSolver(duration: 0.5, bounce: 0.5)

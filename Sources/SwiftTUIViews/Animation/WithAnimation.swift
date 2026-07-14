@@ -66,6 +66,39 @@ public func withAnimation<Result>(
   }
 }
 
+/// Executes `body` with `transaction`'s animation intent applied to any
+/// state changes that occur during its execution — the transaction-valued
+/// form of ``withAnimation(_:_:)``, matching SwiftUI's `withTransaction`.
+///
+/// A default (`.inherit`) transaction leaves the enclosing scope's intent
+/// in place; `disablesAnimations` suppresses it; a transaction carrying an
+/// animation scopes that animation exactly like `withAnimation`.
+@MainActor
+@discardableResult
+public func withTransaction<Result>(
+  _ transaction: Transaction,
+  _ body: () throws -> Result
+) rethrows -> Result {
+  switch transaction.request {
+  case .inherit:
+    return try body()
+  case .disabled:
+    return try withAnimation(nil, body)
+  case .animate(let box):
+    if let animation = box.unwrap(as: Animation.self) {
+      // Route through withAnimation so the box is registered with the
+      // renderer-owned sink — the controller re-hydrates the payload from
+      // that registration.
+      return try withAnimation(animation, body)
+    }
+    // A box that did not originate from a public `Animation` (package
+    // internals) was registered at its origin; scope it directly.
+    return try AnimationContextStorage.$currentRequest.withValue(transaction.request) {
+      try body()
+    }
+  }
+}
+
 /// Executes `body` with the specified animation and fires `completion`
 /// when the animation completes.
 ///

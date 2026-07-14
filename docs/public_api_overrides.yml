@@ -219,6 +219,7 @@ classifications:
     - SwiftTUIViews.TransitionProperties
     - "SwiftTUIViews.withAnimation(_:_:)"
     - "SwiftTUIViews.withAnimation(_:completionCriteria:_:completion:)"
+    - "SwiftTUIViews.withTransaction(_:_:)"
 
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyButtonStyle

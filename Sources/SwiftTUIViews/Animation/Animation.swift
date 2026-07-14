@@ -99,7 +99,8 @@ public struct Animation: Equatable, Hashable, Sendable {
     Animation(
       curve: .spring(
         .init(
-          mass: mass, stiffness: stiffness, damping: damping
+          mass: mass, stiffness: stiffness, damping: damping,
+          initialVelocity: initialVelocity
         )))
   }
 
@@ -459,6 +460,7 @@ extension SpringSolver: Equatable {
   package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.dampingRatio == rhs.dampingRatio
       && lhs.naturalFrequency == rhs.naturalFrequency
+      && lhs.initialVelocity == rhs.initialVelocity
   }
 }
 
@@ -466,5 +468,6 @@ extension SpringSolver: Hashable {
   package func hash(into hasher: inout Hasher) {
     hasher.combine(dampingRatio)
     hasher.combine(naturalFrequency)
+    hasher.combine(initialVelocity)
   }
 }

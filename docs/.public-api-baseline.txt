@@ -3493,6 +3493,8 @@ SwiftTUIViews.EmptyView
 SwiftTUIViews.EmptyView.init()
 SwiftTUIViews.Environment
 SwiftTUIViews.Environment.init(_:)
+SwiftTUIViews.Environment.init(_:)
+SwiftTUIViews.Environment.init(_:)
 SwiftTUIViews.Environment.wrappedValue
 SwiftTUIViews.EnvironmentKey
 SwiftTUIViews.EnvironmentKey.Value
@@ -3523,6 +3525,7 @@ SwiftTUIViews.EnvironmentValues.pointerInputCapabilities
 SwiftTUIViews.EnvironmentValues.resetFocus
 SwiftTUIViews.EnvironmentValues.safeAreaInsets
 SwiftTUIViews.EnvironmentValues.scrollIndicatorVisibility
+SwiftTUIViews.EnvironmentValues.subscript(_:)
 SwiftTUIViews.EnvironmentValues.subscript(_:)
 SwiftTUIViews.EnvironmentValues.tabViewStyle
 SwiftTUIViews.EnvironmentValues.tableHeaderVisibility
@@ -4450,6 +4453,7 @@ SwiftTUIViews.View.coordinateSpace(name:)
 SwiftTUIViews.View.defaultFocus(_:_:)
 SwiftTUIViews.View.defaultFocus(_:_:)
 SwiftTUIViews.View.disabled(_:)
+SwiftTUIViews.View.environment(_:)
 SwiftTUIViews.View.environment(_:_:)
 SwiftTUIViews.View.equatable()
 SwiftTUIViews.View.erasedToAnyView
@@ -4593,6 +4597,7 @@ SwiftTUIViews.ZStackLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.neverBody()
 SwiftTUIViews.withAnimation(_:_:)
 SwiftTUIViews.withAnimation(_:completionCriteria:_:completion:)
+SwiftTUIViews.withTransaction(_:_:)
 SwiftTUIWASI.App.main()
 SwiftTUIWASI.WASIRunner
 SwiftTUIWASI.WASIRunner.run(_:)

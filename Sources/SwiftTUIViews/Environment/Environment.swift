@@ -199,17 +199,32 @@ public struct EnvironmentValues: Equatable, Sendable {
 @MainActor
 /// Reads an inherited environment value from the current view context.
 public struct Environment<Value: Sendable> {
-  private let keyPath: KeyPath<EnvironmentValues, Value>
+  /// Non-nil for key-path readers; the type-keyed observable-object form
+  /// (``init(_:)-swift.type``) reads through ``read`` instead, because a key
+  /// path cannot reference the generic type-keyed subscript (metatype
+  /// indices are not `Hashable`).
+  private let keyPath: KeyPath<EnvironmentValues, Value>?
+  private let read: (EnvironmentValues) -> Value
 
   /// Creates an environment-value reader for `keyPath`.
   public init(
     _ keyPath: KeyPath<EnvironmentValues, Value>
   ) {
     self.keyPath = keyPath
+    read = { $0[keyPath: keyPath] }
+  }
+
+  /// The type-keyed reader seam for the observable-object form; see
+  /// `ObservableObjectEnvironment.swift`.
+  package init(read: @escaping (EnvironmentValues) -> Value) {
+    keyPath = nil
+    self.read = read
   }
 
   public var wrappedValue: Value {
-    EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
+    if let keyPath {
+      EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
+    }
     guard let current = EnvironmentValuesStorage.current else {
       // The silent-default class (F136): inside an authoring/dispatch scope
       // the registration-time environment should have been established
@@ -220,12 +235,12 @@ public struct Environment<Value: Sendable> {
       // behavior and stay uncounted.
       if currentAuthoringContext() != nil {
         SoundnessProbeConfiguration.recordAmbientEnvironmentFallbackRead(
-          "@Environment(\(keyPath)) read default values inside an authoring scope"
+          "@Environment(\(keyPath.map(String.init(describing:)) ?? "\(Value.self)")) read default values inside an authoring scope"
         )
       }
-      return EnvironmentValues()[keyPath: keyPath]
+      return read(EnvironmentValues())
     }
-    return current[keyPath: keyPath]
+    return read(current)
   }
 }
 
