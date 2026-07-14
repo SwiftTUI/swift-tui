@@ -231,8 +231,32 @@ extension TerminalInputParser {
         }
         return .key(KeyPress(key, modifiers: .alt))
       }
-      bufferedBytes.removeFirst()
-      return .key(KeyPress(.escape))
+      // Alt+control: ESC followed by a C0 byte the bare parser maps to a
+      // key (Alt+Return, Alt+Backspace, Alt+Tab, Alt+Ctrl+letter). Emitting
+      // a bare `.escape` here and re-parsing the control byte as a literal
+      // leaked BOTH a modal-dismissing Escape AND a stray activation from
+      // one chord (F165). ESC ESC deliberately stays on the fall-through:
+      // some terminals prefix arrow chords with a second ESC, and consuming
+      // it as Alt+Escape would strand the sequence tail as literal text.
+      switch bufferedBytes[1] {
+      case 0x0A, 0x0D:
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.return, modifiers: .alt))
+      case 0x08, 0x7F:
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.backspace, modifiers: .alt))
+      case 0x09:
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.tab, modifiers: .alt))
+      case 0x01...0x07, 0x0B...0x0C, 0x0E...0x1A:
+        let controlByte = bufferedBytes[1]
+        bufferedBytes.removeFirst(2)
+        let letter = Character(UnicodeScalar(Int(controlByte) + 0x60)!)
+        return .key(KeyPress(.character(letter), modifiers: [.ctrl, .alt]))
+      default:
+        bufferedBytes.removeFirst()
+        return .key(KeyPress(.escape))
+      }
     }
 
     guard bufferedBytes.count > 2 else {
@@ -426,9 +450,13 @@ extension TerminalInputParser {
     guard bufferedBytes.count >= 6,
       bufferedBytes[3] == 0x3B  // semicolon
     else {
-      // Not a modifier sequence — fall through to consume as unknown
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.escape))
+      // Not a modifier sequence: discard the whole scanned envelope
+      // silently, exactly like every other unmapped CSI. The old
+      // fall-through consumed three bytes and emitted `.escape`, leaking a
+      // modal-dismissing Escape plus the envelope tail as literal text
+      // (F165). `discardCSI` waits across a read boundary when the final
+      // byte has not arrived, so the recovery stays atomic.
+      return discardCSI(prefixLength: 2)
     }
 
     // Find the terminal byte (an uppercase letter)
