@@ -373,6 +373,51 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(controller.activeAnimationCount == 0)
   }
 
+  @Test("pre-frame-head offscreen property tick prunes completed animation registrations")
+  func preFrameHeadOffscreenPropertyTickPrunesLedger() {
+    // A finite curve completing during elided off-screen ticks must free its
+    // `registeredAnimations` ledger entry exactly as the on-screen tick does
+    // (F178): the ledger is append-only outside the prune, so a sequence of
+    // distinct finite curves completing off-screen previously grew it without
+    // bound for as long as the view stayed elided.
+    let controller = AnimationController()
+    let leafIdentity = testIdentity("PreHeadElision", "LedgerLeaf")
+    var time = MonotonicInstant.now()
+    controller.processResolvedTree(
+      resolvedLeaf(identity: leafIdentity, opacity: 1.0),
+      transaction: .init(),
+      timestamp: time
+    )
+    let baseline = controller.debugStateSnapshot().registeredAnimationCount
+
+    var opacity = 1.0
+    for step in 0..<8 {
+      // Distinct durations mint distinct animation boxes — each is one
+      // ledger entry.
+      let animation = Animation.linear(duration: .milliseconds(10 + step))
+      controller.register(animation)
+      var animatingTransaction = TransactionSnapshot()
+      animatingTransaction.animationRequest = .animate(animation.animationBox)
+      opacity = opacity == 1.0 ? 0.0 : 1.0
+      controller.processResolvedTree(
+        resolvedLeaf(identity: leafIdentity, opacity: opacity),
+        transaction: animatingTransaction,
+        timestamp: time
+      )
+      // Advance well past the curve's duration so the off-screen tick
+      // completes it.
+      time = time.advanced(by: .milliseconds(500))
+      _ = controller.advancePreFrameHeadOffscreenPropertyAnimationTick(at: time)
+      #expect(controller.activeAnimationCount == 0)
+    }
+
+    let final = controller.debugStateSnapshot().registeredAnimationCount
+    #expect(
+      final <= baseline + 1,
+      "registeredAnimations grew to \(final) (baseline \(baseline)) across 8 off-screen completions — the off-screen tick is missing the ledger prune"
+    )
+  }
+
   // MARK: - commitElided (reduced-commit path)
 
   /// The correctness-critical invariant for the reduced-commit path:

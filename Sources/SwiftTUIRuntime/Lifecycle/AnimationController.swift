@@ -522,6 +522,7 @@ package final class AnimationController: Sendable {
 
     var keysToRemove: [AnimationKey] = []
     var completedBatches: [AnimationBatchID] = []
+    var completedAnimationBoxes: Set<AnimationBox> = []
     var redrawIdentities: Set<Identity> = []
     var latestDeadline: MonotonicInstant = timestamp
     var hasPendingWork = false
@@ -530,27 +531,21 @@ package final class AnimationController: Sendable {
       guard case .property = animation.kind else {
         preconditionFailure("Pre-frame-head off-screen tick only supports property animations.")
       }
-      guard let anim = registeredAnimations[animation.animationBox] else {
-        keysToRemove.append(key)
-        if let batchID = animation.batchID { completedBatches.append(batchID) }
-        continue
+      switch advancePropertyAnimationStep(
+        key: key,
+        animation: animation,
+        at: timestamp,
+        keysToRemove: &keysToRemove,
+        completedBatches: &completedBatches,
+        completedAnimationBoxes: &completedAnimationBoxes,
+        redrawIdentities: &redrawIdentities
+      ) {
+      case .unregistered, .completed:
+        break
+      case .progressed:
+        latestDeadline = timestamp.advanced(by: frameInterval)
+        hasPendingWork = true
       }
-
-      let elapsed = animation.startTime.duration(to: timestamp)
-      var state = animation.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      activeAnimations[key]?.customState = state
-
-      guard evaluated != nil else {
-        keysToRemove.append(key)
-        if let batchID = animation.batchID { completedBatches.append(batchID) }
-        redrawIdentities.insert(key.identity)
-        continue
-      }
-
-      redrawIdentities.insert(key.identity)
-      latestDeadline = timestamp.advanced(by: frameInterval)
-      hasPendingWork = true
     }
 
     for key in keysToRemove {
@@ -559,6 +554,11 @@ package final class AnimationController: Sendable {
     for batchID in completedBatches {
       releaseBatch(batchID)
     }
+    // The eligibility gate guarantees `removingNodes` is empty off-screen, so
+    // the shared prune's removal-overlay scan is a no-op here (F178: before
+    // the shared step, curves completing during elided ticks leaked their
+    // ledger entries — the off-screen path had no prune at all).
+    pruneCompletedAnimationRegistrations(completedAnimationBoxes)
 
     let result = AnimationTickResult(
       hasPendingWork: hasPendingWork,
@@ -567,6 +567,82 @@ package final class AnimationController: Sendable {
     )
     lastTickResult = result
     return result
+  }
+
+  private enum PropertyAnimationStepResult {
+    case unregistered
+    case completed
+    case progressed(Double)
+  }
+
+  /// One shared property-curve evaluation step for the main tick and the
+  /// pre-frame-head off-screen tick (F178): registration lookup, curve
+  /// evaluation, custom-state write-back, and completion bookkeeping —
+  /// including the `completedAnimationBoxes` feed the registration-ledger
+  /// prune consumes. Interpolated-value application stays caller-side: the
+  /// off-screen tick has no visible tree to write into.
+  private func advancePropertyAnimationStep(
+    key: AnimationKey,
+    animation: ActiveAnimation,
+    at timestamp: MonotonicInstant,
+    keysToRemove: inout [AnimationKey],
+    completedBatches: inout [AnimationBatchID],
+    completedAnimationBoxes: inout Set<AnimationBox>,
+    redrawIdentities: inout Set<Identity>
+  ) -> PropertyAnimationStepResult {
+    guard let anim = registeredAnimations[animation.animationBox] else {
+      keysToRemove.append(key)
+      if let batchID = animation.batchID { completedBatches.append(batchID) }
+      return .unregistered
+    }
+
+    let elapsed = animation.startTime.duration(to: timestamp)
+    var state = animation.customState
+    let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+    // Store the updated custom state back on the active animation so the
+    // next tick carries user bookkeeping forward.
+    activeAnimations[key]?.customState = state
+
+    guard let progress = evaluated else {
+      keysToRemove.append(key)
+      completedAnimationBoxes.insert(animation.animationBox)
+      if let batchID = animation.batchID { completedBatches.append(batchID) }
+      redrawIdentities.insert(key.identity)
+      return .completed
+    }
+
+    redrawIdentities.insert(key.identity)
+    return .progressed(progress)
+  }
+
+  /// Prune registration-ledger entries for property curves that just completed
+  /// and whose box no longer backs any live consumer (009). The box→animation
+  /// ledger is otherwise append-only, so a run of unique finite curves grows it
+  /// without bound. A box can back several active slots and any in-flight
+  /// removal overlay, so drop it only once its LAST live reference is gone: a
+  /// still-running or `.repeatForever` animation keeps its box in
+  /// `activeAnimations` (its curve never returns `nil`, so it is never in
+  /// `completedAnimationBoxes`) and is never pruned. Dropping a box a live
+  /// animation still needs would break the retarget / velocity / merge
+  /// handoff and the placed-overlay lookups that key on `registeredAnimations`.
+  private func pruneCompletedAnimationRegistrations(
+    _ completedAnimationBoxes: Set<AnimationBox>
+  ) {
+    guard !completedAnimationBoxes.isEmpty else {
+      return
+    }
+    var liveBoxes = Set<AnimationBox>()
+    for animation in activeAnimations.values {
+      liveBoxes.insert(animation.animationBox)
+    }
+    for entry in removingNodes.values {
+      if let box = entry.animationBox {
+        liveBoxes.insert(box)
+      }
+    }
+    for box in completedAnimationBoxes where !liveBoxes.contains(box) {
+      registeredAnimations.removeValue(forKey: box)
+    }
   }
 
   /// Occupancy reading for the profiling memory signal. Computed, so it stays
@@ -1595,45 +1671,40 @@ package final class AnimationController: Sendable {
     for (key, animation) in activeAnimations {
       switch animation.kind {
       case .property(let from, let to):
-        guard let anim = registeredAnimations[animation.animationBox] else {
-          keysToRemove.append(key)
-          if let batchID = animation.batchID { completedBatches.append(batchID) }
-          continue
-        }
-        let elapsed = animation.startTime.duration(to: timestamp)
-        var state = animation.customState
-        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-        // Store the updated custom state back on the active animation
-        // so the next tick carries user bookkeeping forward.
-        activeAnimations[key]?.customState = state
-
         let slot = AnimationPropertyValueApplication.propertySlot(for: key)
-        guard let progress = evaluated else {
-          // Animation complete — snap to final value and purge.
+        switch advancePropertyAnimationStep(
+          key: key,
+          animation: animation,
+          at: timestamp,
+          keysToRemove: &keysToRemove,
+          completedBatches: &completedBatches,
+          completedAnimationBoxes: &completedAnimationBoxes,
+          redrawIdentities: &redrawIdentities
+        ) {
+        case .unregistered:
+          continue
+        case .completed:
+          // Animation complete — snap to final value; the step purged it.
           if let ownerViewNodeID = animation.ownerViewNodeID {
             interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = to
           } else {
             interpolatedByIdentity[key.identity, default: [:]][slot] = to
           }
-          keysToRemove.append(key)
-          completedAnimationBoxes.insert(animation.animationBox)
-          if let batchID = animation.batchID { completedBatches.append(batchID) }
-          redrawIdentities.insert(key.identity)
           continue
+        case .progressed(let progress):
+          let value = AnimationPropertyValueApplication.interpolate(
+            from: from,
+            to: to,
+            progress: progress
+          )
+          if let ownerViewNodeID = animation.ownerViewNodeID {
+            interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
+          } else {
+            interpolatedByIdentity[key.identity, default: [:]][slot] = value
+          }
+          latestDeadline = timestamp.advanced(by: frameInterval)
+          hasPendingWork = true
         }
-        let value = AnimationPropertyValueApplication.interpolate(
-          from: from,
-          to: to,
-          progress: progress
-        )
-        if let ownerViewNodeID = animation.ownerViewNodeID {
-          interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
-        } else {
-          interpolatedByIdentity[key.identity, default: [:]][slot] = value
-        }
-        redrawIdentities.insert(key.identity)
-        latestDeadline = timestamp.advanced(by: frameInterval)
-        hasPendingWork = true
 
       case .insertionOffset, .matchedGeometry:
         // Placed-level scopes don't read or write the resolved tree
@@ -1765,30 +1836,7 @@ package final class AnimationController: Sendable {
       removingNodes.removeValue(forKey: viewNodeID)
     }
 
-    // Prune registration-ledger entries for property curves that just completed
-    // and whose box no longer backs any live consumer (009). The box→animation
-    // ledger is otherwise append-only, so a run of unique finite curves grows it
-    // without bound. A box can back several active slots and any in-flight
-    // removal overlay, so drop it only once its LAST live reference is gone: a
-    // still-running or `.repeatForever` animation keeps its box in
-    // `activeAnimations` (its curve never returns `nil`, so it is never in
-    // `completedAnimationBoxes`) and is never pruned. Dropping a box a live
-    // animation still needs would break the retarget / velocity / merge
-    // handoff and the placed-overlay lookups that key on `registeredAnimations`.
-    if !completedAnimationBoxes.isEmpty {
-      var liveBoxes = Set<AnimationBox>()
-      for animation in activeAnimations.values {
-        liveBoxes.insert(animation.animationBox)
-      }
-      for entry in removingNodes.values {
-        if let box = entry.animationBox {
-          liveBoxes.insert(box)
-        }
-      }
-      for box in completedAnimationBoxes where !liveBoxes.contains(box) {
-        registeredAnimations.removeValue(forKey: box)
-      }
-    }
+    pruneCompletedAnimationRegistrations(completedAnimationBoxes)
 
     // Apply interpolated values for in-tree animations.
     var appliedIdentities: Set<Identity> = []
