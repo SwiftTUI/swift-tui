@@ -9,6 +9,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -52,6 +53,7 @@ extension Rasterizer {
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
+        dirtyRows: dirtyRows,
         presentationRecorder: presentationRecorder,
         presentationEffects: presentationEffects
       )
@@ -77,6 +79,7 @@ extension Rasterizer {
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
+        dirtyRows: dirtyRows,
         presentationRecorder: presentationRecorder,
         presentationEffects: presentationEffects
       )
@@ -142,6 +145,7 @@ extension Rasterizer {
             cells: &cells,
             clip: clip,
             blendMode: blendMode,
+            dirtyRows: dirtyRows,
             presentationRecorder: presentationRecorder,
             presentationEffects: presentationEffects
           )
@@ -161,6 +165,7 @@ extension Rasterizer {
                 cells: &cells,
                 clip: clip,
                 blendMode: blendMode,
+                dirtyRows: dirtyRows,
                 presentationRecorder: presentationRecorder,
                 presentationEffects: presentationEffects
               )
@@ -172,6 +177,7 @@ extension Rasterizer {
                 with: color,
                 cells: &cells,
                 clip: clip,
+                dirtyRows: dirtyRows,
                 presentationRecorder: presentationRecorder,
                 presentationEffects: presentationEffects
               )
@@ -188,6 +194,7 @@ extension Rasterizer {
             cells: &cells,
             clip: clip,
             blendMode: blendMode,
+            dirtyRows: dirtyRows,
             presentationRecorder: presentationRecorder,
             presentationEffects: presentationEffects
           )
@@ -211,6 +218,7 @@ extension Rasterizer {
                   cells: &cells,
                   clip: clip,
                   blendMode: blendMode,
+                  dirtyRows: dirtyRows,
                   presentationRecorder: presentationRecorder,
                   presentationEffects: presentationEffects
                 )
@@ -221,6 +229,7 @@ extension Rasterizer {
                   with: fillColor,
                   cells: &cells,
                   clip: clip,
+                  dirtyRows: dirtyRows,
                   presentationRecorder: presentationRecorder,
                   presentationEffects: presentationEffects
                 )
@@ -240,6 +249,7 @@ extension Rasterizer {
               cells: &cells,
               clip: clip,
               blendMode: blendMode,
+              dirtyRows: dirtyRows,
               presentationRecorder: presentationRecorder,
               presentationEffects: presentationEffects
             )
@@ -265,6 +275,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -319,6 +330,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -352,6 +364,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -376,6 +389,7 @@ extension Rasterizer {
     clip: CellRect?,
     backgroundStyle: BorderBackgroundStyle? = nil,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -492,6 +506,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -656,9 +671,16 @@ extension Rasterizer {
     with overlay: Color,
     cells: inout [[RasterCell]],
     clip: CellRect?,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
+    // See `write(_:...dirtyRows:)` — the incremental exact-set clamp (F125).
+    // Tinting reads the destination cell, so re-tinting an un-cleared row
+    // is the canonical drift.
+    if let dirtyRows, !dirtyRows.contains(y) {
+      return
+    }
     if let clip {
       guard
         x >= clip.origin.x,

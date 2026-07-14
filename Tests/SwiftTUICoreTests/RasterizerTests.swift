@@ -1554,6 +1554,101 @@ struct RasterizerTests {
     )
     #expect(frame2.visibleIdentities.contains(movingIdentity))
   }
+
+  // MARK: - Incremental idempotency across disjoint dirty bands (F125)
+
+  /// The gap rows between two disjoint dirty bands are inside the paint
+  /// cull's HULL (min...max) but outside the exact-set clear, so a
+  /// translucent node spanning both bands re-composited onto its own
+  /// prior output there — colors drifted a step per incremental frame.
+  /// `.trustSoundDamage` matches release behavior: the DEBUG verify
+  /// policy would repair (and mask) the drift via the F13 oracle.
+  @Test("translucent fill spanning two disjoint dirty bands stays byte-identical")
+  func translucentFillAcrossDisjointBandsStaysByteIdentical() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    func tree(top: String, bottom: String) -> DrawNode {
+      coreRasterRoot(
+        width: 12,
+        height: 8,
+        children: [
+          coreRasterTextNode(id: "top", row: 0, text: top, width: 10),
+          coreRasterTextNode(id: "bottom", row: 6, text: bottom, width: 10),
+          fillNode(
+            "translucentBand",
+            bounds: .init(origin: .zero, size: .init(width: 12, height: 7)),
+            color: Color.red.opacity(0.5)
+          ),
+        ])
+    }
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 0, columnRanges: []),
+        .init(row: 1, columnRanges: []),
+        .init(row: 5, columnRanges: []),
+        .init(row: 6, columnRanges: []),
+      ])
+
+    let previousSurface = rasterizer.rasterize(
+      tree(top: "Alpha", bottom: "Omega"),
+      minimumSize: .init(width: 12, height: 8)
+    )
+    let fresh = rasterizer.rasterize(
+      tree(top: "Beta", bottom: "Sigma"),
+      minimumSize: .init(width: 12, height: 8)
+    )
+    let incremental = rasterizer.rasterize(
+      tree(top: "Beta", bottom: "Sigma"),
+      minimumSize: .init(width: 12, height: 8),
+      previousSurface: previousSurface,
+      damage: damage
+    )
+
+    #expect(
+      incremental == fresh,
+      "gap rows between the dirty bands re-composited the translucent fill"
+    )
+  }
+
+  @Test("an image attachment in the gap row between dirty bands is not duplicated")
+  func gapRowImageAttachmentIsNotDuplicated() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    func tree(top: String, bottom: String) -> DrawNode {
+      coreRasterRoot(
+        width: 12,
+        height: 8,
+        children: [
+          coreRasterTextNode(id: "top", row: 0, text: top, width: 10),
+          coreRasterTextNode(id: "bottom", row: 6, text: bottom, width: 10),
+          coreRasterImageNode(id: "gapImage", row: 3, source: "demo.png"),
+        ])
+    }
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 0, columnRanges: []),
+        .init(row: 6, columnRanges: []),
+      ])
+
+    let previousSurface = rasterizer.rasterize(
+      tree(top: "Alpha", bottom: "Omega"),
+      minimumSize: .init(width: 12, height: 8)
+    )
+    let fresh = rasterizer.rasterize(
+      tree(top: "Beta", bottom: "Sigma"),
+      minimumSize: .init(width: 12, height: 8)
+    )
+    let incremental = rasterizer.rasterize(
+      tree(top: "Beta", bottom: "Sigma"),
+      minimumSize: .init(width: 12, height: 8),
+      previousSurface: previousSurface,
+      damage: damage
+    )
+
+    #expect(incremental.imageAttachments.count == fresh.imageAttachments.count)
+    #expect(
+      incremental == fresh,
+      "the gap-row attachment was both retained and re-appended"
+    )
+  }
 }
 
 private func imagePayload() -> ImagePayload {

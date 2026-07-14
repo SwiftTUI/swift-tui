@@ -11,6 +11,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -45,6 +46,7 @@ extension Rasterizer {
         clip: clip,
         backgroundStyle: backgroundStyle,
         blendMode: blendMode,
+        dirtyRows: dirtyRows,
         presentationRecorder: presentationRecorder,
         presentationEffects: presentationEffects
       )
@@ -82,6 +84,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -99,6 +102,7 @@ extension Rasterizer {
             cells: &cells,
             clip: clip,
             blendMode: blendMode,
+            dirtyRows: dirtyRows,
             presentationRecorder: presentationRecorder,
             presentationEffects: presentationEffects
           )
@@ -120,6 +124,7 @@ extension Rasterizer {
             cells: &cells,
             clip: clip,
             blendMode: blendMode,
+            dirtyRows: dirtyRows,
             presentationRecorder: presentationRecorder,
             presentationEffects: presentationEffects
           )
@@ -137,6 +142,7 @@ extension Rasterizer {
               cells: &cells,
               clip: clip,
               blendMode: blendMode,
+              dirtyRows: dirtyRows,
               presentationRecorder: presentationRecorder,
               presentationEffects: presentationEffects
             )
@@ -157,6 +163,7 @@ extension Rasterizer {
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
+        dirtyRows: dirtyRows,
         presentationRecorder: presentationRecorder,
         presentationEffects: presentationEffects
       )
@@ -174,6 +181,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -192,6 +200,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -210,6 +219,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -226,6 +236,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -264,6 +275,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -284,6 +296,7 @@ extension Rasterizer {
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -304,6 +317,7 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -333,6 +347,7 @@ extension Rasterizer {
       cells: &cells,
       clip: clip,
       blendMode: blendMode,
+      dirtyRows: dirtyRows,
       presentationRecorder: presentationRecorder,
       presentationEffects: presentationEffects
     )

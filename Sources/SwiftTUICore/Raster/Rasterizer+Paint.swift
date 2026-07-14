@@ -438,6 +438,7 @@ extension Rasterizer {
           cells: &cells,
           clip: context.clip,
           blendMode: context.activeBlendMode,
+          dirtyRows: context.dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: context.presentationEffects
         )
@@ -535,6 +536,7 @@ extension Rasterizer {
               cells: &cells,
               clip: frame.clip,
               blendMode: blendMode,
+              dirtyRows: dirtyRows,
               presentationRecorder: presentationRecorder,
               presentationEffects: presentationEffects
             )
@@ -584,6 +586,7 @@ extension Rasterizer {
               cells: &cells,
               clip: frame.clip,
               blendMode: blendMode,
+              dirtyRows: dirtyRows,
               presentationRecorder: presentationRecorder,
               presentationEffects: presentationEffects
             )
@@ -634,6 +637,7 @@ extension Rasterizer {
                 cells: &cells,
                 clip: frame.clip,
                 blendMode: blendMode,
+                dirtyRows: dirtyRows,
                 presentationRecorder: presentationRecorder,
                 presentationEffects: presentationEffects
               )
@@ -700,6 +704,7 @@ extension Rasterizer {
               cells: &cells,
               clip: frame.clip,
               blendMode: blendMode,
+              dirtyRows: dirtyRows,
               presentationRecorder: presentationRecorder,
               presentationEffects: presentationEffects
             )
@@ -727,6 +732,16 @@ extension Rasterizer {
             cellPixelSize: payload.resolvedAsset?.cellPixelSize,
             destinationCells: cells
           )
+        // Incremental repaint gate (F125): the retained-attachment filter
+        // keeps every previous attachment that does NOT intersect the exact
+        // dirty set, so re-appending one here (its node overlaps the dirty
+        // HULL, e.g. a gap row between two disjoint bands) would duplicate
+        // it. Mirror the retention filter exactly.
+        if let dirtyRows,
+          !self.visibleBounds(visibleBounds, intersectsAnyOf: dirtyRows)
+        {
+          continue
+        }
         let attachment = RasterImageAttachment(
           identity: identity,
           bounds: bounds,
@@ -755,6 +770,7 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -773,6 +789,7 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -786,6 +803,7 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -810,6 +828,7 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -822,6 +841,7 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip,
           blendMode: blendMode,
+          dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
           presentationEffects: presentationEffects
         )
@@ -835,6 +855,11 @@ extension Rasterizer {
         for row in 0..<min(grid.size.height, bounds.size.height) {
           let y = bounds.origin.y + row
           if y < effectiveClip.origin.y || y >= effectiveClip.origin.y + effectiveClip.size.height {
+            continue
+          }
+          // Incremental exact-set clamp (F125) for the direct-write leg
+          // below; the blend leg clamps inside `write`.
+          if let dirtyRows, !dirtyRows.contains(y) {
             continue
           }
           guard row < grid.cells.count else {
@@ -868,6 +893,7 @@ extension Rasterizer {
                 cells: &cells,
                 clip: frame.clip,
                 blendMode: blendMode,
+                dirtyRows: dirtyRows,
                 presentationRecorder: presentationRecorder,
                 presentationEffects: presentationEffects
               )

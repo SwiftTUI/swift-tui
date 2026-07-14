@@ -192,9 +192,20 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     clip: CellRect?,
     blendMode: BlendMode? = nil,
+    dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
+    // Incremental repaint clamps writes to the EXACT dirty-row set (F125):
+    // the paint walk culls by the dirty hull, so a node spanning two
+    // disjoint dirty bands reaches rows between them — rows that were
+    // never cleared and still hold the prior frame's composited cells.
+    // Re-writing there double-applies translucent composition and the
+    // surface drifts a step per incremental frame. `nil` (fresh raster)
+    // never clamps.
+    if let dirtyRows, !dirtyRows.contains(y) {
+      return
+    }
     let glyphWidth = max(1, width)
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
       return
