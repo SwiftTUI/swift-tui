@@ -139,6 +139,15 @@ extension LayoutEngine {
       resolved.children.indices.contains(primaryIndex),
       measured.childMeasurements.indices.contains(primaryIndex)
     else {
+      // The decoration's primary index came from resolve; missing it in
+      // either list is a resolve/measure divergence that silently drops the
+      // whole decorated subtree.
+      passContext?.recordPlacementChildMismatch(
+        identity: resolved.identity,
+        behavior: "decoration(primary: \(primaryIndex))",
+        childCount: resolved.children.count,
+        measurementCount: measured.childMeasurements.count
+      )
       return []
     }
 

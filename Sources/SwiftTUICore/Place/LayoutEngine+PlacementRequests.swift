@@ -18,6 +18,14 @@ extension LayoutEngine {
     switch resolved.layoutBehavior {
     case .intrinsic:
       let childCount = min(resolved.children.count, measured.childMeasurements.count)
+      if resolved.children.count != measured.childMeasurements.count {
+        passContext?.recordPlacementChildMismatch(
+          identity: resolved.identity,
+          behavior: "intrinsic",
+          childCount: resolved.children.count,
+          measurementCount: measured.childMeasurements.count
+        )
+      }
       return (0..<childCount).map { index in
         let childMeasurement = measured.childMeasurements[index]
         return PlacementRequest(
@@ -109,6 +117,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "padding",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 
@@ -132,6 +148,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "safeAreaIgnoring",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 
@@ -165,6 +189,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "border",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 
@@ -193,6 +225,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "frame",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 
@@ -219,6 +259,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "offset",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 
@@ -239,6 +287,14 @@ extension LayoutEngine {
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
+        if resolved.children.isEmpty != measured.childMeasurements.isEmpty {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "position",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
       let childSize = childMeasurement.measuredSize
@@ -270,6 +326,20 @@ extension LayoutEngine {
         measured.childMeasurements.indices.contains(selectedIndex),
         resolved.children.indices.contains(selectedIndex)
       else {
+        // A recorded selection that indexes outside either list is a
+        // resolve/measure divergence — the chosen child silently vanishes.
+        // No selection at all (empty ViewThatFits) is legitimate.
+        if let selectedIndex = measured.containerAllocationSnapshot?.selectedChildIndex,
+          !measured.childMeasurements.indices.contains(selectedIndex)
+            || !resolved.children.indices.contains(selectedIndex)
+        {
+          passContext?.recordPlacementChildMismatch(
+            identity: resolved.identity,
+            behavior: "viewThatFits(selected: \(selectedIndex))",
+            childCount: resolved.children.count,
+            measurementCount: measured.childMeasurements.count
+          )
+        }
         return []
       }
 

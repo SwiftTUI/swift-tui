@@ -89,6 +89,23 @@ extension LayoutEngine {
   ) -> [PlacementRequest] {
     if resolved.indexedChildSource != nil,
       let allocation = measured.containerAllocationSnapshot,
+      allocation.lazyStack != nil,
+      allocation.childSizes.count != stackChildren(for: resolved).count
+    {
+      // The allocation snapshot indexes a different flattened child count
+      // than this resolve produced — the indexed-lazy fast path below would
+      // place against the wrong rows. Record it; the non-indexed fallback
+      // at the bottom still places every realized child (never an empty
+      // placement).
+      passContext?.recordPlacementChildMismatch(
+        identity: resolved.identity,
+        behavior: "indexedLazyStack",
+        childCount: stackChildren(for: resolved).count,
+        measurementCount: allocation.childSizes.count
+      )
+    }
+    if resolved.indexedChildSource != nil,
+      let allocation = measured.containerAllocationSnapshot,
       let snapshot = allocation.lazyStack,
       // Flattened cells: a multi-view element contributes one cell per
       // spliced child, so the allocation arrays index the flattened list,

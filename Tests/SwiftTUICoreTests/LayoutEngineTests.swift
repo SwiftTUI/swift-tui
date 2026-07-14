@@ -1388,3 +1388,109 @@ private struct TestIndexedChildSource: IndexedChildSource {
     children[index]
   }
 }
+
+/// F166: placement child/measurement mismatches must be reported, not
+/// silently swallowed. A wrapper whose resolve produced a child but whose
+/// measurement lost it (or vice versa) returned an empty placement — the
+/// invisible-content class — with no diagnostic anywhere.
+@MainActor
+@Suite("Placement mismatch diagnostics (F166)")
+struct PlacementMismatchDiagnosticsTests {
+  @Test("a wrapper with a child but no measurement records a mismatch issue")
+  func wrapperMismatchRecordsIssue() {
+    let engine = LayoutEngine()
+    let child = ResolvedNode(identity: testIdentity("Mismatch", "Child"), kind: .view("Child"))
+    var wrapper = ResolvedNode(
+      identity: testIdentity("Mismatch"),
+      kind: .view("Padded"),
+      children: [child]
+    )
+    wrapper.layoutBehavior = .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
+    let measured = MeasuredNode(
+      identity: wrapper.identity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 10, height: 4),
+      childMeasurements: []
+    )
+    let passContext = LayoutPassContext()
+
+    let requests = engine.placementRequests(
+      for: wrapper,
+      measured: measured,
+      in: .init(origin: .zero, size: .init(width: 10, height: 4)),
+      viewportContext: nil,
+      passContext: passContext
+    )
+
+    #expect(requests.isEmpty)
+    #expect(
+      passContext.runtimeIssues.contains { issue in
+        issue.code == "layout.placementChildMismatch"
+      },
+      "the divergence was swallowed silently; issues: \(passContext.runtimeIssues)"
+    )
+  }
+
+  @Test("a childless wrapper records nothing")
+  func childlessWrapperRecordsNothing() {
+    let engine = LayoutEngine()
+    var wrapper = ResolvedNode(identity: testIdentity("Childless"), kind: .view("Padded"))
+    wrapper.layoutBehavior = .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1))
+    let measured = MeasuredNode(
+      identity: wrapper.identity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 4, height: 2)
+    )
+    let passContext = LayoutPassContext()
+
+    _ = engine.placementRequests(
+      for: wrapper,
+      measured: measured,
+      in: .init(origin: .zero, size: .init(width: 4, height: 2)),
+      viewportContext: nil,
+      passContext: passContext
+    )
+
+    #expect(passContext.runtimeIssues.isEmpty)
+  }
+
+  @Test("an intrinsic container with truncated measurements records a mismatch issue")
+  func intrinsicTruncationRecordsIssue() {
+    let engine = LayoutEngine()
+    let childA = ResolvedNode(identity: testIdentity("Trunc", "A"), kind: .view("A"))
+    let childB = ResolvedNode(identity: testIdentity("Trunc", "B"), kind: .view("B"))
+    let container = ResolvedNode(
+      identity: testIdentity("Trunc"),
+      kind: .view("Container"),
+      children: [childA, childB]
+    )
+    let measured = MeasuredNode(
+      identity: container.identity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 8, height: 2),
+      childMeasurements: [
+        MeasuredNode(
+          identity: childA.identity,
+          proposal: .unspecified,
+          measuredSize: .init(width: 4, height: 1)
+        )
+      ]
+    )
+    let passContext = LayoutPassContext()
+
+    let requests = engine.placementRequests(
+      for: container,
+      measured: measured,
+      in: .init(origin: .zero, size: .init(width: 8, height: 2)),
+      viewportContext: nil,
+      passContext: passContext
+    )
+
+    #expect(requests.count == 1, "the truncated placement itself is unchanged")
+    #expect(
+      passContext.runtimeIssues.contains { issue in
+        issue.code == "layout.placementChildMismatch"
+      }
+    )
+  }
+}

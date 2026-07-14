@@ -180,6 +180,34 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  /// Records one placement child/measurement mismatch (F166): a placement
+  /// request saw a different number of resolved children than measurements
+  /// (or an allocation snapshot indexed a different child count), so part of
+  /// the subtree is silently not placed — the invisible-content class.
+  /// Observability-first like the lifecycle skip counters: a mismatch in a
+  /// user app is better reported than crashed. Deduplicated per identity.
+  package func recordPlacementChildMismatch(
+    identity: Identity,
+    behavior: String,
+    childCount: Int,
+    measurementCount: Int
+  ) {
+    state.withLock { state in
+      let issue = RuntimeIssue(
+        severity: .warning,
+        code: "layout.placementChildMismatch",
+        message:
+          "placement for \(behavior) saw \(childCount) resolved children but "
+          + "\(measurementCount) measurements; the surplus is not placed",
+        identity: identity,
+        source: "LayoutEngine"
+      )
+      if !state.runtimeIssues.contains(issue) {
+        state.runtimeIssues.append(issue)
+      }
+    }
+  }
+
   package func exitCustomLayoutCompatibilityBoundary() {
     state.withLock { state in
       precondition(
