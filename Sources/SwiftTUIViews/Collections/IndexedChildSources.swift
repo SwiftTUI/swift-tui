@@ -94,6 +94,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
 
   private let data: Data
   private let id: KeyPath<Data.Element, ID>
+  private let ids: [ID]
   private let entityIdentities: [EntityIdentity]
   private let content: @MainActor (Data.Element) -> Content
   private let childContext: ResolveContext
@@ -125,6 +126,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     countStorage = data.count
 
     let ids = data.map { $0[keyPath: id] }
+    self.ids = ids
     let scope = childContext.structuralPath
     if let retained = host?.retainedIndexedChildSourceArtifacts(
       forIdentityRoot: childContext.identity
@@ -232,6 +234,16 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       )
       cache[index] = normalized
       return normalized
+    }
+  }
+
+  /// Realization-free: pure function of the element id and the container's
+  /// identity root, byte-identical to the identity `child(at:)` resolves the
+  /// element under (interior re-identification aside — see the protocol
+  /// requirement's note).
+  nonisolated package func elementIdentity(at index: Int) -> Identity {
+    withCheckedMainActorAccess("IndexedChildSource.elementIdentity(at:)") {
+      identityRootStorage.explicitID(ids[index])
     }
   }
 

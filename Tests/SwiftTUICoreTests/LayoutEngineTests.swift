@@ -1,3 +1,4 @@
+import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -720,6 +721,162 @@ struct LayoutEngineTests {
       ])
   }
 
+  @Test("windowed measure realizes only the visible band plus overscan")
+  func windowedMeasureRealizesOnlyVisibleBand() throws {
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 1))
+    }
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: rows,
+      realizationCounter: counter
+    )
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 10),
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    defer { passContext.popMeasureViewportHint() }
+
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+
+    // stride 1 (unit rows, spacing 0), offset 10, viewport 5 -> anchor 10,
+    // window [10-1, 10+5+1+1) = 9..<17.
+    #expect(snapshot.measuredWindow == 9..<17)
+    #expect(snapshot.estimatedRowStride == 1)
+    // Realizations: the probe (element 0) plus the 8 window rows.
+    #expect(counter.count == 9)
+    // Estimated tails keep the full-length arrays and the content extent.
+    #expect(snapshot.childMainOffsets.count == 100)
+    #expect(snapshot.childIdentities.count == 100)
+    #expect(measured.containerAllocationSnapshot?.childSizes.count == 100)
+    #expect(snapshot.contentMainLength == 100)
+    #expect(measured.measuredSize == CellSize(width: 4, height: 100))
+    #expect(snapshot.childIdentities[50] == testIdentity("row-50"))
+    #expect(measured.childMeasurements.isEmpty)
+  }
+
+  @Test("windowed measure needs a hint: without one the source realizes exhaustively")
+  func windowedMeasureFallsBackWithoutHint() throws {
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<20).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 1))
+    }
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: rows,
+      realizationCounter: counter
+    )
+
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: LayoutPassContext(retainedLayout: nil)
+    )
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+
+    #expect(snapshot.measuredWindow == nil)
+    #expect(counter.count >= 20)
+  }
+
+  @Test("windowed placement realizes only the visible rows of a windowed product")
+  func windowedPlacementRealizesOnlyVisibleRows() throws {
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 1))
+    }
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: rows,
+      realizationCounter: counter
+    )
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 10),
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    passContext.popMeasureViewportHint()
+    let measureRealizations = counter.count
+
+    // Production-shaped absolute geometry: scrolled down by 10 -> the stack
+    // sits at absolute y = -10; the viewport shows rows 10..14.
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .init(x: 0, y: -10), size: measured.measuredSize),
+      viewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 5)),
+        contentOffset: .init(x: 0, y: 10)
+      ),
+      passContext: passContext
+    )
+
+    #expect(
+      placed.children.map(\.identity) == (10..<15).map { testIdentity("row-\($0)") }
+    )
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2, 3, 4])
+    // Placement realized exactly the visible rows on demand.
+    #expect(counter.count - measureRealizations == 5)
+  }
+
+  @Test("estimated visible window anchors, spans, and clamps at dataset edges")
+  func estimatedVisibleWindowClampsAtDatasetEdges() {
+    let engine = LayoutEngine()
+    let hint = { (offset: Int, viewport: Int) in
+      MeasureViewportHint(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: offset),
+        viewportSize: .init(width: 8, height: viewport)
+      )
+    }
+
+    #expect(
+      engine.lazyStackEstimatedVisibleWindow(
+        hint: hint(0, 5), axis: .vertical, count: 100, rowStride: 1
+      ) == 0..<7
+    )
+    #expect(
+      engine.lazyStackEstimatedVisibleWindow(
+        hint: hint(1_000, 5), axis: .vertical, count: 20, rowStride: 1
+      ) == 18..<20
+    )
+    #expect(
+      engine.lazyStackEstimatedVisibleWindow(
+        hint: hint(10, 0), axis: .vertical, count: 100, rowStride: 1
+      ) == nil
+    )
+    // Taller rows shrink the index band for the same pixel viewport.
+    #expect(
+      engine.lazyStackEstimatedVisibleWindow(
+        hint: hint(12, 6), axis: .vertical, count: 100, rowStride: 3
+      ) == 3..<8
+    )
+  }
+
   @Test("flexible frame resolves unspecified finite and infinite proposals")
   func flexibleFrameResolvesProposalKinds() {
     let engine = LayoutEngine()
@@ -1334,7 +1491,8 @@ private func lazyStack(
 private func indexedLazyStack(
   _ name: String,
   axis: Axis,
-  children: [ResolvedNode]
+  children: [ResolvedNode],
+  realizationCounter: RealizationCounter? = nil
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
@@ -1347,9 +1505,25 @@ private func indexedLazyStack(
     ),
     indexedChildSource: TestIndexedChildSource(
       identityRoot: testIdentity(name),
-      children: children
+      children: children,
+      realizationCounter: realizationCounter
     )
   )
+}
+
+/// Counts `child(at:)` realizations on the test source, so windowed
+/// measurement/placement tests can pin that out-of-window rows are never
+/// materialized.
+final class RealizationCounter: Sendable {
+  private let storage = Mutex<Int>(0)
+
+  var count: Int {
+    storage.withLock { $0 }
+  }
+
+  func record() {
+    storage.withLock { $0 += 1 }
+  }
 }
 
 private func spacer(_ name: String) -> ResolvedNode {
@@ -1472,13 +1646,16 @@ private struct TestIndexedChildSource: IndexedChildSource {
   let identityRoot: Identity
   let measurementSignature: IndexedChildMeasurementSignature
   private let children: [ResolvedNode]
+  private let realizationCounter: RealizationCounter?
 
   init(
     identityRoot: Identity,
-    children: [ResolvedNode]
+    children: [ResolvedNode],
+    realizationCounter: RealizationCounter? = nil
   ) {
     self.identityRoot = identityRoot
     self.children = children
+    self.realizationCounter = realizationCounter
     measurementSignature = .init(elementPaths: children.map(\.identity.path))
   }
 
@@ -1487,7 +1664,12 @@ private struct TestIndexedChildSource: IndexedChildSource {
   }
 
   func child(at index: Int) -> ResolvedNode {
-    children[index]
+    realizationCounter?.record()
+    return children[index]
+  }
+
+  func elementIdentity(at index: Int) -> Identity {
+    children[index].identity
   }
 }
 

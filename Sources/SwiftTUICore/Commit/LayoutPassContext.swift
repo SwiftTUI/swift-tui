@@ -27,9 +27,35 @@ package struct ScrollViewportContext: Equatable, Sendable {
   }
 }
 
+/// The viewport a scroll layout declares for its content's MEASUREMENT
+/// (proposal 2026-07-13-002 Stage 2.2). Measurement runs before placement,
+/// so no absolute rect exists yet — the hint carries the scrollable axes,
+/// the requested (unclamped) content offset, and the viewport's main-axis
+/// length as known from the scroll layout's own proposal. Lazy containers
+/// use it to bound realization/measurement to the visible band plus
+/// overscan; the offset is unclamped by design (clamping needs the content
+/// size, which is what measurement is computing) — the window math clamps
+/// to the content range itself.
+package struct MeasureViewportHint: Equatable, Sendable {
+  package var axes: AxisSet
+  package var contentOffset: CellPoint
+  package var viewportSize: CellSize
+
+  package init(
+    axes: AxisSet,
+    contentOffset: CellPoint,
+    viewportSize: CellSize
+  ) {
+    self.axes = axes
+    self.contentOffset = contentOffset
+    self.viewportSize = viewportSize
+  }
+}
+
 package final class LayoutPassContext: Sendable {
   private struct MutableState: Sendable {
     var scrollViewportContext: ScrollViewportContext?
+    var measureViewportHints: [MeasureViewportHint]
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
@@ -57,6 +83,7 @@ package final class LayoutPassContext: Sendable {
     state = .init(
       .init(
         scrollViewportContext: scrollViewportContext,
+        measureViewportHints: [],
         workMetrics: .init(),
         workerCustomLayoutCacheUpdates: [],
         layoutDependentRealizations: [],
@@ -70,6 +97,44 @@ package final class LayoutPassContext: Sendable {
 
   package var scrollViewportContext: ScrollViewportContext? {
     state.withLock { $0.scrollViewportContext }
+  }
+
+  /// The innermost measure-viewport hint, or `nil` outside any scroll
+  /// layout's content measurement. Hints are scoped: a scroll layout pushes
+  /// before measuring its content and pops after, so a nested scroll's hint
+  /// shadows the outer one for exactly the inner content's measurement. A
+  /// layout pass is sequential (one work stack, one thread at a time — the
+  /// frame tail may run on a worker, but never concurrently with another
+  /// pass on the same context), which is what makes a scoped stack sound
+  /// here.
+  package var currentMeasureViewportHint: MeasureViewportHint? {
+    state.withLock { $0.measureViewportHints.last }
+  }
+
+  package func pushMeasureViewportHint(_ hint: MeasureViewportHint) {
+    state.withLock { $0.measureViewportHints.append(hint) }
+  }
+
+  package func popMeasureViewportHint() {
+    state.withLock {
+      precondition(
+        !$0.measureViewportHints.isEmpty,
+        "measure viewport hint stack underflow"
+      )
+      $0.measureViewportHints.removeLast()
+    }
+  }
+
+  package func withMeasureViewportHint<Result>(
+    _ hint: MeasureViewportHint?,
+    _ body: () -> Result
+  ) -> Result {
+    guard let hint else {
+      return body()
+    }
+    pushMeasureViewportHint(hint)
+    defer { popMeasureViewportHint() }
+    return body()
   }
 
   package var workMetrics: LayoutWorkMetrics {

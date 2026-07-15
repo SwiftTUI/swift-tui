@@ -10,7 +10,8 @@ extension LayoutEngine {
     for resolved: ResolvedNode,
     proposal: ProposedSize,
     retainedLayout: RetainedLayoutSession?,
-    hasInvalidatedIndexedDescendant: Bool
+    hasInvalidatedIndexedDescendant: Bool,
+    currentMeasureViewportHint: MeasureViewportHint? = nil
   ) -> MeasuredNode? {
     guard let retainedLayout,
       !hasInvalidatedIndexedDescendant,
@@ -24,6 +25,27 @@ extension LayoutEngine {
       previousResolved.isEquivalentForMeasurement(to: resolved)
     else {
       return nil
+    }
+
+    // A windowed lazy product (Stage 2.2) is valid only for its window: the
+    // scroll layout's measurement-reuse signature is deliberately
+    // position-free, so an offset change alone would otherwise reuse the
+    // stale window. Recompute the window the current hint would produce and
+    // deny reuse on any mismatch (including a missing hint).
+    if let lazySnapshot = previousMeasured.containerAllocationSnapshot?.lazyStack,
+      let storedWindow = lazySnapshot.measuredWindow
+    {
+      guard let currentMeasureViewportHint,
+        let rowStride = lazySnapshot.estimatedRowStride,
+        lazyStackEstimatedVisibleWindow(
+          hint: currentMeasureViewportHint,
+          axis: lazySnapshot.axis,
+          count: lazySnapshot.childMainOffsets.count,
+          rowStride: rowStride
+        ) == storedWindow
+      else {
+        return nil
+      }
     }
 
     return previousMeasured

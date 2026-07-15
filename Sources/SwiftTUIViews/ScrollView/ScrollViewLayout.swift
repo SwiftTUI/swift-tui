@@ -141,7 +141,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
 
     for _ in 0..<3 {
       childSize = subview.sizeThatFits(
-        contentProposal(for: proposal, indicatorInsets: indicatorInsets)
+        contentProposal(for: proposal, indicatorInsets: indicatorInsets),
+        measureViewport: measureViewportHint(for: proposal, indicatorInsets: indicatorInsets)
       )
       let nextInsets = requiredIndicatorInsets(
         for: childSize,
@@ -155,9 +156,39 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     }
 
     childSize = subview.sizeThatFits(
-      contentProposal(for: proposal, indicatorInsets: indicatorInsets)
+      contentProposal(for: proposal, indicatorInsets: indicatorInsets),
+      measureViewport: measureViewportHint(for: proposal, indicatorInsets: indicatorInsets)
     )
     return (childSize, indicatorInsets)
+  }
+
+  /// The measure-time viewport this scroll layout declares for its content
+  /// (Stage 2.2): the requested offset is passed unclamped (clamping needs
+  /// the content size, which is what the measurement computes — the window
+  /// math clamps to the content range itself), and a dimension the proposal
+  /// leaves unbounded is 0, meaning "unknown — do not window this axis".
+  private func measureViewportHint(
+    for proposal: ProposedViewSize,
+    indicatorInsets: IndicatorInsets
+  ) -> MeasureViewportHint? {
+    let width: Int =
+      switch proposal.width {
+      case .finite(let value): max(0, value - indicatorInsets.trailing)
+      case .unspecified, .infinity: 0
+      }
+    let height: Int =
+      switch proposal.height {
+      case .finite(let value): max(0, value - indicatorInsets.bottom)
+      case .unspecified, .infinity: 0
+      }
+    guard width > 0 || height > 0 else {
+      return nil
+    }
+    return MeasureViewportHint(
+      axes: axes,
+      contentOffset: .init(x: max(0, position.x), y: max(0, position.y)),
+      viewportSize: .init(width: width, height: height)
+    )
   }
 
   private func requiredIndicatorInsets(
@@ -254,6 +285,14 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
       return 0
     }
     return min(max(0, requested), max(0, content - viewport))
+  }
+}
+
+extension ScrollViewLayout: MeasureViewportDeclaringLayout {
+  /// Indicator insets are unknown before the content measures; declaring the
+  /// uninset viewport makes the estimated window at most one row generous.
+  func declaredMeasureViewport(for proposal: ProposedViewSize) -> MeasureViewportHint? {
+    measureViewportHint(for: proposal, indicatorInsets: .init())
   }
 }
 

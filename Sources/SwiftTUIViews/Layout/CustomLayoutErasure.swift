@@ -173,9 +173,22 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
-    node.children.map { child in
-      engine.measure(child, proposal: proposal, passContext: passContext)
+    // A viewport-declaring layout (a scroll) scopes its declared measure
+    // viewport over this pre-measure of its children, so lazy containers in
+    // the content window instead of realizing every element (Stage 2.2) —
+    // this entry bypasses the layout's own `sizeThatFits`, which is where
+    // the scroll otherwise declares the hint per subview measurement.
+    let hint = (layout as? any MeasureViewportDeclaringLayout)?
+      .declaredMeasureViewport(for: proposal)
+    let measureAll = {
+      node.children.map { child in
+        engine.measure(child, proposal: proposal, passContext: passContext)
+      }
     }
+    guard let passContext, let hint else {
+      return measureAll()
+    }
+    return passContext.withMeasureViewportHint(hint, measureAll)
   }
 
   func placeSubviews(
@@ -263,11 +276,34 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       let placement =
         placementRecorder.placement(for: child.identity)
         ?? defaultPlacement(in: bounds, proposal: measured.proposal)
-      let childMeasurement = engine.measure(
-        child,
-        proposal: placement.proposal,
-        passContext: passContext
-      )
+      // A placement that carries a viewport context (a scroll layout placing
+      // its content) re-declares it as a measure-viewport hint for this
+      // placement-time re-measure, so windowed lazy containers in the
+      // subtree stay windowed here too (Stage 2.2) — the sizeThatFits-side
+      // hint is out of scope by now.
+      let placementMeasureHint = placement.viewportContext.map { context in
+        MeasureViewportHint(
+          axes: context.axes,
+          contentOffset: context.contentOffset,
+          viewportSize: context.viewportRect.size
+        )
+      }
+      let childMeasurement: MeasuredNode
+      if let passContext, let placementMeasureHint {
+        childMeasurement = passContext.withMeasureViewportHint(placementMeasureHint) {
+          engine.measure(
+            child,
+            proposal: placement.proposal,
+            passContext: passContext
+          )
+        }
+      } else {
+        childMeasurement = engine.measure(
+          child,
+          proposal: placement.proposal,
+          passContext: passContext
+        )
+      }
       return engine.place(
         child,
         measured: childMeasurement,

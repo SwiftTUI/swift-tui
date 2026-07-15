@@ -87,53 +87,81 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    if resolved.indexedChildSource != nil,
+    if let source = resolved.indexedChildSource,
       let allocation = measured.containerAllocationSnapshot,
-      allocation.lazyStack != nil,
-      allocation.childSizes.count != stackChildren(for: resolved).count
+      let snapshot = allocation.lazyStack
     {
+      if snapshot.measuredWindow != nil, allocation.childSizes.count == source.count {
+        // Windowed product (Stage 2.2): 1 cell per element by construction
+        // (splices fall back to exhaustive at measure), so the source count
+        // IS the flattened count and rows realize on demand strictly within
+        // the visible range — realizing every element here was exactly the
+        // cost windowed measurement removes.
+        let visibleRange =
+          viewportContext.flatMap {
+            lazyStackVisibleChildRange(
+              for: snapshot,
+              in: bounds,
+              viewportContext: $0,
+              overscan: 0
+            )
+          } ?? (0..<source.count)
+
+        return indexedLazyStackPlacementRequests(
+          childAt: { index in
+            let elements = source.childElements(at: index)
+            return elements.count == 1 ? elements[0] : nil
+          },
+          childSizes: allocation.childSizes,
+          measured: measured,
+          in: bounds,
+          axis: axis,
+          horizontalAlignment: horizontalAlignment,
+          verticalAlignment: verticalAlignment,
+          snapshot: snapshot,
+          visibleRange: visibleRange,
+          passContext: passContext
+        )
+      }
+
+      // Exhaustive product: a multi-view element contributes one cell per
+      // spliced child, so the allocation arrays index the flattened list —
+      // verify against the realized flattened count exactly as before.
+      let flattenedChildren = stackChildren(for: resolved)
+      if snapshot.measuredWindow == nil, allocation.childSizes.count == flattenedChildren.count {
+        let visibleRange =
+          viewportContext.flatMap {
+            lazyStackVisibleChildRange(
+              for: snapshot,
+              in: bounds,
+              viewportContext: $0,
+              overscan: 0
+            )
+          } ?? (0..<flattenedChildren.count)
+
+        return indexedLazyStackPlacementRequests(
+          childAt: { flattenedChildren[$0] },
+          childSizes: allocation.childSizes,
+          measured: measured,
+          in: bounds,
+          axis: axis,
+          horizontalAlignment: horizontalAlignment,
+          verticalAlignment: verticalAlignment,
+          snapshot: snapshot,
+          visibleRange: visibleRange,
+          passContext: passContext
+        )
+      }
+
       // The allocation snapshot indexes a different flattened child count
-      // than this resolve produced — the indexed-lazy fast path below would
-      // place against the wrong rows. Record it; the non-indexed fallback
-      // at the bottom still places every realized child (never an empty
-      // placement).
+      // than this resolve produced — the indexed-lazy fast path would place
+      // against the wrong rows. Record it; the non-indexed fallback at the
+      // bottom still places every realized child (never an empty placement).
       passContext?.recordPlacementChildMismatch(
         identity: resolved.identity,
         behavior: "indexedLazyStack",
-        childCount: stackChildren(for: resolved).count,
+        childCount: snapshot.measuredWindow != nil ? source.count : flattenedChildren.count,
         measurementCount: allocation.childSizes.count
-      )
-    }
-    if resolved.indexedChildSource != nil,
-      let allocation = measured.containerAllocationSnapshot,
-      let snapshot = allocation.lazyStack,
-      // Flattened cells: a multi-view element contributes one cell per
-      // spliced child, so the allocation arrays index the flattened list,
-      // not the element list.
-      case let flattenedChildren = stackChildren(for: resolved),
-      allocation.childSizes.count == flattenedChildren.count
-    {
-      let visibleRange =
-        viewportContext.flatMap {
-          lazyStackVisibleChildRange(
-            for: snapshot,
-            in: bounds,
-            viewportContext: $0,
-            overscan: 0
-          )
-        } ?? (0..<flattenedChildren.count)
-
-      return indexedLazyStackPlacementRequests(
-        children: flattenedChildren,
-        childSizes: allocation.childSizes,
-        measured: measured,
-        in: bounds,
-        axis: axis,
-        horizontalAlignment: horizontalAlignment,
-        verticalAlignment: verticalAlignment,
-        snapshot: snapshot,
-        visibleRange: visibleRange,
-        passContext: passContext
       )
     }
 
@@ -208,7 +236,7 @@ extension LayoutEngine {
   }
 
   private func indexedLazyStackPlacementRequests(
-    children: [ResolvedNode],
+    childAt: (Int) -> ResolvedNode?,
     childSizes: [ChildAllocation],
     measured: MeasuredNode,
     in bounds: CellRect,
@@ -219,8 +247,14 @@ extension LayoutEngine {
     visibleRange: Range<Int>,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    visibleRange.map { index in
-      let child = children[index]
+    visibleRange.compactMap { index in
+      // A nil child means an on-demand realization spliced (windowed
+      // products pin 1 cell per element at measure time, so this is a
+      // mid-frame source drift that cannot normally happen) — tolerate by
+      // not placing the row rather than misaligning every later index.
+      guard let child = childAt(index) else {
+        return nil
+      }
       let childSize = childSizes[index].size
       var childMeasurement = measure(
         child,

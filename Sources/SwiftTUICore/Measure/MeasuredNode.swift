@@ -40,6 +40,16 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   package var contentMainLength: Int
   package var crossLeading: Int
   package var crossTrailing: Int
+  /// The realized-and-measured index band when this snapshot was built under
+  /// a measure-viewport hint (proposal 2026-07-13-002 Stage 2.2); `nil`
+  /// means exhaustive — every entry is a real measurement. Entries outside
+  /// the window are synthesized from the probe row's extent, so a windowed
+  /// product is only valid for its window: the retained-measurement gate
+  /// recomputes the current window and denies reuse on mismatch.
+  package var measuredWindow: Range<Int>?
+  /// The per-row main-axis stride (probe extent + spacing) the estimated
+  /// entries were synthesized with; feeds the retained-gate recompute.
+  package var estimatedRowStride: Int?
 
   package init(
     axis: Axis,
@@ -48,7 +58,9 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     childIdentities: [Identity] = [],
     contentMainLength: Int = 0,
     crossLeading: Int = 0,
-    crossTrailing: Int = 0
+    crossTrailing: Int = 0,
+    measuredWindow: Range<Int>? = nil,
+    estimatedRowStride: Int? = nil
   ) {
     self.axis = axis
     self.childMainOffsets = childMainOffsets
@@ -57,6 +69,8 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     self.contentMainLength = contentMainLength
     self.crossLeading = crossLeading
     self.crossTrailing = crossTrailing
+    self.measuredWindow = measuredWindow
+    self.estimatedRowStride = estimatedRowStride
   }
 }
 

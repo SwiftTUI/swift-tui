@@ -329,7 +329,8 @@ extension LayoutEngine {
       for: node,
       proposal: proposal,
       retainedLayout: passContext?.retainedLayout,
-      hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
+      hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant,
+      currentMeasureViewportHint: passContext?.currentMeasureViewportHint
     ) {
       localMetrics.measuredNodesReused += retained.subtreeNodeCount
       results.append(retained)
@@ -380,6 +381,21 @@ extension LayoutEngine {
       )
     case .stack(let axis, let spacing, horizontalAlignment: _, verticalAlignment: _),
       .lazyStack(let axis, let spacing, horizontalAlignment: _, verticalAlignment: _):
+      // Windowed lazy measurement (Stage 2.2): under a scroll-declared
+      // measure viewport, an eligible indexed-source lazy stack realizes and
+      // measures only the visible band — the exhaustive scheduling below
+      // realizes EVERY element. Ineligible shapes fall through unchanged.
+      if case .lazyStack = node.layoutBehavior,
+        let windowed = windowedLazyStackMeasurement(
+          for: node,
+          originalProposal: proposal,
+          effectiveProposal: effectiveProposal,
+          passContext: passContext
+        )
+      {
+        results.append(windowed)
+        return
+      }
       let children = stackChildren(for: node)
       let idealProposal = stackProposal(
         axis: axis,

@@ -70,6 +70,27 @@ public struct LayoutSubview {
     ).measuredSize
   }
 
+  /// Like ``sizeThatFits(_:)``, but declares the measure-time viewport the
+  /// calling scroll layout will show this content through, so lazy
+  /// containers in the subtree can bound realization and measurement to the
+  /// visible band (proposal 2026-07-13-002 Stage 2.2). The hint is scoped to
+  /// exactly this measurement.
+  package func sizeThatFits(
+    _ proposal: ProposedViewSize,
+    measureViewport hint: MeasureViewportHint?
+  ) -> LayoutSize {
+    guard let passContext, let hint else {
+      return sizeThatFits(proposal)
+    }
+    return passContext.withMeasureViewportHint(hint) {
+      engine.measure(
+        child,
+        proposal: proposal,
+        passContext: passContext
+      ).measuredSize
+    }
+  }
+
   /// Returns layout dimensions for the child under `proposal`.
   public func dimensions(in proposal: ProposedViewSize) -> ViewDimensions {
     engine.dimensions(
@@ -109,6 +130,15 @@ public struct LayoutSubview {
       )
     )
   }
+}
+
+/// A layout that declares the measure-time viewport it shows its content
+/// through (a scroll layout), so lazy containers below it can window
+/// realization and measurement (proposal 2026-07-13-002 Stage 2.2). The
+/// custom-layout machinery consults this at engine measure entries that
+/// bypass the layout's own `sizeThatFits` (the child pre-measure).
+protocol MeasureViewportDeclaringLayout {
+  func declaredMeasureViewport(for proposal: ProposedViewSize) -> MeasureViewportHint?
 }
 
 /// Convenience alias used by custom layout implementations.

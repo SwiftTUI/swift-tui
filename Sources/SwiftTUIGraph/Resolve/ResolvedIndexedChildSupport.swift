@@ -89,6 +89,18 @@ package protocol IndexedChildSource: Sendable {
   /// the eager path's group-splice arm. Elements that realize to a single
   /// view contribute themselves (the default).
   func childElements(at index: Int) -> [ResolvedNode]
+
+  /// The element's identity WITHOUT realizing it, when the source can
+  /// derive one (proposal 2026-07-13-002 Stage 2.2: windowed measurement
+  /// synthesizes allocation entries for rows never materialized this frame,
+  /// and those entries need identities for scroll-target estimation). The
+  /// default realizes — exactly the old behavior; only estimation paths
+  /// call this for out-of-window indices, and only on sources that override
+  /// it realization-free. Content that re-identifies itself (an interior
+  /// `.id(_:)`) can make the derived identity diverge from the realized
+  /// node's — benign for the scroll-estimate consumer, which treats these
+  /// as best-effort targets.
+  func elementIdentity(at index: Int) -> Identity
 }
 
 extension IndexedChildSource {
@@ -97,6 +109,10 @@ extension IndexedChildSource {
 
   package func childElements(at index: Int) -> [ResolvedNode] {
     [child(at: index)]
+  }
+
+  package func elementIdentity(at index: Int) -> Identity {
+    child(at: index).identity
   }
 }
 

@@ -194,7 +194,15 @@ extension LayoutEngine {
         continue
       }
 
-      let stackChildren = stackChildren(for: frame.node)
+      // The pairs below zip against the stored child measurements, so when a
+      // node stores none (lazy stacks deliberately store no child
+      // measurements) realizing its indexed source here is pure waste — the
+      // zip discards every element. At scale that realization was a full
+      // resolveView per row on every enclosing stack's allocation plan.
+      let stackChildren =
+        frame.idealMeasurement.childMeasurements.isEmpty
+        ? []
+        : stackChildren(for: frame.node)
       let childPairs = Array(zip(stackChildren, frame.idealMeasurement.childMeasurements))
 
       if !frame.visited {
