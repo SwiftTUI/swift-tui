@@ -1862,6 +1862,102 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.semanticSnapshot.selectionRoutes.isEmpty)
   }
 
+  @Test("allowsHitTesting is pointer-only and suppresses descendant hit regions")
+  func allowsHitTestingIsPointerOnlyAndSubtreeScoped() {
+    let buttonIdentity = testIdentity("HitTestingSubtree", "Button")
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Nested button") {}
+          .id(buttonIdentity)
+      }
+      .allowsHitTesting(false),
+      context: .init(identity: testIdentity("HitTestingSubtree", "Root"))
+    )
+
+    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [buttonIdentity])
+    #expect(
+      !artifacts.semanticSnapshot.interactionRegions.contains { $0.identity == buttonIdentity })
+
+    let directIdentity = testIdentity("HitTestingSubtree", "Direct")
+    let directArtifacts = DefaultRenderer().render(
+      Text("Direct focus target")
+        .id(directIdentity)
+        .focusable()
+        .allowsHitTesting(false),
+      context: .init(identity: testIdentity("HitTestingSubtree", "DirectRoot"))
+    )
+
+    #expect(directArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [directIdentity])
+    #expect(
+      !directArtifacts.semanticSnapshot.interactionRegions.contains {
+        $0.identity == directIdentity
+      })
+  }
+
+  @Test("allowsHitTesting suppresses payload and indicator hits without suppressing focus")
+  func allowsHitTestingSeparatesPayloadAndIndicatorFocusFromPointerHits() {
+    let linkedTextIdentity = testIdentity("HitTestingPayload", "LinkedText")
+    let inlineLinkIdentity = inlineLinkIdentity(
+      parent: linkedTextIdentity,
+      identifier: "InlineLink[0]"
+    )
+    let linkArtifacts = DefaultRenderer().render(
+      Text("Open \(Link("Docs", destination: "https://example.com"))")
+        .id(linkedTextIdentity)
+        .allowsHitTesting(false),
+      context: .init(identity: testIdentity("HitTestingPayload", "LinkRoot"))
+    )
+
+    let listIdentity = testIdentity("HitTestingPayload", "List")
+    let listRowIdentities = [0, 1].map {
+      listRowIdentity(for: listIdentity, rowIndex: $0)
+    }
+    let listArtifacts = DefaultRenderer().render(
+      List(selection: .constant(nil as Int?)) {
+        Text("Zero").tag(0)
+        Text("One").tag(1)
+      }
+      .id(listIdentity)
+      .allowsHitTesting(false),
+      context: .init(identity: testIdentity("HitTestingPayload", "ListRoot"))
+    )
+
+    let scrollIdentity = testIdentity("HitTestingPayload", "Scroll")
+    let indicatorIdentity = verticalScrollIndicatorIdentity(for: scrollIdentity)
+    let scrollArtifacts = DefaultRenderer().render(
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Row 2")
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 6, height: 2, alignment: .topLeading)
+      .allowsHitTesting(false),
+      context: .init(identity: testIdentity("HitTestingPayload", "ScrollRoot"))
+    )
+
+    #expect(linkArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [inlineLinkIdentity])
+    #expect(
+      !linkArtifacts.semanticSnapshot.interactionRegions.contains {
+        $0.identity == inlineLinkIdentity
+      })
+    #expect(listArtifacts.semanticSnapshot.focusRegions.map(\.identity) == listRowIdentities)
+    #expect(
+      listArtifacts.semanticSnapshot.interactionRegions.allSatisfy {
+        !listRowIdentities.contains($0.identity)
+      })
+    #expect(
+      scrollArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [
+        scrollIdentity, indicatorIdentity,
+      ])
+    #expect(
+      scrollArtifacts.semanticSnapshot.interactionRegions.allSatisfy {
+        $0.identity != scrollIdentity && $0.identity != indicatorIdentity
+      })
+  }
+
   @Test("style environment snapshot derives control chrome for idle, focused, and disabled states")
   func styleEnvironmentSnapshotDerivesControlChromeStates() {
     let appearance = TerminalAppearance(

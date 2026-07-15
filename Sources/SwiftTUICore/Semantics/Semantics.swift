@@ -50,12 +50,15 @@ package struct SemanticExtractor: Sendable {
         let clipRect = context.clipRect
         let sealingParentOnChain = context.sealingParentOnChain
         let interactionsDisabledOnChain = context.interactionsDisabledOnChain
+        let hitTestingDisabledOnChain = context.hitTestingDisabledOnChain
         let isEnabled = node.environmentSnapshot.style.isEnabled
         let interactionsEnabled =
           isEnabled
           && !interactionsDisabledOnChain
           && node.semanticMetadata.interactionAvailability.isEnabled
-        let hitsAllowed = node.semanticMetadata.allowsHitTesting
+        let allowsPointerHitTesting =
+          !hitTestingDisabledOnChain
+          && node.semanticMetadata.allowsHitTesting
         let routeID = primaryRouteID(
           for: node.semanticMetadata.explicitRouteIdentity ?? node.identity,
           ownerNodeID: node.viewNodeID
@@ -77,7 +80,7 @@ package struct SemanticExtractor: Sendable {
           commandHostScopePaths.append(scopePath)
         }
 
-        if participatesInTopLevelFocus, interactionsEnabled, hitsAllowed, !sealingParentOnChain {
+        if participatesInTopLevelFocus, interactionsEnabled, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,
@@ -91,7 +94,7 @@ package struct SemanticExtractor: Sendable {
         }
 
         if interactionsEnabled
-          && hitsAllowed
+          && allowsPointerHitTesting
           && (participatesInTopLevelFocus
             || node.semanticMetadata.participatesInPointerHitTesting)
         {
@@ -124,6 +127,7 @@ package struct SemanticExtractor: Sendable {
             modalFocusScopePath: modalFocusScopePath,
             clippedTo: clipRect,
             sealingParentOnChain: sealingParentOnChain,
+            allowsPointerHitTesting: allowsPointerHitTesting,
             interactionRegions: &interactionRegions,
             focusRegions: &focusRegions,
             nextHitTestOrder: &nextHitTestOrder
@@ -152,6 +156,9 @@ package struct SemanticExtractor: Sendable {
         let clipRect = context.clipRect
         let sealingParentOnChain = context.sealingParentOnChain
         let interactionsDisabledOnChain = context.interactionsDisabledOnChain
+        let allowsPointerHitTesting =
+          !context.hitTestingDisabledOnChain
+          && node.semanticMetadata.allowsHitTesting
         guard node.environmentSnapshot.style.isEnabled else {
           return
         }
@@ -166,6 +173,7 @@ package struct SemanticExtractor: Sendable {
             sectionIdentity: sectionIdentity,
             modalFocusScopePath: modalFocusScopePath,
             clippedTo: clipRect,
+            allowsPointerHitTesting: allowsPointerHitTesting,
             interactionRegions: &interactionRegions,
             focusRegions: &focusRegions,
             nextHitTestOrder: &nextHitTestOrder
@@ -250,6 +258,10 @@ extension SemanticExtractor {
     /// itself is emitted normally.
     let sealingParentOnChain: Bool
     let interactionsDisabledOnChain: Bool
+    /// `true` when an ancestor has disabled pointer hit testing. Unlike
+    /// `interactionsDisabledOnChain`, this suppresses only pointer regions;
+    /// keyboard focus and key-driven interaction remain available.
+    let hitTestingDisabledOnChain: Bool
     /// The walk-parent identities recorded at each identity re-root boundary
     /// (`.id(_:)` entity hosts, portal-hosted content) above this node,
     /// outermost first. Identity-prefix containment checks cannot cross a
@@ -287,7 +299,8 @@ extension SemanticExtractor {
           modalFocusScopePath: nil,
           clipRect: clipRect,
           sealingParentOnChain: false,
-          interactionsDisabledOnChain: false
+          interactionsDisabledOnChain: false,
+          hitTestingDisabledOnChain: false
         ),
         phase: .enter
       )
@@ -326,6 +339,7 @@ extension SemanticExtractor {
           clipRect: nodeClipRect,
           sealingParentOnChain: frame.context.sealingParentOnChain,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain,
+          hitTestingDisabledOnChain: frame.context.hitTestingDisabledOnChain,
           structuralHostChain: frame.context.structuralHostChain
         )
         let nodeHitTestOrder = hitTestOrder
@@ -355,6 +369,8 @@ extension SemanticExtractor {
             || frame.node.semanticMetadata.sealsFocusDescendants,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
             || !frame.node.semanticMetadata.interactionAvailability.isEnabled,
+          hitTestingDisabledOnChain: frame.context.hitTestingDisabledOnChain
+            || !frame.node.semanticMetadata.allowsHitTesting,
           structuralHostChain: frame.context.structuralHostChain
         )
         for child in frame.node.children.reversed() {

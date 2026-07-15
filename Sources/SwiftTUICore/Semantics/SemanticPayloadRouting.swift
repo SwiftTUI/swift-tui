@@ -8,6 +8,7 @@ extension SemanticExtractor {
     modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
+    allowsPointerHitTesting: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -24,6 +25,7 @@ extension SemanticExtractor {
         modalFocusScopePath: modalFocusScopePath,
         clippedTo: clipRect,
         sealingParentOnChain: sealingParentOnChain,
+        allowsPointerHitTesting: allowsPointerHitTesting,
         interactionRegions: &interactionRegions,
         focusRegions: &focusRegions,
         nextHitTestOrder: &nextHitTestOrder
@@ -37,6 +39,7 @@ extension SemanticExtractor {
         modalFocusScopePath: modalFocusScopePath,
         clippedTo: clipRect,
         sealingParentOnChain: sealingParentOnChain,
+        allowsPointerHitTesting: allowsPointerHitTesting,
         interactionRegions: &interactionRegions,
         focusRegions: &focusRegions,
         nextHitTestOrder: &nextHitTestOrder
@@ -46,6 +49,7 @@ extension SemanticExtractor {
         for: node,
         payload: payload,
         clippedTo: clipRect,
+        allowsPointerHitTesting: allowsPointerHitTesting,
         interactionRegions: &interactionRegions,
         nextHitTestOrder: &nextHitTestOrder
       )
@@ -60,6 +64,7 @@ extension SemanticExtractor {
     sectionIdentity: Identity?,
     modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
+    allowsPointerHitTesting: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -89,16 +94,18 @@ extension SemanticExtractor {
         identity = horizontalScrollIndicatorIdentity(for: node.identity)
       }
 
-      interactionRegions.append(
-        InteractionRegion(
-          identity: identity,
-          rect: clippedRect,
-          routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
-          hitTestOrder: nextHitTestOrder,
-          captureOnPress: true
+      if allowsPointerHitTesting {
+        interactionRegions.append(
+          InteractionRegion(
+            identity: identity,
+            rect: clippedRect,
+            routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
+            hitTestOrder: nextHitTestOrder,
+            captureOnPress: true
+          )
         )
-      )
-      nextHitTestOrder += 1
+        nextHitTestOrder += 1
+      }
       focusRegions.append(
         FocusRegion(
           identity: identity,
@@ -120,6 +127,7 @@ extension SemanticExtractor {
     modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
+    allowsPointerHitTesting: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -152,16 +160,18 @@ extension SemanticExtractor {
         for: node.identity,
         rowIndex: rowIndex
       )
-      interactionRegions.append(
-        InteractionRegion(
-          identity: identity,
-          rect: clippedRect,
-          routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
-          hitTestOrder: nextHitTestOrder,
-          captureOnPress: node.semanticMetadata.captureOnPress
+      if allowsPointerHitTesting {
+        interactionRegions.append(
+          InteractionRegion(
+            identity: identity,
+            rect: clippedRect,
+            routeID: primaryRouteID(for: identity, ownerNodeID: node.viewNodeID),
+            hitTestOrder: nextHitTestOrder,
+            captureOnPress: node.semanticMetadata.captureOnPress
+          )
         )
-      )
-      nextHitTestOrder += 1
+        nextHitTestOrder += 1
+      }
       if !sealingParentOnChain {
         focusRegions.append(
           FocusRegion(
@@ -181,9 +191,13 @@ extension SemanticExtractor {
     for node: PlacedNode,
     payload: TablePayload,
     clippedTo clipRect: CellRect?,
+    allowsPointerHitTesting: Bool,
     interactionRegions: inout [InteractionRegion],
     nextHitTestOrder: inout Int
   ) {
+    guard allowsPointerHitTesting else {
+      return
+    }
     let layout = DrawExtractor().visibleTableLayout(
       for: payload,
       in: node.bounds
@@ -236,6 +250,7 @@ extension SemanticExtractor {
     modalFocusScopePath: [Identity]?,
     clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
+    allowsPointerHitTesting: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -281,16 +296,18 @@ extension SemanticExtractor {
           return
         }
 
-        interactionRegions.append(
-          InteractionRegion(
-            identity: fragmentIdentity,
-            rect: clippedRect,
-            routeID: primaryRouteID(for: fragmentIdentity, ownerNodeID: node.viewNodeID),
-            hitTestOrder: nextHitTestOrder,
-            captureOnPress: node.semanticMetadata.captureOnPress
+        if allowsPointerHitTesting {
+          interactionRegions.append(
+            InteractionRegion(
+              identity: fragmentIdentity,
+              rect: clippedRect,
+              routeID: primaryRouteID(for: fragmentIdentity, ownerNodeID: node.viewNodeID),
+              hitTestOrder: nextHitTestOrder,
+              captureOnPress: node.semanticMetadata.captureOnPress
+            )
           )
-        )
-        nextHitTestOrder += 1
+          nextHitTestOrder += 1
+        }
 
         // Focus regions from descendants are suppressed when an ancestor seals
         // focus. Pointer hit-testing stays active because sealing is a keyboard

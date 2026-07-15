@@ -1316,10 +1316,10 @@ private struct StressAF023Fixture: View {
 // MARK: - Attempt 024: hit-testing gate semantic synchronization
 
 extension FrameworkStressAccessibilityFocusTests {
-  @Test("stress accessibility focus 024 hit testing churn synchronizes focus and interaction")
-  func stress024HitTestingChurnSynchronizesFocusAndInteraction() throws {
-    // Hypothesis: focus and pointer semantic products can diverge under retained extraction when
-    // allowsHitTesting repeatedly gates a stable target without changing its visible payload.
+  @Test("stress accessibility focus 024 hit testing churn preserves keyboard focus")
+  func stress024HitTestingChurnPreservesKeyboardFocus() throws {
+    // Hit-testing churn must update only pointer semantics under retained extraction; keyboard
+    // focus remains available while the stable target's visible payload is unchanged.
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressAF024", "Root"),
       size: .init(width: 50, height: 7)
@@ -1330,16 +1330,20 @@ extension FrameworkStressAccessibilityFocusTests {
 
     for generation in 1...12 {
       _ = try harness.clickText("Toggle target hit testing")
-      let expected = generation.isMultiple(of: 2)
+      let pointerHitTestingExpected = generation.isMultiple(of: 2)
       let snapshot = harness.runLoop.latestSemanticSnapshot
       #expect(
         snapshot.focusRegions.contains { $0.identity == StressAF024Fixture.targetIdentity }
-          == expected)
+      )
       #expect(
         snapshot.interactionRegions.contains { $0.identity == StressAF024Fixture.targetIdentity }
-          == expected)
+          == pointerHitTestingExpected)
     }
 
+    #expect(
+      harness.runLoop.latestSemanticSnapshot.focusRegions.filter {
+        $0.identity == StressAF024Fixture.targetIdentity
+      }.count == 1)
     #expect(
       harness.runLoop.latestSemanticSnapshot.interactionRegions.filter {
         $0.identity == StressAF024Fixture.targetIdentity
