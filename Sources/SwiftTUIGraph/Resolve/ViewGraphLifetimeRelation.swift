@@ -1,5 +1,4 @@
-// Shadow writers for Proposal -003's unified lifetime relation. Legacy
-// ledgers remain authoritative until the Stage-5 consumer cutover.
+// Producers and context construction for the unified lifetime relation.
 
 extension ViewGraph {
   func lifetimeReachabilityContext(
@@ -16,14 +15,14 @@ extension ViewGraph {
       else {
         continue
       }
-      let facts = LegacyEntityHomeKeepFacts(
+      let facts = EntityHomeLifetimeFacts(
         entityIsActive: true,
         routeOwnsNode: true,
         occurrence: entity.occurrence,
         resolvedIdentityIndexOwnsNode:
           nodeIDByIdentity[node.resolvedIdentity] == nodeID
       )
-      if legacyEntityHomeKeepsNode(facts) {
+      if entityHomeQualifiesForLifetime(facts) {
         qualifiedHomes[entity] = nodeID
       }
     }
@@ -57,26 +56,6 @@ extension ViewGraph {
     )
   }
 
-  func replaceEvaluationHostAnchor(for node: ViewNode) {
-    guard nodeIfExists(for: node.viewNodeID) === node else {
-      lifetimeAnchors.removeNode(node.viewNodeID)
-      return
-    }
-    let anchors: Set<LifetimeAnchor> =
-      if let host = node.evaluationHost,
-        nodeIfExists(for: host.viewNodeID) === host
-      {
-        [.evaluationHost(host.viewNodeID)]
-      } else {
-        []
-      }
-    lifetimeAnchors.replaceAnchors(
-      ofKind: .evaluationHost,
-      for: node.viewNodeID,
-      with: anchors
-    )
-  }
-
   /// Projects nearest-distinct stamped committed-value edges in one linear
   /// walk of the accepted tree.
   func replaceCommittedValueAnchors(in acceptedRoot: ResolvedNode) {
@@ -99,7 +78,9 @@ extension ViewGraph {
           stampedNode.parent?.viewNodeID == nearestStampedAncestor
             || (crossedValueOnlyLayer
               && (stampedNode.evaluationHost != nil
-                || detachedHostedSubtreeHostByRoot[stampedNodeID] != nil))
+                || lifetimeAnchors.anchors(for: stampedNodeID).contains { anchor in
+                  anchor.kind == .hostedDetached
+                }))
         {
           targetsBySource[nearestStampedAncestor, default: []].insert(stampedNodeID)
         }
@@ -144,16 +125,6 @@ extension ViewGraph {
     for nodeID: ViewNodeID
   ) {
     teardownBarrierWork.enqueue(reason, for: nodeID)
-    switch reason {
-    case .resolveScopeScratch:
-      break
-    case .entityRoutedRemoval:
-      pendingEntityRoutedRemovalNodeIDs.insert(nodeID)
-    case .absorbedShadow:
-      absorbedShadowedNodeIDs.insert(nodeID)
-    case .departedNavigationSurface:
-      departedNavigationSurfaceContentNodeIDs.insert(nodeID)
-    }
   }
 
   func consumeTeardownWork(
@@ -167,8 +138,5 @@ extension ViewGraph {
 
   func discardTeardownWork(for nodeID: ViewNodeID) {
     teardownBarrierWork.removeNode(nodeID)
-    pendingEntityRoutedRemovalNodeIDs.remove(nodeID)
-    absorbedShadowedNodeIDs.remove(nodeID)
-    departedNavigationSurfaceContentNodeIDs.remove(nodeID)
   }
 }

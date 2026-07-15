@@ -21,13 +21,6 @@ extension ViewGraph {
     package var entityRoutingTable: EntityRoutingTable = .init()
     package var lifetimeAnchors: LifetimeAnchorIndex = .init()
     package var nextViewNodeIDRawValue: UInt64 = 0
-    // Subtrees a host resolves every frame but does not commit as children (a
-    // navigation stack's root while a destination is presented). They are
-    // reachable through neither committed values nor parent links, so their
-    // lifetime anchors to the declaring host: `removeSubtree` descends these
-    // edges when the host departs. See `recordDetachedHostedSubtree`.
-    package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>] = [:]
-    package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID] = [:]
     // Authored state-owner nodes whose identity index entry a single-child
     // flattening absorber claimed: `normalizeResolvedElements(count == 1)`
     // lets a wrapper commit a snapshot whose root identity is its only
@@ -44,31 +37,6 @@ extension ViewGraph {
     // owner's lifetime anchors to the absorber's hosted-detached edge) and
     // `liveStateOwnerNode`.
     package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
-    // Per-NavigationStack-host set of the CONTENT-subtree node IDs of the
-    // pushed-destination surfaces `resolveActiveDestinationChain` minted this
-    // frame — the out-of-band `NavigationDestinationSurface` payload roots (one
-    // per active `NavigationDestinationInstance`). Node IDs, not identities:
-    // the surface's own identity collapses onto the reused stack node under a
-    // `.id("owner-\(gen)")` fold (the identity index re-points to the live
-    // host), so an identity lookup at the barrier would land on the live host,
-    // whereas the payload content node stays distinct per generation. Keyed by
-    // the resolving host node's stable `ViewNodeID` so the previous-frame set
-    // survives the host's per-generation resolved-identity churn. A frame's
-    // active set is diffed against the previous frame's; a departed content
-    // node (its declaration root reminted the surface at a new identity — a
-    // leak the structural child diff never sees, since the content node is not
-    // a parented child) is queued in `departedNavigationSurfaceContentNodeIDs`.
-    // Entries drop when the host node leaves the graph. See
-    // `recordActiveNavigationSurfaces` / `tearDownDepartedNavigationSurfaces`.
-    package var activeNavigationSurfaceContentNodeIDsByHost: [ViewNodeID: Set<ViewNodeID>] = [:]
-    // Pushed-destination surface content nodes that departed a host's active
-    // set this frame, owed a dedicated teardown at the finalize barrier.
-    // Consumed (and cleared) by `tearDownDepartedNavigationSurfaces`, which
-    // `removeSubtree`s each departed content subtree — cascading its
-    // detached-hosted Button base/overlay. Checkpoint-covered so a discarded
-    // frame draft rolls the queue back with the rest of the prepared frame
-    // state.
-    package var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID> = []
     // Node IDs that recorded (or adopted) an effect-family registration
     // (lifecycle/task/preference observation) at least once while resident in
     // `nodesByNodeID`. A SUPERSET of the current effect owners: capture
@@ -112,13 +80,11 @@ extension ViewGraph {
     package var structuralAppearEvents: [LifecycleEvent] = []
     package var structuralTaskCancelEvents: [LifecycleEvent] = []
     package var structuralDisappearEvents: [LifecycleEvent] = []
-    package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID> = []
     // Nodes whose identity index entry was overwritten by another node's
     // re-rooted resolved identity this frame (a transparent chain collapse
     // absorbed their output). The finalize barrier reclaims the ones that end
     // the frame parentless and un-routed — nothing can reach them again. See
     // `pruneAbsorbedShadowedNodes`.
-    package var absorbedShadowedNodeIDs: Set<ViewNodeID> = []
     package var teardownBarrierWork: TeardownBarrierWork = .init()
     package var latestLifecycleEvents: [LifecycleEvent] = []
   }

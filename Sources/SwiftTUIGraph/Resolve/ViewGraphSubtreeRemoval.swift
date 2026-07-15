@@ -208,61 +208,40 @@ extension ViewGraph {
       }
     }
 
-    // Hosted detached subtrees: content this node resolved but did not commit
-    // as a child (see `recordDetachedHostedSubtree`) is reachable through
-    // neither the committed values above nor the parent links — its lifetime
-    // anchors here. Visited roots (still being resolved by a live replacement)
-    // and entity-routed re-homes are kept by the descent's standard guards.
-    if let hostedRootIDs = detachedHostedSubtreeRootsByHost.removeValue(forKey: node.viewNodeID) {
-      // Two phases so the ledger is never transiently one-sided: drop every
-      // hostByRoot mirror first (the host's rootsByHost entry is already
-      // gone), THEN recurse — the recursive removals re-validate the ledger
-      // (F97) and would false-positive on a mid-loop half-removed state.
-      for hostedRootID in hostedRootIDs.sorted() {
-        detachedHostedSubtreeHostByRoot.removeValue(forKey: hostedRootID)
-        lifetimeAnchors.remove(
-          anchor: .hostedDetached(node.viewNodeID),
-          for: hostedRootID
-        )
-      }
-      assertDetachedHostedLedgerInverse()
-      for hostedRootID in hostedRootIDs.sorted() {
-        guard let hostedRoot = nodeIfExists(for: hostedRootID) else {
-          continue
-        }
-        // Spare a visited hosted root only while something OUTSIDE this
-        // removal cascade still anchors it (a live parent or a live
-        // re-binding evaluation host): "visited this frame" alone is not
-        // liveness — a dismissing overlay entry resolves its content one
-        // last time in the frame that tears the whole entry down, and
-        // sparing on that visit strands the root with no anchor at all
-        // (unreachable until an eventual same-identity re-mint reuses it —
-        // the census leak the hosted ledger exists to prevent).
-        let anchorSurvivesRemoval =
-          lifetimeReachabilityContext().map { context in
-            lifetimeAnchors.hasAnchorOutside(
-              hostedRootID,
-              excluding: walk.relationCascadeNodeIDs,
-              context: context
-            )
-          } ?? false
-        removeSubtree(
-          rootedAt: hostedRoot,
-          sparingVisitedNodes: anchorSurvivesRemoval,
-          isSubtreeDescent: true,
-          walk: walk
-        )
-      }
-    }
-    if let hostID = detachedHostedSubtreeHostByRoot.removeValue(forKey: node.viewNodeID) {
-      detachedHostedSubtreeRootsByHost[hostID]?.remove(node.viewNodeID)
-      if detachedHostedSubtreeRootsByHost[hostID]?.isEmpty == true {
-        detachedHostedSubtreeRootsByHost.removeValue(forKey: hostID)
-      }
-      assertDetachedHostedLedgerInverse()
+    // A hosted-detached target's root lifetime ends with its declaring host.
+    // Remove the source edges before descending, then tear down the explicit
+    // target root even when a weak/non-structural fact would otherwise spare a
+    // visited node. Only descendants are spared when another durable anchor
+    // survives outside this complete removal cascade. This is the relation-
+    // native form of the hosted-root teardown semantics.
+    let hostedDetachedTargets = lifetimeAnchors.targets(
+      of: .hostedDetached(node.viewNodeID)
+    )
+    for targetNodeID in hostedDetachedTargets.sorted() {
       lifetimeAnchors.remove(
-        anchor: .hostedDetached(hostID),
-        for: node.viewNodeID
+        anchor: .hostedDetached(node.viewNodeID),
+        for: targetNodeID
+      )
+    }
+    for targetNodeID in hostedDetachedTargets.sorted() {
+      guard !walk.enteredNodeIDs.contains(targetNodeID),
+        let target = nodeIfExists(for: targetNodeID)
+      else {
+        continue
+      }
+      let anchorSurvivesRemoval =
+        lifetimeReachabilityContext().map { context in
+          lifetimeAnchors.hasAnchorOutside(
+            targetNodeID,
+            excluding: walk.relationCascadeNodeIDs,
+            context: context
+          )
+        } ?? false
+      removeSubtree(
+        rootedAt: target,
+        sparingVisitedNodes: anchorSurvivesRemoval,
+        isSubtreeDescent: true,
+        walk: walk
       )
     }
 
@@ -373,7 +352,6 @@ extension ViewGraph {
       nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
     }
     releaseEntityRoute(for: node.viewNodeID)
-    activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: node.viewNodeID)
     lifetimeAnchors.removeNode(node.viewNodeID)
     discardTeardownWork(for: node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)

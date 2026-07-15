@@ -43,8 +43,8 @@ struct TeardownReachabilityBaselineTests {
   @Test("inactive entity homes are not kept")
   func inactiveEntityHomesAreNotKept() {
     #expect(
-      !legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      !entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: false,
           routeOwnsNode: true,
           occurrence: 0,
@@ -57,8 +57,8 @@ struct TeardownReachabilityBaselineTests {
   @Test("primary entity homes require route and resolved-identity index ownership")
   func primaryEntityHomesRequireRouteAndResolvedIdentityIndexOwnership() {
     #expect(
-      !legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      !entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: true,
           routeOwnsNode: false,
           occurrence: 0,
@@ -67,8 +67,8 @@ struct TeardownReachabilityBaselineTests {
       )
     )
     #expect(
-      !legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      !entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: true,
           routeOwnsNode: true,
           occurrence: 0,
@@ -77,8 +77,8 @@ struct TeardownReachabilityBaselineTests {
       )
     )
     #expect(
-      legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: true,
           routeOwnsNode: true,
           occurrence: 0,
@@ -91,8 +91,8 @@ struct TeardownReachabilityBaselineTests {
   @Test("duplicate entity occurrences are exempt from index ownership")
   func duplicateEntityOccurrencesAreExemptFromIndexOwnership() {
     #expect(
-      legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: true,
           routeOwnsNode: true,
           occurrence: 1,
@@ -101,8 +101,8 @@ struct TeardownReachabilityBaselineTests {
       )
     )
     #expect(
-      !legacyEntityHomeKeepsNode(
-        LegacyEntityHomeKeepFacts(
+      !entityHomeQualifiesForLifetime(
+        EntityHomeLifetimeFacts(
           entityIsActive: false,
           routeOwnsNode: true,
           occurrence: 1,
@@ -116,17 +116,17 @@ struct TeardownReachabilityBaselineTests {
   func barrierTraceDistinguishesEnqueuedAndConsumedWork() {
     let enqueuedNodeID = ViewNodeID(rawValue: 41)
     let consumedNodeID = ViewNodeID(rawValue: 42)
-    let recorder = LegacyTeardownBarrierTraceRecorder(caller: .preview)
+    let recorder = TeardownBarrierTraceRecorder(caller: .preview)
     recorder.record(
       stage: .staleDetachedHostedRoot,
       nodesBefore: [enqueuedNodeID, consumedNodeID],
       nodesAfter: [enqueuedNodeID],
-      workBefore: LegacyTeardownWorkSnapshot(
+      workBefore: TeardownWorkSnapshot(
         entityRoutedRemovalNodeIDs: [],
         absorbedShadowNodeIDs: [],
         departedNavigationSurfaceNodeIDs: [consumedNodeID]
       ),
-      workAfter: LegacyTeardownWorkSnapshot(
+      workAfter: TeardownWorkSnapshot(
         entityRoutedRemovalNodeIDs: [enqueuedNodeID],
         absorbedShadowNodeIDs: [],
         departedNavigationSurfaceNodeIDs: []
@@ -142,8 +142,8 @@ struct TeardownReachabilityBaselineTests {
     #expect(stage.endingWork.entityRoutedRemovalNodeIDs == [enqueuedNodeID])
   }
 
-  @Test("preview and finalize expose the same legacy reachability and barrier order")
-  func previewAndFinalizeExposeTheSameLegacyReachabilityAndBarrierOrder() throws {
+  @Test("preview and finalize expose the same reachability and barrier order")
+  func previewAndFinalizeExposeTheSameReachabilityAndBarrierOrder() throws {
     let graph = ViewGraph()
     let rootIdentity = testIdentity("Root")
     let childIdentity = testIdentity("Root", "Child")
@@ -162,31 +162,26 @@ struct TeardownReachabilityBaselineTests {
     graph.recordReusedSubtree(candidate, invalidator: nil)
     let checkpoint = graph.makeCheckpoint()
 
-    let previewTrace = LegacyTeardownBarrierTraceRecorder(caller: .preview)
+    let previewTrace = TeardownBarrierTraceRecorder(caller: .preview)
     _ = graph.previewLifecycleEventPlan(
       resolved: candidate,
       placed: nil,
       debugTeardownTrace: previewTrace
     )
     let previewReachability = try #require(
-      graph.debugLegacyLifetimeReachabilitySnapshot()
+      graph.debugLifetimeReachabilitySnapshot()
     )
     #expect(previewReachability.storedNodeIDs == [rootNodeID, childNodeID])
     #expect(previewReachability.reachableNodeIDs == [rootNodeID, childNodeID])
     #expect(previewReachability.keepReasonsByNodeID[rootNodeID] == .root)
     #expect(
       previewReachability.keepReasonsByNodeID[childNodeID]
-        == .structuralChild(rootNodeID)
+        == .parent(rootNodeID)
     )
     #expect(previewReachability.unreachableNodeIDs.isEmpty)
     #expect(graph.debugTeardownCoherenceViolation() == nil)
-    let previewParity = try #require(
-      graph.debugLifetimeRelationParity(activeEntities: [])
-    )
-    #expect(previewParity.isEqual, Comment(rawValue: previewParity.detail))
-
     graph.restoreCheckpoint(checkpoint)
-    let finalizeTrace = LegacyTeardownBarrierTraceRecorder(caller: .finalize)
+    let finalizeTrace = TeardownBarrierTraceRecorder(caller: .finalize)
     _ = graph.finalizeFrame(
       rootIdentity: rootIdentity,
       resolved: candidate,
@@ -194,20 +189,16 @@ struct TeardownReachabilityBaselineTests {
       debugTeardownTrace: finalizeTrace
     )
     let finalizeReachability = try #require(
-      graph.debugLegacyLifetimeReachabilitySnapshot()
+      graph.debugLifetimeReachabilitySnapshot()
     )
 
-    let expectedStageOrder = LegacyTeardownBarrierStage.allCases
+    let expectedStageOrder = TeardownBarrierStage.allCases
     #expect(previewTrace.trace.stages.map(\.stage) == expectedStageOrder)
     #expect(finalizeTrace.trace.stages.map(\.stage) == expectedStageOrder)
     #expect(previewTrace.trace.endingWork.totalCount == 0)
     #expect(finalizeTrace.trace.endingWork.totalCount == 0)
     #expect(finalizeReachability == previewReachability)
     #expect(graph.debugTeardownCoherenceViolation() == nil)
-    let finalizeParity = try #require(
-      graph.debugLifetimeRelationParity(activeEntities: [])
-    )
-    #expect(finalizeParity.isEqual, Comment(rawValue: finalizeParity.detail))
   }
 
   @Test("preview teardown mutations roll back across the total graph checkpoint")
@@ -229,14 +220,14 @@ struct TeardownReachabilityBaselineTests {
     let candidate = graph.snapshot(rootIdentity: rootIdentity)
     graph.beginFrame()
     graph.recordReusedSubtree(candidate, invalidator: nil)
-    graph.debugEnqueueLegacyTeardownWork(
+    graph.debugEnqueueTeardownWork(
       .departedNavigationSurface,
       nodeID: orphan.viewNodeID
     )
     let beforePreview = graph.debugTotalStateSnapshot()
     let checkpoint = graph.makeCheckpoint()
 
-    let previewTrace = LegacyTeardownBarrierTraceRecorder(caller: .preview)
+    let previewTrace = TeardownBarrierTraceRecorder(caller: .preview)
     _ = graph.previewLifecycleEventPlan(
       resolved: candidate,
       placed: nil,
@@ -257,7 +248,7 @@ struct TeardownReachabilityBaselineTests {
     graph.restoreCheckpoint(checkpoint)
     #expect(graph.debugTotalStateSnapshot() == beforePreview)
 
-    let finalizeTrace = LegacyTeardownBarrierTraceRecorder(caller: .finalize)
+    let finalizeTrace = TeardownBarrierTraceRecorder(caller: .finalize)
     _ = graph.finalizeFrame(
       rootIdentity: rootIdentity,
       resolved: candidate,

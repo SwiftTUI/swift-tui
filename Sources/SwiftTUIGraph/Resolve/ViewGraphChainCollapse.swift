@@ -30,8 +30,6 @@ extension ViewGraph {
     guard !candidates.isEmpty else {
       return
     }
-    assert(candidates == absorbedShadowedNodeIDs)
-    absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
     consumeTeardownWork(.absorbedShadow, for: candidates)
     for nodeID in candidates.sorted() {
       // Two stranded shapes qualify:

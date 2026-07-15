@@ -27,8 +27,25 @@ struct LifetimeRelationConsumerTests {
     let graph = try SourceParsingTestSupport.sourceText(
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraph.swift"
     )
-    #expect(graph.contains("lifetimeAnchors.targets(of: .navigationSurface"))
-    #expect(graph.contains("lifetimeRelationReachabilitySnapshot()"))
+    #expect(graph.contains("lifetimeAnchors.replaceNavigationSurfaces"))
+    #expect(graph.contains("lifetimeReachabilitySnapshot()"))
+
+    let lifetimeSources = [removal, entities, collapse, graph].joined(separator: "\n")
+    for retiredStore in [
+      "detachedHostedSubtreeRootsByHost",
+      "detachedHostedSubtreeHostByRoot",
+      "activeNavigationSurfaceContentNodeIDsByHost",
+      "departedNavigationSurfaceContentNodeIDs",
+      "pendingEntityRoutedRemovalNodeIDs",
+      "absorbedShadowedNodeIDs",
+    ] {
+      #expect(!lifetimeSources.contains(retiredStore))
+    }
+
+    let anchors = try SourceParsingTestSupport.sourceText(
+      relativePath: "Sources/SwiftTUIGraph/Resolve/LifetimeAnchorIndex.swift"
+    )
+    #expect(!anchors.contains("case evaluationHost"))
   }
 
   @Test("relation-only child participates in downward removal")

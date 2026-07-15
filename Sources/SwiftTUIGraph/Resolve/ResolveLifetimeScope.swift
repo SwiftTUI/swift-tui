@@ -128,8 +128,6 @@ extension ViewGraph {
 
       let hasOtherDurableAnchor = anchors.contains { anchor in
         switch anchor {
-        case .evaluationHost:
-          return false
         case .hostedDetached(let source):
           return source != frame.hostNodeID && nodeIfExists(for: source) != nil
         case .parent(let source),

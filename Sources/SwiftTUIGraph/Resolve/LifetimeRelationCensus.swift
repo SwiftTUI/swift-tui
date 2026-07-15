@@ -1,6 +1,6 @@
 extension ViewGraph {
-  func lifetimeRelationReachabilitySnapshot()
-    -> LegacyLifetimeReachabilitySnapshot?
+  func lifetimeReachabilitySnapshot()
+    -> LifetimeReachabilitySnapshot?
   {
     guard let root,
       var context = lifetimeReachabilityContext(
@@ -14,7 +14,7 @@ extension ViewGraph {
     // detached node into a committed-root census seed.
     context.liveEntityHomeByIdentity = [:]
     let relation = lifetimeAnchors.reachableNodeIDs(context: context)
-    var reasons: [ViewNodeID: LegacyLifetimeReachabilityReason] = [:]
+    var reasons: [ViewNodeID: LifetimeReachabilityReason] = [:]
     for (nodeID, chain) in relation.chainByNodeID {
       guard let last = chain.last else {
         continue
@@ -34,8 +34,6 @@ extension ViewGraph {
           reasons[nodeID] = .hostedDetached(source)
         case .navigationSurface(let source):
           reasons[nodeID] = .navigationSurface(source)
-        case .evaluationHost(let source):
-          reasons[nodeID] = .evaluationHost(source)
         case .entityHome:
           break
         }
@@ -63,7 +61,7 @@ extension ViewGraph {
       stack.append(contentsOf: node.children)
     }
 
-    return LegacyLifetimeReachabilitySnapshot(
+    return LifetimeReachabilitySnapshot(
       storedNodeIDs: Set(nodesByNodeID.keys),
       reachableNodeIDs: relation.nodeIDs,
       keepReasonsByNodeID: reasons,

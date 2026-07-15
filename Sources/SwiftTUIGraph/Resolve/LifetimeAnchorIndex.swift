@@ -9,20 +9,12 @@ package enum LifetimeAnchor: Hashable, Sendable {
   case entityHome(EntityIdentity)
   case navigationSurface(ViewNodeID)
 
-  /// Migration-only mirror of `ViewNode.evaluationHostNode`.
-  ///
-  /// It is traversable only while the target has no parent anchor or
-  /// parent-object fact. Stage 9 removes this case after every such lifetime
-  /// has a durable replacement.
-  case evaluationHost(ViewNodeID)
-
   package enum Kind: CaseIterable, Hashable, Sendable {
     case parent
     case committedValue
     case hostedDetached
     case entityHome
     case navigationSurface
-    case evaluationHost
   }
 
   package var kind: Kind {
@@ -37,8 +29,6 @@ package enum LifetimeAnchor: Hashable, Sendable {
       .entityHome
     case .navigationSurface:
       .navigationSurface
-    case .evaluationHost:
-      .evaluationHost
     }
   }
 
@@ -47,8 +37,7 @@ package enum LifetimeAnchor: Hashable, Sendable {
     case .parent(let source),
       .committedValue(let source),
       .hostedDetached(let source),
-      .navigationSurface(let source),
-      .evaluationHost(let source):
+      .navigationSurface(let source):
       source
     case .entityHome:
       nil
@@ -232,8 +221,6 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       anchor = .hostedDetached(sourceNodeID)
     case .navigationSurface:
       anchor = .navigationSurface(sourceNodeID)
-    case .evaluationHost:
-      anchor = .evaluationHost(sourceNodeID)
     case .entityHome:
       preconditionFailure("entity-home anchors have no ViewNodeID source")
     }
@@ -363,17 +350,6 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
             diagnosticChain: [.entityHome(entity, nodeID)]
           )
         }
-      case .evaluationHost(let source):
-        guard !hasCurrentParent(nodeID, context: context) else {
-          continue
-        }
-        if !removalCascade.contains(source) {
-          return LifetimeKeepDecision(
-            shouldKeep: true,
-            reason: .anchor(anchor),
-            diagnosticChain: [.root(source), .anchor(anchor, target: nodeID)]
-          )
-        }
       default:
         if let source = anchor.sourceNodeID,
           !removalCascade.contains(source)
@@ -467,11 +443,6 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       let source = queue[cursor]
       cursor += 1
       for (anchor, target) in sortedOutgoingEdges(from: source) {
-        if case .evaluationHost = anchor,
-          hasCurrentParent(target, context: context)
-        {
-          continue
-        }
         enqueue(
           target,
           chain: chainByNodeID[source, default: []] + [.anchor(anchor, target: target)]
@@ -606,7 +577,6 @@ private func lifetimeAnchorLessThan(
     case .hostedDetached: 2
     case .entityHome: 3
     case .navigationSurface: 4
-    case .evaluationHost: 5
     }
   }
   let lhsRank = rank(lhs.kind)

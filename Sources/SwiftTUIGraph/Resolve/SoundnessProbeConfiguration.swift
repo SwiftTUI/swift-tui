@@ -53,7 +53,6 @@ package enum SoundnessProbeConfiguration {
   /// over-removal direction asserts in DEBUG, this one is gated by
   /// baseline-ratchet tests until the residual burns down to zero.
   package static var teardownCoherenceLeakCount = 0
-  package static var lifetimeRelationViolationCount = 0
   package static var barrierNonConvergenceCount = 0
   package static var automaticLifetimeAnchorCount = 0
   package static var unclassifiedResolvedNodeCount = 0
@@ -139,14 +138,6 @@ package enum SoundnessProbeConfiguration {
     lastTeardownLeakUnreachableCount = unreachableCount
     lastViolationDetail = detail()
     emitTrace("teardown-coherence-leak")
-  }
-
-  package static func recordLifetimeRelationViolation(
-    _ detail: @autoclosure () -> String
-  ) {
-    lifetimeRelationViolationCount += 1
-    lastViolationDetail = detail()
-    emitTrace("lifetime-relation")
   }
 
   package static func recordBarrierNonConvergence(

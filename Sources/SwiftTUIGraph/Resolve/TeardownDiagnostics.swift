@@ -1,21 +1,18 @@
-/// The legacy lifetime fact that first made a stored node reachable from the
+/// The durable relation fact that first made a stored node reachable from the
 /// committed root during the teardown-coherence census.
-package enum LegacyLifetimeReachabilityReason: Equatable, Hashable, Sendable {
+package enum LifetimeReachabilityReason: Equatable, Hashable, Sendable {
   case root
-  case structuralChild(ViewNodeID)
   case committedValue(ViewNodeID)
   case hostedDetached(ViewNodeID)
   case navigationSurface(ViewNodeID)
   case parent(ViewNodeID)
-  case evaluationHost(ViewNodeID)
 }
 
-/// Test-facing snapshot of the reachability algorithm that remains authoritative
-/// until Proposal -003 migrates teardown consumers to `LifetimeAnchorIndex`.
-package struct LegacyLifetimeReachabilitySnapshot: Equatable, Sendable {
+/// Test-facing snapshot of the authoritative lifetime relation closure.
+package struct LifetimeReachabilitySnapshot: Equatable, Sendable {
   package var storedNodeIDs: Set<ViewNodeID>
   package var reachableNodeIDs: Set<ViewNodeID>
-  package var keepReasonsByNodeID: [ViewNodeID: LegacyLifetimeReachabilityReason]
+  package var keepReasonsByNodeID: [ViewNodeID: LifetimeReachabilityReason]
   package var staleAliasDetail: String?
 
   package var unreachableNodeIDs: Set<ViewNodeID> {
@@ -23,12 +20,12 @@ package struct LegacyLifetimeReachabilitySnapshot: Equatable, Sendable {
   }
 }
 
-package enum LegacyTeardownBarrierCaller: String, Equatable, Sendable {
+package enum TeardownBarrierCaller: String, Equatable, Sendable {
   case preview
   case finalize
 }
 
-package enum LegacyTeardownBarrierStage: String, CaseIterable, Equatable, Sendable {
+package enum TeardownBarrierStage: String, CaseIterable, Equatable, Sendable {
   case resolveScopeScratch
   case entityRoutedRemoval
   case absorbedShadow
@@ -36,8 +33,8 @@ package enum LegacyTeardownBarrierStage: String, CaseIterable, Equatable, Sendab
   case departedNavigationSurface
 }
 
-/// The three independent legacy work queues consumed by the current barrier.
-package struct LegacyTeardownWorkSnapshot: Equatable, Sendable {
+/// A reason-projected snapshot of the typed teardown work queue.
+package struct TeardownWorkSnapshot: Equatable, Sendable {
   package var resolveScopeScratchNodeIDs: Set<ViewNodeID>
   package var entityRoutedRemovalNodeIDs: Set<ViewNodeID>
   package var absorbedShadowNodeIDs: Set<ViewNodeID>
@@ -63,9 +60,9 @@ package struct LegacyTeardownWorkSnapshot: Equatable, Sendable {
   }
 
   package func subtracting(
-    _ other: LegacyTeardownWorkSnapshot
-  ) -> LegacyTeardownWorkSnapshot {
-    LegacyTeardownWorkSnapshot(
+    _ other: TeardownWorkSnapshot
+  ) -> TeardownWorkSnapshot {
+    TeardownWorkSnapshot(
       resolveScopeScratchNodeIDs: resolveScopeScratchNodeIDs.subtracting(
         other.resolveScopeScratchNodeIDs
       ),
@@ -82,19 +79,19 @@ package struct LegacyTeardownWorkSnapshot: Equatable, Sendable {
   }
 }
 
-package struct LegacyTeardownBarrierStageTrace: Equatable, Sendable {
+package struct TeardownBarrierStageTrace: Equatable, Sendable {
   package var iteration: Int
-  package var stage: LegacyTeardownBarrierStage
+  package var stage: TeardownBarrierStage
   package var removedNodeIDs: Set<ViewNodeID>
-  package var enqueuedWork: LegacyTeardownWorkSnapshot
-  package var consumedWork: LegacyTeardownWorkSnapshot
-  package var endingWork: LegacyTeardownWorkSnapshot
+  package var enqueuedWork: TeardownWorkSnapshot
+  package var consumedWork: TeardownWorkSnapshot
+  package var endingWork: TeardownWorkSnapshot
 }
 
-package struct LegacyTeardownBarrierTrace: Equatable, Sendable {
-  package var caller: LegacyTeardownBarrierCaller
-  package var stages: [LegacyTeardownBarrierStageTrace]
-  package var endingWork: LegacyTeardownWorkSnapshot
+package struct TeardownBarrierTrace: Equatable, Sendable {
+  package var caller: TeardownBarrierCaller
+  package var stages: [TeardownBarrierStageTrace]
+  package var endingWork: TeardownWorkSnapshot
 }
 
 package struct TeardownBarrierResult: Equatable, Sendable {
@@ -103,17 +100,17 @@ package struct TeardownBarrierResult: Equatable, Sendable {
   package var iterationBound: Int
 }
 
-/// Opt-in recorder used by Stage-0 characterization tests. Normal preview and
+/// Opt-in recorder used by barrier characterization tests. Normal preview and
 /// finalize calls pass no recorder and retain their existing behavior.
 @MainActor
-package final class LegacyTeardownBarrierTraceRecorder {
-  package private(set) var trace: LegacyTeardownBarrierTrace
+package final class TeardownBarrierTraceRecorder {
+  package private(set) var trace: TeardownBarrierTrace
 
-  package init(caller: LegacyTeardownBarrierCaller) {
-    trace = LegacyTeardownBarrierTrace(
+  package init(caller: TeardownBarrierCaller) {
+    trace = TeardownBarrierTrace(
       caller: caller,
       stages: [],
-      endingWork: LegacyTeardownWorkSnapshot(
+      endingWork: TeardownWorkSnapshot(
         resolveScopeScratchNodeIDs: [],
         entityRoutedRemovalNodeIDs: [],
         absorbedShadowNodeIDs: [],
@@ -124,14 +121,14 @@ package final class LegacyTeardownBarrierTraceRecorder {
 
   package func record(
     iteration: Int = 0,
-    stage: LegacyTeardownBarrierStage,
+    stage: TeardownBarrierStage,
     nodesBefore: Set<ViewNodeID>,
     nodesAfter: Set<ViewNodeID>,
-    workBefore: LegacyTeardownWorkSnapshot,
-    workAfter: LegacyTeardownWorkSnapshot
+    workBefore: TeardownWorkSnapshot,
+    workAfter: TeardownWorkSnapshot
   ) {
     trace.stages.append(
-      LegacyTeardownBarrierStageTrace(
+      TeardownBarrierStageTrace(
         iteration: iteration,
         stage: stage,
         removedNodeIDs: nodesBefore.subtracting(nodesAfter),
@@ -142,15 +139,13 @@ package final class LegacyTeardownBarrierTraceRecorder {
     )
   }
 
-  package func finish(endingWork: LegacyTeardownWorkSnapshot) {
+  package func finish(endingWork: TeardownWorkSnapshot) {
     trace.endingWork = endingWork
   }
 }
 
-/// Pure inputs to the current pending-entity keep predicate. Kept separate from
-/// `RuntimeRegistrationOwnerKey` and the future relation so Stage 0 can lock the
-/// exact legacy tiebreak before migration.
-package struct LegacyEntityHomeKeepFacts: Equatable, Sendable {
+/// Pure inputs to entity-home qualification when constructing relation context.
+package struct EntityHomeLifetimeFacts: Equatable, Sendable {
   package var entityIsActive: Bool
   package var routeOwnsNode: Bool
   package var occurrence: Int
@@ -169,18 +164,18 @@ package struct LegacyEntityHomeKeepFacts: Equatable, Sendable {
   }
 }
 
-package func legacyEntityHomeKeepsNode(
-  _ facts: LegacyEntityHomeKeepFacts
+package func entityHomeQualifiesForLifetime(
+  _ facts: EntityHomeLifetimeFacts
 ) -> Bool {
   facts.entityIsActive
     && facts.routeOwnsNode
     && (facts.occurrence > 0 || facts.resolvedIdentityIndexOwnsNode)
 }
 
-/// Test-only injection vocabulary for exercising the legacy barrier trace and
+/// Test-only injection vocabulary for exercising the barrier trace and
 /// checkpoint rollback. Production writers continue to mutate the queues at
 /// their existing call sites.
-package enum LegacyTeardownDebugWorkReason: Equatable, Sendable {
+package enum TeardownDebugWorkReason: Equatable, Sendable {
   case resolveScopeScratch
   case entityRoutedRemoval
   case absorbedShadow

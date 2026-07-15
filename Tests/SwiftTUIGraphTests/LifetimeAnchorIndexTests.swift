@@ -139,44 +139,6 @@ struct LifetimeAnchorIndexTests {
     )
   }
 
-  @Test("removal cascades exclude internal anchors and parent suppresses evaluation host")
-  func removalCascadeAndEvaluationHostPrecedence() {
-    let target = nodeID(3)
-    let parent = nodeID(2)
-    let evaluationHost = nodeID(4)
-    var index = LifetimeAnchorIndex()
-    index.insert(anchor: .parent(parent), for: target)
-    index.insert(anchor: .evaluationHost(evaluationHost), for: target)
-    let context = LifetimeReachabilityContext(candidateRootID: nodeID(1))
-
-    let suppressed = index.keepDecision(
-      for: target,
-      removalCascade: [parent, target],
-      context: context
-    )
-    #expect(!suppressed.shouldKeep)
-    #expect(suppressed.reason == .noAnchorOutsideRemovalCascade)
-
-    index.remove(anchor: .parent(parent), for: target)
-    let unsuppressed = index.keepDecision(
-      for: target,
-      removalCascade: [parent, target],
-      context: context
-    )
-    #expect(unsuppressed.shouldKeep)
-    #expect(unsuppressed.reason == .anchor(.evaluationHost(evaluationHost)))
-
-    let objectParentSuppressed = index.keepDecision(
-      for: target,
-      removalCascade: [parent, target],
-      context: LifetimeReachabilityContext(
-        candidateRootID: nodeID(1),
-        parentedNodeIDs: [target]
-      )
-    )
-    #expect(!objectParentSuppressed.shouldKeep)
-  }
-
   @Test("unreachable forensics is bounded and node-ID ordered")
   func unreachableForensicsIsDeterministic() {
     var index = LifetimeAnchorIndex()
@@ -243,13 +205,12 @@ struct LifetimeAnchorIndexTests {
       let target = nodeID(random.next(upperBound: 16) + 1)
       let source = nodeID(random.next(upperBound: 16) + 1)
       let anchor: LifetimeAnchor =
-        switch random.next(upperBound: 6) {
+        switch random.next(upperBound: 5) {
         case 0: .parent(source)
         case 1: .committedValue(source)
         case 2: .hostedDetached(source)
         case 3: .entityHome(entities[random.next(upperBound: entities.count)])
-        case 4: .navigationSurface(source)
-        default: .evaluationHost(source)
+        default: .navigationSurface(source)
         }
 
       switch random.next(upperBound: 5) {
@@ -308,11 +269,6 @@ struct LifetimeAnchorIndexTests {
   @Test("navigation-surface edge neuter breaks its directed reachability fixture")
   func navigationSurfaceEdgeNeuterBites() {
     expectEdgeNeuterBites(.navigationSurface(nodeID(1)))
-  }
-
-  @Test("evaluation-host edge neuter breaks its directed reachability fixture")
-  func evaluationHostEdgeNeuterBites() {
-    expectEdgeNeuterBites(.evaluationHost(nodeID(1)))
   }
 
   @Test("entity-home edge neuter breaks its directed reachability fixture")

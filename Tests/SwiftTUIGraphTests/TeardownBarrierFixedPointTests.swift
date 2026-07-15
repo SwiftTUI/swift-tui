@@ -13,7 +13,7 @@ struct TeardownBarrierFixedPointTests {
     )
 
     #expect(source.components(separatedBy: "settleTeardownBarrier(").count - 1 == 4)
-    #expect(source.components(separatedBy: "runLegacyTeardownStage(").count - 1 == 6)
+    #expect(source.components(separatedBy: "runTeardownStage(").count - 1 == 6)
     #expect(
       source.components(separatedBy: "prunePendingEntityRoutedRemovals(").count - 1 == 1
     )
@@ -23,11 +23,11 @@ struct TeardownBarrierFixedPointTests {
   @Test("resolve-scope scratch is consumed before the other teardown stages")
   func resolveScopeScratchIsFirstAndLeavesNoWork() throws {
     let (graph, root, orphan) = try graphWithOrphan()
-    graph.debugEnqueueLegacyTeardownWork(
+    graph.debugEnqueueTeardownWork(
       .resolveScopeScratch,
       nodeID: orphan.viewNodeID
     )
-    let trace = LegacyTeardownBarrierTraceRecorder(caller: .preview)
+    let trace = TeardownBarrierTraceRecorder(caller: .preview)
 
     let result = graph.debugSettleTeardownBarrier(
       resolved: root,
@@ -48,14 +48,14 @@ struct TeardownBarrierFixedPointTests {
   func lateEntityWorkSettlesOnNextIteration() throws {
     let entity = EntityIdentity("late")
     let (graph, root, orphan) = try graphWithOrphan(entity: entity)
-    let trace = LegacyTeardownBarrierTraceRecorder(caller: .preview)
+    let trace = TeardownBarrierTraceRecorder(caller: .preview)
 
     let result = graph.debugSettleTeardownBarrier(
       resolved: root,
       trace: trace
     ) { stage, iteration in
       if stage == .entityRoutedRemoval, iteration == 0 {
-        graph.debugEnqueueLegacyTeardownWork(
+        graph.debugEnqueueTeardownWork(
           .entityRoutedRemoval,
           nodeID: orphan.viewNodeID
         )
@@ -88,7 +88,7 @@ struct TeardownBarrierFixedPointTests {
 
     let result = graph.debugSettleTeardownBarrier(resolved: root) { stage, _ in
       if stage == .departedNavigationSurface {
-        graph.debugEnqueueLegacyTeardownWork(
+        graph.debugEnqueueTeardownWork(
           .departedNavigationSurface,
           nodeID: impossibleNodeID
         )
@@ -137,13 +137,13 @@ struct TeardownBarrierFixedPointTests {
   }
 
   private func assertStableStageOrder(
-    _ trace: LegacyTeardownBarrierTrace,
+    _ trace: TeardownBarrierTrace,
     sourceLocation: SourceLocation = #_sourceLocation
   ) {
     let stagesByIteration = Dictionary(grouping: trace.stages, by: \.iteration)
     for iteration in stagesByIteration.keys.sorted() {
       #expect(
-        stagesByIteration[iteration]?.map(\.stage) == LegacyTeardownBarrierStage.allCases,
+        stagesByIteration[iteration]?.map(\.stage) == TeardownBarrierStage.allCases,
         "iteration \(iteration)",
         sourceLocation: sourceLocation
       )

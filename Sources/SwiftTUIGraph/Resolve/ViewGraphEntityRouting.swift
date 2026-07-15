@@ -219,12 +219,10 @@ extension ViewGraph {
     // the loop strictly shrinks into the finite node store.
     while !teardownBarrierWork.nodeIDs(for: .entityRoutedRemoval).isEmpty {
       let pendingNodeIDs = teardownBarrierWork.nodeIDs(for: .entityRoutedRemoval)
-      assert(pendingNodeIDs == pendingEntityRoutedRemovalNodeIDs)
-      pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
       consumeTeardownWork(.entityRoutedRemoval, for: pendingNodeIDs)
       for viewNodeID in pendingNodeIDs {
         guard let node = nodeIfExists(for: viewNodeID),
-          let entityIdentity = node.committed.entityIdentity,
+          node.committed.entityIdentity != nil,
           // Use the frame-stamped `visitedThisFrame` signal, not the stored
           // `wasVisitedThisFrame` bool: a genuinely-gone node is never
           // re-prepared in the frame it disappears, so the stored bool stays
@@ -251,14 +249,6 @@ extension ViewGraph {
         // stale copy lost it to the arriving node's reindex. Duplicate-id
         // occurrences (> 0) are exempt: siblings share the identity entry by
         // design, so only the entity route is authoritative for them (G13).
-        let keepFacts = LegacyEntityHomeKeepFacts(
-          entityIsActive: activeEntities.contains(entityIdentity),
-          routeOwnsNode: entityRoutingTable.route(entityIdentity) == node.viewNodeID,
-          occurrence: entityIdentity.occurrence,
-          resolvedIdentityIndexOwnsNode:
-            nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
-        )
-        let legacyKeeps = legacyEntityHomeKeepsNode(keepFacts)
         let relationKeeps =
           lifetimeReachabilityContext(
             activeEntities: activeEntities
@@ -268,7 +258,6 @@ extension ViewGraph {
               context: context
             )
           } != nil
-        assert(legacyKeeps == relationKeeps)
         if relationKeeps {
           continue
         }

@@ -13,11 +13,7 @@ extension ViewGraph {
     package var entityRoutingTable: EntityRoutingTable
     package var lifetimeAnchors: LifetimeAnchorIndex
     package var nextViewNodeIDRawValue: UInt64
-    package var detachedHostedSubtreeRootsByHost: [ViewNodeID: Set<ViewNodeID>]
-    package var detachedHostedSubtreeHostByRoot: [ViewNodeID: ViewNodeID]
     package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
-    package var activeNavigationSurfaceContentNodeIDsByHost: [ViewNodeID: Set<ViewNodeID>]
-    package var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID>
     package var effectRegistrationOwnerNodeIDs: Set<ViewNodeID>
     package var rootEvaluator: Bool
     package var evaluationRootIdentity: Identity?
@@ -30,8 +26,6 @@ extension ViewGraph {
     package var structuralAppearEvents: [LifecycleEvent]
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
-    package var pendingEntityRoutedRemovalNodeIDs: Set<ViewNodeID>
-    package var absorbedShadowedNodeIDs: Set<ViewNodeID>
     package var teardownBarrierWork: TeardownBarrierWork
     package var invalidatedNodeIDs: Set<ViewNodeID>
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
