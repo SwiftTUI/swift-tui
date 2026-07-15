@@ -169,6 +169,7 @@ public enum PerfScenarioRegistry {
       GifPlaybackScenario(),
       LazyList1KScenario(),
       Table1Kx4Scenario(),
+      LazyVStackScrollScenario(),
     ] + additionalScenarios
   }
 

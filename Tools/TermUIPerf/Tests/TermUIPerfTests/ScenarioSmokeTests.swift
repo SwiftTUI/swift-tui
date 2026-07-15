@@ -26,9 +26,11 @@ struct ScenarioSmokeTests {
     // tree so this test stays a wiring check, not a benchmark.
     setenv("TERMUI_PERF_LAZY_LIST_ROWS", "120", 1)
     setenv("TERMUI_PERF_TABLE_ROWS", "120", 1)
+    setenv("TERMUI_PERF_LAZY_VSTACK_ROWS", "200", 1)
     defer {
       unsetenv("TERMUI_PERF_LAZY_LIST_ROWS")
       unsetenv("TERMUI_PERF_TABLE_ROWS")
+      unsetenv("TERMUI_PERF_LAZY_VSTACK_ROWS")
     }
     let artifactRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("termui-perf-scenarios-\(UUID().uuidString)", isDirectory: true)
