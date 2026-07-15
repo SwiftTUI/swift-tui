@@ -19,6 +19,7 @@ extension ViewGraph {
     package var identityByNodeID: [ViewNodeID: Identity] = [:]
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] = [:]
     package var entityRoutingTable: EntityRoutingTable = .init()
+    package var lifetimeAnchors: LifetimeAnchorIndex = .init()
     package var nextViewNodeIDRawValue: UInt64 = 0
     // Subtrees a host resolves every frame but does not commit as children (a
     // navigation stack's root while a destination is presented). They are
@@ -118,6 +119,7 @@ extension ViewGraph {
     // the frame parentless and un-routed — nothing can reach them again. See
     // `pruneAbsorbedShadowedNodes`.
     package var absorbedShadowedNodeIDs: Set<ViewNodeID> = []
+    package var teardownBarrierWork: TeardownBarrierWork = .init()
     package var latestLifecycleEvents: [LifecycleEvent] = []
   }
 

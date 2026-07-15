@@ -186,6 +186,10 @@ package final class ViewGraph {
     get { index.entityRoutingTable }
     set { index.entityRoutingTable = newValue }
   }
+  package var lifetimeAnchors: LifetimeAnchorIndex {
+    get { index.lifetimeAnchors }
+    set { index.lifetimeAnchors = newValue }
+  }
   var nextViewNodeIDRawValue: UInt64 {
     get { index.nextViewNodeIDRawValue }
     set { index.nextViewNodeIDRawValue = newValue }
@@ -269,6 +273,10 @@ package final class ViewGraph {
   var absorbedShadowedNodeIDs: Set<ViewNodeID> {
     get { eventBuffers.absorbedShadowedNodeIDs }
     set { eventBuffers.absorbedShadowedNodeIDs = newValue }
+  }
+  package var teardownBarrierWork: TeardownBarrierWork {
+    get { eventBuffers.teardownBarrierWork }
+    set { eventBuffers.teardownBarrierWork = newValue }
   }
   private var latestLifecycleEvents: [LifecycleEvent] {
     get { eventBuffers.latestLifecycleEvents }
@@ -613,6 +621,7 @@ package final class ViewGraph {
       identityByNodeID: identityByNodeID,
       nodeIDsByStructuralPath: nodeIDsByStructuralPath,
       entityRoutingTable: entityRoutingTable,
+      lifetimeAnchors: lifetimeAnchors,
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
       detachedHostedSubtreeRootsByHost: detachedHostedSubtreeRootsByHost,
       detachedHostedSubtreeHostByRoot: detachedHostedSubtreeHostByRoot,
@@ -633,6 +642,7 @@ package final class ViewGraph {
       structuralDisappearEvents: structuralDisappearEvents,
       pendingEntityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       absorbedShadowedNodeIDs: absorbedShadowedNodeIDs,
+      teardownBarrierWork: teardownBarrierWork,
       invalidatedNodeIDs: invalidatedNodeIDs,
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       latestLifecycleEvents: latestLifecycleEvents,
