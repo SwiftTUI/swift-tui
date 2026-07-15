@@ -175,17 +175,15 @@ extension LayoutEngine {
         width: contentSize.width + insets.horizontal,
         height: contentSize.height + insets.vertical
       )
-    case .safeAreaIgnoring:
+    case .safeAreaIgnoring(let insets):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return CellSize(
-        width: measuredDimension(
-          proposal.width,
-          fallback: contentSize.width
-        ),
-        height: measuredDimension(
-          proposal.height,
-          fallback: contentSize.height
-        )
+        width: insets.horizontal == 0
+          ? contentSize.width
+          : measuredDimension(proposal.width, fallback: contentSize.width),
+        height: insets.vertical == 0
+          ? contentSize.height
+          : measuredDimension(proposal.height, fallback: contentSize.height)
       )
     case .safeAreaInset(let edge, _, let spacing, let safeArea):
       let baseSize = childMeasurements.first?.measuredSize ?? .zero

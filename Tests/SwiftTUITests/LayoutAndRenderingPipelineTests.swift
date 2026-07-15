@@ -42,6 +42,31 @@ struct LayoutAndRenderingPipelineTests {
     #expect(placed.children[1].bounds.origin == .init(x: 5, y: 0))
   }
 
+  @Test("Spacer minLength contributes only on its enclosing stack axis")
+  func spacerMinimumIsStackAxisOnly() throws {
+    let horizontal = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Spacer(minLength: 5)
+      },
+      context: .init(identity: testIdentity("HorizontalSpacer")),
+      proposal: .init(width: 10, height: 8)
+    )
+    let vertical = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Spacer(minLength: 5)
+      },
+      context: .init(identity: testIdentity("VerticalSpacer")),
+      proposal: .init(width: 10, height: 8)
+    )
+
+    let horizontalSpacer = try #require(horizontal.measuredTree.childMeasurements.first)
+    let verticalSpacer = try #require(vertical.measuredTree.childMeasurements.first)
+    #expect(horizontal.measuredTree.measuredSize == .init(width: 10, height: 0))
+    #expect(horizontalSpacer.measuredSize == .init(width: 10, height: 0))
+    #expect(vertical.measuredTree.measuredSize == .init(width: 0, height: 8))
+    #expect(verticalSpacer.measuredSize == .init(width: 0, height: 8))
+  }
+
   @Test("default renderer builds geometry, semantics, draw tree, raster output, and commit plan")
   func defaultRendererBuildsEndToEndArtifacts() {
     let root = VStack(alignment: .leading, spacing: 1) {

@@ -234,10 +234,19 @@ public struct Spacer: PrimitiveView, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
+    let intrinsicSize =
+      switch context.environmentValues.stackAxis {
+      case .horizontal:
+        CellSize(width: minLength, height: 0)
+      case .vertical:
+        CellSize(width: 0, height: minLength)
+      case nil:
+        CellSize(width: minLength, height: minLength)
+      }
+    return [
       resolveLeafNode(
         kindName: "Spacer",
-        intrinsicSize: .init(width: minLength, height: minLength),
+        intrinsicSize: intrinsicSize,
         in: context
       )
     ]

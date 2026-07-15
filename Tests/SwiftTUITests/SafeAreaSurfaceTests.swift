@@ -7,6 +7,23 @@ import Testing
 @MainActor
 @Suite
 struct SafeAreaSurfaceTests {
+  @Test("ignoresSafeArea stays intrinsic on axes with no reclaimed inset")
+  func ignoresSafeAreaStaysIntrinsicOnUnreclaimedAxes() {
+    let zeroInsetArtifacts = render(
+      Text("X").ignoresSafeArea(),
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .zero
+    )
+    let topInsetArtifacts = render(
+      Text("X").ignoresSafeArea(.top),
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .init(top: 1)
+    )
+
+    #expect(zeroInsetArtifacts.measuredTree.measuredSize == .init(width: 1, height: 1))
+    #expect(topInsetArtifacts.measuredTree.measuredSize == .init(width: 1, height: 8))
+  }
+
   @Test("GeometryReader exposes container safe area insets")
   func geometryReaderExposesContainerSafeAreaInsets() {
     let artifacts = render(
