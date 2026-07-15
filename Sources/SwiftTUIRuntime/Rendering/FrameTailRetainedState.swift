@@ -97,14 +97,13 @@ final class FrameTailRetainedState: Sendable {
     // Phase products are reusable next frame only when this frame's committed
     // (effective) tree equals the pre-overlay baseline — i.e. no animation
     // overlay decorated the tree. Comparing the trees directly is the
-    // overlay-empty proxy: it allocates nothing and short-circuits on the first
-    // difference, replacing the previous *two* full `RetainedPhaseExtractionSignature`
-    // builds (one per tree) and their compare with a single comparison plus, only
-    // when reusable, one build. The stored signature is OPTIONAL: a tree with an
-    // unsupported node (`.canvas`/custom layout) yields `nil`, which previously
-    // discarded the products entirely — disabling reuse tree-wide. Keeping the
-    // products with a `nil` signature disables only the whole-tree fast path; the
-    // per-subtree partial-reuse path still reuses every supported subtree.
+    // overlay-empty proxy: it allocates nothing and short-circuits on the
+    // first difference. The next frame's whole-tree/subtree equivalence is
+    // proven by `RetainedPhaseExtractionSignature.subtreesIdentical` against
+    // this frame's index directly, so no per-commit signature is built or
+    // stored; trees with unsupported nodes (`.canvas`/custom layout) simply
+    // never prove whole-tree equivalence while their supported subtrees stay
+    // reusable through the partial path.
     let effectiveMatchesBaseline = artifacts.placedTree == baselinePlacedTree
     state.withLock { state in
       state.previousFrameIndex = .init(
@@ -120,7 +119,6 @@ final class FrameTailRetainedState: Sendable {
         if effectiveMatchesBaseline {
           RetainedFrameTailPhaseProducts(
             proposal: proposal,
-            signature: RetainedPhaseExtractionSignature.make(from: artifacts.placedTree),
             semantics: artifacts.semanticSnapshot.retainedExtractionProduct,
             draw: artifacts.drawTree,
             drawByNodeID: Self.drawIndex(artifacts.drawTree)

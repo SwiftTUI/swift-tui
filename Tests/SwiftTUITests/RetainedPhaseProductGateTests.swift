@@ -72,17 +72,24 @@ struct RetainedPhaseProductGateTests {
       proposal: .unspecified
     )
 
-    let products = state.input(invalidatedIdentities: []).previousPhaseProducts
+    let retained = state.input(invalidatedIdentities: [])
     // P1: the canvas no longer discards the whole frame's products; they are kept
     // so the per-subtree partial-reuse path can still reuse the text subtree.
-    #expect(products != nil)
-    // The whole-tree signature is nil because the tree has an unsupported node —
-    // that only disables the wholeTreeIdentical fast path, not partial reuse.
-    #expect(products?.signature == nil)
+    #expect(retained.previousPhaseProducts != nil)
+    // The unsupported node disables only the wholeTreeIdentical fast path
+    // (canvas payloads are never value-comparable), not partial reuse: the
+    // proof falls to the subtree path and reuses the text subtree.
+    #expect(
+      retained.phaseExtractionProof(
+        for: .unspecified,
+        placed: placed,
+        animationOverlaySnapshot: .init()
+      ) == .subtreesIdentical([text.identity])
+    )
   }
 
-  @Test("a fully supported tree retains products with a non-nil whole-tree signature")
-  func supportedTreeRetainsSignedProducts() {
+  @Test("a fully supported unchanged tree proves whole-tree identical")
+  func supportedTreeProvesWholeTreeIdentical() {
     let rootID = testIdentity("root")
     let placed = PlacedNode(
       identity: rootID,
@@ -98,9 +105,15 @@ struct RetainedPhaseProductGateTests {
       proposal: .unspecified
     )
 
-    let products = state.input(invalidatedIdentities: []).previousPhaseProducts
-    #expect(products != nil)
-    #expect(products?.signature != nil)
+    let retained = state.input(invalidatedIdentities: [])
+    #expect(retained.previousPhaseProducts != nil)
+    #expect(
+      retained.phaseExtractionProof(
+        for: .unspecified,
+        placed: placed,
+        animationOverlaySnapshot: .init()
+      ) == .wholeTreeIdentical
+    )
   }
 
   @Test("an overlay-decorated frame retains no phase products")

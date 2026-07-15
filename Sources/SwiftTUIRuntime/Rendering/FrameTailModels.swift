@@ -20,21 +20,23 @@ struct FrameTailRetainedInput {
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot
   ) -> RetainedPhaseExtractionProof {
+    // Phase products and the frame index are stored together, from the same
+    // artifacts, under one lock (`FrameTailRetainedState.storeCommittedFrame`),
+    // so when products exist the index describes the same committed tree —
+    // the paired walk against the index's placed root is exactly the stored
+    // whole-tree signature compare it replaced.
     guard
       let previous = previousPhaseProducts,
       previous.proposal == proposal,
-      animationOverlaySnapshot.isEmpty
+      animationOverlaySnapshot.isEmpty,
+      let previousFrameIndex = retainedLayout.previousFrameIndex
     else {
       return .none
     }
-    if let previousSignature = previous.signature,
-      let currentSignature = RetainedPhaseExtractionSignature.make(from: placed),
-      previousSignature == currentSignature
+    if let previousRoot = previousFrameIndex.placedNode(for: placed.identity),
+      RetainedPhaseExtractionSignature.subtreesIdentical(placed, previousRoot)
     {
       return .wholeTreeIdentical
-    }
-    guard let previousFrameIndex = retainedLayout.previousFrameIndex else {
-      return .none
     }
 
     var reusableRoots: Set<Identity> = []
@@ -55,9 +57,7 @@ struct FrameTailRetainedInput {
   ) {
     if !invalidationSummary.intersectsSubtree(at: node.identity),
       let previousPlaced = previousFrameIndex.placedNode(for: node.identity),
-      let currentSignature = RetainedPhaseExtractionSignature.make(from: node),
-      let previousSignature = RetainedPhaseExtractionSignature.make(from: previousPlaced),
-      currentSignature == previousSignature
+      RetainedPhaseExtractionSignature.subtreesIdentical(node, previousPlaced)
     {
       reusableRoots.insert(node.identity)
       return
@@ -76,13 +76,6 @@ struct FrameTailRetainedInput {
 
 struct RetainedFrameTailPhaseProducts: Sendable {
   var proposal: ProposedSize
-  /// The whole-tree extraction signature, or `nil` when the committed tree
-  /// contained a node that does not support retained phase extraction
-  /// (`.canvas`/`.foreignSurface`/custom layout). A `nil` signature disables
-  /// only the `.wholeTreeIdentical` fast path; the per-subtree partial-reuse
-  /// path (`collectReusablePhaseSubtrees`) still reuses the supported subtrees
-  /// instead of the whole tree being re-extracted from scratch.
-  var signature: RetainedPhaseExtractionSignature?
   var semantics: SemanticSnapshot
   var draw: DrawNode
   var drawByNodeID: [ViewNodeID: DrawNode]

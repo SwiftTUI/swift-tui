@@ -206,10 +206,8 @@ struct RetainedPhaseExtractionTests {
       )
     ]
 
-    let signature = RetainedPhaseExtractionSignature.make(from: container)
-    let changedSignature = RetainedPhaseExtractionSignature.make(from: changed)
-    #expect(signature != nil)
-    #expect(signature != changedSignature)
+    #expect(RetainedPhaseExtractionSignature.subtreesIdentical(container, container))
+    #expect(!RetainedPhaseExtractionSignature.subtreesIdentical(container, changed))
   }
 
   @Test("placed node equality distinguishes lazy child scroll estimates (F133)")
@@ -252,7 +250,9 @@ struct RetainedPhaseExtractionTests {
       drawPayload: .canvas(.init(drawing: Dots()))
     )
 
-    #expect(RetainedPhaseExtractionSignature.make(from: ordinary) != nil)
-    #expect(RetainedPhaseExtractionSignature.make(from: canvas) == nil)
+    #expect(RetainedPhaseExtractionSignature.subtreesIdentical(ordinary, ordinary))
+    // Canvas payloads are never value-comparable: an unsupported node cannot
+    // prove phase-reuse equivalence even against itself.
+    #expect(!RetainedPhaseExtractionSignature.subtreesIdentical(canvas, canvas))
   }
 }
