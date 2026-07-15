@@ -38,6 +38,28 @@ extension FrameTailRenderer {
     return summary.count == 0
       && summary.mainActorOnlyIndexedChildSourceCount > 0
       && summary.layoutRealizedContentCount == 0
+      // Snapshotting pre-realizes EVERY source element on the main actor
+      // before the tail can offload. Past this budget that pre-realization
+      // costs more than offloading the tail wins: a windowed main-actor
+      // tail realizes on the order of one viewport of rows per source
+      // (proposal 2026-07-13-002 Stage 2.2b — the F144 async twin). The
+      // frame then keeps the live sources and runs the tail on the main
+      // actor (`canOffloadLayout` is already false for these trees).
+      && summary.mainActorOnlyIndexedChildSourceElementCount
+        <= Self.workerSnapshotElementBudget(for: input.proposal)
+  }
+
+  /// Four times the root proposal's larger dimension: generous against a
+  /// windowed tail's per-source realization (viewport rows + overscan, a few
+  /// measure entries per frame), so small sources — where the snapshot is
+  /// cheap and offload genuinely wins — keep offloading unchanged.
+  static func workerSnapshotElementBudget(for proposal: ProposedSize) -> Int {
+    let width: Int =
+      if case .finite(let value) = proposal.width { value } else { 0 }
+    let height: Int =
+      if case .finite(let value) = proposal.height { value } else { 0 }
+    let bound = max(width, height)
+    return bound > 0 ? 4 * bound : 256
   }
 
   func needsPreparedGraphDuringLayout(
@@ -64,6 +86,11 @@ extension FrameTailRenderer {
         (summary.mainActorOnlyIndexedChildSourceCount > 0)
           == containsMainActorOnlyIndexedChildSource(resolved),
         "customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceCount drifted"
+      )
+      assert(
+        summary.mainActorOnlyIndexedChildSourceElementCount
+          == mainActorOnlyIndexedChildSourceElementScan(resolved),
+        "customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceElementCount drifted"
       )
       assert(
         (summary.layoutRealizedContentCount > 0) == containsLayoutRealizedContent(resolved),
@@ -102,6 +129,25 @@ extension FrameTailRenderer {
       }
     }
     return node.children.contains { containsMainActorOnlyIndexedChildSource($0) }
+  }
+
+  func mainActorOnlyIndexedChildSourceElementScan(
+    _ node: ResolvedNode
+  ) -> Int {
+    var total = 0
+    if let source = node.indexedChildSource {
+      if !source.canRunOnWorker {
+        total += source.count
+      }
+      if let workerChildren = source.workerResolvedChildren {
+        total += workerChildren.reduce(0) {
+          $0 + mainActorOnlyIndexedChildSourceElementScan($1)
+        }
+      }
+    }
+    return node.children.reduce(total) {
+      $0 + mainActorOnlyIndexedChildSourceElementScan($1)
+    }
   }
 
   func containsLayoutRealizedContent(

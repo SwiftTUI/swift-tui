@@ -23,6 +23,28 @@ extension VerticalAlignment {
 @MainActor
 @Suite(.serialized)
 struct AsyncFrameTailRenderingTests {
+  @Test("worker-snapshot element budget scales with the root bound, defaults unbounded")
+  func workerSnapshotElementBudgetScalesWithRootBound() {
+    // Proposal 2026-07-13-002 Stage 2.2b: past this budget the frame head
+    // keeps live lazy sources (no pre-realizing snapshot) and the tail runs
+    // on the main actor, where windowed measurement bounds the work.
+    #expect(
+      FrameTailRenderer.workerSnapshotElementBudget(
+        for: ProposedSize(width: .finite(80), height: .finite(32))
+      ) == 320
+    )
+    #expect(
+      FrameTailRenderer.workerSnapshotElementBudget(
+        for: ProposedSize(width: .finite(40), height: .finite(120))
+      ) == 480
+    )
+    #expect(
+      FrameTailRenderer.workerSnapshotElementBudget(
+        for: ProposedSize(width: .unspecified, height: .unspecified)
+      ) == 256
+    )
+  }
+
   @Test("blocked async frame tail queues input without committing ahead")
   func blockedFrameTailQueuesInputWithoutCommittingAhead() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailRoot")

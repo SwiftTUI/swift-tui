@@ -353,7 +353,7 @@ package struct ResolvedNode: Equatable, Sendable {
       summary.record(identity)
     }
     if let indexedChildSource, !indexedChildSource.canRunOnWorker {
-      summary.recordMainActorOnlyIndexedChildSource()
+      summary.recordMainActorOnlyIndexedChildSource(elementCount: indexedChildSource.count)
     }
     if layoutRealizedContent != nil {
       summary.recordLayoutRealizedContent()

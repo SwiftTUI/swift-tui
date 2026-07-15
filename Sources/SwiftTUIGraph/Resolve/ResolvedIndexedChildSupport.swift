@@ -129,6 +129,11 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
   package var firstIdentity: Identity?
   /// Indexed child sources in the subtree whose `canRunOnWorker` is `false`.
   package var mainActorOnlyIndexedChildSourceCount: Int
+  /// Total elements across those sources: the worker-snapshot pre-realization
+  /// is O(this), so the offload eligibility budgets against it (proposal
+  /// 2026-07-13-002 Stage 2.2b — pre-realizing a large source on the main
+  /// actor costs more than offloading the tail can win).
+  package var mainActorOnlyIndexedChildSourceElementCount: Int
   /// Layout-realized content boundaries in the subtree.
   package var layoutRealizedContentCount: Int
 
@@ -136,11 +141,14 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     count: Int = 0,
     firstIdentity: Identity? = nil,
     mainActorOnlyIndexedChildSourceCount: Int = 0,
+    mainActorOnlyIndexedChildSourceElementCount: Int = 0,
     layoutRealizedContentCount: Int = 0
   ) {
     self.count = count
     self.firstIdentity = firstIdentity
     self.mainActorOnlyIndexedChildSourceCount = mainActorOnlyIndexedChildSourceCount
+    self.mainActorOnlyIndexedChildSourceElementCount =
+      mainActorOnlyIndexedChildSourceElementCount
     self.layoutRealizedContentCount = layoutRealizedContentCount
   }
 
@@ -151,8 +159,9 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     }
   }
 
-  package mutating func recordMainActorOnlyIndexedChildSource() {
+  package mutating func recordMainActorOnlyIndexedChildSource(elementCount: Int) {
     mainActorOnlyIndexedChildSourceCount += 1
+    mainActorOnlyIndexedChildSourceElementCount += elementCount
   }
 
   package mutating func recordLayoutRealizedContent() {
@@ -165,6 +174,8 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
       firstIdentity = other.firstIdentity
     }
     mainActorOnlyIndexedChildSourceCount += other.mainActorOnlyIndexedChildSourceCount
+    mainActorOnlyIndexedChildSourceElementCount +=
+      other.mainActorOnlyIndexedChildSourceElementCount
     layoutRealizedContentCount += other.layoutRealizedContentCount
   }
 }

@@ -51,6 +51,31 @@ struct ResolvedNodeOffloadSummaryTests {
     #expect(target.customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceCount == 0)
   }
 
+  @Test("main-actor source element counts aggregate through the subtree summary")
+  func mainActorSourceElementCountsAggregate() {
+    var lazyChild = makeNode("lazy-child")
+    lazyChild.indexedChildSource = MainActorOnlyChildSource(
+      identityRoot: lazyChild.identity,
+      elementCount: 250
+    )
+    var target = makeNode("target")
+    target.indexedChildSource = MainActorOnlyChildSource(
+      identityRoot: target.identity,
+      elementCount: 1_000
+    )
+    target.children = [lazyChild]
+
+    #expect(target.customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceCount == 2)
+    #expect(
+      target.customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceElementCount == 1_250
+    )
+
+    target.children = []
+    #expect(
+      target.customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceElementCount == 1_000
+    )
+  }
+
   @Test("children setter re-aggregates disqualifiers from the new subtree")
   func childrenSetterReaggregates() {
     var child = makeNode("child")
@@ -116,7 +141,8 @@ private final class OffloadSummaryTestRealizer: LayoutDependentContentRealizer {
 
 private struct MainActorOnlyChildSource: IndexedChildSource {
   let identityRoot: Identity
-  var count: Int { 0 }
+  var elementCount = 0
+  var count: Int { elementCount }
   var measurementSignature: IndexedChildMeasurementSignature {
     .init(elementPaths: ["main-actor-only"])
   }

@@ -10,8 +10,10 @@
 /// List-scenario trap — so window-shift work is exercised directly.
 ///
 /// Row count is `TERMUI_PERF_LAZY_VSTACK_ROWS`-overridable for scaling
-/// probes. The committed default is the largest scale HEAD drives promptly;
-/// flipping it to 10k with a fast first frame is the Stage-2 exit criterion.
+/// probes. The default is 10k — the Stage-2 exit criterion, flipped when
+/// windowed measurement landed: the pre-windowing HEAD could not present a
+/// 10k first frame within 120 seconds; the windowed pipeline completes the
+/// whole 10k scenario in ~1.3s (debug).
 public struct LazyVStackScrollScenario: PerfScenario {
   public let name: PerfScenarioName = .lazyVStackScroll
   public let defaultTerminalSize = PerfTerminalSize(columns: 80, rows: 32)
@@ -24,7 +26,7 @@ public struct LazyVStackScrollScenario: PerfScenario {
   // of every row — beyond the runner's 2-second default at measurement scale.
   public let initialFrameTimeout: Duration = .seconds(60)
 
-  private static let defaultRowCount = 1_000
+  private static let defaultRowCount = 10_000
   /// Each burst scrolls farther than the viewport is tall, so the settle
   /// marker (the burst's new top row) is never visible before the burst.
   private static let burstRows = 30
