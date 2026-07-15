@@ -1928,33 +1928,6 @@ package final class ViewGraph {
     }
   }
 
-  /// Declares that `host` resolved `resolved` this frame without committing it
-  /// as a child (a navigation stack's root while a destination is presented).
-  /// Such a subtree is reachable through neither committed values nor parent
-  /// links — resolution is its only lifetime anchor — so `removeSubtree`
-  /// descends these edges when the host departs, tearing the hosted subtree
-  /// down with the same visited-sparing and entity-deferral guards as every
-  /// other departed-subtree descent. Re-committing the subtree later (the
-  /// destination dismisses) makes the edge redundant, not wrong: the host's
-  /// teardown already reaches an attached child, and the walk is idempotent.
-  package func recordDetachedHostedSubtree(
-    _ resolved: ResolvedNode,
-    hostedBy host: ViewNode?
-  ) {
-    guard let host,
-      let rootNodeID = resolved.viewNodeID ?? viewNodeID(for: resolved.identity),
-      rootNodeID != host.viewNodeID,
-      nodeIfExists(for: rootNodeID) != nil
-    else {
-      return
-    }
-    recordManualResolveLifetimeAnchor(
-      rootNodeID: rootNodeID,
-      hostedByNodeID: host.viewNodeID
-    )
-    recordDetachedHostedNode(rootNodeID, hostedByNodeID: host.viewNodeID)
-  }
-
   /// Records the content-subtree node IDs of the pushed-destination surfaces a
   /// `NavigationStack` resolved this frame, keyed by the resolving host node,
   /// and queues any content node that departed the host's active set since last

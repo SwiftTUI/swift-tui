@@ -7,7 +7,6 @@ private final class ResolveLifetimeScopeFrame {
   weak var graph: ViewGraph?
   let hostNodeID: ViewNodeID
   var observedNodeIDs: Set<ViewNodeID> = []
-  var manualHostedNodeIDs: Set<ViewNodeID> = []
 
   init(graph: ViewGraph, hostNodeID: ViewNodeID) {
     self.graph = graph
@@ -100,19 +99,6 @@ extension ViewGraph {
     SoundnessProbeConfiguration.recordAutomaticLifetimeAnchor()
   }
 
-  func recordManualResolveLifetimeAnchor(
-    rootNodeID: ViewNodeID,
-    hostedByNodeID hostNodeID: ViewNodeID
-  ) {
-    guard let frame = ResolveLifetimeScopeContext.current,
-      frame.graph === self,
-      frame.hostNodeID == hostNodeID
-    else {
-      return
-    }
-    frame.manualHostedNodeIDs.insert(rootNodeID)
-  }
-
   private func closeResolveLifetimeScope(_ frame: ResolveLifetimeScopeFrame) {
     guard frame.graph === self,
       nodeIfExists(for: frame.hostNodeID) != nil
@@ -120,8 +106,8 @@ extension ViewGraph {
       return
     }
 
-    var automaticallyHosted: Set<ViewNodeID> = []
     var classifiedNodeIDs: Set<ViewNodeID> = []
+    var liveObservedNodeIDs: Set<ViewNodeID> = []
     for nodeID in frame.observedNodeIDs.sorted() {
       guard nodeID != frame.hostNodeID else {
         continue
@@ -131,6 +117,7 @@ extension ViewGraph {
       guard nodeIfExists(for: nodeID) != nil else {
         continue
       }
+      liveObservedNodeIDs.insert(nodeID)
       let anchors = lifetimeAnchors.anchors(for: nodeID)
       if anchors.contains(.parent(frame.hostNodeID))
         || anchors.contains(.committedValue(frame.hostNodeID))
@@ -162,20 +149,17 @@ extension ViewGraph {
       // durable detached result when the host's finished apply did not commit
       // it and no other durable owner claimed it. An intentional scratch mint
       // is explicit `.resolveScopeScratch` debt rather than a reported result.
-      automaticallyHosted.insert(nodeID)
       classifiedNodeIDs.insert(nodeID)
       recordDetachedHostedNode(nodeID, hostedByNodeID: frame.hostNodeID)
       SoundnessProbeConfiguration.recordAutomaticLifetimeAnchor()
     }
 
-    let unexplainedManual = frame.manualHostedNodeIDs.subtracting(classifiedNodeIDs)
-    if !unexplainedManual.isEmpty {
-      let detail =
-        "manual hosted nodes were not classified host=\(frame.hostNodeID) missing=\(unexplainedManual)"
-      SoundnessProbeConfiguration.recordResolveLifetimeScopeManualMismatch(
-        detail
+    let unclassified = liveObservedNodeIDs.subtracting(classifiedNodeIDs)
+    for nodeID in unclassified.sorted() {
+      SoundnessProbeConfiguration.recordUnclassifiedResolvedNode(
+        "resolved node has no lifetime classification host=\(frame.hostNodeID) node=\(nodeID)"
       )
-      assertionFailure(detail)
     }
+    assert(unclassified.isEmpty)
   }
 }

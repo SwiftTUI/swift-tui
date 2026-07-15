@@ -148,26 +148,6 @@ struct ResolveLifetimeScopeTests {
     )
   }
 
-  @Test("manual declarations are explained by the automatic classifier")
-  func manualDeclarationComparisonHasNoMismatch() throws {
-    let graph = ViewGraph()
-    let host = evaluateStoredNode(graph, named: "Host")
-    let detached = evaluateStoredNode(graph, named: "Detached")
-    let mismatchBefore = SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount
-    let unclassifiedBefore = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
-
-    graph.withResolveLifetimeScope(hostedBy: host) {
-      graph.reportResolvedLifetimeNode(detached)
-      graph.recordDetachedHostedSubtree(detached.snapshot(), hostedBy: host)
-    }
-
-    #expect(
-      SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount
-        == mismatchBefore
-    )
-    #expect(SoundnessProbeConfiguration.unclassifiedResolvedNodeCount == unclassifiedBefore)
-  }
-
   @Test("a candidate removed before scope close needs no lifetime classification")
   func sameFrameRemovedCandidateIsIgnored() throws {
     let graph = ViewGraph()

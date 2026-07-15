@@ -34,7 +34,6 @@ struct SoundnessProbeConfigurationTests {
     let slotDropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
     let barrierCount = SoundnessProbeConfiguration.barrierNonConvergenceCount
     let automaticAnchorCount = SoundnessProbeConfiguration.automaticLifetimeAnchorCount
-    let manualMismatchCount = SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount
     let unclassifiedCount = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
@@ -53,7 +52,6 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = slotDropCount
       SoundnessProbeConfiguration.barrierNonConvergenceCount = barrierCount
       SoundnessProbeConfiguration.automaticLifetimeAnchorCount = automaticAnchorCount
-      SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount = manualMismatchCount
       SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }

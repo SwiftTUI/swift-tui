@@ -226,13 +226,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         // resolved node keeps its lazy source instead of child nodes — so the
         // mint would strand alive in the store when the container departs (the
         // F04/F91 teardown-coherence leak; the gallery collections-tab
-        // warning). Anchor it to the host captured at declaration so that
-        // host's teardown retires realized elements through the standard
-        // cascade.
-        childContext.viewGraph?.recordDetachedHostedSubtree(
-          normalized,
-          hostedBy: mintHost
-        )
+        // warning). The captured resolve-lifetime scope supplies the live
+        // declaration host and owns this detached result there.
+        childContext.viewGraph?.reportDetachedResolvedLifetimeResult(normalized)
         cache[index] = normalized
         return normalized
       }

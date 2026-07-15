@@ -4,10 +4,10 @@ import Testing
 @testable import SwiftTUIGraph
 
 @MainActor
-@Suite("Proposal -003 Stage 0 teardown baseline")
+@Suite("Proposal -003 teardown reachability")
 struct TeardownReachabilityBaselineTests {
-  @Test("remaining manual hosted-subtree anchor inventory is locked")
-  func remainingManualHostedSubtreeAnchorInventoryIsLocked() throws {
+  @Test("manual hosted-subtree anchor API has no production invocations")
+  func manualHostedSubtreeAnchorAPIHasNoProductionInvocations() throws {
     let repositoryRoot = try SourceParsingTestSupport.repositoryRoot()
     let sourcesRoot = repositoryRoot.appendingPathComponent("Sources")
     let enumerator = try #require(
@@ -37,11 +37,7 @@ struct TeardownReachabilityBaselineTests {
       invocationCountsByPath[relativePath] = invocationCount
     }
 
-    let expected = [
-      "Sources/SwiftTUIViews/Collections/IndexedChildSources.swift": 1
-    ]
-    #expect(invocationCountsByPath == expected)
-    #expect(invocationCountsByPath.values.reduce(0, +) == 1)
+    #expect(invocationCountsByPath.isEmpty)
   }
 
   @Test("inactive entity homes are not kept")
