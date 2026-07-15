@@ -1,11 +1,16 @@
 package struct InvalidationSummary: Equatable, Sendable {
   package let directlyInvalidated: Set<Identity>
   package let identitiesWithInvalidatedDescendants: Set<Identity>
+  /// The invalidated identities' component paths, resolved once so the
+  /// per-candidate ancestor query below prefix-compares against this (tiny)
+  /// list instead of minting an `Identity` per ancestor level per call.
+  private let directlyInvalidatedComponents: [[String]]
 
   package init(
     invalidatedIdentities: Set<Identity>
   ) {
     directlyInvalidated = invalidatedIdentities
+    directlyInvalidatedComponents = invalidatedIdentities.map(\.components)
 
     var identitiesWithInvalidatedDescendants: Set<Identity> = []
     for invalidatedIdentity in invalidatedIdentities {
@@ -29,6 +34,14 @@ package struct InvalidationSummary: Equatable, Sendable {
     directlyInvalidated.isEmpty
   }
 
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    // `directlyInvalidatedComponents` is derived from `directlyInvalidated`
+    // in Set-iteration order — comparing it would make equal summaries
+    // spuriously unequal. The two identity sets carry all the information.
+    lhs.directlyInvalidated == rhs.directlyInvalidated
+      && lhs.identitiesWithInvalidatedDescendants == rhs.identitiesWithInvalidatedDescendants
+  }
+
   package func isDirectlyInvalidated(
     _ identity: Identity
   ) -> Bool {
@@ -44,12 +57,23 @@ package struct InvalidationSummary: Equatable, Sendable {
   package func hasInvalidatedAncestor(
     of identity: Identity
   ) -> Bool {
-    var ancestor = StructuralPath(identity: identity).parent
-    while let current = ancestor {
-      if directlyInvalidated.contains(current.identityProjection) {
+    // Inverted from the historical per-level ancestor walk: an invalidated
+    // identity is a strict ancestor of `identity` exactly when its component
+    // path is a strict prefix (`StructuralPath(identity:)` round-trips the
+    // component list losslessly, so prefix-on-components equals membership of
+    // the projected ancestor identity in the set). Iterating the (tiny)
+    // invalidated list avoids minting an `Identity` — plus hashing it — per
+    // ancestor level on every reuse-gate query.
+    guard !directlyInvalidatedComponents.isEmpty else {
+      return false
+    }
+    let components = identity.components
+    for invalidatedComponents in directlyInvalidatedComponents {
+      if invalidatedComponents.count < components.count,
+        zip(invalidatedComponents, components).allSatisfy(==)
+      {
         return true
       }
-      ancestor = current.parent
     }
     return false
   }

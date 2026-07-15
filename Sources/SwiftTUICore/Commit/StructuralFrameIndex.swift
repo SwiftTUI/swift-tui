@@ -15,6 +15,11 @@ package struct StructuralFrameIndex: Equatable, Sendable {
   package let subtreeRangeByNode: [StructuralNodeKey: Range<Int>]
   package let subtreeSignatureByNode: [StructuralNodeKey: Int]
   package let postorder: [StructuralNodeKey]
+  /// Each node's own index in `postorder`. Together with `subtreeRangeByNode`
+  /// this answers ancestor/descendant queries by range containment in O(1)
+  /// per pair, letting the invalidation queries below iterate the (tiny)
+  /// invalidated set instead of scanning whole subtrees.
+  package let postorderPositionByNode: [StructuralNodeKey: Int]
 
   package var runtimeIdentities: Set<Identity> {
     Set(nodeByRuntimeIdentity.keys)
@@ -30,6 +35,9 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     subtreeRangeByNode = builder.subtreeRangeByNode
     subtreeSignatureByNode = builder.subtreeSignatureByNode
     postorder = builder.postorder
+    postorderPositionByNode = Dictionary(
+      uniqueKeysWithValues: builder.postorder.enumerated().map { ($1, $0) }
+    )
   }
 
   package func nodes(
@@ -60,27 +68,48 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     return runtimeIdentityByNode[parent]
   }
 
+  // The invalidation queries below iterate the invalidated node-key set and
+  // answer ancestry by postorder-range containment — O(|invalidated|) per
+  // call — instead of scanning subtrees or ancestor chains. Invalidation sets
+  // are tiny (median 2 post-F08) while subtrees run to hundreds of nodes.
+  // Key membership subsumes the old per-node identity re-check: the key set
+  // is resolved from the SAME identity set through `nodeByRuntimeIdentity`,
+  // the exact inverse of `runtimeIdentityByNode`, so an identity match at a
+  // node implies that node's key is in the set; identities absent from the
+  // frame resolve to no keys and can never match a frame-resident node.
+  // Every query preserves the `nil` (identity unknown to this frame) vs
+  // `false` (known, no intersection) distinction — the unindexed-invalidation
+  // fallback chain in `RetainedInvalidationSummary` depends on it.
+
   package func hasInvalidatedAncestor(
     of identity: Identity,
     invalidatedIdentities: Set<Identity>
+  ) -> Bool? {
+    hasInvalidatedAncestor(
+      of: identity,
+      invalidatedNodes: nodeKeys(for: invalidatedIdentities)
+    )
+  }
+
+  package func hasInvalidatedAncestor(
+    of identity: Identity,
+    invalidatedNodes: Set<StructuralNodeKey>
   ) -> Bool? {
     let keys = nodes(for: identity)
     guard !keys.isEmpty else {
       return nil
     }
-    let invalidatedNodes = nodeKeys(for: invalidatedIdentities)
+    guard !invalidatedNodes.isEmpty else {
+      return false
+    }
     for key in keys {
-      var parent = parentByNode[key]
-      while let current = parent {
-        if invalidatedNodes.contains(current) {
+      guard let position = postorderPositionByNode[key] else {
+        continue
+      }
+      for invalidated in invalidatedNodes where invalidated != key {
+        if let range = subtreeRangeByNode[invalidated], range.contains(position) {
           return true
         }
-        if let parentIdentity = runtimeIdentityByNode[current],
-          invalidatedIdentities.contains(parentIdentity)
-        {
-          return true
-        }
-        parent = parentByNode[current]
       }
     }
     return false
@@ -90,22 +119,29 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     of identity: Identity,
     invalidatedIdentities: Set<Identity>
   ) -> Bool? {
+    containsInvalidatedDescendant(
+      of: identity,
+      invalidatedNodes: nodeKeys(for: invalidatedIdentities)
+    )
+  }
+
+  package func containsInvalidatedDescendant(
+    of identity: Identity,
+    invalidatedNodes: Set<StructuralNodeKey>
+  ) -> Bool? {
     let keys = nodes(for: identity)
     guard !keys.isEmpty else {
       return nil
     }
-    let invalidatedNodes = nodeKeys(for: invalidatedIdentities)
+    guard !invalidatedNodes.isEmpty else {
+      return false
+    }
     for key in keys {
       guard let range = subtreeRangeByNode[key] else {
         continue
       }
-      for descendant in postorder[range] where descendant != key {
-        if invalidatedNodes.contains(descendant) {
-          return true
-        }
-        if let descendantIdentity = runtimeIdentityByNode[descendant],
-          invalidatedIdentities.contains(descendantIdentity)
-        {
+      for invalidated in invalidatedNodes where invalidated != key {
+        if let position = postorderPositionByNode[invalidated], range.contains(position) {
           return true
         }
       }
@@ -117,6 +153,18 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     at identity: Identity,
     invalidatedIdentities: Set<Identity>
   ) -> Bool? {
+    intersectsSubtree(
+      at: identity,
+      invalidatedNodes: nodeKeys(for: invalidatedIdentities),
+      invalidatedIdentities: invalidatedIdentities
+    )
+  }
+
+  package func intersectsSubtree(
+    at identity: Identity,
+    invalidatedNodes: Set<StructuralNodeKey>,
+    invalidatedIdentities: Set<Identity>
+  ) -> Bool? {
     if invalidatedIdentities.contains(identity) {
       return true
     }
@@ -125,20 +173,23 @@ package struct StructuralFrameIndex: Equatable, Sendable {
     }
     if containsInvalidatedDescendant(
       of: identity,
-      invalidatedIdentities: invalidatedIdentities
+      invalidatedNodes: invalidatedNodes
     ) == true {
       return true
     }
     if hasInvalidatedAncestor(
       of: identity,
-      invalidatedIdentities: invalidatedIdentities
+      invalidatedNodes: invalidatedNodes
     ) == true {
       return true
     }
     return false
   }
 
-  private func nodeKeys(
+  /// Resolves an identity set to its frame node keys. Frame-constant callers
+  /// (`RetainedInvalidationSummary`) resolve once and reuse the set across
+  /// every per-candidate query.
+  package func nodeKeys(
     for identities: Set<Identity>
   ) -> Set<StructuralNodeKey> {
     var keys: Set<StructuralNodeKey> = []

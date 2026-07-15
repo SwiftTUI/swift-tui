@@ -259,6 +259,10 @@ package struct RetainedInvalidationSummary: Sendable {
   private let base: InvalidationSummary
   private let structuralFrame: StructuralFrameIndex?
   private let hasUnindexedInvalidations: Bool
+  /// Frame-constant resolution of `directlyInvalidated` to structural node
+  /// keys, computed once so the per-candidate `intersectsSubtree` queries
+  /// (measure/place reuse gates, phase-reuse collection) never rebuild it.
+  private let invalidatedNodeKeys: Set<StructuralNodeKey>
   package let identitiesWithSyntheticInvalidatedAncestors: Set<Identity>
   package let affectedIndexedChildSourceRoots: Set<Identity>
 
@@ -282,6 +286,7 @@ package struct RetainedInvalidationSummary: Sendable {
     guard let previousFrameIndex else {
       structuralFrame = nil
       hasUnindexedInvalidations = false
+      invalidatedNodeKeys = []
       identitiesWithSyntheticInvalidatedAncestors = []
       affectedIndexedChildSourceRoots = []
       return
@@ -293,6 +298,8 @@ package struct RetainedInvalidationSummary: Sendable {
     )
     structuralFrame = previousStructuralFrame
     self.hasUnindexedInvalidations = hasUnindexedInvalidations
+    let invalidatedNodeKeys = previousStructuralFrame.nodeKeys(for: invalidatedIdentities)
+    self.invalidatedNodeKeys = invalidatedNodeKeys
 
     let previousResolvedIdentities = previousStructuralFrame.runtimeIdentities
     let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(
@@ -328,6 +335,7 @@ package struct RetainedInvalidationSummary: Sendable {
         }
         let structuralResult = previousStructuralFrame.intersectsSubtree(
           at: source.identityRoot,
+          invalidatedNodes: invalidatedNodeKeys,
           invalidatedIdentities: invalidatedIdentities
         )
         if structuralResult == true
@@ -366,7 +374,7 @@ package struct RetainedInvalidationSummary: Sendable {
   ) -> Bool {
     if let structuralResult = structuralFrame?.containsInvalidatedDescendant(
       of: identity,
-      invalidatedIdentities: directlyInvalidated
+      invalidatedNodes: invalidatedNodeKeys
     ) {
       if structuralResult || !hasUnindexedInvalidations {
         return structuralResult
@@ -406,6 +414,7 @@ package struct RetainedInvalidationSummary: Sendable {
   ) -> Bool {
     if let structuralResult = structuralFrame?.intersectsSubtree(
       at: identity,
+      invalidatedNodes: invalidatedNodeKeys,
       invalidatedIdentities: directlyInvalidated
     ) {
       if structuralResult || !hasUnindexedInvalidations {
@@ -500,3 +509,5 @@ package struct RetainedLayoutSession: Sendable {
     invalidationSummary.affectsIndexedChildSource(within: identity)
   }
 }
+
+
