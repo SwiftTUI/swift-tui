@@ -215,6 +215,32 @@ main actor when the execution strategy supports it. That boundary is why the
 runtime stage pipeline is different from the phase-product model: the fused tail
 is a scheduling optimization over distinct products, not a different data model.
 
+## Lazy Container Windowing
+
+`LazyVStack`/`LazyHStack` content backed by an indexed source (a direct
+`ForEach`) is viewport-windowed end to end when it sits under a `ScrollView`:
+the scroll layout declares a measure-time viewport, measurement realizes and
+sizes only the visible band plus overscan (every other allocation entry is
+synthesized from the first row's extent), and placement materializes rows on
+demand strictly within the visible range. Consequences hosts and tests can
+observe:
+
+- Rows outside the viewport are not placed: they paint nothing, mint no
+  interaction regions, and are not focus-traversal targets until scrolled
+  into view — matching SwiftUI's lazy contract (offscreen lazy rows do not
+  exist yet). `scrollTo` still reaches them through the allocation snapshot's
+  estimated frames.
+- The container's content size is an estimate that refines as real
+  measurements replace estimates when the window moves; the scroll offset
+  registry re-anchors on content-size change.
+- Ineligible shapes — sources spliced into multiple cells per element,
+  negotiated (`nil`) spacing, no enclosing scroll-declared viewport — fall
+  back to exhaustive realization, byte-identical to the pre-windowing
+  pipeline.
+- Frames whose live lazy sources exceed the worker-snapshot element budget
+  keep those sources live and run the frame tail on the main actor instead
+  of pre-realizing every element for worker offload.
+
 ## Damage And Presentation
 
 Renderer-private reuse hints and host-facing damage are separate concepts.

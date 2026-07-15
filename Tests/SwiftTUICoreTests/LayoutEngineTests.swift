@@ -843,6 +843,62 @@ struct LayoutEngineTests {
     #expect(counter.count - measureRealizations == 5)
   }
 
+  @Test("window movement replaces estimates with real measurements (drift correction)")
+  func windowMovementCorrectsEstimates() throws {
+    // Rows 0..49 are 1 cell tall; rows 50..99 are 3 cells. The probe row (0)
+    // estimates every out-of-window entry at 1 cell, so a product windowed
+    // near the top under-estimates the tail. Scrolling the hint into the
+    // tall band re-windows: the new product measures the tall rows for real
+    // and its content estimate grows — the correction mechanic Stage 2.4
+    // relies on (the scroll registry re-anchors on content-size change).
+    let engine = LayoutEngine()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: index < 50 ? 1 : 3))
+    }
+    let lazy = indexedLazyStack("lazy", axis: .vertical, children: rows)
+    let passContext = LayoutPassContext(retainedLayout: nil)
+
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .zero,
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    let topProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    passContext.popMeasureViewportHint()
+    let topSnapshot = try #require(topProduct.containerAllocationSnapshot?.lazyStack)
+    // Every row estimated at the probe's 1 cell: 100 total.
+    #expect(topSnapshot.contentMainLength == 100)
+
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 60),
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    let tallProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    passContext.popMeasureViewportHint()
+    let tallSnapshot = try #require(tallProduct.containerAllocationSnapshot?.lazyStack)
+    let tallWindow = try #require(tallSnapshot.measuredWindow)
+
+    // The re-windowed product measured the tall rows for real...
+    for index in tallWindow where index >= 50 {
+      #expect(tallSnapshot.childMainLengths[index] == 3)
+    }
+    // ...so its content estimate grew past the all-1-cell estimate.
+    #expect(tallSnapshot.contentMainLength > topSnapshot.contentMainLength)
+  }
+
   @Test("estimated visible window anchors, spans, and clamps at dataset edges")
   func estimatedVisibleWindowClampsAtDatasetEdges() {
     let engine = LayoutEngine()
