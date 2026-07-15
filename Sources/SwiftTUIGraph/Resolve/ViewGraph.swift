@@ -2737,6 +2737,9 @@ package final class ViewGraph {
 
   func legacyTeardownWorkSnapshot() -> LegacyTeardownWorkSnapshot {
     LegacyTeardownWorkSnapshot(
+      resolveScopeScratchNodeIDs: teardownBarrierWork.nodeIDs(
+        for: .resolveScopeScratch
+      ),
       entityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       absorbedShadowNodeIDs: absorbedShadowedNodeIDs,
       departedNavigationSurfaceNodeIDs: departedNavigationSurfaceContentNodeIDs
@@ -2745,6 +2748,7 @@ package final class ViewGraph {
 
   private func runLegacyTeardownStage(
     _ stage: LegacyTeardownBarrierStage,
+    iteration: Int,
     trace: LegacyTeardownBarrierTraceRecorder?,
     _ body: () -> Void
   ) {
@@ -2756,6 +2760,7 @@ package final class ViewGraph {
     let workBefore = legacyTeardownWorkSnapshot()
     body()
     trace.record(
+      iteration: iteration,
       stage: stage,
       nodesBefore: nodesBefore,
       nodesAfter: Set(nodesByNodeID.keys),
@@ -2769,6 +2774,8 @@ package final class ViewGraph {
     nodeID: ViewNodeID
   ) {
     switch reason {
+    case .resolveScopeScratch:
+      enqueueTeardownWork(.resolveScopeScratch, for: nodeID)
     case .entityRoutedRemoval:
       enqueueTeardownWork(.entityRoutedRemoval, for: nodeID)
     case .absorbedShadow:
@@ -2778,38 +2785,133 @@ package final class ViewGraph {
     }
   }
 
+  private func pruneResolveScopeScratch() {
+    let candidates = teardownBarrierWork.nodeIDs(for: .resolveScopeScratch)
+    guard !candidates.isEmpty else {
+      return
+    }
+    consumeTeardownWork(.resolveScopeScratch, for: candidates)
+    for nodeID in candidates.sorted() {
+      guard let node = nodeIfExists(for: nodeID),
+        nodeID != root?.viewNodeID
+      else {
+        continue
+      }
+      removeSubtree(
+        rootedAt: node,
+        sparingVisitedNodes: true,
+        ignoringLifetimeAnchors: true
+      )
+    }
+  }
+
+  @discardableResult
   private func settleTeardownBarrier(
     candidateRootID: ViewNodeID,
     resolved: ResolvedNode,
     activeEntities: Set<EntityIdentity>,
-    trace: LegacyTeardownBarrierTraceRecorder?
-  ) {
+    trace: LegacyTeardownBarrierTraceRecorder?,
+    afterStage: ((LegacyTeardownBarrierStage, Int) -> Void)? = nil
+  ) -> TeardownBarrierResult {
     precondition(
       nodeIfExists(for: candidateRootID) != nil,
       "teardown barrier candidate root must remain stored"
     )
-    runLegacyTeardownStage(
-      .entityRoutedRemoval,
-      trace: trace
-    ) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    let iterationBound = max(
+      2,
+      2
+        * (nodesByNodeID.count
+          + lifetimeAnchors.edgeCount
+          + teardownBarrierWork.reasonCount
+          + 1)
+    )
+
+    for iteration in 0..<iterationBound {
+      let nodesBefore = Set(nodesByNodeID.keys)
+      let anchorsBefore = lifetimeAnchors
+      let workBefore = teardownBarrierWork
+
+      runLegacyTeardownStage(.resolveScopeScratch, iteration: iteration, trace: trace) {
+        pruneResolveScopeScratch()
+      }
+      afterStage?(.resolveScopeScratch, iteration)
+      runLegacyTeardownStage(.entityRoutedRemoval, iteration: iteration, trace: trace) {
+        prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+      }
+      afterStage?(.entityRoutedRemoval, iteration)
+      runLegacyTeardownStage(.absorbedShadow, iteration: iteration, trace: trace) {
+        pruneAbsorbedShadowedNodes(activeEntities: activeEntities)
+      }
+      afterStage?(.absorbedShadow, iteration)
+      runLegacyTeardownStage(
+        .staleDetachedHostedRoot,
+        iteration: iteration,
+        trace: trace
+      ) {
+        sweepStaleDetachedHostedRoots(activeEntities: activeEntities)
+      }
+      afterStage?(.staleDetachedHostedRoot, iteration)
+      runLegacyTeardownStage(
+        .departedNavigationSurface,
+        iteration: iteration,
+        trace: trace
+      ) {
+        tearDownDepartedNavigationSurfaces()
+      }
+      afterStage?(.departedNavigationSurface, iteration)
+
+      let madeProgress =
+        nodesBefore != Set(nodesByNodeID.keys)
+        || anchorsBefore != lifetimeAnchors
+        || workBefore != teardownBarrierWork
+      if !madeProgress {
+        trace?.finish(endingWork: legacyTeardownWorkSnapshot())
+        guard teardownBarrierWork.isEmpty else {
+          SoundnessProbeConfiguration.recordBarrierNonConvergence(
+            "teardown barrier made no progress with work=\(teardownBarrierWork)"
+          )
+          return TeardownBarrierResult(
+            didConverge: false,
+            iterationCount: iteration + 1,
+            iterationBound: iterationBound
+          )
+        }
+        verifyLifetimeRelationParity(resolved: resolved)
+        assert(legacyTeardownWorkSnapshot().totalCount == 0)
+        return TeardownBarrierResult(
+          didConverge: true,
+          iterationCount: iteration + 1,
+          iterationBound: iterationBound
+        )
+      }
     }
-    runLegacyTeardownStage(.absorbedShadow, trace: trace) {
-      pruneAbsorbedShadowedNodes(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: trace) {
-      sweepStaleDetachedHostedRoots(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.departedNavigationSurface, trace: trace) {
-      tearDownDepartedNavigationSurfaces()
-    }
-    // The three teardown stages above run `removeSubtree` cascades whose
-    // descents can defer entity-routed descendants after the first drain.
-    runLegacyTeardownStage(.lateEntityRoutedRemoval, trace: trace) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    }
+
     trace?.finish(endingWork: legacyTeardownWorkSnapshot())
-    verifyLifetimeRelationParity(resolved: resolved)
+    SoundnessProbeConfiguration.recordBarrierNonConvergence(
+      "teardown barrier exceeded derived bound \(iterationBound) work=\(teardownBarrierWork)"
+    )
+    return TeardownBarrierResult(
+      didConverge: false,
+      iterationCount: iterationBound,
+      iterationBound: iterationBound
+    )
+  }
+
+  package func debugSettleTeardownBarrier(
+    resolved: ResolvedNode,
+    trace: LegacyTeardownBarrierTraceRecorder? = nil,
+    afterStage: ((LegacyTeardownBarrierStage, Int) -> Void)? = nil
+  ) -> TeardownBarrierResult {
+    guard let candidateRootID = nodeIfExists(for: resolved.identity)?.viewNodeID else {
+      preconditionFailure("debug teardown barrier requires a stored candidate root")
+    }
+    return settleTeardownBarrier(
+      candidateRootID: candidateRootID,
+      resolved: resolved,
+      activeEntities: entityIdentities(in: resolved),
+      trace: trace,
+      afterStage: afterStage
+    )
   }
 
   package func previewLifecycleEventPlan(
@@ -2838,11 +2940,15 @@ package final class ViewGraph {
     guard let candidateRootID = nodeIfExists(for: resolved.identity)?.viewNodeID else {
       preconditionFailure("lifecycle preview requires a stored candidate root")
     }
-    settleTeardownBarrier(
+    let barrierResult = settleTeardownBarrier(
       candidateRootID: candidateRootID,
       resolved: resolved,
       activeEntities: entityIdentities(in: resolved),
       trace: debugTeardownTrace
+    )
+    precondition(
+      barrierResult.didConverge,
+      "lifecycle preview teardown barrier did not converge"
     )
     return frameLifecycleEventPlan(
       resolved: resolved,
@@ -2877,11 +2983,15 @@ package final class ViewGraph {
       preconditionFailure("frame finalization requires a stored candidate root")
     }
     let activeEntities = entityIdentities(in: resolved)
-    settleTeardownBarrier(
+    let barrierResult = settleTeardownBarrier(
       candidateRootID: candidateRootID,
       resolved: resolved,
       activeEntities: activeEntities,
       trace: debugTeardownTrace
+    )
+    precondition(
+      barrierResult.didConverge,
+      "frame finalization teardown barrier did not converge"
     )
 
     for viewNodeID in frameOrder {

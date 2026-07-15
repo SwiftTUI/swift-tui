@@ -132,6 +132,12 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
   package var anchorsByNodeID: [ViewNodeID: Set<LifetimeAnchor>]
   package var nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>]
 
+  package var edgeCount: Int {
+    anchorsByNodeID.values.reduce(into: 0) { count, anchors in
+      count += anchors.count
+    }
+  }
+
   package init(
     anchorsByNodeID: [ViewNodeID: Set<LifetimeAnchor>] = [:],
     nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>] = [:]

@@ -32,6 +32,7 @@ struct SoundnessProbeConfigurationTests {
     let memoCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let duplicateCount = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
     let slotDropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
+    let barrierCount = SoundnessProbeConfiguration.barrierNonConvergenceCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
@@ -47,6 +48,7 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoCount
       SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = duplicateCount
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = slotDropCount
+      SoundnessProbeConfiguration.barrierNonConvergenceCount = barrierCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     try body()
