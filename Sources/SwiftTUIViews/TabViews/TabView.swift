@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Selects one declared tab and renders a terminal-native tab strip above the
 /// active content.
@@ -490,13 +490,10 @@ extension TabView {
     in context: ResolveContext
   ) -> [TabOption] {
     // Phase 1: walk declared children and peek metadata (tab label + tag)
-    // off each without resolving. We capture a lazy `resolveOne` closure
-    // per child so that only the active tab actually enters the resolve
-    // pipeline — inactive tabs never call `beginEvaluation`, so their
-    // `.onAppear` / `.task` handlers do not fire until the user first
-    // selects them.
+    // off each without resolving. Only the active tab's lazy payload enters
+    // the resolve pipeline — inactive tabs never call `beginEvaluation`, so
+    // their `.onAppear` / `.task` handlers do not fire until selected.
     var peekedEntries: [PeekedTabChildMetadata] = []
-    var resolveClosures: [() -> ResolvedNode] = []
     let declaredContentPayloads = lazyDeclaredBuilderChildren(
       from: content,
       debugName: "TabBody"
@@ -509,7 +506,7 @@ extension TabView {
       in: childContext,
       kindName: "Tab",
       nextIndex: &nextIndex
-    ) { child, childContext, resolveOne in
+    ) { child, _, _ in
       peekedEntries.append(peekTabChildMetadata(from: child))
       let payloadIndex = contentPayloads.count
       let contentPayload =
@@ -517,41 +514,15 @@ extension TabView {
         ? declaredContentPayloads[payloadIndex]
         : nil
       contentPayloads.append(contentPayload)
-      if let declaration = child as? any TabDeclarationView {
-        resolveClosures.append {
-          declaration.resolveTabDeclarationContent(in: childContext)
-        }
-      } else {
-        resolveClosures.append(resolveOne)
-      }
     }
-
-    let selectedIndex =
-      peekedEntries.firstIndex { entry in
-        guard let tag = entry.tag else { return false }
-        return pickerSelectionMatches(tag, selection: selection.wrappedValue)
-      }
-      ?? peekedEntries.indices.first { peekedEntries[$0].tag != nil }
 
     return peekedEntries.enumerated().compactMap { index, entry in
       guard let tag = entry.tag else {
         return nil
       }
-      let isActive = (index == selectedIndex)
-
       let label: TabItemLabel
       if let peekedLabel = entry.label {
         label = peekedLabel
-      } else if isActive {
-        let resolved = resolveClosures[index]()
-        if let derived = tabItemLabel(in: resolved) {
-          label = derived
-        } else {
-          let fallbackTitle = resolvedNodeLabelText(from: resolved)
-          label = TabItemLabel(
-            fallbackTitle.isEmpty ? "Tab \(index + 1)" : fallbackTitle
-          )
-        }
       } else {
         label = TabItemLabel("Tab \(index + 1)")
       }
@@ -956,20 +927,6 @@ private func setStoredTabOverflowMenuExpanded(
     value: isExpanded,
     invalidationIdentity: invalidationIdentity
   )
-}
-
-private func tabItemLabel(
-  in node: ResolvedNode
-) -> TabItemLabel? {
-  if let label = node.semanticMetadata.tabItemLabel {
-    return label
-  }
-  for child in node.children {
-    if let match = tabItemLabel(in: child) {
-      return match
-    }
-  }
-  return nil
 }
 
 // Tab metadata peeking — `PeekedTabChildMetadata`, the `TabMetadataPeekingView`

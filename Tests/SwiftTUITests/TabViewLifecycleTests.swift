@@ -212,6 +212,64 @@ struct TabViewLifecycleTests {
     #expect(probe.settingsAppearCount == 1)
   }
 
+  @Test("implicit Text labels stay identical while inactive and active")
+  func implicitTextLabelsStayStableAcrossSelection() {
+    let renderer = DefaultRenderer()
+    let root = testIdentity("ImplicitTextTabLabels")
+
+    func render(_ selection: String) -> String {
+      renderer.render(
+        TabView(selection: .constant(selection)) {
+          Text("Home").tag("home")
+          Text("Settings").tag("settings")
+        }
+        .tabViewStyle(.literalTabs),
+        context: .init(identity: root),
+        proposal: .init(width: 32, height: 5)
+      ).rasterSurface.lines.joined(separator: "\n")
+    }
+
+    let home = render("home")
+    let settings = render("settings")
+    for surface in [home, settings] {
+      #expect(surface.contains("Home"))
+      #expect(surface.contains("Settings"))
+      #expect(!surface.contains("Tab 1"))
+      #expect(!surface.contains("Tab 2"))
+    }
+  }
+
+  @Test("opaque tab content keeps stable fallback labels and resolves only the active child")
+  func opaqueFallbackIsStableAndResolutionIsActiveOnly() {
+    let probe = TabResolutionProbe()
+    let renderer = DefaultRenderer()
+    let root = testIdentity("OpaqueTabFallback")
+
+    func render(_ selection: String) -> String {
+      renderer.render(
+        TabView(selection: .constant(selection)) {
+          ResolutionCountingTabLeaf(name: "One", probe: probe).tag("one")
+          ResolutionCountingTabLeaf(name: "Two", probe: probe).tag("two")
+        }
+        .tabViewStyle(.literalTabs),
+        context: .init(identity: root),
+        proposal: .init(width: 32, height: 5)
+      ).rasterSurface.lines.joined(separator: "\n")
+    }
+
+    let first = render("one")
+    #expect(probe.counts["One"] == 1)
+    #expect(probe.counts["Two", default: 0] == 0)
+    #expect(first.contains("Tab 1"))
+    #expect(first.contains("Tab 2"))
+
+    let second = render("two")
+    #expect(probe.counts["One"] == 1)
+    #expect(probe.counts["Two"] == 1)
+    #expect(second.contains("Tab 1"))
+    #expect(second.contains("Tab 2"))
+  }
+
   @Test("switching selected tabs keeps distinct local-state storage per tab content root")
   func switchingTabsKeepsDistinctContentStateIdentities() {
     let renderer = DefaultRenderer()
@@ -254,6 +312,22 @@ struct TabViewLifecycleTests {
 
     let surface = second.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("label seeded"))
+  }
+}
+
+@MainActor
+private final class TabResolutionProbe {
+  var counts: [String: Int] = [:]
+}
+
+private struct ResolutionCountingTabLeaf: PrimitiveView, ResolvableView {
+  let name: String
+  let probe: TabResolutionProbe
+
+  @MainActor
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    probe.counts[name, default: 0] += 1
+    return resolveViewElements(Text("Opaque \(name)"), in: context)
   }
 }
 

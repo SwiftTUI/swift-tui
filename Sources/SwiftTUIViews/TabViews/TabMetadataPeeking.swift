@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // Tab metadata peeking.
 //
@@ -68,6 +68,12 @@ where Content: View, Modifier: ViewModifier {
       return result
     }
     return peekTabChildMetadata(from: content)
+  }
+}
+
+extension Text: TabMetadataPeekingView {
+  package var peekedTabChildMetadata: PeekedTabChildMetadata {
+    PeekedTabChildMetadata(label: TabItemLabel(content))
   }
 }
 
