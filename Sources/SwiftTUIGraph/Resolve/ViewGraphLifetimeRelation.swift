@@ -2,6 +2,42 @@
 // ledgers remain authoritative until the Stage-5 consumer cutover.
 
 extension ViewGraph {
+  func lifetimeReachabilityContext(
+    candidateRootID: ViewNodeID? = nil,
+    activeEntities: Set<EntityIdentity> = []
+  ) -> LifetimeReachabilityContext? {
+    guard let candidateRootID = candidateRootID ?? root?.viewNodeID else {
+      return nil
+    }
+    var qualifiedHomes: [EntityIdentity: ViewNodeID] = [:]
+    for entity in activeEntities {
+      guard let nodeID = entityRoutingTable.route(entity),
+        let node = nodeIfExists(for: nodeID)
+      else {
+        continue
+      }
+      let facts = LegacyEntityHomeKeepFacts(
+        entityIsActive: true,
+        routeOwnsNode: true,
+        occurrence: entity.occurrence,
+        resolvedIdentityIndexOwnsNode:
+          nodeIDByIdentity[node.resolvedIdentity] == nodeID
+      )
+      if legacyEntityHomeKeepsNode(facts) {
+        qualifiedHomes[entity] = nodeID
+      }
+    }
+    return LifetimeReachabilityContext(
+      candidateRootID: candidateRootID,
+      activeEntityIdentities: activeEntities,
+      liveEntityHomeByIdentity: qualifiedHomes,
+      parentedNodeIDs: Set(
+        nodesByNodeID.values.compactMap { node in
+          node.parent == nil ? nil : node.viewNodeID
+        })
+    )
+  }
+
   package func replaceParentTargets(
     of parentNodeID: ViewNodeID,
     with children: [ViewNode]
@@ -127,5 +163,12 @@ extension ViewGraph {
     for nodeID in nodeIDs {
       teardownBarrierWork.remove(reason, for: nodeID)
     }
+  }
+
+  func discardTeardownWork(for nodeID: ViewNodeID) {
+    teardownBarrierWork.removeNode(nodeID)
+    pendingEntityRoutedRemovalNodeIDs.remove(nodeID)
+    absorbedShadowedNodeIDs.remove(nodeID)
+    departedNavigationSurfaceContentNodeIDs.remove(nodeID)
   }
 }

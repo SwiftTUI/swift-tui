@@ -51,6 +51,15 @@ package struct TeardownBarrierWork: Equatable, Sendable {
     reasonsByNodeID[nodeID, default: []]
   }
 
+  package func nodeIDs(
+    for reason: TeardownWorkReason
+  ) -> Set<ViewNodeID> {
+    Set(
+      reasonsByNodeID.compactMap { nodeID, reasons in
+        reasons.contains(reason) ? nodeID : nil
+      })
+  }
+
   package var nodeIDs: Set<ViewNodeID> {
     Set(reasonsByNodeID.keys)
   }

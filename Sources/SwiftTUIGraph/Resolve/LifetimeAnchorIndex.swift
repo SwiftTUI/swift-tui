@@ -297,6 +297,23 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     return result
   }
 
+  package func removalCascade(
+    from rootNodeID: ViewNodeID
+  ) -> Set<ViewNodeID> {
+    var result: Set<ViewNodeID> = []
+    var queue = [rootNodeID]
+    var cursor = 0
+    while cursor < queue.count {
+      let nodeID = queue[cursor]
+      cursor += 1
+      guard result.insert(nodeID).inserted else {
+        continue
+      }
+      queue.append(contentsOf: removalTargets(of: nodeID).sorted())
+    }
+    return result
+  }
+
   /// Removes every incoming and outgoing edge that names `nodeID`.
   package mutating func removeNode(_ nodeID: ViewNodeID) {
     for anchor in anchorsByNodeID[nodeID, default: []] {
@@ -368,6 +385,34 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       reason: .noAnchorOutsideRemovalCascade,
       diagnosticChain: []
     )
+  }
+
+  package func qualifiedEntityHome(
+    for nodeID: ViewNodeID,
+    context: LifetimeReachabilityContext
+  ) -> EntityIdentity? {
+    sortedAnchors(anchorsByNodeID[nodeID, default: []]).compactMap { anchor -> EntityIdentity? in
+      guard case .entityHome(let entity) = anchor,
+        entityHomeIsQualified(entity, nodeID: nodeID, context: context)
+      else {
+        return nil
+      }
+      return entity
+    }.first
+  }
+
+  package mutating func removeRemovalEdges(
+    from sourceNodeID: ViewNodeID,
+    to targetNodeID: ViewNodeID
+  ) {
+    for anchor in [
+      LifetimeAnchor.parent(sourceNodeID),
+      .committedValue(sourceNodeID),
+      .hostedDetached(sourceNodeID),
+      .navigationSurface(sourceNodeID),
+    ] {
+      remove(anchor: anchor, for: targetNodeID)
+    }
   }
 
   package func reachableNodeIDs(

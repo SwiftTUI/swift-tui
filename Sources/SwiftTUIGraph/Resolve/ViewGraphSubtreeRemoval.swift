@@ -13,6 +13,7 @@ extension ViewGraph {
   /// already removing.
   final class SubtreeRemovalWalk {
     var enteredNodeIDs: Set<ViewNodeID> = []
+    var relationCascadeNodeIDs: Set<ViewNodeID> = []
   }
 
   func removeSubtree(
@@ -20,6 +21,7 @@ extension ViewGraph {
     committedSnapshot: ResolvedNode? = nil,
     sparingVisitedNodes: Bool = false,
     isSubtreeDescent: Bool = false,
+    ignoringLifetimeAnchors: Bool = false,
     walk: SubtreeRemovalWalk? = nil
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
@@ -36,6 +38,11 @@ extension ViewGraph {
     // snapshot can cover departed descendants the first entry's snapshot does
     // not, and the descent strictly shrinks into the finite resolved tree.
     let walk = walk ?? SubtreeRemovalWalk()
+    if walk.relationCascadeNodeIDs.isEmpty {
+      walk.relationCascadeNodeIDs = lifetimeAnchors.removalCascade(
+        from: node.viewNodeID
+      )
+    }
     guard walk.enteredNodeIDs.insert(node.viewNodeID).inserted else {
       guard let committedSnapshot else {
         return
@@ -79,6 +86,7 @@ extension ViewGraph {
       }
       return
     }
+    let relationTargets = lifetimeAnchors.removalTargets(of: node.viewNodeID)
 
     // A departed-subtree teardown (an explicitly diffed-out child, a churn
     // orphan) removes a root the caller has already judged gone, but the walk
@@ -117,10 +125,20 @@ extension ViewGraph {
     // visited, parent-detached node with neither is a stranded same-frame
     // mint whose output a chain collapse absorbed (`pruneAbsorbedShadowedNodes`)
     // — keeping it would leak it beyond every teardown path's reach.
+    let hasDurableAnchorOutsideCascade =
+      !ignoringLifetimeAnchors
+      && (lifetimeReachabilityContext().map { context in
+        lifetimeAnchors.hasAnchorOutside(
+          node.viewNodeID,
+          excluding: walk.relationCascadeNodeIDs,
+          context: context
+        )
+      } ?? false)
     if node.parent == nil,
       node.viewNodeID != root?.viewNodeID,
       node.visitedThisFrame(currentFrameID),
-      nodeIDByIdentity[node.identity] == node.viewNodeID
+      hasDurableAnchorOutsideCascade
+        || nodeIDByIdentity[node.identity] == node.viewNodeID
         || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
         || entityRoutingTable.entityByNodeID[node.viewNodeID].map({ entity in
           entityRoutingTable.route(entity) == node.viewNodeID
@@ -220,11 +238,13 @@ extension ViewGraph {
         // sparing on that visit strands the root with no anchor at all
         // (unreachable until an eventual same-identity re-mint reuses it —
         // the census leak the hosted ledger exists to prevent).
-        let anchor = hostedRoot.parent ?? hostedRoot.evaluationHost
         let anchorSurvivesRemoval =
-          anchor.map { anchor in
-            nodeIfExists(for: anchor.viewNodeID) === anchor
-              && !walk.enteredNodeIDs.contains(anchor.viewNodeID)
+          lifetimeReachabilityContext().map { context in
+            lifetimeAnchors.hasAnchorOutside(
+              hostedRootID,
+              excluding: walk.relationCascadeNodeIDs,
+              context: context
+            )
           } ?? false
         removeSubtree(
           rootedAt: hostedRoot,
@@ -243,6 +263,44 @@ extension ViewGraph {
       lifetimeAnchors.remove(
         anchor: .hostedDetached(hostID),
         for: node.viewNodeID
+      )
+    }
+
+    // Relation-native downward traversal catches children represented only by
+    // a durable lifetime edge. Snapshotting happened before any node-local
+    // cleanup; remove this source's exact edges, then spare a target only when
+    // another anchor survives outside the complete cascade.
+    for targetNodeID in relationTargets.sorted() {
+      lifetimeAnchors.removeRemovalEdges(
+        from: node.viewNodeID,
+        to: targetNodeID
+      )
+      guard !walk.enteredNodeIDs.contains(targetNodeID),
+        let target = nodeIfExists(for: targetNodeID)
+      else {
+        continue
+      }
+      let targetIsAbsorbed =
+        teardownBarrierWork.reasons(for: targetNodeID).contains(.absorbedShadow)
+      if !targetIsAbsorbed,
+        let context = lifetimeReachabilityContext(),
+        lifetimeAnchors.keepDecision(
+          for: targetNodeID,
+          removalCascade: walk.relationCascadeNodeIDs,
+          context: context
+        ).shouldKeep
+      {
+        continue
+      }
+      if targetIsAbsorbed {
+        adoptAbsorbedRuntimeRegistrations(from: target)
+      }
+      removeSubtree(
+        rootedAt: target,
+        sparingVisitedNodes: sparingVisitedNodes,
+        isSubtreeDescent: true,
+        ignoringLifetimeAnchors: targetIsAbsorbed,
+        walk: walk
       )
     }
 
@@ -317,7 +375,7 @@ extension ViewGraph {
     releaseEntityRoute(for: node.viewNodeID)
     activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: node.viewNodeID)
     lifetimeAnchors.removeNode(node.viewNodeID)
-    teardownBarrierWork.removeNode(node.viewNodeID)
+    discardTeardownWork(for: node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
     // The effect-owner index mirrors `nodesByNodeID` membership exactly (its

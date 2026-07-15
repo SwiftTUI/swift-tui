@@ -217,8 +217,9 @@ extension ViewGraph {
     // entity-routed descendants back into the pending set. Each pass consumes
     // a disjoint snapshot and either keeps or removes every node in it, so
     // the loop strictly shrinks into the finite node store.
-    while !pendingEntityRoutedRemovalNodeIDs.isEmpty {
-      let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
+    while !teardownBarrierWork.nodeIDs(for: .entityRoutedRemoval).isEmpty {
+      let pendingNodeIDs = teardownBarrierWork.nodeIDs(for: .entityRoutedRemoval)
+      assert(pendingNodeIDs == pendingEntityRoutedRemovalNodeIDs)
       pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
       consumeTeardownWork(.entityRoutedRemoval, for: pendingNodeIDs)
       for viewNodeID in pendingNodeIDs {
@@ -257,7 +258,18 @@ extension ViewGraph {
           resolvedIdentityIndexOwnsNode:
             nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
         )
-        if legacyEntityHomeKeepsNode(keepFacts) {
+        let legacyKeeps = legacyEntityHomeKeepsNode(keepFacts)
+        let relationKeeps =
+          lifetimeReachabilityContext(
+            activeEntities: activeEntities
+          ).flatMap { context in
+            lifetimeAnchors.qualifiedEntityHome(
+              for: node.viewNodeID,
+              context: context
+            )
+          } != nil
+        assert(legacyKeeps == relationKeeps)
+        if relationKeeps {
           continue
         }
         removeSubtree(rootedAt: node, sparingVisitedNodes: true)

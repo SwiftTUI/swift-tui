@@ -3,6 +3,7 @@
 package enum LegacyLifetimeReachabilityReason: Equatable, Hashable, Sendable {
   case root
   case structuralChild(ViewNodeID)
+  case committedValue(ViewNodeID)
   case hostedDetached(ViewNodeID)
   case navigationSurface(ViewNodeID)
   case parent(ViewNodeID)

@@ -51,7 +51,7 @@ package struct LifetimeRelationParityReport: Equatable, Sendable {
       inverse=\(inverseViolations) \
       removedRefs=\(removedNodeReferenceDescriptions) \
       diagnostics=\(divergenceDescriptions) \
-      workMatches=\(workMatches)
+      workMatches=\(workMatches) legacyWork=\(legacyWork) relationWork=\(relationWork)
       """
   }
 }
@@ -66,20 +66,20 @@ extension ViewGraph {
       return nil
     }
 
-    let context = LifetimeReachabilityContext(
-      candidateRootID: rootNodeID,
-      activeEntityIdentities: activeEntities,
-      // Entity homes qualify a local removal decision; the legacy teardown
-      // census never promotes them to global committed-root seeds. Keep this
-      // closure comparison on that same question. Stage-5 keep parity below
-      // still supplies the qualified homes to `keepDecision`.
-      liveEntityHomeByIdentity: [:],
-      parentedNodeIDs: Set(
-        nodesByNodeID.values.compactMap { node in
-          node.parent == nil ? nil : node.viewNodeID
-        }
+    guard
+      var context = lifetimeReachabilityContext(
+        candidateRootID: rootNodeID,
+        activeEntities: activeEntities
       )
-    )
+    else {
+      return nil
+    }
+    context
+      .liveEntityHomeByIdentity  // Entity homes qualify a local removal decision; the legacy teardown
+    // census never promotes them to global committed-root seeds. Keep this
+    // closure comparison on that same question. Stage-5 keep parity below
+    // still supplies the qualified homes to `keepDecision`.
+    = [:]
     let relation = lifetimeAnchors.reachableNodeIDs(context: context)
     let storedLegacyReachable = legacy.reachableNodeIDs.intersection(legacy.storedNodeIDs)
     let reasonDivergences = Set<ViewNodeID>(
@@ -178,6 +178,8 @@ extension ViewGraph {
       return anchors.contains { anchor in
         anchor.kind == .parent || anchor.kind == .committedValue
       }
+    case .committedValue(let source):
+      return anchors.contains(.committedValue(source))
     case .hostedDetached(let source):
       return anchors.contains(.hostedDetached(source))
     case .navigationSurface(let source):
