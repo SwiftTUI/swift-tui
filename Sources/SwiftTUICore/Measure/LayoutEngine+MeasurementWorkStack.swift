@@ -226,7 +226,7 @@ extension LayoutEngine {
         let effectiveProposal,
         let children,
         let axis,
-        var state
+        let state
       ):
         let measurement = popMeasurement(from: &results)
         let childIndex = state.plan.order[state.position]
@@ -257,7 +257,7 @@ extension LayoutEngine {
         let effectiveProposal,
         let children,
         let axis,
-        var state,
+        let state,
         let batchPositions
       ):
         // Batch consumption was charged at scheduling time (unbounded

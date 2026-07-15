@@ -39,8 +39,17 @@ struct StackSequentialAllocationPlan {
   var unboundedTailFromPosition: [Bool]
 }
 
-struct StackSequentialAllocationState {
-  var plan: StackSequentialAllocationPlan
+/// Sequential-allocation bookkeeping for one stack measure.
+///
+/// Deliberately a class: the state flows linearly through the measurement
+/// work stack (exactly one work item references it at a time), but a popped
+/// work item keeps its enum payload alive through the whole switch body — as
+/// a struct, every per-child `measurements` write re-copied the O(n) arrays
+/// through the multiply-referenced buffers, turning stack allocation into
+/// O(n²) element copies per measure. Reference semantics make each step's
+/// mutation in-place; `plan` is immutable after construction.
+final class StackSequentialAllocationState {
+  let plan: StackSequentialAllocationPlan
   /// Next order position to offer space to.
   var position: Int
   /// Main-axis cells not yet consumed by processed children.
@@ -50,6 +59,20 @@ struct StackSequentialAllocationState {
   var allocatedMainSizes: [Int]
   /// Collected allocation-pass measurements, indexed by child.
   var measurements: [MeasuredNode?]
+
+  init(
+    plan: StackSequentialAllocationPlan,
+    position: Int,
+    remainingMain: Int,
+    allocatedMainSizes: [Int],
+    measurements: [MeasuredNode?]
+  ) {
+    self.plan = plan
+    self.position = position
+    self.remainingMain = remainingMain
+    self.allocatedMainSizes = allocatedMainSizes
+    self.measurements = measurements
+  }
 }
 
 extension LayoutEngine {
@@ -166,7 +189,6 @@ extension LayoutEngine {
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
-    var state = state
     let plan = state.plan
 
     guard state.position < plan.order.count else {
