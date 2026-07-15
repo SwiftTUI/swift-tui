@@ -1393,6 +1393,7 @@ package final class ViewNode {
     registeredHandlers.recordLifecycleAppear(
       registration
     )
+    noteEffectRegistrationOwnership()
   }
 
   package func recordLifecycleDisappearRegistration(
@@ -1402,6 +1403,7 @@ package final class ViewNode {
     registeredHandlers.recordLifecycleDisappear(
       registration
     )
+    noteEffectRegistrationOwnership()
   }
 
   package func recordLifecycleChangeRegistration(
@@ -1411,6 +1413,7 @@ package final class ViewNode {
     registeredHandlers.recordLifecycleChange(
       registration
     )
+    noteEffectRegistrationOwnership()
   }
 
   package func recordTaskRegistration(
@@ -1422,6 +1425,7 @@ package final class ViewNode {
       identity: identity,
       registration: registration
     )
+    noteEffectRegistrationOwnership()
   }
 
   package func recordPreferenceObservationRegistration(
@@ -1429,6 +1433,7 @@ package final class ViewNode {
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordPreferenceObservation(registration)
+    noteEffectRegistrationOwnership()
   }
 
   package func recordCommandRegistration(
@@ -1455,6 +1460,16 @@ package final class ViewNode {
   private func recordRuntimeRegistrationMutation() {
     // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     runtimeRegistrationMutationGeneration &+= 1
+  }
+
+  /// Enrolls this node in the graph's effect-owner index (F148) so the
+  /// always-full effect republication finds it without walking every live
+  /// node. Every path that can flip `hasEffectRegistrations` to `true` must
+  /// call this: the lifecycle/task/preference-observation record methods
+  /// above and `adoptRuntimeRegistrations`. Graph-less nodes (bare test
+  /// fixtures) have no republication to enroll in.
+  private func noteEffectRegistrationOwnership() {
+    ownerGraph?.noteEffectRegistrationOwner(viewNodeID)
   }
 
   package func runtimeRegistrationFingerprintEntry()
@@ -1493,6 +1508,9 @@ package final class ViewNode {
     }
     recordRuntimeRegistrationMutation()
     registeredHandlers.absorbAdopted(departing.registeredHandlers)
+    if registeredHandlers.hasEffectRegistrations {
+      noteEffectRegistrationOwnership()
+    }
   }
 
   package func restoreOwnRuntimeRegistrations(

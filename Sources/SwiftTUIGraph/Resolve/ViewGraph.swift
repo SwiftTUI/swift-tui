@@ -210,6 +210,10 @@ package final class ViewGraph {
     get { index.departedNavigationSurfaceContentNodeIDs }
     set { index.departedNavigationSurfaceContentNodeIDs = newValue }
   }
+  var effectRegistrationOwnerNodeIDs: Set<ViewNodeID> {
+    get { index.effectRegistrationOwnerNodeIDs }
+    set { index.effectRegistrationOwnerNodeIDs = newValue }
+  }
   private var rootEvaluator: (@MainActor () -> Void)? {
     get { rootEvaluation.rootEvaluator }
     set { rootEvaluation.rootEvaluator = newValue }
@@ -615,6 +619,7 @@ package final class ViewGraph {
       flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity,
       activeNavigationSurfaceContentNodeIDsByHost: activeNavigationSurfaceContentNodeIDsByHost,
       departedNavigationSurfaceContentNodeIDs: departedNavigationSurfaceContentNodeIDs,
+      effectRegistrationOwnerNodeIDs: effectRegistrationOwnerNodeIDs,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
       viewportLifecycleNodesByKey: viewportLifecycleNodesByKey,
@@ -3288,23 +3293,41 @@ package final class ViewGraph {
     return false
   }
 
-  /// Republishes low-volume effect registries from EVERY live node, regardless
-  /// of the frame's runtime-registration publication scope. Scoped
-  /// (`.subtrees`) publication restores registrations by walking each frontier
-  /// root's ViewNode subtree, which cannot cross capture-host island seams
-  /// (scoped content payloads, presentation-portal attachments, `.id`-re-rooted
-  /// subtrees, lazy viewport entries) or intentionally reused stable subtrees.
-  /// Lifecycle, task, and preference-observation effects for such nodes would
-  /// otherwise reach the runtime without matching live registrations.
+  /// Republishes low-volume effect registries from every live effect-owning
+  /// node, regardless of the frame's runtime-registration publication scope.
+  /// Scoped (`.subtrees`) publication restores registrations by walking each
+  /// frontier root's ViewNode subtree, which cannot cross capture-host island
+  /// seams (scoped content payloads, presentation-portal attachments,
+  /// `.id`-re-rooted subtrees, lazy viewport entries) or intentionally reused
+  /// stable subtrees. Lifecycle, task, and preference-observation effects for
+  /// such nodes would otherwise reach the runtime without matching live
+  /// registrations.
+  ///
+  /// The walk iterates `effectRegistrationOwnerNodeIDs` — a maintained
+  /// superset of the nodes whose handlers hold an effect family — instead of
+  /// every live node (F148): effect owners are a handful while live trees are
+  /// hundreds of nodes. The live-set membership gate and the per-node
+  /// `hasEffectRegistrations` guard inside `restoreOwnEffectRegistrations`
+  /// keep the restored content identical to the historical every-live-node
+  /// walk by construction (superset entries restore nothing).
   package func republishAllEffectRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
     registrations.lifecycleRegistry?.reset()
     registrations.taskRegistry?.reset()
     registrations.preferenceObservationRegistry?.reset()
-    for nodeID in liveNodeIDs {
+    for nodeID in effectRegistrationOwnerNodeIDs where liveNodeIDs.contains(nodeID) {
       nodesByNodeID[nodeID]?.restoreOwnEffectRegistrations(into: registrations)
     }
+  }
+
+  /// Records that `viewNodeID`'s node holds (or just adopted) an
+  /// effect-family registration. Called from every `ViewNode` effect record
+  /// path and from registration adoption; entries leave the set only when the
+  /// node leaves `nodesByNodeID`, so the set stays a superset of the true
+  /// effect owners across capture-session resets and checkpoint rollbacks.
+  package func noteEffectRegistrationOwner(_ viewNodeID: ViewNodeID) {
+    effectRegistrationOwnerNodeIDs.insert(viewNodeID)
   }
 
   private func runtimeRegistrationSubtreeNodeCount(

@@ -68,6 +68,18 @@ extension ViewGraph {
     // frame draft rolls the queue back with the rest of the prepared frame
     // state.
     package var departedNavigationSurfaceContentNodeIDs: Set<ViewNodeID> = []
+    // Node IDs that recorded (or adopted) an effect-family registration
+    // (lifecycle/task/preference observation) at least once while resident in
+    // `nodesByNodeID`. A SUPERSET of the current effect owners: capture
+    // sessions that reset a node's handlers do not remove it, so membership
+    // only decides which nodes the always-full effect republication LOOKS AT
+    // (F148) — `NodeHandlers.hasEffectRegistrations` stays the authority on
+    // what restores. Inserted by `noteEffectRegistrationOwner` from every
+    // effect record path and registration adoption; removed exactly where the
+    // node leaves `nodesByNodeID` (`removeSubtree`'s index cleanup), so a
+    // stale ID cannot outlive its node. Checkpoint-covered with the node
+    // store, so rollback restores both sides of the invariant together.
+    package var effectRegistrationOwnerNodeIDs: Set<ViewNodeID> = []
   }
 
   /// The root evaluator closure and the identity it re-roots from.

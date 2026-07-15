@@ -310,6 +310,11 @@ extension ViewGraph {
     activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
+    // The effect-owner index mirrors `nodesByNodeID` membership exactly (its
+    // only removal is here, beside the node store's): a discarded node's ID
+    // never re-enters the map (IDs are minted monotonically), so this cannot
+    // strand a future owner.
+    effectRegistrationOwnerNodeIDs.remove(node.viewNodeID)
   }
 
   private func removeResolvedNodeReuseCaches(
