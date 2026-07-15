@@ -2778,6 +2778,40 @@ package final class ViewGraph {
     }
   }
 
+  private func settleTeardownBarrier(
+    candidateRootID: ViewNodeID,
+    resolved: ResolvedNode,
+    activeEntities: Set<EntityIdentity>,
+    trace: LegacyTeardownBarrierTraceRecorder?
+  ) {
+    precondition(
+      nodeIfExists(for: candidateRootID) != nil,
+      "teardown barrier candidate root must remain stored"
+    )
+    runLegacyTeardownStage(
+      .entityRoutedRemoval,
+      trace: trace
+    ) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    runLegacyTeardownStage(.absorbedShadow, trace: trace) {
+      pruneAbsorbedShadowedNodes(activeEntities: activeEntities)
+    }
+    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: trace) {
+      sweepStaleDetachedHostedRoots(activeEntities: activeEntities)
+    }
+    runLegacyTeardownStage(.departedNavigationSurface, trace: trace) {
+      tearDownDepartedNavigationSurfaces()
+    }
+    // The three teardown stages above run `removeSubtree` cascades whose
+    // descents can defer entity-routed descendants after the first drain.
+    runLegacyTeardownStage(.lateEntityRoutedRemoval, trace: trace) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    trace?.finish(endingWork: legacyTeardownWorkSnapshot())
+    verifyLifetimeRelationParity(resolved: resolved)
+  }
+
   package func previewLifecycleEventPlan(
     resolved: ResolvedNode,
     placed: ViewportVisibilitySummary?
@@ -2801,37 +2835,15 @@ package final class ViewGraph {
     // committed one. Both prunes are self-consuming — the later
     // `finalizeFrame` re-run is a no-op — and an aborted candidate rolls the
     // mutations back with the rest of the prepared frame state.
-    let activeEntities = entityIdentities(in: resolved)
-    runLegacyTeardownStage(
-      .entityRoutedRemoval,
+    guard let candidateRootID = nodeIfExists(for: resolved.identity)?.viewNodeID else {
+      preconditionFailure("lifecycle preview requires a stored candidate root")
+    }
+    settleTeardownBarrier(
+      candidateRootID: candidateRootID,
+      resolved: resolved,
+      activeEntities: entityIdentities(in: resolved),
       trace: debugTeardownTrace
-    ) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.absorbedShadow, trace: debugTeardownTrace) {
-      pruneAbsorbedShadowedNodes(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: debugTeardownTrace) {
-      sweepStaleDetachedHostedRoots(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.departedNavigationSurface, trace: debugTeardownTrace) {
-      tearDownDepartedNavigationSurfaces()
-    }
-    // The three teardown stages above run `removeSubtree` cascades whose
-    // descents can DEFER entity-routed descendants into the pending set —
-    // after the drain above already ran. Nothing else consumes the set this
-    // frame and `beginFrame` clears it silently, so a late deferral must be
-    // decided here (the TabView overflow-menu collapse strands its ForEach
-    // rows otherwise: the menu subtree is torn down by the stale
-    // detached-hosted sweep, not the structural diff).
-    runLegacyTeardownStage(
-      .lateEntityRoutedRemoval,
-      trace: debugTeardownTrace
-    ) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    }
-    debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
-    verifyLifetimeRelationParity(resolved: resolved)
+    )
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2861,31 +2873,16 @@ package final class ViewGraph {
     debugTeardownTrace: LegacyTeardownBarrierTraceRecorder?
   ) -> [LifecycleEvent] {
     root = nodeIfExists(for: rootIdentity)
+    guard let candidateRootID = root?.viewNodeID else {
+      preconditionFailure("frame finalization requires a stored candidate root")
+    }
     let activeEntities = entityIdentities(in: resolved)
-    runLegacyTeardownStage(
-      .entityRoutedRemoval,
+    settleTeardownBarrier(
+      candidateRootID: candidateRootID,
+      resolved: resolved,
+      activeEntities: activeEntities,
       trace: debugTeardownTrace
-    ) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.absorbedShadow, trace: debugTeardownTrace) {
-      pruneAbsorbedShadowedNodes(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: debugTeardownTrace) {
-      sweepStaleDetachedHostedRoots(activeEntities: activeEntities)
-    }
-    runLegacyTeardownStage(.departedNavigationSurface, trace: debugTeardownTrace) {
-      tearDownDepartedNavigationSurfaces()
-    }
-    // Late-deferral drain — see `previewLifecycleEventPlan` for the rationale.
-    runLegacyTeardownStage(
-      .lateEntityRoutedRemoval,
-      trace: debugTeardownTrace
-    ) {
-      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    }
-    debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
-    verifyLifetimeRelationParity(resolved: resolved)
+    )
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
