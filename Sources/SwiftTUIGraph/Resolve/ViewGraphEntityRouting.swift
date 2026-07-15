@@ -243,11 +243,14 @@ extension ViewGraph {
         // stale copy lost it to the arriving node's reindex. Duplicate-id
         // occurrences (> 0) are exempt: siblings share the identity entry by
         // design, so only the entity route is authoritative for them (G13).
-        if activeEntities.contains(entityIdentity),
-          entityRoutingTable.route(entityIdentity) == node.viewNodeID,
-          entityIdentity.occurrence > 0
-            || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
-        {
+        let keepFacts = LegacyEntityHomeKeepFacts(
+          entityIsActive: activeEntities.contains(entityIdentity),
+          routeOwnsNode: entityRoutingTable.route(entityIdentity) == node.viewNodeID,
+          occurrence: entityIdentity.occurrence,
+          resolvedIdentityIndexOwnsNode:
+            nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
+        )
+        if legacyEntityHomeKeepsNode(keepFacts) {
           continue
         }
         removeSubtree(rootedAt: node, sparingVisitedNodes: true)

@@ -2674,9 +2674,64 @@ package final class ViewGraph {
     ).events
   }
 
+  private func legacyTeardownWorkSnapshot() -> LegacyTeardownWorkSnapshot {
+    LegacyTeardownWorkSnapshot(
+      entityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
+      absorbedShadowNodeIDs: absorbedShadowedNodeIDs,
+      departedNavigationSurfaceNodeIDs: departedNavigationSurfaceContentNodeIDs
+    )
+  }
+
+  private func runLegacyTeardownStage(
+    _ stage: LegacyTeardownBarrierStage,
+    trace: LegacyTeardownBarrierTraceRecorder?,
+    _ body: () -> Void
+  ) {
+    guard let trace else {
+      body()
+      return
+    }
+    let nodesBefore = Set(nodesByNodeID.keys)
+    let workBefore = legacyTeardownWorkSnapshot()
+    body()
+    trace.record(
+      stage: stage,
+      nodesBefore: nodesBefore,
+      nodesAfter: Set(nodesByNodeID.keys),
+      workBefore: workBefore,
+      workAfter: legacyTeardownWorkSnapshot()
+    )
+  }
+
+  package func debugEnqueueLegacyTeardownWork(
+    _ reason: LegacyTeardownDebugWorkReason,
+    nodeID: ViewNodeID
+  ) {
+    switch reason {
+    case .entityRoutedRemoval:
+      pendingEntityRoutedRemovalNodeIDs.insert(nodeID)
+    case .absorbedShadow:
+      absorbedShadowedNodeIDs.insert(nodeID)
+    case .departedNavigationSurface:
+      departedNavigationSurfaceContentNodeIDs.insert(nodeID)
+    }
+  }
+
   package func previewLifecycleEventPlan(
     resolved: ResolvedNode,
     placed: ViewportVisibilitySummary?
+  ) -> ViewGraphFrameLifecycleEventPlan {
+    previewLifecycleEventPlan(
+      resolved: resolved,
+      placed: placed,
+      debugTeardownTrace: nil
+    )
+  }
+
+  package func previewLifecycleEventPlan(
+    resolved: ResolvedNode,
+    placed: ViewportVisibilitySummary?,
+    debugTeardownTrace: LegacyTeardownBarrierTraceRecorder?
   ) -> ViewGraphFrameLifecycleEventPlan {
     // The finalize-frame teardown barrier emits the departed subtrees'
     // cancel/disappear events (an entity-routed removal deferred out of the
@@ -2686,10 +2741,21 @@ package final class ViewGraph {
     // `finalizeFrame` re-run is a no-op — and an aborted candidate rolls the
     // mutations back with the rest of the prepared frame state.
     let activeEntities = entityIdentities(in: resolved)
-    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    pruneAbsorbedShadowedNodes()
-    sweepStaleDetachedHostedRoots()
-    tearDownDepartedNavigationSurfaces()
+    runLegacyTeardownStage(
+      .entityRoutedRemoval,
+      trace: debugTeardownTrace
+    ) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    runLegacyTeardownStage(.absorbedShadow, trace: debugTeardownTrace) {
+      pruneAbsorbedShadowedNodes()
+    }
+    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: debugTeardownTrace) {
+      sweepStaleDetachedHostedRoots()
+    }
+    runLegacyTeardownStage(.departedNavigationSurface, trace: debugTeardownTrace) {
+      tearDownDepartedNavigationSurfaces()
+    }
     // The three teardown stages above run `removeSubtree` cascades whose
     // descents can DEFER entity-routed descendants into the pending set —
     // after the drain above already ran. Nothing else consumes the set this
@@ -2697,7 +2763,13 @@ package final class ViewGraph {
     // decided here (the TabView overflow-menu collapse strands its ForEach
     // rows otherwise: the menu subtree is torn down by the stale
     // detached-hosted sweep, not the structural diff).
-    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    runLegacyTeardownStage(
+      .lateEntityRoutedRemoval,
+      trace: debugTeardownTrace
+    ) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2710,14 +2782,47 @@ package final class ViewGraph {
     placed: ViewportVisibilitySummary?,
     previewedPlan: ViewGraphFrameLifecycleEventPlan? = nil
   ) -> [LifecycleEvent] {
+    finalizeFrame(
+      rootIdentity: rootIdentity,
+      resolved: resolved,
+      placed: placed,
+      previewedPlan: previewedPlan,
+      debugTeardownTrace: nil
+    )
+  }
+
+  package func finalizeFrame(
+    rootIdentity: Identity,
+    resolved: ResolvedNode,
+    placed: ViewportVisibilitySummary?,
+    previewedPlan: ViewGraphFrameLifecycleEventPlan? = nil,
+    debugTeardownTrace: LegacyTeardownBarrierTraceRecorder?
+  ) -> [LifecycleEvent] {
     root = nodeIfExists(for: rootIdentity)
     let activeEntities = entityIdentities(in: resolved)
-    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
-    pruneAbsorbedShadowedNodes()
-    sweepStaleDetachedHostedRoots()
-    tearDownDepartedNavigationSurfaces()
+    runLegacyTeardownStage(
+      .entityRoutedRemoval,
+      trace: debugTeardownTrace
+    ) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    runLegacyTeardownStage(.absorbedShadow, trace: debugTeardownTrace) {
+      pruneAbsorbedShadowedNodes()
+    }
+    runLegacyTeardownStage(.staleDetachedHostedRoot, trace: debugTeardownTrace) {
+      sweepStaleDetachedHostedRoots()
+    }
+    runLegacyTeardownStage(.departedNavigationSurface, trace: debugTeardownTrace) {
+      tearDownDepartedNavigationSurfaces()
+    }
     // Late-deferral drain — see `previewLifecycleEventPlan` for the rationale.
-    prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    runLegacyTeardownStage(
+      .lateEntityRoutedRemoval,
+      trace: debugTeardownTrace
+    ) {
+      prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
+    }
+    debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
@@ -2839,13 +2944,14 @@ package final class ViewGraph {
   /// spares a visited root only while an anchor outside the removal cascade
   /// survives. `FrameworkStressTests` pins the zero-count
   /// ("portal overlay button chrome leaves no teardown-coherence orphans").
-  private func teardownCoherenceViolation()
-    -> (isOverRemoval: Bool, detail: String, unreachableCount: Int)?
+  private func legacyLifetimeReachabilitySnapshot()
+    -> LegacyLifetimeReachabilitySnapshot?
   {
     guard let root else {
       return nil
     }
     var reachable: Set<ViewNodeID> = []
+    var keepReasonsByNodeID: [ViewNodeID: LegacyLifetimeReachabilityReason] = [:]
 
     // Walk the live structure: children arrays plus hosted-detached ledger
     // edges, descending only nodes the store still holds. A child entry whose
@@ -2856,15 +2962,22 @@ package final class ViewGraph {
     // an ID the committed structure still walks — that is the deleted sweep's
     // "removed a live re-adopted node" failure mode.
     var staleAliasDetail: String?
-    func absorb(_ subtreeRoot: ViewNode) {
-      var stack: [ViewNode] = [subtreeRoot]
-      while let node = stack.popLast() {
+    func absorb(
+      _ subtreeRoot: ViewNode,
+      reason: LegacyLifetimeReachabilityReason
+    ) {
+      var stack: [(node: ViewNode, reason: LegacyLifetimeReachabilityReason)] = [
+        (subtreeRoot, reason)
+      ]
+      while let entry = stack.popLast() {
+        let node = entry.node
         let nodeID = node.viewNodeID
         // `insert` doubles as the cycle guard: `ViewNode.apply` deliberately
         // tolerates self-in-children chains.
         guard reachable.insert(nodeID).inserted else {
           continue
         }
+        keepReasonsByNodeID[nodeID] = entry.reason
         guard let stored = nodesByNodeID[nodeID] else {
           continue
         }
@@ -2874,18 +2987,27 @@ package final class ViewGraph {
             \(nodeID) at \(node.identity.path)
             """
         }
-        stack.append(contentsOf: node.children)
+        stack.append(
+          contentsOf: node.children.map {
+            ($0, LegacyLifetimeReachabilityReason.structuralChild(nodeID))
+          }
+        )
         for hostedRootID in detachedHostedSubtreeRootsByHost[nodeID] ?? [] {
           if let hostedRoot = nodesByNodeID[hostedRootID] {
-            stack.append(hostedRoot)
+            stack.append((hostedRoot, .hostedDetached(nodeID)))
           }
         }
       }
     }
 
-    absorb(root)
+    absorb(root, reason: .root)
     if let staleAliasDetail {
-      return (isOverRemoval: true, detail: staleAliasDetail, unreachableCount: 0)
+      return LegacyLifetimeReachabilitySnapshot(
+        storedNodeIDs: Set(nodesByNodeID.keys),
+        reachableNodeIDs: reachable,
+        keepReasonsByNodeID: keepReasonsByNodeID,
+        staleAliasDetail: staleAliasDetail
+      )
     }
 
     // Fixed point: absorb any stored node whose parent/evaluation-host anchor
@@ -2895,16 +3017,45 @@ package final class ViewGraph {
     while absorbedAny {
       absorbedAny = false
       for node in nodesByNodeID.values where !reachable.contains(node.viewNodeID) {
-        let anchor = node.parent ?? node.evaluationHost
-        guard let anchor, reachable.contains(anchor.viewNodeID) else {
+        let reason: LegacyLifetimeReachabilityReason
+        if let parent = node.parent {
+          guard reachable.contains(parent.viewNodeID) else {
+            continue
+          }
+          reason = .parent(parent.viewNodeID)
+        } else if let evaluationHost = node.evaluationHost,
+          reachable.contains(evaluationHost.viewNodeID)
+        {
+          reason = .evaluationHost(evaluationHost.viewNodeID)
+        } else {
           continue
         }
-        absorb(node)
+        absorb(node, reason: reason)
         absorbedAny = true
       }
     }
 
-    let unreachableIDs = nodesByNodeID.keys.filter { !reachable.contains($0) }
+    return LegacyLifetimeReachabilitySnapshot(
+      storedNodeIDs: Set(nodesByNodeID.keys),
+      reachableNodeIDs: reachable,
+      keepReasonsByNodeID: keepReasonsByNodeID,
+      staleAliasDetail: nil
+    )
+  }
+
+  private func teardownCoherenceViolation()
+    -> (isOverRemoval: Bool, detail: String, unreachableCount: Int)?
+  {
+    guard let snapshot = legacyLifetimeReachabilitySnapshot() else {
+      return nil
+    }
+    if let staleAliasDetail = snapshot.staleAliasDetail {
+      return (isOverRemoval: true, detail: staleAliasDetail, unreachableCount: 0)
+    }
+
+    let unreachableIDs = nodesByNodeID.keys.filter {
+      snapshot.unreachableNodeIDs.contains($0)
+    }
     guard unreachableIDs.isEmpty else {
       let samples = unreachableIDs.prefix(4).map { nodeID in
         let path = nodesByNodeID[nodeID]?.identity.path ?? "?"
@@ -2921,6 +3072,12 @@ package final class ViewGraph {
       )
     }
     return nil
+  }
+
+  package func debugLegacyLifetimeReachabilitySnapshot()
+    -> LegacyLifetimeReachabilitySnapshot?
+  {
+    legacyLifetimeReachabilitySnapshot()
   }
 
   /// Instance-scoped census read for tests: the process-global probe
