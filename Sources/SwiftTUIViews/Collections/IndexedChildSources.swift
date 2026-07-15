@@ -175,65 +175,73 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         return cached
       }
 
-      let dataIndex = data.index(data.startIndex, offsetBy: index)
-      let element = data[dataIndex]
-      let structuralElementContext = childContext.indexedChild(
-        kind: .init(rawValue: "ForEachElement"),
-        index: index
-      )
-      let elementContext = structuralElementContext.replacingIdentity(
-        with: childContext.identity.explicitID(element[keyPath: id])
-      )
-      .suppressingStructuralLifecycle()
-      // Mirror `ForEach.resolveElements`: diverge structural identity
-      // per iteration so identity-deriving modifiers (`.panel()`) see
-      // a distinct position per element, while `viewIdentity` stays
-      // pinned to the outer authoring scope so owner-semantics callers
-      // (controls, @State) remain stable.
-      let perIterationScope = authoringScope.map { scope in
-        AuthoringContext(
-          viewIdentity: scope.viewIdentity,
-          structuralIdentity: elementContext.identity,
-          structuralPath: elementContext.structuralPath,
-          focusedValues: scope.focusedValues,
-          viewNode: scope.viewNode,
-          ownerNodeID: scope.ownerNodeID,
-          stateGraphScope: scope.stateGraphScope,
-          ordinalTracker: scope.ordinalTracker
+      let realize = { [self] () -> ResolvedNode in
+        let dataIndex = data.index(data.startIndex, offsetBy: index)
+        let element = data[dataIndex]
+        let structuralElementContext = childContext.indexedChild(
+          kind: .init(rawValue: "ForEachElement"),
+          index: index
         )
+        let elementContext = structuralElementContext.replacingIdentity(
+          with: childContext.identity.explicitID(element[keyPath: id])
+        )
+        .suppressingStructuralLifecycle()
+        // Mirror `ForEach.resolveElements`: diverge structural identity
+        // per iteration so identity-deriving modifiers (`.panel()`) see
+        // a distinct position per element, while `viewIdentity` stays
+        // pinned to the outer authoring scope so owner-semantics callers
+        // (controls, @State) remain stable.
+        let perIterationScope = authoringScope.map { scope in
+          AuthoringContext(
+            viewIdentity: scope.viewIdentity,
+            structuralIdentity: elementContext.identity,
+            structuralPath: elementContext.structuralPath,
+            focusedValues: scope.focusedValues,
+            viewNode: scope.viewNode,
+            ownerNodeID: scope.ownerNodeID,
+            stateGraphScope: scope.stateGraphScope,
+            ordinalTracker: scope.ordinalTracker
+          )
+        }
+        let view = withAuthoringContext(perIterationScope) {
+          elementContext.trackingObservableAccess {
+            content(element)
+          }
+        }
+        let route = ResolveEntityRoute(
+          identity: entityIdentities[index],
+          structuralPath: elementContext.structuralPath
+        )
+        var normalized = withAuthoringContext(perIterationScope) {
+          withResolveEntityRoute(route) {
+            resolveView(view, in: elementContext)
+          }
+        }
+        normalized.attachResolvedForEachEntity(
+          entityIdentities[index],
+          at: elementContext.structuralPath
+        )
+        childContext.viewGraph?.refreshResolvedMetadata(for: normalized)
+        // The realized element joins no children array — the container's
+        // resolved node keeps its lazy source instead of child nodes — so the
+        // mint would strand alive in the store when the container departs (the
+        // F04/F91 teardown-coherence leak; the gallery collections-tab
+        // warning). Anchor it to the host captured at declaration so that
+        // host's teardown retires realized elements through the standard
+        // cascade.
+        childContext.viewGraph?.recordDetachedHostedSubtree(
+          normalized,
+          hostedBy: mintHost
+        )
+        cache[index] = normalized
+        return normalized
       }
-      let view = withAuthoringContext(perIterationScope) {
-        elementContext.trackingObservableAccess {
-          content(element)
+      if let graph = childContext.viewGraph {
+        return graph.withCapturedResolveLifetimeScope(hostedBy: mintHost) {
+          realize()
         }
       }
-      let route = ResolveEntityRoute(
-        identity: entityIdentities[index],
-        structuralPath: elementContext.structuralPath
-      )
-      var normalized = withAuthoringContext(perIterationScope) {
-        withResolveEntityRoute(route) {
-          resolveView(view, in: elementContext)
-        }
-      }
-      normalized.attachResolvedForEachEntity(
-        entityIdentities[index],
-        at: elementContext.structuralPath
-      )
-      childContext.viewGraph?.refreshResolvedMetadata(for: normalized)
-      // The realized element joins no children array — the container's
-      // resolved node keeps its lazy source instead of child nodes — so the
-      // mint would strand alive in the store when the container departs (the
-      // F04/F91 teardown-coherence leak; the gallery collections-tab
-      // warning). Anchor it to the host captured at declaration so that
-      // host's teardown retires realized elements through the standard
-      // cascade.
-      childContext.viewGraph?.recordDetachedHostedSubtree(
-        normalized,
-        hostedBy: mintHost
-      )
-      cache[index] = normalized
-      return normalized
+      return realize()
     }
   }
 

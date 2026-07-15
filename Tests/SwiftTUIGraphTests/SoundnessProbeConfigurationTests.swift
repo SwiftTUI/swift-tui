@@ -33,6 +33,9 @@ struct SoundnessProbeConfigurationTests {
     let duplicateCount = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
     let slotDropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
     let barrierCount = SoundnessProbeConfiguration.barrierNonConvergenceCount
+    let automaticAnchorCount = SoundnessProbeConfiguration.automaticLifetimeAnchorCount
+    let manualMismatchCount = SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount
+    let unclassifiedCount = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
@@ -49,6 +52,9 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = duplicateCount
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = slotDropCount
       SoundnessProbeConfiguration.barrierNonConvergenceCount = barrierCount
+      SoundnessProbeConfiguration.automaticLifetimeAnchorCount = automaticAnchorCount
+      SoundnessProbeConfiguration.resolveLifetimeScopeManualMismatchCount = manualMismatchCount
+      SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     try body()

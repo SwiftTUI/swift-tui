@@ -55,6 +55,9 @@ package enum SoundnessProbeConfiguration {
   package static var teardownCoherenceLeakCount = 0
   package static var lifetimeRelationViolationCount = 0
   package static var barrierNonConvergenceCount = 0
+  package static var automaticLifetimeAnchorCount = 0
+  package static var resolveLifetimeScopeManualMismatchCount = 0
+  package static var unclassifiedResolvedNodeCount = 0
   /// The unreachable-node census size of the most recent leak record: the
   /// F91 ratchet asserts this stays at its pinned baseline (a growing census
   /// is the "residual class grows silently" failure the split exists to
@@ -153,6 +156,26 @@ package enum SoundnessProbeConfiguration {
     barrierNonConvergenceCount += 1
     lastViolationDetail = detail()
     emitTrace("teardown-barrier-non-convergence")
+  }
+
+  package static func recordAutomaticLifetimeAnchor() {
+    automaticLifetimeAnchorCount += 1
+  }
+
+  package static func recordResolveLifetimeScopeManualMismatch(
+    _ detail: @autoclosure () -> String
+  ) {
+    resolveLifetimeScopeManualMismatchCount += 1
+    lastViolationDetail = detail()
+    emitTrace("resolve-lifetime-scope-manual-mismatch")
+  }
+
+  package static func recordUnclassifiedResolvedNode(
+    _ detail: @autoclosure () -> String
+  ) {
+    unclassifiedResolvedNodeCount += 1
+    lastViolationDetail = detail()
+    emitTrace("resolve-lifetime-scope-unclassified")
   }
 
   /// Records one caught registration-publication divergence (F04): after a

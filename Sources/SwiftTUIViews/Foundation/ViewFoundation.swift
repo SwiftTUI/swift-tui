@@ -369,6 +369,7 @@ func resolveView<V: View>(
     )
     var structurallyStamped = reused
     structurallyStamped.structuralPath = context.structuralPath
+    context.viewGraph?.reportResolvedLifetimeResult(structurallyStamped)
     return structurallyStamped
   }
 
@@ -415,6 +416,7 @@ func resolveView<V: View>(
     context.recordResolvedReuse(count: reused.subtreeNodeCount)
     var structurallyStamped = reused
     structurallyStamped.structuralPath = context.structuralPath
+    context.viewGraph?.reportResolvedLifetimeResult(structurallyStamped)
     return structurallyStamped
   }
 
@@ -459,80 +461,92 @@ func resolveView<V: View>(
       }
     }
   }
-  context.recordResolvedComputation()
-  // Memoization diagnostics: would this recomputed node have been memoizable?
-  // Captured before the body runs, while `graphNode.committed` still holds the
-  // prior frame's output. In release this is sampled and opt-in via
-  // `SWIFTTUI_MEMO_TRACE`; when unsampled it is a single Bool guard.
-  let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
-  let erased: Any = view
-  var accessedStateSlots = 0
-  var resolved = ViewUpdateGuard.withViewUpdate {
-    EnvironmentValuesStorage.$current.withValue(context.environmentValues) {
-      ViewNodeContext.withValue(graphNode) {
-        if erased is any ResolvableView {
-          let resolve = {
-            normalizeResolvedElements(
+  let resolveFresh = { () -> ResolvedNode in
+    context.recordResolvedComputation()
+    // Memoization diagnostics: would this recomputed node have been memoizable?
+    // Captured before the body runs, while `graphNode.committed` still holds the
+    // prior frame's output. In release this is sampled and opt-in via
+    // `SWIFTTUI_MEMO_TRACE`; when unsampled it is a single Bool guard.
+    let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
+    let erased: Any = view
+    var accessedStateSlots = 0
+    var resolved = ViewUpdateGuard.withViewUpdate {
+      EnvironmentValuesStorage.$current.withValue(context.environmentValues) {
+        ViewNodeContext.withValue(graphNode) {
+          if erased is any ResolvableView {
+            let resolve = {
+              normalizeResolvedElements(
+                resolveViewElements(view, in: context),
+                in: context
+              )
+            }
+
+            guard let authoringContextOverride else {
+              return resolve()
+            }
+
+            let authoringContext = rebasedAuthoringContext(
+              authoringContextOverride,
+              viewNode: graphNode
+            )
+            return withAuthoringContext(authoringContext) {
+              resolve()
+            }
+          }
+
+          let authoringContext =
+            authoringContextOverride.map {
+              rebasedAuthoringContext($0, viewNode: graphNode)
+            }
+            ?? makeAuthoringContext(
+              for: context,
+              viewNode: graphNode
+            )
+          return withAuthoringContext(authoringContext) {
+            let resolved = normalizeResolvedElements(
               resolveViewElements(view, in: context),
               in: context
             )
+            accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
+            return resolved
           }
-
-          guard let authoringContextOverride else {
-            return resolve()
-          }
-
-          let authoringContext = rebasedAuthoringContext(
-            authoringContextOverride,
-            viewNode: graphNode
-          )
-          return withAuthoringContext(authoringContext) {
-            resolve()
-          }
-        }
-
-        let authoringContext =
-          authoringContextOverride.map {
-            rebasedAuthoringContext($0, viewNode: graphNode)
-          }
-          ?? makeAuthoringContext(
-            for: context,
-            viewNode: graphNode
-          )
-        return withAuthoringContext(authoringContext) {
-          let resolved = normalizeResolvedElements(
-            resolveViewElements(view, in: context),
-            in: context
-          )
-          accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
-          return resolved
         }
       }
     }
-  }
-  assignEntityIdentityOccurrences(to: &resolved._storedChildren)
-  if let graphNode {
-    if let committed = context.viewGraph?.finishEvaluation(
-      graphNode,
-      resolved: resolved,
-      accessedStateSlots: accessedStateSlots
-    ) {
-      resolved = committed
-    } else {
-      resolved.viewNodeID = graphNode.viewNodeID
-      resolved.recomputeSubtreeRuntimeNodeIDsStamped()
+    assignEntityIdentityOccurrences(to: &resolved._storedChildren)
+    if let graphNode {
+      if let committed = context.viewGraph?.finishEvaluation(
+        graphNode,
+        resolved: resolved,
+        accessedStateSlots: accessedStateSlots
+      ) {
+        resolved = committed
+      } else {
+        resolved.viewNodeID = graphNode.viewNodeID
+        resolved.recomputeSubtreeRuntimeNodeIDsStamped()
+      }
     }
+    resolved.structuralPath = context.structuralPath
+    // Shadow oracle: a would-skip node's freshly recomputed output must equal
+    // the prior committed output; a mismatch is the soundness alarm. Then stash
+    // this frame's view value for next frame's comparison.
+    if let memoObservation {
+      finishMemoObservation(memoObservation, newResolved: resolved)
+    }
+    if shouldCaptureMemoViewValue(view) {
+      graphNode?.memoViewValue = view
+    }
+    return resolved
   }
-  resolved.structuralPath = context.structuralPath
-  // Shadow oracle: a would-skip node's freshly recomputed output must equal
-  // the prior committed output; a mismatch is the soundness alarm. Then stash
-  // this frame's view value for next frame's comparison.
-  if let memoObservation {
-    finishMemoObservation(memoObservation, newResolved: resolved)
+
+  let resolved: ResolvedNode
+  if let graphNode, let graph = context.viewGraph {
+    graph.reportResolvedLifetimeNode(graphNode)
+    resolved = graph.withResolveLifetimeScope(hostedBy: graphNode, resolveFresh)
+  } else {
+    resolved = resolveFresh()
   }
-  if shouldCaptureMemoViewValue(view) {
-    graphNode?.memoViewValue = view
-  }
+  context.viewGraph?.reportResolvedLifetimeResult(resolved)
   return resolved
 }
 

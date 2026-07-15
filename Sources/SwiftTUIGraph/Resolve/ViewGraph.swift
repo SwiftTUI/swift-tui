@@ -1948,6 +1948,10 @@ package final class ViewGraph {
     else {
       return
     }
+    recordManualResolveLifetimeAnchor(
+      rootNodeID: rootNodeID,
+      hostedByNodeID: host.viewNodeID
+    )
     recordDetachedHostedNode(rootNodeID, hostedByNodeID: host.viewNodeID)
   }
 
@@ -2025,7 +2029,7 @@ package final class ViewGraph {
     }
   }
 
-  private func recordDetachedHostedNode(
+  func recordDetachedHostedNode(
     _ rootNodeID: ViewNodeID,
     hostedByNodeID hostID: ViewNodeID
   ) {
