@@ -4,7 +4,7 @@ import Testing
 @testable import SwiftTUIGraph
 
 /// Locks each registry's subtree-matcher family (F106). Three deliberately
-/// different matching semantics exist (owner-key structural-path;
+/// different matching semantics exist (explicit owner identity;
 /// focus-detached-owner; bare identity-prefix) and the header of
 /// `RuntimeRegistrationSubtreeMatching.swift` warns collapsing them is
 /// unsafe — but until this suite, nothing failed if a registry's

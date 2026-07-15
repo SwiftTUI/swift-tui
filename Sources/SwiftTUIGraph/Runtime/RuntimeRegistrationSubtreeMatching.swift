@@ -2,12 +2,13 @@
 // families exist deliberately — collapsing their semantics is NOT safe:
 //
 // 1. Owner-key matching (`RuntimeRegistrationOwnerKey.matchesAnySubtreeRoot`)
-//    adds a structural-path projection for the handler families whose
-//    registrations follow `.id`-re-rooted structural identity.
+//    follows the explicitly persisted owner identity. Pointer/hover may choose
+//    an authored owner identity distinct from the registry key; other families
+//    use their registration identity.
 // 2. `focusRegistrationMatchesAnySubtreeRoot` below adds the recording node's
 //    identity for focus snapshots published at detached identities — the
-//    owner key's structural path is built FROM the registered identity, so it
-//    cannot express detached ownership (the F04 stacking finding).
+//    ordinary owner-key families do not adopt that publisher-lifetime rule
+//    (the F04 stacking finding).
 // 3. `identityMatchesAnySubtreeRoot` below is the bare identity-prefix match
 //    for the families keyed only by their own registration identity
 //    (scroll position, lifecycle, preference observation).

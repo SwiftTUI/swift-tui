@@ -758,8 +758,7 @@ package final class ViewGraph {
     }
     let owner = RuntimeRegistrationOwnerKey(
       viewNodeID: node.viewNodeID,
-      identity: identity,
-      structuralPath: StructuralPath(identity: identity)
+      identity: identity
     )
     actionRegistry?.restore(
       [identity: registration],
