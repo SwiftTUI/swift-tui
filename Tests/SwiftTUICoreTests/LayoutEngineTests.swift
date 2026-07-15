@@ -490,6 +490,11 @@ struct LayoutEngineTests {
     )
 
     let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    // Production-shaped geometry: the scroll layout places its content
+    // translated by the clamped offset, so a stack scrolled down by 1 sits
+    // at absolute y = -1 while the viewport rect stays put. The window math
+    // intersects the two absolute ranges (`contentOffset` no longer feeds
+    // the range directly).
     let passContext = LayoutPassContext(
       retainedLayout: nil,
       scrollViewportContext: .init(
@@ -501,7 +506,7 @@ struct LayoutEngineTests {
     let placed = engine.place(
       lazy,
       measured: measured,
-      in: .init(origin: .zero, size: measured.measuredSize),
+      in: .init(origin: .init(x: 0, y: -1), size: measured.measuredSize),
       passContext: passContext
     )
 
@@ -511,7 +516,7 @@ struct LayoutEngineTests {
         testIdentity("row-1"),
         testIdentity("row-2"),
       ])
-    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2])
+    #expect(placed.children.map(\.bounds.origin.y) == [-1, 0, 1])
   }
 
   @Test("lazy horizontal stack places only the visible viewport range")
@@ -533,6 +538,8 @@ struct LayoutEngineTests {
     )
 
     let measured = engine.measure(lazy, proposal: .init(width: 4, height: 8))
+    // Production-shaped: scrolled right by 1 means the stack sits at
+    // absolute x = -1 (see the vertical variant's comment).
     let passContext = LayoutPassContext(
       retainedLayout: nil,
       scrollViewportContext: .init(
@@ -544,7 +551,7 @@ struct LayoutEngineTests {
     let placed = engine.place(
       lazy,
       measured: measured,
-      in: .init(origin: .zero, size: measured.measuredSize),
+      in: .init(origin: .init(x: -1, y: 0), size: measured.measuredSize),
       passContext: passContext
     )
 
@@ -554,7 +561,7 @@ struct LayoutEngineTests {
         testIdentity("column-1"),
         testIdentity("column-2"),
       ])
-    #expect(placed.children.map(\.bounds.origin.x) == [0, 1, 2])
+    #expect(placed.children.map(\.bounds.origin.x) == [-1, 0, 1])
   }
 
   @Test("indexed lazy stacks retain sizing metadata without storing off-screen child measurements")
@@ -596,6 +603,8 @@ struct LayoutEngineTests {
     )
 
     let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    // Production-shaped: scrolled down by 1 -> stack absolute origin y = -1;
+    // the visible row is row-1, which lands at absolute y = 0.
     let passContext = LayoutPassContext(
       retainedLayout: nil,
       scrollViewportContext: .init(
@@ -607,7 +616,7 @@ struct LayoutEngineTests {
     let placed = engine.place(
       lazy,
       measured: measured,
-      in: .init(origin: .zero, size: .init(width: 8, height: 4)),
+      in: .init(origin: .init(x: 0, y: -1), size: .init(width: 8, height: 4)),
       passContext: passContext
     )
 
@@ -615,7 +624,100 @@ struct LayoutEngineTests {
       placed.children.map(\.identity) == [
         testIdentity("row-1")
       ])
-    #expect(placed.children.map(\.bounds.origin.y) == [1])
+    #expect(placed.children.map(\.bounds.origin.y) == [0])
+  }
+
+  @Test("lazy stack offset inside scrolled content windows against its own bounds")
+  func lazyStackOffsetInsideScrolledContentWindowsAgainstOwnBounds() {
+    // A 2-row header sits above the stack inside the scrolled content and the
+    // viewport is scrolled down by 2: the stack's translated origin is back
+    // at absolute 0, so rows 0..1 are the visible band. The old
+    // `contentOffset`-based math read the SCROLL offset (2) as the stack's
+    // own scroll position and would window rows [1, 5) — dropping visible
+    // row 0 (the header height exceeds the overscan allowance).
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: (0..<6).map { index in
+        leaf("row-\(index)", size: .init(width: 2, height: 1))
+      },
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 6))
+    let passContext = LayoutPassContext(
+      retainedLayout: nil,
+      scrollViewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 2)),
+        contentOffset: .init(x: 0, y: 2)
+      )
+    )
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    #expect(
+      placed.children.map(\.identity) == [
+        testIdentity("row-0"),
+        testIdentity("row-1"),
+        testIdentity("row-2"),
+      ])
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2])
+  }
+
+  @Test("viewport context survives a wrapper between scroll content and the lazy stack")
+  func viewportContextSurvivesWrapperAboveLazyStack() {
+    // Production shape: the scroll layout hands the context to its DIRECT
+    // content child's placement entry; any wrapper below must inherit it
+    // down to the lazy stack (children previously reset to the pass-context
+    // global — nil in the composed pipeline — so only a lazy stack that WAS
+    // the direct content ever windowed). The pass context here carries NO
+    // global, exactly like production; the context arrives only through the
+    // top-level placement entry.
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: (0..<5).map { index in
+        leaf("row-\(index)", size: .init(width: 2, height: 1))
+      },
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+    let wrapper = stack(
+      "wrapper",
+      axis: .vertical,
+      children: [lazy]
+    )
+
+    let measured = engine.measure(wrapper, proposal: .init(width: 8, height: 5))
+    let placed = engine.place(
+      wrapper,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      viewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 1)),
+        contentOffset: .zero
+      ),
+      passContext: LayoutPassContext(retainedLayout: nil)
+    )
+
+    let placedLazy = placed.children[0]
+    #expect(placedLazy.identity == testIdentity("lazy"))
+    #expect(
+      placedLazy.children.map(\.identity) == [
+        testIdentity("row-0"),
+        testIdentity("row-1"),
+      ])
   }
 
   @Test("flexible frame resolves unspecified finite and infinite proposals")

@@ -170,7 +170,19 @@ extension LayoutEngine {
         childCount: requests.count
       )
     )
-    let childViewportContext = passContext?.scrollViewportContext
+    // Children inherit the CURRENT node's viewport context: a wrapper
+    // between the scroll content and a lazy stack (padding, frame, an
+    // intermediate stack) shares the enclosing viewport, so the context
+    // must survive the descent (it previously reset every child to the
+    // pass-context global — nil in the composed pipeline — so windowing
+    // engaged only for a lazy stack that WAS the direct scroll content).
+    // Nested scroll views stay correct: a custom-layout child is placed
+    // via a fresh `place` entry seeded from its own recorded placement,
+    // so an inner scroll's context replaces the outer one at that
+    // boundary and this inheritance never crosses it. The pass-context
+    // global remains the top-level seed/fallback for harness-injected
+    // contexts.
+    let childViewportContext = viewportContext ?? passContext?.scrollViewportContext
     for request in requests.reversed() {
       work.append(
         .place(

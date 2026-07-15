@@ -63,6 +63,7 @@ extension LayoutEngine {
 
   package func lazyStackVisibleChildRange(
     for snapshot: LazyStackAllocationSnapshot,
+    in bounds: CellRect,
     viewportContext: LazyStackViewportContext,
     overscan: Int = 1
   ) -> Range<Int>? {
@@ -83,12 +84,25 @@ extension LayoutEngine {
       return nil
     }
 
-    let contentOffset = max(
+    // Absolute intersection: the stack's placement bounds are already
+    // scroll-translated (the scroll layout places its content at
+    // viewport origin minus the clamped offset), and the viewport rect is
+    // absolute, so intersecting the two main-axis ranges yields the visible
+    // band for a stack ANYWHERE inside the scrolled content — a header
+    // above the stack or wrapper nesting shifts `bounds`, not this math.
+    // The previous form read `contentOffset` directly, which is the stack's
+    // own scroll position only when the stack IS the content origin.
+    let stackStart = mainDimension(of: bounds.origin, for: snapshot.axis)
+    let viewportStart =
+      mainDimension(of: viewportContext.viewportRect.origin, for: snapshot.axis)
+    let visibleStart = max(
       0,
-      mainDimension(of: viewportContext.contentOffset, for: snapshot.axis)
+      min(viewportStart - stackStart, snapshot.contentMainLength)
     )
-    let visibleStart = min(contentOffset, snapshot.contentMainLength)
-    let visibleEnd = min(snapshot.contentMainLength, visibleStart + viewportLength)
+    let visibleEnd = min(
+      snapshot.contentMainLength,
+      viewportStart + viewportLength - stackStart
+    )
     guard visibleStart < visibleEnd else {
       return nil
     }

@@ -117,6 +117,7 @@ extension LayoutEngine {
         viewportContext.flatMap {
           lazyStackVisibleChildRange(
             for: snapshot,
+            in: bounds,
             viewportContext: $0,
             overscan: 0
           )
@@ -141,6 +142,7 @@ extension LayoutEngine {
       let snapshot = measured.containerAllocationSnapshot?.lazyStack,
       let visibleRange = lazyStackVisibleChildRange(
         for: snapshot,
+        in: bounds,
         viewportContext: viewportContext
       )
     else {
