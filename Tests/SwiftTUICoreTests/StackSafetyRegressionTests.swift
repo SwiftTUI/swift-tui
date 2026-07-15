@@ -946,7 +946,7 @@ private func makeIndexedLazyStackLayoutTree(
 
 private struct TestStackSafetyIndexedChildSource: IndexedChildSource {
   let identityRoot: Identity
-  let measurementSignature: String
+  let measurementSignature: IndexedChildMeasurementSignature
   private let children: [ResolvedNode]
 
   init(
@@ -955,7 +955,7 @@ private struct TestStackSafetyIndexedChildSource: IndexedChildSource {
   ) {
     self.identityRoot = identityRoot
     self.children = children
-    self.measurementSignature = children.map(\.identity.path).joined(separator: "|")
+    self.measurementSignature = .init(elementPaths: children.map(\.identity.path))
   }
 
   var count: Int {

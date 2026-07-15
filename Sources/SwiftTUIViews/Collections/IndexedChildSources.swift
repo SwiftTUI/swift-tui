@@ -8,12 +8,89 @@ package protocol IndexedChildSourceView {
   ) -> (any IndexedChildSource)?
 }
 
+/// Test instrumentation (the F118 probe pattern): counts retained-artifact
+/// adoptions vs fresh mints in `ForEachIndexedChildSource.init`, so a
+/// live-session test can pin that the F145 retention actually engages on the
+/// composed runtime path — a nil `ViewNodeContext.current` at declaration
+/// time would silently disable it (every rebuild would fresh-mint, correct
+/// but decorative). Increments compile out of release, so the probe costs
+/// nothing where no test reads it.
+@MainActor
+package enum IndexedChildSourceArtifactsProbe {
+  package private(set) static var adoptionCount = 0
+  package private(set) static var freshMintCount = 0
+
+  package static func recordAdoption() {
+    #if DEBUG
+      adoptionCount += 1
+    #endif
+  }
+
+  package static func recordFreshMint() {
+    #if DEBUG
+      freshMintCount += 1
+    #endif
+  }
+
+  package static func reset() {
+    #if DEBUG
+      adoptionCount = 0
+      freshMintCount = 0
+    #endif
+  }
+}
+
+/// The identity artifacts a `ForEachIndexedChildSource` retains across
+/// container resolves (F145): pure functions of (element ids, identity root,
+/// entity scope), adopted only when all three match, so a rebuilt source over
+/// unchanged data skips the per-element `EntityIdentity` mints and the
+/// identity-path signature build — and shares the signature's storage box,
+/// making downstream equivalence comparisons pointer-fast. Element caches are
+/// deliberately NOT retained here: equal ids do not imply equal element
+/// values, and realized rows capture the declaring frame's `ResolveContext`
+/// (frame-scoped registries) — carrying them across frames is the
+/// stale-draft-registry bug class.
+@MainActor
+private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
+  RetainedIndexedChildSourceArtifacts
+{
+  let identityRoot: Identity
+  let scope: StructuralPath
+  let ids: [ID]
+  let entityIdentities: [EntityIdentity]
+  let signature: IndexedChildMeasurementSignature
+
+  init(
+    identityRoot: Identity,
+    scope: StructuralPath,
+    ids: [ID],
+    entityIdentities: [EntityIdentity],
+    signature: IndexedChildMeasurementSignature
+  ) {
+    self.identityRoot = identityRoot
+    self.scope = scope
+    self.ids = ids
+    self.entityIdentities = entityIdentities
+    self.signature = signature
+  }
+
+  func matches(
+    ids: [ID],
+    identityRoot: Identity,
+    scope: StructuralPath
+  ) -> Bool {
+    self.identityRoot == identityRoot
+      && self.scope == scope
+      && self.ids == ids
+  }
+}
+
 @MainActor
 package final class ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource
 where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   private let countStorage: Int
   private let identityRootStorage: Identity
-  private let measurementSignatureStorage: String
+  private let measurementSignatureStorage: IndexedChildMeasurementSignature
 
   private let data: Data
   private let id: KeyPath<Data.Element, ID>
@@ -41,18 +118,39 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     self.id = id
     self.content = content
     self.childContext = childContext
-    entityIdentities = makeEntityIdentities(
-      for: data,
-      id: id,
-      scope: childContext.structuralPath
-    )
     authoringScope = currentAuthoringContext()
-    mintHost = ViewNodeContext.current
+    let host = ViewNodeContext.current
+    mintHost = host
     identityRootStorage = childContext.identity
     countStorage = data.count
-    measurementSignatureStorage = data.map {
-      childContext.identity.explicitID($0[keyPath: id]).path
-    }.joined(separator: "|")
+
+    let ids = data.map { $0[keyPath: id] }
+    let scope = childContext.structuralPath
+    if let retained = host?.retainedIndexedChildSourceArtifacts(
+      forIdentityRoot: childContext.identity
+    ) as? ForEachSourceIdentityArtifacts<ID>,
+      retained.matches(ids: ids, identityRoot: childContext.identity, scope: scope)
+    {
+      IndexedChildSourceArtifactsProbe.recordAdoption()
+      entityIdentities = retained.entityIdentities
+      measurementSignatureStorage = retained.signature
+    } else {
+      IndexedChildSourceArtifactsProbe.recordFreshMint()
+      entityIdentities = makeEntityIdentities(ids: ids, scope: scope)
+      measurementSignatureStorage = IndexedChildMeasurementSignature(
+        elementPaths: ids.lazy.map { childContext.identity.explicitID($0).path }
+      )
+      host?.retainIndexedChildSourceArtifacts(
+        ForEachSourceIdentityArtifacts(
+          identityRoot: childContext.identity,
+          scope: scope,
+          ids: ids,
+          entityIdentities: entityIdentities,
+          signature: measurementSignatureStorage
+        ),
+        forIdentityRoot: childContext.identity
+      )
+    }
   }
 
   nonisolated package var count: Int {
@@ -63,7 +161,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     withCheckedMainActorAccess("IndexedChildSource.identityRoot") { identityRootStorage }
   }
 
-  nonisolated package var measurementSignature: String {
+  nonisolated package var measurementSignature: IndexedChildMeasurementSignature {
     withCheckedMainActorAccess("IndexedChildSource.measurementSignature") {
       measurementSignatureStorage
     }

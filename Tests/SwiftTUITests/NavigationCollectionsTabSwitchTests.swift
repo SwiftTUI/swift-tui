@@ -105,6 +105,44 @@ struct NavigationCollectionsTabSwitchTests {
       """
     )
   }
+
+  @Test("external-wake re-resolves adopt retained collection identity artifacts (F145)")
+  func externalWakeReresolvesAdoptRetainedArtifacts() throws {
+    let harness = try NavCollectionsTabHarness()
+    defer { harness.shutdown() }
+
+    try harness.clickText("NavTab")
+    #expect(
+      harness.frame.contains("Lazy row 0"),
+      "the collections tab must be visible before probing; frame:\n\(harness.frame)"
+    )
+
+    // Everything from here is synchronous on the MainActor, so no parallel
+    // suite can interleave probe traffic between the reset and the reads.
+    IndexedChildSourceArtifactsProbe.reset()
+    try harness.pumpExternalWakeFrames(4)
+
+    // External wakes re-resolve the whole plan (the empty-invalidation
+    // reuse denial — the -002 Stage-0 idle attribution), so the pane's lazy
+    // stacks rebuild their indexed sources each wake with unchanged data:
+    // every rebuild must adopt the retained identity artifacts. A nil
+    // `ViewNodeContext.current` at declaration time would silently
+    // fresh-mint every frame — correct output, decorative retention. If
+    // wake-frame reuse certification ever stops these re-resolves entirely,
+    // adoptionCount drops to 0 — revisit this expectation together with the
+    // F145 evidence; both premises change at once.
+    #expect(
+      IndexedChildSourceArtifactsProbe.adoptionCount > 0,
+      "wake-frame source rebuilds must adopt retained identity artifacts"
+    )
+    #expect(
+      IndexedChildSourceArtifactsProbe.freshMintCount == 0,
+      """
+      no lazy container's ids changed across idle wakes — a fresh mint means \
+      adoption silently disengaged
+      """
+    )
+  }
 }
 
 /// Mirrors the gallery's NavigationCollectionsTab at reduced size: a

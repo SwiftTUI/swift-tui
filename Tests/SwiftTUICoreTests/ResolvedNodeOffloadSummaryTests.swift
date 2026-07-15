@@ -45,7 +45,7 @@ struct ResolvedNodeOffloadSummaryTests {
 
     target.indexedChildSource = IndexedChildSourceSnapshot(
       identityRoot: target.identity,
-      measurementSignature: "sig",
+      measurementSignature: .init(elementPaths: ["sig"]),
       children: []
     )
     #expect(target.customLayoutFallbackSummary.mainActorOnlyIndexedChildSourceCount == 0)
@@ -72,7 +72,7 @@ struct ResolvedNodeOffloadSummaryTests {
     var target = makeNode("target")
     target.indexedChildSource = IndexedChildSourceSnapshot(
       identityRoot: target.identity,
-      measurementSignature: "sig",
+      measurementSignature: .init(elementPaths: ["sig"]),
       children: [workerChild]
     )
 
@@ -117,7 +117,9 @@ private final class OffloadSummaryTestRealizer: LayoutDependentContentRealizer {
 private struct MainActorOnlyChildSource: IndexedChildSource {
   let identityRoot: Identity
   var count: Int { 0 }
-  var measurementSignature: String { "main-actor-only" }
+  var measurementSignature: IndexedChildMeasurementSignature {
+    .init(elementPaths: ["main-actor-only"])
+  }
 
   func child(at index: Int) -> ResolvedNode {
     ResolvedNode(identity: identityRoot, kind: .view("main-actor-only-child"))

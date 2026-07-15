@@ -852,7 +852,9 @@ private func framePipelineIndexedLifecyclePlaced(
 private struct FramePipelineEmptyIndexedChildSource: IndexedChildSource {
   let count = 0
   let identityRoot: Identity
-  let measurementSignature = "frame-pipeline-empty"
+  let measurementSignature = IndexedChildMeasurementSignature(
+    elementPaths: ["frame-pipeline-empty"]
+  )
 
   func child(at _: Int) -> ResolvedNode {
     preconditionFailure("No indexed children should be materialized.")

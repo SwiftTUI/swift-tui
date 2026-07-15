@@ -372,7 +372,7 @@ private func lifecycleNode(
 private struct EmptyIndexedChildSource: IndexedChildSource {
   let count = 0
   let identityRoot = testIdentity("Root", "LazyVStack")
-  let measurementSignature = "empty"
+  let measurementSignature = IndexedChildMeasurementSignature(elementPaths: ["empty"])
 
   func child(at _: Int) -> ResolvedNode {
     preconditionFailure("No indexed children should be materialized in this test.")

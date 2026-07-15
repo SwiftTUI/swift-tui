@@ -362,6 +362,31 @@ package final class ViewNode {
   private var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]] = [:]
   private var exactIdentityOccurrenceTallyFrameID: UInt64 = 0
 
+  /// Identity artifacts retained across resolves of the lazy indexed-child
+  /// containers this node hosts, keyed by each container's child-context
+  /// identity (F145). Pure derived memoization: the adopting source
+  /// content-verifies an entry (element ids + identity root + entity scope)
+  /// before use, so a stale entry — including one restored from an older
+  /// checkpoint image — can only miss, never corrupt.
+  private var retainedIndexedChildSourceArtifactsByRoot:
+    [Identity: any RetainedIndexedChildSourceArtifacts] = [:]
+  {
+    didSet { recordCheckpointMutation() }
+  }
+
+  package func retainedIndexedChildSourceArtifacts(
+    forIdentityRoot identityRoot: Identity
+  ) -> (any RetainedIndexedChildSourceArtifacts)? {
+    retainedIndexedChildSourceArtifactsByRoot[identityRoot]
+  }
+
+  package func retainIndexedChildSourceArtifacts(
+    _ artifacts: any RetainedIndexedChildSourceArtifacts,
+    forIdentityRoot identityRoot: Identity
+  ) {
+    retainedIndexedChildSourceArtifactsByRoot[identityRoot] = artifacts
+  }
+
   package func claimExactIdentityOccurrence(
     for identity: Identity,
     at structuralPath: StructuralPath
@@ -1792,6 +1817,11 @@ extension ViewNode {
     /// a newer frame) and same-frame re-claims are position-idempotent.
     package var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]]
     package var exactIdentityOccurrenceTallyFrameID: UInt64
+    /// Derived memoization (see the live property): entries are
+    /// content-verified at adoption, so restoring an older image is safe —
+    /// a mismatched entry misses and re-mints.
+    package var retainedIndexedChildSourceArtifactsByRoot:
+      [Identity: any RetainedIndexedChildSourceArtifacts]
     /// Capture metadata, not restored state: the node's checkpoint-mutation
     /// generation at the moment this image was taken. ``restoreCheckpoint(_:)``
     /// never writes it back — live generations are monotonic (every restore
@@ -1818,6 +1848,7 @@ extension ViewNode {
       memoViewValue: memoViewValue,
       exactIdentityOccurrenceTally: exactIdentityOccurrenceTally,
       exactIdentityOccurrenceTallyFrameID: exactIdentityOccurrenceTallyFrameID,
+      retainedIndexedChildSourceArtifactsByRoot: retainedIndexedChildSourceArtifactsByRoot,
       checkpointMutationGeneration: checkpointMutationGeneration
     )
   }
@@ -1842,6 +1873,8 @@ extension ViewNode {
     memoViewValue = checkpoint.memoViewValue
     exactIdentityOccurrenceTally = checkpoint.exactIdentityOccurrenceTally
     exactIdentityOccurrenceTallyFrameID = checkpoint.exactIdentityOccurrenceTallyFrameID
+    retainedIndexedChildSourceArtifactsByRoot =
+      checkpoint.retainedIndexedChildSourceArtifactsByRoot
   }
 }
 

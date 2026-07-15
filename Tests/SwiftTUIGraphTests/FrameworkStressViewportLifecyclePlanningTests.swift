@@ -657,7 +657,7 @@ private func indexedLifecycleRoot() -> ResolvedNode {
     kind: .root,
     indexedChildSource: IndexedChildSourceSnapshot(
       identityRoot: rootIdentity,
-      measurementSignature: "stress-lifecycle",
+      measurementSignature: .init(elementPaths: ["stress-lifecycle"]),
       children: []
     )
   )

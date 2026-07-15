@@ -1368,7 +1368,7 @@ private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
 
 private struct TestIndexedChildSource: IndexedChildSource {
   let identityRoot: Identity
-  let measurementSignature: String
+  let measurementSignature: IndexedChildMeasurementSignature
   private let children: [ResolvedNode]
 
   init(
@@ -1377,7 +1377,7 @@ private struct TestIndexedChildSource: IndexedChildSource {
   ) {
     self.identityRoot = identityRoot
     self.children = children
-    measurementSignature = children.map(\.identity.path).joined(separator: "|")
+    measurementSignature = .init(elementPaths: children.map(\.identity.path))
   }
 
   var count: Int {

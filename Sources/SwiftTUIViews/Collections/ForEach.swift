@@ -263,12 +263,22 @@ package func makeEntityIdentities<Data, ID>(
   scope: StructuralPath
 ) -> [EntityIdentity]
 where Data: RandomAccessCollection, ID: Hashable & Sendable {
+  makeEntityIdentities(
+    ids: data.map { $0[keyPath: id] },
+    scope: scope
+  )
+}
+
+package func makeEntityIdentities<ID>(
+  ids: [ID],
+  scope: StructuralPath
+) -> [EntityIdentity]
+where ID: Hashable & Sendable {
   var counts: [ID: Int] = [:]
   var identities: [EntityIdentity] = []
-  identities.reserveCapacity(data.count)
+  identities.reserveCapacity(ids.count)
 
-  for element in data {
-    let value = element[keyPath: id]
+  for value in ids {
     let occurrence = counts[value, default: 0]
     counts[value] = occurrence + 1
     identities.append(
