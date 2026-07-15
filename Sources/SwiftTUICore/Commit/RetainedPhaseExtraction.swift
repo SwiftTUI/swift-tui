@@ -17,17 +17,7 @@ package enum RetainedPhaseExtractionProof: Equatable, Sendable {
   }
 }
 
-/// Per-node phase-extraction signature vocabulary plus the paired
-/// subtree-equivalence walk the frame tail uses for phase reuse.
-///
-/// `NodeSignature` is the total mirror of the `PlacedNode` fields the
-/// retained draw/semantics products depend on (locked against `PlacedNode`'s
-/// stored fields by `PlacedNodeMirrorTotalityTests`). `subtreesIdentical`
-/// compares two placed subtrees one node pair at a time and short-circuits on
-/// the first difference — it replaced the historical whole-subtree signature
-/// arrays, which were rebuilt per reuse candidate at every descent level
-/// (O(n·depth) node copies per frame on partial-reuse frames).
-package enum RetainedPhaseExtractionSignature {
+package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
   private struct NodeSignature: Equatable, Sendable {
     var identity: Identity
     var kind: NodeKind
@@ -49,29 +39,6 @@ package enum RetainedPhaseExtractionSignature {
     var isTransient: Bool
     var matchedGeometry: MatchedGeometryConfig?
     var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
-
-    init(_ node: PlacedNode) {
-      identity = node.identity
-      kind = node.kind
-      environmentSnapshot = node.environmentSnapshot
-      bounds = node.bounds
-      contentBounds = node.contentBounds
-      clipBounds = node.clipBounds
-      zIndex = node.zIndex
-      childCount = node.children.count
-      semanticRole = node.semanticRole
-      layoutMetadata = node.layoutMetadata
-      drawMetadata = .init(node.drawMetadata)
-      drawEffects = node.drawEffects
-      surfaceComposition = node.surfaceComposition
-      semanticMetadata = node.semanticMetadata
-      lifecycleMetadata = node.lifecycleMetadata
-      drawPayload = node.drawPayload
-      layoutBehavior = node.layoutBehavior
-      isTransient = node.isTransient
-      matchedGeometry = node.matchedGeometry
-      lazyChildScrollEstimates = node.lazyChildScrollEstimates
-    }
   }
 
   private struct DrawMetadataSignature: Equatable, Sendable {
@@ -92,30 +59,49 @@ package enum RetainedPhaseExtractionSignature {
     }
   }
 
-  /// Whether the two placed subtrees are byte-equivalent for phase reuse:
-  /// every positional node pair matches on the full `NodeSignature` field
-  /// set and every node on both sides supports retained extraction
-  /// (`.canvas`/`.foreignSurface`/custom layout never prove equivalence —
-  /// their draw products are not value-comparable). First difference wins.
-  package static func subtreesIdentical(
-    _ current: PlacedNode,
-    _ previous: PlacedNode
-  ) -> Bool {
-    var stack: [(PlacedNode, PlacedNode)] = [(current, previous)]
-    while let (currentNode, previousNode) = stack.popLast() {
-      guard currentNode.supportsRetainedPhaseExtraction,
-        previousNode.supportsRetainedPhaseExtraction,
-        NodeSignature(currentNode) == NodeSignature(previousNode)
-      else {
-        return false
+  private var nodes: [NodeSignature]
+
+  package static func make(
+    from placed: PlacedNode
+  ) -> Self? {
+    var nodes: [NodeSignature] = []
+    nodes.reserveCapacity(placed.subtreeNodeCount)
+    var stack: [PlacedNode] = [placed]
+
+    while let node = stack.popLast() {
+      guard node.supportsRetainedPhaseExtraction else {
+        return nil
       }
-      // The signature compare above pins equal child counts, so positional
-      // pairing is total.
-      for pair in zip(currentNode.children, previousNode.children) {
-        stack.append(pair)
+      nodes.append(
+        NodeSignature(
+          identity: node.identity,
+          kind: node.kind,
+          environmentSnapshot: node.environmentSnapshot,
+          bounds: node.bounds,
+          contentBounds: node.contentBounds,
+          clipBounds: node.clipBounds,
+          zIndex: node.zIndex,
+          childCount: node.children.count,
+          semanticRole: node.semanticRole,
+          layoutMetadata: node.layoutMetadata,
+          drawMetadata: .init(node.drawMetadata),
+          drawEffects: node.drawEffects,
+          surfaceComposition: node.surfaceComposition,
+          semanticMetadata: node.semanticMetadata,
+          lifecycleMetadata: node.lifecycleMetadata,
+          drawPayload: node.drawPayload,
+          layoutBehavior: node.layoutBehavior,
+          isTransient: node.isTransient,
+          matchedGeometry: node.matchedGeometry,
+          lazyChildScrollEstimates: node.lazyChildScrollEstimates
+        )
+      )
+      for child in node.children.reversed() {
+        stack.append(child)
       }
     }
-    return true
+
+    return Self(nodes: nodes)
   }
 }
 

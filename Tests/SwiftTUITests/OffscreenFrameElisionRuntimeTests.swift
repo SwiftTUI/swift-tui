@@ -84,6 +84,10 @@ struct OffscreenFrameElisionRuntimeTests {
     #expect(retained.previousPhaseProducts?.semantics == semantics)
     #expect(retained.previousPhaseProducts?.draw == draw)
     #expect(
+      retained.previousPhaseProducts?.signature
+        == RetainedPhaseExtractionSignature.make(from: baseline)
+    )
+    #expect(
       retained.phaseExtractionProof(
         for: .init(width: .finite(10), height: .finite(4)),
         placed: baseline,
@@ -216,8 +220,9 @@ struct OffscreenFrameElisionRuntimeTests {
     let retained = retainedState.input(invalidatedIdentities: [])
     // The unsupported canvas no longer discards the whole frame's phase products
     // (it previously zeroed them, starving reuse tree-wide); they are retained
-    // so the per-subtree partial path can run.
+    // with a nil whole-tree signature so the per-subtree partial path can run.
     #expect(retained.previousPhaseProducts != nil)
+    #expect(retained.previousPhaseProducts?.signature == nil)
 
     let proof = retained.phaseExtractionProof(
       for: .init(width: .finite(8), height: .finite(2)),

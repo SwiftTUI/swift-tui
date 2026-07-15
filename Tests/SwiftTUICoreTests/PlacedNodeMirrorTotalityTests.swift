@@ -38,9 +38,6 @@ struct PlacedNodeMirrorTotalityTests {
       "subtreeBounds":
         "derived cache recomputed from bounds/children didSets — the walk compares every "
         + "node's bounds, which subsumes it",
-      "subtreeNodeCount":
-        "derived cache — equal childCount at every paired node pins equal subtree node "
-        + "counts by recursion",
     ],
     "==": [
       "viewNodeID":
@@ -76,13 +73,12 @@ struct PlacedNodeMirrorTotalityTests {
   private func mirrorText(for mirror: String) throws -> String {
     switch mirror {
     case "signature":
-      // The signature struct's field list (including its `PlacedNode` init)
-      // plus the `subtreesIdentical` paired walk that consumes it — a field
-      // is covered when either names it.
+      // The signature struct's field list plus the `make` walk that populates
+      // it — a field is covered when either names it.
       let source = try sourceText(relativePath: Self.extractionPath)
       let structBody = try typeBody(kind: "struct", name: "NodeSignature", in: source)
-      let walkBody = functionBodyText(named: "subtreesIdentical", in: source)
-      return structBody + "\n" + walkBody
+      let makeBody = functionBodyText(named: "make", in: source)
+      return structBody + "\n" + makeBody
     case "==":
       let source = try sourceText(relativePath: Self.placedNodePath)
       return functionBodyText(named: "==", in: source)
