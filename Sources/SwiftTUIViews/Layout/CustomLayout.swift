@@ -126,8 +126,71 @@ public struct LayoutSubview {
         position: position,
         anchor: anchor,
         proposal: proposal,
+        exactSize: nil,
         viewportContext: viewportContext
       )
+    )
+  }
+
+  func place(
+    at position: LayoutPoint,
+    proposal: ProposedViewSize,
+    exactSize: LayoutSize
+  ) {
+    placementRecorder?.record(
+      identity: child.identity,
+      placement: .init(
+        position: position,
+        anchor: .topLeading,
+        proposal: proposal,
+        exactSize: exactSize,
+        viewportContext: nil
+      )
+    )
+  }
+}
+
+func builtinLayoutSize(
+  behavior: LayoutBehavior,
+  proposal: ProposedViewSize,
+  subviews: LayoutSubviews
+) -> LayoutSize {
+  guard let first = subviews.first else {
+    return .zero
+  }
+  return first.engine.measureBuiltinLayout(
+    behavior: behavior,
+    children: subviews.map(\.child),
+    proposal: proposal,
+    passContext: first.passContext
+  ).measuredSize
+}
+
+func placeBuiltinLayoutSubviews(
+  behavior: LayoutBehavior,
+  in bounds: LayoutRect,
+  proposal: ProposedViewSize,
+  subviews: LayoutSubviews
+) {
+  guard let first = subviews.first else {
+    return
+  }
+  let placements = first.engine.placeBuiltinLayout(
+    behavior: behavior,
+    children: subviews.map(\.child),
+    proposal: proposal,
+    in: bounds,
+    passContext: first.passContext
+  )
+  precondition(
+    placements.count == subviews.count,
+    "builtin Layout delegation produced a mismatched child placement count"
+  )
+  for (subview, placement) in zip(subviews, placements) {
+    subview.place(
+      at: placement.bounds.origin,
+      proposal: placement.proposal,
+      exactSize: placement.bounds.size
     )
   }
 }

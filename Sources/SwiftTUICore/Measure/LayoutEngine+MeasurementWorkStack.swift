@@ -2,9 +2,12 @@ extension LayoutEngine {
   package func measureIterative(
     _ resolved: ResolvedNode,
     proposal: ProposedSize,
-    passContext: LayoutPassContext?
+    passContext: LayoutPassContext?,
+    allowsRootReuse: Bool = true
   ) -> MeasuredNode {
-    var work: [MeasurementWorkItem] = [.measure(resolved, proposal)]
+    var work: [MeasurementWorkItem] = [
+      allowsRootReuse ? .measure(resolved, proposal) : .measureFresh(resolved, proposal)
+    ]
     var results: [MeasuredNode] = []
     var localMetrics = LayoutWorkMetrics()
 
@@ -16,6 +19,17 @@ extension LayoutEngine {
         scheduleMeasurement(
           of: node,
           proposal: proposal,
+          allowsReuse: true,
+          passContext: passContext,
+          localMetrics: &localMetrics,
+          work: &work,
+          results: &results
+        )
+      case .measureFresh(let node, let proposal):
+        scheduleMeasurement(
+          of: node,
+          proposal: proposal,
+          allowsReuse: false,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work,
@@ -315,29 +329,34 @@ extension LayoutEngine {
   private func scheduleMeasurement(
     of node: ResolvedNode,
     proposal: ProposedSize,
+    allowsReuse: Bool,
     passContext: LayoutPassContext?,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
-    let hasInvalidatedIndexedDescendant = hasInvalidatedIndexedDescendant(
-      for: node,
-      passContext: passContext
-    )
+    let hasInvalidatedIndexedDescendant =
+      allowsReuse
+      && hasInvalidatedIndexedDescendant(
+        for: node,
+        passContext: passContext
+      )
 
-    if let retained = retainedMeasurement(
-      for: node,
-      proposal: proposal,
-      retainedLayout: passContext?.retainedLayout,
-      hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant,
-      currentMeasureViewportHint: passContext?.currentMeasureViewportHint
-    ) {
+    if allowsReuse,
+      let retained = retainedMeasurement(
+        for: node,
+        proposal: proposal,
+        retainedLayout: passContext?.retainedLayout,
+        hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant,
+        currentMeasureViewportHint: passContext?.currentMeasureViewportHint
+      )
+    {
       localMetrics.measuredNodesReused += retained.subtreeNodeCount
       results.append(retained)
       return
     }
 
-    if !hasInvalidatedIndexedDescendant,
+    if allowsReuse, !hasInvalidatedIndexedDescendant,
       let cached = cache?.lookup(resolved: node, proposal: proposal)
     {
       localMetrics.measuredNodesReused += cached.subtreeNodeCount

@@ -291,6 +291,47 @@ private struct WidthStampingLayout: Layout {
   }
 }
 
+private struct LayoutConformanceDelegator<L: Layout>: Layout {
+  var layout: L
+
+  func makeCache(subviews: LayoutSubviews) -> L.Cache {
+    layout.makeCache(subviews: subviews)
+  }
+
+  func updateCache(
+    _ cache: inout L.Cache,
+    subviews: LayoutSubviews
+  ) {
+    layout.updateCache(&cache, subviews: subviews)
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout L.Cache
+  ) -> LayoutSize {
+    layout.sizeThatFits(
+      proposal: proposal,
+      subviews: subviews,
+      cache: &cache
+    )
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout L.Cache
+  ) {
+    layout.placeSubviews(
+      in: bounds,
+      proposal: proposal,
+      subviews: subviews,
+      cache: &cache
+    )
+  }
+}
+
 private struct BodyBasedBadge: View {
   let title: String
 
@@ -6128,6 +6169,135 @@ struct SwiftUISurfaceTests {
         .init(x: 3, y: 1),
       ])
     #expect(layoutArtifacts.rasterSurface.lines == viewArtifacts.rasterSurface.lines)
+  }
+
+  @Test("delegating to HStackLayout preserves flexible main-axis allocation")
+  func delegatedHStackLayoutExpandsFlexibleChildren() {
+    let reference = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("A")
+        Spacer(minLength: 0)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Reference")),
+      proposal: .init(width: 7, height: 1)
+    )
+    let artifacts = DefaultRenderer().render(
+      LayoutConformanceDelegator(layout: HStackLayout(spacing: 0)) {
+        Text("A")
+        Spacer(minLength: 0)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 7, height: 1)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == reference.measuredTree.measuredSize)
+    #expect(
+      artifacts.placedTree.children.map(\.bounds) == reference.placedTree.children.map(\.bounds))
+    #expect(artifacts.rasterSurface.lines == reference.rasterSurface.lines)
+  }
+
+  @Test("delegating to VStackLayout preserves flexible main-axis allocation")
+  func delegatedVStackLayoutExpandsFlexibleChildren() {
+    let reference = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("A")
+        Spacer(minLength: 0)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Reference")),
+      proposal: .init(width: 1, height: 7)
+    )
+    let artifacts = DefaultRenderer().render(
+      LayoutConformanceDelegator(layout: VStackLayout(spacing: 0)) {
+        Text("A")
+        Spacer(minLength: 0)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 1, height: 7)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == reference.measuredTree.measuredSize)
+    #expect(
+      artifacts.placedTree.children.map(\.bounds) == reference.placedTree.children.map(\.bounds))
+    #expect(artifacts.rasterSurface.lines == reference.rasterSurface.lines)
+  }
+
+  @Test("delegating to HStackLayout preserves unbounded flexible-frame allocation")
+  func delegatedHStackLayoutExpandsFlexibleFrames() {
+    let reference = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("A")
+        Text("B").frame(maxWidth: .infinity, alignment: .leading)
+      },
+      context: .init(identity: testIdentity("Reference")),
+      proposal: .init(width: 7, height: 1)
+    )
+    let artifacts = DefaultRenderer().render(
+      LayoutConformanceDelegator(layout: HStackLayout(spacing: 0)) {
+        Text("A")
+        Text("B").frame(maxWidth: .infinity, alignment: .leading)
+      },
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 7, height: 1)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == reference.measuredTree.measuredSize)
+    #expect(
+      artifacts.placedTree.children.map(\.bounds) == reference.placedTree.children.map(\.bounds))
+    #expect(artifacts.rasterSurface.lines == reference.rasterSurface.lines)
+  }
+
+  @Test("delegating to HStackLayout preserves finite-proposal compression")
+  func delegatedHStackLayoutCompressesChildren() {
+    let reference = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("ABCDEFG")
+        Text("Z")
+      },
+      context: .init(identity: testIdentity("Reference")),
+      proposal: .init(width: 5, height: 1)
+    )
+    let artifacts = DefaultRenderer().render(
+      LayoutConformanceDelegator(layout: HStackLayout(spacing: 0)) {
+        Text("ABCDEFG")
+        Text("Z")
+      },
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 5, height: 1)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == reference.measuredTree.measuredSize)
+    #expect(
+      artifacts.placedTree.children.map(\.bounds) == reference.placedTree.children.map(\.bounds))
+    #expect(artifacts.rasterSurface.lines == reference.rasterSurface.lines)
+  }
+
+  @Test("delegating to ZStackLayout proposes the available size to children")
+  func delegatedZStackLayoutUsesParentProposal() {
+    let reference = DefaultRenderer().render(
+      ZStack(alignment: .bottomTrailing) {
+        Rectangle()
+        Text("X")
+      },
+      context: .init(identity: testIdentity("Reference")),
+      proposal: .init(width: 6, height: 3)
+    )
+    let artifacts = DefaultRenderer().render(
+      LayoutConformanceDelegator(layout: ZStackLayout(alignment: .bottomTrailing)) {
+        Rectangle()
+        Text("X")
+      },
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 6, height: 3)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == reference.measuredTree.measuredSize)
+    #expect(
+      artifacts.placedTree.children.map(\.bounds) == reference.placedTree.children.map(\.bounds))
+    #expect(artifacts.rasterSurface.lines == reference.rasterSurface.lines)
   }
 
   @Test("ForEach expands data-driven children with stable explicit identities")

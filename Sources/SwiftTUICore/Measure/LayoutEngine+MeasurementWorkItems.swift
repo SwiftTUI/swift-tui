@@ -1,5 +1,6 @@
 enum MeasurementWorkItem {
   case measure(ResolvedNode, ProposedSize)
+  case measureFresh(ResolvedNode, ProposedSize)
   case finishNode(
     ResolvedNode,
     originalProposal: ProposedSize,

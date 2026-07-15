@@ -309,11 +309,11 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         measured: childMeasurement,
         in: LayoutRect(
           origin: placedOrigin(
-            for: childMeasurement.measuredSize,
+            for: placement.exactSize ?? childMeasurement.measuredSize,
             at: placement.position,
             anchor: placement.anchor
           ),
-          size: childMeasurement.measuredSize
+          size: placement.exactSize ?? childMeasurement.measuredSize
         ),
         viewportContext: placement.viewportContext,
         passContext: passContext

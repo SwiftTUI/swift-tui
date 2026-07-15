@@ -3,7 +3,8 @@ import SwiftTUICore
 // Placement geometry for custom layouts.
 //
 // `LayoutSubviewPlacementRecord` captures one subview placement (position,
-// anchor, proposal, optional viewport context); `LayoutSubviewPlacementRecorder`
+// anchor, proposal, optional exact size, and optional viewport context);
+// `LayoutSubviewPlacementRecorder`
 // collects them keyed by identity during a layout pass. `defaultPlacement`
 // centers a subview in its bounds; `placedOrigin` converts an anchored
 // placement into a top-left origin.
@@ -17,6 +18,7 @@ struct LayoutSubviewPlacementRecord {
   var position: LayoutPoint
   var anchor: Alignment
   var proposal: ProposedViewSize
+  var exactSize: LayoutSize?
   var viewportContext: ScrollViewportContext?
 }
 
@@ -42,7 +44,9 @@ func defaultPlacement(
       y: bounds.origin.y + (bounds.size.height / 2)
     ),
     anchor: .center,
-    proposal: proposal
+    proposal: proposal,
+    exactSize: nil,
+    viewportContext: nil
   )
 }
 
