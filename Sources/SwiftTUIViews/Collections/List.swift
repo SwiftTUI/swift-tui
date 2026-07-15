@@ -209,13 +209,10 @@ extension List {
     // these minted subtrees join no children array — without an anchor the
     // list's departure can never reach them and they strand alive in the
     // store (the F04/F91 teardown-coherence leak; the gallery collections-tab
-    // warning). Anchor each mint to the evaluating host so its teardown
-    // retires them through the standard cascade.
+    // warning). Resolve-lifetime scope owns each detached value at the nearest
+    // declaring host.
     for node in nodes {
-      context.viewGraph?.recordDetachedHostedSubtree(
-        node,
-        hostedBy: ViewNodeContext.current
-      )
+      context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
     }
 
     var items: [ListItemPayload] = []

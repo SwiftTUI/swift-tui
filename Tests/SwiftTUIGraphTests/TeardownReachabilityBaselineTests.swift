@@ -39,13 +39,10 @@ struct TeardownReachabilityBaselineTests {
 
     let expected = [
       "Sources/SwiftTUIViews/Collections/IndexedChildSources.swift": 1,
-      "Sources/SwiftTUIViews/Collections/List.swift": 1,
-      "Sources/SwiftTUIViews/Collections/Table.swift": 1,
-      "Sources/SwiftTUIViews/Controls/Picker.swift": 1,
       "Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift": 1,
     ]
     #expect(invocationCountsByPath == expected)
-    #expect(invocationCountsByPath.values.reduce(0, +) == 5)
+    #expect(invocationCountsByPath.values.reduce(0, +) == 2)
   }
 
   @Test("inactive entity homes are not kept")

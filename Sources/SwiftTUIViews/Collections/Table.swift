@@ -217,10 +217,7 @@ extension Table {
     // same stranding shape as `List.resolvedItems`; see the anchor comment
     // there.
     for node in nodes {
-      context.viewGraph?.recordDetachedHostedSubtree(
-        node,
-        hostedBy: ViewNodeContext.current
-      )
+      context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
     }
     var rows: [TableRowPayload] = []
     collectTableRows(from: nodes, into: &rows)
