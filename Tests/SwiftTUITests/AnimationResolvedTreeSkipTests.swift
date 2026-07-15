@@ -4,16 +4,16 @@ import Testing
 @testable import SwiftTUIRuntime
 
 /// Pins the F66 head gate's controller-side contract: the resolved-tree
-/// processing skip requires a processed baseline and a fully idle controller
-/// (no animation batch on the transaction, no active animations, no removal
-/// overlays), and the skip path counts its firings so integration shapes can
-/// assert the gate is alive. The value-identity half of the proof (a
-/// fully-reused resolve) is asserted at the skip site in DEBUG.
+/// processing skip requires a processed baseline and no new animation batch.
+/// Controller-owned in-flight work does not block an animation-equivalent tree from
+/// skipping the snapshot/diff census (F149). The skip path counts its firings so
+/// integration shapes can assert the gate is alive. The animation-equivalence
+/// half of the proof (a fully-reused resolve) is asserted at the skip site in DEBUG.
 @MainActor
 @Suite
 struct AnimationResolvedTreeSkipTests {
-  @Test("skip gate requires a processed baseline and an idle controller")
-  func gateRequiresProcessedBaselineAndIdleController() {
+  @Test("skip gate requires a processed baseline and no new animation batch")
+  func gateRequiresProcessedBaselineAndNoNewAnimationBatch() {
     let controller = AnimationController()
     let tree = ResolvedNode(
       identity: Identity(components: ["AnimationSkipRoot"]),
@@ -47,5 +47,57 @@ struct AnimationResolvedTreeSkipTests {
     controller.noteSkippedResolvedTreeProcessing(resolved: tree)
     #expect(controller.resolvedTreeProcessingSkipCount == 1)
     #expect(controller.canSkipResolvedTreeProcessing(transaction: plain))
+  }
+
+  @Test("active property animation does not block an animation-equivalent tree skip")
+  func activePropertyAnimationDoesNotBlockAnimationEquivalentTreeSkip() {
+    let controller = AnimationController()
+    let identity = Identity(components: ["AnimationSkipActiveLeaf"])
+    var baseline = ResolvedNode(identity: identity, kind: .view("Leaf"))
+    baseline.drawMetadata.baseStyle.explicitOpacity = 1
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(baseline, transaction: .init(), timestamp: t0)
+
+    var target = baseline
+    target.drawMetadata.baseStyle.explicitOpacity = 0
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(
+      controller.register(.linear(duration: .milliseconds(500)))
+    )
+    controller.processResolvedTree(target, transaction: transaction, timestamp: t0)
+    #expect(controller.activeAnimationCount == 1)
+
+    #expect(
+      controller.canSkipResolvedTreeProcessing(transaction: .init()),
+      "a deadline-only tick owns no new authored target state to snapshot or diff"
+    )
+  }
+
+  @Test("transaction-only changes do not invalidate an animation-equivalent skip")
+  func transactionOnlyChangesDoNotInvalidateAnimationEquivalentSkip() {
+    let controller = AnimationController()
+    let identity = Identity(components: ["AnimationSkipDebugSignature"])
+    let baseline = ResolvedNode(
+      identity: identity,
+      kind: .view("Leaf"),
+      transactionSnapshot: .init(debugSignature: "baseline")
+    )
+    controller.processResolvedTree(
+      baseline,
+      transaction: .init(),
+      timestamp: MonotonicInstant.now()
+    )
+
+    var transactionOnlyChange = TransactionSnapshot(debugSignature: "deadline")
+    transactionOnlyChange.animationRequest = .disabled
+    let reused = ResolvedNode(
+      identity: identity,
+      kind: .view("Leaf"),
+      transactionSnapshot: transactionOnlyChange
+    )
+    #expect(controller.canSkipResolvedTreeProcessing(transaction: .init()))
+    controller.noteSkippedResolvedTreeProcessing(resolved: reused)
+    #expect(controller.resolvedTreeProcessingSkipCount == 1)
+    #expect(controller.debugStateSnapshot().previousTreeRoot == reused)
   }
 }

@@ -15,6 +15,9 @@ extension AnimationController {
     package var activeAnimations: [AnimationKey: ActiveAnimation]
     package var removingNodes: [ViewNodeID: RemovalEntry]
     package var lastTickResult: AnimationTickResult
+    package var resolvedTreeProcessingSkipCount: Int
+    package var lastResolvedTreeProcessedNodeCount: Int
+    package var lastPropertyInterpolationVisitedNodeCount: Int
   }
 
   package struct DebugStateSnapshot: Equatable {

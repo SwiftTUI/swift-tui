@@ -2593,61 +2593,6 @@ struct AnimationControllerPropertyTests {
     #expect(tick.nextDeadline != nil)
     #expect(tick.redrawIdentities.isEmpty)
 
-    // Contract pin (supersedes the F32 full-suppression fallback): a
-    // stranded empty-batch drain is pending work that needs NO retained-reuse
-    // suppression — the drain fires from a controller-internal deadline in
-    // `applyInterpolations` and touches no tree state, so the attributable
-    // projection names it with an EMPTY scope. The run loop certifies that
-    // named-empty scope instead of recomputing the whole tree on every frame
-    // of the drain window (the tab-switch `suppressed=` bursts).
-    #expect(controller.attributablePendingAnimationIdentities == [])
-  }
-
-  @Test("in-flight removal transition is attributable pending animation work")
-  func removalTransitionIsAttributablePendingAnimationWork() throws {
-    let controller = AnimationController()
-    let animation = Animation.easeInOut(duration: .milliseconds(200))
-    controller.register(animation)
-
-    let leafIdentity = Identity(components: [.named("root"), .named("attributable-leaf")])
-    let leafNodeID = ViewNodeID(rawValue: 2)
-    controller.beginTransitionCollection()
-    controller.registerTransition(
-      for: leafIdentity,
-      viewNodeID: leafNodeID,
-      transition: AnyTransition.opacity
-    )
-    controller.finishTransitionCollection()
-
-    let leaf = ResolvedNode(
-      viewNodeID: leafNodeID,
-      identity: leafIdentity,
-      kind: .view("Leaf")
-    )
-    let root = ResolvedNode(
-      identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
-      children: [leaf]
-    )
-    let t0 = MonotonicInstant.now()
-    controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
-
-    #expect(controller.attributablePendingAnimationIdentities == [])
-
-    // Frame 2: leaf removed under a withAnimation intent — the removal
-    // transition starts and its identity becomes attributable pending work.
-    controller.beginTransitionCollection()
-    controller.finishTransitionCollection()
-    var transaction = TransactionSnapshot()
-    transaction.animationRequest = .animate(animation.animationBox)
-    let root2 = ResolvedNode(
-      identity: Identity(components: [.named("root")]),
-      kind: .view("Root"),
-      children: []
-    )
-    controller.processResolvedTree(root2, transaction: transaction, timestamp: t0)
-
-    #expect(controller.attributablePendingAnimationIdentities == [leafIdentity])
   }
 
   @Test(

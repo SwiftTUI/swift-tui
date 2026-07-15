@@ -24,6 +24,12 @@ package final class AnimationController: Sendable {
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
   package private(set) var lastTickResult: AnimationTickResult = .init()
+  /// Nodes visited by the most recent resolved-tree snapshot/diff census.
+  /// Deadline-only F149 skips report zero.
+  package private(set) var lastResolvedTreeProcessedNodeCount = 0
+  /// Nodes visited while applying property interpolation on the most recent
+  /// tick. A routed single-property update visits only its ancestor route.
+  package private(set) var lastPropertyInterpolationVisitedNodeCount = 0
   /// Monotonic generation bumped by ``reset()``. A frame draft captures this at
   /// creation; if it advances before the draft commits, the reset happened
   /// mid-flight and the draft's pre-reset state must not be republished.
@@ -242,7 +248,10 @@ package final class AnimationController: Sendable {
       completionLedger: completionLedger,
       activeAnimations: activeAnimations,
       removingNodes: removingNodes,
-      lastTickResult: lastTickResult
+      lastTickResult: lastTickResult,
+      resolvedTreeProcessingSkipCount: resolvedTreeProcessingSkipCount,
+      lastResolvedTreeProcessedNodeCount: lastResolvedTreeProcessedNodeCount,
+      lastPropertyInterpolationVisitedNodeCount: lastPropertyInterpolationVisitedNodeCount
     )
   }
 
@@ -255,6 +264,10 @@ package final class AnimationController: Sendable {
     activeAnimations = checkpoint.activeAnimations
     removingNodes = checkpoint.removingNodes
     lastTickResult = checkpoint.lastTickResult
+    resolvedTreeProcessingSkipCount = checkpoint.resolvedTreeProcessingSkipCount
+    lastResolvedTreeProcessedNodeCount = checkpoint.lastResolvedTreeProcessedNodeCount
+    lastPropertyInterpolationVisitedNodeCount =
+      checkpoint.lastPropertyInterpolationVisitedNodeCount
   }
 
   fileprivate func publishCommittedState(
@@ -442,42 +455,8 @@ package final class AnimationController: Sendable {
     }.count
   }
 
-  package var activePropertyAnimationIdentities: Set<Identity> {
-    activeAnimations.keys.reduce(into: Set<Identity>()) { partial, key in
-      if case .property = key.scope {
-        partial.insert(key.identity)
-      }
-    }
-  }
-
   private var removingIdentitySet: Set<Identity> {
     Set(removingNodes.values.map(\.identity))
-  }
-
-  /// The identities of every pending animation work item that needs
-  /// retained-reuse suppression: active animations of any scope (property,
-  /// insertion offset, matched geometry) plus in-flight removal transitions.
-  ///
-  /// Stranded empty-batch completion drains deliberately contribute NOTHING
-  /// here: a pending drain is a controller-internal deadline that fires in
-  /// `applyInterpolations` (the frame head runs on every frame shape,
-  /// including elided and dropped frames), touches no tree state, and
-  /// re-registers nothing — so no subtree needs to recompute for it.
-  /// Classifying drains as identity-agnostic previously made the run loop
-  /// fall back to FULL retained-reuse suppression plus forced root
-  /// evaluation for the batch's entire nominal duration, so a tab-switch
-  /// transition's empty `withAnimation` batch recomputed the whole tree on
-  /// every frame of the switch burst (the multi-hundred-node `suppressed=`
-  /// runs in the reuse trace, and the recompute latency behind the Life-tab
-  /// presentation starvation).
-  ///
-  /// `nil` is reserved for pending work the controller genuinely cannot
-  /// attribute (no such class exists today); the run loop keeps the
-  /// full-suppression fallback for it.
-  package var attributablePendingAnimationIdentities: Set<Identity>? {
-    var identities = Set(activeAnimations.keys.map(\.identity))
-    identities.formUnion(removingIdentitySet)
-    return identities
   }
 
   package var preFrameHeadOffscreenPropertyAnimationRedrawIdentities: Set<Identity>? {
@@ -792,29 +771,32 @@ package final class AnimationController: Sendable {
 
   /// `true` when this frame's ``processResolvedTree(_:transaction:timestamp:)``
   /// is provably a no-op and may be skipped (F66). The caller must have
-  /// established that the canonical resolved tree is value-identical to the
-  /// one last processed (a fully-reused resolve — zero nodes computed);
+  /// established that the canonical resolved tree is animation-process
+  /// equivalent to the one last processed (a fully-reused resolve — zero
+  /// nodes computed);
   /// this gate adds the controller-state half of the proof:
   ///
   /// - the transaction opens no animation batch, so no animation can start
   ///   and no stranded-batch drain is owed for it;
-  /// - no active animations exist to retarget, supersede, or expire;
-  /// - no removal overlays are pending;
+  /// - the controller may hold active animations or removal overlays, because
+  ///   their deadline-only advancement is owned by `applyInterpolations` and
+  ///   the placed-overlay pass rather than authored snapshot diffing;
   /// - a previous processed tree exists (baselines are recorded).
   ///
   /// Under those conditions the identity diff is empty, matched-geometry
   /// plans are empty (the key→identity maps are unchanged), the transition
   /// prune is a no-op (already pruned against the same live set), and the
-  /// baseline stores would rewrite value-identical data — so skipping the
+  /// baseline stores would rewrite animation-equivalent data — so skipping the
   /// full-tree walk changes nothing. `noteSkippedResolvedTreeProcessing`
-  /// DEBUG-asserts the value-identity premise.
+  /// DEBUG-asserts that premise against the exact resolved fields consumed by
+  /// this controller. Transaction snapshots are intentionally excluded: with
+  /// no changed animatable snapshot and no new root animation batch, changing
+  /// inherited transaction intent cannot enqueue work.
   package func canSkipResolvedTreeProcessing(
     transaction: TransactionSnapshot
   ) -> Bool {
     previousTreeRoot != nil
       && transaction.animationRequest.animationBoxIfAny == nil
-      && activeAnimations.isEmpty
-      && removingNodes.isEmpty
   }
 
   /// Number of frames whose resolved-tree processing was skipped by the
@@ -823,28 +805,65 @@ package final class AnimationController: Sendable {
   package private(set) var resolvedTreeProcessingSkipCount = 0
 
   /// The skip-path counterpart of ``processResolvedTree``'s per-frame
-  /// resets: clears the head completion count (nothing can fire on a
-  /// skipped frame) and pins the caller's value-identity premise in DEBUG.
+  /// resets: clears the head completion count (nothing can fire on a skipped
+  /// frame), refreshes the retained removal-capture root without walking it,
+  /// and pins the caller's animation-process-equivalence premise in DEBUG.
   package func noteSkippedResolvedTreeProcessing(resolved: ResolvedNode) {
     lastFrameHeadCompletionCount = 0
+    lastResolvedTreeProcessedNodeCount = 0
     resolvedTreeProcessingSkipCount += 1
     #if DEBUG
-      if previousTreeRoot != resolved {
+      if let previousTreeRoot,
+        let divergence = Self.debugFirstAnimationProcessDivergence(
+          previousTreeRoot,
+          resolved,
+          path: "root"
+        )
+      {
         assertionFailure(
           """
-          processResolvedTree skipped for a resolved tree that differs from \
-          the last processed one — the zero-computed-nodes premise does not \
-          imply value identity here. First divergence: \
-          \(previousTreeRoot.map {
-            Self.debugFirstDivergence($0, resolved, path: "root")
-          } ?? "no previous tree was processed")
+          processResolvedTree skipped for a resolved tree that differs in \
+          animation-processing inputs — the zero-computed-nodes premise is \
+          unsound here. First divergence: \(divergence)
           """
         )
       }
     #endif
+    previousTreeRoot = resolved
   }
 
   #if DEBUG
+    /// Names the first divergence in the exact resolved-tree inputs consumed
+    /// by `processResolvedTree`: identity topology, owner node routing,
+    /// animatable snapshots, and matched-geometry registration. Transaction
+    /// snapshots are not baselines and cannot matter when the animatable
+    /// snapshot is unchanged.
+    private static func debugFirstAnimationProcessDivergence(
+      _ lhs: ResolvedNode,
+      _ rhs: ResolvedNode,
+      path: String
+    ) -> String? {
+      if lhs.identity != rhs.identity { return "\(path): identity" }
+      if lhs.viewNodeID != rhs.viewNodeID { return "\(path): viewNodeID" }
+      if AnimatableSnapshot.extract(from: lhs).values
+        != AnimatableSnapshot.extract(from: rhs).values
+      {
+        return "\(path): animatableSnapshot"
+      }
+      if lhs.matchedGeometry != rhs.matchedGeometry { return "\(path): matchedGeometry" }
+      if lhs.children.count != rhs.children.count { return "\(path): children.count" }
+      for (index, (l, r)) in zip(lhs.children, rhs.children).enumerated() {
+        if let divergence = debugFirstAnimationProcessDivergence(
+          l,
+          r,
+          path: "\(path)[\(index)]<\(l.identity.path)>"
+        ) {
+          return divergence
+        }
+      }
+      return nil
+    }
+
     /// Walks two resolved trees in lockstep and names the first node path +
     /// field where `==` diverges — the F66 skip-premise assert's forensic
     /// payload, so a premise break names its divergent subtree instead of
@@ -920,6 +939,7 @@ package final class AnimationController: Sendable {
     timestamp: MonotonicInstant
   ) {
     lastFrameHeadCompletionCount = 0
+    lastResolvedTreeProcessedNodeCount = 0
     // If the incoming transaction carries an animation box, make sure
     // the controller has the concrete Animation registered. In normal
     // flow the View-layer `withAnimation`/`.animation(_:value:)` sink
@@ -945,6 +965,12 @@ package final class AnimationController: Sendable {
     var newMatchedKeysByIdentity: [Identity: MatchedGeometryKey] = [:]
     var newNodeIDByIdentity: [Identity: ViewNodeID] = [:]
     var newLiveNodeIDs: Set<ViewNodeID> = []
+    let activeKeysByOwnerNodeID = Dictionary(
+      grouping: activeAnimations.compactMap { key, animation in
+        animation.ownerViewNodeID.map { ($0, key) }
+      },
+      by: \.0
+    ).mapValues { entries in entries.map(\.1) }
     processNode(
       node,
       parentIdentity: nil,
@@ -956,7 +982,8 @@ package final class AnimationController: Sendable {
       childIndexAccumulator: &newChildIndexByIdentity,
       matchedKeyAccumulator: &newMatchedKeysByIdentity,
       nodeIDAccumulator: &newNodeIDByIdentity,
-      liveNodeIDAccumulator: &newLiveNodeIDs
+      liveNodeIDAccumulator: &newLiveNodeIDs,
+      activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
     )
 
     // Detect insertions and removals by diffing identity sets.  Skip
@@ -1064,6 +1091,7 @@ package final class AnimationController: Sendable {
       }
       enqueueInsertionAnimation(
         identity: identity,
+        viewNodeID: viewNodeID,
         transition: transition,
         snapshot: newSnapshots[identity] ?? .init(),
         transaction: transaction,
@@ -1312,6 +1340,7 @@ package final class AnimationController: Sendable {
 
   private func enqueueInsertionAnimation(
     identity: Identity,
+    viewNodeID: ViewNodeID,
     transition: AnyTransition,
     snapshot: AnimatableSnapshot,
     transaction: TransactionSnapshot,
@@ -1345,6 +1374,8 @@ package final class AnimationController: Sendable {
           to: AnyAnimatable(target)
         ),
         animationBox: box,
+        ownerViewNodeID: viewNodeID,
+        resolvedIdentity: identity,
         startTime: timestamp,
         batchID: batchID
       )
@@ -1398,8 +1429,17 @@ package final class AnimationController: Sendable {
     childIndexAccumulator: inout [Identity: Int],
     matchedKeyAccumulator: inout [Identity: MatchedGeometryKey],
     nodeIDAccumulator: inout [Identity: ViewNodeID],
-    liveNodeIDAccumulator: inout Set<ViewNodeID>
+    liveNodeIDAccumulator: inout Set<ViewNodeID>,
+    activeKeysByOwnerNodeID: [ViewNodeID: [AnimationKey]]
   ) {
+    lastResolvedTreeProcessedNodeCount += 1
+    if let viewNodeID = node.viewNodeID,
+      let activeKeys = activeKeysByOwnerNodeID[viewNodeID]
+    {
+      for key in activeKeys {
+        activeAnimations[key]?.resolvedIdentity = node.identity
+      }
+    }
     let snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
 
@@ -1454,7 +1494,8 @@ package final class AnimationController: Sendable {
         childIndexAccumulator: &childIndexAccumulator,
         matchedKeyAccumulator: &matchedKeyAccumulator,
         nodeIDAccumulator: &nodeIDAccumulator,
-        liveNodeIDAccumulator: &liveNodeIDAccumulator
+        liveNodeIDAccumulator: &liveNodeIDAccumulator,
+        activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
       )
     }
   }
@@ -1634,6 +1675,7 @@ package final class AnimationController: Sendable {
         || !pendingEmptyBatchCompletions.isEmpty
     else {
       lastTickResult = AnimationTickResult()
+      lastPropertyInterpolationVisitedNodeCount = 0
       return lastTickResult
     }
 
@@ -1647,6 +1689,7 @@ package final class AnimationController: Sendable {
     // `ViewNodeID` so they follow the entity across an identity-changing move
     // (G10a); the rest fall back to the registration `Identity`.
     var interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]] = [:]
+    var interpolatedIdentityByNodeID: [ViewNodeID: Identity] = [:]
     var interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
 
     // Record the batches that completed animations belong to so we can
@@ -1687,6 +1730,8 @@ package final class AnimationController: Sendable {
           // Animation complete — snap to final value; the step purged it.
           if let ownerViewNodeID = animation.ownerViewNodeID {
             interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = to
+            interpolatedIdentityByNodeID[ownerViewNodeID] =
+              animation.resolvedIdentity ?? key.identity
           } else {
             interpolatedByIdentity[key.identity, default: [:]][slot] = to
           }
@@ -1699,6 +1744,8 @@ package final class AnimationController: Sendable {
           )
           if let ownerViewNodeID = animation.ownerViewNodeID {
             interpolatedByNodeID[ownerViewNodeID, default: [:]][slot] = value
+            interpolatedIdentityByNodeID[ownerViewNodeID] =
+              animation.resolvedIdentity ?? key.identity
           } else {
             interpolatedByIdentity[key.identity, default: [:]][slot] = value
           }
@@ -1840,12 +1887,18 @@ package final class AnimationController: Sendable {
 
     // Apply interpolated values for in-tree animations.
     var appliedIdentities: Set<Identity> = []
+    var interpolationVisitedNodeCount = 0
     tree = AnimationPropertyValueApplication.applyInterpolatedValues(
       tree: tree,
       interpolatedByNodeID: interpolatedByNodeID,
+      interpolatedIdentityByNodeID: interpolatedIdentityByNodeID,
       interpolatedByIdentity: interpolatedByIdentity,
+      parentByIdentity: previousParentByIdentity,
+      childIndexByIdentity: previousChildIndexByIdentity,
+      visitedNodeCount: &interpolationVisitedNodeCount,
       appliedIdentities: &appliedIdentities
     )
+    lastPropertyInterpolationVisitedNodeCount = interpolationVisitedNodeCount
     // A node-id-keyed animation lands on the entity's *current* identity, which
     // can differ from the registration `Identity` after a move; redraw the
     // identities actually written so the moved view repaints (G10a).
@@ -1958,6 +2011,9 @@ package final class AnimationController: Sendable {
     activeAnimations.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
     lastTickResult = .init()
+    resolvedTreeProcessingSkipCount = 0
+    lastResolvedTreeProcessedNodeCount = 0
+    lastPropertyInterpolationVisitedNodeCount = 0
     resetEpoch &+= 1
   }
 }

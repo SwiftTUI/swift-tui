@@ -236,7 +236,7 @@ struct FrameResolveStateTests {
     let rootIdentity = testIdentity("Root")
     let state = warmedSelectiveState(rootIdentity: rootIdentity)
     state.forceRootEvaluation = true
-    state.forceRootEvaluationSources = [.focusSyncRerender, .animationPropertySafety]
+    state.forceRootEvaluationSources = [.focusSyncRerender, .unattributed]
 
     let inputs = state.prepareInputs(
       from: resolveContext(rootIdentity: rootIdentity),
@@ -245,7 +245,7 @@ struct FrameResolveStateTests {
 
     #expect(
       inputs.forceRootEvaluationSources == [
-        .animationPropertySafety, .focusSyncRerender,
+        .focusSyncRerender, .unattributed,
       ]
     )
     #expect(inputs.selectiveEvaluationDisabledReasons.contains(.frameStateForceRoot))
@@ -263,7 +263,7 @@ struct FrameResolveStateTests {
     let rootIdentity = testIdentity("Root")
     let state = warmedSelectiveState(rootIdentity: rootIdentity)
     state.forceRootEvaluation = true
-    state.forceRootEvaluationSources = [.identityAgnosticAnimationSafety]
+    state.forceRootEvaluationSources = [.focusSyncRerender]
 
     let inputs = state.prepareInputs(
       from: resolveContext(rootIdentity: rootIdentity),
@@ -272,7 +272,7 @@ struct FrameResolveStateTests {
 
     #expect(
       inputs.diagnosticSelectiveEvaluationDisabledReasonNames.contains(
-        "frame_state_force_root(identity_agnostic_animation_safety)"
+        "frame_state_force_root(focus_sync_rerender)"
       )
     )
   }

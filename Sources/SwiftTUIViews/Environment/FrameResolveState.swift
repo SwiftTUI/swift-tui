@@ -1,5 +1,3 @@
-package import SwiftTUICore
-
 package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   package var suppressesAll: Bool
   package var identities: Set<Identity>
@@ -8,8 +6,6 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   /// ancestors, and descendants — except that a descendant sitting below a
   /// focus-presentation-inert slot *declared by the matched member itself* is
   /// exempt (see `suppresses(identity:isFocusPresentationDescendantExempt:)`).
-  /// Animation cones stay in `identities`: an animating subtree needs its
-  /// registrations re-established regardless of presentation promises.
   package var focusPresentationMembers: Set<Identity>
   /// Old/new focus/press identities whose root path carries NO runtime-focus
   /// side-field reader: nothing that resolves on that path can vary with the
@@ -20,16 +16,6 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
   /// its finite focus/press coverage instead of falling back to the
   /// root-forced path.
   package var chromeOnlyFocusMembers: Set<Identity>
-  /// `true` when the run loop certifies that every identity this frame's
-  /// forced evaluation must recompute is named in `identities` — INCLUDING
-  /// the case where that set is empty. A pending stranded-batch completion
-  /// drain forces a frame (its deadline must reach `applyInterpolations`)
-  /// but requires no subtree to recompute, so its scope is a *named empty*
-  /// one: without this bit an empty scope is indistinguishable from "frame
-  /// forced for an unnamed reason", and the empty-invalidation reuse guard
-  /// would conservatively recompute the whole tree on every drain frame.
-  package var namesForcedEvaluation: Bool
-
   package static let none = Self()
   package static let all = Self(suppressesAll: true)
 
@@ -37,14 +23,12 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
     suppressesAll: Bool = false,
     identities: Set<Identity> = [],
     focusPresentationMembers: Set<Identity> = [],
-    chromeOnlyFocusMembers: Set<Identity> = [],
-    namesForcedEvaluation: Bool = false
+    chromeOnlyFocusMembers: Set<Identity> = []
   ) {
     self.suppressesAll = suppressesAll
     self.identities = identities
     self.focusPresentationMembers = focusPresentationMembers
     self.chromeOnlyFocusMembers = chromeOnlyFocusMembers
-    self.namesForcedEvaluation = namesForcedEvaluation
   }
 
   package var isEmpty: Bool {
@@ -189,9 +173,6 @@ package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
 /// guessing.
 package enum ForceRootEvaluationSource: String, Sendable, CaseIterable {
   case focusSyncRerender = "focus_sync_rerender"
-  case animationPropertySafety = "animation_property_safety"
-  case animationPendingWorkSafety = "animation_pending_work_safety"
-  case identityAgnosticAnimationSafety = "identity_agnostic_animation_safety"
   case unattributed = "unattributed"
 }
 
@@ -221,8 +202,7 @@ package struct FrameResolveInputs {
   ///
   /// The run loop sets this on frames where some reached nodes must recompute
   /// even if they are disjoint from ordinary invalidation: focus/press runtime
-  /// readers and active property-animation identities. The run-loop policy
-  /// decides separately whether that safety scope also needs root evaluation.
+  /// readers and the old/new focus or press identities.
   package var retainedReuseSuppressionScope: RetainedReuseSuppressionScope
 
   package init(

@@ -44,6 +44,13 @@ package struct ActiveAnimation: Sendable {
   /// for animations registered without a resolved node id; those fall back to
   /// the ``AnimationKey`` identity.
   package var ownerViewNodeID: ViewNodeID? = nil
+  /// The owner's identity in the most recently processed canonical tree.
+  ///
+  /// Entity-keyed interpolation uses this only to route through the resolved
+  /// tree efficiently. Matching still keys on ``ownerViewNodeID``. A full
+  /// resolved-tree pass refreshes the value after an identity-changing move;
+  /// deadline-only ticks reuse it because their canonical tree is unchanged.
+  package var resolvedIdentity: Identity? = nil
   package var startTime: MonotonicInstant
   /// Per-key persistent state threaded into
   /// ``CustomAnimation/animate(value:time:context:)`` on each tick.

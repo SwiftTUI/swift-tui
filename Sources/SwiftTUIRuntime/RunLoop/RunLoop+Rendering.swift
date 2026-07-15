@@ -410,32 +410,21 @@ extension RunLoop {
 
   /// Scoped-reuse safety gate. Retained `ViewNode` reuse (enabled via
   /// `TransactionSnapshot.isReuseEquivalent`) needs selective suppression for
-  /// runtime state that is intentionally outside `EnvironmentSnapshot` equality
-  /// and for active property animations whose registrations must stay fresh:
+  /// runtime state that is intentionally outside `EnvironmentSnapshot` equality:
   ///
   /// 1. **Focus/press moved.** Focus and press are deliberately kept out of
   ///    `EnvironmentSnapshot` equality (see `EnvironmentRuntimeStateTests`), so
   ///    runtime-state readers would reuse stale values unless those readers and
   ///    the old/new controls recompute.
-  /// 2. **A property-scope animation is in flight.** A reused subtree's body
-  ///    never re-runs, so its `withAnimation`/`repeatForever` is never
-  ///    re-registered and `activeAnimationCount` decays to zero. Recomputing
-  ///    the active identities each tick keeps the registration alive.
+  /// Animation deadlines do not enter this scope (F149). The controller owns
+  /// active curve state, overlays, and completion drains; a deadline alone
+  /// authors no new target value and therefore needs no view-graph evaluation.
+  /// Independent input/state/focus/environment causes still contribute their
+  /// ordinary dirty work on the same frame.
   ///
-  /// Identity-agnostic pending animation work still falls back to full
-  /// suppression because there is no narrower subtree to name.
-  ///
-  /// The run-loop policy decides separately whether the safety scope also
-  /// needs root evaluation: focus/press-only finite scopes are queued as
-  /// graph-local dirty work by the frame head, while animation safety stays
-  /// root-forced until its own measurement tranche proves a narrower policy
-  /// is profitable (the F32 reuse gate already scopes tick-frame recompute).
-  private struct RetainedReuseFrameSafety {
-    var suppressionScope: RetainedReuseSuppressionScope
-    var requiresRootEvaluation: Bool
-    var rootEvaluationSource: ForceRootEvaluationSource?
-  }
-
+  /// Focus/press-only finite scopes are queued as graph-local dirty work by the
+  /// frame head. The focus-sync scroll fallback remains root-forced because it
+  /// cannot be attributed to an identity cone.
   /// Per-render-pass evaluation policy, shared by both frame drivers and
   /// recomputed PER convergence iteration, not once per scheduled frame: the
   /// eager focus-location rerender runs after a mid-frame relocation
@@ -462,13 +451,12 @@ extension RunLoop {
   /// - A scroll-reveal rerender repositions viewport content with no
   ///   attributable identity cone, so it keeps the root-forced fallback.
   ///
-  /// Animation safety stays root-forced until its own measurement tranche
-  /// proves a narrower policy is profitable.
+  /// Animation deadline-only frames remain eligible for whole-tree retained
+  /// reuse and the animation injection stage's zero-computed-node skip.
   private func applyRenderPassEvaluationPolicy(
     convergence: FocusSyncConvergenceState
   ) {
-    let retainedReuseFrameSafety = retainedReuseFrameSafetyForFrame()
-    var suppressionScope = retainedReuseFrameSafety.suppressionScope
+    var suppressionScope = retainedReuseSuppressionScopeForFrame()
     if convergence.rerenderedForFocusSync {
       if convergence.scrollPositionChanged {
         renderer.forceRootEvaluation(source: .focusSyncRerender)
@@ -478,26 +466,15 @@ extension RunLoop {
         )
       }
     }
-    if retainedReuseFrameSafety.requiresRootEvaluation {
-      renderer.forceRootEvaluation(
-        source: retainedReuseFrameSafety.rootEvaluationSource ?? .unattributed
-      )
-    }
-    // A named-EMPTY scope must still reach the frame: it certifies that the
-    // frame's forced evaluation (a pending stranded-batch drain) requires no
-    // recompute, which is what lets the empty-invalidation reuse guard admit
-    // whole-tree retained reuse on drain frames.
-    if !suppressionScope.isEmpty || suppressionScope.namesForcedEvaluation {
+    if !suppressionScope.isEmpty {
       renderer.suppressRetainedReuseForNextFrame(suppressionScope)
     }
   }
 
-  private func retainedReuseFrameSafetyForFrame()
-    -> RetainedReuseFrameSafety
+  private func retainedReuseSuppressionScopeForFrame()
+    -> RetainedReuseSuppressionScope
   {
     var scope = RetainedReuseSuppressionScope()
-    var requiresRootEvaluation = false
-    var rootEvaluationSource: ForceRootEvaluationSource?
 
     let currentFocusIdentity = focusTracker.currentFocusIdentity
     if currentFocusIdentity != previousFrameFocusIdentity {
@@ -534,60 +511,7 @@ extension RunLoop {
       )
     }
 
-    let controller = renderer.internalAnimationController
-    let activePropertyIdentities = controller.activePropertyAnimationIdentities
-    if !activePropertyIdentities.isEmpty {
-      scope.formUnion(activePropertyIdentities)
-      requiresRootEvaluation = true
-      rootEvaluationSource = .animationPropertySafety
-      if ReuseDenialTrace.isEnabled {
-        ReuseDenialTrace.recordSuppressionScopeDescription(
-          "anim-props(\(activePropertyIdentities.count))"
-        )
-      }
-    }
-    if controller.lastTickResult.hasPendingWork,
-      activePropertyIdentities.isEmpty
-    {
-      // Non-property pending work (insertion offsets, matched geometry,
-      // removal transitions) is identity-attributable, so suppress reuse for
-      // those cones only — subtrees disjoint from the animating identities
-      // keep retained/memoized reuse on every tick (F32). The `nil` fallback
-      // survives as a safety net for a future pending-work class the
-      // controller cannot attribute; no such class exists today (stranded
-      // empty-batch completion drains deliberately contribute no identities
-      // — see `attributablePendingAnimationIdentities`).
-      guard
-        let attributableIdentities = controller.attributablePendingAnimationIdentities
-      else {
-        return .init(
-          suppressionScope: .all,
-          requiresRootEvaluation: true,
-          rootEvaluationSource: .identityAgnosticAnimationSafety
-        )
-      }
-      // The pending work is fully named — including the named-EMPTY case
-      // (only stranded drains pending): the drain just needs the frame to
-      // run, not any subtree to recompute, so certify the scope instead of
-      // forcing evaluation. Only a non-empty cone needs root evaluation to
-      // reach and re-register the animating subtrees.
-      scope.namesForcedEvaluation = true
-      if !attributableIdentities.isEmpty {
-        scope.formUnion(attributableIdentities)
-        requiresRootEvaluation = true
-        rootEvaluationSource = .animationPendingWorkSafety
-        if ReuseDenialTrace.isEnabled {
-          ReuseDenialTrace.recordSuppressionScopeDescription(
-            "anim-pending(\(attributableIdentities.count))"
-          )
-        }
-      }
-    }
-    return .init(
-      suppressionScope: scope,
-      requiresRootEvaluation: requiresRootEvaluation,
-      rootEvaluationSource: rootEvaluationSource
-    )
+    return scope
   }
 
   /// A focus/press move's old/new identity enters the suppression scope as a

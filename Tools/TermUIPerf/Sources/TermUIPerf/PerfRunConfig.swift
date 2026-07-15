@@ -75,6 +75,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case layoutScrollBurst = "layout-scroll-burst"
   case syntheticOffscreenPhaseAnimator = "synthetic-offscreen-phase-animator"
   case syntheticContinuousAnimation = "synthetic-continuous-animation"
+  case syntheticSingleTween = "synthetic-single-tween"
   case syntheticTextShimmer = "synthetic-text-shimmer"
   case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
   case syntheticObservableFanout = "synthetic-observable-fanout"

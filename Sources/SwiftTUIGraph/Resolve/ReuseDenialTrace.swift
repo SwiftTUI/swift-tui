@@ -81,7 +81,7 @@ package enum ReuseDenialTrace {
   }
 
   /// Records a description of one leg of the frame's retained-reuse
-  /// suppression scope (focus move, press move, animation cones), so a
+  /// suppression scope (focus or press moves), so a
   /// multi-hundred-node `suppressed=` count can be attributed to the member
   /// identities whose ancestor/descendant matching produced it. Recorded by
   /// the run loop when it composes the scope; appears as a `| scope:` segment

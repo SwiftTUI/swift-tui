@@ -18,9 +18,146 @@ package enum AnimationPropertyValueApplication {
   package static func applyInterpolatedValues(
     tree: ResolvedNode,
     interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]],
+    interpolatedIdentityByNodeID: [ViewNodeID: Identity],
     interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]],
+    parentByIdentity: [Identity: Identity],
+    childIndexByIdentity: [Identity: Int],
+    visitedNodeCount: inout Int,
     appliedIdentities: inout Set<Identity>
   ) -> ResolvedNode {
+    guard !interpolatedByNodeID.isEmpty || !interpolatedByIdentity.isEmpty else {
+      return tree
+    }
+
+    // Identity-keyed values deliberately retain the legacy full walk: duplicate
+    // occurrences of an Identity all receive the value. Entity-keyed values are
+    // unique and can use the previous-frame topology to route directly to their
+    // current occurrence.
+    guard interpolatedByIdentity.isEmpty,
+      Set(interpolatedByNodeID.keys) == Set(interpolatedIdentityByNodeID.keys),
+      let childIndicesByParent = interpolationRoute(
+        targetIdentities: Set(interpolatedIdentityByNodeID.values),
+        rootIdentity: tree.identity,
+        parentByIdentity: parentByIdentity,
+        childIndexByIdentity: childIndexByIdentity
+      )
+    else {
+      return applyInterpolatedValuesFullWalk(
+        tree: tree,
+        interpolatedByNodeID: interpolatedByNodeID,
+        interpolatedByIdentity: interpolatedByIdentity,
+        visitedNodeCount: &visitedNodeCount,
+        appliedIdentities: &appliedIdentities
+      )
+    }
+
+    let appliedBeforeRoute = appliedIdentities
+    var remainingNodeIDs = Set(interpolatedByNodeID.keys)
+    let routed = applyInterpolatedValuesOnRoute(
+      tree: tree,
+      interpolatedByNodeID: interpolatedByNodeID,
+      childIndicesByParent: childIndicesByParent,
+      remainingNodeIDs: &remainingNodeIDs,
+      visitedNodeCount: &visitedNodeCount,
+      appliedIdentities: &appliedIdentities
+    )
+    guard routed.complete, remainingNodeIDs.isEmpty else {
+      // A stale/collapsed topology entry must never drop a sampled value. Throw
+      // away the partial routed result and preserve the prior full-walk behavior
+      // for this frame.
+      appliedIdentities = appliedBeforeRoute
+      return applyInterpolatedValuesFullWalk(
+        tree: tree,
+        interpolatedByNodeID: interpolatedByNodeID,
+        interpolatedByIdentity: interpolatedByIdentity,
+        visitedNodeCount: &visitedNodeCount,
+        appliedIdentities: &appliedIdentities
+      )
+    }
+    return routed.node
+  }
+
+  private static func interpolationRoute(
+    targetIdentities: Set<Identity>,
+    rootIdentity: Identity,
+    parentByIdentity: [Identity: Identity],
+    childIndexByIdentity: [Identity: Int]
+  ) -> [Identity: Set<Int>]? {
+    var childIndicesByParent: [Identity: Set<Int>] = [:]
+    for targetIdentity in targetIdentities {
+      var current = targetIdentity
+      var visited: Set<Identity> = []
+      while current != rootIdentity {
+        guard visited.insert(current).inserted,
+          let parent = parentByIdentity[current],
+          let childIndex = childIndexByIdentity[current],
+          childIndex >= 0
+        else {
+          return nil
+        }
+        childIndicesByParent[parent, default: []].insert(childIndex)
+        current = parent
+      }
+    }
+    return childIndicesByParent
+  }
+
+  private static func applyInterpolatedValuesOnRoute(
+    tree: ResolvedNode,
+    interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]],
+    childIndicesByParent: [Identity: Set<Int>],
+    remainingNodeIDs: inout Set<ViewNodeID>,
+    visitedNodeCount: inout Int,
+    appliedIdentities: inout Set<Identity>
+  ) -> (node: ResolvedNode, complete: Bool) {
+    visitedNodeCount += 1
+    var node = tree
+    if let viewNodeID = node.viewNodeID,
+      let byNodeID = interpolatedByNodeID[viewNodeID]
+    {
+      for (slot, value) in byNodeID {
+        applyValue(&node, slot: slot, value: value)
+      }
+      appliedIdentities.insert(node.identity)
+      remainingNodeIDs.remove(viewNodeID)
+    }
+
+    guard let childIndices = childIndicesByParent[node.identity],
+      !childIndices.isEmpty
+    else {
+      return (node, true)
+    }
+
+    var interpolatedChildren = node.children
+    for childIndex in childIndices.sorted() {
+      guard interpolatedChildren.indices.contains(childIndex) else {
+        return (tree, false)
+      }
+      let routed = applyInterpolatedValuesOnRoute(
+        tree: interpolatedChildren[childIndex],
+        interpolatedByNodeID: interpolatedByNodeID,
+        childIndicesByParent: childIndicesByParent,
+        remainingNodeIDs: &remainingNodeIDs,
+        visitedNodeCount: &visitedNodeCount,
+        appliedIdentities: &appliedIdentities
+      )
+      guard routed.complete else {
+        return (tree, false)
+      }
+      interpolatedChildren[childIndex] = routed.node
+    }
+    node.setChildrenPreservingDerivedState(interpolatedChildren)
+    return (node, true)
+  }
+
+  private static func applyInterpolatedValuesFullWalk(
+    tree: ResolvedNode,
+    interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]],
+    interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]],
+    visitedNodeCount: inout Int,
+    appliedIdentities: inout Set<Identity>
+  ) -> ResolvedNode {
+    visitedNodeCount += 1
     var node = tree
     // Entity-keyed values follow the node across an identity-changing move and
     // take precedence over any identity-keyed fallback for the same slot.
@@ -40,13 +177,12 @@ package enum AnimationPropertyValueApplication {
       }
       appliedIdentities.insert(node.identity)
     }
-    // Recursively apply interpolated values to children; the shape is unchanged
-    // so bypass derived-state recomputes.
     let interpolatedChildren = node.children.map { child in
-      applyInterpolatedValues(
+      applyInterpolatedValuesFullWalk(
         tree: child,
         interpolatedByNodeID: interpolatedByNodeID,
         interpolatedByIdentity: interpolatedByIdentity,
+        visitedNodeCount: &visitedNodeCount,
         appliedIdentities: &appliedIdentities
       )
     }

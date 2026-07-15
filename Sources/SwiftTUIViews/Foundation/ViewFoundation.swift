@@ -1,5 +1,3 @@
-package import SwiftTUICore
-
 /// Resolves authored views into resolved render trees.
 package struct Resolver {
   package init() {}
@@ -333,11 +331,9 @@ func resolveView<V: View>(
     context.suppressesStructuralLifecycle,
     for: context.identity
   )
-  // The run loop suppresses retained reuse for reuse-unsafe identities (focus/
-  // press runtime readers and active property-animation identities): forcing
-  // root evaluation only makes the walk *reach* every node — each reached node
-  // still independently chooses reuse here — so affected nodes additionally
-  // skip this fast path.
+  // The run loop suppresses retained reuse for focus/press runtime readers and
+  // the old/new focus or press identities. Each reached node still chooses
+  // reuse independently here, so affected nodes additionally skip this path.
   let suppressesRetainedReuse = context.effectiveSuppressesRetainedReuse(
     at: context.identity
   )

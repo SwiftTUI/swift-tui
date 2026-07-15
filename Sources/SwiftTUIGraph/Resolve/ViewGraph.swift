@@ -2437,8 +2437,8 @@ package final class ViewGraph {
     // frame was forced for a reason OUTSIDE invalidation tracking, so
     // disjointness from the (empty) set proves nothing — deny reuse — UNLESS
     // the caller certifies that reason is fully named by a finite
-    // retained-reuse suppression scope (focus/press runtime readers, active
-    // animation cones). The caller rejects suppressed identities before
+    // retained-reuse suppression scope (focus/press runtime readers and the
+    // old/new focus or press identities). The caller rejects suppressed identities before
     // consulting this gate, so a node reaching it with
     // `allowsEmptyInvalidation` is outside every named recompute cone and
     // the environment/transaction equality checks below are the remaining

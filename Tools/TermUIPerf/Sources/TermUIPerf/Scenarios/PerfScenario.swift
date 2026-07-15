@@ -157,6 +157,7 @@ public enum PerfScenarioRegistry {
       LayoutScrollBurstScenario(),
       SyntheticPhaseAnimatorScenario(),
       SyntheticRepeatForeverScenario(),
+      SyntheticSingleTweenScenario(),
       SyntheticShimmerScenario(),
       SyntheticNarrowInvalidationScenario(),
       SyntheticObservableFanoutScenario(),

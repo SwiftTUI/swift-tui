@@ -477,8 +477,9 @@ public struct ResolveContext: Equatable, Sendable {
   /// Returns whether retained reuse is suppressed for `identity` in this frame.
   /// Suppressed identities recompute even when disjoint from ordinary
   /// invalidation. The run loop scopes this to focus/press runtime readers and
-  /// active animation cones, with a conservative full-suppression fallback for
-  /// identity-agnostic animation work. Focus/press members honor
+  /// the old/new focus or press identities. Animation deadline ticks do not
+  /// enter the scope because the controller advances them without evaluating
+  /// authored views. Focus/press members honor
   /// focus-presentation-inert slot declarations recorded on the member's own
   /// graph node (a `TabView`'s content slot), so a near-root focused container
   /// does not put its whole content subtree into the recompute cone.
@@ -534,13 +535,11 @@ public struct ResolveContext: Equatable, Sendable {
     }
   }
 
-  /// Whether this frame's forced evaluation is fully named by a FINITE
-  /// retained-reuse suppression scope. Such frames (pure focus moves,
-  /// non-property animation ticks, pending stranded-batch drains) carry no
-  /// ordinary invalidation, but every identity that must recompute is in the
-  /// scope — including the named-EMPTY drain case, where that set is empty —
-  /// so a node that already passed the suppression check may take retained
-  /// reuse even though the frame's invalidation set is empty.
+  /// Whether this frame's forced evaluation is fully named by a finite
+  /// retained-reuse suppression scope. A pure focus/press move can carry no
+  /// ordinary invalidation while every identity that must recompute is in the
+  /// scope, so a node that already passed the suppression check may take
+  /// retained reuse even though the frame's invalidation set is empty.
   @MainActor
   package var effectiveFiniteSuppressionScopeNamesForcedEvaluation: Bool {
     guard
@@ -548,7 +547,7 @@ public struct ResolveContext: Equatable, Sendable {
     else {
       return false
     }
-    return !scope.suppressesAll && (!scope.isEmpty || scope.namesForcedEvaluation)
+    return !scope.suppressesAll && !scope.isEmpty
   }
 
   @MainActor
