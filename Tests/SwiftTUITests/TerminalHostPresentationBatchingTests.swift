@@ -260,8 +260,14 @@ struct TerminalHostPresentationBatchingTests {
     #expect(incrementalWrites == ["\u{001B}[1;5H    "])
   }
 
-  @Test("terminal host drops stale pending frames and forces a full repaint on recovery")
-  func droppedPendingFramesForceFullRepaintRecovery() async throws {
+  // Expectation history: before the F180 dropped-frame recovery redesign,
+  // superseding a queued frame forced full repaints — this test used to
+  // expect "\u{001B}[2J\u{001B}[1;1HABAA" as the second write and a
+  // .fullRepaint recovery for "WXYZ". Recovery now diffs against the last
+  // surface actually written (the blocked "AAAA" repaint), so the dropped
+  // "BAAA" never influences the emitted bytes.
+  @Test("terminal host drops stale pending frames and recovers with an incremental diff")
+  func droppedPendingFramesRecoverWithAnIncrementalDiff() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)
     let host = TerminalHost(
       inputFileDescriptor: 0,
@@ -298,7 +304,7 @@ struct TerminalHostPresentationBatchingTests {
     #expect(
       controller.writes == [
         "\u{001B}[2J\u{001B}[1;1HAAAA",
-        "\u{001B}[2J\u{001B}[1;1HABAA",
+        "\u{001B}[1;2HB",
       ]
     )
 
@@ -310,16 +316,21 @@ struct TerminalHostPresentationBatchingTests {
     )
     try host.drainPendingPresentation()
 
-    #expect(metrics.strategy == .fullRepaint)
+    #expect(metrics.strategy == .incremental)
     #expect(
-      controller.writes.last == "\u{001B}[2J\u{001B}[1;1HWXYZ"
+      controller.writes.last == "\u{001B}[1;1HWXYZ"
     )
   }
 
+  // Expectation history: this test used to expect the present replacing a
+  // queued frame to full repaint immediately ("\u{001B}[2J\u{001B}[1;1HCCCD").
+  // After the F180 redesign the replacement diffs against the last written
+  // surface ("BBBB", whose write is blocked in flight but committed), so the
+  // dropped "CCCC" costs nothing on the wire.
   @Test(
-    "terminal host forces a full repaint immediately when the current submit replaces a queued frame"
+    "terminal host recovers with an incremental diff when the current submit replaces a queued frame"
   )
-  func replacingQueuedFrameUsesImmediateFullRepaint() async throws {
+  func replacingQueuedFrameRecoversWithAnIncrementalDiff() async throws {
     let controller = BlockingPresentationWriteController(
       isTTY: true,
       blocksFirstWrite: false
@@ -365,18 +376,24 @@ struct TerminalHostPresentationBatchingTests {
     controller.unblockWrite()
     try host.drainPendingPresentation()
 
-    #expect(metrics.strategy == .fullRepaint)
+    #expect(metrics.strategy == .incremental)
     #expect(
       controller.writes == [
         "\u{001B}[2J\u{001B}[1;1HAAAA",
         "\u{001B}[1;1HBBBB",
-        "\u{001B}[2J\u{001B}[1;1HCCCD",
+        "\u{001B}[1;1HCCCD",
       ]
     )
   }
 
-  @Test("drop recovery full repaints stay synchronized when the terminal supports it")
-  func dropRecoveryFullRepaintsStaySynchronized() async throws {
+  // Expectation history: recovery after a drop used to be a full repaint, and
+  // this test pinned its synchronized-output wrapping
+  // ("\u{001B}[?2026h\u{001B}[2J…"). Recovery is now an ordinary incremental
+  // diff, which — per the standing emission policy — is never wrapped; the
+  // synchronized wrap remains pinned for genuine full repaints by
+  // "terminal host wraps full repaints in synchronized output when supported".
+  @Test("drop recovery diffs stay incremental under synchronized-output terminals")
+  func dropRecoveryDiffsStayIncrementalUnderSynchronizedOutputTerminals() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)
     let host = TerminalHost(
       inputFileDescriptor: 0,
@@ -423,10 +440,277 @@ struct TerminalHostPresentationBatchingTests {
     )
     try host.drainPendingPresentation()
 
-    #expect(metrics.strategy == .fullRepaint)
+    #expect(metrics.strategy == .incremental)
     #expect(
-      controller.writes.last == "\u{001B}[?2026h\u{001B}[2J\u{001B}[1;1HWXYZ\u{001B}[?2026l"
+      controller.writes.last == "\u{001B}[1;1HWXYZ"
     )
+  }
+
+  @Test("dropped-frame recovery diffs against the last written surface")
+  func droppedFrameRecoveryDiffsAgainstLastWrittenSurface() async throws {
+    let controller = BlockingPresentationWriteController(
+      isTTY: true,
+      blocksFirstWrite: false
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AAAA"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    controller.armBlockNextWrite()
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AABA"]
+      )
+    )
+    await controller.waitForBlockedWriteToStart()
+
+    // Queued behind the blocked write; superseded below without ever reaching
+    // the terminal.
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AABC"]
+      )
+    )
+    // The recovery diff must target the last WRITTEN surface ("AABA"), not the
+    // dropped "AABC": cell 0 differs from both, but cell 3 matches the dropped
+    // frame and NOT the written one — a diff against the dropped frame would
+    // strand cell 3 at "A" on the real screen.
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["XABC"]
+      )
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .incremental)
+    #expect(
+      controller.writes == [
+        "\u{001B}[2J\u{001B}[1;1HAAAA",
+        "\u{001B}[1;3HB",
+        "\u{001B}[1;1HX\u{001B}[2CC",
+      ]
+    )
+  }
+
+  @Test("a stale damage hint is ignored after a dropped frame")
+  func staleDamageHintIsIgnoredAfterDroppedFrame() async throws {
+    let controller = BlockingPresentationWriteController(
+      isTTY: true,
+      blocksFirstWrite: false
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["CAAA", "BBBB"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    controller.armBlockNextWrite()
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["CAAA", "BBBZ"]
+      )
+    )
+    await controller.waitForBlockedWriteToStart()
+
+    // This frame changes row 0 only, and is dropped before it is written.
+    let damageAwareHost: any DamageAwarePresentationSurface = host
+    _ = try damageAwareHost.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["CAXA", "BBBZ"]
+      ),
+      damage: .init(dirtyRows: [0])
+    )
+    // The pipeline computes damage against the frame it last presented — the
+    // DROPPED one — so the row-1-only hint is stale: row 0 still shows the
+    // written "CAAA" and must be repaired too.
+    let metrics = try damageAwareHost.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["CAXA", "BBXZ"]
+      ),
+      damage: .init(dirtyRows: [1])
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .incremental)
+    #expect(
+      controller.writes.last == "\u{001B}[1;3HX\u{001B}[2;3HX"
+    )
+  }
+
+  @Test("pending accessibility cursor focus keeps the next present incremental")
+  func pendingAccessibilityCursorFocusKeepsNextPresentIncremental() async throws {
+    let controller = BlockingPresentationWriteController(
+      isTTY: true,
+      blocksFirstWrite: false
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AAAA"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    controller.armBlockNextWrite()
+    try host.presentAccessibilityCursorFocus(at: .init(x: 2, y: 0))
+    await controller.waitForBlockedWriteToStart()
+    // With the first focus write blocked in flight, a second supplemental
+    // frame sits in the queue when the next present arrives. Supplemental
+    // output carries no cell content — it must not degrade the presentation.
+    try host.presentAccessibilityCursorFocus(at: .init(x: 1, y: 0))
+
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AABA"]
+      )
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .incremental)
+    #expect(controller.writes.last == "\u{001B}[1;3HB")
+  }
+
+  @Test("kitty images transmitted only in a dropped frame are retransmitted on recovery")
+  func kittyImagesFromDroppedFramesAreRetransmittedOnRecovery() async throws {
+    let controller = BlockingPresentationWriteController(
+      isTTY: true,
+      blocksFirstWrite: false
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+    host.capabilityProbe.cachedGraphicsCapabilities = .init(
+      supportedProtocols: [.kitty],
+      preferredProtocol: .kitty,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    host.capabilityProbe.hasProbedGraphicsCapabilities = true
+
+    let imageX = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: [
+        rgbaPixel(red: 255, green: 0, blue: 0),
+        rgbaPixel(red: 255, green: 0, blue: 0),
+        rgbaPixel(red: 0, green: 0, blue: 255),
+        rgbaPixel(red: 0, green: 0, blue: 255),
+      ]
+    )
+    let imageY = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: [
+        rgbaPixel(red: 0, green: 255, blue: 0),
+        rgbaPixel(red: 0, green: 255, blue: 0),
+        rgbaPixel(red: 255, green: 255, blue: 0),
+        rgbaPixel(red: 255, green: 255, blue: 0),
+      ]
+    )
+    let attachmentX = makeRasterImageAttachment(
+      pngBytes: imageX,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .zero, size: .init(width: 2, height: 1))
+    )
+    let attachmentY = makeRasterImageAttachment(
+      pngBytes: imageY,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
+      identity: testIdentity("Root", "ImageY")
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["    ", "    "],
+        imageAttachments: [attachmentX]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    controller.armBlockNextWrite()
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["z   ", "    "],
+        imageAttachments: [attachmentX]
+      )
+    )
+    await controller.waitForBlockedWriteToStart()
+
+    // This frame transmits image Y for the first time — and is dropped, so
+    // the terminal never receives Y's pixel data.
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["z   ", "    "],
+        imageAttachments: [attachmentX, attachmentY]
+      )
+    )
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["z   ", "    "],
+        imageAttachments: [attachmentX, attachmentY]
+      )
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .incremental)
+    let recoveryWrite = try #require(controller.writes.last)
+    // Image X reached the terminal in the first frame: re-place by id.
+    #expect(recoveryWrite.contains("_Ga=p"))
+    // Image Y's data only ever rode the dropped frame: it must be
+    // re-transmitted, not placed by id.
+    #expect(recoveryWrite.contains("_Ga=T"))
   }
 }
 

@@ -425,7 +425,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         currentSurface: preparedSurface,
         damage: presentationSession.presentationDamage(requested: damage)
       )
-      presentationSession.forceFullRepaint = false
+      presentationSession.requestedDamageTrustsBaseline = true
 
       let emissionBuilder = TerminalHostPresentationEmissionBuilder(
         capabilityProfile: capabilityProfile,
@@ -436,8 +436,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       )
       // Bind to locals: passing two `inout` arguments both derived from
       // `presentationSession` would overlap and trap on exclusive access.
-      var transmittedKittyImages = presentationSession.transmittedKittyImages
-      var residentKittyImageData = presentationSession.residentKittyImageData
+      // The pre-submission values also feed the in-flight snapshot, restored
+      // if this frame is later dropped without reaching the terminal.
+      let transmittedKittyImagesBeforeSubmission = presentationSession.transmittedKittyImages
+      let residentKittyImageDataBeforeSubmission = presentationSession.residentKittyImageData
+      var transmittedKittyImages = transmittedKittyImagesBeforeSubmission
+      var residentKittyImageData = residentKittyImageDataBeforeSubmission
       let emission = emissionBuilder.build(
         for: preparedSurface,
         plan: plan,
@@ -459,14 +463,25 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       )
 
       if !bufferedOutput.isEmpty {
+        let sequence = presentationSession.nextFrameSequence
+        presentationSession.nextFrameSequence += 1
+        presentationSession.inFlightFrame = .init(
+          sequence: sequence,
+          surface: preparedSurface,
+          transmittedKittyImagesBeforeSubmission: transmittedKittyImagesBeforeSubmission,
+          residentKittyImageDataBeforeSubmission: residentKittyImageDataBeforeSubmission
+        )
         presentationWriterIfNeeded().submit(
           .init(
+            sequence: sequence,
             output: bufferedOutput
           )
         )
+      } else {
+        // Nothing was emitted, so this surface is cell-identical to the
+        // written baseline — adopt it as the baseline directly.
+        presentationSession.lastWrittenSurface = preparedSurface
       }
-
-      presentationSession.lastSubmittedSurface = preparedSurface
 
       return emission.metrics(
         for: plan,
@@ -481,10 +496,10 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       }
 
       presentationWriter.drain()
-      if presentationWriter.consumeDropFlag() {
-        presentationSession.markDroppedFrame()
-      }
-      try presentationWriter.consumePendingError()
+      presentationSession.reconcile(
+        lastCommittedSequence: presentationWriter.lastCommittedSequence()
+      )
+      try consumePendingErrorInvalidatingOnFailure(presentationWriter)
     }
 
     private func synchronizePresentationState() throws {
@@ -492,13 +507,23 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         return
       }
 
-      if presentationWriter.consumeDropFlag() {
-        presentationSession.markDroppedFrame()
+      presentationSession.reconcile(
+        lastCommittedSequence: presentationWriter.reconcileBeforePlanning()
+      )
+      try consumePendingErrorInvalidatingOnFailure(presentationWriter)
+    }
+
+    private func consumePendingErrorInvalidatingOnFailure(
+      _ presentationWriter: TerminalPresentationWriter
+    ) throws {
+      do {
+        try presentationWriter.consumePendingError()
+      } catch {
+        // A failed write leaves the terminal contents unknowable; the next
+        // present must rebuild from scratch.
+        presentationSession.invalidateRetainedState()
+        throw error
       }
-      if presentationWriter.hasPendingFrame() {
-        presentationSession.markDroppedFrame()
-      }
-      try presentationWriter.consumePendingError()
     }
 
     private func presentationWriterIfNeeded() -> TerminalPresentationWriter {

@@ -1327,20 +1327,72 @@ struct TerminalGraphicsProtocolTests {
     #expect(!updateWrite.contains("d=I,i=\(secondVariantID)"))
   }
 
-  @Test("resident kitty image data survives a dropped frame so recovery can free it")
-  func residentKittyImageDataSurvivesDroppedFrame() {
+  // Expectation history: before the F180 dropped-frame recovery redesign, a
+  // drop cleared `transmittedKittyImages` wholesale (markDroppedFrame) and the
+  // recovery frame full-repainted. Drops now roll the kitty bookkeeping back
+  // to the pre-submission snapshot instead — the dropped frame's placements
+  // AND data transmissions never reached the terminal — while genuinely
+  // resident data stays freeable exactly as before.
+  @Test("kitty bookkeeping rolls back when the in-flight frame is dropped")
+  func kittyBookkeepingRollsBackOnDroppedInFlightFrame() {
     var session = TerminalPresentationSession()
-    session.transmittedKittyImages = [10, 20]
-    session.residentKittyImageData = [10, 20]
+    let writtenSurface = RasterSurface(
+      size: .init(width: 2, height: 1),
+      lines: ["ab"]
+    )
+    session.lastWrittenSurface = writtenSurface
+    // The in-flight frame transmitted image 30 and freed image 20; neither
+    // reached the terminal.
+    session.transmittedKittyImages = [10, 30]
+    session.residentKittyImageData = [10, 30]
+    session.inFlightFrame = .init(
+      sequence: 5,
+      surface: RasterSurface(size: .init(width: 2, height: 1), lines: ["cd"]),
+      transmittedKittyImagesBeforeSubmission: [10, 20],
+      residentKittyImageDataBeforeSubmission: [10, 20]
+    )
 
-    // A dropped frame invalidates on-screen placements (force a re-transmit) but
-    // the terminal still holds the pixel data — so it stays freeable.
-    session.markDroppedFrame()
-    #expect(session.forceFullRepaint)
-    #expect(session.transmittedKittyImages.isEmpty)
+    session.reconcile(lastCommittedSequence: 4)
+
+    #expect(session.transmittedKittyImages == [10, 20])
     #expect(session.residentKittyImageData == [10, 20])
+    #expect(session.lastWrittenSurface == writtenSurface)
+    #expect(session.inFlightFrame == nil)
+    // The pipeline's damage hint references the dropped frame — stale for the
+    // rolled-back baseline.
+    #expect(session.presentationDamage(requested: .init(dirtyRows: [1])) == nil)
+  }
 
-    // A dropped queued frame (invalidateRetainedState) behaves the same.
+  @Test("kitty bookkeeping is kept when the in-flight frame committed")
+  func kittyBookkeepingIsKeptWhenInFlightFrameCommitted() {
+    var session = TerminalPresentationSession()
+    let submittedSurface = RasterSurface(
+      size: .init(width: 2, height: 1),
+      lines: ["cd"]
+    )
+    session.transmittedKittyImages = [10, 30]
+    session.residentKittyImageData = [10, 30]
+    session.inFlightFrame = .init(
+      sequence: 5,
+      surface: submittedSurface,
+      transmittedKittyImagesBeforeSubmission: [10, 20],
+      residentKittyImageDataBeforeSubmission: [10, 20]
+    )
+
+    session.reconcile(lastCommittedSequence: 5)
+
+    #expect(session.transmittedKittyImages == [10, 30])
+    #expect(session.residentKittyImageData == [10, 30])
+    #expect(session.lastWrittenSurface == submittedSurface)
+    #expect(session.inFlightFrame == nil)
+    let damage = PresentationDamage(dirtyRows: [1])
+    #expect(session.presentationDamage(requested: damage) == damage)
+  }
+
+  @Test("resident kitty image data survives retained-state invalidation so recovery can free it")
+  func residentKittyImageDataSurvivesRetainedStateInvalidation() {
+    // Stored kitty data outlives a screen clear; placements do not. The
+    // recovery repaint must still be able to free superseded image data.
     var invalidated = TerminalPresentationSession()
     invalidated.transmittedKittyImages = [10]
     invalidated.residentKittyImageData = [10]
@@ -1349,6 +1401,9 @@ struct TerminalGraphicsProtocolTests {
     #expect(invalidated.residentKittyImageData == [10])
 
     // A full session reset drops the record (fresh writer / unknown store).
+    var session = TerminalPresentationSession()
+    session.transmittedKittyImages = [10, 20]
+    session.residentKittyImageData = [10, 20]
     session.reset()
     #expect(session.residentKittyImageData.isEmpty)
     #expect(session.transmittedKittyImages.isEmpty)

@@ -23,9 +23,10 @@ import SwiftTUICore
       // superseded blend variant whose buffer we must free, or the terminal
       // accumulates one image per animated frame (only placement-deletes are
       // otherwise emitted). This is sourced from `residentKittyImageData`, not
-      // the transmit set, because stored data outlives the dropped/cleared
-      // placements that reset the transmit set — so the recovery repaint after a
-      // dropped frame still frees the images it superseded.
+      // the transmit set, because stored data outlives the cleared placements
+      // that reset the transmit set (screen-clearing repaints, retained-state
+      // invalidation) — so a recovery repaint still frees the images it
+      // superseded.
       let residentBefore = residentKittyImageData
       var referencedImageIDs: Set<UInt32> = []
       switch plan.strategy {
