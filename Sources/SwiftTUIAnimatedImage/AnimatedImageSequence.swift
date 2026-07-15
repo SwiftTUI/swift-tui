@@ -1,7 +1,67 @@
+import Synchronization
+
+/// Lazily-populated per-frame PNG byte cache (F153). Reference storage is
+/// shared by value copies of the owning sequence; any `frames` mutation swaps
+/// the box via `didSet`, so a mutated copy can never be served bytes encoded
+/// from the pre-mutation frames.
+private final class EncodedFrameStore: Sendable {
+  private let slots = Mutex<[[UInt8]?]>([])
+
+  func encodedData(
+    at index: Int,
+    frameCount: Int,
+    encode: () -> [UInt8]
+  ) -> [UInt8] {
+    let cached = slots.withLock { slots in
+      slots.indices.contains(index) ? slots[index] : nil
+    }
+    if let cached {
+      return cached
+    }
+    let encoded = encode()
+    slots.withLock { slots in
+      if slots.count != frameCount {
+        slots = Array(repeating: nil, count: frameCount)
+      }
+      if slots.indices.contains(index) {
+        slots[index] = encoded
+      }
+    }
+    return encoded
+  }
+}
+
 /// A finite set of pre-composed frames and display delays.
 public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
-  public var frames: [AnimatedImageFrame]
+  public var frames: [AnimatedImageFrame] {
+    didSet {
+      encodedFrameStore = EncodedFrameStore()
+    }
+  }
   internal var delayNanoseconds: [UInt64]
+  private var encodedFrameStore = EncodedFrameStore()
+
+  /// PNG bytes for the frame at `index`, encoded once per frame (F153):
+  /// playback loops and body re-evaluations reuse the cached encoding
+  /// instead of re-running the encoder on every tick.
+  internal func encodedImageData(at index: Int) -> [UInt8] {
+    encodedFrameStore.encodedData(at: index, frameCount: frames.count) {
+      frames[index].imageData
+    }
+  }
+
+  // The encoded-frame store is derived data (invalidated on `frames`
+  // mutation) and deliberately excluded: equality and hashing speak for the
+  // authored value — frames and delays — exactly as the synthesized
+  // conformances did before the cache existed.
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.frames == rhs.frames && lhs.delayNanoseconds == rhs.delayNanoseconds
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(frames)
+    hasher.combine(delayNanoseconds)
+  }
 
   public var frameDelays: [Duration] {
     delayNanoseconds.map { delay in

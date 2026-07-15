@@ -157,6 +157,7 @@ public enum PerfScenarioRegistry {
       TextInputEditingScenario(),
       MemoEquatableBoundaryScenario(),
       CanvasPartialReuseScenario(),
+      GifPlaybackScenario(),
     ] + additionalScenarios
   }
 

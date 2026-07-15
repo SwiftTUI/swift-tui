@@ -208,8 +208,10 @@ SwiftTUIAnimatedImage.AnimatedImagePixel.green
 SwiftTUIAnimatedImage.AnimatedImagePixel.init(red:green:blue:alpha:)
 SwiftTUIAnimatedImage.AnimatedImagePixel.red
 SwiftTUIAnimatedImage.AnimatedImageSequence
+SwiftTUIAnimatedImage.AnimatedImageSequence.==(_:_:)
 SwiftTUIAnimatedImage.AnimatedImageSequence.frameDelays
 SwiftTUIAnimatedImage.AnimatedImageSequence.frames
+SwiftTUIAnimatedImage.AnimatedImageSequence.hash(into:)
 SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:frameDelays:)
 SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:framesPerSecond:)
 SwiftTUIArguments.CompletionsCommand

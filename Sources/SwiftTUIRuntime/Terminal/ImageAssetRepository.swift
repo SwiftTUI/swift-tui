@@ -18,7 +18,9 @@ import SwiftTUICore
   import WASILibc
 #endif
 
-private struct ImageLookupKey: Sendable {
+// Internal (not file-private) so the sampled-hash contract below is
+// directly testable: forced bucket collisions must stay separable by `==`.
+struct ImageLookupKey: Sendable {
   var source: ImageSource
   var resourceRoots: [String]
   var cellPixelSize: PixelSize
@@ -58,7 +60,28 @@ extension ImageLookupKey: Hashable {
   }
 
   func hash(into hasher: inout Hasher) {
-    hasher.combine(source)
+    switch source {
+    case .data(let bytes):
+      // Hashing the full payload on every lookup dominates animated-image
+      // resolve cost (F153): the repository re-hashes the same PNG bytes per
+      // tick even on cache hits. Sample the buffer instead — `==` above
+      // stays byte-exact, so same-shaped payloads can only cost a bucket
+      // collision, never a wrong hit. (Equal sources sample identically, so
+      // the equal-implies-equal-hash contract holds.)
+      hasher.combine(0x64617461)  // 'data' — keeps the case discriminated
+      hasher.combine(bytes.count)
+      let sampleCount = 64
+      if bytes.count <= sampleCount * 2 {
+        hasher.combine(bytes)
+      } else {
+        for offset in 0..<sampleCount {
+          hasher.combine(bytes[offset])
+          hasher.combine(bytes[bytes.count - 1 - offset])
+        }
+      }
+    case .path, .fileURL:
+      hasher.combine(source)
+    }
     hasher.combine(resourceRoots)
     hasher.combine(cellPixelSize.width)
     hasher.combine(cellPixelSize.height)
