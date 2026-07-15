@@ -85,6 +85,8 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case memoEquatableBoundary = "memo-equatable-boundary"
   case canvasPartialReuse = "canvas-partial-reuse"
   case gifPlayback = "gif-playback"
+  case lazyList1K = "lazy-list-1k"
+  case table1Kx4 = "table-1kx4"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()

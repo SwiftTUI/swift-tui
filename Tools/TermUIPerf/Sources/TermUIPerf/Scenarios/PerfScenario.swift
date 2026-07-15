@@ -128,8 +128,17 @@ public protocol PerfScenario {
   var scriptedEvents: [String] { get }
   var visualMarkers: [String] { get }
   var settlingDescription: String { get }
+  /// How long the runner waits for the FIRST presented frame before the drive
+  /// closure runs. Scenarios whose initial tree is deliberately huge (the
+  /// full-materialization baselines) override this; everything else keeps the
+  /// historical 2 seconds.
+  var initialFrameTimeout: Duration { get }
 
   func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult
+}
+
+extension PerfScenario {
+  public var initialFrameTimeout: Duration { .seconds(2) }
 }
 
 public enum PerfScenarioRegistry {
@@ -158,6 +167,8 @@ public enum PerfScenarioRegistry {
       MemoEquatableBoundaryScenario(),
       CanvasPartialReuseScenario(),
       GifPlaybackScenario(),
+      LazyList1KScenario(),
+      Table1Kx4Scenario(),
     ] + additionalScenarios
   }
 
@@ -306,7 +317,10 @@ public enum PerfScenarioRunner {
 
         var memoryTask: Task<Void, Never>?
         do {
-          _ = try await waitForPresentedFrame(in: terminalHost)
+          _ = try await waitForPresentedFrame(
+            in: terminalHost,
+            timeout: scenario.initialFrameTimeout
+          )
           memoryTask = memorySampler.startSampling(interval: options.memorySampleInterval)
           events = try await drive(
             PerfScenarioDriver(

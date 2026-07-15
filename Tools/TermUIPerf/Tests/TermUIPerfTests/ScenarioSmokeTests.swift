@@ -21,6 +21,15 @@ struct ScenarioSmokeTests {
   @Test("deterministic scenarios write artifact directories")
   @MainActor
   func deterministicScenariosWriteArtifactDirectories() async throws {
+    // The collection baselines default to their measurement scale (1k rows —
+    // seconds per frame in debug by design); pin the smoke sweep to a small
+    // tree so this test stays a wiring check, not a benchmark.
+    setenv("TERMUI_PERF_LAZY_LIST_ROWS", "120", 1)
+    setenv("TERMUI_PERF_TABLE_ROWS", "120", 1)
+    defer {
+      unsetenv("TERMUI_PERF_LAZY_LIST_ROWS")
+      unsetenv("TERMUI_PERF_TABLE_ROWS")
+    }
     let artifactRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("termui-perf-scenarios-\(UUID().uuidString)", isDirectory: true)
     defer {
