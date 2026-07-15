@@ -29,6 +29,7 @@ extension ViewGraph {
     }
     let candidates = absorbedShadowedNodeIDs
     absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
+    consumeTeardownWork(.absorbedShadow, for: candidates)
     for nodeID in candidates.sorted() {
       // Two stranded shapes qualify:
       // - a same-frame mint (`!wasPresentAtFrameStart`) — the cold-resolve

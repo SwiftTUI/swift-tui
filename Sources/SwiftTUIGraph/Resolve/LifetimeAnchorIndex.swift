@@ -188,6 +188,58 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     )
   }
 
+  /// Re-homes an entity exactly as `EntityRoutingTable.bind` does: one node
+  /// per entity and one entity per node.
+  package mutating func rehomeEntity(
+    _ entity: EntityIdentity,
+    to nodeID: ViewNodeID
+  ) {
+    for previousNodeID in nodeIDsByAnchor[.entityHome(entity), default: []]
+    where previousNodeID != nodeID {
+      remove(anchor: .entityHome(entity), for: previousNodeID)
+    }
+    for previousAnchor in anchorsByNodeID[nodeID, default: []]
+    where previousAnchor.kind == .entityHome && previousAnchor != .entityHome(entity) {
+      remove(anchor: previousAnchor, for: nodeID)
+    }
+    insert(anchor: .entityHome(entity), for: nodeID)
+  }
+
+  package mutating func removeEntityHome(for nodeID: ViewNodeID) {
+    for anchor in anchorsByNodeID[nodeID, default: []] where anchor.kind == .entityHome {
+      remove(anchor: anchor, for: nodeID)
+    }
+  }
+
+  package mutating func replaceTargets(
+    ofKind kind: LifetimeAnchor.Kind,
+    sourcedBy sourceNodeID: ViewNodeID,
+    with targetNodeIDs: Set<ViewNodeID>
+  ) {
+    let anchor: LifetimeAnchor
+    switch kind {
+    case .parent:
+      anchor = .parent(sourceNodeID)
+    case .committedValue:
+      anchor = .committedValue(sourceNodeID)
+    case .hostedDetached:
+      anchor = .hostedDetached(sourceNodeID)
+    case .navigationSurface:
+      anchor = .navigationSurface(sourceNodeID)
+    case .evaluationHost:
+      anchor = .evaluationHost(sourceNodeID)
+    case .entityHome:
+      preconditionFailure("entity-home anchors have no ViewNodeID source")
+    }
+    let previous = nodeIDsByAnchor[anchor, default: []]
+    for nodeID in previous.subtracting(targetNodeIDs) {
+      remove(anchor: anchor, for: nodeID)
+    }
+    for nodeID in targetNodeIDs.subtracting(previous) {
+      insert(anchor: anchor, for: nodeID)
+    }
+  }
+
   /// Replaces one host's active navigation targets and returns its departed set.
   @discardableResult
   package mutating func replaceNavigationSurfaces(

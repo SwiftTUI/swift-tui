@@ -36,7 +36,7 @@ extension ViewGraph {
         }
         nodeIDByIdentity[identity] = routedNodeID
         identityByNodeID[routedNodeID] = identity
-        entityRoutingTable.bind(entityIdentity, to: routedNodeID)
+        bindEntityRoute(entityIdentity, to: routedNodeID)
         if identity != routedNode.identity {
           // Adopted across identities: the committed value's positional stamp
           // pairing is unverified against whatever children this position
@@ -45,7 +45,7 @@ extension ViewGraph {
         }
         return routedNode
       }
-      entityRoutingTable.release(routedNodeID)
+      releaseEntityRoute(for: routedNodeID)
     }
 
     if let existing = nodeIfExists(for: identity) {
@@ -54,7 +54,7 @@ extension ViewGraph {
           existing.committed.entityIdentity
           ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
         if existingEntityIdentity == entityIdentity {
-          entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
+          bindEntityRoute(entityIdentity, to: existing.viewNodeID)
           return existing
         }
         // A different entity (or none) occupies this `Identity` slot. A
@@ -80,7 +80,7 @@ extension ViewGraph {
             removeSubtree(rootedAt: existing)
             displacedOccupant = true
           } else {
-            entityRoutingTable.bind(entityIdentity, to: existing.viewNodeID)
+            bindEntityRoute(entityIdentity, to: existing.viewNodeID)
             return existing
           }
         }
@@ -126,7 +126,7 @@ extension ViewGraph {
     nodeIDByIdentity[identity] = viewNodeID
     identityByNodeID[viewNodeID] = identity
     if let entityIdentity {
-      entityRoutingTable.bind(entityIdentity, to: viewNodeID)
+      bindEntityRoute(entityIdentity, to: viewNodeID)
     }
     if displacedOccupant {
       node.entityDisplacedOccupantFrameID = currentFrameID
@@ -169,7 +169,7 @@ extension ViewGraph {
     {
       return
     }
-    entityRoutingTable.bind(entityIdentity, to: viewNodeID)
+    bindEntityRoute(entityIdentity, to: viewNodeID)
   }
 
   func entityIdentities(
@@ -191,8 +191,14 @@ extension ViewGraph {
   func releaseInactiveEntityRoutes(
     activeEntities: Set<EntityIdentity>
   ) {
+    let releasedNodeIDs = entityRoutingTable.nodeIDByEntity.compactMap { entity, nodeID in
+      activeEntities.contains(entity) && liveNodeIDs.contains(nodeID) ? nil : nodeID
+    }
     entityRoutingTable.releaseEntities(notIn: activeEntities)
     entityRoutingTable.releaseNodes(notIn: liveNodeIDs)
+    for nodeID in releasedNodeIDs {
+      lifetimeAnchors.removeEntityHome(for: nodeID)
+    }
   }
 
   func shouldDeferEntityRoutedRemoval(
@@ -214,6 +220,7 @@ extension ViewGraph {
     while !pendingEntityRoutedRemovalNodeIDs.isEmpty {
       let pendingNodeIDs = pendingEntityRoutedRemovalNodeIDs
       pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
+      consumeTeardownWork(.entityRoutedRemoval, for: pendingNodeIDs)
       for viewNodeID in pendingNodeIDs {
         guard let node = nodeIfExists(for: viewNodeID),
           let entityIdentity = node.committed.entityIdentity,

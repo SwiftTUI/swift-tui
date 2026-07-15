@@ -192,6 +192,10 @@ struct TeardownReachabilityBaselineTests {
     )
     #expect(previewReachability.unreachableNodeIDs.isEmpty)
     #expect(graph.debugTeardownCoherenceViolation() == nil)
+    let previewParity = try #require(
+      graph.debugLifetimeRelationParity(activeEntities: [])
+    )
+    #expect(previewParity.isEqual, Comment(rawValue: previewParity.detail))
 
     graph.restoreCheckpoint(checkpoint)
     let finalizeTrace = LegacyTeardownBarrierTraceRecorder(caller: .finalize)
@@ -212,6 +216,10 @@ struct TeardownReachabilityBaselineTests {
     #expect(finalizeTrace.trace.endingWork.totalCount == 0)
     #expect(finalizeReachability == previewReachability)
     #expect(graph.debugTeardownCoherenceViolation() == nil)
+    let finalizeParity = try #require(
+      graph.debugLifetimeRelationParity(activeEntities: [])
+    )
+    #expect(finalizeParity.isEqual, Comment(rawValue: finalizeParity.detail))
   }
 
   @Test("preview teardown mutations roll back across the total graph checkpoint")

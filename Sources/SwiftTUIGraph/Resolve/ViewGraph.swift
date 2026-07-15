@@ -515,7 +515,7 @@ package final class ViewGraph {
       let shadowedNodeID = nodeIDByIdentity[node.resolvedIdentity],
       shadowedNodeID != node.viewNodeID
     {
-      absorbedShadowedNodeIDs.insert(shadowedNodeID)
+      enqueueTeardownWork(.absorbedShadow, for: shadowedNodeID)
       // The shadowed node shares this node's re-rooted resolved identity — a
       // chain collapse absorbed its output into this node (the interior mint
       // of a collapsed `.id` chain). While warm, the interior stays alive
@@ -1677,6 +1677,7 @@ package final class ViewGraph {
     structuralDisappearEvents.removeAll(keepingCapacity: true)
     pendingEntityRoutedRemovalNodeIDs.removeAll(keepingCapacity: true)
     absorbedShadowedNodeIDs.removeAll(keepingCapacity: true)
+    teardownBarrierWork = .init()
     latestLifecycleEvents.removeAll(keepingCapacity: true)
     detachedHostedRootsRecordedThisFrame.removeAll(keepingCapacity: true)
   }
@@ -1705,6 +1706,7 @@ package final class ViewGraph {
       invalidator: invalidator,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle
     )
+    replaceEvaluationHostAnchor(for: node)
     if node.isAtOutermostEvaluationDepth {
       lifecycleEvaluationTargetsRecordedByOwner[node.viewNodeID] = []
     }
@@ -1793,7 +1795,7 @@ package final class ViewGraph {
     {
       node.resetStateSlotsSparingReadThisFrame()
     }
-    entityRoutingTable.bind(entityIdentity, to: node.viewNodeID)
+    bindEntityRoute(entityIdentity, to: node.viewNodeID)
   }
 
   @discardableResult
@@ -1831,6 +1833,7 @@ package final class ViewGraph {
       resolved: resolved,
       children: childNodes
     )
+    replaceCommittedValueAnchors(in: node.committed)
     reindexDependencies(
       for: node,
       previous: previousDependencies
@@ -1972,8 +1975,16 @@ package final class ViewGraph {
   ) {
     let previous = activeNavigationSurfaceContentNodeIDsByHost[hostNodeID] ?? []
     let departed = previous.subtracting(contentNodeIDs)
+    let relationDeparted = lifetimeAnchors.replaceNavigationSurfaces(
+      hostedBy: hostNodeID,
+      with: contentNodeIDs
+    )
+    assert(relationDeparted == departed)
     if !departed.isEmpty {
       departedNavigationSurfaceContentNodeIDs.formUnion(departed)
+      for nodeID in departed {
+        teardownBarrierWork.enqueue(.departedNavigationSurface, for: nodeID)
+      }
     }
     if contentNodeIDs.isEmpty {
       activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: hostNodeID)
@@ -2001,6 +2012,7 @@ package final class ViewGraph {
     }
     let departed = departedNavigationSurfaceContentNodeIDs
     departedNavigationSurfaceContentNodeIDs.removeAll(keepingCapacity: false)
+    consumeTeardownWork(.departedNavigationSurface, for: departed)
     for nodeID in departed {
       guard let node = nodeIfExists(for: nodeID) else {
         continue
@@ -2021,6 +2033,17 @@ package final class ViewGraph {
     // (early-return below): "recorded this frame" is a liveness signal, not a
     // mutation signal.
     detachedHostedRootsRecordedThisFrame.insert(rootNodeID)
+    if nodeIfExists(for: rootNodeID) != nil,
+      nodeIfExists(for: hostID) != nil
+    {
+      lifetimeAnchors.rehomeDetachedRoot(rootNodeID, to: hostID)
+    } else {
+      lifetimeAnchors.replaceAnchors(
+        ofKind: .hostedDetached,
+        for: rootNodeID,
+        with: []
+      )
+    }
     if detachedHostedSubtreeHostByRoot[rootNodeID] == hostID {
       return
     }
@@ -2281,6 +2304,7 @@ package final class ViewGraph {
       frameID: currentFrameID,
       invalidator: invalidator
     )
+    replaceEvaluationHostAnchor(for: node)
     let previousResolvedIdentity = node.resolvedIdentity
     if retained {
       // Retained subtree: this root passed reusableSnapshot's full disjointness
@@ -2294,6 +2318,7 @@ package final class ViewGraph {
       // node IDs. Commit it directly so runtime-ID stamping stays O(1) at the
       // retained root instead of walking the whole subtree again.
       node.applyRetainedSnapshot(subtree)
+      replaceCommittedValueAnchors(in: node.committed)
     } else {
       // Non-retained recursion: production resolve never reaches this branch
       // (both `reusableSnapshot` returns pass `retained: true`); the only
@@ -2683,7 +2708,7 @@ package final class ViewGraph {
     ).events
   }
 
-  private func legacyTeardownWorkSnapshot() -> LegacyTeardownWorkSnapshot {
+  func legacyTeardownWorkSnapshot() -> LegacyTeardownWorkSnapshot {
     LegacyTeardownWorkSnapshot(
       entityRoutedRemovalNodeIDs: pendingEntityRoutedRemovalNodeIDs,
       absorbedShadowNodeIDs: absorbedShadowedNodeIDs,
@@ -2718,11 +2743,11 @@ package final class ViewGraph {
   ) {
     switch reason {
     case .entityRoutedRemoval:
-      pendingEntityRoutedRemovalNodeIDs.insert(nodeID)
+      enqueueTeardownWork(.entityRoutedRemoval, for: nodeID)
     case .absorbedShadow:
-      absorbedShadowedNodeIDs.insert(nodeID)
+      enqueueTeardownWork(.absorbedShadow, for: nodeID)
     case .departedNavigationSurface:
-      departedNavigationSurfaceContentNodeIDs.insert(nodeID)
+      enqueueTeardownWork(.departedNavigationSurface, for: nodeID)
     }
   }
 
@@ -2779,6 +2804,7 @@ package final class ViewGraph {
       prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     }
     debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
+    verifyLifetimeRelationParity(resolved: resolved)
     return frameLifecycleEventPlan(
       resolved: resolved,
       placed: placed
@@ -2832,6 +2858,7 @@ package final class ViewGraph {
       prunePendingEntityRoutedRemovals(activeEntities: activeEntities)
     }
     debugTeardownTrace?.finish(endingWork: legacyTeardownWorkSnapshot())
+    verifyLifetimeRelationParity(resolved: resolved)
 
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
@@ -2953,7 +2980,7 @@ package final class ViewGraph {
   /// spares a visited root only while an anchor outside the removal cascade
   /// survives. `FrameworkStressTests` pins the zero-count
   /// ("portal overlay button chrome leaves no teardown-coherence orphans").
-  private func legacyLifetimeReachabilitySnapshot()
+  func legacyLifetimeReachabilitySnapshot()
     -> LegacyLifetimeReachabilitySnapshot?
   {
     guard let root else {
@@ -3004,6 +3031,11 @@ package final class ViewGraph {
         for hostedRootID in detachedHostedSubtreeRootsByHost[nodeID] ?? [] {
           if let hostedRoot = nodesByNodeID[hostedRootID] {
             stack.append((hostedRoot, .hostedDetached(nodeID)))
+          }
+        }
+        for surfaceRootID in activeNavigationSurfaceContentNodeIDsByHost[nodeID] ?? [] {
+          if let surfaceRoot = nodesByNodeID[surfaceRootID] {
+            stack.append((surfaceRoot, .navigationSurface(nodeID)))
           }
         }
       }
@@ -3793,7 +3825,7 @@ package final class ViewGraph {
         continue
       }
       if shouldDeferEntityRoutedRemoval(of: removedNode) {
-        pendingEntityRoutedRemovalNodeIDs.insert(removedNode.viewNodeID)
+        enqueueTeardownWork(.entityRoutedRemoval, for: removedNode.viewNodeID)
         continue
       }
 

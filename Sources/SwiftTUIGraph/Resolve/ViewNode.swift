@@ -838,6 +838,10 @@ package final class ViewNode {
       }
       child.parent = self
     }
+    ownerGraph?.replaceParentTargets(
+      of: viewNodeID,
+      with: children.filter { $0 !== self }
+    )
     invalidateAncestorCachedSnapshots()
   }
 

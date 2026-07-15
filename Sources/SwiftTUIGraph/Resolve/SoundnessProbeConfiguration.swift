@@ -53,6 +53,7 @@ package enum SoundnessProbeConfiguration {
   /// over-removal direction asserts in DEBUG, this one is gated by
   /// baseline-ratchet tests until the residual burns down to zero.
   package static var teardownCoherenceLeakCount = 0
+  package static var lifetimeRelationViolationCount = 0
   /// The unreachable-node census size of the most recent leak record: the
   /// F91 ratchet asserts this stays at its pinned baseline (a growing census
   /// is the "residual class grows silently" failure the split exists to
@@ -135,6 +136,14 @@ package enum SoundnessProbeConfiguration {
     lastTeardownLeakUnreachableCount = unreachableCount
     lastViolationDetail = detail()
     emitTrace("teardown-coherence-leak")
+  }
+
+  package static func recordLifetimeRelationViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    lifetimeRelationViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("lifetime-relation")
   }
 
   /// Records one caught registration-publication divergence (F04): after a

@@ -289,6 +289,47 @@ struct LifetimeAnchorIndexTests {
     work.removeNode(nodeID(2))
     #expect(work.isEmpty)
   }
+
+  @Test("parent edge neuter breaks its directed reachability fixture")
+  func parentEdgeNeuterBites() {
+    expectEdgeNeuterBites(.parent(nodeID(1)))
+  }
+
+  @Test("committed-value edge neuter breaks its directed reachability fixture")
+  func committedValueEdgeNeuterBites() {
+    expectEdgeNeuterBites(.committedValue(nodeID(1)))
+  }
+
+  @Test("hosted-detached edge neuter breaks its directed reachability fixture")
+  func hostedDetachedEdgeNeuterBites() {
+    expectEdgeNeuterBites(.hostedDetached(nodeID(1)))
+  }
+
+  @Test("navigation-surface edge neuter breaks its directed reachability fixture")
+  func navigationSurfaceEdgeNeuterBites() {
+    expectEdgeNeuterBites(.navigationSurface(nodeID(1)))
+  }
+
+  @Test("evaluation-host edge neuter breaks its directed reachability fixture")
+  func evaluationHostEdgeNeuterBites() {
+    expectEdgeNeuterBites(.evaluationHost(nodeID(1)))
+  }
+
+  @Test("entity-home edge neuter breaks its directed reachability fixture")
+  func entityHomeEdgeNeuterBites() {
+    let entity = EntityIdentity("neuter")
+    let target = nodeID(2)
+    var index = LifetimeAnchorIndex()
+    index.insert(anchor: .entityHome(entity), for: target)
+    let context = LifetimeReachabilityContext(
+      candidateRootID: nodeID(1),
+      activeEntityIdentities: [entity],
+      liveEntityHomeByIdentity: [entity: target]
+    )
+    #expect(index.reachableNodeIDs(context: context).nodeIDs.contains(target))
+    index.remove(anchor: .entityHome(entity), for: target)
+    #expect(!index.reachableNodeIDs(context: context).nodeIDs.contains(target))
+  }
 }
 
 @MainActor
@@ -333,4 +374,14 @@ private struct DeterministicLifetimeRandom {
 
 private func nodeID(_ rawValue: Int) -> ViewNodeID {
   ViewNodeID(rawValue: UInt64(rawValue))
+}
+
+private func expectEdgeNeuterBites(_ anchor: LifetimeAnchor) {
+  let target = nodeID(2)
+  var index = LifetimeAnchorIndex()
+  index.insert(anchor: anchor, for: target)
+  let context = LifetimeReachabilityContext(candidateRootID: nodeID(1))
+  #expect(index.reachableNodeIDs(context: context).nodeIDs.contains(target))
+  index.remove(anchor: anchor, for: target)
+  #expect(!index.reachableNodeIDs(context: context).nodeIDs.contains(target))
 }

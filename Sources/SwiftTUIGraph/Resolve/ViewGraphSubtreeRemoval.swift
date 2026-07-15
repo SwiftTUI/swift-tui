@@ -142,7 +142,7 @@ extension ViewGraph {
     if isSubtreeDescent,
       shouldDeferEntityRoutedRemoval(of: node)
     {
-      pendingEntityRoutedRemovalNodeIDs.insert(node.viewNodeID)
+      enqueueTeardownWork(.entityRoutedRemoval, for: node.viewNodeID)
       return
     }
 
@@ -202,6 +202,10 @@ extension ViewGraph {
       // (F97) and would false-positive on a mid-loop half-removed state.
       for hostedRootID in hostedRootIDs.sorted() {
         detachedHostedSubtreeHostByRoot.removeValue(forKey: hostedRootID)
+        lifetimeAnchors.remove(
+          anchor: .hostedDetached(node.viewNodeID),
+          for: hostedRootID
+        )
       }
       assertDetachedHostedLedgerInverse()
       for hostedRootID in hostedRootIDs.sorted() {
@@ -236,6 +240,10 @@ extension ViewGraph {
         detachedHostedSubtreeRootsByHost.removeValue(forKey: hostID)
       }
       assertDetachedHostedLedgerInverse()
+      lifetimeAnchors.remove(
+        anchor: .hostedDetached(hostID),
+        for: node.viewNodeID
+      )
     }
 
     let lifecycleMetadata =
@@ -306,8 +314,10 @@ extension ViewGraph {
     if nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID {
       nodeIDByIdentity.removeValue(forKey: node.resolvedIdentity)
     }
-    entityRoutingTable.release(node.viewNodeID)
+    releaseEntityRoute(for: node.viewNodeID)
     activeNavigationSurfaceContentNodeIDsByHost.removeValue(forKey: node.viewNodeID)
+    lifetimeAnchors.removeNode(node.viewNodeID)
+    teardownBarrierWork.removeNode(node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
     // The effect-owner index mirrors `nodesByNodeID` membership exactly (its
