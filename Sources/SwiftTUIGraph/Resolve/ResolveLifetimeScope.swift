@@ -82,6 +82,24 @@ extension ViewGraph {
     frame.observedNodeIDs.insert(nodeID)
   }
 
+  /// Marks a resolved result that the caller intentionally consumes by value
+  /// instead of committing as a child. The active LIFO scope supplies the
+  /// nearest declaring host, so semantic splice/collapse sites never choose or
+  /// retain a host themselves.
+  package func reportDetachedResolvedLifetimeResult(_ resolved: ResolvedNode) {
+    guard let frame = ResolveLifetimeScopeContext.current,
+      frame.graph === self,
+      let nodeID = resolved.viewNodeID ?? nodeIfExists(for: resolved.identity)?.viewNodeID,
+      frame.hostNodeID != nodeID,
+      nodeIfExists(for: nodeID) != nil
+    else {
+      return
+    }
+    frame.observedNodeIDs.insert(nodeID)
+    recordDetachedHostedNode(nodeID, hostedByNodeID: frame.hostNodeID)
+    SoundnessProbeConfiguration.recordAutomaticLifetimeAnchor()
+  }
+
   func recordManualResolveLifetimeAnchor(
     rootNodeID: ViewNodeID,
     hostedByNodeID hostNodeID: ViewNodeID

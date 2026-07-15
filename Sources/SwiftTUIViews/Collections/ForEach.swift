@@ -105,15 +105,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         // the row's own mint (the node carrying this iteration's entity route
         // and any row-scoped state) appears in no committed value afterwards
         // — reachable through neither children arrays nor parent links.
-        // Anchor its lifetime to the resolving host so teardown reaches it
-        // (a churned tab payload otherwise strands it as a
-        // teardown-coherence census orphan). The spliced children are
-        // committed normally; the hosted edge is redundant for them, not
-        // wrong (see `recordDetachedHostedSubtree`).
-        context.viewGraph?.recordDetachedHostedSubtree(
-          elementNode,
-          hostedBy: ViewNodeContext.current
-        )
+        // Resolve-lifetime scope automatically owns that mint at the nearest
+        // declaring host; the spliced children are committed normally.
+        context.viewGraph?.reportDetachedResolvedLifetimeResult(elementNode)
         resolved.append(contentsOf: elementNode.children)
       } else {
         resolved.append(elementNode)

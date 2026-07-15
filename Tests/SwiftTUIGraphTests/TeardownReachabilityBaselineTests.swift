@@ -6,8 +6,8 @@ import Testing
 @MainActor
 @Suite("Proposal -003 Stage 0 teardown baseline")
 struct TeardownReachabilityBaselineTests {
-  @Test("manual hosted-subtree anchor inventory is locked at eleven call sites")
-  func manualHostedSubtreeAnchorInventoryIsLockedAtElevenCallSites() throws {
+  @Test("remaining manual hosted-subtree anchor inventory is locked")
+  func remainingManualHostedSubtreeAnchorInventoryIsLocked() throws {
     let repositoryRoot = try SourceParsingTestSupport.repositoryRoot()
     let sourcesRoot = repositoryRoot.appendingPathComponent("Sources")
     let enumerator = try #require(
@@ -38,18 +38,14 @@ struct TeardownReachabilityBaselineTests {
     }
 
     let expected = [
-      "Sources/SwiftTUIViews/Collections/ForEach.swift": 1,
       "Sources/SwiftTUIViews/Collections/IndexedChildSources.swift": 1,
       "Sources/SwiftTUIViews/Collections/List.swift": 1,
-      "Sources/SwiftTUIViews/Collections/OutlineViews.swift": 2,
       "Sources/SwiftTUIViews/Collections/Table.swift": 1,
       "Sources/SwiftTUIViews/Controls/Picker.swift": 1,
-      "Sources/SwiftTUIViews/Foundation/AnyView.swift": 1,
-      "Sources/SwiftTUIViews/Foundation/ViewFoundation.swift": 2,
       "Sources/SwiftTUIViews/NavigationViews/NavigationStack.swift": 1,
     ]
     #expect(invocationCountsByPath == expected)
-    #expect(invocationCountsByPath.values.reduce(0, +) == 11)
+    #expect(invocationCountsByPath.values.reduce(0, +) == 5)
   }
 
   @Test("inactive entity homes are not kept")

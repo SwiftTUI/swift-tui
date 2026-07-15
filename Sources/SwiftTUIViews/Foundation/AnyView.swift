@@ -62,13 +62,9 @@ public struct AnyView: PrimitiveView, ResolvableView {
       // slots, not one overlaid box). The hoisted elements keep their
       // type-keyed content identities, so a payload type swap still replaces
       // the whole subtree. The group's minted content node is spliced out of
-      // every children array; anchor it to the evaluating host so teardown
-      // can reach it (`appendDeclaredChildNodes`' group-splice stranding
-      // shape).
-      context.viewGraph?.recordDetachedHostedSubtree(
-        content,
-        hostedBy: ViewNodeContext.current
-      )
+      // every children array; resolve-lifetime scope automatically owns that
+      // detached mint at the nearest declaring host.
+      context.viewGraph?.reportDetachedResolvedLifetimeResult(content)
       return content.children
     }
 
