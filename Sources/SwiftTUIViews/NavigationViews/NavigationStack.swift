@@ -47,14 +47,10 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
     // While a destination is presented, the root subtree stays resolved every
     // frame (its state must survive the push) but is absent from this stack's
     // committed children — reachable through neither committed values nor
-    // parent links. Anchor its lifetime to the resolving host node so the
-    // host's teardown (an owner `.id` churn, a structural removal) tears the
-    // root subtree down with it instead of stranding it.
+    // parent links. Resolve-lifetime scope owns the detached value at the
+    // nearest declaring host so owner churn/removal tears it down.
     if resolution.visibleNode.identity != rootNode.identity {
-      context.viewGraph?.recordDetachedHostedSubtree(
-        rootNode,
-        hostedBy: ViewNodeContext.current
-      )
+      context.viewGraph?.reportDetachedResolvedLifetimeResult(rootNode)
     }
 
     // Record the pushed-destination surface content nodes this stack resolved
