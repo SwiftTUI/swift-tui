@@ -40,12 +40,8 @@ enum AnimationResolvedTreeDiffing {
     newMatchedKeysByIdentity: [Identity: MatchedGeometryKey],
     previousMatchedKeyIdentities: [MatchedGeometryKey: Identity],
     previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect],
-    transaction: TransactionSnapshot
+    transactionForIdentity: (Identity) -> TransactionSnapshot
   ) -> MatchedGeometryAnimationPlans {
-    guard case .animate(let box) = transaction.animationRequest else {
-      return .init(animations: [], consumedKeys: [])
-    }
-
     var animations: [MatchedGeometryAnimationPlan] = []
     var consumedKeys: Set<MatchedGeometryKey> = []
     for (identity, key) in newMatchedKeysByIdentity {
@@ -55,6 +51,10 @@ enum AnimationResolvedTreeDiffing {
         continue
       }
       guard let fromBounds = previousMatchedGeometryBounds[key] else {
+        continue
+      }
+      let transaction = transactionForIdentity(identity)
+      guard case .animate(let box) = transaction.animationRequest else {
         continue
       }
       animations.append(

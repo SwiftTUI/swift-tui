@@ -83,7 +83,8 @@ struct DefaultRendererFrameHeadCoordinator {
     let baselineCheckpoints = baselineCheckpoints(for: mode)
     let resolveInputs = storeResolveInputs(
       in: &resolveContext,
-      proposal: proposal
+      proposal: proposal,
+      animationController: animationDraft.controller
     )
     let observationDraft = beginGraphEvaluation(
       resolveContext: &resolveContext,
@@ -162,7 +163,10 @@ struct DefaultRendererFrameHeadCoordinator {
     elidedFrameTimingRecorder.measure(.animationTick) {
       AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
         to: &resolved,
-        transaction: draft.frameContext.transaction,
+        transactionPlan: FrameAnimationTransactionPlan(
+          base: draft.frameContext.transaction,
+          segments: draft.frameContext.animationSegments
+        ),
         timestamp: animationTimestamp,
         surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
         resolvedNodesComputed: draft.resolveContext.resolveWorkTracker?
@@ -233,7 +237,8 @@ struct DefaultRendererFrameHeadCoordinator {
 
   private func storeResolveInputs(
     in resolveContext: inout ResolveContext,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    animationController: AnimationController
   ) -> FrameResolveInputs {
     var resolveInputs = frameState.prepareInputs(
       from: resolveContext,
@@ -243,7 +248,8 @@ struct DefaultRendererFrameHeadCoordinator {
     translatePresentationPortalInvalidations(
       in: &resolveInputs,
       contentRootIdentity: resolveContext.identity,
-      portalRootIdentity: presentationPortalIdentity(for: resolveContext.identity)
+      portalRootIdentity: presentationPortalIdentity(for: resolveContext.identity),
+      animationController: animationController
     )
     // Diagnostic (inert unless SWIFTTUI_INVAL_TRACE): decompose how this frame's
     // invalidation set was assembled — raw scheduler set vs portal-translation
@@ -263,27 +269,39 @@ struct DefaultRendererFrameHeadCoordinator {
   private func translatePresentationPortalInvalidations(
     in resolveInputs: inout FrameResolveInputs,
     contentRootIdentity: Identity,
-    portalRootIdentity: Identity
+    portalRootIdentity: Identity,
+    animationController: AnimationController
   ) {
     guard !resolveInputs.invalidatedIdentities.isEmpty else {
       return
     }
 
-    let translatedIdentities = viewGraph.translatePresentationPortalInvalidations(
-      resolveInputs.invalidatedIdentities,
-      portalRootIdentity: portalRootIdentity,
-      activeOverlayEntryIdentities: activePresentationOverlayEntryIdentities(
-        portalRootIdentity: portalRootIdentity
-      )
+    let originalIdentities = resolveInputs.invalidatedIdentities
+    let originalAnimationSegments = resolveInputs.animationSegments
+    let activeOverlayEntryIdentities = activePresentationOverlayEntryIdentities(
+      portalRootIdentity: portalRootIdentity
     )
-    guard translatedIdentities != resolveInputs.invalidatedIdentities else {
+    let displacedBatchIDs = resolveInputs.rewriteInvalidationIdentities { identities in
+      viewGraph.translatePresentationPortalInvalidations(
+        identities,
+        portalRootIdentity: portalRootIdentity,
+        activeOverlayEntryIdentities: activeOverlayEntryIdentities
+      )
+    }
+    if !displacedBatchIDs.isEmpty {
+      animationController.parkSupersededBatchCompletions(
+        displacedBatchIDs,
+        at: .now()
+      )
+    }
+    guard
+      resolveInputs.invalidatedIdentities != originalIdentities
+        || resolveInputs.animationSegments != originalAnimationSegments
+    else {
       return
     }
 
-    resolveInputs.invalidatedIdentities = translatedIdentities
-    resolveInputs.invalidationSummary = .init(
-      invalidatedIdentities: translatedIdentities
-    )
+    let translatedIdentities = resolveInputs.invalidatedIdentities
     resolveInputs.usesSelectiveEvaluation = FrameResolveState.selectiveEvaluationDecision(
       enabled: frameState.selectiveEvaluationEnabled,
       environmentRequiresRoot: resolveInputs.environmentRequiresRootEvaluation,
@@ -586,7 +604,8 @@ struct DefaultRendererFrameHeadCoordinator {
     let frameContext = FrameContext(
       environment: resolveInputs.environment,
       transaction: resolveInputs.transaction,
-      invalidatedIdentities: resolveInputs.invalidatedIdentities
+      invalidatedIdentities: resolveInputs.invalidatedIdentities,
+      animationSegments: resolveInputs.animationSegments
     )
     let frameTailInput = FrameTailInput(
       generation: renderGeneration,
@@ -693,7 +712,7 @@ private struct AnimationInjectionStage {
   @MainActor
   func apply(
     to resolved: inout ResolvedNode,
-    transaction: TransactionSnapshot,
+    transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
     resolvedNodesComputed: Int?,
@@ -709,13 +728,13 @@ private struct AnimationInjectionStage {
       // deliberately ignores transaction changes when the animatable target
       // snapshot itself is unchanged.
       if resolvedNodesComputed == 0 || resolvedTreeWasFullyReused,
-        controller.canSkipResolvedTreeProcessing(transaction: transaction)
+        controller.canSkipResolvedTreeProcessing(transactionPlan: transactionPlan)
       {
         controller.noteSkippedResolvedTreeProcessing(resolved: resolved)
       } else {
         controller.processResolvedTree(
           resolved,
-          transaction: transaction,
+          transactionPlan: transactionPlan,
           timestamp: timestamp
         )
       }

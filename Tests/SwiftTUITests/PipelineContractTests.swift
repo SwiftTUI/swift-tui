@@ -1,6 +1,7 @@
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 @_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
@@ -394,6 +395,47 @@ struct PipelineContractTests {
       ))
     #expect(visualOnly.decision == .canDropVisualOnly)
     #expect(visualOnly.impact.isVisualOnly)
+  }
+
+  @Test("an identity-scoped animation segment blocks completed-frame dropping")
+  func animationSegmentBlocksCompletedFrameDrop() {
+    let rootIdentity = testIdentity("PipelineContractSegmentDropRoot")
+    let childIdentity = testIdentity("PipelineContractSegmentDropRoot", "Child")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: PipelineContractSemanticSurface(),
+      terminalInputReader: EmptyPipelineContractInputReader(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity])
+    ) { _, _ in
+      Text("Ready")
+    }
+    let frame = ScheduledFrame(
+      causes: [.invalidation],
+      invalidatedIdentities: [childIdentity],
+      signalNames: [],
+      externalReasons: [],
+      triggeredDeadline: nil,
+      nextDeadline: nil,
+      animationSegments: [
+        AnimationInvalidationSegment(
+          identities: [childIdentity],
+          animationRequest: .disabled
+        )
+      ]
+    )
+
+    let blockers = runLoop.frameDropEligibilityBlockers(
+      artifacts: makePipelineContractArtifacts(dropEligibilityBlockers: []),
+      scheduledFrame: frame,
+      focusGraphChanged: false,
+      focusBindingChanged: false,
+      focusedValuesChanged: false,
+      scrollPositionChanged: false,
+      preferenceObservationChanged: false
+    )
+
+    #expect(blockers == [.animationTransaction])
   }
 
   @Test(.disabled("closed by Stage 6: worker and recursion safety"))

@@ -47,8 +47,15 @@ struct FrameSchedulerIntentCoalescingTests {
     let frame = try #require(scheduler.consumeReadyFrame())
     #expect(frame.intentRequestCount == 2)
     #expect(frame.invalidatedIdentities == [firstIdentity, secondIdentity])
-    #expect(frame.animationRequest == .disabled)
-    #expect(frame.animationBatchID == batchID)
+    #expect(
+      frame.animationSegments == [
+        AnimationInvalidationSegment(
+          identities: [secondIdentity],
+          animationRequest: .disabled,
+          animationBatchID: batchID
+        )
+      ]
+    )
   }
 
   @Test("requests of different kinds all increment the same counter")

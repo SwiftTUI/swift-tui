@@ -51,7 +51,8 @@ extension RunLoop {
         context: resolveContext(for: scheduledFrame),
         proposal: proposal(),
         elisionCauses: scheduledFrame.causes,
-        elisionAnimationRequest: scheduledFrame.animationRequest
+        elisionHasExplicitAnimationTransactions: scheduledFrame
+          .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
         return .rendered(renderedArtifacts, .completed, nil)
@@ -69,7 +70,8 @@ extension RunLoop {
         context: resolveContext(for: scheduledFrame),
         proposal: proposal(),
         elisionCauses: scheduledFrame.causes,
-        elisionAnimationRequest: scheduledFrame.animationRequest
+        elisionHasExplicitAnimationTransactions: scheduledFrame
+          .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
         return .rendered(renderedArtifacts, .completed, nil)
@@ -124,7 +126,8 @@ extension RunLoop {
       context: resolveContext(for: scheduledFrame),
       proposal: proposal(),
       elisionCauses: scheduledFrame.causes,
-      elisionAnimationRequest: scheduledFrame.animationRequest,
+      elisionHasExplicitAnimationTransactions: scheduledFrame
+        .hasExplicitAnimationTransactions,
       newestDesiredGeneration: {
         RenderGeneration(
           self.scheduler.hasPendingFrame(at: .now())

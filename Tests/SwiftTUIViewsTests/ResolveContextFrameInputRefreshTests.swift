@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SwiftTUICore
+@testable import SwiftTUIGraph
 @testable import SwiftTUIViews
 
 // The frame-input refresh (`applyingCurrentFrameResolveInputs`) keeps captured
@@ -122,6 +123,132 @@ struct ResolveContextFrameInputRefreshTests {
     #expect(refreshed.environmentValues.focusedIdentity == authoredFocus)
     #expect(refreshed.environmentValues.isFocused)
   }
+
+  @Test("disjoint animation segments refresh only their claimed subtrees")
+  func disjointAnimationSegmentsRefreshClaimedSubtrees() {
+    let root = testIdentity("Root")
+    let first = testIdentity("Root", "First")
+    let second = testIdentity("Root", "Second")
+    let clean = testIdentity("Root", "Clean")
+    let secondRequest = AnimationRequest.animate(AnyHashableSendable("second"))
+    let box = inputBox(
+      focusedIdentity: nil,
+      pressedIdentity: nil,
+      animationSegments: [
+        AnimationInvalidationSegment(
+          identities: [first],
+          animationRequest: .disabled,
+          animationBatchID: AnimationBatchID(1)
+        ),
+        AnimationInvalidationSegment(
+          identities: [second],
+          animationRequest: secondRequest,
+          animationBatchID: AnimationBatchID(2)
+        ),
+      ]
+    )
+
+    func refreshed(_ identity: Identity) -> ResolveContext {
+      var context = ResolveContext(identity: identity)
+      context.frameInputs = box
+      return context.applyingCurrentFrameResolveInputs()
+    }
+
+    #expect(refreshed(root).transaction.animationRequest == .inherit)
+    #expect(refreshed(clean).transaction.animationRequest == .inherit)
+    #expect(refreshed(first).transaction.animationRequest == .disabled)
+    #expect(refreshed(first).transaction.animationBatchID == AnimationBatchID(1))
+    #expect(refreshed(first.child(.named("Leaf"))).transaction.animationRequest == .disabled)
+    #expect(refreshed(second).transaction.animationRequest == secondRequest)
+    #expect(refreshed(second).transaction.animationBatchID == AnimationBatchID(2))
+  }
+
+  @Test("a deeper animation segment wins below a broader segment")
+  func deeperAnimationSegmentWins() {
+    let root = testIdentity("Root")
+    let branch = testIdentity("Root", "Branch")
+    let leaf = branch.child(.named("Leaf"))
+    let deeperRequest = AnimationRequest.animate(AnyHashableSendable("deeper"))
+    let box = inputBox(
+      focusedIdentity: nil,
+      pressedIdentity: nil,
+      animationSegments: [
+        AnimationInvalidationSegment(
+          identities: [root],
+          animationRequest: .disabled
+        ),
+        AnimationInvalidationSegment(
+          identities: [branch],
+          animationRequest: deeperRequest
+        ),
+      ]
+    )
+    var context = ResolveContext(identity: leaf)
+    context.frameInputs = box
+
+    #expect(
+      context.applyingCurrentFrameResolveInputs().transaction.animationRequest == deeperRequest)
+  }
+
+  @Test("an authored transaction override wins over the frame segment")
+  func authoredTransactionOverrideWinsOverFrameSegment() {
+    let identity = testIdentity("Root", "Authored")
+    var authoredTransaction = TransactionSnapshot()
+    authoredTransaction.animationRequest = .disabled
+    var context = ResolveContext(identity: identity, transaction: authoredTransaction)
+    context.propagated.authoredTransactionOverride = true
+    context.frameInputs = inputBox(
+      focusedIdentity: nil,
+      pressedIdentity: nil,
+      animationSegments: [
+        AnimationInvalidationSegment(
+          identities: [identity],
+          animationRequest: .animate(AnyHashableSendable("frame"))
+        )
+      ]
+    )
+
+    #expect(context.applyingCurrentFrameResolveInputs().transaction.animationRequest == .disabled)
+  }
+
+  @Test("portal-style identity rewrites keep the newest segment on a translated collision")
+  func portalStyleRewriteNormalizesSegmentCollision() {
+    let firstSource = testIdentity("Portal", "StaleFirst")
+    let secondSource = testIdentity("Portal", "StaleSecond")
+    let liveHost = testIdentity("Portal", "LiveHost")
+    let ordinary = testIdentity("Root", "Ordinary")
+    let firstBatchID = AnimationBatchID(3)
+    let secondBatchID = AnimationBatchID(4)
+    var inputs = frameInputs(
+      invalidatedIdentities: [firstSource, secondSource, ordinary],
+      animationSegments: [
+        AnimationInvalidationSegment(
+          identities: [firstSource],
+          animationRequest: .disabled,
+          animationBatchID: firstBatchID
+        ),
+        AnimationInvalidationSegment(
+          identities: [secondSource],
+          animationRequest: .animate(AnyHashableSendable("newer")),
+          animationBatchID: secondBatchID
+        ),
+      ]
+    )
+
+    let displacedBatchIDs = inputs.rewriteInvalidationIdentities { identities in
+      Set(
+        identities.map { identity in
+          identity == firstSource || identity == secondSource ? liveHost : identity
+        }
+      )
+    }
+
+    #expect(inputs.invalidatedIdentities == [liveHost, ordinary])
+    #expect(inputs.animationSegments.count == 1)
+    #expect(inputs.animationSegments.first?.identities == [liveHost])
+    #expect(inputs.animationSegments.first?.animationBatchID == secondBatchID)
+    #expect(displacedBatchIDs == [firstBatchID])
+  }
 }
 
 private func resolveContext(
@@ -141,25 +268,40 @@ private func resolveContext(
 @MainActor
 private func inputBox(
   focusedIdentity: Identity?,
-  pressedIdentity: Identity?
+  pressedIdentity: Identity?,
+  animationSegments: [AnimationInvalidationSegment] = []
 ) -> FrameResolveInputBox {
   var environmentValues = EnvironmentValues()
   environmentValues.focusedIdentity = focusedIdentity
   environmentValues.pressedIdentity = pressedIdentity
   let box = FrameResolveInputBox()
   box.store(
-    FrameResolveInputs(
+    frameInputs(
       invalidatedIdentities: [],
-      invalidationSummary: .init(invalidatedIdentities: []),
-      environmentValues: environmentValues,
-      environment: .init(),
-      focusedValues: .init(),
-      transaction: .init(),
-      resolveWorkTracker: nil,
-      proposal: ProposedSize(width: 80, height: 24),
-      usesSelectiveEvaluation: true,
-      environmentRequiresRootEvaluation: false
+      animationSegments: animationSegments,
+      environmentValues: environmentValues
     )
   )
   return box
+}
+
+@MainActor
+private func frameInputs(
+  invalidatedIdentities: Set<Identity>,
+  animationSegments: [AnimationInvalidationSegment],
+  environmentValues: EnvironmentValues = .init()
+) -> FrameResolveInputs {
+  FrameResolveInputs(
+    invalidatedIdentities: invalidatedIdentities,
+    invalidationSummary: .init(invalidatedIdentities: invalidatedIdentities),
+    environmentValues: environmentValues,
+    environment: .init(),
+    focusedValues: .init(),
+    transaction: .init(),
+    animationSegments: animationSegments,
+    resolveWorkTracker: nil,
+    proposal: ProposedSize(width: 80, height: 24),
+    usesSelectiveEvaluation: true,
+    environmentRequiresRootEvaluation: false
+  )
 }

@@ -16,10 +16,10 @@ public struct ScheduledFrame: Equatable, Sendable {
   public var triggeredDeadline: MonotonicInstant?
   public var nextDeadline: MonotonicInstant?
   package var forceRootEvaluation: Bool
-  package var animationRequest: AnimationRequest
-  package var animationBatchID: AnimationBatchID?
-  /// Batch IDs the latest-wins coalescing displaced before this frame
-  /// drained (F117); the runtime parks their completions so they still fire.
+  package var animationSegments: [AnimationInvalidationSegment]
+  /// Batch IDs whose every identity the segmented latest-wins coalescing
+  /// displaced before this frame drained; the runtime parks their completions
+  /// so they still fire.
   package var supersededAnimationBatchIDs: [AnimationBatchID]
   /// Total number of `request*` calls (input, invalidation, signal,
   /// external, deadline) that the scheduler coalesced into this
@@ -45,8 +45,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
     self.forceRootEvaluation = false
-    self.animationRequest = .inherit
-    self.animationBatchID = nil
+    self.animationSegments = []
     self.supersededAnimationBatchIDs = []
     self.intentRequestCount = 0
   }
@@ -59,8 +58,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     triggeredDeadline: MonotonicInstant?,
     nextDeadline: MonotonicInstant?,
     forceRootEvaluation: Bool = false,
-    animationRequest: AnimationRequest,
-    animationBatchID: AnimationBatchID? = nil,
+    animationSegments: [AnimationInvalidationSegment] = [],
     supersededAnimationBatchIDs: [AnimationBatchID] = [],
     intentRequestCount: Int = 0
   ) {
@@ -71,10 +69,41 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
     self.forceRootEvaluation = forceRootEvaluation
-    self.animationRequest = animationRequest
-    self.animationBatchID = animationBatchID
+    self.animationSegments = AnimationInvalidationSegments.normalized(animationSegments)
     self.supersededAnimationBatchIDs = supersededAnimationBatchIDs
     self.intentRequestCount = intentRequestCount
+  }
+
+  package var hasExplicitAnimationTransactions: Bool {
+    !animationSegments.isEmpty
+  }
+
+  package var liveAnimationBatchIDs: [AnimationBatchID] {
+    AnimationInvalidationSegments.liveBatchIDs(in: animationSegments)
+  }
+
+  /// Rewrites invalidation identities and their animation segments together.
+  /// Batches whose every identity the rewrite drops or displaces are promoted
+  /// to the superseded list so their completions remain deliverable.
+  @discardableResult
+  package mutating func rewriteInvalidationIdentities(
+    _ transform: (Set<Identity>) -> Set<Identity>
+  ) -> [AnimationBatchID] {
+    let originalBatchIDs = liveAnimationBatchIDs
+    let segmentedIdentities = AnimationInvalidationSegments.identityUnion(animationSegments)
+    let unsegmentedIdentities = invalidatedIdentities.subtracting(segmentedIdentities)
+    animationSegments = AnimationInvalidationSegments.rewritingIdentities(
+      in: animationSegments,
+      transform
+    )
+    invalidatedIdentities = transform(unsegmentedIdentities).union(
+      AnimationInvalidationSegments.identityUnion(animationSegments)
+    )
+    let displacedBatchIDs = originalBatchIDs.filter { !liveAnimationBatchIDs.contains($0) }
+    for batchID in displacedBatchIDs where !supersededAnimationBatchIDs.contains(batchID) {
+      supersededAnimationBatchIDs.append(batchID)
+    }
+    return displacedBatchIDs
   }
 }
 
@@ -202,13 +231,11 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
     /// Monotonic arm counter backing ``DeadlineArmCut``. Never reset — a cut
     /// captured before `reset()` must stay meaningful.
     var nextDeadlineArmOrdinal: UInt64 = 0
-    var pendingAnimationRequest: AnimationRequest = .inherit
-    var pendingAnimationBatchID: AnimationBatchID?
-    /// Batch IDs whose slot the latest-wins coalescing rule overwrote before
-    /// a drain (F117). Carried on the produced frame so the runtime can park
-    /// their `withAnimation` completions — a superseded batch's animations
-    /// never retain it, so without this its completion would never fire.
-    var pendingSupersededBatchIDs: [AnimationBatchID] = []
+    var pendingAnimationSegments: [AnimationInvalidationSegment] = []
+    /// Every batch observed since the last drain, in first-observed order.
+    /// Supersession is derived at drain time so a partially displaced batch
+    /// remains live while any segment still carries it.
+    var pendingObservedAnimationBatchIDs: [AnimationBatchID] = []
     /// Tally of `request*` calls received since the last `consumeReadyFrame`.
     /// Drained into the produced `ScheduledFrame` for cancellation-pressure
     /// diagnostics; reset to 0 on consume.
@@ -368,6 +395,9 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
         causes.insert(.deadline)
       }
 
+      let liveAnimationBatchIDs = AnimationInvalidationSegments.liveBatchIDs(
+        in: state.pendingAnimationSegments
+      )
       let scheduled = ScheduledFrame(
         causes: causes,
         invalidatedIdentities: state.invalidatedIdentities,
@@ -375,9 +405,10 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
         externalReasons: state.externalReasons.sorted(),
         triggeredDeadline: triggeredDeadline,
         nextDeadline: state.pendingDeadlines.first?.instant,
-        animationRequest: state.pendingAnimationRequest,
-        animationBatchID: state.pendingAnimationBatchID,
-        supersededAnimationBatchIDs: state.pendingSupersededBatchIDs,
+        animationSegments: state.pendingAnimationSegments,
+        supersededAnimationBatchIDs: state.pendingObservedAnimationBatchIDs.filter {
+          !liveAnimationBatchIDs.contains($0)
+        },
         intentRequestCount: state.pendingIntentRequestCount
       )
 
@@ -385,9 +416,8 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
       state.signalNames.removeAll(keepingCapacity: true)
       state.externalReasons.removeAll(keepingCapacity: true)
-      state.pendingAnimationRequest = .inherit
-      state.pendingAnimationBatchID = nil
-      state.pendingSupersededBatchIDs.removeAll(keepingCapacity: true)
+      state.pendingAnimationSegments.removeAll(keepingCapacity: true)
+      state.pendingObservedAnimationBatchIDs.removeAll(keepingCapacity: true)
       state.pendingIntentRequestCount = 0
 
       return scheduled
@@ -400,9 +430,8 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
       state.signalNames.removeAll(keepingCapacity: true)
       state.externalReasons.removeAll(keepingCapacity: true)
-      state.pendingAnimationRequest = .inherit
-      state.pendingAnimationBatchID = nil
-      state.pendingSupersededBatchIDs.removeAll(keepingCapacity: true)
+      state.pendingAnimationSegments.removeAll(keepingCapacity: true)
+      state.pendingObservedAnimationBatchIDs.removeAll(keepingCapacity: true)
       state.pendingIntentRequestCount = 0
       // The arm ordinal is deliberately NOT reset: a drain-pass cut captured
       // before a reset must keep excluding deadlines armed after it.
@@ -534,21 +563,16 @@ extension FrameScheduler: AnimationAwareInvalidating {
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(identities)
       state.pendingIntentRequestCount += 1
-      // Coalescing rule: latest explicit request wins; `.inherit` never
-      // overrides an explicit pending request.  Batch ID coalesces the
-      // same way — latest wins, a nil batch ID never overrides an
-      // explicit one.
-      if animation != .inherit {
-        state.pendingAnimationRequest = animation
-      }
-      if let batchID {
-        if let superseded = state.pendingAnimationBatchID,
-          superseded != batchID,
-          !state.pendingSupersededBatchIDs.contains(superseded)
-        {
-          state.pendingSupersededBatchIDs.append(superseded)
-        }
-        state.pendingAnimationBatchID = batchID
+      AnimationInvalidationSegments.append(
+        AnimationInvalidationSegment(
+          identities: identities,
+          animationRequest: animation,
+          animationBatchID: batchID
+        ),
+        to: &state.pendingAnimationSegments
+      )
+      if let batchID, !state.pendingObservedAnimationBatchIDs.contains(batchID) {
+        state.pendingObservedAnimationBatchIDs.append(batchID)
       }
     }
     notifyPendingFrameRequestWaiters()
@@ -561,8 +585,7 @@ extension FrameScheduler: CancelledFrameIntentReplaying {
     let carriesInvalidationIntent =
       frame.causes.contains(.invalidation)
       || !frame.invalidatedIdentities.isEmpty
-      || frame.animationRequest != .inherit
-      || frame.animationBatchID != nil
+      || frame.hasExplicitAnimationTransactions
     guard carriesInvalidationIntent else {
       return
     }
@@ -571,24 +594,27 @@ extension FrameScheduler: CancelledFrameIntentReplaying {
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(frame.invalidatedIdentities)
       state.pendingIntentRequestCount += 1
-      // Replay preserves the cancelled frame's one-shot animation intent only
-      // when no newer explicit animation is already queued.
-      if state.pendingAnimationRequest == .inherit, frame.animationRequest != .inherit {
-        state.pendingAnimationRequest = frame.animationRequest
+      // A cancelled frame is older than intent already pending at replay time.
+      // Restore it first, then reapply the pending segments so newer intent
+      // wins only for exact contested identities.
+      let newerSegments = state.pendingAnimationSegments
+      let newerObservedBatchIDs = state.pendingObservedAnimationBatchIDs
+      state.pendingAnimationSegments = frame.animationSegments
+      for segment in newerSegments {
+        AnimationInvalidationSegments.append(
+          segment,
+          to: &state.pendingAnimationSegments
+        )
       }
-      if state.pendingAnimationBatchID == nil {
-        state.pendingAnimationBatchID = frame.animationBatchID
-      } else if let dropped = frame.animationBatchID,
-        dropped != state.pendingAnimationBatchID,
-        !state.pendingSupersededBatchIDs.contains(dropped)
-      {
-        // A newer explicit batch already claimed the slot; the cancelled
-        // frame's batch is superseded, not lost (F117).
-        state.pendingSupersededBatchIDs.append(dropped)
-      }
-      for superseded in frame.supersededAnimationBatchIDs
-      where !state.pendingSupersededBatchIDs.contains(superseded) {
-        state.pendingSupersededBatchIDs.append(superseded)
+
+      state.pendingObservedAnimationBatchIDs.removeAll(keepingCapacity: true)
+      let observedBatchIDs =
+        frame.liveAnimationBatchIDs
+        + frame.supersededAnimationBatchIDs
+        + newerObservedBatchIDs
+      for batchID in observedBatchIDs
+      where !state.pendingObservedAnimationBatchIDs.contains(batchID) {
+        state.pendingObservedAnimationBatchIDs.append(batchID)
       }
     }
     notifyPendingFrameRequestWaiters()

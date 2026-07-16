@@ -190,6 +190,7 @@ package struct FrameResolveInputs {
   package var environment: EnvironmentSnapshot
   package var focusedValues: FocusedValues
   package var transaction: TransactionSnapshot
+  package var animationSegments: [AnimationInvalidationSegment]
   package var resolveWorkTracker: ResolveWorkTracker?
   package var proposal: ProposedSize
   package var usesSelectiveEvaluation: Bool
@@ -212,6 +213,7 @@ package struct FrameResolveInputs {
     environment: EnvironmentSnapshot,
     focusedValues: FocusedValues,
     transaction: TransactionSnapshot,
+    animationSegments: [AnimationInvalidationSegment] = [],
     resolveWorkTracker: ResolveWorkTracker?,
     proposal: ProposedSize,
     usesSelectiveEvaluation: Bool,
@@ -226,6 +228,7 @@ package struct FrameResolveInputs {
     self.environment = environment
     self.focusedValues = focusedValues
     self.transaction = transaction
+    self.animationSegments = AnimationInvalidationSegments.normalized(animationSegments)
     self.resolveWorkTracker = resolveWorkTracker
     self.proposal = proposal
     self.usesSelectiveEvaluation = usesSelectiveEvaluation
@@ -247,6 +250,30 @@ package struct FrameResolveInputs {
       let sources = forceRootEvaluationSources.map(\.rawValue).joined(separator: "+")
       return "\(reason.diagnosticName)(\(sources))"
     }
+  }
+
+  /// Rewrites ordinary invalidation identities and their animation metadata as
+  /// one currency. Segment collisions introduced by the rewrite retain the
+  /// original oldest-to-newest latest-wins order. Returns batches whose every
+  /// segment the rewrite dropped or displaced so the renderer can park their
+  /// completions on its abortable animation draft.
+  @discardableResult
+  package mutating func rewriteInvalidationIdentities(
+    _ transform: (Set<Identity>) -> Set<Identity>
+  ) -> [AnimationBatchID] {
+    let originalBatchIDs = AnimationInvalidationSegments.liveBatchIDs(in: animationSegments)
+    let segmentedIdentities = AnimationInvalidationSegments.identityUnion(animationSegments)
+    let unsegmentedIdentities = invalidatedIdentities.subtracting(segmentedIdentities)
+    animationSegments = AnimationInvalidationSegments.rewritingIdentities(
+      in: animationSegments,
+      transform
+    )
+    invalidatedIdentities = transform(unsegmentedIdentities).union(
+      AnimationInvalidationSegments.identityUnion(animationSegments)
+    )
+    invalidationSummary = .init(invalidatedIdentities: invalidatedIdentities)
+    let liveBatchIDs = AnimationInvalidationSegments.liveBatchIDs(in: animationSegments)
+    return originalBatchIDs.filter { !liveBatchIDs.contains($0) }
   }
 }
 
@@ -440,6 +467,7 @@ package final class FrameResolveState {
       environment: context.environment,
       focusedValues: context.focusedValues,
       transaction: context.transaction,
+      animationSegments: context.animationSegments,
       resolveWorkTracker: context.resolveWorkTracker,
       proposal: proposal,
       usesSelectiveEvaluation: usesSelectiveEvaluation,

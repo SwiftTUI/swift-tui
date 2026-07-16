@@ -46,7 +46,7 @@ struct AnimationSchedulerTests {
     )
 
     let frame = scheduler.consumeReadyFrame(at: .now())
-    #expect(frame?.animationRequest == animationRequest)
+    #expect(frame?.animationSegments.first?.animationRequest == animationRequest)
   }
 
   @Test("consumed frame resets pending animation request to inherit")
@@ -64,7 +64,7 @@ struct AnimationSchedulerTests {
     // After consumption, a plain invalidation should not carry animation.
     scheduler.requestInvalidation(of: [Identity(components: [] as [IdentityComponent])])
     let nextFrame = scheduler.consumeReadyFrame(at: .now())
-    #expect(nextFrame?.animationRequest == .inherit)
+    #expect(nextFrame?.animationSegments.isEmpty == true)
   }
 
   @Test("explicit animation request beats inherit during coalescing")
@@ -84,7 +84,7 @@ struct AnimationSchedulerTests {
     )
 
     let frame = scheduler.consumeReadyFrame(at: .now())
-    #expect(frame?.animationRequest == explicit)
+    #expect(frame?.animationSegments.first?.animationRequest == explicit)
   }
 
   @Test("replaying a cancelled animation frame restores its transaction onto pending work")
@@ -112,13 +112,15 @@ struct AnimationSchedulerTests {
     #expect(
       replayedFrame.invalidatedIdentities == Set([animatedIdentity, newerIdentity])
     )
-    #expect(replayedFrame.animationRequest == animationRequest)
-    #expect(replayedFrame.animationBatchID == batchID)
+    #expect(replayedFrame.animationSegments.count == 1)
+    #expect(replayedFrame.animationSegments[0].identities == [animatedIdentity])
+    #expect(replayedFrame.animationSegments[0].animationRequest == animationRequest)
+    #expect(replayedFrame.animationSegments[0].animationBatchID == batchID)
     #expect(replayedFrame.intentRequestCount == 2)
   }
 
-  @Test("replaying a cancelled animation frame does not replace newer explicit animation")
-  func replayCancelledAnimationFrameKeepsNewerExplicitAnimation() throws {
+  @Test("replaying a cancelled animation frame preserves disjoint newer animation")
+  func replayCancelledAnimationFramePreservesDisjointNewerAnimation() throws {
     let scheduler = FrameScheduler()
     let cancelledIdentity = testIdentity("Root", "Cancelled")
     let newerIdentity = testIdentity("Root", "Newer")
@@ -149,8 +151,14 @@ struct AnimationSchedulerTests {
     #expect(
       replayedFrame.invalidatedIdentities == Set([cancelledIdentity, newerIdentity])
     )
-    #expect(replayedFrame.animationRequest == newerAnimation)
-    #expect(replayedFrame.animationBatchID == newerBatchID)
+    #expect(replayedFrame.animationSegments.count == 2)
+    #expect(replayedFrame.animationSegments[0].identities == [cancelledIdentity])
+    #expect(replayedFrame.animationSegments[0].animationRequest == cancelledAnimation)
+    #expect(replayedFrame.animationSegments[0].animationBatchID == cancelledBatchID)
+    #expect(replayedFrame.animationSegments[1].identities == [newerIdentity])
+    #expect(replayedFrame.animationSegments[1].animationRequest == newerAnimation)
+    #expect(replayedFrame.animationSegments[1].animationBatchID == newerBatchID)
+    #expect(replayedFrame.supersededAnimationBatchIDs.isEmpty)
   }
 
   @Test("replaying a cancelled input-only frame does not synthesize invalidation")

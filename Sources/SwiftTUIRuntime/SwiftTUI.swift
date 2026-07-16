@@ -222,7 +222,7 @@ public struct DefaultRenderer {
       context: context,
       proposal: proposal,
       elisionCauses: [],
-      elisionAnimationRequest: .inherit
+      elisionHasExplicitAnimationTransactions: false
     ) {
     case .rendered(let artifacts):
       return artifacts
@@ -261,7 +261,7 @@ public struct DefaultRenderer {
       context: context,
       proposal: proposal,
       elisionCauses: [],
-      elisionAnimationRequest: .inherit
+      elisionHasExplicitAnimationTransactions: false
     ) {
     case .rendered(let artifacts):
       return artifacts
@@ -282,33 +282,34 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
     renderView(
       root,
       context: context,
       proposal: proposal,
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     )
   }
 
   /// Run-loop entry point for the abortable async path that may elide an
-  /// off-screen-only animation tick. See ``renderEliding(_:context:proposal:elisionCauses:elisionAnimationRequest:)``.
+  /// off-screen-only animation tick. See
+  /// ``renderEliding(_:context:proposal:elisionCauses:elisionHasExplicitAnimationTransactions:)``.
   @MainActor
   package func renderAsyncEliding<V: View>(
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
     await renderViewAsync(
       root,
       context: context,
       proposal: proposal,
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     )
   }
 
@@ -333,7 +334,7 @@ public struct DefaultRenderer {
       context: context,
       proposal: proposal,
       elisionCauses: [],
-      elisionAnimationRequest: .inherit,
+      elisionHasExplicitAnimationTransactions: false,
       newestDesiredGeneration: newestDesiredGeneration,
       completedFramePolicy: completedFramePolicy,
       completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
@@ -360,7 +361,7 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest,
+    elisionHasExplicitAnimationTransactions: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
     completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
@@ -377,7 +378,7 @@ public struct DefaultRenderer {
       context: context,
       proposal: proposal,
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest,
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
       newestDesiredGeneration: newestDesiredGeneration,
       completedFramePolicy: completedFramePolicy,
       completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
@@ -393,7 +394,7 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest,
+    elisionHasExplicitAnimationTransactions: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration?,
     completedFramePolicy: CompletedFramePolicy?,
     completedFrameAdditionalBlockers:
@@ -406,7 +407,7 @@ public struct DefaultRenderer {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     ) {
       return .elided
     }
@@ -427,7 +428,7 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionAnimationRequest: elisionAnimationRequest
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
         ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(
@@ -528,14 +529,14 @@ public struct DefaultRenderer {
   @MainActor
   private func makeCommitElidedFrameIfOffscreen(
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) -> (FrameHeadDraft) -> Bool {
     { [self] draft in
       let tick = draft.animationDraft.controller.lastTickResult
       guard
         OffscreenFrameElision.shouldElide(
           causes: elisionCauses,
-          animationRequest: elisionAnimationRequest,
+          hasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
           redrawIdentities: tick.redrawIdentities,
           drawnIdentities: frameTailRenderer.previousDrawnIdentities
         )
@@ -550,7 +551,7 @@ public struct DefaultRenderer {
   @MainActor
   private func elideOffscreenAnimationBeforeFrameHeadIfPossible(
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) -> Bool {
     guard
       let redrawIdentities =
@@ -561,7 +562,7 @@ public struct DefaultRenderer {
     guard
       OffscreenFrameElision.shouldElide(
         causes: elisionCauses,
-        animationRequest: elisionAnimationRequest,
+        hasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
         redrawIdentities: redrawIdentities,
         drawnIdentities: frameTailRenderer.previousDrawnIdentities
       )
@@ -585,12 +586,12 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     ) {
       return .elided
     }
@@ -611,7 +612,7 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionAnimationRequest: elisionAnimationRequest
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
         ),
         latePreferenceReconciliation: { input, clock in
           renderer.frameTailCoordinator.renderLayoutResolvingLatePreferences(
@@ -678,12 +679,12 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     elisionCauses: Set<WakeCause>,
-    elisionAnimationRequest: AnimationRequest
+    elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionAnimationRequest: elisionAnimationRequest
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     ) {
       return .elided
     }
@@ -704,7 +705,7 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionAnimationRequest: elisionAnimationRequest
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
         ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(draft) {

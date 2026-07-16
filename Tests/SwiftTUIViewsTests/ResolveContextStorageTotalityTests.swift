@@ -185,6 +185,11 @@ struct ResolveContextStorageTotalityTests {
         + "any reuse decision",
       draft: .survives("live-state seam, not a registration")
     ),
+    "animationSegments": notEquated(
+      "per-frame selection input; applyingCurrentFrameResolveInputs projects the "
+        + "identity-specific transaction that already participates in equality",
+      draft: .survives("frame transaction plan, not a runtime registration")
+    ),
     "suppressesStructuralLifecycle": equated(
       draft: .survives("resolve-scope flag, not a registration")
     ),
@@ -358,12 +363,17 @@ struct ResolveContextStorageTotalityTests {
     let inputBox = FrameResolveInputBox()
     let log = PresentationTriggerObservationLog()
     let scopeIdentity = Identity(components: [IdentityComponent(rawValue: "scope")])
+    let animationSegment = AnimationInvalidationSegment(
+      identities: [scopeIdentity],
+      animationRequest: .disabled
+    )
     context.liveScrollPositionRegistry = liveScroll
     context.liveFocusBindingRegistry = liveFocus
     context.invalidationProxy = proxy
     context.observationBridge = bridge
     context.viewGraph = graph
     context.frameInputs = inputBox
+    context.animationSegments = [animationSegment]
     context.presentationTriggerObserver = log
     context.imageAssetResolver = { _, _, _ in nil }
     context.requestDeadline = { _ in }
@@ -416,6 +426,11 @@ struct ResolveContextStorageTotalityTests {
           #expect(unwrappedObject(value) === graph, "\(name) must survive the draft swap")
         case "frameInputs":
           #expect(unwrappedObject(value) === inputBox, "\(name) must survive the draft swap")
+        case "animationSegments":
+          #expect(
+            value as? [AnimationInvalidationSegment] == [animationSegment],
+            "\(name) must survive the draft swap"
+          )
         case "presentationTriggerObserver":
           #expect(unwrappedObject(value) === log, "\(name) must survive the draft swap")
         case "imageAssetResolver", "requestDeadline":

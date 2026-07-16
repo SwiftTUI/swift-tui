@@ -11,7 +11,7 @@ struct OffscreenFrameElisionTests {
   func elidesDeadlineOnlyFrameWithDisjointRedraw() {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .inherit,
+      hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1"), testIdentity("2")],
       drawnIdentities: [testIdentity("3"), testIdentity("4")]
     )
@@ -22,7 +22,7 @@ struct OffscreenFrameElisionTests {
   func elidesEmptyRedrawDrainCase() {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .inherit,
+      hasExplicitAnimationTransactions: false,
       redrawIdentities: [],
       drawnIdentities: [testIdentity("3")]
     )
@@ -33,7 +33,7 @@ struct OffscreenFrameElisionTests {
   func elidesWhenDrawnIdentitiesIsEmpty() {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .inherit,
+      hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1")],
       drawnIdentities: []
     )
@@ -46,7 +46,7 @@ struct OffscreenFrameElisionTests {
   func doesNotElideWhenRedrawOverlapsDrawn() {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .inherit,
+      hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1"), testIdentity("3")],
       drawnIdentities: [testIdentity("3"), testIdentity("4")]
     )
@@ -60,7 +60,7 @@ struct OffscreenFrameElisionTests {
   func doesNotElideWhenNonDeadlineCausePresent(extra: WakeCause) {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline, extra],
-      animationRequest: .inherit,
+      hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1")],
       drawnIdentities: [testIdentity("3")]
     )
@@ -69,10 +69,9 @@ struct OffscreenFrameElisionTests {
 
   @Test("Does not elide when an explicit animation transaction is present")
   func doesNotElideWhenExplicitAnimationTransaction() {
-    let box = AnyHashableSendable(0)
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .animate(box),
+      hasExplicitAnimationTransactions: true,
       redrawIdentities: [testIdentity("1")],
       drawnIdentities: [testIdentity("3")]
     )
@@ -83,7 +82,7 @@ struct OffscreenFrameElisionTests {
   func doesNotElideWhenAnimationDisabled() {
     let result = OffscreenFrameElision.shouldElide(
       causes: [.deadline],
-      animationRequest: .disabled,
+      hasExplicitAnimationTransactions: true,
       redrawIdentities: [testIdentity("1")],
       drawnIdentities: [testIdentity("3")]
     )

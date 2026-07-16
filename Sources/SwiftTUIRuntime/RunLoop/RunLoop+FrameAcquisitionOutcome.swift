@@ -111,7 +111,7 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame
   ) -> Set<FrameDropEligibility.Blocker> {
     var blockers = renderer.internalAnimationController.frameDropEligibilityBlockers
-    if scheduledFrame.animationRequest != .inherit {
+    if scheduledFrame.hasExplicitAnimationTransactions {
       blockers.insert(.animationTransaction)
     }
     if artifacts.semanticSnapshot.focusRegions != latestSemanticSnapshot.focusRegions {

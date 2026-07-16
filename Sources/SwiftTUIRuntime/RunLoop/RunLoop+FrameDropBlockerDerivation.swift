@@ -33,7 +33,7 @@ extension RunLoop {
     if preferenceObservationChanged {
       additionalBlockers.insert(.preferenceObservationDelta)
     }
-    if scheduledFrame.animationRequest != .inherit {
+    if scheduledFrame.hasExplicitAnimationTransactions {
       additionalBlockers.insert(.animationTransaction)
     }
     return FrameDropEligibility.classify(

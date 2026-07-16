@@ -192,6 +192,13 @@ public struct ResolveContext: Equatable, Sendable {
     get { propagated.frameInputs }
     set { propagated.frameInputs = newValue }
   }
+  /// Identity-scoped animation intent attached to the current scheduled frame.
+  /// Stored outside `transaction` until frame inputs can select the segment for
+  /// each evaluator identity.
+  package var animationSegments: [AnimationInvalidationSegment] {
+    get { propagated.animationSegments }
+    set { propagated.animationSegments = newValue }
+  }
   package var suppressesStructuralLifecycle: Bool {
     get { propagated.suppressesStructuralLifecycle }
     set { propagated.suppressesStructuralLifecycle = newValue }
@@ -461,7 +468,10 @@ public struct ResolveContext: Equatable, Sendable {
     // for that subtree the captured transaction IS the current value (F137,
     // the transaction analog of the authored focus/press exemption above).
     if !propagated.authoredTransactionOverride {
-      refreshed.transaction = inputs.transaction
+      refreshed.transaction = FrameAnimationTransactionPlan(
+        base: inputs.transaction,
+        segments: inputs.animationSegments
+      ).transaction(for: refreshed.identity)
     }
     refreshed.resolveWorkTracker = inputs.resolveWorkTracker
     return refreshed
@@ -651,6 +661,7 @@ extension ResolveContext {
     package var viewGraph: ViewGraph?
     package var imageAssetResolver: ImageAssetResolver?
     package var frameInputs: FrameResolveInputBox?
+    package var animationSegments: [AnimationInvalidationSegment]
     package var suppressesStructuralLifecycle: Bool
     /// True while resolving inside a subtree whose owning `.id(_:)` re-rooted its
     /// resolved identity this frame (an identity churn). Set by
@@ -724,6 +735,7 @@ extension ResolveContext {
       viewGraph: ViewGraph? = nil,
       imageAssetResolver: ImageAssetResolver? = nil,
       frameInputs: FrameResolveInputBox? = nil,
+      animationSegments: [AnimationInvalidationSegment] = [],
       suppressesStructuralLifecycle: Bool = false,
       withinChurnedSubtree: Bool = false,
       authoredFocusPressOverrides: AuthoredFocusPressOverrides = [],
@@ -750,6 +762,7 @@ extension ResolveContext {
       self.viewGraph = viewGraph
       self.imageAssetResolver = imageAssetResolver
       self.frameInputs = frameInputs
+      self.animationSegments = animationSegments
       self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
       self.withinChurnedSubtree = withinChurnedSubtree
       self.authoredFocusPressOverrides = authoredFocusPressOverrides

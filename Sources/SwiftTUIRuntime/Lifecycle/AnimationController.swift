@@ -343,10 +343,12 @@ package final class AnimationController: Sendable {
       previousParentByIdentity: previousParentByIdentity,
       previousChildIndexByIdentity: previousChildIndexByIdentity,
       activeAnimationKeys: Set(activeAnimations.keys),
+      activeAnimationBoxesByKey: activeAnimations.mapValues(\.animationBox),
       registeredAnimationCount: registeredAnimations.count,
       completionClosureBatchIDs: Set(completionClosures.keys),
       batchRefCounts: batchRefCounts,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
+      removalAnimationBoxesByNodeID: removingNodes.mapValues(\.animationBox),
       transitionNodeIDs: Set(transitionsByNodeID.keys),
       transitionIdentities: Set(transitionIdentitiesByNodeID.values),
       previousTransitionNodeIDs: Set(previousTransitionsByNodeID.keys),
@@ -793,10 +795,22 @@ package final class AnimationController: Sendable {
   /// no changed animatable snapshot and no new root animation batch, changing
   /// inherited transaction intent cannot enqueue work.
   package func canSkipResolvedTreeProcessing(
-    transaction: TransactionSnapshot
+    transactionPlan: FrameAnimationTransactionPlan
   ) -> Bool {
     previousTreeRoot != nil
-      && transaction.animationRequest.animationBoxIfAny == nil
+      && !transactionPlan.hasExplicitTransactions
+      && transactionPlan.base.animationRequest.animationBoxIfAny == nil
+      && transactionPlan.base.animationBatchID == nil
+  }
+
+  /// Direct-test convenience for a frame with one base transaction and no
+  /// identity-scoped scheduler segments.
+  package func canSkipResolvedTreeProcessing(
+    transaction: TransactionSnapshot
+  ) -> Bool {
+    canSkipResolvedTreeProcessing(
+      transactionPlan: FrameAnimationTransactionPlan(base: transaction)
+    )
   }
 
   /// Number of frames whose resolved-tree processing was skipped by the
@@ -935,9 +949,10 @@ package final class AnimationController: Sendable {
   /// for changed properties.
   package func processResolvedTree(
     _ node: ResolvedNode,
-    transaction: TransactionSnapshot,
+    transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant
   ) {
+    let transaction = transactionPlan.base
     lastFrameHeadCompletionCount = 0
     lastResolvedTreeProcessedNodeCount = 0
     // If the incoming transaction carries an animation box, make sure
@@ -952,11 +967,13 @@ package final class AnimationController: Sendable {
     // this animation", and an unregistered box would otherwise be purged
     // on the next tick (its `evaluate` finds no registration), silently
     // dropping the requested animation.
-    if case .animate(let box) = transaction.animationRequest,
-      registeredAnimations[box] == nil,
-      let animation = box.unwrap(as: Animation.self)
-    {
-      registeredAnimations[box] = animation
+    for frameTransaction in transactionPlan.transactions {
+      if case .animate(let box) = frameTransaction.animationRequest,
+        registeredAnimations[box] == nil,
+        let animation = box.unwrap(as: Animation.self)
+      {
+        registeredAnimations[box] = animation
+      }
     }
 
     var newSnapshots: [Identity: AnimatableSnapshot] = [:]
@@ -964,6 +981,7 @@ package final class AnimationController: Sendable {
     var newChildIndexByIdentity: [Identity: Int] = [:]
     var newMatchedKeysByIdentity: [Identity: MatchedGeometryKey] = [:]
     var newNodeIDByIdentity: [Identity: ViewNodeID] = [:]
+    var newTransactionsByIdentity: [Identity: TransactionSnapshot] = [:]
     var newLiveNodeIDs: Set<ViewNodeID> = []
     let activeKeysByOwnerNodeID = Dictionary(
       grouping: activeAnimations.compactMap { key, animation in
@@ -976,12 +994,14 @@ package final class AnimationController: Sendable {
       parentIdentity: nil,
       childIndex: 0,
       transaction: transaction,
+      transactionPlan: transactionPlan,
       timestamp: timestamp,
       snapshotAccumulator: &newSnapshots,
       parentAccumulator: &newParentByIdentity,
       childIndexAccumulator: &newChildIndexByIdentity,
       matchedKeyAccumulator: &newMatchedKeysByIdentity,
       nodeIDAccumulator: &newNodeIDByIdentity,
+      transactionAccumulator: &newTransactionsByIdentity,
       liveNodeIDAccumulator: &newLiveNodeIDs,
       activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
     )
@@ -1032,7 +1052,10 @@ package final class AnimationController: Sendable {
       newMatchedKeysByIdentity: newMatchedKeysByIdentity,
       previousMatchedKeyIdentities: previousMatchedKeyIdentities,
       previousMatchedGeometryBounds: previousMatchedGeometryBounds,
-      transaction: transaction
+      transactionForIdentity: { identity in
+        newTransactionsByIdentity[identity]
+          ?? transactionPlan.transaction(for: identity)
+      }
     )
     let matchedKeysConsumedByMatch = matchedGeometryPlans.consumedKeys
     for plan in matchedGeometryPlans.animations {
@@ -1094,7 +1117,8 @@ package final class AnimationController: Sendable {
         viewNodeID: viewNodeID,
         transition: transition,
         snapshot: newSnapshots[identity] ?? .init(),
-        transaction: transaction,
+        transaction: newTransactionsByIdentity[identity]
+          ?? transactionPlan.transaction(for: identity),
         timestamp: timestamp
       )
     }
@@ -1234,7 +1258,11 @@ package final class AnimationController: Sendable {
         parentIdentity: injectionParent,
         childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
         transition: transition,
-        animationBox: transaction.animationRequest.animationBoxIfAny,
+        animationBox: transactionForDepartedIdentity(
+          identity,
+          transactionPlan: transactionPlan
+        )
+        .animationRequest.animationBoxIfAny,
         startTime: timestamp,
         startOpacity: initialOpacity,
         placedSnapshot: placedSnapshot
@@ -1290,8 +1318,25 @@ package final class AnimationController: Sendable {
     // await-ed on its completion (like ``PhaseAnimator``) would hang.
     // Schedule a drain for each such batch here; the drain fires
     // after the animation's nominal duration in ``applyInterpolations``.
-    scheduleStrandedBatchDrains(
-      transaction: transaction,
+    for frameTransaction in transactionPlan.transactions
+    where frameTransaction.animationBatchID != nil {
+      scheduleStrandedBatchDrains(
+        transaction: frameTransaction,
+        timestamp: timestamp
+      )
+    }
+  }
+
+  /// Direct-test convenience for a frame with one base transaction and no
+  /// identity-scoped scheduler segments.
+  package func processResolvedTree(
+    _ node: ResolvedNode,
+    transaction: TransactionSnapshot,
+    timestamp: MonotonicInstant
+  ) {
+    processResolvedTree(
+      node,
+      transactionPlan: FrameAnimationTransactionPlan(base: transaction),
       timestamp: timestamp
     )
   }
@@ -1406,6 +1451,27 @@ package final class AnimationController: Sendable {
     }
   }
 
+  /// Selects animation intent for a node that no longer exists in the current
+  /// resolved tree. Authored `.id` can rebase a child's public identity outside
+  /// its structural parent's identity path, so identity ancestry alone cannot
+  /// associate that departed child with the segment that caused its removal.
+  /// Walk the retained structural parent chain until a claimed identity is
+  /// found; live insertion/property paths instead carry their selected
+  /// transaction directly on the newly resolved node.
+  private func transactionForDepartedIdentity(
+    _ identity: Identity,
+    transactionPlan: FrameAnimationTransactionPlan
+  ) -> TransactionSnapshot {
+    var candidate: Identity? = identity
+    while let current = candidate {
+      if transactionPlan.segment(for: current) != nil {
+        return transactionPlan.transaction(for: current)
+      }
+      candidate = previousParentByIdentity[current]
+    }
+    return transactionPlan.base
+  }
+
   /// Returns the currently interpolated value of the animation at
   /// `key` if one is in flight, or nil if the slot is empty.  Used by
   /// the insertion path to retarget from the displayed value when a
@@ -1423,12 +1489,14 @@ package final class AnimationController: Sendable {
     parentIdentity: Identity?,
     childIndex: Int,
     transaction: TransactionSnapshot,
+    transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant,
     snapshotAccumulator: inout [Identity: AnimatableSnapshot],
     parentAccumulator: inout [Identity: Identity],
     childIndexAccumulator: inout [Identity: Int],
     matchedKeyAccumulator: inout [Identity: MatchedGeometryKey],
     nodeIDAccumulator: inout [Identity: ViewNodeID],
+    transactionAccumulator: inout [Identity: TransactionSnapshot],
     liveNodeIDAccumulator: inout Set<ViewNodeID>,
     activeKeysByOwnerNodeID: [ViewNodeID: [AnimationKey]]
   ) {
@@ -1443,27 +1511,38 @@ package final class AnimationController: Sendable {
     let snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
 
-    // Determine the effective animation request: child transactions
-    // override parent; otherwise inherit.
-    let effectiveRequest = effectiveAnimationRequest(
-      node: node,
-      parent: transaction
-    )
+    // Determine the effective transaction. A resolved node normally already
+    // carries its frame-selected segment. Consulting the plan here also covers
+    // controller-direct inputs and departed/reused transaction snapshots.
+    let frameSegment = transactionPlan.segment(for: node.identity)
+    var effectiveTransaction = node.transactionSnapshot
+    if effectiveTransaction.animationRequest == .inherit {
+      if let frameSegment {
+        effectiveTransaction.animationRequest = frameSegment.animationRequest
+        effectiveTransaction.animationBatchID = frameSegment.animationBatchID
+      } else {
+        effectiveTransaction.animationRequest = transaction.animationRequest
+        effectiveTransaction.animationBatchID = transaction.animationBatchID
+      }
+    } else if effectiveTransaction.animationBatchID == nil {
+      let isFrameSegmentBoundary =
+        frameSegment.map { segment in
+          segment.animationRequest == effectiveTransaction.animationRequest
+            && segment.animationBatchID == nil
+        } ?? false
+      if !isFrameSegmentBoundary {
+        effectiveTransaction.animationBatchID = transaction.animationBatchID
+      }
+    }
 
     if let previous {
-      // A child transaction's .animate overrides inherit the parent's
-      // batch ID when its own is nil; that way `.animation(_:value:)`
-      // subtree overrides don't lose the `withAnimation` completion
-      // association.
-      let effectiveBatchID =
-        node.transactionSnapshot.animationBatchID ?? transaction.animationBatchID
       diffAndEnqueue(
         identity: node.identity,
         viewNodeID: node.viewNodeID,
         previous: previous,
         current: snapshot,
-        request: effectiveRequest,
-        batchID: effectiveBatchID,
+        request: effectiveTransaction.animationRequest,
+        batchID: effectiveTransaction.animationBatchID,
         timestamp: timestamp
       )
     }
@@ -1481,35 +1560,25 @@ package final class AnimationController: Sendable {
       nodeIDAccumulator[node.identity] = viewNodeID
       liveNodeIDAccumulator.insert(viewNodeID)
     }
+    transactionAccumulator[node.identity] = effectiveTransaction
 
     for (index, child) in node.children.enumerated() {
       processNode(
         child,
         parentIdentity: node.identity,
         childIndex: index,
-        transaction: transaction,
+        transaction: effectiveTransaction,
+        transactionPlan: transactionPlan,
         timestamp: timestamp,
         snapshotAccumulator: &snapshotAccumulator,
         parentAccumulator: &parentAccumulator,
         childIndexAccumulator: &childIndexAccumulator,
         matchedKeyAccumulator: &matchedKeyAccumulator,
         nodeIDAccumulator: &nodeIDAccumulator,
+        transactionAccumulator: &transactionAccumulator,
         liveNodeIDAccumulator: &liveNodeIDAccumulator,
         activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
       )
-    }
-  }
-
-  private func effectiveAnimationRequest(
-    node: ResolvedNode,
-    parent: TransactionSnapshot
-  ) -> AnimationRequest {
-    // Node's transaction snapshot carries the most-specific intent.
-    switch node.transactionSnapshot.animationRequest {
-    case .inherit:
-      return parent.animationRequest
-    case .disabled, .animate:
-      return node.transactionSnapshot.animationRequest
     }
   }
 

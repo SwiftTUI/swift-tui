@@ -103,9 +103,17 @@ extension RunLoop {
         scheduledFrame.invalidatedIdentities.subtracting(reCarried)
       )
     }
-    rerender.invalidatedIdentities = renderer.rerenderInvalidationTargets(
-      reCarried.union(convergence.midFrameRelocationInvalidations),
-      contentRootIdentity: rootIdentity
+    rerender.rewriteInvalidationIdentities { identities in
+      renderer.rerenderInvalidationTargets(
+        renderer.droppingInertPresentationTriggerLeaves(from: identities),
+        contentRootIdentity: rootIdentity
+      )
+    }
+    rerender.invalidatedIdentities.formUnion(
+      renderer.rerenderInvalidationTargets(
+        convergence.midFrameRelocationInvalidations,
+        contentRootIdentity: rootIdentity
+      )
     )
     return rerender
   }

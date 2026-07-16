@@ -11,8 +11,7 @@ public struct FrameContext: Equatable, Sendable {
   }
   package var invalidationSummary: InvalidationSummary
   public var timestamp: MonotonicInstant
-  package var animationRequest: AnimationRequest
-  package var animationBatchID: AnimationBatchID?
+  package var animationSegments: [AnimationInvalidationSegment]
 
   /// Creates a frame context.
   public init(
@@ -28,18 +27,16 @@ public struct FrameContext: Equatable, Sendable {
       invalidatedIdentities: invalidatedIdentities
     )
     self.timestamp = timestamp
-    self.animationRequest = .inherit
-    self.animationBatchID = nil
+    self.animationSegments = []
   }
 
-  /// Creates a frame context with an animation request.
+  /// Creates a frame context with identity-scoped animation transactions.
   package init(
     environment: EnvironmentSnapshot = .init(),
     transaction: TransactionSnapshot = .init(),
     invalidatedIdentities: Set<Identity> = [],
     timestamp: MonotonicInstant = .now(),
-    animationRequest: AnimationRequest,
-    animationBatchID: AnimationBatchID? = nil
+    animationSegments: [AnimationInvalidationSegment]
   ) {
     self.environment = environment
     self.transaction = transaction
@@ -48,8 +45,7 @@ public struct FrameContext: Equatable, Sendable {
       invalidatedIdentities: invalidatedIdentities
     )
     self.timestamp = timestamp
-    self.animationRequest = animationRequest
-    self.animationBatchID = animationBatchID
+    self.animationSegments = AnimationInvalidationSegments.normalized(animationSegments)
   }
 
   /// Returns whether `identity` is directly invalidated in this frame.

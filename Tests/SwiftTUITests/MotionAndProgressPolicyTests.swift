@@ -443,4 +443,63 @@ struct ReducedMotionCompletionDeliveryTests {
       "the orphaned completion ledger blocked frame drops for the session"
     )
   }
+
+  @Test("reduced motion parks every disjoint same-frame animation batch")
+  func reducedMotionParksEverySegmentBatch() throws {
+    let rootIdentity = testIdentity("ReducedMotionSegmentRoot")
+    let firstIdentity = testIdentity("ReducedMotionSegmentRoot", "First")
+    let secondIdentity = testIdentity("ReducedMotionSegmentRoot", "Second")
+    let scheduler = FrameScheduler()
+    let firstAnimation = Animation.linear(duration: .milliseconds(100))
+    let secondAnimation = Animation.linear(duration: .milliseconds(250))
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: MotionPolicyTestSurface(),
+      terminalInputReader: MotionPolicyInputReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      runtimeConfiguration: RuntimeConfiguration(motion: .reduced),
+      viewBuilder: ScopedMapper { _ in
+        Text("Ready")
+      }
+    )
+    let controller = runLoop.renderer.internalAnimationController
+    let firstBatchID = AnimationBatchID(13_402)
+    let secondBatchID = AnimationBatchID(13_403)
+    let counter = CompletionCounter()
+    controller.registerCompletion(batchID: firstBatchID) {
+      MainActor.assumeIsolated { counter.increment() }
+    }
+    controller.registerCompletion(batchID: secondBatchID) {
+      MainActor.assumeIsolated { counter.increment() }
+    }
+
+    scheduler.requestInvalidation(
+      of: [firstIdentity],
+      animation: .animate(firstAnimation.animationBox),
+      batchID: firstBatchID
+    )
+    scheduler.requestInvalidation(
+      of: [secondIdentity],
+      animation: .animate(secondAnimation.animationBox),
+      batchID: secondBatchID
+    )
+    let frame = try #require(scheduler.consumeReadyFrame())
+    #expect(frame.liveAnimationBatchIDs == [firstBatchID, secondBatchID])
+
+    let context = runLoop.resolveContext(for: frame)
+    #expect(context.transaction.animationRequest == .disabled)
+    #expect(context.animationSegments.isEmpty)
+
+    var leaf = ResolvedNode(
+      identity: testIdentity("ReducedMotionSegmentLeaf"),
+      kind: .view("Leaf")
+    )
+    _ = controller.applyInterpolations(
+      to: &leaf,
+      at: .now().advanced(by: .milliseconds(1))
+    )
+    #expect(counter.count == 2)
+  }
 }

@@ -53,10 +53,8 @@ package enum FrameRecordDerivation {
       coalescedEventBatches: sample.coalescedEventBatches,
       coalescedWakeCauses: formattedWakeCauses(sample.coalescedWakeCauses),
       coalescedIntentRequests: sample.intentRequestCount,
-      scheduledAnimationRequest: formattedAnimationRequest(
-        sample.scheduledFrame.animationRequest
-      ),
-      scheduledAnimationBatchID: sample.scheduledFrame.animationBatchID?.value,
+      scheduledAnimationRequest: formattedAnimationTransactions(sample.scheduledFrame),
+      scheduledAnimationBatchID: singularAnimationBatchID(sample.scheduledFrame)?.value,
       animationControllerActiveAnimationCount: sample.animationControllerActiveAnimationCount,
       animationControllerHasPendingWork: sample.animationControllerHasPendingWork,
       workerTimings: diag.timing.workerTimings,
@@ -210,10 +208,8 @@ package enum FrameRecordDerivation {
       coalescedEventBatches: sample.coalescedEventBatches,
       coalescedWakeCauses: formattedWakeCauses(sample.coalescedWakeCauses),
       coalescedIntentRequests: sample.intentRequestCount,
-      scheduledAnimationRequest: formattedAnimationRequest(
-        sample.scheduledFrame.animationRequest
-      ),
-      scheduledAnimationBatchID: sample.scheduledFrame.animationBatchID?.value,
+      scheduledAnimationRequest: formattedAnimationTransactions(sample.scheduledFrame),
+      scheduledAnimationBatchID: singularAnimationBatchID(sample.scheduledFrame)?.value,
       animationControllerActiveAnimationCount: sample.animationControllerActiveAnimationCount,
       animationControllerHasPendingWork: sample.animationControllerHasPendingWork,
       workerTimings: nil,
@@ -305,10 +301,8 @@ package enum FrameRecordDerivation {
       coalescedEventBatches: sample.coalescedEventBatches,
       coalescedWakeCauses: formattedWakeCauses(sample.coalescedWakeCauses),
       coalescedIntentRequests: sample.intentRequestCount,
-      scheduledAnimationRequest: formattedAnimationRequest(
-        sample.scheduledFrame.animationRequest
-      ),
-      scheduledAnimationBatchID: sample.scheduledFrame.animationBatchID?.value,
+      scheduledAnimationRequest: formattedAnimationTransactions(sample.scheduledFrame),
+      scheduledAnimationBatchID: singularAnimationBatchID(sample.scheduledFrame)?.value,
       animationControllerActiveAnimationCount: sample.animationControllerActiveAnimationCount,
       animationControllerHasPendingWork: sample.animationControllerHasPendingWork,
       workerTimings: nil,
@@ -396,5 +390,25 @@ package enum FrameRecordDerivation {
     case .animate:
       "animate"
     }
+  }
+
+  private static func formattedAnimationTransactions(_ frame: ScheduledFrame) -> String {
+    guard !frame.animationSegments.isEmpty else {
+      return "inherit"
+    }
+    if frame.animationSegments.count == 1 {
+      return formattedAnimationRequest(frame.animationSegments[0].animationRequest)
+    }
+    let requests = frame.animationSegments.map {
+      formattedAnimationRequest($0.animationRequest)
+    }
+    return "segments[\(frame.animationSegments.count)]:" + requests.joined(separator: ",")
+  }
+
+  private static func singularAnimationBatchID(
+    _ frame: ScheduledFrame
+  ) -> AnimationBatchID? {
+    let liveBatchIDs = frame.liveAnimationBatchIDs
+    return liveBatchIDs.count == 1 ? liveBatchIDs[0] : nil
   }
 }

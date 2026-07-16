@@ -29,10 +29,12 @@ extension AnimationController {
     package var previousParentByIdentity: [Identity: Identity]
     package var previousChildIndexByIdentity: [Identity: Int]
     package var activeAnimationKeys: Set<AnimationKey>
+    package var activeAnimationBoxesByKey: [AnimationKey: AnimationBox]
     package var registeredAnimationCount: Int
     package var completionClosureBatchIDs: Set<AnimationBatchID>
     package var batchRefCounts: [AnimationBatchID: Int]
     package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
+    package var removalAnimationBoxesByNodeID: [ViewNodeID: AnimationBox?]
     package var transitionNodeIDs: Set<ViewNodeID>
     package var transitionIdentities: Set<Identity>
     package var previousTransitionNodeIDs: Set<ViewNodeID>

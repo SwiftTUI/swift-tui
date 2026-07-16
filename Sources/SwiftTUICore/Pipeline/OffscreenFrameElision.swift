@@ -22,18 +22,19 @@ package enum OffscreenFrameElision {
   ///
   /// - Parameters:
   ///   - causes: The set of wake reasons that produced the scheduled frame.
-  ///   - animationRequest: The animation intent attached to the frame.
+  ///   - hasExplicitAnimationTransactions: Whether the frame carries any new
+  ///     identity-scoped animation transaction.
   ///   - redrawIdentities: Identities that would be redrawn this frame.
   ///   - drawnIdentities: Identities that have been committed to the visible
   ///     surface at least once.
   package static func shouldElide(
     causes: Set<WakeCause>,
-    animationRequest: AnimationRequest,
+    hasExplicitAnimationTransactions: Bool,
     redrawIdentities: Set<Identity>,
     drawnIdentities: Set<Identity>
   ) -> Bool {
     guard causes == [.deadline] else { return false }
-    guard case .inherit = animationRequest else { return false }
+    guard !hasExplicitAnimationTransactions else { return false }
     return redrawIdentities.isDisjoint(with: drawnIdentities)
   }
 }

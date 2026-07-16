@@ -1291,8 +1291,12 @@ extension FrameworkStressFramePipelineTests {
         armedBefore: scheduler.deadlineArmCut
       )
     )
-    #expect(frame.animationRequest == .disabled)
-    #expect(frame.animationBatchID == newerBatch)
+    #expect(frame.animationSegments.count == 2)
+    #expect(frame.animationSegments[0].identities == [cancelledIdentity])
+    #expect(frame.animationSegments[0].animationRequest.animationBoxIfAny != nil)
+    #expect(frame.animationSegments[1].identities == [newerIdentity])
+    #expect(frame.animationSegments[1].animationRequest == .disabled)
+    #expect(frame.animationSegments[1].animationBatchID == newerBatch)
     #expect(frame.invalidatedIdentities == [newerIdentity, cancelledIdentity])
   }
 }
@@ -1304,15 +1308,26 @@ private func framePipelineScheduledFrame(
   batchID: AnimationBatchID? = nil,
   supersededBatchIDs: [AnimationBatchID] = []
 ) -> ScheduledFrame {
-  ScheduledFrame(
+  let animationSegments: [AnimationInvalidationSegment] =
+    if animation != .inherit || batchID != nil, !identities.isEmpty {
+      [
+        AnimationInvalidationSegment(
+          identities: identities,
+          animationRequest: animation,
+          animationBatchID: batchID
+        )
+      ]
+    } else {
+      []
+    }
+  return ScheduledFrame(
     causes: causes,
     invalidatedIdentities: identities,
     signalNames: [],
     externalReasons: [],
     triggeredDeadline: nil,
     nextDeadline: nil,
-    animationRequest: animation,
-    animationBatchID: batchID,
+    animationSegments: animationSegments,
     supersededAnimationBatchIDs: supersededBatchIDs
   )
 }
@@ -1328,13 +1343,14 @@ extension FrameworkStressFramePipelineTests {
     let newerBatch = AnimationBatchID(220)
     let cancelledBatch = AnimationBatchID(221)
     let earlierSuperseded = AnimationBatchID(222)
+    let contestedIdentity = testIdentity("FramePipeline022", "Contested")
     scheduler.requestInvalidation(
-      of: [testIdentity("FramePipeline022", "Newer")],
+      of: [contestedIdentity],
       animation: .disabled,
       batchID: newerBatch
     )
     let cancelled = framePipelineScheduledFrame(
-      identities: [testIdentity("FramePipeline022", "Cancelled")],
+      identities: [contestedIdentity],
       animation: .disabled,
       batchID: cancelledBatch,
       supersededBatchIDs: [earlierSuperseded]
@@ -1349,7 +1365,7 @@ extension FrameworkStressFramePipelineTests {
         armedBefore: scheduler.deadlineArmCut
       )
     )
-    #expect(frame.animationBatchID == newerBatch)
+    #expect(frame.animationSegments.first?.animationBatchID == newerBatch)
     #expect(frame.supersededAnimationBatchIDs == [cancelledBatch, earlierSuperseded])
     #expect(Set(frame.supersededAnimationBatchIDs).count == 2)
   }
@@ -1788,7 +1804,7 @@ extension FrameworkStressFramePipelineTests {
     #expect(
       OffscreenFrameElision.shouldElide(
         causes: [.deadline],
-        animationRequest: .inherit,
+        hasExplicitAnimationTransactions: false,
         redrawIdentities: [departed],
         drawnIdentities: latestDrawn
       )
@@ -1796,7 +1812,7 @@ extension FrameworkStressFramePipelineTests {
     #expect(
       !OffscreenFrameElision.shouldElide(
         causes: [.deadline],
-        animationRequest: .inherit,
+        hasExplicitAnimationTransactions: false,
         redrawIdentities: [visible],
         drawnIdentities: latestDrawn
       )

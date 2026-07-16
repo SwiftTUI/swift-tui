@@ -57,6 +57,7 @@ extension RunLoop {
       )
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
+    var animationSegments = scheduledFrame.animationSegments
     if runtimeConfiguration.motion == .reduced {
       // SwiftUI's reduced-motion contract: the state change applies
       // instantly AND the `withAnimation(_:completion:)` closure still
@@ -67,17 +68,16 @@ extension RunLoop {
       // orphaned: a live awaiter hung forever and the non-empty ledger
       // raised the `.animationCompletion` frame-drop blocker for the
       // whole session (F134).
-      if let reducedBatchID = scheduledFrame.animationBatchID {
+      let reducedBatchIDs = scheduledFrame.liveAnimationBatchIDs
+      if !reducedBatchIDs.isEmpty {
         renderer.internalAnimationController.parkSupersededBatchCompletions(
-          [reducedBatchID],
+          reducedBatchIDs,
           at: .now()
         )
       }
       transactionSnapshot.animationRequest = .disabled
       transactionSnapshot.animationBatchID = nil
-    } else {
-      transactionSnapshot.animationRequest = scheduledFrame.animationRequest
-      transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
+      animationSegments.removeAll(keepingCapacity: false)
     }
     // Phase 3's ``diffAndEnqueue`` retargets in-flight animations correctly via
     // ``sample(existing, at:)`` + ``effectiveFrom``. The scheduler stays
@@ -94,6 +94,7 @@ extension RunLoop {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: true
     )
+    context.animationSegments = animationSegments
     context.forceRootEvaluation = scheduledFrame.forceRootEvaluation
     context.localPointerHandlerRegistry = localPointerHandlerRegistry
     context.localTerminationRegistry = localTerminationRegistry
