@@ -32,31 +32,36 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+
     switch storage {
     case .trueContent(let content):
-      let branchContext = context.child(component: .init(rawValue: "true"))
+      let branchContext = slotContext.child(component: .init(rawValue: "true"))
+      var branchIndex = 0
       appendDeclaredChildNodes(
         content,
         in: branchContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &branchIndex,
         into: &resolved
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
-        // The collapsed branch still occupies its source position: consume
-        // one structural index so trailing siblings keep their identities
-        // when the `if` toggles (a plain EmptyView child consumes one too).
-        // No node is minted for it.
-        nextIndex += 1
+        // The slot was consumed above. No node is minted for the implicit
+        // empty branch, but trailing siblings keep their authored indices.
         return
       }
-      let branchContext = context.child(component: .init(rawValue: "false"))
+      let branchContext = slotContext.child(component: .init(rawValue: "false"))
+      var branchIndex = 0
       appendDeclaredChildNodes(
         content,
         in: branchContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &branchIndex,
         into: &resolved
       )
     }
@@ -126,30 +131,36 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
       _ resolveOne: @escaping @MainActor () -> ResolvedNode
     ) -> Void
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+
     switch storage {
     case .trueContent(let content):
-      let branchContext = context.child(component: .init(rawValue: "true"))
+      let branchContext = slotContext.child(component: .init(rawValue: "true"))
+      var branchIndex = 0
       enumerateDeclaredChildViews(
         content,
         in: branchContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &branchIndex,
         visitor: visitor
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
-        // Mirror appendDeclaredChildren: the collapsed branch consumes one
-        // structural index (the DeclaredChildrenView contract requires both
-        // traversals to advance `nextIndex` identically).
-        nextIndex += 1
+        // Mirror appendDeclaredChildren: the slot was already consumed and
+        // the implicit empty branch produces no visitor call.
         return
       }
-      let branchContext = context.child(component: .init(rawValue: "false"))
+      let branchContext = slotContext.child(component: .init(rawValue: "false"))
+      var branchIndex = 0
       enumerateDeclaredChildViews(
         content,
         in: branchContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &branchIndex,
         visitor: visitor
       )
     }

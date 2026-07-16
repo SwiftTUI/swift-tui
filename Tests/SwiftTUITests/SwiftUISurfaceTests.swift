@@ -407,7 +407,8 @@ struct SwiftUISurfaceTests {
     #expect(resolved.kind == .view("VStack"))
     #expect(resolved.children.count == 4)
     #expect(resolved.children[0].identity == testIdentity("Root", "VStack[0]"))
-    #expect(resolved.children[1].identity == testIdentity("Root", "true", "VStack[1]"))
+    #expect(
+      resolved.children[1].identity == testIdentity("Root", "VStack[1]", "true", "VStack[0]"))
     #expect(resolved.children[2].identity == testIdentity("Root", "VStack[2]", "Group[0]"))
     #expect(resolved.children[3].identity == testIdentity("Root", "VStack[2]", "Group[2]"))
   }
@@ -679,7 +680,7 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
-    "conditional lifecycle ownership follows the resolved branch identity instead of inventing a wrapper"
+    "conditional lifecycle ownership follows the branch child below its authored slot"
   )
   func conditionalLifecycleOwnershipFollowsResolvedBranchIdentity() {
     func makeRoot(_ isVisible: Bool) -> some View {
@@ -697,16 +698,28 @@ struct SwiftUISurfaceTests {
     let shown = Resolver().resolve(makeRoot(true), in: .init(identity: testIdentity("Root")))
     let hidden = Resolver().resolve(makeRoot(false), in: .init(identity: testIdentity("Root")))
 
-    #expect(shown.identity == testIdentity("Root", "true", "Group[0]"))
-    #expect(hidden.identity == testIdentity("Root", "false", "Group[0]"))
-    #expect(shown.lifecycleMetadata.appearHandlerIDs == ["Root/true/Group[0]#appear[0]"])
-    #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/false/Group[0]#appear[0]"])
+    #expect(shown.identity == testIdentity("Root", "Group[0]", "true", "Group[0]"))
+    #expect(hidden.identity == testIdentity("Root", "Group[0]", "false", "Group[0]"))
+    #expect(
+      shown.lifecycleMetadata.appearHandlerIDs == ["Root/Group[0]/true/Group[0]#appear[0]"])
+    #expect(
+      hidden.lifecycleMetadata.appearHandlerIDs == ["Root/Group[0]/false/Group[0]#appear[0]"])
     #expect(
       shown.lifecycleMetadata.tasks
-        == [.init(id: "Root/true/Group[0]#task[id:Swift.String]", priority: .userInitiated)])
+        == [
+          .init(
+            id: "Root/Group[0]/true/Group[0]#task[id:Swift.String]",
+            priority: .userInitiated
+          )
+        ])
     #expect(
       hidden.lifecycleMetadata.tasks
-        == [.init(id: "Root/false/Group[0]#task[id:Swift.String]", priority: .userInitiated)])
+        == [
+          .init(
+            id: "Root/Group[0]/false/Group[0]#task[id:Swift.String]",
+            priority: .userInitiated
+          )
+        ])
   }
 
   @Test(
@@ -743,13 +756,13 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    let rowIdentity = testIdentity("Root", "true", "VStack[0]")
+    let rowIdentity = testIdentity("Root", "VStack[0]", "true", "VStack[0]")
     #expect(shownArtifacts.commitPlan.lifecycle.map(\.identity) == [rowIdentity, rowIdentity])
     #expect(
       shownArtifacts.commitPlan.lifecycle.map(\.operation) == [
-        .appear(handlerIDs: ["Root/true/VStack[0]#appear[0]"]),
+        .appear(handlerIDs: ["Root/VStack[0]/true/VStack[0]#appear[0]"]),
         .taskStart(
-          .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated)),
+          .init(id: "Root/VStack[0]/true/VStack[0]#task[id:1]", priority: .userInitiated)),
       ]
     )
     #expect(shownArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [false, true])
@@ -758,9 +771,9 @@ struct SwiftUISurfaceTests {
     #expect(
       updatedTaskArtifacts.commitPlan.lifecycle.map(\.operation) == [
         .taskCancel(
-          .init(id: "Root/true/VStack[0]#task[id:1]", priority: .userInitiated)),
+          .init(id: "Root/VStack[0]/true/VStack[0]#task[id:1]", priority: .userInitiated)),
         .taskStart(
-          .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated)),
+          .init(id: "Root/VStack[0]/true/VStack[0]#task[id:2]", priority: .userInitiated)),
       ]
     )
     #expect(updatedTaskArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, true])
@@ -768,8 +781,8 @@ struct SwiftUISurfaceTests {
     #expect(
       removedArtifacts.commitPlan.lifecycle.map(\.operation) == [
         .taskCancel(
-          .init(id: "Root/true/VStack[0]#task[id:2]", priority: .userInitiated)),
-        .disappear(handlerIDs: ["Root/true/VStack[0]#disappear[0]"]),
+          .init(id: "Root/VStack[0]/true/VStack[0]#task[id:2]", priority: .userInitiated)),
+        .disappear(handlerIDs: ["Root/VStack[0]/true/VStack[0]#disappear[0]"]),
       ]
     )
     #expect(removedArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, false])

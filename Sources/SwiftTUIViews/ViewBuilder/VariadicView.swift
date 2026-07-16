@@ -16,11 +16,19 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveDeclaredChildren(
-      self,
-      in: context,
-      kindName: "Group"
-    )
+    var resolved: [ResolvedNode] = []
+    var elementIndex = 0
+    for element in content {
+      appendDeclaredChildNodes(
+        element,
+        in: context,
+        kindName: "Group",
+        nextIndex: &elementIndex,
+        into: &resolved
+      )
+    }
+    assignEntityIdentityOccurrences(to: &resolved)
+    return resolved
   }
 
   package func appendDeclaredChildren(
@@ -29,12 +37,19 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+    var elementIndex = 0
+
     for element in content {
       appendDeclaredChildNodes(
         element,
-        in: context,
+        in: slotContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &elementIndex,
         into: &resolved
       )
     }
@@ -72,12 +87,19 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
       _ resolveOne: @escaping @MainActor () -> ResolvedNode
     ) -> Void
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+    var elementIndex = 0
+
     for element in content {
       enumerateDeclaredChildViews(
         element,
-        in: context,
+        in: slotContext,
         kindName: kindName,
-        nextIndex: &nextIndex,
+        nextIndex: &elementIndex,
         visitor: visitor
       )
     }
