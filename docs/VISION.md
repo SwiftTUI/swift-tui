@@ -62,6 +62,14 @@ makes a small number of intentional departures:
   binding (or item) that presents the surface. Presenter-side observation
   (e.g. an `onDismiss:` callback) is compatible with this stance; child-side
   dismissal commands are not.
+- **Structured tab declarations — no `.tabItem`.** Terminal tab chrome is
+  structured value metadata, not an arbitrary label view tree. Declare tabs
+  with `Tab(_:detail:badge:value:content:)`, which keeps the label, selection
+  value, and content in one data-driven declaration. This avoids resolving or
+  retaining label-only view trees outside the active content and gives every
+  `TabViewStyle` deterministic terminal text. Plain tagged children remain
+  supported: `Text` supplies its implicit label, while opaque content receives
+  a stable `"Tab N"` fallback. `View.tabItem(_:)` is intentionally omitted.
 
 ## In scope today
 
