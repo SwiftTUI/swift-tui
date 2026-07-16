@@ -127,7 +127,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
 
     let ids = data.map { $0[keyPath: id] }
     self.ids = ids
-    let scope = childContext.structuralPath
+    let scope = forEachEntityScope(identityRoot: childContext.identity)
     if let retained = host?.retainedIndexedChildSourceArtifacts(
       forIdentityRoot: childContext.identity
     ) as? ForEachSourceIdentityArtifacts<ID>,
@@ -140,7 +140,12 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       IndexedChildSourceArtifactsProbe.recordFreshMint()
       entityIdentities = makeEntityIdentities(ids: ids, scope: scope)
       measurementSignatureStorage = IndexedChildMeasurementSignature(
-        elementPaths: ids.lazy.map { childContext.identity.explicitID($0).path }
+        elementPaths: zip(ids, entityIdentities).lazy.map { id, entityIdentity in
+          childContext.identity.explicitID(
+            id,
+            occurrence: entityIdentity.occurrence
+          ).path
+        }
       )
       host?.retainIndexedChildSourceArtifacts(
         ForEachSourceIdentityArtifacts(
@@ -178,50 +183,17 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       let realize = { [self] () -> ResolvedNode in
         let dataIndex = data.index(data.startIndex, offsetBy: index)
         let element = data[dataIndex]
-        let structuralElementContext = childContext.indexedChild(
-          kind: .init(rawValue: "ForEachElement"),
-          index: index
+        let iteration = makeForEachIteration(
+          element: element,
+          id: element[keyPath: id],
+          offset: index,
+          occurrence: entityIdentities[index].occurrence,
+          entityIdentity: entityIdentities[index],
+          in: childContext,
+          authoringScope: authoringScope,
+          suppressStructuralLifecycle: true
         )
-        let elementContext = structuralElementContext.replacingIdentity(
-          with: childContext.identity.explicitID(element[keyPath: id])
-        )
-        .suppressingStructuralLifecycle()
-        // Mirror `ForEach.resolveElements`: diverge structural identity
-        // per iteration so identity-deriving modifiers (`.panel()`) see
-        // a distinct position per element, while `viewIdentity` stays
-        // pinned to the outer authoring scope so owner-semantics callers
-        // (controls, @State) remain stable.
-        let perIterationScope = authoringScope.map { scope in
-          AuthoringContext(
-            viewIdentity: scope.viewIdentity,
-            structuralIdentity: elementContext.identity,
-            structuralPath: elementContext.structuralPath,
-            focusedValues: scope.focusedValues,
-            viewNode: scope.viewNode,
-            ownerNodeID: scope.ownerNodeID,
-            stateGraphScope: scope.stateGraphScope,
-            ordinalTracker: scope.ordinalTracker
-          )
-        }
-        let view = withAuthoringContext(perIterationScope) {
-          elementContext.trackingObservableAccess {
-            content(element)
-          }
-        }
-        let route = ResolveEntityRoute(
-          identity: entityIdentities[index],
-          structuralPath: elementContext.structuralPath
-        )
-        var normalized = withAuthoringContext(perIterationScope) {
-          withResolveEntityRoute(route) {
-            resolveView(view, in: elementContext)
-          }
-        }
-        normalized.attachResolvedForEachEntity(
-          entityIdentities[index],
-          at: elementContext.structuralPath
-        )
-        childContext.viewGraph?.refreshResolvedMetadata(for: normalized)
+        let normalized = iteration.resolve(content: content)
         // The realized element joins no children array — the container's
         // resolved node keeps its lazy source instead of child nodes — so the
         // mint would strand alive in the store when the container departs (the
@@ -247,7 +219,10 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   /// requirement's note).
   nonisolated package func elementIdentity(at index: Int) -> Identity {
     withCheckedMainActorAccess("IndexedChildSource.elementIdentity(at:)") {
-      identityRootStorage.explicitID(ids[index])
+      identityRootStorage.explicitID(
+        ids[index],
+        occurrence: entityIdentities[index].occurrence
+      )
     }
   }
 
@@ -264,19 +239,21 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       let realized = child(at: index)
       let dataIndex = data.index(data.startIndex, offsetBy: index)
       let element = data[dataIndex]
-      let elementIdentity = childContext.identity.explicitID(element[keyPath: id])
-      let flattened: [ResolvedNode]
-      if realized.identity == elementIdentity,
-        realized.kind == .view("EmptyView")
-      {
-        flattened = []
-      } else if realized.identity == elementIdentity,
-        realized.kind == .view("Group")
-      {
-        flattened = realized.children
-      } else {
-        flattened = [realized]
-      }
+      let iteration = makeForEachIteration(
+        element: element,
+        id: element[keyPath: id],
+        offset: index,
+        occurrence: entityIdentities[index].occurrence,
+        entityIdentity: entityIdentities[index],
+        in: childContext,
+        authoringScope: authoringScope,
+        suppressStructuralLifecycle: true
+      )
+      let flattened = iteration.consume(
+        realized,
+        as: .declaredChildren,
+        reportDetachedGroup: false
+      )
       elementsCache[index] = flattened
       return flattened
     }

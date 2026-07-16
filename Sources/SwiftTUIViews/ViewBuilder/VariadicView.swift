@@ -56,22 +56,46 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
   }
 
   package func appendScopedDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+    var elementIndex = 0
     for element in content {
       appendScopedDeclaredBuilderChildren(
         from: element,
+        in: slotContext,
+        kindName: kindName,
+        nextIndex: &elementIndex,
         into: &children
       )
     }
   }
 
   package func appendPortalDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
+    var elementIndex = 0
     for element in content {
       appendPortalDeclaredBuilderChildren(
         from: element,
+        in: slotContext,
+        kindName: kindName,
+        nextIndex: &elementIndex,
         into: &children
       )
     }

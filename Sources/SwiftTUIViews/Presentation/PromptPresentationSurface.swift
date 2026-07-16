@@ -259,25 +259,22 @@ package struct PromptPresentationSurface: View, ActionScope {
   /// `scrollMaxHeight` from the descriptor is ignored intentionally so
   /// short menus don't reserve extra empty rows below their last item.
   ///
-  /// Iterates payloads via `ForEach` + per-item `PortalAttachmentView`
-  /// rather than `PortalAttachmentGroupView`. The group view returns a
-  /// single intrinsic-layout node when there are multiple payloads,
-  /// which would let menu items overlap in one row. Iterating gives
-  /// the VStack its own children to lay out vertically.
+  /// Expands payloads through a transparent sequence rather than an indexed
+  /// `ForEach`. The sequence gives the VStack separate children to lay out
+  /// vertically while preserving declaration-side entity identity when the
+  /// payloads themselves came from a `ForEach`.
   private var menuContentBody: some View {
     VStack(alignment: .leading, spacing: 0) {
-      ForEach(item.contentPayloads.indices, id: \.self) { index in
-        PortalAttachmentView(payload: item.contentPayloads[index])
-      }
+      PortalAttachmentSequenceView(payloads: item.contentPayloads)
     }
   }
 
   private var presentationActions: some View {
     HStack(spacing: 1) {
-      ForEach(item.actionPayloads.indices, id: \.self) { index in
-        PortalAttachmentView(payload: item.actionPayloads[index])
-          .fixedSize()
-      }
+      PortalAttachmentSequenceView(
+        payloads: item.actionPayloads,
+        fixedSizeChildren: true
+      )
     }
     .fixedSize()
     .padding(.init(horizontal: 1, vertical: 0))

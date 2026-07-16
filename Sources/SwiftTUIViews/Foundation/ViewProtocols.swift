@@ -59,10 +59,16 @@ package protocol DeclaredChildrenView {
   )
 
   func appendScopedDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   )
 
   func appendPortalDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   )
 

@@ -4,7 +4,8 @@ package import SwiftTUICore
 /// exposing `AnyView` as the transport type.
 @MainActor
 package struct ScopedContentPayload: Sendable {
-  private let resolveElementsClosure: @MainActor @Sendable (ResolveContext) -> [ResolvedNode]
+  private let resolveElementsClosure:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
@@ -18,21 +19,37 @@ package struct ScopedContentPayload: Sendable {
       authoringContext: authoringContext,
       content: content
     )
-    resolveElementsClosure = { context in
+    resolveElementsClosure = { context, _ in
       builder.resolveElements(in: context)
     }
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package init(
+    resolveElements:
+      @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
+  ) {
+    resolveElementsClosure = resolveElements
+  }
+
+  package func resolveElements(
+    in context: ResolveContext,
+    placementRoot: ResolveContext? = nil
+  ) -> [ResolvedNode] {
     // Captured content resolves through whatever node hosts this payload — a
     // non-transparent hosting boundary. Host-escaping entity routes must not
     // be claimed at that node (see `ResolveContext.entityHosting`).
-    resolveElementsClosure(context.asEntityHost())
+    resolveElementsClosure(
+      context.asEntityHost(),
+      (placementRoot ?? context).asEntityHost()
+    )
   }
 
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
+  package func resolve(
+    in context: ResolveContext,
+    placementRoot: ResolveContext? = nil
+  ) -> ResolvedNode {
     normalizeResolvedElements(
-      resolveElements(in: context),
+      resolveElements(in: context, placementRoot: placementRoot),
       in: context
     )
   }
@@ -203,21 +220,27 @@ package struct LazySubviewPayload: Sendable {
     )
   }
 
-  package func resolve(in context: ResolveContext) -> ResolvedNode {
+  package func resolve(
+    in context: ResolveContext,
+    placementRoot: ResolveContext? = nil
+  ) -> ResolvedNode {
     switch storage {
     case .scopedContent(let payload):
-      return payload.resolve(in: context)
+      return payload.resolve(in: context, placementRoot: placementRoot)
     case .portal(let payload):
-      return payload.resolve(in: context)
+      return payload.resolve(in: context, placementRoot: placementRoot)
     }
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolveElements(
+    in context: ResolveContext,
+    placementRoot: ResolveContext? = nil
+  ) -> [ResolvedNode] {
     switch storage {
     case .scopedContent(let payload):
-      return payload.resolveElements(in: context)
+      return payload.resolveElements(in: context, placementRoot: placementRoot)
     case .portal(let payload):
-      return [payload.resolve(in: context)]
+      return payload.resolveElements(in: context, placementRoot: placementRoot)
     }
   }
 }
@@ -227,9 +250,10 @@ package typealias NavigationDestinationPayload = LazySubviewPayload
 @MainActor
 package struct ScopedContentPayloadView: PrimitiveView, ResolvableView {
   package var payload: ScopedContentPayload
+  package var placementRoot: ResolveContext? = nil
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    payload.resolveElements(in: context)
+    payload.resolveElements(in: context, placementRoot: placementRoot)
   }
 }
 
@@ -243,12 +267,10 @@ package struct ScopedContentPayloadGroupView: PrimitiveView, ResolvableView {
     case 0:
       return []
     case 1:
-      return [
-        resolveView(
-          ScopedContentPayloadView(payload: payloads[0]),
-          in: context
-        )
-      ]
+      return payloads[0].resolveElements(
+        in: context,
+        placementRoot: context
+      )
     default:
       return [
         resolveScopedContentGroupElements(
@@ -272,13 +294,13 @@ private func resolveScopedContentGroupElements(
   in context: ResolveContext
 ) -> ResolvedNode {
   context.recordResolvedComputation()
-  let resolvedChildren = payloads.enumerated().map { index, payload in
-    resolveView(
-      ScopedContentPayloadView(payload: payload),
+  let resolvedChildren = payloads.enumerated().flatMap { index, payload in
+    payload.resolveElements(
       in: context.indexedChild(
         kind: .init(rawValue: kindName),
         index: index
-      )
+      ),
+      placementRoot: context
     )
   }
 

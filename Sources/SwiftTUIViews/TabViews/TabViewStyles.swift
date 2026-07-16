@@ -375,11 +375,13 @@ public struct TabViewStyleBodyConfiguration: Sendable {
 
       // Keep the style-owned content slot transparent while preserving the
       // lazy payload boundary that owns active-tab lifecycle and state.
+      let payloadContext = context.indexedChild(
+        kind: .init(rawValue: "TabContentPayload"),
+        index: activeContentIndex ?? 0
+      )
       let child = payload.resolve(
-        in: context.indexedChild(
-          kind: .init(rawValue: "TabContentPayload"),
-          index: activeContentIndex ?? 0
-        )
+        in: payloadContext,
+        placementRoot: context
       )
 
       return [

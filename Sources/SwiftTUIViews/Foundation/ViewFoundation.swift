@@ -171,13 +171,35 @@ package func appendScopedDeclaredBuilderChildren<V: View>(
   from view: V,
   into children: inout [ScopedContentPayload]
 ) {
+  var nextIndex = 0
+  appendScopedDeclaredBuilderChildren(
+    from: view,
+    in: .root,
+    kindName: "Group",
+    nextIndex: &nextIndex,
+    into: &children
+  )
+}
+
+@MainActor
+package func appendScopedDeclaredBuilderChildren<V: View>(
+  from view: V,
+  in context: DeclaredPayloadTraversalContext,
+  kindName: String,
+  nextIndex: inout Int,
+  into children: inout [ScopedContentPayload]
+) {
   let erased: Any = view
   if let structural = erased as? any DeclaredChildrenView {
     structural.appendScopedDeclaredChildren(
+      in: context,
+      kindName: kindName,
+      nextIndex: &nextIndex,
       into: &children
     )
     return
   }
+  nextIndex += 1
   children.append(
     ScopedContentPayload {
       view

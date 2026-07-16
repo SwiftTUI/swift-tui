@@ -82,40 +82,76 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
   }
 
   package func appendScopedDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
     switch storage {
     case .trueContent(let content):
+      let branchContext = slotContext.child(component: .init(rawValue: "true"))
+      var branchIndex = 0
       appendScopedDeclaredBuilderChildren(
         from: content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &branchIndex,
         into: &children
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return
       }
+      let branchContext = slotContext.child(component: .init(rawValue: "false"))
+      var branchIndex = 0
       appendScopedDeclaredBuilderChildren(
         from: content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &branchIndex,
         into: &children
       )
     }
   }
 
   package func appendPortalDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
+    let slotContext = context.indexedChild(
+      kind: .init(rawValue: kindName),
+      index: nextIndex
+    )
+    nextIndex += 1
     switch storage {
     case .trueContent(let content):
+      let branchContext = slotContext.child(component: .init(rawValue: "true"))
+      var branchIndex = 0
       appendPortalDeclaredBuilderChildren(
         from: content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &branchIndex,
         into: &children
       )
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return
       }
+      let branchContext = slotContext.child(component: .init(rawValue: "false"))
+      var branchIndex = 0
       appendPortalDeclaredBuilderChildren(
         from: content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &branchIndex,
         into: &children
       )
     }

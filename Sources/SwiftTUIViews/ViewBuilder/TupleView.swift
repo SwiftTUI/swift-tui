@@ -41,22 +41,34 @@ public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, Decl
   }
 
   package func appendScopedDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [ScopedContentPayload]
   ) {
     for child in repeat each value {
       appendScopedDeclaredBuilderChildren(
         from: child,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
         into: &children
       )
     }
   }
 
   package func appendPortalDeclaredChildren(
+    in context: DeclaredPayloadTraversalContext,
+    kindName: String,
+    nextIndex: inout Int,
     into children: inout [PortalAttachmentContentPayload]
   ) {
     for child in repeat each value {
       appendPortalDeclaredBuilderChildren(
         from: child,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
         into: &children
       )
     }
