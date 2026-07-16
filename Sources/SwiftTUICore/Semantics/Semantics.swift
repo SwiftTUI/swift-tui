@@ -113,7 +113,8 @@ package struct SemanticExtractor: Sendable {
                 routeID: routeID,
                 hitTestOrder: order,
                 captureOnPress: node.semanticMetadata.captureOnPress,
-                contentShape: explicitPath
+                contentShape: explicitPath,
+                pointerGesturePriority: node.semanticMetadata.pointerGesturePriority
               )
             )
           }

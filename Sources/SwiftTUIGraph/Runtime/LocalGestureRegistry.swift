@@ -1,6 +1,18 @@
 /// Holds gesture recognizers attached to the view tree. Mirrors the
 /// structure of `LocalPointerHandlerRegistry` and `LocalActionRegistry`:
 /// keyed by the attaching `Identity`, drained on subtree teardown.
+package enum GestureAttachmentRole: Equatable, Sendable {
+  case ordinary
+  case highPriority
+  case simultaneous
+}
+
+@MainActor
+private struct GestureRegistration {
+  var recognizer: AnyGestureRecognizer
+  var role: GestureAttachmentRole
+}
+
 @MainActor
 package final class LocalGestureRegistry: Equatable {
   private var recognizers: [Identity: AnyGestureRecognizer] = [:]
@@ -34,7 +46,7 @@ package final class LocalGestureRegistry: Equatable {
   private struct PassAuthoredList {
     var recency: UInt64
     weak var firstNode: ViewNode?
-    var recognizers: [AnyGestureRecognizer]
+    var registrations: [GestureRegistration]
   }
 
   private var passAuthoredRecognizers: [Identity: PassAuthoredList] = [:]
@@ -47,12 +59,13 @@ package final class LocalGestureRegistry: Equatable {
   package func register(
     identity: Identity,
     structuralKey: Identity? = nil,
-    recognizer: AnyGestureRecognizer
+    recognizer: AnyGestureRecognizer,
+    role: GestureAttachmentRole = .ordinary
   ) {
     passAuthoredRecognizers[identity] = PassAuthoredList(
       recency: ViewNodeContext.current?.runtimeRegistrationRecency ?? 0,
       firstNode: ViewNodeContext.current,
-      recognizers: [recognizer]
+      registrations: [GestureRegistration(recognizer: recognizer, role: role)]
     )
     if let structuralKey {
       structuralKeysByIdentity[identity] = structuralKey
@@ -63,17 +76,23 @@ package final class LocalGestureRegistry: Equatable {
   package func registerStacked(
     identity: Identity,
     structuralKey: Identity? = nil,
-    recognizer: AnyGestureRecognizer
+    recognizer: AnyGestureRecognizer,
+    role: GestureAttachmentRole = .ordinary
   ) {
     guard var authored = passAuthoredRecognizers[identity],
       authored.recency == (ViewNodeContext.current?.runtimeRegistrationRecency ?? 0),
       authored.firstNode?.gestureRegistration(for: identity) != nil
     else {
-      register(identity: identity, structuralKey: structuralKey, recognizer: recognizer)
+      register(
+        identity: identity,
+        structuralKey: structuralKey,
+        recognizer: recognizer,
+        role: role
+      )
       return
     }
 
-    authored.recognizers.append(recognizer)
+    authored.registrations.append(GestureRegistration(recognizer: recognizer, role: role))
     passAuthoredRecognizers[identity] = authored
     applyPassRegistrations(for: identity)
   }
@@ -89,27 +108,29 @@ package final class LocalGestureRegistry: Equatable {
   /// A gesture *added* mid-interaction lands in a fresh position and joins
   /// the entry immediately instead of being discarded.
   private func applyPassRegistrations(for identity: Identity) {
-    let authored = passAuthoredRecognizers[identity]?.recognizers ?? []
+    let authored = passAuthoredRecognizers[identity]?.registrations ?? []
     let previousElements = recognizers[identity].map(stackElements(of:)) ?? []
 
-    var result: [AnyGestureRecognizer] = []
+    var result: [GestureRegistration] = []
     result.reserveCapacity(authored.count)
     for (index, incoming) in authored.enumerated() {
       if index < previousElements.count,
-        previousElements[index].isActive,
-        previousElements[index] !== incoming
+        previousElements[index].recognizer.isActive,
+        previousElements[index].recognizer !== incoming.recognizer
       {
-        let preserved = previousElements[index]
-        if preserved.adoptAuthoredCallbacks(from: incoming) {
-          preserved.noteCarriedAuthoredMint(incoming.carriedAuthoredMintGeneration)
+        let preserved = previousElements[index].recognizer
+        if preserved.adoptAuthoredCallbacks(from: incoming.recognizer) {
+          preserved.noteCarriedAuthoredMint(
+            incoming.recognizer.carriedAuthoredMintGeneration
+          )
         }
-        incoming.tearDown()
-        result.append(preserved)
+        incoming.recognizer.tearDown()
+        result.append(GestureRegistration(recognizer: preserved, role: incoming.role))
       } else {
         if index < previousElements.count,
-          previousElements[index] !== incoming
+          previousElements[index].recognizer !== incoming.recognizer
         {
-          previousElements[index].tearDown()
+          previousElements[index].recognizer.tearDown()
         }
         result.append(incoming)
       }
@@ -120,17 +141,17 @@ package final class LocalGestureRegistry: Equatable {
     // pass authors it next, positional reconciliation re-claims it.
     for (index, element) in previousElements.enumerated()
     where index >= authored.count {
-      if element.isActive {
+      if element.recognizer.isActive {
         result.append(element)
-      } else if !authored.contains(where: { $0 === element }) {
-        element.tearDown()
+      } else if !authored.contains(where: { $0.recognizer === element.recognizer }) {
+        element.recognizer.tearDown()
       }
     }
 
     let entry =
-      result.count == 1
-      ? result[0]
-      : AnyGestureRecognizer(StackedGestureRecognizer(recognizers: result))
+      result.count == 1 && result[0].role == .ordinary
+      ? result[0].recognizer
+      : AnyGestureRecognizer(StackedGestureRecognizer(registrations: result))
     recognizers[identity] = entry
     ownersByIdentity[identity] = .current(identity: identity)
     // Record on the pass's FIRST registering node: stacked levels can run
@@ -146,11 +167,11 @@ package final class LocalGestureRegistry: Equatable {
 
   private func stackElements(
     of recognizer: AnyGestureRecognizer
-  ) -> [AnyGestureRecognizer] {
+  ) -> [GestureRegistration] {
     guard let stacked = recognizer.base as? StackedGestureRecognizer else {
-      return [recognizer]
+      return [GestureRegistration(recognizer: recognizer, role: .ordinary)]
     }
-    return stacked.recognizers
+    return stacked.registrations
   }
 
   package func recognizer(for identity: Identity) -> AnyGestureRecognizer? {
@@ -330,66 +351,106 @@ package final class LocalGestureRegistry: Equatable {
 private final class StackedGestureRecognizer: GestureRecognizer {
   typealias Value = Never
 
-  fileprivate let recognizers: [AnyGestureRecognizer]
+  fileprivate let registrations: [GestureRegistration]
+  private var highPriorityOwnsStream = false
 
-  init(recognizers: [AnyGestureRecognizer]) {
-    self.recognizers = recognizers
+  init(registrations: [GestureRegistration]) {
+    self.registrations = registrations
+    highPriorityOwnsStream = registrations.contains {
+      $0.role == .highPriority && $0.recognizer.isActive
+    }
   }
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     guard let other = replacement as? StackedGestureRecognizer,
-      other.recognizers.count == recognizers.count
+      other.registrations.count == registrations.count
     else {
       return false
     }
     var adoptedAll = true
-    for (mine, theirs) in zip(recognizers, other.recognizers) {
-      adoptedAll = mine.adoptAuthoredCallbacks(from: theirs) && adoptedAll
+    for (mine, theirs) in zip(registrations, other.registrations) {
+      adoptedAll = mine.recognizer.adoptAuthoredCallbacks(from: theirs.recognizer) && adoptedAll
     }
     return adoptedAll
   }
 
   func reArm() {
-    for recognizer in recognizers {
-      recognizer.reArm()
+    if !isActive {
+      highPriorityOwnsStream = false
+    }
+    for registration in registrations {
+      registration.recognizer.reArm()
     }
   }
 
   var phase: GestureRecognizerPhase {
-    if recognizers.contains(where: { $0.phase == .changed }) {
+    if registrations.contains(where: { $0.recognizer.phase == .changed }) {
       return .changed
     }
-    if recognizers.contains(where: { $0.phase == .began }) {
+    if registrations.contains(where: { $0.recognizer.phase == .began }) {
       return .began
     }
-    if recognizers.contains(where: { !$0.phase.isTerminal }) {
+    if registrations.contains(where: { !$0.recognizer.phase.isTerminal }) {
       return .possible
     }
-    if recognizers.contains(where: { $0.phase == .ended }) {
+    if registrations.contains(where: { $0.recognizer.phase == .ended }) {
       return .ended
     }
-    if recognizers.contains(where: { $0.phase == .failed }) {
+    if registrations.contains(where: { $0.recognizer.phase == .failed }) {
       return .failed
     }
     return .cancelled
   }
 
   var isActive: Bool {
-    recognizers.contains { $0.isActive }
+    registrations.contains { $0.recognizer.isActive }
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     var sawHandled = false
     var sawFailed = false
 
-    for recognizer in recognizers {
-      switch recognizer.handle(event: event) {
+    // High-priority recognizers receive the stream first. A claiming high
+    // lane defeats ordinary siblings, while simultaneous recognizers always
+    // participate. Multiple recognizers in one lane preserve the framework's
+    // established authored-order broadcast semantics.
+    var highPriorityHandled = false
+    for registration in registrations where registration.role == .highPriority {
+      switch registration.recognizer.handle(event: event) {
+      case .handled:
+        sawHandled = true
+        highPriorityHandled = true
+      case .failed:
+        sawFailed = true
+      case .ignored:
+        break
+      }
+    }
+    if highPriorityHandled {
+      highPriorityOwnsStream = true
+    }
+
+    for registration in registrations where registration.role == .simultaneous {
+      switch registration.recognizer.handle(event: event) {
       case .handled:
         sawHandled = true
       case .failed:
         sawFailed = true
       case .ignored:
         break
+      }
+    }
+
+    if !highPriorityOwnsStream {
+      for registration in registrations where registration.role == .ordinary {
+        switch registration.recognizer.handle(event: event) {
+        case .handled:
+          sawHandled = true
+        case .failed:
+          sawFailed = true
+        case .ignored:
+          break
+        }
       }
     }
 
@@ -401,8 +462,8 @@ private final class StackedGestureRecognizer: GestureRecognizer {
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     var didTerminate = false
-    for recognizer in recognizers {
-      if recognizer.handleDeadline(at: instant) {
+    for registration in registrations {
+      if registration.recognizer.handleDeadline(at: instant) {
         didTerminate = true
       }
     }
@@ -414,8 +475,8 @@ private final class StackedGestureRecognizer: GestureRecognizer {
   }
 
   func tearDown() {
-    for recognizer in recognizers {
-      recognizer.tearDown()
+    for registration in registrations {
+      registration.recognizer.tearDown()
     }
   }
 }

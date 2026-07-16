@@ -6,6 +6,7 @@ public struct InteractionRegion: Equatable, Sendable {
   public var hitTestOrder: Int
   public var captureOnPress: Bool
   public var contentShape: Path?
+  package var pointerGesturePriority: PointerGesturePriority
 
   public init(
     identity: Identity,
@@ -21,6 +22,25 @@ public struct InteractionRegion: Equatable, Sendable {
     self.hitTestOrder = hitTestOrder
     self.captureOnPress = captureOnPress
     self.contentShape = contentShape
+    self.pointerGesturePriority = .ordinary
+  }
+
+  package init(
+    identity: Identity,
+    rect: CellRect,
+    routeID: RouteID,
+    hitTestOrder: Int = 0,
+    captureOnPress: Bool = false,
+    contentShape: Path? = nil,
+    pointerGesturePriority: PointerGesturePriority
+  ) {
+    self.identity = identity
+    self.rect = rect
+    self.routeID = routeID
+    self.hitTestOrder = hitTestOrder
+    self.captureOnPress = captureOnPress
+    self.contentShape = contentShape
+    self.pointerGesturePriority = pointerGesturePriority
   }
 
   public func contains(_ location: PointerLocation) -> Bool {

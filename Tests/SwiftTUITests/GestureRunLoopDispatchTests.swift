@@ -64,6 +64,65 @@ struct GestureRunLoopDispatchTests {
     #expect(box.count == 1)
   }
 
+  @Test("high-priority ancestor gesture defeats a descendant button through the RunLoop")
+  func highPriorityAncestorGestureDefeatsDescendantControl() async throws {
+    @MainActor final class Counts {
+      var gesture = 0
+      var button = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("HighPriorityControl")])
+    let view = VStack {
+      Button("Control") {
+        counts.button += 1
+      }
+    }
+    .frame(minWidth: 10, maxWidth: 10, minHeight: 3, maxHeight: 3)
+    .highPriorityGesture(
+      TapGesture().onEnded {
+        counts.gesture += 1
+      }
+    )
+
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: rootIdentity, environmentValues: environment)
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: context,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let buttonRegion = try #require(
+      initial.semanticSnapshot.interactionRegions
+        .filter { $0.pointerGesturePriority == .ordinary }
+        .max { $0.hitTestOrder < $1.hitTestOrder }
+    )
+    let point = centerPoint(of: buttonRegion.rect)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.gesture == 1)
+    #expect(counts.button == 0)
+  }
+
   @Test("SpatialTapGesture delivers local coordinates through the full RunLoop mouse path")
   func spatialTapGestureCarriesLocalCoordinatesThroughRunLoop() async throws {
     @MainActor final class Box {

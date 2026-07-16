@@ -164,6 +164,55 @@ struct GestureViewModifierTests {
     #expect(box.longPressCount == 1)
   }
 
+  @Test("high-priority gestures defeat ordinary siblings but preserve simultaneous gestures")
+  func highPriorityGestureWinsItsRecognizerStack() throws {
+    @MainActor final class Counts {
+      var ordinary = 0
+      var highPriority = 0
+      var simultaneous = 0
+    }
+    let counts = Counts()
+    let root = Identity(components: [.named("high-priority-stack")])
+    var environment = EnvironmentValues()
+    environment.terminalSize = CellSize(width: 20, height: 5)
+
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: root, environmentValues: environment)
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      Text("Priority")
+        .frame(minWidth: 10, maxWidth: 10, minHeight: 1, maxHeight: 1)
+        .gesture(TapGesture().onEnded { counts.ordinary += 1 })
+        .highPriorityGesture(TapGesture().onEnded { counts.highPriority += 1 })
+        .simultaneousGesture(TapGesture().onEnded { counts.simultaneous += 1 }),
+      context: context,
+      proposal: .init(width: 20, height: 5)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    #expect(region.pointerGesturePriority == .high)
+    let eventLocation = Point(region.rect.origin)
+    for _ in 0..<2 {
+      _ = pointerRegistry.dispatch(
+        routeID: region.routeID,
+        event: .init(kind: .down(.primary), location: eventLocation, targetRect: region.rect)
+      )
+      _ = pointerRegistry.dispatch(
+        routeID: region.routeID,
+        event: .init(kind: .up(.primary), location: eventLocation, targetRect: region.rect)
+      )
+    }
+
+    #expect(counts.highPriority == 2)
+    #expect(counts.simultaneous == 2)
+    #expect(counts.ordinary == 0)
+  }
+
   @Test(".gesture(LongPressGesture()) sets captureOnPress on the region")
   func longPressCaptures() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "r")])

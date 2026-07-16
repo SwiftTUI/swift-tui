@@ -82,7 +82,12 @@ extension RunLoop {
     guard
       let region = latestSemanticSnapshot.interactionRegions
         .filter({ $0.contains(location) })
-        .max(by: { $0.hitTestOrder < $1.hitTestOrder })
+        .max(by: { lhs, rhs in
+          if lhs.pointerGesturePriority != rhs.pointerGesturePriority {
+            return lhs.pointerGesturePriority == .ordinary
+          }
+          return lhs.hitTestOrder < rhs.hitTestOrder
+        })
     else {
       return nil
     }

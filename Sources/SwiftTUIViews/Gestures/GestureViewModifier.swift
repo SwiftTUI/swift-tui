@@ -10,7 +10,29 @@ extension View {
     modifier(
       GestureAttachmentModifier(
         gesture: gesture,
-        mask: mask
+        mask: mask,
+        role: .ordinary
+      )
+    )
+  }
+
+  /// Attaches a gesture that is recognized before gestures attached with
+  /// ``gesture(_:including:)`` and before pointer controls in the view's
+  /// subhierarchy.
+  ///
+  /// A high-priority gesture that handles the pointer stream prevents
+  /// ordinary gestures and controls from activating. Gestures attached with
+  /// ``simultaneousGesture(_:including:)`` continue to recognize alongside
+  /// it.
+  public func highPriorityGesture<G: Gesture>(
+    _ gesture: G,
+    including mask: GestureMask = .all
+  ) -> some View {
+    modifier(
+      GestureAttachmentModifier(
+        gesture: gesture,
+        mask: mask,
+        role: .highPriority
       )
     )
   }
@@ -18,11 +40,9 @@ extension View {
   /// Attaches a gesture that recognizes alongside the view's other
   /// gestures, matching SwiftUI's `simultaneousGesture(_:including:)`.
   ///
-  /// This framework's gesture dispatch broadcasts every event to all
-  /// recognizers attached at an identity (there is no implicit exclusivity
-  /// to opt out of), so the attachment itself is identical to
-  /// ``gesture(_:including:)`` — the modifier exists for SwiftUI source
-  /// compatibility and reads as a statement of intent.
+  /// Simultaneous gestures continue to receive the pointer stream when a
+  /// ``highPriorityGesture(_:including:)`` at the same identity handles it;
+  /// ordinary gestures yield to that high-priority recognizer.
   public func simultaneousGesture<G: Gesture>(
     _ gesture: G,
     including mask: GestureMask = .all
@@ -30,7 +50,8 @@ extension View {
     modifier(
       GestureAttachmentModifier(
         gesture: gesture,
-        mask: mask
+        mask: mask,
+        role: .simultaneous
       )
     )
   }
@@ -42,6 +63,7 @@ extension View {
 public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
   let gesture: G
   let mask: GestureMask
+  package let role: GestureAttachmentRole
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
@@ -124,7 +146,8 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     gestureRegistry.registerStacked(
       identity: routeIdentity,
       structuralKey: node.identity,
-      recognizer: recognizer
+      recognizer: recognizer,
+      role: role
     )
 
     // Forward pointer events through the recognizer. The handler
@@ -161,7 +184,8 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     var gestureMetadata = SemanticMetadata(
       participatesInPointerHitTesting: true,
       captureOnPress: capture,
-      allowsHitTesting: true
+      allowsHitTesting: true,
+      pointerGesturePriority: role == .highPriority ? .high : .ordinary
     )
     if routeIdentity != node.identity {
       gestureMetadata.explicitRouteIdentity = routeIdentity

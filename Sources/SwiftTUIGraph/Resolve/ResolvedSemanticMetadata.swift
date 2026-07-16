@@ -71,6 +71,9 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var explicitInteractionPath: Path?
   public var namedCoordinateSpaceName: String?
   package var interactionAvailability: InteractionAvailability
+  /// Gesture-specific pointer precedence. Kept package-only because it is a
+  /// routing product of gesture modifiers, not author-facing semantic data.
+  package var pointerGesturePriority: PointerGesturePriority
   /// When set, the semantics walk mints this node's pointer route from this
   /// identity instead of the node's structural identity. Stamped by gesture
   /// attachment when the gesture keys its registration on an entity-rerooted
@@ -241,6 +244,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     explicitInteractionPath: Path? = nil,
     namedCoordinateSpaceName: String? = nil,
     interactionAvailability: InteractionAvailability = .enabled,
+    pointerGesturePriority: PointerGesturePriority = .ordinary,
     hostedCollectionContainer: HostedCollectionContainerMetadata? = nil,
     hostedCollectionItem: HostedCollectionItemMetadata? = nil,
     isHostedCollectionRowBoundary: Bool = false
@@ -273,6 +277,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.explicitInteractionPath = explicitInteractionPath
     self.namedCoordinateSpaceName = namedCoordinateSpaceName
     self.interactionAvailability = interactionAvailability
+    self.pointerGesturePriority = pointerGesturePriority
     self.hostedCollectionContainer = hostedCollectionContainer
     self.hostedCollectionItem = hostedCollectionItem
     self.isHostedCollectionRowBoundary = isHostedCollectionRowBoundary
@@ -313,6 +318,9 @@ public struct SemanticMetadata: Equatable, Sendable {
         interactionAvailability,
         other.interactionAvailability
       ),
+      pointerGesturePriority: other.pointerGesturePriority == .high
+        ? .high
+        : pointerGesturePriority,
       hostedCollectionContainer: other.hostedCollectionContainer ?? hostedCollectionContainer,
       hostedCollectionItem: other.hostedCollectionItem ?? hostedCollectionItem,
       isHostedCollectionRowBoundary: isHostedCollectionRowBoundary
@@ -392,6 +400,16 @@ public struct SemanticMetadata: Equatable, Sendable {
     }
     return flags
   }
+}
+
+/// Pointer hit-test precedence stamped by gesture attachment.
+///
+/// This stays package-only: public authors express it through
+/// `highPriorityGesture`, while semantic extraction and the run loop carry
+/// the resolved routing decision.
+package enum PointerGesturePriority: Equatable, Sendable {
+  case ordinary
+  case high
 }
 
 package enum HostedCollectionContainerKind: Equatable, Sendable {

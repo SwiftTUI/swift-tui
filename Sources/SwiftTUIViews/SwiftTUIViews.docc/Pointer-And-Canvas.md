@@ -52,6 +52,32 @@ Hover events are local to the view that installed the handler. The terminal
 runtime enables high-volume all-motion reporting only while the rendered tree
 contains hover subscribers.
 
+## Gesture Precedence
+
+Use ``View/gesture(_:including:)`` for ordinary recognition and
+``View/highPriorityGesture(_:including:)`` when an enclosing interaction must
+win before ordinary gestures or controls in its subhierarchy:
+
+```swift
+Button("Open") {
+  openSelection()
+}
+.highPriorityGesture(
+  TapGesture().onEnded {
+    showPreviewInstead()
+  }
+)
+```
+
+Once the high-priority recognizer claims the pointer stream, ordinary sibling
+recognizers do not receive it and a descendant control does not activate.
+``View/simultaneousGesture(_:including:)`` is the explicit exception: it keeps
+receiving the same stream alongside a high-priority recognizer.
+
+All three attachment modifiers honor ``GestureMask``. In particular,
+`including: .subviews` omits the gesture at the modified view, while
+`including: .gesture` omits descendant gesture attachments.
+
 ## Coordinate Spaces And Hit Testing
 
 Local and global coordinate spaces preserve fractional values. Named spaces are
