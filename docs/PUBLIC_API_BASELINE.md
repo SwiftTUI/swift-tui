@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 61 | 533 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 272 | 1477 |
+| `SwiftTUIViews` | 274 | 1481 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -124,7 +124,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (272)
+### Canonical surface (274)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -267,6 +267,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 3 members
 - `NavigationStack` — struct — 3 members
+- `NavigationTitleModifier` — struct
 - `Never` — extension — 3 members
 - `neverBody()` — func
 - `OffsetModifier` — struct
@@ -381,10 +382,11 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TupleView` — struct — 1 member
 - `UnderlineTabViewStyle` — struct — 4 members
 - `ValueAnimationModifier` — struct
+- `ValueNavigationDestinationModifier` — struct
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 148 members
+- `View` — protocol — 150 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

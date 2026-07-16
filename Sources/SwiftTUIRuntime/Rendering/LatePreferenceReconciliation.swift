@@ -318,10 +318,14 @@ func layoutRuntimeIssues(
 private func rootRuntimeIssues(
   in resolved: ResolvedNode
 ) -> [RuntimeIssue] {
-  let duplicateEntityIssues = resolved.duplicateEntityIdentityRuntimeIssues()
+  var issues = resolved.duplicateEntityIdentityRuntimeIssues()
+  for issue in resolved.preferenceValues[RuntimeIssuePreferenceKey.self]
+  where !issues.contains(issue) {
+    issues.append(issue)
+  }
   let unhostedToolbarItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
   guard !unhostedToolbarItems.isEmpty else {
-    return duplicateEntityIssues
+    return issues
   }
 
   let titles =
@@ -336,16 +340,18 @@ private func rootRuntimeIssues(
     }
   let sourceIdentity =
     unhostedToolbarItems.compactMap(\.sourceIdentity).first ?? resolved.identity
-  return duplicateEntityIssues + [
-    RuntimeIssue(
-      severity: .warning,
-      code: "toolbar.unhostedItems",
-      message:
-        "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
-      identity: sourceIdentity,
-      source: ".toolbarItem(...)"
-    )
-  ]
+  let unhostedIssue = RuntimeIssue(
+    severity: .warning,
+    code: "toolbar.unhostedItems",
+    message:
+      "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
+    identity: sourceIdentity,
+    source: ".toolbarItem(...)"
+  )
+  if !issues.contains(unhostedIssue) {
+    issues.append(unhostedIssue)
+  }
+  return issues
 }
 
 private func latePreferenceReconciliationLimitIssue(

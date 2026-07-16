@@ -28,7 +28,8 @@ SwiftTUI provides:
   [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package
 - Terminal-native presentation through alerts, confirmation dialogs, sheets,
   popovers, popover tips, menus, and toasts
-- Binding-driven `NavigationStack` destination presentation
+- Typed-path and binding-driven `NavigationStack` destination presentation,
+  with path mutation for deep links, pushes, pops, and pop-to-root
 - Keyboard-based focus and navigation model with pointer-based augmentation
 - Terminal capability detection for colors, images, pointer precision, and more
 - Shared accessibility semantics with terminal, Web/WASI, and SwiftUI host delivery

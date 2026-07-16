@@ -183,7 +183,7 @@ private struct NavCollectionsPane: View {
   @State private var showingDetail = false
 
   var body: some View {
-    NavigationStack(id: "nav-collections-test") {
+    NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 1) {
           HStack(alignment: .top, spacing: 2) {

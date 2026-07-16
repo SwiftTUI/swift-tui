@@ -3806,8 +3806,9 @@ SwiftTUIViews.Namespace.init(line:column:)
 SwiftTUIViews.Namespace.wrappedValue
 SwiftTUIViews.NavigationStack
 SwiftTUIViews.NavigationStack.id
-SwiftTUIViews.NavigationStack.init(id:root:)
+SwiftTUIViews.NavigationStack.init(path:root:)
 SwiftTUIViews.NavigationStack.init(root:)
+SwiftTUIViews.NavigationTitleModifier
 SwiftTUIViews.Never.Body
 SwiftTUIViews.Never.Value
 SwiftTUIViews.Never.body
@@ -4436,6 +4437,7 @@ SwiftTUIViews.VStackLayout.placeSubviews(in:proposal:subviews:cache:)
 SwiftTUIViews.VStackLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.VStackLayout.spacing
 SwiftTUIViews.ValueAnimationModifier
+SwiftTUIViews.ValueNavigationDestinationModifier
 SwiftTUIViews.VariadicView
 SwiftTUIViews.VariadicView.body
 SwiftTUIViews.VerticalAlignmentGuideModifier
@@ -4518,8 +4520,10 @@ SwiftTUIViews.View.listStyle(_:)
 SwiftTUIViews.View.listStyle(_:)
 SwiftTUIViews.View.matchedGeometryEffect(id:in:isSource:)
 SwiftTUIViews.View.modifier(_:)
+SwiftTUIViews.View.navigationDestination(for:destination:)
 SwiftTUIViews.View.navigationDestination(isPresented:destination:)
 SwiftTUIViews.View.navigationDestination(item:destination:)
+SwiftTUIViews.View.navigationTitle(_:)
 SwiftTUIViews.View.offset(_:)
 SwiftTUIViews.View.offset(x:y:)
 SwiftTUIViews.View.onAppear(perform:)

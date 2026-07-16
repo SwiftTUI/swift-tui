@@ -1,21 +1,39 @@
 public import SwiftTUICore
 
-/// A binding-driven destination host for terminal-native surface replacement.
+/// A data-driven destination host for terminal-native surface replacement.
 ///
 /// `NavigationStack` has no built-in chrome. It renders the root content when
-/// no destination binding is active and renders the topmost active destination
-/// when one or more `navigationDestination(...)` declarations are active.
-public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveView, ActionScope,
-  ResolvableView
-{
-  public let id: ID
+/// its path and destination bindings are inactive, and renders the topmost
+/// destination declared by that data otherwise.
+public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, ResolvableView {
+  /// The framework-derived identity used by the stack's `ActionScope`
+  /// conformance.
+  ///
+  /// Stack lifetime and navigation identity follow structural view identity;
+  /// callers do not supply an identifier to the initializer.
+  public let id: AnyID
+  private let pathBinding: NavigationPathBinding?
   private let root: Root
 
   public init(
-    id: ID,
     @ViewBuilder root: () -> Root
   ) {
-    self.id = id
+    id = implicitNavigationStackID()
+    pathBinding = nil
+    self.root = root()
+  }
+
+  /// Creates a stack whose pushed destinations are derived from `path`.
+  ///
+  /// Append values to push, remove the last value to pop, and remove every
+  /// value to return to the root. Register the matching view builder with
+  /// ``View/navigationDestination(for:destination:)`` inside the stack.
+  public init<Element: Hashable & Sendable>(
+    path: Binding<[Element]>,
+    @ViewBuilder root: () -> Root
+  ) {
+    id = implicitNavigationStackID()
+    pathBinding = NavigationPathBinding(path)
     self.root = root()
   }
 
@@ -29,8 +47,8 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
   private func resolvedNode(in context: ResolveContext) -> ResolvedNode {
     // Publish this stack's identity as the declaration scope for the
     // `navigationDestination(...)` modifiers resolving in its subtree. The
-    // stack's identity is structural (position-based, independent of the `id`
-    // parameter) and sits outside any branch its root toggles, so it is stable
+    // stack's identity is structural (position-based) and sits outside any
+    // branch its root toggles, so it is stable
     // per stack and unique across sibling stacks — the branch-independent,
     // per-stack-unique root a stable-`.id` source needs for its pushed surface
     // (see `navigationDestinationDeclarationRoot`).
@@ -39,9 +57,15 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
       .child(component: .named("Root"))
       .settingEnvironment(\.navigationDestinationDeclarationScope, to: context.identity)
     let rootNode = root.resolve(in: rootContext)
-    let resolution = resolveActiveDestinationChain(
+    let pathResolution = resolveValuePath(
       from: rootNode,
+      pathBinding: pathBinding,
       in: context
+    )
+    let resolution = resolveActiveDestinationChain(
+      from: pathResolution.visibleNode,
+      in: context,
+      initial: pathResolution
     )
 
     // While a destination is presented, the root subtree stays resolved every
@@ -85,6 +109,30 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
     var preferences = resolution.accumulatedPreferences
     preferences.merge(resolution.visibleNode.preferenceValues)
     preferences[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+    preferences[NavigationValueDestinationPreferenceKey.self] = .init()
+
+    let navigationTitle = preferences[NavigationTitlePreferenceKey.self]
+    preferences[NavigationTitlePreferenceKey.self] = nil
+    if let navigationTitle {
+      var toolbarItems = preferences[ToolbarItemsPreferenceKey.self]
+      toolbarItems.insert(
+        ToolbarItemConfig(
+          title: navigationTitle,
+          position: .top,
+          isEnabled: false,
+          action: {}
+        ),
+        at: 0
+      )
+      preferences[ToolbarItemsPreferenceKey.self] = toolbarItems
+    }
+
+    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+    for issue in resolution.runtimeIssues where !runtimeIssues.contains(issue) {
+      runtimeIssues.append(issue)
+    }
+    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+
     var popPreferences = preferences[NavigationDestinationPopPreferenceKey.self]
     popPreferences.entries.append(contentsOf: resolution.popEntries)
     preferences[NavigationDestinationPopPreferenceKey.self] = popPreferences
@@ -94,16 +142,38 @@ public struct NavigationStack<ID: Hashable & Sendable, Root: View>: PrimitiveVie
   }
 }
 
-extension NavigationStack where ID == AnyID {
-  public init(
-    @ViewBuilder root: () -> Root
-  ) {
-    guard let scope = currentAuthoringContext() else {
-      preconditionFailure(
-        "NavigationStack() requires an authoring context -- call it inside a View's body, or use NavigationStack(id:) with an explicit identity."
-      )
+@MainActor
+private func implicitNavigationStackID() -> AnyID {
+  if let scope = currentAuthoringContext() {
+    return AnyID(scope.structuralPath)
+  }
+  return AnyID("NavigationStack")
+}
+
+@MainActor
+private struct NavigationPathBinding {
+  var valueTypeID: ObjectIdentifier
+  var valueTypeName: String
+  var values: @MainActor @Sendable () -> [AnyHashableSendable]
+  var removeSuffix: @MainActor @Sendable (Int) -> Void
+
+  init<Element: Hashable & Sendable>(_ binding: Binding<[Element]>) {
+    let authoringContext = makeLazySubviewAuthoringContext()
+    valueTypeID = ObjectIdentifier(Element.self)
+    valueTypeName = String(reflecting: Element.self)
+    values = {
+      binding.wrappedValue.map(AnyHashableSendable.init)
     }
-    self.init(id: AnyID(scope.structuralPath), root: root)
+    removeSuffix = { firstRemovedIndex in
+      withAuthoringContext(authoringContext) {
+        var path = binding.wrappedValue
+        guard firstRemovedIndex >= 0, firstRemovedIndex < path.count else {
+          return
+        }
+        path.removeSubrange(firstRemovedIndex...)
+        binding.wrappedValue = path
+      }
+    }
   }
 }
 
@@ -134,6 +204,21 @@ extension View {
         destination: destination,
         destinationAuthoringContext: makeLazySubviewAuthoringContext(),
         dismissAuthoringContext: makeLazySubviewAuthoringContext()
+      )
+    )
+  }
+
+  /// Registers a destination builder for values stored in the nearest
+  /// navigation stack's typed path.
+  public func navigationDestination<Data: Hashable & Sendable, Destination: View>(
+    for data: Data.Type,
+    @ViewBuilder destination: @escaping @MainActor @Sendable (Data) -> Destination
+  ) -> some View {
+    modifier(
+      ValueNavigationDestinationModifier(
+        data: data,
+        destination: destination,
+        destinationAuthoringContext: makeLazySubviewAuthoringContext()
       )
     )
   }
@@ -272,6 +357,57 @@ where Item.ID: Sendable {
   }
 }
 
+/// The modifier value produced by
+/// ``View/navigationDestination(for:destination:)``.
+public struct ValueNavigationDestinationModifier<Data: Hashable & Sendable, Destination: View>:
+  PrimitiveViewModifier
+{
+  var data: Data.Type
+  var destination: @MainActor @Sendable (Data) -> Destination
+  var destinationAuthoringContext: AuthoringContext?
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    let sourceIdentity = node.identity
+    let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
+    let declarationIdentity = navigationDestinationDeclarationIdentity(
+      sourceIdentity: sourceIdentity,
+      sourceEntity: node.entityIdentity,
+      modifierOrdinal: modifierOrdinal,
+      scope: context.environmentValues.navigationDestinationDeclarationScope
+    )
+
+    node.preferenceValues.merge(
+      NavigationValueDestinationPreferenceKey.self,
+      value: .init(
+        declarations: [
+          .init(
+            sourceIdentity: sourceIdentity,
+            declarationIdentity: declarationIdentity,
+            valueTypeID: ObjectIdentifier(data),
+            valueTypeName: String(reflecting: data),
+            makePayload: { [destination, destinationAuthoringContext] value in
+              guard let value = value.unwrap(as: Data.self) else {
+                return nil
+              }
+              return NavigationDestinationPayload(
+                navigationDestinationAuthoringContext: destinationAuthoringContext,
+                declarationIdentity: declarationIdentity
+              ) {
+                destination(value)
+              }
+            }
+          )
+        ]
+      )
+    )
+    return [node]
+  }
+}
+
 @MainActor
 package func navigationDestinationPopAction(
   in node: ResolvedNode,
@@ -295,6 +431,8 @@ private struct NavigationChainResolution {
   var visibleNode: ResolvedNode
   var accumulatedPreferences: PreferenceValues
   var popEntries: [NavigationDestinationPopEntry]
+  var runtimeIssues: [RuntimeIssue]
+  var depth: Int
   // The out-of-band pushed-destination surface CONTENT-node IDs minted this
   // resolve (one per active `NavigationDestinationInstance`). The resolving
   // host node records these so a per-generation declaration-root churn — which
@@ -304,30 +442,167 @@ private struct NavigationChainResolution {
   var activeSurfaceContentNodeIDs: [ViewNodeID]
 }
 
+private let navigationDestinationDepthLimit = 32
+
 @MainActor
-private func resolveActiveDestinationChain(
+private func resolveValuePath(
   from rootNode: ResolvedNode,
+  pathBinding: NavigationPathBinding?,
   in context: ResolveContext
 ) -> NavigationChainResolution {
   var visibleNode = rootNode
   var accumulatedPreferences = PreferenceValues()
   var popEntries: [NavigationDestinationPopEntry] = []
+  var runtimeIssues: [RuntimeIssue] = []
   var activeSurfaceContentNodeIDs: [ViewNodeID] = []
 
-  for _ in 0..<32 {
+  guard let pathBinding else {
+    return NavigationChainResolution(
+      visibleNode: visibleNode,
+      accumulatedPreferences: accumulatedPreferences,
+      popEntries: popEntries,
+      runtimeIssues: runtimeIssues,
+      depth: 0,
+      activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+    )
+  }
+
+  let values = pathBinding.values()
+  guard !values.isEmpty else {
+    return NavigationChainResolution(
+      visibleNode: visibleNode,
+      accumulatedPreferences: accumulatedPreferences,
+      popEntries: popEntries,
+      runtimeIssues: runtimeIssues,
+      depth: 0,
+      activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+    )
+  }
+
+  var declarations = visibleNode.preferenceValues[
+    NavigationValueDestinationPreferenceKey.self
+  ].declarations
+  visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+
+  for (index, value) in values.prefix(navigationDestinationDepthLimit).enumerated() {
+    guard
+      let declaration = declarations.last(where: {
+        $0.valueTypeID == pathBinding.valueTypeID
+      }),
+      let payload = declaration.makePayload(value)
+    else {
+      runtimeIssues.append(
+        RuntimeIssue(
+          severity: .warning,
+          code: "navigation.missingValueDestination",
+          message:
+            "No navigation destination is registered for path value type \(pathBinding.valueTypeName); the path stopped at index \(index).",
+          identity: context.identity,
+          source: ".navigationDestination(for:destination:)"
+        )
+      )
+      return NavigationChainResolution(
+        visibleNode: visibleNode,
+        accumulatedPreferences: accumulatedPreferences,
+        popEntries: popEntries,
+        runtimeIssues: runtimeIssues,
+        depth: index,
+        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+      )
+    }
+
+    accumulatedPreferences.merge(visibleNode.preferenceValues)
+    let instanceIdentity =
+      declaration.declarationIdentity
+      .child("Path[\(index)]")
+      .explicitID(value)
+    let instance = NavigationDestinationInstance(
+      identity: instanceIdentity,
+      payload: payload,
+      dismiss: { [pathBinding] in
+        pathBinding.removeSuffix(index)
+      }
+    )
+    popEntries.append(
+      NavigationDestinationPopEntry(
+        scopeIdentity: instanceIdentity,
+        dismiss: instance.dismiss
+      )
+    )
+
+    visibleNode = NavigationDestinationSurface(instance: instance)
+      .resolve(in: context.replacingIdentity(with: instanceIdentity))
+    if let contentNodeID = visibleNode.children.first?.viewNodeID {
+      activeSurfaceContentNodeIDs.append(contentNodeID)
+    }
+
+    let nestedDeclarations = visibleNode.preferenceValues[
+      NavigationValueDestinationPreferenceKey.self
+    ].declarations
+    declarations.append(contentsOf: nestedDeclarations)
+    visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+  }
+
+  if values.count > navigationDestinationDepthLimit {
+    runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
+  }
+
+  return NavigationChainResolution(
+    visibleNode: visibleNode,
+    accumulatedPreferences: accumulatedPreferences,
+    popEntries: popEntries,
+    runtimeIssues: runtimeIssues,
+    depth: min(values.count, navigationDestinationDepthLimit),
+    activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+  )
+}
+
+@MainActor
+private func resolveActiveDestinationChain(
+  from rootNode: ResolvedNode,
+  in context: ResolveContext,
+  initial: NavigationChainResolution
+) -> NavigationChainResolution {
+  var visibleNode = rootNode
+  var accumulatedPreferences = initial.accumulatedPreferences
+  var popEntries = initial.popEntries
+  var runtimeIssues = initial.runtimeIssues
+  var depth = initial.depth
+  var activeSurfaceContentNodeIDs = initial.activeSurfaceContentNodeIDs
+
+  while depth < navigationDestinationDepthLimit {
     let declarations = visibleNode.preferenceValues[
       NavigationDestinationDeclarationPreferenceKey.self
     ].declarations
     let activeInstances = declarations.compactMap(\.instance)
 
     visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+    visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
 
     guard let instance = activeInstances.last else {
       return NavigationChainResolution(
         visibleNode: visibleNode,
         accumulatedPreferences: accumulatedPreferences,
         popEntries: popEntries,
+        runtimeIssues: runtimeIssues,
+        depth: depth,
         activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+      )
+    }
+
+    if activeInstances.count > 1 {
+      for losingInstance in activeInstances.dropLast() {
+        losingInstance.dismiss()
+      }
+      runtimeIssues.append(
+        RuntimeIssue(
+          severity: .warning,
+          code: "navigation.multipleActiveDestinations",
+          message:
+            "\(activeInstances.count) binding-driven navigation destinations were active in the same surface; the last declaration won and every earlier binding was reset.",
+          identity: context.identity,
+          source: ".navigationDestination(...)"
+        )
       )
     }
 
@@ -348,14 +623,37 @@ private func resolveActiveDestinationChain(
     if let contentNodeID = visibleNode.children.first?.viewNodeID {
       activeSurfaceContentNodeIDs.append(contentNodeID)
     }
+    depth += 1
   }
 
+  let hasOverflow = visibleNode.preferenceValues[
+    NavigationDestinationDeclarationPreferenceKey.self
+  ].declarations.contains { $0.instance != nil }
   visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+  visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+  if hasOverflow,
+    !runtimeIssues.contains(where: { $0.code == "navigation.depthLimitExceeded" })
+  {
+    runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
+  }
   return NavigationChainResolution(
     visibleNode: visibleNode,
     accumulatedPreferences: accumulatedPreferences,
     popEntries: popEntries,
+    runtimeIssues: runtimeIssues,
+    depth: depth,
     activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+  )
+}
+
+private func navigationDepthLimitIssue(identity: Identity) -> RuntimeIssue {
+  RuntimeIssue(
+    severity: .warning,
+    code: "navigation.depthLimitExceeded",
+    message:
+      "Navigation exceeded the \(navigationDestinationDepthLimit)-destination safety limit; deeper destinations were not resolved.",
+    identity: identity,
+    source: "NavigationStack"
   )
 }
 

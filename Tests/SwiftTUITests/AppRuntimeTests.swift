@@ -1672,7 +1672,7 @@ private struct GalleryLikeNavigationCollectionsTab: View {
   @State private var selectedDoc = "overview"
 
   var body: some View {
-    NavigationStack(id: "gallery-like-navigation-collections") {
+    NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 1) {
           Text("Navigation content")

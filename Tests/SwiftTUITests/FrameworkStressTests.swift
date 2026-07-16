@@ -1379,7 +1379,7 @@ private struct MixedDeferredStressFixture: View {
   }
 
   private var navigationTab: some View {
-    NavigationStack(id: "mixed-deferred-stress-navigation") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("Nav root")
           .onAppear {}
@@ -4375,7 +4375,7 @@ private struct NavigationSourcePruningOwner: View {
   @State private var detailPresented = false
 
   var body: some View {
-    NavigationStack(id: "navigation-source-pruning-\(version)") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("Nav owner \(version)")
           .onAppear {}

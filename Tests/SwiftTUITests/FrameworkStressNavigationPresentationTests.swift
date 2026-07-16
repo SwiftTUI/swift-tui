@@ -40,7 +40,7 @@ private struct StressNP001Fixture: View {
   @State private var generation = 0
 
   var body: some View {
-    NavigationStack(id: "stress-np-001-stack") {
+    NavigationStack {
       Button("Open Boolean Destination") { isPresented = true }
         .navigationDestination(isPresented: $isPresented) {
           StressNP001Destination(
@@ -103,7 +103,7 @@ private struct StressNP002Fixture: View {
   @State private var item: StressNP002Item?
 
   var body: some View {
-    NavigationStack(id: "stress-np-002-stack") {
+    NavigationStack {
       Button("Open Item A") {
         item = StressNP002Item(id: "a", version: 0)
       }
@@ -173,7 +173,7 @@ private struct StressNP003Fixture: View {
   @State private var nextVersion = 0
 
   var body: some View {
-    NavigationStack(id: "stress-np-003-stack") {
+    NavigationStack {
       Button("Open Stable Item") {
         item = StressNP003Item(version: nextVersion)
         nextVersion += 1
@@ -234,7 +234,7 @@ private struct StressNP004Fixture: View {
   @State private var generation = 0
 
   var body: some View {
-    NavigationStack(id: "stress-np-004-stack") {
+    NavigationStack {
       Button("Open Remintable Destination") { isPresented = true }
         .id("stress-np-004-source-\(generation)")
         .navigationDestination(isPresented: $isPresented) {
@@ -297,7 +297,7 @@ private struct StressNP005Fixture: View {
   @State private var generation = 0
 
   var body: some View {
-    NavigationStack(id: "stress-np-005-stack-\(generation)") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("root stack generation \(generation)")
         Button("Open Stack Destination") { isPresented = true }
@@ -362,7 +362,7 @@ private struct StressNP006Fixture: View {
   @State private var reversed = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-006-stack") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         if reversed {
           peer
@@ -443,7 +443,7 @@ private struct StressNP007Fixture: View {
   @State private var expanded = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-007-stack") {
+    NavigationStack {
       Group {
         if expanded {
           Button("Open Cardinality Destination") { isPresented = true }
@@ -521,7 +521,7 @@ private struct StressNP008Fixture: View {
   @State private var usesSecond = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-008-stack") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("binding first \(probe.first) second \(probe.second)")
         Button("Open First Destination Binding") {
@@ -590,7 +590,7 @@ private struct StressNP009Fixture: View {
   @State private var outer = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-009-stack") {
+    NavigationStack {
       Button("Open Outer Destination") { outer = true }
         .navigationDestination(isPresented: $outer) {
           StressNP009OuterDestination()
@@ -672,7 +672,7 @@ private struct StressNP010Fixture: View {
   @State private var item: StressNP010Item?
 
   var body: some View {
-    NavigationStack(id: "stress-np-010-stack") {
+    NavigationStack {
       Button("Open Versioned Destination") {
         item = StressNP010Item(version: 0)
       }
@@ -756,7 +756,7 @@ private struct StressNP011Fixture: View {
   @State private var outer = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-011-outer-stack") {
+    NavigationStack {
       Button("Open Outer Stack Destination") { outer = true }
         .navigationDestination(isPresented: $outer) {
           StressNP011OuterDestination()
@@ -772,7 +772,7 @@ private struct StressNP011OuterDestination: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("outer stack destination")
-      NavigationStack(id: "stress-np-011-inner-stack") {
+      NavigationStack {
         Button("Open Inner Stack Destination") { inner = true }
           .navigationDestination(isPresented: $inner) {
             Button("Inner Stack Focus Target") {}
@@ -818,13 +818,13 @@ private struct StressNP012Fixture: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 2) {
-      NavigationStack(id: "stress-np-012-left") {
+      NavigationStack {
         Button("Left Root Target") { left = true }
           .navigationDestination(isPresented: $left) {
             Button("Left Destination Target") {}
           }
       }
-      NavigationStack(id: "stress-np-012-right") {
+      NavigationStack {
         Button("Right Root Target") { right = true }
           .navigationDestination(isPresented: $right) {
             Button("Right Destination Target") {}
@@ -877,14 +877,14 @@ private struct StressNP013Fixture: View {
       }
       HStack(alignment: .top, spacing: 2) {
         if showsLeft {
-          NavigationStack(id: "stress-np-013-left") {
+          NavigationStack {
             Button("Left Removed Root") { left = true }
               .navigationDestination(isPresented: $left) {
                 Button("Left Removed Destination") {}
               }
           }
         }
-        NavigationStack(id: "stress-np-013-right") {
+        NavigationStack {
           Button("Right Surviving Root") { right = true }
             .navigationDestination(isPresented: $right) {
               Button("Right Surviving Destination") {}
@@ -929,7 +929,7 @@ private struct StressNP014Fixture: View {
   @State private var isPresented = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-014-stack") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("root focus surface")
         Button("Push Focus Destination") { isPresented = true }
@@ -980,7 +980,7 @@ private struct StressNP015Fixture: View {
   @State private var outer = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-015-stack") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("root focus level")
         Button("Push Outer Focus Level") { outer = true }
@@ -1058,7 +1058,7 @@ private struct StressNP016Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-016-stack") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("sheet navigation root")
         Button("Push Sheet Destination") { destination = true }
@@ -1126,7 +1126,7 @@ private struct StressNP017Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-017-stack") {
+    NavigationStack {
       Button("Push Menu Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           VStack(alignment: .leading, spacing: 0) {
@@ -1178,7 +1178,7 @@ private struct StressNP018Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-018-stack") {
+    NavigationStack {
       Button("Push Item Popover Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP018Destination()
@@ -1325,7 +1325,7 @@ private struct StressNP020Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-020-stack") {
+    NavigationStack {
       Button("Push Reminted Sheet Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP020Destination()
@@ -1396,7 +1396,7 @@ private struct StressNP021Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-021-stack") {
+    NavigationStack {
       Button("Push Alert Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP021Destination(probe: probe)
@@ -1471,7 +1471,7 @@ private struct StressNP022Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-022-stack") {
+    NavigationStack {
       Button("Push Confirmation Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP022Destination(probe: probe)
@@ -1572,7 +1572,7 @@ private struct StressNP023Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-023-stack") {
+    NavigationStack {
       Button("Push Layered Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP023Destination()
@@ -1668,7 +1668,7 @@ private struct StressNP024Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-024-outer-stack") {
+    NavigationStack {
       Button("Push Nested Sheet Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP024Destination()
@@ -1698,7 +1698,7 @@ private struct StressNP024Sheet: View {
   @State private var generation = 0
 
   var body: some View {
-    NavigationStack(id: "stress-np-024-inner-scope") {
+    NavigationStack {
       Button("Inner Sheet Stack Root") { inner = true }
         .navigationDestination(isPresented: $inner) {
           VStack(alignment: .leading, spacing: 0) {
@@ -1753,7 +1753,7 @@ private struct StressNP025Fixture: View {
   @State private var destination = false
 
   var body: some View {
-    NavigationStack(id: "stress-np-025-stack") {
+    NavigationStack {
       Button("Push Prompt Destination") { destination = true }
         .navigationDestination(isPresented: $destination) {
           StressNP025Destination()

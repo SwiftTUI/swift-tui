@@ -6342,7 +6342,7 @@ private struct NavigationPushStrandPane: View {
   @State private var showingDetail = false
 
   var body: some View {
-    NavigationStack(id: "nav-push-strand") {
+    NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 1) {
           Text("Navigation lab")

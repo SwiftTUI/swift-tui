@@ -55,6 +55,15 @@ The canonical public surface is the API ordinary app code uses first:
 If a feature can be expressed on this surface, it should be documented there
 first.
 
+`NavigationStack` supports both a root-only initializer and a homogeneous
+`Binding<[Route]>` path. Register route rendering with
+`.navigationDestination(for:destination:)`; append or remove path values to
+push, pop, deep-link, or return to the root. Boolean- and item-binding
+destinations remain available for presentation-shaped routes. A visible
+destination can contribute `.navigationTitle(_:)` to an enclosing toolbar
+style. The framework intentionally exposes neither `NavigationLink` nor an
+environment dismiss command.
+
 ## Actor isolation model
 
 The authoring surface is honestly isolated; the package does not suppress the

@@ -640,7 +640,7 @@ extension FrameworkStressStateIdentityTests {
     @State private var presentsSecond = false
 
     var body: some View {
-      NavigationStack(id: "state-identity-010-stack") {
+      NavigationStack {
         if includesFirst {
           rootContent
             .navigationDestination(isPresented: $presentsFirst) {

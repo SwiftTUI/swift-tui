@@ -606,7 +606,7 @@ private struct StressLL010Fixture: View {
   @State private var item: StressLL010Item?
 
   var body: some View {
-    NavigationStack(id: "stress-010-navigation") {
+    NavigationStack {
       Button("Open Item Destination") {
         item = StressLL010Item(version: 0)
       }
@@ -666,7 +666,7 @@ private struct StressLL011Fixture: View {
   @State private var isPresented = false
 
   var body: some View {
-    NavigationStack(id: "stress-011-navigation") {
+    NavigationStack {
       Button("Open Fresh Destination") { isPresented = true }
         .navigationDestination(isPresented: $isPresented) {
           StressLL011Destination(isPresented: $isPresented)
@@ -692,10 +692,10 @@ private struct StressLL011Destination: View {
 // MARK: - Attempt 012: navigation declaration order churn
 
 extension FrameworkStressLayoutLifecycleTests {
-  @Test("stress 012 reordered active destinations keep last-wins pop routing")
-  func stress012ReorderedActiveDestinationsKeepLastWinsPopRouting() throws {
-    // Hypothesis: retained destination preferences may preserve the old
-    // declaration order or pop closure after stable sources reorder.
+  @Test("stress 012 reordered destinations do not revive a reset conflict loser")
+  func stress012ReorderedDestinationsDoNotReviveResetConflictLoser() throws {
+    // Hypothesis: declaration-order churn may revive a binding that the
+    // deterministic conflict resolver reset when both sources were active.
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressLL012", "Root"),
       size: .init(width: 48, height: 9)
@@ -705,15 +705,17 @@ extension FrameworkStressLayoutLifecycleTests {
     defer { harness.shutdown() }
 
     #expect(harness.frame.contains("visible destination B"))
-    for generation in 1...6 {
+    for _ in 1...6 {
       let frame = try harness.clickText("Reverse Destination Order")
-      let expected = generation.isMultiple(of: 2) ? "B" : "A"
-      #expect(frame.contains("visible destination \(expected)"))
+      #expect(frame.contains("visible destination B"))
+      #expect(!frame.contains("visible destination A"))
     }
 
     let popped = try harness.clickText("Close B")
-    #expect(popped.contains("visible destination A"))
     #expect(!popped.contains("visible destination B"))
+    #expect(!popped.contains("visible destination A"))
+    #expect(popped.contains("source A"))
+    #expect(popped.contains("source B"))
   }
 }
 
@@ -724,7 +726,7 @@ private struct StressLL012Fixture: View {
   @State private var reversed = false
 
   var body: some View {
-    NavigationStack(id: "stress-012-navigation") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         if reversed {
           secondSource
@@ -810,7 +812,7 @@ private struct StressLL013Fixture: View {
   @State private var isPresented = false
 
   var body: some View {
-    NavigationStack(id: "stress-013-navigation") {
+    NavigationStack {
       VStack(alignment: .leading, spacing: 0) {
         Text("root model \(probe.count)")
           .task(id: "hidden-root-task") {
@@ -1280,7 +1282,7 @@ private struct StressLL021Sheet: View {
   @State private var showsDetail = false
 
   var body: some View {
-    NavigationStack(id: "stress-021-navigation") {
+    NavigationStack {
       Button("Push Sheet Detail") { showsDetail = true }
         .navigationDestination(isPresented: $showsDetail) {
           VStack(alignment: .leading, spacing: 0) {
@@ -1322,10 +1324,11 @@ extension FrameworkStressLayoutLifecycleTests {
       probe.events.removeAll(keepingCapacity: true)
       _ = try harness.clickText("Advance Reordered Values")
       #expect(
-        probe.events.sorted() == [
-          "first:\(generation - 1)->\(generation)",
-          "second:\((generation - 1) * 10)->\(generation * 10)",
-        ].sorted()
+        probe.events.sorted()
+          == [
+            "first:\(generation - 1)->\(generation)",
+            "second:\((generation - 1) * 10)->\(generation * 10)",
+          ].sorted()
       )
       #expect(harness.lifecycleRegistrationCount <= 2)
 

@@ -10,7 +10,7 @@ struct NavigationDestinationTests {
   @Test("NavigationStack renders root content when no destination is active")
   func rendersRootWhenInactive() {
     let surface = renderSurface(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(isPresented: .constant(false)) {
             Text("Destination")
@@ -25,7 +25,7 @@ struct NavigationDestinationTests {
   @Test("navigationDestination(isPresented:) renders the active destination")
   func booleanDestinationRendersWhenActive() {
     let surface = renderSurface(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(isPresented: .constant(true)) {
             Text("Destination")
@@ -41,7 +41,7 @@ struct NavigationDestinationTests {
   func itemDestinationRendersWhenActive() {
     let item = NavigationDestinationTestItem(id: "track-1", title: "Track 1")
     let surface = renderSurface(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(item: .constant(item)) { item in
             Text("Detail \(item.title)")
@@ -56,7 +56,7 @@ struct NavigationDestinationTests {
   @Test("multiple active destinations at one level render deterministically with last wins")
   func multipleActiveDestinationsUseLastWins() {
     let surface = renderSurface(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(isPresented: .constant(true)) {
             Text("First")
@@ -75,7 +75,7 @@ struct NavigationDestinationTests {
   @Test("nested active destinations render the topmost destination")
   func nestedDestinationsRenderTopmost() {
     let surface = renderSurface(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(isPresented: .constant(true)) {
             Text("First")
@@ -101,7 +101,7 @@ struct NavigationDestinationTests {
     let renderer = DefaultRenderer()
     let destinationButton = testIdentity("DestinationButton")
     let artifacts = renderer.render(
-      NavigationStack(id: "stack") {
+      NavigationStack {
         Text("Root")
           .navigationDestination(
             isPresented: Binding(
@@ -163,7 +163,7 @@ private struct NavigationEscapeFixture: View {
   @State private var isSheetPresented = true
 
   var body: some View {
-    NavigationStack(id: "stack") {
+    NavigationStack {
       Text("Root")
         .navigationDestination(isPresented: $isPresented) {
           Button("Destination") {}

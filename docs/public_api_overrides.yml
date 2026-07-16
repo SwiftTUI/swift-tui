@@ -284,6 +284,7 @@ classifications:
     - SwiftTUIViews.BuiltinPromptPresentationModifier
     - SwiftTUIViews.BuiltinSheetPresentationModifier
     - SwiftTUIViews.ItemNavigationDestinationModifier
+    - SwiftTUIViews.NavigationTitleModifier
     - SwiftTUIViews.SafeAreaInsetModifier
     - SwiftTUIViews.SafeAreaPaddingModifier
     - SwiftTUIViews.SemanticMetadataModifier
@@ -294,6 +295,7 @@ classifications:
     - SwiftTUIViews.ToolbarItemContributionModifier
     - SwiftTUIViews.ToolbarModifier
     - SwiftTUIViews.TransactionModifier
+    - SwiftTUIViews.ValueNavigationDestinationModifier
     - SwiftTUIViews.TransitionRegistrationModifier
     - SwiftTUIViews.ValueAnimationModifier
     - SwiftTUIViews.VerticalAlignmentGuideModifier

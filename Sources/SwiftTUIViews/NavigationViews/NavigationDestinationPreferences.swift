@@ -59,6 +59,59 @@ package enum NavigationDestinationDeclarationPreferenceKey: PreferenceKey {
 }
 
 @MainActor
+package struct NavigationValueDestinationDeclaration: Sendable {
+  package var sourceIdentity: Identity
+  package var declarationIdentity: Identity
+  package var valueTypeID: ObjectIdentifier
+  package var valueTypeName: String
+  package var makePayload:
+    @MainActor @Sendable (AnyHashableSendable) -> NavigationDestinationPayload?
+
+  package init(
+    sourceIdentity: Identity,
+    declarationIdentity: Identity,
+    valueTypeID: ObjectIdentifier,
+    valueTypeName: String,
+    makePayload:
+      @escaping @MainActor @Sendable (AnyHashableSendable) ->
+      NavigationDestinationPayload?
+  ) {
+    self.sourceIdentity = sourceIdentity
+    self.declarationIdentity = declarationIdentity
+    self.valueTypeID = valueTypeID
+    self.valueTypeName = valueTypeName
+    self.makePayload = makePayload
+  }
+}
+
+package struct NavigationValueDestinationPreferenceValue: Sendable,
+  CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  package var declarations: [NavigationValueDestinationDeclaration] = []
+
+  package var description: String {
+    debugDescription
+  }
+
+  package var debugDescription: String {
+    let types = declarations.map(\.valueTypeName)
+    return "NavigationValueDestinationPreferenceValue(\(types))"
+  }
+}
+
+package enum NavigationValueDestinationPreferenceKey: PreferenceKey {
+  package static let defaultValue = NavigationValueDestinationPreferenceValue()
+
+  package static func reduce(
+    value: inout NavigationValueDestinationPreferenceValue,
+    nextValue: () -> NavigationValueDestinationPreferenceValue
+  ) {
+    value.declarations.append(contentsOf: nextValue().declarations)
+  }
+}
+
+@MainActor
 package struct NavigationDestinationInstance: Sendable {
   package var identity: Identity
   package var payload: NavigationDestinationPayload
