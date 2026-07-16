@@ -53,6 +53,15 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
   }
 }
 
+extension AnyTabViewStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
 /// The environment-driven default tab-view style.
 public struct AutomaticTabViewStyle: Sendable {
   public init() {}

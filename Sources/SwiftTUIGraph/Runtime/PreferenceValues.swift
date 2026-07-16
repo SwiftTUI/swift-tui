@@ -16,8 +16,10 @@ private protocol PreferenceValueBox: Sendable {
   var keyDebugName: String { get }
   var snapshotValue: String { get }
   var valueTypeDescription: String { get }
+  var reuseValue: TypedReuseValue { get }
 
   func value<Value>(as type: Value.Type) -> Value?
+  func isEqual(to other: any PreferenceValueBox) -> Bool
   func reduced(
     with next: any PreferenceValueBox
   ) -> (any PreferenceValueBox)?
@@ -25,21 +27,31 @@ private protocol PreferenceValueBox: Sendable {
 
 private struct TypedPreferenceValueBox<Key: PreferenceKey>: PreferenceValueBox {
   let base: Key.Value
+  let reuseValue: TypedReuseValue
+
+  init(base: Key.Value) {
+    self.base = base
+    reuseValue = TypedReuseValue(base)
+  }
 
   var keyDebugName: String {
     String(reflecting: Key.self)
   }
 
   var snapshotValue: String {
-    String(reflecting: base)
+    reuseValue.debugValue
   }
 
   var valueTypeDescription: String {
-    String(reflecting: Key.Value.self)
+    reuseValue.valueTypeDescription
   }
 
   func value<Value>(as type: Value.Type) -> Value? {
     base as? Value
+  }
+
+  func isEqual(to other: any PreferenceValueBox) -> Bool {
+    reuseValue.isEqual(to: other.reuseValue)
   }
 
   func reduced(
@@ -61,11 +73,13 @@ private struct TypedPreferenceValueBox<Key: PreferenceKey>: PreferenceValueBox {
 /// A typed container of reduced preference values for a resolved subtree.
 package struct PreferenceValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any PreferenceValueBox]
-  private var snapshotValues: [String: String]
+  /// Reflected values retained for diagnostics only. Reuse equality is driven
+  /// by the typed boxes in `storage`.
+  private var debugValues: [String: String]
 
   package init() {
     storage = [:]
-    snapshotValues = [:]
+    debugValues = [:]
   }
 
   package subscript<K: PreferenceKey>(key: K.Type) -> K.Value {
@@ -85,7 +99,7 @@ package struct PreferenceValues: Equatable, Sendable {
       let identifier = ObjectIdentifier(key)
       let box = TypedPreferenceValueBox<K>(base: newValue)
       storage[identifier] = box
-      snapshotValues[box.keyDebugName] = box.snapshotValue
+      debugValues[box.keyDebugName] = box.snapshotValue
     }
   }
 
@@ -142,10 +156,10 @@ package struct PreferenceValues: Equatable, Sendable {
           )
         }
         storage[identifier] = reducedBox
-        snapshotValues[reducedBox.keyDebugName] = reducedBox.snapshotValue
+        debugValues[reducedBox.keyDebugName] = reducedBox.snapshotValue
       } else {
         storage[identifier] = nextBox
-        snapshotValues[nextBox.keyDebugName] = nextBox.snapshotValue
+        debugValues[nextBox.keyDebugName] = nextBox.snapshotValue
       }
     }
   }
@@ -156,6 +170,16 @@ extension PreferenceValues {
     lhs: Self,
     rhs: Self
   ) -> Bool {
-    lhs.snapshotValues == rhs.snapshotValues
+    guard lhs.storage.count == rhs.storage.count else {
+      return false
+    }
+    for (identifier, left) in lhs.storage {
+      guard let right = rhs.storage[identifier],
+        left.isEqual(to: right)
+      else {
+        return false
+      }
+    }
+    return true
   }
 }

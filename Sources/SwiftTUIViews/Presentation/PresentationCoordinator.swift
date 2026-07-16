@@ -102,6 +102,20 @@ where Item.ID: Sendable {
   }
 }
 
+extension PresentationCoordinatorHandle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    // Handles are injected by one live portal state and route through that
+    // state at call time; within a graph, family label + availability is the
+    // stable semantic carrier. Unlike public custom environment actions there
+    // is no user-authored closure surface here.
+    return snapshotLabel == other.snapshotLabel
+      && isAvailable == other.isAvailable
+  }
+}
+
 @MainActor
 package protocol PresentationCoordinator: AnyObject {
   associatedtype Item: Identifiable & Sendable where Item.ID: Sendable

@@ -170,6 +170,15 @@ public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStri
   }
 }
 
+extension AnyPickerStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
 /// The environment-driven default picker style.
 public struct AutomaticPickerStyle: Sendable, PickerStyle {
   public init() {}
@@ -326,6 +335,8 @@ public struct MenuPickerStyle: Sendable, PickerStyle {
 }
 
 private protocol AnyPickerStyleBox: Sendable {
+  func isEqualForReuse(to other: any AnyPickerStyleBox) -> Bool
+
   @MainActor
   func selectionDelta(
     for event: KeyEvent
@@ -343,6 +354,21 @@ private protocol AnyPickerStyleBox: Sendable {
 
 private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
   let style: S
+
+  func isEqualForReuse(to other: any AnyPickerStyleBox) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    if style is AutomaticPickerStyle
+      || style is InlinePickerStyle
+      || style is SegmentedPickerStyle
+      || style is RadioGroupPickerStyle
+      || style is MenuPickerStyle
+    {
+      return true
+    }
+    return typedValuesAreEqualForReuse(style, other.style)
+  }
 
   @MainActor
   func selectionDelta(

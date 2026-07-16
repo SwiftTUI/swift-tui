@@ -8,58 +8,34 @@ public protocol EnvironmentKey {
   static var defaultValue: Value { get }
 }
 
-private protocol EnvironmentValueBox: Sendable {
-  var snapshotValue: String { get }
-  var valueTypeDescription: String { get }
+private final class EnvironmentValueBox: Sendable {
+  let keyDebugName: String
+  let reuseValue: TypedReuseValue
 
-  func value<Value>(as type: Value.Type) -> Value?
-
-  /// Change-detection equality between two boxed environment values.
-  ///
-  /// Compares the underlying typed values via `==` when `Value` is `Equatable`,
-  /// and otherwise falls back to the reflected ``snapshotValue`` string — the
-  /// historical comparison for every value — so non-`Equatable` keys keep their
-  /// prior conservative behavior.
-  func isEqual(to other: any EnvironmentValueBox) -> Bool
-}
-
-private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
-  let base: Value
+  init<Key: EnvironmentKey>(key: Key.Type, base: Key.Value) {
+    keyDebugName = String(reflecting: key)
+    reuseValue = TypedReuseValue(base)
+  }
 
   var snapshotValue: String {
-    String(reflecting: base)
+    reuseValue.debugValue
   }
 
   var valueTypeDescription: String {
-    String(reflecting: Value.self)
+    reuseValue.valueTypeDescription
   }
 
-  func value<T>(as type: T.Type) -> T? {
-    base as? T
+  func value<Value>(as type: Value.Type) -> Value? {
+    reuseValue.value(as: type)
   }
 
-  func isEqual(to other: any EnvironmentValueBox) -> Bool {
-    // A box only ever shares a storage key with a box of the same `Value` type
-    // (the environment key fixes the value type), so extraction succeeds for
-    // matching keys. A type mismatch is treated as changed.
-    guard let otherBase = other.value(as: Value.self) else {
-      return false
-    }
-    if let equatable = base as? any Equatable {
-      return Self.areEqual(equatable, otherBase)
-    }
-    // Non-`Equatable`: preserve the historical reflected-string comparison.
-    return snapshotValue == other.snapshotValue
-  }
-
-  /// Opens the `any Equatable` existential to bind its concrete type so `==`
-  /// is type-safe. Mirrors `MemoValueComparator.openEquatable`.
-  private static func areEqual(_ lhs: any Equatable, _ rhs: Value) -> Bool {
-    func compare<T: Equatable>(_ l: T) -> Bool {
-      guard let r = rhs as? T else { return false }
-      return l == r
-    }
-    return compare(lhs)
+  /// Change-detection equality between two boxed environment values.
+  ///
+  /// Compares the underlying typed values via `==`, explicit framework-owned
+  /// reuse equality, or reference identity. An opaque value with no typed proof
+  /// compares unequal; reflected ``snapshotValue`` text is diagnostics only.
+  func isEqual(to other: EnvironmentValueBox) -> Bool {
+    reuseValue.isEqual(to: other.reuseValue)
   }
 }
 
@@ -77,8 +53,10 @@ package enum EnvironmentValuesStorage {
 
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
-  private var storage: [ObjectIdentifier: any EnvironmentValueBox]
-  private var snapshotValues: [String: String]
+  private var storage: [ObjectIdentifier: EnvironmentValueBox]
+  /// Reflected values retained for snapshot diagnostics only. Change
+  /// detection is driven by the typed boxes in `storage`.
+  private var debugValues: [String: String]
   package var _focusedIdentity: Identity?
   package var _pressedIdentity: Identity?
   /// Side-field like `_focusedIdentity`: the per-node focus-cone bake
@@ -92,7 +70,7 @@ public struct EnvironmentValues: Equatable, Sendable {
   /// Creates an empty environment container.
   public init() {
     storage = [:]
-    snapshotValues = [:]
+    debugValues = [:]
     _focusedIdentity = nil
     _pressedIdentity = nil
     _isFocused = false
@@ -119,9 +97,9 @@ public struct EnvironmentValues: Equatable, Sendable {
     }
     set {
       let identifier = ObjectIdentifier(key)
-      let box = TypedEnvironmentValueBox(base: newValue)
+      let box = EnvironmentValueBox(key: key, base: newValue)
       storage[identifier] = box
-      snapshotValues[String(reflecting: key)] = box.snapshotValue
+      debugValues[box.keyDebugName] = box.snapshotValue
     }
   }
 
@@ -132,8 +110,15 @@ public struct EnvironmentValues: Equatable, Sendable {
     reuseStyle: Bool = false
   ) -> EnvironmentSnapshot {
     var mergedValues = snapshot.values
-    if !snapshotValues.isEmpty {
-      mergedValues.merge(snapshotValues) { _, new in new }
+    if !debugValues.isEmpty {
+      mergedValues.merge(debugValues) { _, new in new }
+    }
+    var mergedTypedValues = snapshot.typedValues
+    for (identifier, box) in storage {
+      mergedTypedValues[identifier] = EnvironmentSnapshotValue(
+        keyDebugName: box.keyDebugName,
+        reuseValue: box.reuseValue
+      )
     }
     let style: StyleEnvironmentSnapshot
     if reuseStyle {
@@ -158,17 +143,14 @@ public struct EnvironmentValues: Equatable, Sendable {
     return EnvironmentSnapshot(
       debugSignature: snapshot.debugSignature,
       values: mergedValues,
+      typedValues: mergedTypedValues,
       style: style
     )
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    // Change detection compares the boxed typed values. `storage` keys are in
-    // exact 1:1 correspondence with the reflected `snapshotValues` keys (both
-    // are written together on every set and never removed), so requiring the
-    // same key set here matches the historical `snapshotValues == snapshotValues`
-    // key comparison. Per-key, `isEqual(to:)` uses typed `==` for `Equatable`
-    // values and the reflected-string fallback otherwise.
+    // Change detection compares the boxed typed values. `debugValues` is a
+    // debug projection only; it is deliberately not equality currency.
     guard lhs.storage.count == rhs.storage.count else {
       return false
     }

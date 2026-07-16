@@ -1157,10 +1157,7 @@ package final class ViewNode {
     if committed.style != current.style {
       ReuseDenialTrace.recordEnvironmentKeyDiff("style")
     }
-    let committedValues = committed.values
-    let currentValues = current.values
-    for key in Set(committedValues.keys).union(currentValues.keys)
-    where committedValues[key] != currentValues[key] {
+    for key in committed.differingValueDebugNames(from: current) {
       ReuseDenialTrace.recordEnvironmentKeyDiff("val:\(key)")
     }
   }

@@ -171,6 +171,15 @@ public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugS
   }
 }
 
+extension AnyTextFieldStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
 /// The environment-driven default text-field style.
 public struct AutomaticTextFieldStyle: Sendable, TextFieldStyle {
   public init() {}
@@ -220,6 +229,8 @@ public struct RoundedBorderTextFieldStyle: Sendable, TextFieldStyle {
 }
 
 private protocol AnyTextFieldStyleBox: Sendable {
+  func isEqualForReuse(to other: any AnyTextFieldStyleBox) -> Bool
+
   @MainActor
   func resolveBody(
     configuration: TextFieldStyleConfiguration,
@@ -229,6 +240,19 @@ private protocol AnyTextFieldStyleBox: Sendable {
 
 private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyleBox {
   let style: S
+
+  func isEqualForReuse(to other: any AnyTextFieldStyleBox) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    if style is AutomaticTextFieldStyle
+      || style is PlainTextFieldStyle
+      || style is RoundedBorderTextFieldStyle
+    {
+      return true
+    }
+    return typedValuesAreEqualForReuse(style, other.style)
+  }
 
   @MainActor
   func resolveBody(

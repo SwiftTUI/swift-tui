@@ -195,8 +195,12 @@ private struct BakeReaderStripRoot: View {
   }
 }
 
-private struct ProbeTabViewStyle: TabViewStyle {
+private struct ProbeTabViewStyle: TabViewStyle, Equatable {
   let counters: StripEvaluationCounters
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.counters === rhs.counters
+  }
 
   var snapshotLabel: String {
     "ProbeTabViewStyle"
@@ -263,8 +267,12 @@ private struct ProbeStripItemView: View, Equatable {
   }
 }
 
-private struct BakeReaderTabViewStyle: TabViewStyle {
+private struct BakeReaderTabViewStyle: TabViewStyle, Equatable {
   let counters: StripEvaluationCounters
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.counters === rhs.counters
+  }
 
   var snapshotLabel: String {
     "BakeReaderTabViewStyle"

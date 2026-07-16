@@ -145,6 +145,15 @@ public struct AnyButtonStyle: Sendable, CustomStringConvertible, CustomDebugStri
   }
 }
 
+extension AnyButtonStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
 /// The environment-driven default button style.
 public struct AutomaticButtonStyle: Sendable, ButtonStyle {
   public init() {}
@@ -283,6 +292,8 @@ public struct LinkButtonStyle: Sendable, ButtonStyle {
 }
 
 private protocol AnyButtonStyleBox: Sendable {
+  func isEqualForReuse(to other: any AnyButtonStyleBox) -> Bool
+
   @MainActor
   func resolvedProminence(
     base: ControlProminence
@@ -297,6 +308,21 @@ private protocol AnyButtonStyleBox: Sendable {
 
 private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
   let style: S
+
+  func isEqualForReuse(to other: any AnyButtonStyleBox) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    if style is AutomaticButtonStyle
+      || style is PlainButtonStyle
+      || style is BorderedButtonStyle
+      || style is BorderedProminentButtonStyle
+      || style is LinkButtonStyle
+    {
+      return true
+    }
+    return typedValuesAreEqualForReuse(style, other.style)
+  }
 
   @MainActor
   func resolvedProminence(

@@ -225,6 +225,62 @@ private enum ClipboardReadActionKey: EnvironmentKey {
   static let defaultValue = ClipboardReadAction.placeholder
 }
 
+// Framework-supplied action carriers are rebuilt around stable runtime verbs
+// every frame. Their package labels are an explicit semantic proof; public
+// custom actions deliberately compare unequal so a changed closure capture can
+// never hide behind the shared `*.custom` debug label.
+extension OpenLinkAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "OpenLinkAction.custom",
+      other.snapshotLabel != "OpenLinkAction.custom"
+    else {
+      return false
+    }
+    return snapshotLabel == other.snapshotLabel
+      && isPlaceholder == other.isPlaceholder
+  }
+}
+
+extension ResetFocusAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "ResetFocusAction.custom",
+      other.snapshotLabel != "ResetFocusAction.custom"
+    else {
+      return false
+    }
+    return snapshotLabel == other.snapshotLabel
+      && isPlaceholder == other.isPlaceholder
+  }
+}
+
+extension ClipboardWriteAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "ClipboardWriteAction.custom",
+      other.snapshotLabel != "ClipboardWriteAction.custom"
+    else {
+      return false
+    }
+    return snapshotLabel == other.snapshotLabel
+      && isPlaceholder == other.isPlaceholder
+  }
+}
+
+extension ClipboardReadAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "ClipboardReadAction.custom",
+      other.snapshotLabel != "ClipboardReadAction.custom"
+    else {
+      return false
+    }
+    return snapshotLabel == other.snapshotLabel
+      && isPlaceholder == other.isPlaceholder
+  }
+}
+
 extension EnvironmentValues {
   public var openLinkAction: OpenLinkAction {
     get { self[OpenLinkActionKey.self] }

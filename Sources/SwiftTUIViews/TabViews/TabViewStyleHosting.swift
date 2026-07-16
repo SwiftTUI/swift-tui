@@ -1,6 +1,8 @@
 @_spi(Testing) package import SwiftTUICore
 
 protocol AnyTabViewStyleBox: Sendable {
+  func isEqualForReuse(to other: any AnyTabViewStyleBox) -> Bool
+
   @MainActor
   func presentation(
     for configuration: TabViewStyleConfiguration
@@ -15,6 +17,20 @@ protocol AnyTabViewStyleBox: Sendable {
 
 struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
   let style: S
+
+  func isEqualForReuse(to other: any AnyTabViewStyleBox) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    if style is AutomaticTabViewStyle
+      || style is UnderlineTabViewStyle
+      || style is LiteralTabsTabViewStyle
+      || style is PowerlineTabViewStyle
+    {
+      return true
+    }
+    return typedValuesAreEqualForReuse(style, other.style)
+  }
 
   @MainActor
   func presentation(

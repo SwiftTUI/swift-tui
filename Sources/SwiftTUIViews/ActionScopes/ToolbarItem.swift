@@ -49,6 +49,48 @@ public struct ToolbarItemConfig: Sendable {
   }
 }
 
+extension ToolbarItemConfig: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    // The action registry refreshes handlers independently of resolved-tree
+    // product equality. Compare the authored toolbar contract while excluding
+    // only that refreshed closure, matching the registry's ownership seam.
+    return title == other.title
+      && toolbarImagesEqual(icon, other.icon)
+      && toolbarPositionsEqual(position, other.position)
+      && isEnabled == other.isEnabled
+      && systemHint == other.systemHint
+      && sourceIdentity == other.sourceIdentity
+  }
+}
+
+private func toolbarImagesEqual(_ left: Image?, _ right: Image?) -> Bool {
+  switch (left, right) {
+  case (nil, nil):
+    return true
+  case (let left?, let right?):
+    return left.source == right.source
+      && left.isResizable == right.isResizable
+      && left.scalingMode == right.scalingMode
+  default:
+    return false
+  }
+}
+
+private func toolbarPositionsEqual(
+  _ left: ToolbarItemConfig.Position,
+  _ right: ToolbarItemConfig.Position
+) -> Bool {
+  switch (left, right) {
+  case (.top, .top), (.bottom, .bottom), (.automatic, .automatic):
+    return true
+  default:
+    return false
+  }
+}
+
 /// Preference key that accumulates toolbar-item contributions from
 /// descendants up to the nearest ActionScope that has declared a
 /// toolbar. Consumed and cleared at that scope.
@@ -118,7 +160,8 @@ extension View {
   /// use ``toolbarItem(_:)`` with a config instead.
   @available(
     *, deprecated,
-    message: "the icon builder is not rendered; use toolbarItem(_:) with a ToolbarItemConfig carrying an icon Image"
+    message:
+      "the icon builder is not rendered; use toolbarItem(_:) with a ToolbarItemConfig carrying an icon Image"
   )
   @MainActor
   public func toolbarItem<Label: View, Icon: View>(

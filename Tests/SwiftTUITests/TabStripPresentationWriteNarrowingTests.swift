@@ -150,7 +150,7 @@ private struct StripWriteTabRoot: View {
 /// are wrapped in `item.route` (live `TabItem[i]` identities exist — the
 /// narrowed path); without it no route identities exist and the certified
 /// write must fall back to broad invalidation.
-private struct MarkerTabViewStyle: TabViewStyle {
+private struct MarkerTabViewStyle: TabViewStyle, Equatable {
   var routesItems: Bool
 
   var snapshotLabel: String {
