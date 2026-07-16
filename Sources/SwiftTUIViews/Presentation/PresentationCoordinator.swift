@@ -126,21 +126,33 @@ package protocol PresentationCoordinator: AnyObject {
   init()
 
   @ViewBuilder
-  func makeBody() -> Body
+  func makeBody(for item: Item) -> Body
 
   func present(_ item: Item)
   func dismiss(id: Item.ID)
 }
 
+package enum PresentationOverlayCompositionPolicy: Sendable {
+  /// Every active item owns a separately mounted overlay entry.
+  case eachActiveItem
+
+  /// Only the oldest active item is visible; later items wait in FIFO order.
+  case oldestActiveItem
+
+  /// One family-level entry renders the coordinator's aggregate item body.
+  case aggregateNewestItem
+}
+
 @MainActor
-package protocol ManagedPresentationCoordinator: PresentationCoordinator {
+package protocol ManagedPresentationCoordinator: PresentationCoordinator
+where Item: PortalPresentationItem {
   static var modalPolicy: PortalModalPolicy { get }
   static var overlayKindName: String { get }
+  static var overlayCompositionPolicy: PresentationOverlayCompositionPolicy { get }
 
   var isActive: Bool { get }
   var declaredSourceIdentities: Set<Identity> { get }
-  var latestItem: Item? { get }
-  var latestActivationOrdinal: Int? { get }
+  var overlayItemsOldestFirst: [PresentationOverlayItem<Item>] { get }
   func activeItem(id: Item.ID) -> Item?
   func dismissAction(for item: Item) -> (@MainActor @Sendable () -> Void)?
   // Requirement (not just the extension default) so per-item policies like the
@@ -160,6 +172,10 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
 }
 
 extension ManagedPresentationCoordinator {
+  package static var overlayCompositionPolicy: PresentationOverlayCompositionPolicy {
+    .eachActiveItem
+  }
+
   package func modalPolicy(
     for _: Item
   ) -> PortalModalPolicy {

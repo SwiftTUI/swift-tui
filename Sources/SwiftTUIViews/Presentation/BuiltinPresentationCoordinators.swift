@@ -10,12 +10,14 @@ package final class AlertPresentationCoordinator:
   package static let zIndex = 260
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
   package static let overlayKindName = "AlertPresentation"
+  package static let overlayCompositionPolicy =
+    PresentationOverlayCompositionPolicy.oldestActiveItem
 
   @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPromptPresentation(item: latestItem)
-    }
+  package func makeBody(
+    for item: PromptPresentationItem
+  ) -> some View {
+    HostedPromptPresentation(item: item)
   }
 
   package func present(
@@ -51,12 +53,14 @@ package final class ConfirmationDialogPresentationCoordinator:
   package static let zIndex = 240
   package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
   package static let overlayKindName = "ConfirmationDialogPresentation"
+  package static let overlayCompositionPolicy =
+    PresentationOverlayCompositionPolicy.oldestActiveItem
 
   @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPromptPresentation(item: latestItem)
-    }
+  package func makeBody(
+    for item: PromptPresentationItem
+  ) -> some View {
+    HostedPromptPresentation(item: item)
   }
 
   package func present(
@@ -96,10 +100,10 @@ package final class SheetPresentationCoordinator:
   package static let overlayKindName = "SheetPresentation"
 
   @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPromptPresentation(item: latestItem)
-    }
+  package func makeBody(
+    for item: PromptPresentationItem
+  ) -> some View {
+    HostedPromptPresentation(item: item)
   }
 
   package func present(
@@ -137,10 +141,10 @@ package final class PopoverPresentationCoordinator:
   package static let overlayKindName = "PopoverPresentation"
 
   @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPopoverPresentation(item: latestItem)
-    }
+  package func makeBody(
+    for item: PopoverPresentationItem
+  ) -> some View {
+    HostedPopoverPresentation(item: item)
   }
 
   package func present(
@@ -184,10 +188,10 @@ package final class MenuPresentationCoordinator:
   package static let overlayKindName = "MenuPresentation"
 
   @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPromptPresentation(item: latestItem)
-    }
+  package func makeBody(
+    for item: PromptPresentationItem
+  ) -> some View {
+    HostedPromptPresentation(item: item)
   }
 
   package func present(
@@ -223,9 +227,13 @@ package final class ToastPresentationCoordinator:
   package static let zIndex = 100
   package static let modalPolicy = PortalModalPolicy.nonModal
   package static let overlayKindName = "ToastPresentation"
+  package static let overlayCompositionPolicy =
+    PresentationOverlayCompositionPolicy.aggregateNewestItem
 
   @ViewBuilder
-  package func makeBody() -> some View {
+  package func makeBody(
+    for _: ToastPresentationItem
+  ) -> some View {
     if isActive {
       ToastCoordinatorBodyView(items: itemsOldestFirst)
     }

@@ -609,10 +609,10 @@ extension FrameworkStressPopoverTipLifecycleTests {
     }
     defer { harness.shutdown() }
 
-    // Popovers intentionally display the latest item only; dismissing it
-    // must reveal the older live item instead of losing it to an ID collision.
-    #expect(popoverTipStressEntryCount(in: harness) == 1)
-    #expect(!harness.frame.contains("First duplicate tip"))
+    // Each source owns an independently mounted popover entry even when the
+    // authored tip IDs match. Dismissing one must not disturb the other.
+    #expect(popoverTipStressEntryCount(in: harness) == 2)
+    #expect(harness.frame.contains("First duplicate tip"))
     #expect(harness.frame.contains("Second duplicate tip"))
 
     _ = try harness.clickText("Acknowledge second", chooseLast: true)
@@ -631,10 +631,10 @@ extension FrameworkStressPopoverTipLifecycleTests {
 // MARK: - Attempt 017: duplicate-source traversal reorder
 
 extension FrameworkStressPopoverTipLifecycleTests {
-  @Test("stress popover tip 017 reordered sources publish the current latest tip")
-  func popoverTip017ReorderedSourcesPublishCurrentLatestTip() throws {
-    // Hypothesis: the stored coordinator ordering can remain pinned to the
-    // first traversal order when two live sources reorder around each other.
+  @Test("stress popover tip 017 reordered sources preserve both current entries")
+  func popoverTip017ReorderedSourcesPreserveBothCurrentEntries() throws {
+    // Hypothesis: traversal reordering can remount, reorder, or stale either
+    // independently active entry even though both source identities survive.
     let rootIdentity = testIdentity("PopoverTipStress017", "Root")
     let model = PopoverTipDuplicateStressModel()
     let harness = try StressRuntimeHarness(
@@ -644,6 +644,8 @@ extension FrameworkStressPopoverTipLifecycleTests {
       PopoverTipDuplicateStressRoot(model: model)
     }
     defer { harness.shutdown() }
+    let initialEntryIDs = popoverTipStressEntryIDs(in: harness)
+    #expect(initialEntryIDs.count == 2)
 
     for generation in 1...12 {
       model.firstGeneration = generation
@@ -651,11 +653,9 @@ extension FrameworkStressPopoverTipLifecycleTests {
       model.reverseSources.toggle()
       let frame = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
 
-      let expected = model.reverseSources ? "First" : "Second"
-      let departed = model.reverseSources ? "Second" : "First"
-      #expect(frame.contains("\(expected) duplicate tip \(generation)"))
-      #expect(!frame.contains("\(departed) duplicate tip \(generation)"))
-      #expect(popoverTipStressEntryCount(in: harness) == 1)
+      #expect(frame.contains("First duplicate tip \(generation)"))
+      #expect(frame.contains("Second duplicate tip \(generation)"))
+      #expect(popoverTipStressEntryIDs(in: harness) == initialEntryIDs)
       #expect(harness.actionRegistrationCount <= 2)
     }
   }
@@ -1278,6 +1278,13 @@ private func refreshPopoverTipStressHarness<Content: View>(
 private func popoverTipStressEntryCount<Content: View>(
   in harness: StressRuntimeHarness<Content>
 ) -> Int {
+  popoverTipStressEntryIDs(in: harness).count
+}
+
+@MainActor
+private func popoverTipStressEntryIDs<Content: View>(
+  in harness: StressRuntimeHarness<Content>
+) -> [String] {
   harness.runLoop.renderer.debugRuntimeSubsystemSnapshot().presentationPortalState.overlayEntries
-    .count
+    .map(\.id)
 }

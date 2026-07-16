@@ -42,10 +42,6 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     coordinator?.declaredSourceIdentities ?? []
   }
 
-  package var latestItem: C.Item? {
-    coordinator?.latestItem
-  }
-
   package func activeItem(
     id: C.Item.ID
   ) -> C.Item? {
@@ -101,18 +97,43 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     instance().dismiss(id: id)
   }
 
-  package func overlayEntry() -> OverlayStackEntry? {
-    guard let coordinator, coordinator.isActive, let item = coordinator.latestItem else {
-      return nil
+  package func overlayEntries() -> [OverlayStackEntry] {
+    guard let coordinator, coordinator.isActive else {
+      return []
     }
 
+    let activeItems = coordinator.overlayItemsOldestFirst
+    let visibleItems: ArraySlice<PresentationOverlayItem<C.Item>>
+    switch C.overlayCompositionPolicy {
+    case .eachActiveItem:
+      visibleItems = activeItems[...]
+    case .oldestActiveItem:
+      visibleItems = activeItems.prefix(1)
+    case .aggregateNewestItem:
+      visibleItems = activeItems.suffix(1)
+    }
+
+    return visibleItems.map { overlayItem in
+      makeOverlayEntry(
+        item: overlayItem.item,
+        activationOrdinal: overlayItem.activationOrdinal,
+        coordinator: coordinator
+      )
+    }
+  }
+
+  private func makeOverlayEntry(
+    item: C.Item,
+    activationOrdinal: Int,
+    coordinator: C
+  ) -> OverlayStackEntry {
     let stableID = "\(C.overlayKindName):\(item.portalEntryID.ownerStableKey)"
     return OverlayStackEntry(
       id: stableID,
       portalEntryID: item.portalEntryID,
       ordering: PortalOrdering(
         zIndex: C.zIndex,
-        activationOrdinal: coordinator.latestActivationOrdinal ?? 0,
+        activationOrdinal: activationOrdinal,
         stableTieBreaker: stableID
       ),
       kindName: C.overlayKindName,
@@ -126,7 +147,7 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
           modalPolicy: coordinator.modalPolicy(for: item)
         )
       ) {
-        coordinator.makeBody()
+        coordinator.makeBody(for: item)
       }
     )
   }
@@ -152,7 +173,7 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
 private struct AnyPresentationCoordinatorBox {
   private let beginSynchronizingImpl: @MainActor () -> Void
   private let endSynchronizingImpl: @MainActor () -> Void
-  private let overlayEntryImpl: @MainActor () -> OverlayStackEntry?
+  private let overlayEntriesImpl: @MainActor () -> [OverlayStackEntry]
   private let declaredSourceIdentitiesImpl: @MainActor () -> Set<Identity>
 
   init<C>(
@@ -164,8 +185,8 @@ private struct AnyPresentationCoordinatorBox {
     endSynchronizingImpl = {
       box.endSynchronizing()
     }
-    overlayEntryImpl = {
-      box.overlayEntry()
+    overlayEntriesImpl = {
+      box.overlayEntries()
     }
     declaredSourceIdentitiesImpl = {
       box.declaredSourceIdentities
@@ -183,8 +204,8 @@ private struct AnyPresentationCoordinatorBox {
   }
 
   @MainActor
-  func overlayEntry() -> OverlayStackEntry? {
-    overlayEntryImpl()
+  func overlayEntries() -> [OverlayStackEntry] {
+    overlayEntriesImpl()
   }
 
   @MainActor
@@ -312,8 +333,8 @@ package final class PresentationCoordinatorRegistry {
 
   package func overlayEntries() -> [OverlayStackEntry] {
     allBoxes
-      .compactMap {
-        $0.overlayEntry()
+      .flatMap {
+        $0.overlayEntries()
       }
       .map { entry in
         // Attach the presenting declaration's captured environment so the

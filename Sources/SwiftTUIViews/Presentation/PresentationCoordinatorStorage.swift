@@ -18,15 +18,26 @@ package enum PresentationActivationOrdinalMint {
   }
 }
 
-package struct TrackedPresentationItem<Item: Identifiable & Sendable>: Sendable
-where Item.ID: Sendable {
+package struct TrackedPresentationItem<Item: PortalPresentationItem>: Sendable {
   var item: Item
   var activationOrdinal: Int
 }
 
+package struct PresentationOverlayItem<Item: PortalPresentationItem>: Sendable {
+  package var item: Item
+  package var activationOrdinal: Int
+
+  package init(
+    item: Item,
+    activationOrdinal: Int
+  ) {
+    self.item = item
+    self.activationOrdinal = activationOrdinal
+  }
+}
+
 @MainActor
-package final class PresentationFamilyItemStore<Item: Identifiable & Sendable>
-where Item.ID: Sendable {
+package final class PresentationFamilyItemStore<Item: PortalPresentationItem> {
   package struct Checkpoint: Sendable {
     fileprivate var declarativeItemsBySource: [Identity: [Item.ID: TrackedPresentationItem<Item>]]
     fileprivate var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>]
@@ -91,7 +102,8 @@ where Item.ID: Sendable {
 
   private func applySync(
     sourceIdentity: Identity,
-    items: [Item]
+    items: [Item],
+    continuityItemsByStableKey: [String: TrackedPresentationItem<Item>]? = nil
   ) {
     guard !items.isEmpty else {
       declarativeItemsBySource[sourceIdentity] = [:]
@@ -103,6 +115,7 @@ where Item.ID: Sendable {
     for item in items {
       let activationOrdinal =
         previousItems[item.id]?.activationOrdinal
+        ?? continuityItemsByStableKey?[item.portalEntryID.ownerStableKey]?.activationOrdinal
         ?? activeEntry(for: item.id)?.activationOrdinal
         ?? allocateActivationOrdinal()
       nextItems[item.id] = .init(
@@ -114,10 +127,26 @@ where Item.ID: Sendable {
   }
 
   package func endSynchronizing() {
+    // Every source in this pass must recover activation continuity from the
+    // same immutable pre-pass view. Applying a positional source reorder
+    // in-place can otherwise overwrite the old source that a later item needs
+    // for its lookup, spuriously reminting that surviving item's ordinal.
+    let continuityItemsByStableKey = mergedActiveItems().values.reduce(
+      into: [String: TrackedPresentationItem<Item>]()
+    ) { itemsByStableKey, trackedItem in
+      let stableKey = trackedItem.item.portalEntryID.ownerStableKey
+      if let existing = itemsByStableKey[stableKey],
+        existing.activationOrdinal > trackedItem.activationOrdinal
+      {
+        return
+      }
+      itemsByStableKey[stableKey] = trackedItem
+    }
     for sourceIdentity in pendingPassSources {
       applySync(
         sourceIdentity: sourceIdentity,
-        items: pendingPassItemsBySource[sourceIdentity] ?? []
+        items: pendingPassItemsBySource[sourceIdentity] ?? [],
+        continuityItemsByStableKey: continuityItemsByStableKey
       )
     }
     pendingPassItemsBySource.removeAll(keepingCapacity: true)
@@ -168,35 +197,11 @@ where Item.ID: Sendable {
     Set(declarativeItemsBySource.keys)
   }
 
-  package var latestItem: Item? {
-    newestFirst.first
-  }
-
-  package var latestActivationOrdinal: Int? {
-    mergedActiveItems()
-      .values
-      .max { lhs, rhs in
-        if lhs.activationOrdinal != rhs.activationOrdinal {
-          return lhs.activationOrdinal < rhs.activationOrdinal
-        }
-        return String(reflecting: lhs.item.id) < String(reflecting: rhs.item.id)
-      }?
-      .activationOrdinal
-  }
-
-  package var newestFirst: [Item] {
-    mergedActiveItems()
-      .values
-      .sorted { lhs, rhs in
-        if lhs.activationOrdinal != rhs.activationOrdinal {
-          return lhs.activationOrdinal > rhs.activationOrdinal
-        }
-        return String(reflecting: lhs.item.id) < String(reflecting: rhs.item.id)
-      }
-      .map(\.item)
-  }
-
   package var oldestFirst: [Item] {
+    trackedOldestFirst.map(\.item)
+  }
+
+  package var trackedOldestFirst: [TrackedPresentationItem<Item>] {
     mergedActiveItems()
       .values
       .sorted { lhs, rhs in
@@ -205,7 +210,6 @@ where Item.ID: Sendable {
         }
         return String(reflecting: lhs.item.id) < String(reflecting: rhs.item.id)
       }
-      .map(\.item)
   }
 
   /// The currently-active item for `id`, if any. Deadline tasks armed at
@@ -266,15 +270,13 @@ where Item.ID: Sendable {
 }
 
 @MainActor
-package struct StoredPresentationCoordinatorCheckpoint<Item: Identifiable & Sendable>: Sendable
-where Item.ID: Sendable {
+package struct StoredPresentationCoordinatorCheckpoint<Item: PortalPresentationItem>: Sendable {
   fileprivate var itemStore: PresentationFamilyItemStore<Item>.Checkpoint
   fileprivate var invalidationIdentity: Identity?
 }
 
 @MainActor
-package class StoredPresentationCoordinator<Item: Identifiable & Sendable>
-where Item.ID: Sendable {
+package class StoredPresentationCoordinator<Item: PortalPresentationItem> {
   package let itemStore = PresentationFamilyItemStore<Item>()
 
   private weak var imperativeInvalidator: (any Invalidating)?
@@ -330,20 +332,17 @@ where Item.ID: Sendable {
     itemStore.declaredSourceIdentities
   }
 
-  package var latestItem: Item? {
-    itemStore.latestItem
-  }
-
-  package var latestActivationOrdinal: Int? {
-    itemStore.latestActivationOrdinal
-  }
-
-  package var itemsNewestFirst: [Item] {
-    itemStore.newestFirst
-  }
-
   package var itemsOldestFirst: [Item] {
     itemStore.oldestFirst
+  }
+
+  package var overlayItemsOldestFirst: [PresentationOverlayItem<Item>] {
+    itemStore.trackedOldestFirst.map {
+      PresentationOverlayItem(
+        item: $0.item,
+        activationOrdinal: $0.activationOrdinal
+      )
+    }
   }
 
   package func activeItem(

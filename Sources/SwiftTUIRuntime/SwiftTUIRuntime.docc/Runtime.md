@@ -34,6 +34,13 @@ displayed through root-level composition.
   base declarations before overlay composition; wrapper-hosted and selectively
   re-evaluated subtrees must not wait for an outer host rerender before an
   already-declared presentation appears
+- Each active sheet, full-screen cover, popover, and menu produces its own
+  stable overlay entry. Later activations compose above earlier activations
+  without unmounting the covered entry
+- Alerts and confirmation dialogs expose only their oldest active entry and
+  advance in first-in, first-out order. Toasts remain one aggregate entry
+- Escape and other stack-wide dismissal routes consider visible entries only,
+  then select the most recently activated entry across presentation families
 - The renderer composes the base root and overlay stack for downstream measure,
   place, semantics, draw, raster, and commit work
 - Opening or dismissing a presentation does not re-resolve the displayed base subtree under a synthetic identity path. Presentation churn should be transparent to the currently selected tab or child owner unless the presentation action itself mutates the state that selects different content

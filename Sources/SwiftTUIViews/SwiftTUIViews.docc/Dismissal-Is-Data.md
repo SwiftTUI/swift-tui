@@ -67,6 +67,19 @@ and full-screen covers. A full-screen cover uses the same data contract while
 occupying the complete terminal proposal without a sheet header, card inset,
 border, or implicit close button.
 
+## Keep simultaneous presentations independent
+
+When multiple presentation sources are active, SwiftTUI preserves each
+source's own binding, mounted state, tasks, and dismissal callback. Sheets,
+full-screen covers, popovers, and menus remain mounted as separate surfaces;
+the most recently activated surface is drawn above earlier surfaces.
+
+Alerts and confirmation dialogs instead form first-in, first-out queues. Only
+the oldest active prompt is visible. A waiting prompt's source remains active,
+and its content mounts when every earlier prompt has been dismissed. Escape
+dismisses the most recently activated *visible* presentation across families,
+so a queued prompt cannot intercept dismissal from a visible surface.
+
 ## Observe teardown at the presenter
 
 `onDismiss` runs once after a previously committed activation disappears. It
