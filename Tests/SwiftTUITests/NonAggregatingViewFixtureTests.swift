@@ -130,6 +130,24 @@ struct NonAggregatingViewFixtureTests {
         )
       )
 
+    case "full-screen-cover":
+      return FixtureSpec(
+        name: name,
+        size: .init(width: 36, height: 8),
+        view: AnyView(
+          Text("Background")
+            .fullScreenCover(isPresented: .constant(true)) {
+              VStack(alignment: .leading, spacing: 1) {
+                Text("Full-screen workspace")
+                  .bold()
+                Divider()
+                Text("No card chrome")
+              }
+              .padding(1)
+            }
+        )
+      )
+
     default:
       return FixtureSpec(
         name: name,
@@ -153,6 +171,7 @@ private let nonAggregatingFixtureNames = [
   "slider",
   "button",
   "progress-view",
+  "full-screen-cover",
 ]
 
 private struct FixtureSpec {

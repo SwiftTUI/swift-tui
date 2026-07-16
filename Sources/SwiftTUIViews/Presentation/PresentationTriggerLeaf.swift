@@ -104,6 +104,37 @@ func resolvePresentationModifier<Base: View>(
   )
 }
 
+/// Shared trigger-leaf path for optional identifiable presentation sources.
+/// The optional read and current-item re-read both happen inside the trigger
+/// leaf so item changes never attribute work to the disjoint background.
+@MainActor
+func resolveItemPresentationModifier<
+  Base: View,
+  Item: Identifiable & Sendable
+>(
+  content: ModifierContentInputs<Base>,
+  item: Binding<Item?>,
+  in context: ResolveContext,
+  declaration:
+    @escaping @MainActor (
+      _ background: ResolvedNode,
+      _ triggerIdentity: Identity,
+      _ currentItem: Item
+    ) -> PresentationCoordinatorDeclarationPreferenceValue
+) -> [ResolvedNode] where Item.ID: Sendable {
+  let itemBinding = item
+  return resolvePresentationModifier(
+    content: content,
+    isActive: { itemBinding.wrappedValue != nil },
+    in: context
+  ) { background, triggerIdentity in
+    guard let currentItem = itemBinding.wrappedValue else {
+      return .init(declarations: [])
+    }
+    return declaration(background, triggerIdentity, currentItem)
+  }
+}
+
 /// Generalized core of ``resolvePresentationModifier(content:isPresented:in:prepareBackground:declaration:)``
 /// for presentations whose activation state is not a plain `Binding<Bool>`
 /// (item bindings, tip eligibility + dismissal `@State`). `isActive` is read

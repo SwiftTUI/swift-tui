@@ -1,0 +1,13 @@
+fixture full-screen-cover
+configuration preview-unicode
+surface 36x8
+capability glyph=unicode color=none styles=false
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
+01│····································
+02│·Full-screen·workspace··············
+03│····································
+04│·──────────────────────────────────·
+05│····································
+06│·No·card·chrome·····················
+07│····································
+08│····································

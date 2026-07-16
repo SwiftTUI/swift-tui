@@ -43,6 +43,12 @@ package enum PromptPresentationContentSizing: Equatable, Sendable {
   case intrinsic
 }
 
+/// Internal rendering mode for prompt-family presentation surfaces.
+package enum PromptPresentationSurfaceMode: Equatable, Sendable {
+  case standard
+  case fullScreen
+}
+
 package struct PromptPresentationDescriptor: Equatable, Sendable {
   package enum BodyMode: Equatable, Sendable {
     case contentOnly
@@ -64,6 +70,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var borderStyle: StrokeStyle
   package var contentSizing: PromptPresentationContentSizing
   package var createsFocusScope: Bool
+  package var surfaceMode: PromptPresentationSurfaceMode
 
   package init(
     alignment: Alignment,
@@ -80,7 +87,8 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     chrome: PresentationChrome = .surface,
     borderStyle: StrokeStyle = StrokeStyle(borderSet: .innerHalfBlock, placement: .outset),
     contentSizing: PromptPresentationContentSizing = .fillAvailable,
-    createsFocusScope: Bool = true
+    createsFocusScope: Bool = true,
+    surfaceMode: PromptPresentationSurfaceMode = .standard
   ) {
     self.alignment = alignment
     self.accessibilityRole = accessibilityRole
@@ -97,11 +105,13 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     self.borderStyle = borderStyle
     self.contentSizing = contentSizing
     self.createsFocusScope = createsFocusScope
+    self.surfaceMode = surfaceMode
   }
 }
 
 package protocol PortalPresentationItem: Identifiable, Sendable where ID == String {
   var portalEntryID: PortalEntryID { get }
+  var entryDismissObserver: (@MainActor @Sendable () -> Void)? { get }
 }
 
 package struct PromptPresentationItem: PortalPresentationItem {
@@ -113,6 +123,11 @@ package struct PromptPresentationItem: PortalPresentationItem {
   package var messagePayloads: [PortalAttachmentPayload]
   package var contentPayloads: [PortalAttachmentPayload]
   package var dismiss: @MainActor @Sendable () -> Void
+  package var onDismiss: (@MainActor @Sendable () -> Void)?
+
+  package var entryDismissObserver: (@MainActor @Sendable () -> Void)? {
+    onDismiss
+  }
 
   @MainActor
   package init(
@@ -123,7 +138,8 @@ package struct PromptPresentationItem: PortalPresentationItem {
     actionPayloads: [PortalAttachmentPayload],
     messagePayloads: [PortalAttachmentPayload],
     contentPayloads: [PortalAttachmentPayload],
-    dismiss: @escaping @MainActor @Sendable () -> Void
+    dismiss: @escaping @MainActor @Sendable () -> Void,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) {
     let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
     let edge = PortalAttachmentEdge(portalEntryID: portalEntryID)
@@ -135,6 +151,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
     self.messagePayloads = messagePayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.dismiss = dismiss
+    self.onDismiss = onDismiss
   }
 }
 
@@ -146,6 +163,10 @@ package struct PopoverPresentationItem: PortalPresentationItem {
   package var arrowEdge: Edge?
   package var modalPolicy: PortalModalPolicy
   package var surfaceItem: PromptPresentationItem
+
+  package var entryDismissObserver: (@MainActor @Sendable () -> Void)? {
+    surfaceItem.onDismiss
+  }
 
   package init(
     id: String,
@@ -173,6 +194,14 @@ package struct ToastPresentationItem: PortalPresentationItem {
   package var presentation: ToastStylePresentation
   package var duration: Double?
   package var dismiss: @MainActor @Sendable () -> Void
+  package var onDismiss: (@MainActor @Sendable () -> Void)?
+
+  // A toast overlay can host several independently-lived items. Each toast
+  // row registers its own committed disappearance observer instead of using
+  // the family overlay entry root.
+  package var entryDismissObserver: (@MainActor @Sendable () -> Void)? {
+    nil
+  }
 
   @MainActor
   package init(
@@ -181,7 +210,8 @@ package struct ToastPresentationItem: PortalPresentationItem {
     contentPayloads: [PortalAttachmentPayload],
     presentation: ToastStylePresentation,
     duration: Double?,
-    dismiss: @escaping @MainActor @Sendable () -> Void
+    dismiss: @escaping @MainActor @Sendable () -> Void,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) {
     let portalEntryID = portalEntryID ?? fallbackPortalEntryID(for: id)
     let edge = PortalAttachmentEdge(
@@ -194,6 +224,22 @@ package struct ToastPresentationItem: PortalPresentationItem {
     self.presentation = presentation
     self.duration = duration
     self.dismiss = dismiss
+    self.onDismiss = onDismiss
+  }
+}
+
+@MainActor
+package func presentationDismissObserver(
+  _ onDismiss: (@MainActor @Sendable () -> Void)?,
+  authoringContext: AuthoringContext?
+) -> (@MainActor @Sendable () -> Void)? {
+  guard let onDismiss else {
+    return nil
+  }
+  return { [authoringContext] in
+    withAuthoringContext(authoringContext) {
+      onDismiss()
+    }
   }
 }
 

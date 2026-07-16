@@ -10,30 +10,29 @@ package struct BuiltinItemPopoverPresentationModifier<
   package var popoverContent: @MainActor (Item) -> PopoverContent
   package var popoverContentAuthoringContext: AuthoringContext?
   package var dismissAuthoringContext: AuthoringContext?
+  package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  package var onDismissAuthoringContext: AuthoringContext? = nil
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    // Lever B for item popovers: the `item` read moves into the trigger leaf
-    // so setting/clearing the item spares the disjoint-sibling background.
     let itemBinding = item
     let attachmentAnchor = attachmentAnchor
     let arrowEdge = arrowEdge
     let popoverContent = popoverContent
     let popoverContentAuthoringContext = popoverContentAuthoringContext
     let dismissAuthoringContext = dismissAuthoringContext
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    return resolvePresentationModifier(
+    return resolveItemPresentationModifier(
       content: content,
-      isActive: { itemBinding.wrappedValue != nil },
+      item: itemBinding,
       in: context
-    ) { background, triggerIdentity in
-      // Re-read inside the leaf's resolve: same call stack as the `isActive`
-      // check, and the read stays attributed to the leaf.
-      guard let currentItem = itemBinding.wrappedValue else {
-        return .init(declarations: [])
-      }
+    ) { background, triggerIdentity, currentItem in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
@@ -62,7 +61,8 @@ package struct BuiltinItemPopoverPresentationModifier<
             dismissInvalidator,
             triggerIdentity: triggerIdentity
           )
-        }
+        },
+        onDismiss: onDismiss
       )
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }
@@ -79,6 +79,8 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
   package var action: @MainActor @Sendable (PopoverTipAction) -> Void
   package var actionAuthoringContext: AuthoringContext?
   package var dismissAuthoringContext: AuthoringContext?
+  package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  package var onDismissAuthoringContext: AuthoringContext? = nil
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -115,6 +117,10 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     let action = action
     let actionAuthoringContext = actionAuthoringContext
     let dismissAuthoringContext = dismissAuthoringContext
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     let dismissedTipID = $dismissedTipID
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let isActive: @MainActor @Sendable () -> Bool
@@ -183,7 +189,8 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
           portalEntryID: portalEntryID,
           modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction
         ),
-        dismiss: dismiss
+        dismiss: dismiss,
+        onDismiss: onDismiss
       )
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }
@@ -319,7 +326,8 @@ func popoverPresentationItem(
   arrowEdge: Edge?,
   modalPolicy: PortalModalPolicy,
   contentPayloads: [PortalAttachmentPayload],
-  dismiss: @escaping @MainActor @Sendable () -> Void
+  dismiss: @escaping @MainActor @Sendable () -> Void,
+  onDismiss: (@MainActor @Sendable () -> Void)? = nil
 ) -> PopoverPresentationItem {
   let surfaceItem = PromptPresentationItem(
     id: id,
@@ -331,7 +339,8 @@ func popoverPresentationItem(
     actionPayloads: [],
     messagePayloads: [],
     contentPayloads: contentPayloads,
-    dismiss: dismiss
+    dismiss: dismiss,
+    onDismiss: onDismiss
   )
   return PopoverPresentationItem(
     id: id,

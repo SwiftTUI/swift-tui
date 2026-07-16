@@ -7,6 +7,7 @@ extension View {
   /// Presents a compact popover attached to this view.
   public func popover<PopoverContent: View>(
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     attachmentAnchor: PopoverAttachmentAnchor = .rect(.bounds),
     arrowEdge: Edge? = nil,
     @ViewBuilder content popoverContent: () -> PopoverContent
@@ -18,7 +19,9 @@ extension View {
         arrowEdge: arrowEdge,
         popoverContent: popoverContent(),
         popoverContentAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -26,6 +29,7 @@ extension View {
   /// Presents a compact popover for the current optional item.
   public func popover<Item: Identifiable & Sendable, PopoverContent: View>(
     item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     attachmentAnchor: PopoverAttachmentAnchor = .rect(.bounds),
     arrowEdge: Edge? = nil,
     @ViewBuilder content popoverContent: @escaping @MainActor (Item) -> PopoverContent
@@ -37,7 +41,9 @@ extension View {
         arrowEdge: arrowEdge,
         popoverContent: popoverContent,
         popoverContentAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -46,6 +52,7 @@ extension View {
   public func popoverTip<Tip: PopoverTip>(
     _ tip: Tip?,
     isPresented: Binding<Bool>? = nil,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     attachmentAnchor: PopoverAttachmentAnchor = .rect(.bounds),
     arrowEdge: Edge? = nil,
     action: @escaping @MainActor @Sendable (PopoverTipAction) -> Void = { _ in }
@@ -58,7 +65,9 @@ extension View {
         arrowEdge: arrowEdge,
         action: action,
         actionAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -71,6 +80,8 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
   package var popoverContent: PopoverContent
   package var popoverContentAuthoringContext: AuthoringContext?
   package var dismissAuthoringContext: AuthoringContext?
+  package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  package var onDismissAuthoringContext: AuthoringContext? = nil
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -85,6 +96,10 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
     let popoverContent = popoverContent
     let popoverContentAuthoringContext = popoverContentAuthoringContext
     let dismissAuthoringContext = dismissAuthoringContext
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     let dismissInvalidator = context.invalidationProxy?.invalidator
     return resolvePresentationModifier(
       content: content,
@@ -116,7 +131,8 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
             dismissInvalidator,
             triggerIdentity: triggerIdentity
           )
-        }
+        },
+        onDismiss: onDismiss
       )
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }

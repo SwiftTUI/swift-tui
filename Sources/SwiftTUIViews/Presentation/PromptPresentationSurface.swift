@@ -29,14 +29,19 @@ package struct HostedPromptPresentation: View {
 
   @ViewBuilder
   private var sizedSurface: some View {
-    let surface = PromptPresentationSurface(item: item)
-      .padding(insetEdges)
+    switch item.descriptor.surfaceMode {
+    case .fullScreen:
+      PromptPresentationSurface(item: item)
+    case .standard:
+      let surface = PromptPresentationSurface(item: item)
+        .padding(insetEdges)
 
-    switch item.descriptor.contentSizing {
-    case .fillAvailable:
-      surface
-    case .intrinsic:
-      surface.fixedSize(horizontal: true, vertical: true)
+      switch item.descriptor.contentSizing {
+      case .fillAvailable:
+        surface
+      case .intrinsic:
+        surface.fixedSize(horizontal: true, vertical: true)
+      }
     }
   }
 
@@ -93,7 +98,16 @@ package struct PromptPresentationSurface: View, ActionScope {
   }
 
   package var body: some View {
+    switch item.descriptor.surfaceMode {
+    case .fullScreen:
+      fullScreenContentBody
+    case .standard:
+      standardSurface
+    }
+  }
 
+  @ViewBuilder
+  private var standardSurface: some View {
     let content = VStack(alignment: .leading, spacing: 0) {
       presentationHeader
       switch item.descriptor.bodyMode {
@@ -109,18 +123,9 @@ package struct PromptPresentationSurface: View, ActionScope {
     case .surface:
       content
         .background {
-          // Full-bleed: the surface fill covers the entire box, including the
-          // outermost ring where the border line is drawn. The single-line
-          // stroke below sits on this fill (it carries an explicit surface
-          // background), so the card reads edge-to-edge with a thin border
-          // rather than a chunky half-block frame.
           Rectangle().fill(.terminalSurfaceBackground)
         }
         .overlay {
-          // Square single-line border drawn into the outermost cells of the
-          // filled box. The explicit `background` makes each glyph cell carry
-          // the surface fill, so the line bleeds with the card regardless of
-          // what sits behind the presentation.
           Rectangle().strokeBorder(
             .terminalBorder(.accent),
             style: item.descriptor.borderStyle,
@@ -132,14 +137,8 @@ package struct PromptPresentationSurface: View, ActionScope {
           maxWidth: maximumWidth,
           alignment: .leading
         )
-        .semanticMetadata(
-          presentationSemanticMetadata
-        )
+        .semanticMetadata(presentationSemanticMetadata)
     case .menu:
-      // Menu chrome: compact, intrinsic-width bordered box. No header
-      // row (the trigger that opened it stays in place behind the
-      // overlay), no close button (Escape dismisses), no max-width cap
-      // (the menu sizes to its longest item).
       menuContentBody
         .padding(.init(horizontal: 1, vertical: 1))
         .background {
@@ -151,17 +150,10 @@ package struct PromptPresentationSurface: View, ActionScope {
             style: item.descriptor.borderStyle
           )
         }
-        .semanticMetadata(
-          presentationSemanticMetadata
-        )
+        .semanticMetadata(presentationSemanticMetadata)
     case .dropdown:
-      // Full-width, top-aligned strip. Dropdowns are command-palette-style
-      // surfaces: no title row or close button, just the supplied content.
       contentBody
-        .frame(
-          maxWidth: .infinity,
-          alignment: .topLeading
-        )
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background {
           Rectangle().fill(.terminalSurfaceBackground)
         }
@@ -171,10 +163,20 @@ package struct PromptPresentationSurface: View, ActionScope {
             .drawMetadata(.init(opacity: 0.6))
             .frame(maxWidth: .infinity, alignment: .bottom)
         }
-        .semanticMetadata(
-          presentationSemanticMetadata
-        )
+        .semanticMetadata(presentationSemanticMetadata)
     }
+  }
+
+  private var fullScreenContentBody: some View {
+    PortalAttachmentGroupView(
+      kindName: "PresentationContent",
+      payloads: item.contentPayloads
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background {
+      Rectangle().fill(.terminalSurfaceBackground)
+    }
+    .semanticMetadata(presentationSemanticMetadata)
   }
 
   private var maximumWidth: ProposedDimension {

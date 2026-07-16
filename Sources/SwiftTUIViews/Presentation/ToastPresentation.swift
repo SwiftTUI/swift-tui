@@ -189,14 +189,17 @@ extension View {
     _ message: S,
     isPresented: Binding<Bool>,
     style: AnyToastStyle = .info,
-    duration: Double? = 3.0
+    duration: Double? = 3.0,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View {
     modifier(
       ToastModifier(
         isPresented: isPresented,
         style: style,
         duration: duration,
-        toastContent: Text(String(message))
+        toastContent: Text(String(message)),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -206,13 +209,15 @@ extension View {
     _ message: S,
     isPresented: Binding<Bool>,
     style: Style,
-    duration: Double? = 3.0
+    duration: Double? = 3.0,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View {
     toast(
       message,
       isPresented: isPresented,
       style: AnyToastStyle(style),
-      duration: duration
+      duration: duration,
+      onDismiss: onDismiss
     )
   }
 
@@ -221,6 +226,7 @@ extension View {
     isPresented: Binding<Bool>,
     style: AnyToastStyle = .info,
     duration: Double? = 3.0,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder content toastContent: () -> ToastContent
   ) -> some View {
     modifier(
@@ -228,7 +234,9 @@ extension View {
         isPresented: isPresented,
         style: style,
         duration: duration,
-        toastContent: toastContent()
+        toastContent: toastContent(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -238,12 +246,14 @@ extension View {
     isPresented: Binding<Bool>,
     style: Style,
     duration: Double? = 3.0,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder content toastContent: () -> ToastContent
   ) -> some View {
     toast(
       isPresented: isPresented,
       style: AnyToastStyle(style),
       duration: duration,
+      onDismiss: onDismiss,
       content: toastContent
     )
   }
@@ -255,6 +265,8 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
   var duration: Double?
   var toastContent: ToastContent
   var dismissAuthoringContext: AuthoringContext? = makePortalAttachmentAuthoringContext()
+  var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  var onDismissAuthoringContext: AuthoringContext? = makePortalAttachmentAuthoringContext()
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -290,6 +302,10 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     let token = attachmentOrdinal == 0 ? "toast" : "toast[\(attachmentOrdinal)]"
     let portalEntryID = presentationAttachment(for: node, token: token)
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     let item = ToastPresentationItem(
       id: portalEntryID.description,
       portalEntryID: portalEntryID,
@@ -305,7 +321,8 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
           isPresented.wrappedValue = false
         }
         dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-      }
+      },
+      onDismiss: onDismiss
     )
 
     var declaration = PresentationCoordinatorDeclaration(
@@ -360,7 +377,7 @@ private struct ToastPresentationView: View {
     // resolving, so the task closure must capture the handle value, not the
     // property (an in-task read would see defaults).
     let handle = coordinatorHandle
-    return HStack(alignment: .center, spacing: 1) {
+    let toastBody = HStack(alignment: .center, spacing: 1) {
       if let icon = item.presentation.icon {
         Text(icon)
           .foregroundStyle(item.presentation.iconStyle)
@@ -404,6 +421,11 @@ private struct ToastPresentationView: View {
       // closure, not the one captured when this deadline was armed.
       let activeItem = handle.activeItem(id: item.id)
       (activeItem ?? item).dismiss()
+    }
+    if let onDismiss = item.onDismiss {
+      toastBody.onDisappear(perform: onDismiss)
+    } else {
+      toastBody
     }
   }
 }

@@ -8,6 +8,7 @@ package struct OverlayStackEntry: Sendable {
   package var modalPolicy: PortalModalPolicy
   package var acceptsEscape: Bool
   package var dismiss: (@MainActor @Sendable () -> Void)?
+  package var onDismiss: (@MainActor @Sendable () -> Void)?
   package var payload: PortalAttachmentPayload
   /// The presenting declaration's captured environment, attached by
   /// `PresentationCoordinatorRegistry.overlayEntries()`. The entry host
@@ -23,6 +24,7 @@ package struct OverlayStackEntry: Sendable {
     modalPolicy: PortalModalPolicy,
     acceptsEscape: Bool,
     dismiss: (@MainActor @Sendable () -> Void)?,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     payload: PortalAttachmentPayload,
     sourceEnvironmentValues: EnvironmentValues? = nil
   ) {
@@ -33,6 +35,7 @@ package struct OverlayStackEntry: Sendable {
     self.modalPolicy = modalPolicy
     self.acceptsEscape = acceptsEscape
     self.dismiss = dismiss
+    self.onDismiss = onDismiss
     self.payload = payload
     self.sourceEnvironmentValues = sourceEnvironmentValues
   }
@@ -199,6 +202,25 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
         invalidationScope: .fullSurfaceDiff
       )
     )
+    if let onDismiss = entry.onDismiss {
+      let ordinal = entryNode.lifecycleMetadata.disappearHandlerIDs.count
+      let handlerID =
+        HandlerDescriptorIntake(
+          context: bodyContext,
+          fallbackAuthoringScope: nil
+        ).registerDisappearHandler(
+          identity: entryNode.identity,
+          ordinal: ordinal,
+          handler: onDismiss
+        ) ?? "\(entryNode.identity)#disappear[\(ordinal)]"
+      entryNode.lifecycleMetadata = entryNode.lifecycleMetadata.merging(
+        .init(disappearHandlerIDs: [handlerID])
+      )
+      context.viewGraph?.recordLifecycleEvaluationOwner(
+        target: entryNode.identity,
+        owner: context.identity
+      )
+    }
     entryNode.declarationOwnerEdge = entry.declarationOwnerEdge(
       placementRoot: context.structuralPath
     )

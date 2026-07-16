@@ -160,11 +160,38 @@ package func sheetPromptPresentationSpec(
   )
 }
 
+package func fullScreenCoverPromptPresentationSpec() -> PromptPresentationSpec {
+  PromptPresentationSpec(
+    token: "fullScreenCover",
+    descriptor: .init(
+      alignment: .topLeading,
+      accessibilityRole: .sheet,
+      backdropOpacity: 0,
+      defaultDismissTitle: "Close",
+      headerTone: .accent,
+      minWidth: 0,
+      scrollMinHeight: 0,
+      scrollIdealHeight: 0,
+      scrollMaxHeight: 0,
+      bodyMode: .contentOnly,
+      contentSizing: .fillAvailable,
+      surfaceMode: .fullScreen
+    ),
+    reconcile: { registry, sourceIdentity, item in
+      registry.sheet.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
+    }
+  )
+}
+
 extension View {
   /// Presents an alert with a default dismiss action.
   public func alert<S: StringProtocol>(
     _ title: S,
-    isPresented: Binding<Bool>
+    isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View {
     let spec = alertPromptPresentationSpec()
     return modifier(
@@ -180,7 +207,9 @@ extension View {
         message: EmptyView(),
         actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
         messageAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -189,6 +218,7 @@ extension View {
   public func alert<S: StringProtocol, Actions: View, Message: View>(
     _ title: S,
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
@@ -201,7 +231,68 @@ extension View {
         message: message(),
         actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
         messageAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents an alert for the current optional item with a default dismiss action.
+  public func alert<S: StringProtocol, Item: Identifiable & Sendable>(
+    _ title: S,
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  ) -> some View where Item.ID: Sendable {
+    let spec = alertPromptPresentationSpec()
+    let dismissAuthoringContext = makePortalAttachmentAuthoringContext()
+    return modifier(
+      BuiltinItemPromptPresentationModifier(
+        title: String(title),
+        item: item,
+        spec: spec,
+        actions: { _ in
+          defaultItemPresentationActions(
+            defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+            item: item,
+            dismissAuthoringContext: dismissAuthoringContext
+          )
+        },
+        message: { _ in EmptyView() },
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: dismissAuthoringContext,
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents an alert whose actions and message receive the current optional item.
+  public func alert<
+    S: StringProtocol,
+    Item: Identifiable & Sendable,
+    Actions: View,
+    Message: View
+  >(
+    _ title: S,
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder actions: @escaping @MainActor (Item) -> Actions,
+    @ViewBuilder message: @escaping @MainActor (Item) -> Message
+  ) -> some View where Item.ID: Sendable {
+    modifier(
+      BuiltinItemPromptPresentationModifier(
+        title: String(title),
+        item: item,
+        spec: alertPromptPresentationSpec(),
+        actions: actions,
+        message: message,
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -209,7 +300,8 @@ extension View {
   /// Presents a confirmation dialog with a default dismiss action.
   public func confirmationDialog<S: StringProtocol>(
     _ title: S,
-    isPresented: Binding<Bool>
+    isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View {
     let spec = confirmationDialogPromptPresentationSpec()
     return modifier(
@@ -225,7 +317,9 @@ extension View {
         message: EmptyView(),
         actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
         messageAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -234,6 +328,7 @@ extension View {
   public func confirmationDialog<S: StringProtocol, Actions: View, Message: View>(
     _ title: S,
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
@@ -246,7 +341,68 @@ extension View {
         message: message(),
         actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
         messageAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents a confirmation dialog for the current optional item.
+  public func confirmationDialog<S: StringProtocol, Item: Identifiable & Sendable>(
+    _ title: S,
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  ) -> some View where Item.ID: Sendable {
+    let spec = confirmationDialogPromptPresentationSpec()
+    let dismissAuthoringContext = makePortalAttachmentAuthoringContext()
+    return modifier(
+      BuiltinItemPromptPresentationModifier(
+        title: String(title),
+        item: item,
+        spec: spec,
+        actions: { _ in
+          defaultItemPresentationActions(
+            defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+            item: item,
+            dismissAuthoringContext: dismissAuthoringContext
+          )
+        },
+        message: { _ in EmptyView() },
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: dismissAuthoringContext,
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents a confirmation dialog whose builders receive the current item.
+  public func confirmationDialog<
+    S: StringProtocol,
+    Item: Identifiable & Sendable,
+    Actions: View,
+    Message: View
+  >(
+    _ title: S,
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder actions: @escaping @MainActor (Item) -> Actions,
+    @ViewBuilder message: @escaping @MainActor (Item) -> Message
+  ) -> some View where Item.ID: Sendable {
+    modifier(
+      BuiltinItemPromptPresentationModifier(
+        title: String(title),
+        item: item,
+        spec: confirmationDialogPromptPresentationSpec(),
+        actions: actions,
+        message: message,
+        actionsAuthoringContext: makePortalAttachmentAuthoringContext(),
+        messageAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -254,6 +410,7 @@ extension View {
   /// Presents custom sheet content without a title.
   public func sheet<SheetContent: View>(
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
     modifier(
@@ -263,7 +420,9 @@ extension View {
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
         sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -272,6 +431,7 @@ extension View {
   public func sheet<S: StringProtocol, SheetContent: View>(
     _ title: S,
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
     modifier(
@@ -281,7 +441,97 @@ extension View {
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
         sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents custom sheet content for the current optional item.
+  public func sheet<Item: Identifiable & Sendable, SheetContent: View>(
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder content sheetContent: @escaping @MainActor (Item) -> SheetContent
+  ) -> some View where Item.ID: Sendable {
+    modifier(
+      BuiltinItemSheetPresentationModifier(
+        title: "",
+        item: item,
+        spec: sheetPromptPresentationSpec(),
+        sheetContent: sheetContent,
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents titled custom sheet content for the current optional item.
+  public func sheet<
+    S: StringProtocol,
+    Item: Identifiable & Sendable,
+    SheetContent: View
+  >(
+    _ title: S,
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder content sheetContent: @escaping @MainActor (Item) -> SheetContent
+  ) -> some View where Item.ID: Sendable {
+    modifier(
+      BuiltinItemSheetPresentationModifier(
+        title: String(title),
+        item: item,
+        spec: sheetPromptPresentationSpec(),
+        sheetContent: sheetContent,
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents content that occupies the full terminal surface.
+  public func fullScreenCover<CoverContent: View>(
+    isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder content coverContent: () -> CoverContent
+  ) -> some View {
+    modifier(
+      BuiltinSheetPresentationModifier(
+        title: "",
+        isPresented: isPresented,
+        spec: fullScreenCoverPromptPresentationSpec(),
+        sheetContent: coverContent(),
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
+      )
+    )
+  }
+
+  /// Presents full-screen content for the current optional item.
+  public func fullScreenCover<
+    Item: Identifiable & Sendable,
+    CoverContent: View
+  >(
+    item: Binding<Item?>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
+    @ViewBuilder content coverContent: @escaping @MainActor (Item) -> CoverContent
+  ) -> some View where Item.ID: Sendable {
+    modifier(
+      BuiltinItemSheetPresentationModifier(
+        title: "",
+        item: item,
+        spec: fullScreenCoverPromptPresentationSpec(),
+        sheetContent: coverContent,
+        sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
@@ -299,6 +549,22 @@ private func defaultPresentationActions(
     action: {
       withAuthoringContext(dismissAuthoringContext) {
         isPresented.wrappedValue = false
+      }
+    }
+  )
+}
+
+@MainActor
+private func defaultItemPresentationActions<Item>(
+  defaultDismissTitle: String,
+  item: Binding<Item?>,
+  dismissAuthoringContext: AuthoringContext?
+) -> Button<Text> {
+  Button(
+    defaultDismissTitle,
+    action: {
+      withAuthoringContext(dismissAuthoringContext) {
+        item.wrappedValue = nil
       }
     }
   )

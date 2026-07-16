@@ -150,7 +150,10 @@ The full ActionScope/commands surface is public:
 - `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
 - `.toolbar(style:)` and `.toolbarItem(...)`.
 - `Scene` and the presentation modifiers (`.alert`, `.confirmationDialog`,
-  `.sheet`, `.popover`, `.popoverTip`, `.toast`) conform to `ActionScope`.
+  `.sheet`, `.fullScreenCover`, `.popover`, `.popoverTip`, `.toast`) conform
+  to `ActionScope`. Boolean and optional-item presentation state is owned by
+  the presenter; `onDismiss` observes committed teardown after the entry has
+  left the rendered tree.
 
 ## Products
 

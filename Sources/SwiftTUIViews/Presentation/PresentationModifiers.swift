@@ -11,12 +11,18 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   var actionsAuthoringContext: AuthoringContext?
   var messageAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
+  var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  var onDismissAuthoringContext: AuthoringContext? = nil
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -50,7 +56,8 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
             dismissInvalidator,
             triggerIdentity: triggerIdentity
           )
-        }
+        },
+        onDismiss: onDismiss
       )
 
       return .init(
@@ -75,12 +82,18 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
   var sheetContent: SheetContent
   var sheetContentAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
+  var onDismiss: (@MainActor @Sendable () -> Void)? = nil
+  var onDismissAuthoringContext: AuthoringContext? = nil
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -109,7 +122,8 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
             dismissInvalidator,
             triggerIdentity: triggerIdentity
           )
-        }
+        },
+        onDismiss: onDismiss
       )
 
       return .init(
@@ -120,6 +134,152 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
               sourceIdentity,
               item
             )
+          }
+        ]
+      )
+    }
+  }
+}
+
+package struct BuiltinItemPromptPresentationModifier<
+  Item: Identifiable & Sendable,
+  Actions: View,
+  Message: View
+>: PrimitiveViewModifier where Item.ID: Sendable {
+  var title: String
+  var item: Binding<Item?>
+  var spec: PromptPresentationSpec
+  var actions: @MainActor (Item) -> Actions
+  var message: @MainActor (Item) -> Message
+  var actionsAuthoringContext: AuthoringContext?
+  var messageAuthoringContext: AuthoringContext?
+  var dismissAuthoringContext: AuthoringContext?
+  var onDismiss: (@MainActor @Sendable () -> Void)?
+  var onDismissAuthoringContext: AuthoringContext?
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let itemBinding = item
+    let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
+    return resolveItemPresentationModifier(
+      content: content,
+      item: itemBinding,
+      in: context
+    ) { background, triggerIdentity, currentItem in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(
+        for: background,
+        token: "\(spec.token):\(String(reflecting: currentItem.id))"
+      )
+      let presentationItem = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: title,
+        descriptor: spec.descriptor,
+        actionPayloads: withAuthoringContext(actionsAuthoringContext) {
+          portalAttachmentDeclaredBuilderChildren(
+            from: actions(currentItem),
+            portalEntryID: portalEntryID
+          )
+        },
+        messagePayloads: withAuthoringContext(messageAuthoringContext) {
+          portalAttachmentDeclaredBuilderChildren(
+            from: message(currentItem),
+            portalEntryID: portalEntryID
+          )
+        },
+        contentPayloads: [],
+        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            itemBinding.wrappedValue = nil
+          }
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
+        },
+        onDismiss: onDismiss
+      )
+
+      return .init(
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            spec.reconcile(registry, sourceIdentity, presentationItem)
+          }
+        ]
+      )
+    }
+  }
+}
+
+package struct BuiltinItemSheetPresentationModifier<
+  Item: Identifiable & Sendable,
+  SheetContent: View
+>: PrimitiveViewModifier where Item.ID: Sendable {
+  var title: String
+  var item: Binding<Item?>
+  var spec: PromptPresentationSpec
+  var sheetContent: @MainActor (Item) -> SheetContent
+  var sheetContentAuthoringContext: AuthoringContext?
+  var dismissAuthoringContext: AuthoringContext?
+  var onDismiss: (@MainActor @Sendable () -> Void)?
+  var onDismissAuthoringContext: AuthoringContext?
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let itemBinding = item
+    let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
+    return resolveItemPresentationModifier(
+      content: content,
+      item: itemBinding,
+      in: context
+    ) { background, triggerIdentity, currentItem in
+      let sourceIdentity = background.identity
+      let portalEntryID = presentationAttachment(
+        for: background,
+        token: "\(spec.token):\(String(reflecting: currentItem.id))"
+      )
+      let presentationItem = PromptPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        title: title,
+        descriptor: spec.descriptor,
+        actionPayloads: [],
+        messagePayloads: [],
+        contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
+          portalAttachmentDeclaredBuilderChildren(
+            from: sheetContent(currentItem),
+            portalEntryID: portalEntryID
+          )
+        },
+        dismiss: { [itemBinding, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            itemBinding.wrappedValue = nil
+          }
+          requestPresentationDismissReconcile(
+            dismissInvalidator,
+            triggerIdentity: triggerIdentity
+          )
+        },
+        onDismiss: onDismiss
+      )
+
+      return .init(
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            spec.reconcile(registry, sourceIdentity, presentationItem)
           }
         ]
       )
@@ -196,19 +356,25 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
   package let sheetContentBuilder: ([ActivePaletteCommand]) -> SheetContent
   package let sheetContentAuthoringContext: AuthoringContext?
   package let dismissAuthoringContext: AuthoringContext?
+  package let onDismiss: (@MainActor @Sendable () -> Void)?
+  package let onDismissAuthoringContext: AuthoringContext?
 
   package init(
     title: String,
     isPresented: Binding<Bool>,
     sheetContentBuilder: @escaping ([ActivePaletteCommand]) -> SheetContent,
     sheetContentAuthoringContext: AuthoringContext?,
-    dismissAuthoringContext: AuthoringContext?
+    dismissAuthoringContext: AuthoringContext?,
+    onDismiss: (@MainActor @Sendable () -> Void)?,
+    onDismissAuthoringContext: AuthoringContext?
   ) {
     self.title = title
     self.isPresented = isPresented
     self.sheetContentBuilder = sheetContentBuilder
     self.sheetContentAuthoringContext = sheetContentAuthoringContext
     self.dismissAuthoringContext = dismissAuthoringContext
+    self.onDismiss = onDismiss
+    self.onDismissAuthoringContext = onDismissAuthoringContext
   }
 
   package func resolve<Base: View>(
@@ -216,6 +382,10 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let onDismiss = presentationDismissObserver(
+      onDismiss,
+      authoringContext: onDismissAuthoringContext
+    )
     let spec = sheetPromptPresentationSpec(chrome: .dropdown)
     // Absorbed `paletteCommand(...)` contributions are captured off the
     // background before they are cleared, so they reach the sheet-content
@@ -254,7 +424,8 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
             dismissInvalidator,
             triggerIdentity: triggerIdentity
           )
-        }
+        },
+        onDismiss: onDismiss
       )
 
       return .init(
@@ -283,6 +454,7 @@ extension ActionScope where Self: View {
   public func paletteSheet<S: StringProtocol, SheetContent: View>(
     _ title: S,
     isPresented: Binding<Bool>,
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     @ViewBuilder content: @escaping @MainActor ([ActivePaletteCommand]) -> SheetContent
   ) -> some View & ActionScope {
     modifier(
@@ -291,7 +463,9 @@ extension ActionScope where Self: View {
         isPresented: isPresented,
         sheetContentBuilder: content,
         sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
-        dismissAuthoringContext: makePortalAttachmentAuthoringContext()
+        dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
+        onDismiss: onDismiss,
+        onDismissAuthoringContext: makePortalAttachmentAuthoringContext()
       )
     )
   }
