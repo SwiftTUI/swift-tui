@@ -4,25 +4,39 @@ extension ResolvedNode {
   package func isEquivalentForMeasurement(
     to other: Self
   ) -> Bool {
-    structuralPath == other.structuralPath
-      && kind == other.kind
-      && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
-      && environmentSnapshot == other.environmentSnapshot
-      && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
-      && layoutMetadata == other.layoutMetadata
-      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
-      // cached measured node would carry the previous capture's guides into
-      // placement, so guide-carrying nodes never reuse cached measurements.
-      && !layoutMetadata.hasExplicitAlignmentGuides
-      && layoutRealizedContent?.equivalenceSignature
-        == other.layoutRealizedContent?.equivalenceSignature
-      && drawPayload.isEquivalentForMeasurement(to: other.drawPayload)
-      && intrinsicSize == other.intrinsicSize
-      && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
-      && children.count == other.children.count
-      && zip(children, other.children).allSatisfy { lhsChild, rhsChild in
-        lhsChild.isEquivalentForMeasurement(to: rhsChild)
+    // Node-hosted collections preserve authored row subtrees instead of
+    // collapsing them into draw payloads. Those trees can exceed the frame-tail
+    // worker's deliberately-small stack, and recursive equivalence previously
+    // overflowed it before the cache could reject or accept the entry. Keep the
+    // exact same field contract while moving the traversal storage to the heap.
+    var pending: [(Self, Self)] = [(self, other)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.structuralPath == rhs.structuralPath,
+        lhs.kind == rhs.kind,
+        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.layoutBehavior.isEquivalentForMeasurement(to: rhs.layoutBehavior),
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+        // cached measured node would carry the previous capture's guides into
+        // placement, so guide-carrying nodes never reuse cached measurements.
+        !lhs.layoutMetadata.hasExplicitAlignmentGuides,
+        lhs.layoutRealizedContent?.equivalenceSignature
+          == rhs.layoutRealizedContent?.equivalenceSignature,
+        lhs.drawPayload.isEquivalentForMeasurement(to: rhs.drawPayload),
+        lhs.intrinsicSize == rhs.intrinsicSize,
+        lhs.indexedChildSource?.measurementSignature
+          == rhs.indexedChildSource?.measurementSignature,
+        lhs.children.count == rhs.children.count
+      else {
+        return false
       }
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
+      }
+    }
+    return true
   }
 
   /// Stricter equivalence check used by the retained layout placement cache.

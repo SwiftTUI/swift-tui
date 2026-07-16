@@ -1,21 +1,51 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 
 // `Section` — the header/content/footer grouping view — lives in
 // `Section.swift`.
 
 /// Presents selectable rows in a vertically scrollable list.
 public struct List<SelectionValue: Hashable, Content: View>: PrimitiveView, ResolvableView {
-  public var selection: Binding<SelectionValue>
+  private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
   private var onActivate: (@MainActor (SelectionValue) -> Void)?
   private var content: Content
+  package var usesIndexedDataSource = false
 
+  @_disfavoredOverload
   public init(
     selection: Binding<SelectionValue>,
     onActivate: (@MainActor (SelectionValue) -> Void)? = nil,
     @ViewBuilder content: () -> Content
   ) {
-    self.selection = selection
+    selectionPolicy = .requiredSingle(selection)
     self.onActivate = onActivate
+    self.content = content()
+  }
+
+  public init(
+    selection: Binding<SelectionValue?>,
+    onActivate: (@MainActor (SelectionValue) -> Void)? = nil,
+    @ViewBuilder content: () -> Content
+  ) {
+    selectionPolicy = .optionalSingle(selection)
+    self.onActivate = onActivate
+    self.content = content()
+  }
+
+  public init(
+    selection: Binding<Set<SelectionValue>>,
+    onActivate: (@MainActor (SelectionValue) -> Void)? = nil,
+    @ViewBuilder content: () -> Content
+  ) {
+    selectionPolicy = .multiple(selection)
+    self.onActivate = onActivate
+    self.content = content()
+  }
+
+  public init(
+    @ViewBuilder content: () -> Content
+  ) where SelectionValue == Never {
+    selectionPolicy = .none
+    onActivate = nil
     self.content = content()
   }
 
@@ -28,7 +58,16 @@ public struct List<SelectionValue: Hashable, Content: View>: PrimitiveView, Reso
 
 extension List {
   private struct RowSelection: Sendable {
-    var tag: SelectionTag
+    var tag: SelectionTag?
+    var identity: Identity
+  }
+
+  private struct ResolvedItems {
+    var items: [ListItemPayload] = []
+    var rows: [RowSelection] = []
+    var children: [ResolvedNode] = []
+    var runtimeIssues: [RuntimeIssue] = []
+    var indexedSource: (any IndexedChildSource)?
   }
 
   private func resolvedNode(
@@ -41,14 +80,23 @@ extension List {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
-    let resolvedContent = resolvedItems(in: context.child(component: .named("ListItems")))
-    let rows = resolvedContent.rows
-    let selectedIndex = rows.firstIndex { row in
-      pickerSelectionMatches(
-        row.tag,
-        selection: selection.wrappedValue
+    let itemContext = context.child(component: .named("ListItems"))
+    let resolvedContent: ResolvedItems
+    if usesIndexedDataSource,
+      let source = makeIndexedChildSource(
+        from: content,
+        in: itemContext.settingEnvironment(\.isResolvingHostedCollectionContent, to: true)
       )
+    {
+      resolvedContent = resolvedIndexedItems(from: source, in: context)
+    } else {
+      resolvedContent = resolvedItems(in: itemContext)
     }
+    let rows = resolvedContent.rows
+    let selectedIndices = rows.indices.filter { index in
+      rows[index].tag.map(selectionPolicy.contains) == true
+    }
+    let selectedIndex = selectedIndices.first
     let focusedRowIndex = rows.indices.first { rowIndex in
       context.environmentValues.focusedIdentity
         == listRowIdentity(
@@ -70,18 +118,18 @@ extension List {
       isSelected: true
     )
 
-    if isEnabled {
-      let binding = selection
+    if isEnabled, selectionPolicy.isSelectable {
+      let policy = selectionPolicy
       let intake = HandlerDescriptorIntake(
         context: context,
         fallbackAuthoringScope: nil
       )
       let activate: @MainActor (SelectionTag) -> Bool = { tag in
-        guard let value = pickerSelectionValue(from: tag, as: SelectionValue.self) else {
+        guard let value = policy.value(from: tag) else {
           return false
         }
-        if binding.wrappedValue != value {
-          binding.wrappedValue = value
+        if !policy.isMultiple {
+          _ = policy.select(tag)
         }
         onActivate?(value)
         return true
@@ -93,11 +141,21 @@ extension List {
           delta = -1
         case .arrowDown:
           delta = 1
-        case .return, .space:
-          guard let selectedIndex, rows.indices.contains(selectedIndex) else {
+        case .return:
+          guard let activeRowIndex, rows.indices.contains(activeRowIndex) else {
             return false
           }
-          return activate(rows[selectedIndex].tag)
+          guard let tag = rows[activeRowIndex].tag else {
+            return false
+          }
+          return activate(tag)
+        case .space:
+          guard let activeRowIndex, rows.indices.contains(activeRowIndex),
+            let tag = rows[activeRowIndex].tag
+          else {
+            return false
+          }
+          return policy.isMultiple ? policy.toggle(tag) : activate(tag)
         default:
           delta = nil
         }
@@ -106,11 +164,7 @@ extension List {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: rows.map(\.tag),
-          delta: delta
-        )
+        return policy.step(orderedTags: rows.compactMap(\.tag), delta: delta)
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
@@ -121,20 +175,26 @@ extension List {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: rows.map(\.tag),
-          delta: delta
-        )
+        return policy.step(orderedTags: rows.compactMap(\.tag), delta: delta)
       }
 
-      for (rowIndex, row) in rows.enumerated() {
+      let interactionIndices: any Sequence<Int> =
+        if resolvedContent.indexedSource == nil {
+          rows.indices
+        } else {
+          collectionInteractionIndices(count: rows.count, anchor: activeRowIndex)
+        }
+      for rowIndex in interactionIndices {
+        let row = rows[rowIndex]
+        guard let tag = row.tag else {
+          continue
+        }
         let rowIdentity = listRowIdentity(
           for: context.identity,
           rowIndex: rowIndex
         )
         intake.registerAction(identity: rowIdentity) {
-          activate(row.tag)
+          policy.isMultiple ? policy.toggle(tag) : activate(tag)
         }
         intake.registerKeyHandler(identity: rowIdentity) { event in
           let delta: Int?
@@ -155,13 +215,18 @@ extension List {
             max(rowIndex + delta, rows.startIndex),
             rows.index(before: rows.endIndex)
           )
-          _ = setBoundSelection(binding, to: rows[targetIndex].tag)
+          guard let targetTag = rows[targetIndex].tag else {
+            return false
+          }
+          if !policy.isMultiple {
+            _ = policy.select(targetTag)
+          }
           return false
         }
       }
     }
 
-    let payload = ListPayload(
+    var payload = ListPayload(
       items: resolvedContent.items,
       selectedRowIndex: activeRowIndex,
       style: listStyle,
@@ -181,65 +246,107 @@ extension List {
       showsIndicators: showsIndicators,
       opacity: chrome.opacity
     )
+    payload.isViewportBacked = resolvedContent.indexedSource != nil
 
-    return ResolvedNode(
+    var metadata = focusableControlMetadata(
+      isFocusable: rows.isEmpty ? nil : false,
+      focusInteractions: .edit,
+      scrollRole: .list,
+      accessibilityRole: .list
+    )
+    metadata.hostedCollectionContainer = .init(kind: .list)
+    var node = ResolvedNode(
       identity: context.identity,
       kind: .view("List"),
+      children: resolvedContent.children,
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        isFocusable: rows.isEmpty ? nil : false,
-        focusInteractions: .edit,
-        scrollRole: .list,
-        accessibilityRole: .list
-      ),
-      drawPayload: .list(payload)
+      semanticMetadata: metadata,
+      drawPayload: .list(payload),
+      indexedChildSource: resolvedContent.indexedSource
     )
+    node.drawMetadata.clipsToBounds = true
+    var preferences = node.preferenceValues
+    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+    for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
+      runtimeIssues.append(issue)
+    }
+    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+    node.preferenceValues = preferences
+    return node
   }
 
   private func resolvedItems(
     in context: ResolveContext
-  ) -> (items: [ListItemPayload], rows: [RowSelection]) {
+  ) -> ResolvedItems {
     let nodes = resolveDeclaredChildren(
       content,
-      in: context,
+      in: context.settingEnvironment(\.isResolvingHostedCollectionContent, to: true),
       kindName: "ListContent"
     )
-    // The row content is value-collapsed into the list draw payload below, so
-    // these minted subtrees join no children array — without an anchor the
-    // list's departure can never reach them and they strand alive in the
-    // store (the F04/F91 teardown-coherence leak; the gallery collections-tab
-    // warning). Resolve-lifetime scope owns each detached value at the nearest
-    // declaring host.
-    for node in nodes {
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
-    }
-
-    var items: [ListItemPayload] = []
-    var rows: [RowSelection] = []
+    var result = ResolvedItems()
     var hasEmittedSection = false
     var previousSectionBottomVisibility: Visibility?
     collectTopLevelItems(
       from: nodes,
-      into: &items,
-      rows: &rows,
+      into: &result,
       hasEmittedSection: &hasEmittedSection,
       previousSectionBottomVisibility: &previousSectionBottomVisibility
     )
-    return (items, rows)
+    return result
+  }
+
+  private func resolvedIndexedItems(
+    from source: any IndexedChildSource,
+    in context: ResolveContext
+  ) -> ResolvedItems {
+    var result = ResolvedItems()
+    result.items.reserveCapacity(source.count)
+    result.rows.reserveCapacity(source.count)
+    for index in 0..<source.count {
+      let candidateTag = source.elementSelectionTag(at: index)
+      let compatibleTag = candidateTag.flatMap { tag in
+        selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
+      }
+      result.items.append(.init(kind: .row, text: ""))
+      result.rows.append(
+        .init(
+          tag: compatibleTag,
+          identity: source.elementIdentity(at: index)
+        )
+      )
+    }
+
+    let policy = selectionPolicy
+    result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
+      var node = rawNode
+      let row = resolvedHostedListRow(from: node)
+      let compatibleTag = row.tag.flatMap { tag in
+        policy.isSelectable && policy.value(from: tag) != nil ? tag : nil
+      }
+      node = applyingHostedRowForegroundStyle(
+        row.drawMetadata.listStyle?.rowForegroundStyle,
+        to: node
+      )
+      node.semanticMetadata.hostedCollectionItem = .init(
+        role: .listRow(rowIndex: index),
+        isSelectable: compatibleTag != nil
+      )
+      return node
+    }
+    return result
   }
 
   private func collectTopLevelItems(
     from nodes: [ResolvedNode],
-    into items: inout [ListItemPayload],
-    rows: inout [RowSelection],
+    into result: inout ResolvedItems,
     hasEmittedSection: inout Bool,
     previousSectionBottomVisibility: inout Visibility?
   ) {
-    for node in nodes {
+    for var node in nodes {
       if node.semanticMetadata.sectionRole == .section {
-        if hasEmittedSection, !items.isEmpty {
-          items.append(
+        if hasEmittedSection, !result.items.isEmpty {
+          result.items.append(
             .init(
               kind: .sectionBreak,
               text: "",
@@ -249,73 +356,159 @@ extension List {
               )
             )
           )
+          var breakMetadata = SemanticMetadata(isFocusable: false)
+          breakMetadata.hostedCollectionItem = .init(role: .listSectionBreak)
+          result.children.append(
+            ResolvedNode(
+              identity: node.identity.child(.named("ListSectionBreak")),
+              kind: .view("ListSectionBreak"),
+              environmentSnapshot: node.environmentSnapshot,
+              transactionSnapshot: node.transactionSnapshot,
+              semanticMetadata: breakMetadata,
+              intrinsicSize: .init(width: 1, height: 1)
+            )
+          )
         }
-        collectSection(node, into: &items, rows: &rows)
+        collectSection(node, into: &result)
         previousSectionBottomVisibility =
           node.drawMetadata.listStyle?.sectionSeparatorBottomVisibility
         hasEmittedSection = true
-      } else if let row = resolvedListRow(from: node) {
-        items.append(listItemPayload(from: row))
-        rows.append(.init(tag: row.tag))
+      } else if containsHostedCollectionRowBoundary(node) {
+        collectItems(from: [node], into: &result)
       } else {
-        collectTopLevelItems(
-          from: node.children,
-          into: &items,
-          rows: &rows,
-          hasEmittedSection: &hasEmittedSection,
-          previousSectionBottomVisibility: &previousSectionBottomVisibility
-        )
+        appendRow(node: &node, to: &result)
       }
     }
   }
 
   private func collectSection(
     _ node: ResolvedNode,
-    into items: inout [ListItemPayload],
-    rows: inout [RowSelection]
+    into result: inout ResolvedItems
   ) {
-    for child in node.children {
+    for var child in node.children {
       switch child.semanticMetadata.sectionRole {
       case .header:
         let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
-          items.append(
+          result.items.append(
             .init(
               kind: .header,
               text: label,
               style: listItemTextStyle(from: child.drawMetadata)
             )
           )
+          child.semanticMetadata.hostedCollectionItem = .init(role: .listHeader)
+          result.children.append(child)
         }
       case .footer:
         let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
-          items.append(
+          result.items.append(
             .init(
               kind: .footer,
               text: label,
               style: listItemTextStyle(from: child.drawMetadata)
             )
           )
+          child.semanticMetadata.hostedCollectionItem = .init(role: .listFooter)
+          result.children.append(child)
         }
       default:
-        collectItems(from: child.children, into: &items, rows: &rows)
+        collectItems(from: child.children, into: &result)
       }
     }
   }
 
   private func collectItems(
     from nodes: [ResolvedNode],
-    into items: inout [ListItemPayload],
-    rows: inout [RowSelection]
+    into result: inout ResolvedItems
   ) {
-    for node in nodes {
-      if let row = resolvedListRow(from: node) {
-        items.append(listItemPayload(from: row))
-        rows.append(.init(tag: row.tag))
-      } else {
-        collectItems(from: node.children, into: &items, rows: &rows)
+    for var node in nodes {
+      if node.semanticMetadata.isHostedCollectionRowBoundary {
+        appendRow(node: &node, to: &result)
+        continue
       }
+      if containsHostedCollectionRowBoundary(node) {
+        collectItems(from: node.children, into: &result)
+        continue
+      }
+      let row = resolvedHostedListRow(from: node)
+      if row.tagCount > 0 || node.children.isEmpty {
+        appendRow(node: &node, row: row, to: &result)
+      } else {
+        collectItems(from: node.children, into: &result)
+      }
+    }
+  }
+
+  private func containsHostedCollectionRowBoundary(_ node: ResolvedNode) -> Bool {
+    node.semanticMetadata.isHostedCollectionRowBoundary
+      || node.children.contains(where: containsHostedCollectionRowBoundary)
+  }
+
+  private func appendRow(
+    node: inout ResolvedNode,
+    to result: inout ResolvedItems
+  ) {
+    appendRow(node: &node, row: resolvedHostedListRow(from: node), to: &result)
+  }
+
+  private func appendRow(
+    node: inout ResolvedNode,
+    row: ResolvedListRow,
+    to result: inout ResolvedItems
+  ) {
+    let rowIndex = result.rows.count
+    let compatibleTag = row.tag.flatMap { tag in
+      selectionPolicy.value(from: tag) == nil ? nil : tag
+    }
+    result.items.append(listItemPayload(from: row))
+    result.rows.append(.init(tag: compatibleTag, identity: node.identity))
+    node = applyingHostedRowForegroundStyle(
+      row.drawMetadata.listStyle?.rowForegroundStyle,
+      to: node
+    )
+    node.semanticMetadata.hostedCollectionItem = .init(
+      role: .listRow(rowIndex: rowIndex),
+      isSelectable: compatibleTag != nil
+    )
+    result.children.append(node)
+
+    let issue: RuntimeIssue?
+    if !selectionPolicy.isSelectable {
+      issue = nil
+    } else if row.tagCount == 0 {
+      issue = RuntimeIssue(
+        severity: .warning,
+        code: "collection.missingSelectionTag",
+        message:
+          "Selectable List row has no selection tag; the row remains visible but is not selectable.",
+        identity: node.identity,
+        source: "List"
+      )
+    } else if row.tagCount > 1 {
+      issue = RuntimeIssue(
+        severity: .error,
+        code: "collection.ambiguousSelectionTag",
+        message:
+          "Selectable List row has \(row.tagCount) selection tags; the row remains visible but is not selectable.",
+        identity: node.identity,
+        source: "List"
+      )
+    } else if compatibleTag == nil {
+      issue = RuntimeIssue(
+        severity: .warning,
+        code: "collection.incompatibleSelectionTag",
+        message:
+          "Selectable List row has a tag incompatible with the selection value type; the row remains visible but is not selectable.",
+        identity: node.identity,
+        source: "List"
+      )
+    } else {
+      issue = nil
+    }
+    if let issue, !result.runtimeIssues.contains(issue) {
+      result.runtimeIssues.append(issue)
     }
   }
 }

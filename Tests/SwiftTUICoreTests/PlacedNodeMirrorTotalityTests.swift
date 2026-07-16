@@ -25,6 +25,7 @@ struct PlacedNodeMirrorTotalityTests {
   private static let storageAliases: [String: String] = [
     "_semanticMetadata": "semanticMetadata",
     "_boxedLayoutBehavior": "layoutBehavior",
+    "_placementMetadata": "placementMetadata",
   ]
 
   /// Per-mirror exemption manifests: stored fields the mirror deliberately
@@ -55,8 +56,8 @@ struct PlacedNodeMirrorTotalityTests {
       "children": "placement-owned (child placement)",
       "subtreeNodeCount": "derived cache recomputed from placement geometry",
       "subtreeBounds": "derived cache recomputed from placement geometry",
-      "lazyChildScrollEstimates":
-        "placement-owned: populated by the layout engine's lazy allocation loop, not "
+      "placementMetadata":
+        "placement-owned: populated from allocation snapshots by the layout engine, not "
         + "projected from the resolved node",
     ],
   ]
@@ -100,10 +101,7 @@ struct PlacedNodeMirrorTotalityTests {
     let fields = try placedNodeFieldNames()
     #expect(Set(fields).count == fields.count)
     #expect(fields.count >= 20, "parser found implausibly few stored fields: \(fields)")
-    #expect(
-      fields.contains("lazyChildScrollEstimates"),
-      "parser lost the F133 field — check the stored-property discrimination"
-    )
+    #expect(fields.contains("placementMetadata"), "parser lost the placement sidecar")
 
     let body = try mirrorText(for: mirror)
     #expect(!body.isEmpty, "could not locate the \(mirror) mirror source")

@@ -103,6 +103,21 @@ package struct LazyChildScrollEstimate: Equatable, Sendable {
   }
 }
 
+/// Rare placement-only metadata kept out of `PlacedNode`'s inline footprint.
+///
+/// Deep placed trees are destroyed recursively by Swift value semantics, so
+/// adding another inline field to `PlacedNode` can exhaust the thread stack at
+/// otherwise-supported depths. Grouping sparse allocation products behind one
+/// copy-on-write box keeps the recursive node size stable.
+package struct PlacedNodePlacementMetadata: Equatable, Sendable {
+  package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
+  package var hostedCollectionTableColumnWidths: [Int]?
+
+  package var isEmpty: Bool {
+    lazyChildScrollEstimates == nil && hostedCollectionTableColumnWidths == nil
+  }
+}
+
 /// A node after layout has assigned concrete bounds.
 ///
 /// Placement owns final bounds, content bounds, clipping, z-order, child
@@ -204,7 +219,30 @@ package struct PlacedNode: Equatable, Sendable {
   /// see ``LazyChildScrollEstimate``. Populated only on lazy containers
   /// whose allocation covers more children than the visible window placed;
   /// `nil` everywhere else.
-  package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
+  private var _placementMetadata: Boxed<PlacedNodePlacementMetadata>?
+  package var placementMetadata: PlacedNodePlacementMetadata {
+    get { _placementMetadata?.value ?? .init() }
+    set {
+      _placementMetadata = newValue.isEmpty ? nil : Boxed(newValue)
+    }
+  }
+  package var lazyChildScrollEstimates: [LazyChildScrollEstimate]? {
+    get { placementMetadata.lazyChildScrollEstimates }
+    set {
+      var metadata = placementMetadata
+      metadata.lazyChildScrollEstimates = newValue
+      placementMetadata = metadata
+    }
+  }
+  /// Measurement-discovered auto widths for an indexed hosted Table.
+  package var hostedCollectionTableColumnWidths: [Int]? {
+    get { placementMetadata.hostedCollectionTableColumnWidths }
+    set {
+      var metadata = placementMetadata
+      metadata.hostedCollectionTableColumnWidths = newValue
+      placementMetadata = metadata
+    }
+  }
   package var resolvedMetadata: PlacedNodeResolvedMetadata {
     get {
       PlacedNodeResolvedMetadata(
@@ -313,6 +351,7 @@ package struct PlacedNode: Equatable, Sendable {
     }
     self.isTransient = isTransient
     self.matchedGeometry = matchedGeometry
+    _placementMetadata = nil
     subtreeNodeCount = 1
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
@@ -404,6 +443,6 @@ extension PlacedNode {
       && lhs.subtreeNodeCount == rhs.subtreeNodeCount
       && lhs.isTransient == rhs.isTransient
       && lhs.matchedGeometry == rhs.matchedGeometry
-      && lhs.lazyChildScrollEstimates == rhs.lazyChildScrollEstimates
+      && lhs.placementMetadata == rhs.placementMetadata
   }
 }

@@ -15,17 +15,20 @@ package struct ListDisplayLine {
   var isHeader: Bool
   var rowIndex: Int?
   var sectionIndex: Int?
+  var itemIndex: Int?
 
   init(
     kind: Kind,
     isHeader: Bool,
     rowIndex: Int?,
-    sectionIndex: Int? = nil
+    sectionIndex: Int? = nil,
+    itemIndex: Int? = nil
   ) {
     self.kind = kind
     self.isHeader = isHeader
     self.rowIndex = rowIndex
     self.sectionIndex = sectionIndex
+    self.itemIndex = itemIndex
   }
 }
 
@@ -38,7 +41,8 @@ package struct ListVisibleLayout {
 extension DrawExtractor {
   func listCommands(
     for payload: ListPayload,
-    in bounds: CellRect
+    in bounds: CellRect,
+    hostsCommittedItems: Bool = false
   ) -> [DrawCommand] {
     let layout = payload.style.visibleListLayout(
       for: payload,
@@ -60,16 +64,18 @@ extension DrawExtractor {
 
       switch line.kind {
       case .text(let content, let style):
-        commands.append(
-          .text(
-            bounds: lineBounds,
-            content: content,
-            style: style,
-            lineLimit: 1,
-            truncationMode: .tail,
-            wrappingStrategy: .wordBoundary
+        if !hostsCommittedItems || line.itemIndex == nil {
+          commands.append(
+            .text(
+              bounds: lineBounds,
+              content: content,
+              style: style,
+              lineLimit: 1,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
           )
-        )
+        }
       case .row(let marker, let markerStyle, let text, let textStyle, let backgroundStyle):
         if let backgroundStyle {
           commands.append(
@@ -105,7 +111,7 @@ extension DrawExtractor {
             )
           )
         }
-        if textBounds.size.width > 0 {
+        if textBounds.size.width > 0, !hostsCommittedItems {
           commands.append(
             .text(
               bounds: textBounds,

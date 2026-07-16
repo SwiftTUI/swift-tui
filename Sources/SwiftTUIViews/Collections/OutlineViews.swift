@@ -369,21 +369,24 @@ private struct OutlineEntry<Element, ID: Hashable & Sendable>: Identifiable {
   let isLast: Bool
 }
 
-private struct OutlineRow<Content: View>: View {
+private struct OutlineRow<Content: View>: PrimitiveView, ResolvableView {
   let prefix: String
   let content: Content
   let authoringScope: AuthoringContext?
 
   @ViewBuilder
-  var body: some View {
-    if prefix.isEmpty {
+  private func rowBody(
+    prefix renderedPrefix: String,
+    spacing: Int
+  ) -> some View {
+    if renderedPrefix.isEmpty {
       ScopedOutlineRowContent(
         authoringScope: authoringScope,
         content: content
       )
     } else {
-      HStack(alignment: .firstTextBaseline, spacing: 0) {
-        Text(prefix)
+      HStack(alignment: .firstTextBaseline, spacing: spacing) {
+        Text(renderedPrefix)
           .lineLimit(1)
           .fixedSize(horizontal: true, vertical: false)
           .foregroundStyle(.terminalBorder(.neutral))
@@ -393,6 +396,28 @@ private struct OutlineRow<Content: View>: View {
         )
       }
     }
+  }
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let isHosted = context.environmentValues.isResolvingHostedCollectionContent
+    let renderedPrefix =
+      isHosted
+      ? String(prefix.drop(while: \.isWhitespace))
+      : prefix
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("OutlineRow"),
+        children: resolveDeclaredChildren(
+          rowBody(prefix: renderedPrefix, spacing: isHosted ? 1 : 0),
+          in: context.child(component: .named("Content")),
+          kindName: "OutlineRow"
+        ),
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: .init(isHostedCollectionRowBoundary: true)
+      )
+    ]
   }
 }
 

@@ -1,4 +1,4 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 
 /// Declares the cell content for a row in a ``Table``.
 public struct TableRow<Content: View>: PrimitiveView, ResolvableView {
@@ -39,16 +39,38 @@ extension TableRow {
 /// Presents row and column data in a terminal table.
 public struct Table<SelectionValue: Hashable, Rows: View>: PrimitiveView, ResolvableView {
   public var columns: [TableColumn]
-  private var selection: Binding<SelectionValue>?
+  private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
   private var rows: Rows
+  package var usesIndexedDataSource = false
 
+  @_disfavoredOverload
   public init(
     selection: Binding<SelectionValue>,
     columns: [TableColumn],
     @ViewBuilder rows: () -> Rows
   ) {
     self.columns = columns
-    self.selection = selection
+    selectionPolicy = .requiredSingle(selection)
+    self.rows = rows()
+  }
+
+  public init(
+    selection: Binding<SelectionValue?>,
+    columns: [TableColumn],
+    @ViewBuilder rows: () -> Rows
+  ) {
+    self.columns = columns
+    selectionPolicy = .optionalSingle(selection)
+    self.rows = rows()
+  }
+
+  public init(
+    selection: Binding<Set<SelectionValue>>,
+    columns: [TableColumn],
+    @ViewBuilder rows: () -> Rows
+  ) {
+    self.columns = columns
+    selectionPolicy = .multiple(selection)
     self.rows = rows()
   }
 
@@ -57,7 +79,7 @@ public struct Table<SelectionValue: Hashable, Rows: View>: PrimitiveView, Resolv
     @ViewBuilder rows: () -> Rows
   ) where SelectionValue == Never {
     self.columns = columns
-    selection = nil
+    selectionPolicy = .none
     self.rows = rows()
   }
 
@@ -69,6 +91,13 @@ public struct Table<SelectionValue: Hashable, Rows: View>: PrimitiveView, Resolv
 }
 
 extension Table {
+  private struct ResolvedRows {
+    var payloads: [TableRowPayload] = []
+    var children: [ResolvedNode] = []
+    var runtimeIssues: [RuntimeIssue] = []
+    var indexedSource: (any IndexedChildSource)?
+  }
+
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
@@ -76,26 +105,43 @@ extension Table {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isSelectable = selection != nil
+    let isSelectable = selectionPolicy.isSelectable
     let tableStyle = context.environmentValues.listStyle.presentation
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
     let showsHeaders =
       context.environmentValues.tableHeaderVisibility != .hidden
     let resolvedColumns = columns.map(\.resolvedTableColumnPayload)
-    let resolvedRows = resolvedRows(in: context.child(component: .named("TableRows")))
-    let selectableRowIndices = resolvedRows.indices.filter { index in
-      resolvedRows[index].tag != nil
+    let rowContext = context.child(component: .named("TableRows"))
+    var resolvedContent: ResolvedRows
+    if usesIndexedDataSource, let source = makeIndexedChildSource(from: rows, in: rowContext) {
+      resolvedContent = resolvedIndexedRows(
+        from: source,
+        in: context,
+        columns: resolvedColumns,
+        tableStyle: tableStyle
+      )
+    } else {
+      resolvedContent = resolvedRows(in: rowContext)
     }
-    let selectedIndex: Int? =
-      if let selection {
-        resolvedRows.firstIndex { row in
-          guard let tag = row.tag else {
-            return false
-          }
-          return pickerSelectionMatches(tag, selection: selection.wrappedValue)
-        }
-      } else { nil }
+    let resolvedRows = resolvedContent.payloads
+    if resolvedContent.indexedSource == nil {
+      resolvedContent.children = hostedTableRowNodes(
+        resolvedContent.children,
+        columns: resolvedColumns,
+        rows: resolvedRows,
+        joinGlyph: tableStyle.tableBorderGlyphs.columnJoin
+      )
+    }
+    let selectableRowIndices = resolvedRows.indices.filter { index in
+      guard let tag = resolvedRows[index].tag else {
+        return false
+      }
+      return pickerSelectionValue(from: tag, as: SelectionValue.self) != nil
+    }
+    let selectedIndex = resolvedRows.firstIndex { row in
+      row.tag.map(selectionPolicy.contains) == true
+    }
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
@@ -106,8 +152,8 @@ extension Table {
       isSelected: true
     )
 
-    if isEnabled, let selection {
-      let binding = selection
+    if isEnabled, selectionPolicy.isSelectable {
+      let policy = selectionPolicy
       let intake = HandlerDescriptorIntake(
         context: context,
         fallbackAuthoringScope: nil
@@ -130,11 +176,7 @@ extension Table {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: selectableTags,
-          delta: delta
-        )
+        return policy.step(orderedTags: selectableTags, delta: delta)
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
@@ -145,14 +187,16 @@ extension Table {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: selectableTags,
-          delta: delta
-        )
+        return policy.step(orderedTags: selectableTags, delta: delta)
       }
 
-      for rowIndex in selectableRowIndices {
+      let interactionIndices: any Sequence<Int> =
+        if resolvedContent.indexedSource == nil {
+          selectableRowIndices
+        } else {
+          collectionInteractionIndices(count: resolvedRows.count, anchor: selectedIndex)
+        }
+      for rowIndex in interactionIndices {
         guard let tag = resolvedRows[rowIndex].tag else {
           continue
         }
@@ -168,12 +212,12 @@ extension Table {
             return false
           }
 
-          return setBoundSelection(binding, to: tag)
+          return policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
         }
       }
     }
 
-    let payload = TablePayload(
+    var payload = TablePayload(
       columns: resolvedColumns,
       rows: resolvedRows,
       selectedRowIndex: selectedIndex,
@@ -189,50 +233,189 @@ extension Table {
       showsIndicators: showsIndicators,
       opacity: chrome.opacity
     )
+    payload.isViewportBacked = resolvedContent.indexedSource != nil
 
-    return ResolvedNode(
+    var metadata = focusableControlMetadata(
+      isFocusable: isSelectable ? nil : false,
+      focusInteractions: isSelectable ? .edit : .automatic,
+      scrollRole: .table,
+      accessibilityRole: .table
+    )
+    metadata.hostedCollectionContainer = .init(kind: .table)
+    var node = ResolvedNode(
       identity: context.identity,
       kind: .view("Table"),
+      children: resolvedContent.children,
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        isFocusable: isSelectable ? nil : false,
-        focusInteractions: isSelectable ? .edit : .automatic,
-        scrollRole: .table,
-        accessibilityRole: .table
-      ),
-      drawPayload: .table(payload)
+      semanticMetadata: metadata,
+      drawPayload: .table(payload),
+      indexedChildSource: resolvedContent.indexedSource
     )
+    node.drawMetadata.clipsToBounds = true
+    var preferences = node.preferenceValues
+    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+    for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
+      runtimeIssues.append(issue)
+    }
+    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+    node.preferenceValues = preferences
+    return node
+  }
+
+  private func hostedTableRowNodes(
+    _ rows: [ResolvedNode],
+    columns: [TableColumnPayload],
+    rows payloads: [TableRowPayload],
+    joinGlyph: String
+  ) -> [ResolvedNode] {
+    let widths = measureTableColumnWidths(columns: columns, rows: payloads)
+    let joinWidth = layoutText(
+      for: columns.isEmpty ? "" : joinGlyph,
+      width: nil
+    ).size.width
+
+    return rows.map { row in
+      var row = row
+      row.children = row.children.enumerated().map { index, cell in
+        let cell = singleLineHostedTableCell(cell)
+        let width = widths.indices.contains(index) ? widths[index] : 1
+        let alignment =
+          columns.indices.contains(index)
+          ? hostedCellAlignment(columns[index].alignment)
+          : Alignment.leading
+        var hostedCell = ResolvedNode(
+          identity: row.identity.child(.indexed("HostedTableCell", index: index)),
+          kind: .view("HostedTableCell"),
+          children: [cell],
+          environmentSnapshot: cell.environmentSnapshot,
+          transactionSnapshot: cell.transactionSnapshot,
+          layoutBehavior: .frame(width: width, height: nil, alignment: alignment),
+          semanticMetadata: .init(isFocusable: false)
+        )
+        hostedCell.drawMetadata.clipsToBounds = true
+        return hostedCell
+      }
+      row.layoutBehavior = .stack(
+        axis: .horizontal,
+        spacing: 2 + joinWidth,
+        horizontalAlignment: .leading,
+        verticalAlignment: .center
+      )
+      return row
+    }
+  }
+
+  private func hostedCellAlignment(_ alignment: TableCellAlignment) -> Alignment {
+    switch alignment {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
+  private func singleLineHostedTableCell(_ source: ResolvedNode) -> ResolvedNode {
+    var node = source
+    node.layoutMetadata.lineLimit = 1
+    node.layoutMetadata.textTruncationMode = .tail
+    node.children = node.children.map(singleLineHostedTableCell)
+    return node
   }
 
   private func resolvedRows(
     in context: ResolveContext
-  ) -> [TableRowPayload] {
+  ) -> ResolvedRows {
     let nodes = resolveDeclaredChildren(
       rows,
       in: context,
       kindName: "TableContent"
     )
-    // The row content is value-collapsed into the table draw payload below —
-    // same stranding shape as `List.resolvedItems`; see the anchor comment
-    // there.
-    for node in nodes {
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
+    var result = ResolvedRows()
+    collectTableRows(from: nodes, into: &result)
+    return result
+  }
+
+  private func resolvedIndexedRows(
+    from source: any IndexedChildSource,
+    in context: ResolveContext,
+    columns: [TableColumnPayload],
+    tableStyle: CollectionStylePresentation
+  ) -> ResolvedRows {
+    var result = ResolvedRows()
+    result.payloads.reserveCapacity(source.count)
+    for index in 0..<source.count {
+      let candidateTag = source.elementSelectionTag(at: index)
+      let compatibleTag = candidateTag.flatMap { tag in
+        selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
+      }
+      result.payloads.append(
+        .init(
+          tag: compatibleTag,
+          cells: columns.map { _ in .init(text: "") }
+        )
+      )
     }
-    var rows: [TableRowPayload] = []
-    collectTableRows(from: nodes, into: &rows)
-    return rows
+
+    let policy = selectionPolicy
+    result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
+      var node = rawNode
+      node.semanticMetadata.accessibilityRole = nil
+      let tag = node.semanticMetadata.selectionTag
+      let compatibleTag = tag.flatMap { tag in
+        policy.isSelectable && policy.value(from: tag) != nil ? tag : nil
+      }
+      let rowPayload = TableRowPayload(
+        tag: compatibleTag,
+        cells: tableRowCellPayloads(from: node),
+        style: listItemTextStyle(from: node.drawMetadata),
+        rowForegroundStyle: node.drawMetadata.listStyle?.rowForegroundStyle,
+        rowBackgroundStyle: node.drawMetadata.listStyle?.rowBackgroundStyle,
+        rowSeparators: .init(
+          top: node.drawMetadata.listStyle?.rowSeparatorTopVisibility,
+          bottom: node.drawMetadata.listStyle?.rowSeparatorBottomVisibility
+        )
+      )
+      node = applyingHostedRowForegroundStyle(
+        node.drawMetadata.listStyle?.rowForegroundStyle,
+        to: node
+      )
+      node.semanticMetadata.hostedCollectionItem = .init(
+        role: .tableRow(rowIndex: index),
+        isSelectable: compatibleTag != nil
+      )
+      node =
+        hostedTableRowNodes(
+          [node],
+          columns: columns,
+          rows: [rowPayload],
+          joinGlyph: tableStyle.tableBorderGlyphs.columnJoin
+        )[0]
+      return node
+    }
+    return result
   }
 
   private func collectTableRows(
     from nodes: [ResolvedNode],
-    into rows: inout [TableRowPayload]
+    into result: inout ResolvedRows
   ) {
-    for node in nodes {
+    for var node in nodes {
       if node.semanticMetadata.accessibilityRole == .tableRow {
-        rows.append(
+        // TableRow is a structural host. Nested cell content contributes its
+        // own accessibility normally; the table container owns the table role
+        // and row-background selection remains a separate fallback route.
+        node.semanticMetadata.accessibilityRole = nil
+        let rowIndex = result.payloads.count
+        let tag = node.semanticMetadata.selectionTag
+        let compatibleTag = tag.flatMap { tag in
+          selectionPolicy.value(from: tag) == nil ? nil : tag
+        }
+        result.payloads.append(
           .init(
-            tag: node.semanticMetadata.selectionTag,
+            tag: compatibleTag,
             cells: tableRowCellPayloads(from: node),
             style: listItemTextStyle(from: node.drawMetadata),
             rowForegroundStyle: node.drawMetadata.listStyle?.rowForegroundStyle,
@@ -243,8 +426,46 @@ extension Table {
             )
           )
         )
+        node = applyingHostedRowForegroundStyle(
+          node.drawMetadata.listStyle?.rowForegroundStyle,
+          to: node
+        )
+        node.semanticMetadata.hostedCollectionItem = .init(
+          role: .tableRow(rowIndex: rowIndex),
+          isSelectable: compatibleTag != nil
+        )
+        result.children.append(node)
+
+        guard selectionPolicy.isSelectable else {
+          continue
+        }
+        let issue: RuntimeIssue?
+        if tag == nil {
+          issue = RuntimeIssue(
+            severity: .warning,
+            code: "collection.missingSelectionTag",
+            message:
+              "Selectable Table row has no selection tag; the row remains visible but is not selectable.",
+            identity: node.identity,
+            source: "Table"
+          )
+        } else if compatibleTag == nil {
+          issue = RuntimeIssue(
+            severity: .warning,
+            code: "collection.incompatibleSelectionTag",
+            message:
+              "Selectable Table row has a tag incompatible with the selection value type; the row remains visible but is not selectable.",
+            identity: node.identity,
+            source: "Table"
+          )
+        } else {
+          issue = nil
+        }
+        if let issue, !result.runtimeIssues.contains(issue) {
+          result.runtimeIssues.append(issue)
+        }
       } else {
-        collectTableRows(from: node.children, into: &rows)
+        collectTableRows(from: node.children, into: &result)
       }
     }
   }

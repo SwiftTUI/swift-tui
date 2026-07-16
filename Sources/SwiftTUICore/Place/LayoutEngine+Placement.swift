@@ -31,6 +31,9 @@ extension LayoutEngine {
       measured: measured,
       placedChildren: children
     )
+    node.hostedCollectionTableColumnWidths =
+      measured.containerAllocationSnapshot?
+      .hostedCollection?.tableColumnWidths
     return node
   }
 
@@ -245,6 +248,7 @@ extension LayoutEngine {
         )
       }
     }
+    translatedNode.hostedCollectionTableColumnWidths = node.hostedCollectionTableColumnWidths
     return translatedNode
   }
 

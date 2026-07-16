@@ -2,6 +2,13 @@ extension LayoutEngine {
   package func stackChildren(
     for resolved: ResolvedNode
   ) -> [ResolvedNode] {
+    // Hosted List/Table sources have their own viewport allocation snapshot.
+    // Treating them as generic indexed stacks here realizes the entire source
+    // during enclosing-stack flexibility/minimum-size derivation, even though
+    // their measurement already contains only the visible window.
+    if resolved.semanticMetadata.hostedCollectionContainer != nil {
+      return resolved.children
+    }
     guard let source = resolved.indexedChildSource else {
       return resolved.children
     }

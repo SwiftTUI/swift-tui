@@ -81,6 +81,7 @@ public struct TablePayload: Equatable, Sendable {
   public var showsSelectionMarker: Bool
   public var showsIndicators: Bool
   public var opacity: Double
+  package var isViewportBacked: Bool = false
 
   public init(
     columns: [TableColumnPayload],

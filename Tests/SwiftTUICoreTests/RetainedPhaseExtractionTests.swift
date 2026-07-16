@@ -233,6 +233,23 @@ struct RetainedPhaseExtractionTests {
     #expect(container != changed)
   }
 
+  @Test("phase signature distinguishes hosted collection table column widths")
+  func phaseSignatureDistinguishesHostedCollectionTableColumnWidths() {
+    var table = PlacedNode(
+      identity: testIdentity("table"),
+      bounds: .init(origin: .zero, size: .init(width: 20, height: 4))
+    )
+    table.hostedCollectionTableColumnWidths = [8, 10]
+    var changed = table
+    changed.hostedCollectionTableColumnWidths = [12, 10]
+
+    let signature = RetainedPhaseExtractionSignature.make(from: table)
+    let changedSignature = RetainedPhaseExtractionSignature.make(from: changed)
+    #expect(signature != nil)
+    #expect(signature != changedSignature)
+    #expect(table != changed)
+  }
+
   @Test("retained phase signature rejects type-erased draw payloads")
   func retainedPhaseSignatureRejectsTypeErasedDrawPayloads() {
     struct Dots: CanvasDrawing, Equatable {

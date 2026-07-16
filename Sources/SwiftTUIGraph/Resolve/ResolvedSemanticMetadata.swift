@@ -79,6 +79,9 @@ public struct SemanticMetadata: Equatable, Sendable {
   /// conditional-branch re-resolve that re-mints the chain node. Region
   /// identity, rect, and focus stay structural.
   package var explicitRouteIdentity: Identity?
+  package var hostedCollectionContainer: HostedCollectionContainerMetadata?
+  package var hostedCollectionItem: HostedCollectionItemMetadata?
+  package var isHostedCollectionRowBoundary: Bool
 
   package var focusScopeBoundary: Bool {
     get { flag(Self.focusScopeBoundaryFlag) }
@@ -237,7 +240,10 @@ public struct SemanticMetadata: Equatable, Sendable {
     explicitInteractionRect: CellRect? = nil,
     explicitInteractionPath: Path? = nil,
     namedCoordinateSpaceName: String? = nil,
-    interactionAvailability: InteractionAvailability = .enabled
+    interactionAvailability: InteractionAvailability = .enabled,
+    hostedCollectionContainer: HostedCollectionContainerMetadata? = nil,
+    hostedCollectionItem: HostedCollectionItemMetadata? = nil,
+    isHostedCollectionRowBoundary: Bool = false
   ) {
     flags = Self.makeFlags(
       isFocusable: isFocusable,
@@ -267,6 +273,9 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.explicitInteractionPath = explicitInteractionPath
     self.namedCoordinateSpaceName = namedCoordinateSpaceName
     self.interactionAvailability = interactionAvailability
+    self.hostedCollectionContainer = hostedCollectionContainer
+    self.hostedCollectionItem = hostedCollectionItem
+    self.isHostedCollectionRowBoundary = isHostedCollectionRowBoundary
   }
 
   public func merging(_ other: Self) -> Self {
@@ -303,7 +312,11 @@ public struct SemanticMetadata: Equatable, Sendable {
       interactionAvailability: mergedInteractionAvailability(
         interactionAvailability,
         other.interactionAvailability
-      )
+      ),
+      hostedCollectionContainer: other.hostedCollectionContainer ?? hostedCollectionContainer,
+      hostedCollectionItem: other.hostedCollectionItem ?? hostedCollectionItem,
+      isHostedCollectionRowBoundary: isHostedCollectionRowBoundary
+        || other.isHostedCollectionRowBoundary
     )
     merged.explicitRouteIdentity = other.explicitRouteIdentity ?? explicitRouteIdentity
     return merged
@@ -378,6 +391,45 @@ public struct SemanticMetadata: Equatable, Sendable {
       flags |= accessibilityHiddenFlag
     }
     return flags
+  }
+}
+
+package enum HostedCollectionContainerKind: Equatable, Sendable {
+  case list
+  case table
+}
+
+package struct HostedCollectionContainerMetadata: Equatable, Sendable {
+  package var kind: HostedCollectionContainerKind
+  package var isSourceBacked: Bool
+
+  package init(
+    kind: HostedCollectionContainerKind,
+    isSourceBacked: Bool = false
+  ) {
+    self.kind = kind
+    self.isSourceBacked = isSourceBacked
+  }
+}
+
+package enum HostedCollectionItemRole: Equatable, Sendable {
+  case listHeader
+  case listFooter
+  case listRow(rowIndex: Int)
+  case listSectionBreak
+  case tableRow(rowIndex: Int)
+}
+
+package struct HostedCollectionItemMetadata: Equatable, Sendable {
+  package var role: HostedCollectionItemRole
+  package var isSelectable: Bool
+
+  package init(
+    role: HostedCollectionItemRole,
+    isSelectable: Bool = false
+  ) {
+    self.role = role
+    self.isSelectable = isSelectable
   }
 }
 

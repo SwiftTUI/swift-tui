@@ -43,6 +43,8 @@ private struct DrawPhaseProjection {
   var drawEffects: DrawEffects
   var drawPayload: DrawPayload
   var layoutBehavior: LayoutBehavior
+  var hostedCollectionContainer: HostedCollectionContainerMetadata?
+  var hostedTableColumnWidths: [Int]?
 }
 
 private enum ExtractionStep {
@@ -253,9 +255,22 @@ extension DrawExtractor {
         )
       )
     case .list(let payload):
-      commands.append(contentsOf: listCommands(for: payload, in: bounds))
+      commands.append(
+        contentsOf: listCommands(
+          for: payload,
+          in: bounds,
+          hostsCommittedItems: projection.hostedCollectionContainer?.kind == .list
+        )
+      )
     case .table(let payload):
-      commands.append(contentsOf: tableCommands(for: payload, in: bounds))
+      commands.append(
+        contentsOf: tableCommands(
+          for: payload,
+          in: bounds,
+          hostsCommittedItems: projection.hostedCollectionContainer?.kind == .table,
+          columnWidths: projection.hostedTableColumnWidths
+        )
+      )
     case .shape(let payload):
       switch payload.operation {
       case .fill(let style, let mode):
@@ -398,7 +413,9 @@ extension DrawExtractor {
       drawMetadata: placed.drawMetadata,
       drawEffects: placed.drawEffects,
       drawPayload: placed.drawPayload,
-      layoutBehavior: placed.layoutBehavior
+      layoutBehavior: placed.layoutBehavior,
+      hostedCollectionContainer: placed.semanticMetadata.hostedCollectionContainer,
+      hostedTableColumnWidths: placed.hostedCollectionTableColumnWidths
     )
   }
 

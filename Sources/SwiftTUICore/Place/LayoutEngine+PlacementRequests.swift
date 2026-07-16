@@ -1,3 +1,5 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
   func placementRequests(
     for resolved: ResolvedNode,
@@ -17,6 +19,30 @@ extension LayoutEngine {
 
     switch resolved.layoutBehavior {
     case .intrinsic:
+      if let hostedCollection = resolved.semanticMetadata.hostedCollectionContainer {
+        switch hostedCollection.kind {
+        case .list:
+          if case .list(let payload) = resolved.drawPayload {
+            return hostedListPlacementRequests(
+              for: resolved,
+              measured: measured,
+              payload: payload,
+              in: bounds,
+              passContext: passContext
+            )
+          }
+        case .table:
+          if case .table(let payload) = resolved.drawPayload {
+            return hostedTablePlacementRequests(
+              for: resolved,
+              measured: measured,
+              payload: payload,
+              in: bounds,
+              passContext: passContext
+            )
+          }
+        }
+      }
       let childCount = min(resolved.children.count, measured.childMeasurements.count)
       if resolved.children.count != measured.childMeasurements.count {
         passContext?.recordPlacementChildMismatch(
@@ -237,22 +263,34 @@ extension LayoutEngine {
       }
 
       let childOrigin =
-        simpleAlignedOrigin(
-          for: child,
-          measured: childMeasurement,
-          in: bounds,
-          alignment: alignment
-        )
-        ?? alignedOrigin(
-          for: viewDimensions(for: child, measured: childMeasurement),
-          in: bounds,
-          alignment: alignment
-        )
+        if resolved.kind == .view("HostedTableCell"),
+          childMeasurement.measuredSize.width > bounds.size.width
+        {
+          bounds.origin
+        } else {
+          simpleAlignedOrigin(
+            for: child,
+            measured: childMeasurement,
+            in: bounds,
+            alignment: alignment
+          )
+            ?? alignedOrigin(
+              for: viewDimensions(for: child, measured: childMeasurement),
+              in: bounds,
+              alignment: alignment
+            )
+        }
+      let childSize =
+        if resolved.kind == .view("HostedTableCell") {
+          CellSize(width: bounds.size.width, height: childMeasurement.measuredSize.height)
+        } else {
+          childMeasurement.measuredSize
+        }
       return [
         .init(
           resolved: child,
           measured: childMeasurement,
-          bounds: CellRect(origin: childOrigin, size: childMeasurement.measuredSize)
+          bounds: CellRect(origin: childOrigin, size: childSize)
         )
       ]
     case .offset(let x, let y):
@@ -354,5 +392,156 @@ extension LayoutEngine {
     case .custom:
       return []
     }
+  }
+
+  private func hostedListPlacementRequests(
+    for resolved: ResolvedNode,
+    measured: MeasuredNode,
+    payload: ListPayload,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacementRequest] {
+    let indexedSource = resolved.indexedChildSource
+    let sourceIndices = measured.containerAllocationSnapshot?.hostedCollection?.sourceIndices ?? []
+    let childCount =
+      indexedSource == nil
+      ? min(resolved.children.count, measured.childMeasurements.count)
+      : min(sourceIndices.count, measured.childMeasurements.count)
+    if indexedSource == nil, resolved.children.count != measured.childMeasurements.count {
+      passContext?.recordPlacementChildMismatch(
+        identity: resolved.identity,
+        behavior: "hostedList",
+        childCount: resolved.children.count,
+        measurementCount: measured.childMeasurements.count
+      )
+    }
+
+    let layout = payload.style.visibleListLayout(for: payload, in: bounds)
+    var requests: [PlacementRequest] = []
+    var additionalYOffset = 0
+    var placedItemIndices: Set<Int> = []
+    for (lineIndex, line) in layout.lines.enumerated() {
+      guard let itemIndex = line.itemIndex,
+        placedItemIndices.insert(itemIndex).inserted
+      else {
+        continue
+      }
+
+      let measurementIndex: Int
+      let child: ResolvedNode
+      if let indexedSource {
+        guard let index = sourceIndices.firstIndex(of: itemIndex), index < childCount else {
+          continue
+        }
+        measurementIndex = index
+        child = indexedSource.child(at: itemIndex)
+      } else {
+        guard itemIndex < childCount else {
+          continue
+        }
+        measurementIndex = itemIndex
+        child = resolved.children[itemIndex]
+      }
+      let childMeasurement = measured.childMeasurements[measurementIndex]
+      let markerWidth = line.rowIndex == nil || !payload.showsSelectionMarker ? 0 : 2
+      let origin = CellPoint(
+        x: layout.contentBounds.origin.x + markerWidth,
+        y: layout.contentBounds.origin.y + lineIndex + additionalYOffset
+      )
+      let childBounds = CellRect(origin: origin, size: childMeasurement.measuredSize)
+      let collectionBottom = bounds.origin.y + bounds.size.height
+      if childBounds.origin.y < collectionBottom,
+        childBounds.origin.y + childBounds.size.height > bounds.origin.y
+      {
+        requests.append(
+          PlacementRequest(
+            resolved: child,
+            measured: childMeasurement,
+            bounds: childBounds
+          )
+        )
+      }
+      additionalYOffset += max(0, childMeasurement.measuredSize.height - 1)
+    }
+    return requests
+  }
+
+  private func hostedTablePlacementRequests(
+    for resolved: ResolvedNode,
+    measured: MeasuredNode,
+    payload: TablePayload,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacementRequest] {
+    let indexedSource = resolved.indexedChildSource
+    let sourceIndices = measured.containerAllocationSnapshot?.hostedCollection?.sourceIndices ?? []
+    let childCount =
+      indexedSource == nil
+      ? min(resolved.children.count, measured.childMeasurements.count)
+      : min(sourceIndices.count, measured.childMeasurements.count)
+    if indexedSource == nil, resolved.children.count != measured.childMeasurements.count {
+      passContext?.recordPlacementChildMismatch(
+        identity: resolved.identity,
+        behavior: "hostedTable",
+        childCount: resolved.children.count,
+        measurementCount: measured.childMeasurements.count
+      )
+    }
+
+    let layout = DrawExtractor().visibleTableLayout(
+      for: payload,
+      in: bounds,
+      columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths
+    )
+    let leftWidth = layoutText(
+      for: payload.style.tableBorderGlyphs.left,
+      width: nil
+    ).size.width
+    var requests: [PlacementRequest] = []
+    var additionalYOffset = 0
+    for (lineIndex, line) in layout.lines.enumerated() {
+      guard line.role == .row,
+        let rowIndex = line.rowIndex
+      else {
+        continue
+      }
+      let measurementIndex: Int
+      let child: ResolvedNode
+      if let indexedSource {
+        guard let index = sourceIndices.firstIndex(of: rowIndex), index < childCount else {
+          continue
+        }
+        measurementIndex = index
+        child = indexedSource.child(at: rowIndex)
+      } else {
+        guard rowIndex < childCount else {
+          continue
+        }
+        measurementIndex = rowIndex
+        child = resolved.children[rowIndex]
+      }
+      let childMeasurement = measured.childMeasurements[measurementIndex]
+      let childBounds = CellRect(
+        origin: .init(
+          x: bounds.origin.x + leftWidth + 1,
+          y: bounds.origin.y + lineIndex + additionalYOffset
+        ),
+        size: childMeasurement.measuredSize
+      )
+      let collectionBottom = bounds.origin.y + bounds.size.height
+      if childBounds.origin.y < collectionBottom,
+        childBounds.origin.y + childBounds.size.height > bounds.origin.y
+      {
+        requests.append(
+          PlacementRequest(
+            resolved: child,
+            measured: childMeasurement,
+            bounds: childBounds
+          )
+        )
+      }
+      additionalYOffset += max(0, childMeasurement.measuredSize.height - 1)
+    }
+    return requests
   }
 }

@@ -1,11 +1,9 @@
 @_spi(Runners) import SwiftTUI
 
-/// Proposal 2026-07-13-002 Stage-0 vehicle: a `List` over a 1,000-element (by default)
-/// indexed `ForEach` source — the shape whose every-element resolve/measure
-/// the viewport-true lazy collections program targets. The driver settles the
-/// initial render (the headline full-materialization cost), then scrolls the
-/// viewport (re-layout + window shift), then moves selection with arrow keys
-/// (interaction frames over an unchanged data source).
+/// F173 vehicle: a direct-data `List` over 1,000 elements by default. The
+/// initializer exposes a total indexed source, so finite frames realize only
+/// the visible band plus bounded overscan while the selection walk repeatedly
+/// shifts that band over an unchanged data source.
 ///
 /// A `sel:<tag>|` mirror line gives the driver a deterministic settle marker
 /// for selection moves that is independent of row focus chrome. Row count is
@@ -23,8 +21,7 @@ public struct LazyList1KScenario: PerfScenario {
   ]
   public let visualMarkers = ["lrow 0"]
   public let settlingDescription = "first frame showing the list's first row"
-  // The initial frame IS the workload: a full 1k-row materialization —
-  // seconds in debug, beyond the runner's 2-second default.
+  // Keep headroom for scaling probes that set the row-count override to 10k.
   public let initialFrameTimeout: Duration = .seconds(60)
 
   private static let defaultRowCount = 1_000
@@ -34,13 +31,14 @@ public struct LazyList1KScenario: PerfScenario {
   @MainActor
   public func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult {
     let rowCount = Self.resolvedRowCount()
+    let usesEagerBuilder = Self.usesEagerBuilder()
     return try await PerfScenarioRunner.runWindow(
       scenario: self,
       options: options
     ) {
-      PerfLazyListView(rowCount: rowCount)
+      PerfLazyListView(rowCount: rowCount, usesEagerBuilder: usesEagerBuilder)
     } drive: { driver in
-      // Initial render: the full-materialization cost the program attacks.
+      // Initial render: direct-data source setup plus the first viewport.
       _ = try await driver.waitForFrame(containing: "lrow 0", timeout: .seconds(120))
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
       var events: [PerfEventRecord] = []
@@ -135,12 +133,17 @@ public struct LazyList1KScenario: PerfScenario {
     }
     return parsed
   }
+
+  private static func usesEagerBuilder() -> Bool {
+    environmentValue("TERMUI_PERF_COLLECTION_SOURCE_MODE") == "eager"
+  }
 }
 
 private struct PerfLazyListView: View {
   let rowCount: Int
+  let usesEagerBuilder: Bool
 
-  @State private var selection = 0
+  @State private var selection: Int? = 0
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -148,21 +151,32 @@ private struct PerfLazyListView: View {
         .foregroundStyle(.tint)
       // Deterministic mirror of the selection — independent of row focus
       // chrome — so the driver can settle each selection move.
-      Text("sel:\(selection)|")
-      List(selection: $selection) {
-        ForEach(0..<rowCount, id: \.self) { index in
-          HStack(spacing: 1) {
-            Text("lrow \(index)")
-            Spacer(minLength: 1)
-            Text("meta \(index % 97)")
-              .foregroundStyle(.separator)
+      Text("sel:\(selection ?? -1)|")
+      if usesEagerBuilder {
+        List(selection: $selection) {
+          ForEach(0..<rowCount, id: \.self) { index in
+            row(index).tag(index)
           }
-          .tag(index)
         }
+        .frame(height: 24)
+        .border(.separator)
+      } else {
+        List(0..<rowCount, id: \.self, selection: $selection) { index in
+          row(index)
+        }
+        .frame(height: 24)
+        .border(.separator)
       }
-      .frame(height: 24)
-      .border(.separator)
     }
     .padding(1)
+  }
+
+  private func row(_ index: Int) -> some View {
+    HStack(spacing: 1) {
+      Text("lrow \(index)")
+      Spacer(minLength: 1)
+      Text("meta \(index % 97)")
+        .foregroundStyle(.separator)
+    }
   }
 }

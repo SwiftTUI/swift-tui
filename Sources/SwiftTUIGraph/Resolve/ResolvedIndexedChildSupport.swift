@@ -101,6 +101,22 @@ package protocol IndexedChildSource: Sendable {
   /// node's — benign for the scroll-estimate consumer, which treats these
   /// as best-effort targets.
   func elementIdentity(at index: Int) -> Identity
+
+  /// A realization-free candidate tag derived from the indexed element ID.
+  /// Collection containers use it to locate an initially selected direct-data
+  /// row before that row enters the viewport. Authored row metadata remains
+  /// authoritative once the element is realized.
+  func elementSelectionTag(at index: Int) -> SelectionTag?
+
+  /// Merges visible table auto-width discoveries with source-retained
+  /// monotonic high-water values. A changed column schema resets the cache.
+  func retainedTableColumnWidths(
+    columns: [TableColumnPayload],
+    discovered: [Int]
+  ) -> [Int]
+
+  /// Applies the allocation's common table widths to cached hosted rows.
+  func applyHostedTableColumnWidths(_ widths: [Int])
 }
 
 extension IndexedChildSource {
@@ -114,6 +130,19 @@ extension IndexedChildSource {
   package func elementIdentity(at index: Int) -> Identity {
     child(at: index).identity
   }
+
+  package func elementSelectionTag(at index: Int) -> SelectionTag? {
+    nil
+  }
+
+  package func retainedTableColumnWidths(
+    columns: [TableColumnPayload],
+    discovered: [Int]
+  ) -> [Int] {
+    discovered
+  }
+
+  package func applyHostedTableColumnWidths(_ widths: [Int]) {}
 }
 
 /// Resolve-time aggregate of every layout-offload disqualifier in a subtree.

@@ -136,22 +136,49 @@ extension SemanticExtractor {
       for: payload,
       in: node.bounds
     )
+    let hostsCommittedRows = node.semanticMetadata.hostedCollectionContainer?.kind == .list
 
     for (lineIndex, line) in layout.lines.enumerated() {
       guard let rowIndex = line.rowIndex else {
         continue
       }
 
-      let lineRect = CellRect(
-        origin: .init(
-          x: layout.contentBounds.origin.x,
-          y: layout.contentBounds.origin.y + lineIndex
-        ),
-        size: .init(
-          width: layout.contentBounds.size.width,
-          height: 1
-        )
-      )
+      let hostedRow =
+        hostsCommittedRows
+        ? node.children.first { child in
+          child.semanticMetadata.hostedCollectionItem?.role == .listRow(rowIndex: rowIndex)
+        }
+        : nil
+      if hostsCommittedRows,
+        hostedRow?.semanticMetadata.hostedCollectionItem?.isSelectable != true
+      {
+        continue
+      }
+
+      let lineRect =
+        if let hostedRow {
+          CellRect(
+            origin: .init(
+              x: layout.contentBounds.origin.x,
+              y: hostedRow.bounds.origin.y
+            ),
+            size: .init(
+              width: layout.contentBounds.size.width,
+              height: max(1, hostedRow.bounds.size.height)
+            )
+          )
+        } else {
+          CellRect(
+            origin: .init(
+              x: layout.contentBounds.origin.x,
+              y: layout.contentBounds.origin.y + lineIndex
+            ),
+            size: .init(
+              width: layout.contentBounds.size.width,
+              height: 1
+            )
+          )
+        }
       guard let clippedRect = clippedRect(for: lineRect, clippedTo: clipRect) else {
         continue
       }
@@ -200,8 +227,10 @@ extension SemanticExtractor {
     }
     let layout = DrawExtractor().visibleTableLayout(
       for: payload,
-      in: node.bounds
+      in: node.bounds,
+      columnWidths: node.hostedCollectionTableColumnWidths
     )
+    let hostsCommittedRows = node.semanticMetadata.hostedCollectionContainer?.kind == .table
 
     for (lineIndex, line) in layout.lines.enumerated() {
       guard line.role == .row, let rowIndex = line.rowIndex else {
@@ -211,16 +240,42 @@ extension SemanticExtractor {
         continue
       }
 
-      let lineRect = CellRect(
-        origin: .init(
-          x: node.bounds.origin.x,
-          y: node.bounds.origin.y + lineIndex
-        ),
-        size: .init(
-          width: node.bounds.size.width,
-          height: 1
-        )
-      )
+      let hostedRow =
+        hostsCommittedRows
+        ? node.children.first { child in
+          child.semanticMetadata.hostedCollectionItem?.role == .tableRow(rowIndex: rowIndex)
+        }
+        : nil
+      if hostsCommittedRows,
+        hostedRow?.semanticMetadata.hostedCollectionItem?.isSelectable != true
+      {
+        continue
+      }
+
+      let lineRect =
+        if let hostedRow {
+          CellRect(
+            origin: .init(
+              x: node.bounds.origin.x,
+              y: hostedRow.bounds.origin.y
+            ),
+            size: .init(
+              width: node.bounds.size.width,
+              height: max(1, hostedRow.bounds.size.height)
+            )
+          )
+        } else {
+          CellRect(
+            origin: .init(
+              x: node.bounds.origin.x,
+              y: node.bounds.origin.y + lineIndex
+            ),
+            size: .init(
+              width: node.bounds.size.width,
+              height: 1
+            )
+          )
+        }
       guard let clippedRect = clippedRect(for: lineRect, clippedTo: clipRect) else {
         continue
       }

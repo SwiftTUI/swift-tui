@@ -35,6 +35,16 @@ extension CollectionStylePresentation {
   package func measuredListIdealSize(
     for payload: ListPayload
   ) -> CellSize {
+    if payload.isViewportBacked {
+      let horizontalInset = listContentInsets.leading + listContentInsets.trailing
+      let verticalInset = listContentInsets.top + listContentInsets.bottom
+      let separatorCount = showsListRowSeparators ? max(0, payload.items.count - 1) : 0
+      let markerWidth = payload.showsSelectionMarker && !payload.items.isEmpty ? 2 : 0
+      return CellSize(
+        width: markerWidth + horizontalInset,
+        height: payload.items.count + separatorCount + verticalInset
+      )
+    }
     let horizontalInset = listContentInsets.leading + listContentInsets.trailing
     let perSectionVerticalInset = listContentInsets.top + listContentInsets.bottom
     let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
@@ -127,6 +137,12 @@ extension CollectionStylePresentation {
     for payload: ListPayload,
     viewportLineCount: Int
   ) -> [ListDisplayLine] {
+    if payload.isViewportBacked {
+      return viewportBackedVisibleListLines(
+        for: payload,
+        viewportLineCount: viewportLineCount
+      )
+    }
     let displayLines = materializedListLines(for: payload)
     guard viewportLineCount > 0 else {
       return []
@@ -192,6 +208,135 @@ extension CollectionStylePresentation {
     return Array(displayLines.prefix(viewportLineCount))
   }
 
+  private func viewportBackedVisibleListLines(
+    for payload: ListPayload,
+    viewportLineCount: Int
+  ) -> [ListDisplayLine] {
+    guard viewportLineCount > 0, !payload.items.isEmpty else {
+      return []
+    }
+
+    let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
+    let sectionInsetCount = usesSectionChrome ? 2 : 0
+    let rowSpan = showsListRowSeparators ? 2 : 1
+    let bodyLineCount = payload.items.count * rowSpan - (rowSpan - 1)
+    let displayLineCount = sectionInsetCount + bodyLineCount
+    let visibleLineCount =
+      displayLineCount > viewportLineCount && payload.showsIndicators && viewportLineCount >= 3
+      ? max(1, viewportLineCount - 2)
+      : viewportLineCount
+    let selectedRow = min(
+      max(payload.selectedRowIndex ?? 0, 0),
+      payload.items.count - 1
+    )
+    let selectedLineIndex = (usesSectionChrome ? 1 : 0) + selectedRow * rowSpan
+    let offset = min(
+      max(0, selectedLineIndex - (visibleLineCount / 2)),
+      max(0, displayLineCount - visibleLineCount)
+    )
+    let end = min(displayLineCount, offset + visibleLineCount)
+    var visible = (offset..<end).map { position in
+      viewportBackedListLine(
+        at: position,
+        payload: payload,
+        usesSectionChrome: usesSectionChrome,
+        rowSpan: rowSpan,
+        bodyLineCount: bodyLineCount
+      )
+    }
+
+    guard displayLineCount > viewportLineCount,
+      payload.showsIndicators,
+      viewportLineCount >= 3
+    else {
+      return visible
+    }
+
+    let indicatorStyle = TextStyle(
+      foregroundStyle: .semantic(.separator),
+      opacity: payload.opacity
+    )
+    visible.insert(
+      .init(
+        kind: .text(offset == 0 ? "" : "↑", indicatorStyle),
+        isHeader: true,
+        rowIndex: nil
+      ),
+      at: 0
+    )
+    visible.append(
+      .init(
+        kind: .text(end >= displayLineCount ? "" : "↓", indicatorStyle),
+        isHeader: true,
+        rowIndex: nil
+      )
+    )
+    return visible
+  }
+
+  private func viewportBackedListLine(
+    at position: Int,
+    payload: ListPayload,
+    usesSectionChrome: Bool,
+    rowSpan: Int,
+    bodyLineCount: Int
+  ) -> ListDisplayLine {
+    let bodyPosition = position - (usesSectionChrome ? 1 : 0)
+    if bodyPosition < 0 || bodyPosition >= bodyLineCount {
+      return .init(
+        kind: .text("", .init(opacity: payload.opacity)),
+        isHeader: true,
+        rowIndex: nil,
+        sectionIndex: usesSectionChrome ? 0 : nil
+      )
+    }
+    if rowSpan == 2, bodyPosition % 2 == 1 {
+      return .init(
+        kind: .separator(payload.borderStyle ?? .semantic(.separator)),
+        isHeader: false,
+        rowIndex: nil,
+        sectionIndex: usesSectionChrome ? 0 : nil
+      )
+    }
+
+    let rowIndex = bodyPosition / rowSpan
+    let item = payload.items[rowIndex]
+    let isSelected = rowIndex == payload.selectedRowIndex
+    var style = item.style
+    if let rowForegroundStyle = item.rowForegroundStyle {
+      style.foregroundStyle = rowForegroundStyle
+    } else if style.foregroundStyle == nil {
+      style.foregroundStyle = payload.foregroundStyle ?? .semantic(.foreground)
+    }
+    if isSelected, let selectedForegroundStyle = payload.selectedRowForegroundStyle {
+      style.foregroundStyle = selectedForegroundStyle
+    }
+    style.opacity *= payload.opacity
+    let marker = payload.showsSelectionMarker ? (isSelected ? "▌ " : "  ") : ""
+    let markerStyle = TextStyle(
+      foregroundStyle: isSelected
+        ? (payload.selectedRowMarkerStyle ?? payload.selectedRowForegroundStyle
+          ?? payload.foregroundStyle ?? .semantic(.foreground))
+        : payload.borderStyle ?? .semantic(.separator),
+      opacity: payload.opacity
+    )
+    return .init(
+      kind: .row(
+        marker: marker,
+        markerStyle: markerStyle,
+        text: item.text,
+        textStyle: style,
+        backgroundStyle: isSelected
+          ? (payload.selectedRowBackgroundStyle ?? item.rowBackgroundStyle)
+          : item.rowBackgroundStyle
+      ),
+      isHeader: false,
+      rowIndex: rowIndex,
+      sectionIndex: usesSectionChrome ? 0 : nil,
+      itemIndex: rowIndex
+    )
+  }
+
   private func materializedListLines(
     for payload: ListPayload
   ) -> [ListDisplayLine] {
@@ -254,7 +399,8 @@ extension CollectionStylePresentation {
           .init(
             kind: .text(item.text, styleOverride),
             isHeader: true,
-            rowIndex: nil
+            rowIndex: nil,
+            itemIndex: index
           )
         )
       case .footer:
@@ -267,7 +413,8 @@ extension CollectionStylePresentation {
           .init(
             kind: .text(item.text, styleOverride),
             isHeader: true,
-            rowIndex: nil
+            rowIndex: nil,
+            itemIndex: index
           )
         )
       case .row:
@@ -305,7 +452,8 @@ extension CollectionStylePresentation {
                 : item.rowBackgroundStyle
             ),
             isHeader: false,
-            rowIndex: rowIndex
+            rowIndex: rowIndex,
+            itemIndex: index
           )
         )
 
@@ -338,7 +486,8 @@ extension CollectionStylePresentation {
           .init(
             kind: .separator(payload.borderStyle ?? .semantic(.separator)),
             isHeader: true,
-            rowIndex: nil
+            rowIndex: nil,
+            itemIndex: index
           )
         )
       }

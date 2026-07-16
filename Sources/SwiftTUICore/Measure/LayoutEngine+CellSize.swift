@@ -39,13 +39,15 @@ extension LayoutEngine {
           proposal: proposal
         )
       case .list(let payload):
-        return measuredListSize(
+        return measuredHostedListSize(
           for: payload,
+          childMeasurements: childMeasurements,
           proposal: proposal
         )
       case .table(let payload):
-        return measuredTableSize(
+        return measuredHostedTableSize(
           for: payload,
+          childMeasurements: childMeasurements,
           proposal: proposal
         )
       case .shape:

@@ -1,4 +1,3 @@
-package import SwiftTUICore
 package import SwiftTUIGraph
 
 @MainActor
@@ -59,6 +58,8 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
   let ids: [ID]
   let entityIdentities: [EntityIdentity]
   let signature: IndexedChildMeasurementSignature
+  var tableColumns: [TableColumnPayload]?
+  var tableColumnWidths: [Int] = []
 
   init(
     identityRoot: Identity,
@@ -96,6 +97,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   private let id: KeyPath<Data.Element, ID>
   private let ids: [ID]
   private let entityIdentities: [EntityIdentity]
+  private let identityArtifacts: ForEachSourceIdentityArtifacts<ID>
   private let content: @MainActor (Data.Element) -> Content
   private let childContext: ResolveContext
   private let authoringScope: AuthoringContext?
@@ -136,6 +138,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       IndexedChildSourceArtifactsProbe.recordAdoption()
       entityIdentities = retained.entityIdentities
       measurementSignatureStorage = retained.signature
+      identityArtifacts = retained
     } else {
       IndexedChildSourceArtifactsProbe.recordFreshMint()
       entityIdentities = makeEntityIdentities(ids: ids, scope: scope)
@@ -147,14 +150,16 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           ).path
         }
       )
+      let artifacts = ForEachSourceIdentityArtifacts(
+        identityRoot: childContext.identity,
+        scope: scope,
+        ids: ids,
+        entityIdentities: entityIdentities,
+        signature: measurementSignatureStorage
+      )
+      identityArtifacts = artifacts
       host?.retainIndexedChildSourceArtifacts(
-        ForEachSourceIdentityArtifacts(
-          identityRoot: childContext.identity,
-          scope: scope,
-          ids: ids,
-          entityIdentities: entityIdentities,
-          signature: measurementSignatureStorage
-        ),
+        artifacts,
         forIdentityRoot: childContext.identity
       )
     }
@@ -226,6 +231,32 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     }
   }
 
+  nonisolated package func elementSelectionTag(at index: Int) -> SelectionTag? {
+    withCheckedMainActorAccess("IndexedChildSource.elementSelectionTag(at:)") {
+      SelectionTag(value: ids[index], includeOptional: true)
+    }
+  }
+
+  nonisolated package func retainedTableColumnWidths(
+    columns: [TableColumnPayload],
+    discovered: [Int]
+  ) -> [Int] {
+    withCheckedMainActorAccess("IndexedChildSource.retainedTableColumnWidths") {
+      if identityArtifacts.tableColumns != columns
+        || identityArtifacts.tableColumnWidths.count != discovered.count
+      {
+        identityArtifacts.tableColumns = columns
+        identityArtifacts.tableColumnWidths = discovered
+      } else {
+        identityArtifacts.tableColumnWidths = zip(
+          identityArtifacts.tableColumnWidths,
+          discovered
+        ).map(max)
+      }
+      return identityArtifacts.tableColumnWidths
+    }
+  }
+
   nonisolated package func childElements(at index: Int) -> [ResolvedNode] {
     withCheckedMainActorAccess("IndexedChildSource.childElements(at:)") {
       if let cached = elementsCache[index] {
@@ -258,6 +289,87 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       return flattened
     }
   }
+}
+
+@MainActor
+package final class HostedCollectionIndexedChildSource: IndexedChildSource {
+  private let base: any IndexedChildSource
+  private let transform: @MainActor (ResolvedNode, Int) -> ResolvedNode
+  private var cache: [Int: ResolvedNode] = [:]
+  private var tableColumnWidths: [Int]?
+
+  package init(
+    base: any IndexedChildSource,
+    transform: @escaping @MainActor (ResolvedNode, Int) -> ResolvedNode
+  ) {
+    self.base = base
+    self.transform = transform
+  }
+
+  nonisolated package var count: Int { base.count }
+  nonisolated package var identityRoot: Identity { base.identityRoot }
+  nonisolated package var measurementSignature: IndexedChildMeasurementSignature {
+    base.measurementSignature
+  }
+
+  nonisolated package func child(at index: Int) -> ResolvedNode {
+    withCheckedMainActorAccess("HostedCollectionIndexedChildSource.child(at:)") {
+      if let cached = cache[index] {
+        return cached
+      }
+      var node = transform(base.child(at: index), index)
+      if let tableColumnWidths {
+        node = applyingHostedTableColumnWidths(tableColumnWidths, to: node)
+      }
+      cache[index] = node
+      return node
+    }
+  }
+
+  nonisolated package func childElements(at index: Int) -> [ResolvedNode] {
+    [child(at: index)]
+  }
+
+  nonisolated package func elementIdentity(at index: Int) -> Identity {
+    base.elementIdentity(at: index)
+  }
+
+  nonisolated package func elementSelectionTag(at index: Int) -> SelectionTag? {
+    base.elementSelectionTag(at: index)
+  }
+
+  nonisolated package func retainedTableColumnWidths(
+    columns: [TableColumnPayload],
+    discovered: [Int]
+  ) -> [Int] {
+    base.retainedTableColumnWidths(columns: columns, discovered: discovered)
+  }
+
+  nonisolated package func applyHostedTableColumnWidths(_ widths: [Int]) {
+    withCheckedMainActorAccess("HostedCollectionIndexedChildSource.applyTableWidths") {
+      tableColumnWidths = widths
+      cache = cache.mapValues { applyingHostedTableColumnWidths(widths, to: $0) }
+    }
+  }
+}
+
+@MainActor
+private func applyingHostedTableColumnWidths(
+  _ widths: [Int],
+  to source: ResolvedNode
+) -> ResolvedNode {
+  var node = source
+  node.children = node.children.enumerated().map { index, child in
+    var child = applyingHostedTableColumnWidths(widths, to: child)
+    if child.kind == .view("HostedTableCell"),
+      case .frame(_, let height, let alignment) = child.layoutBehavior,
+      widths.indices.contains(index)
+    {
+      child.layoutBehavior = .frame(width: widths[index], height: height, alignment: alignment)
+    }
+    return child
+  }
+  return node
 }
 
 extension ForEach: IndexedChildSourceView {

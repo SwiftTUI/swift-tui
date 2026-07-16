@@ -102,6 +102,7 @@ Lowering helpers remain package-only implementation details.
 ### Guides
 
 - <doc:Authoring-Views>
+- <doc:Collections>
 - <doc:AnyView>
 - <doc:Geometry-And-Preferences>
 - <doc:State-Environment-And-Focus>

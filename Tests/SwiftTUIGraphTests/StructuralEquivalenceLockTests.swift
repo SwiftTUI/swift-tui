@@ -53,4 +53,28 @@ struct StructuralEquivalenceLockTests {
     #expect(!original.isEquivalentForPlacement(to: moved))
     #expect(original.placementEquivalence(to: moved) == .divergent)
   }
+
+  @Test("measurement equivalence is stack-safe for node-hosted row depth")
+  func measurementEquivalenceIsStackSafeForNodeHostedRows() {
+    func nestedTree() -> ResolvedNode {
+      var node = ResolvedNode(
+        identity: testIdentity("Leaf"),
+        structuralPath: slot("Leaf"),
+        kind: .view("Text")
+      )
+      for depth in (0..<256).reversed() {
+        node = ResolvedNode(
+          identity: testIdentity("HostedRow", "\(depth)"),
+          structuralPath: slot("HostedRow", "\(depth)"),
+          kind: .view("HostedRow"),
+          children: [node]
+        )
+      }
+      return node
+    }
+
+    let original = nestedTree()
+    let repeated = nestedTree()
+    #expect(original.isEquivalentForMeasurement(to: repeated))
+  }
 }

@@ -38,7 +38,7 @@ package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
     var layoutBehavior: LayoutBehavior
     var isTransient: Bool
     var matchedGeometry: MatchedGeometryConfig?
-    var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
+    var placementMetadata: PlacedNodePlacementMetadata
   }
 
   private struct DrawMetadataSignature: Equatable, Sendable {
@@ -93,7 +93,7 @@ package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
           layoutBehavior: node.layoutBehavior,
           isTransient: node.isTransient,
           matchedGeometry: node.matchedGeometry,
-          lazyChildScrollEstimates: node.lazyChildScrollEstimates
+          placementMetadata: node.placementMetadata
         )
       )
       for child in node.children.reversed() {

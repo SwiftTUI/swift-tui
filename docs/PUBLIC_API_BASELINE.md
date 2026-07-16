@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 61 | 533 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 274 | 1481 |
+| `SwiftTUIViews` | 274 | 1497 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -256,7 +256,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `LinearGradient` — extension — 1 member
 - `Link` — struct — 4 members
 - `LinkButtonStyle` — struct — 3 members
-- `List` — struct — 10 members
+- `List` — struct — 18 members
 - `ListStyle` — protocol — 1 member
 - `LiteralTabsTabViewStyle` — struct — 4 members
 - `LongPressGesture` — struct — 6 members
@@ -336,7 +336,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `Stepper` — struct — 4 members
 - `SuccessToastStyle` — struct — 2 members
 - `Tab` — struct — 2 members
-- `Table` — struct — 3 members
+- `Table` — struct — 11 members
 - `TableColumn` — struct — 5 members
 - `TableRow` — struct — 1 member
 - `TabView` — struct — 2 members

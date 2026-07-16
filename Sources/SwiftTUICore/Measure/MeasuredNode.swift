@@ -13,15 +13,33 @@ package struct ContainerAllocationSnapshot: Equatable, Sendable {
   package var childSizes: [ChildAllocation]
   package var selectedChildIndex: Int?
   package var lazyStack: LazyStackAllocationSnapshot?
+  package var hostedCollection: HostedCollectionAllocationSnapshot?
 
   package init(
     childSizes: [ChildAllocation] = [],
     selectedChildIndex: Int? = nil,
-    lazyStack: LazyStackAllocationSnapshot? = nil
+    lazyStack: LazyStackAllocationSnapshot? = nil,
+    hostedCollection: HostedCollectionAllocationSnapshot? = nil
   ) {
     self.childSizes = childSizes
     self.selectedChildIndex = selectedChildIndex
     self.lazyStack = lazyStack
+    self.hostedCollection = hostedCollection
+  }
+}
+
+/// Realized source indices for a node-hosted List or Table measurement.
+/// Child measurements are index-parallel with this bounded list.
+package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
+  package var sourceIndices: [Int]
+  package var tableColumnWidths: [Int]?
+
+  package init(
+    sourceIndices: [Int],
+    tableColumnWidths: [Int]? = nil
+  ) {
+    self.sourceIndices = sourceIndices
+    self.tableColumnWidths = tableColumnWidths
   }
 }
 

@@ -385,6 +385,16 @@ extension LayoutEngine {
       to: proposal
     )
 
+    if let windowed = windowedHostedCollectionMeasurement(
+      for: node,
+      originalProposal: proposal,
+      effectiveProposal: effectiveProposal,
+      passContext: passContext
+    ) {
+      results.append(windowed)
+      return
+    }
+
     switch node.layoutBehavior {
     case .intrinsic, .overlay, .offset, .position:
       scheduleChildren(

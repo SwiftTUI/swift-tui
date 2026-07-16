@@ -103,6 +103,7 @@ to produce resolved trees, frame artifacts, or rendered terminal text.
 
 See also:
 
+- <doc:Collections>
 - <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
 - ``AnyView``
