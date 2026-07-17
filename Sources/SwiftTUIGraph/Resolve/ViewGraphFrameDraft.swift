@@ -273,6 +273,42 @@ package final class ViewGraphFrameDraft {
         )
       }
     }
+    // Committed-handler resolution oracle (2026-07-17 campaign §5): every
+    // appear/disappear handler ID the committed tree names must resolve in
+    // the just-published live lifecycle registry. A hollow node record — a
+    // re-minted or never-applied node adopted in place of the recording
+    // owner — leaves the committed tree naming handlers no store can
+    // dispatch, and the F04 oracle cannot see it (scoped restore and full
+    // rebuild read the same hollowed records). Change handlers ride node
+    // dispatch queues rather than committed metadata, so the appear and
+    // disappear legs carry the class here.
+    if SoundnessProbeConfiguration.isSampledFrame,
+      let lifecycleRegistry = liveRegistrations.lifecycleRegistry,
+      let committedRoot = viewGraph.committedRootSnapshotIfAvailable()
+    {
+      var missing: [String] = []
+      var stack = [committedRoot]
+      while let node = stack.popLast(), missing.count < 4 {
+        for handlerID in node.lifecycleMetadata.appearHandlerIDs
+        where lifecycleRegistry.appearHandler(for: handlerID) == nil {
+          missing.append("appear:\(handlerID)")
+        }
+        for handlerID in node.lifecycleMetadata.disappearHandlerIDs
+        where lifecycleRegistry.disappearHandler(for: handlerID) == nil {
+          missing.append("disappear:\(handlerID)")
+        }
+        stack.append(contentsOf: node.children)
+      }
+      if !missing.isEmpty {
+        SoundnessProbeConfiguration.recordCommittedHandlerResolutionViolation(
+          """
+          committed handler resolution: committed tree names handlers absent \
+          from the published lifecycle registry: \(missing.joined(separator: ", ")) \
+          [mode=\(publicationModeName) roots=\(publicationSubtreeRootCount)]
+          """
+        )
+      }
+    }
     if publicationIsUnchanged {
       viewGraph.recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame()
     } else {

@@ -68,6 +68,7 @@ package enum SoundnessProbeConfiguration {
   package static var plannerTargetlessFrontierEscalationCount = 0
   package static var lifecycleHandlerSkipCount = 0
   package static var ambientEnvironmentFallbackReadCount = 0
+  package static var committedHandlerResolutionViolationCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -261,6 +262,22 @@ package enum SoundnessProbeConfiguration {
     stateSlotRestorationDropCount += 1
     lastViolationDetail = detail()
     emitTrace("state-slot-restoration-drop")
+  }
+
+  /// Records one committed-tree handler ID that failed to resolve in the
+  /// just-published live lifecycle registry (2026-07-17 campaign §5): the
+  /// committed tree still names an appear/disappear handler whose owning
+  /// node record is hollow, so the committed callback can never fire. The
+  /// F04 publication oracle is structurally blind to this class — a scoped
+  /// restore and a full rebuild read the SAME hollowed records and agree —
+  /// so resolution is checked against the committed tree itself on sampled
+  /// frames.
+  package static func recordCommittedHandlerResolutionViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    committedHandlerResolutionViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("committed-handler-resolution")
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per

@@ -3107,6 +3107,13 @@ package final class ViewGraph {
     return root.snapshot()
   }
 
+  /// The root's committed value as-is (no rebuild), for read-only oracles
+  /// that must observe exactly what the frame committed. `nil` before the
+  /// first frame resolves a root.
+  package func committedRootSnapshotIfAvailable() -> ResolvedNode? {
+    root?.committed
+  }
+
   package func snapshot(
     rootIdentity: Identity
   ) -> ResolvedNode {
