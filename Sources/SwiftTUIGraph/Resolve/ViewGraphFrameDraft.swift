@@ -424,7 +424,8 @@ package final class ViewGraphFrameDraft {
     preservingCurrentStateMutations: Bool
   ) {
     let stateMutations =
-      preservingCurrentStateMutations ? viewGraph.stateMutationOverlay() : nil
+      preservingCurrentStateMutations
+      ? viewGraph.stateMutationOverlay(restorableInto: targetCheckpoint) : nil
     // The restore is generation-gated inside ViewGraph (only nodes whose live
     // generation differs from the image are rewritten) and carries its own
     // gated-vs-ungated soundness oracle — no plan/fallback machinery here.

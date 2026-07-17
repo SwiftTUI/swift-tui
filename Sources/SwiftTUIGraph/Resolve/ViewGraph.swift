@@ -1281,12 +1281,24 @@ package final class ViewGraph {
     )
   }
 
-  package func stateMutationOverlay() -> StateMutationOverlay {
+  package func stateMutationOverlay(
+    restorableInto checkpoint: Checkpoint
+  ) -> StateMutationOverlay {
+    // Only writes whose owner exists in the restore target can be re-applied
+    // after the restore. Input events dispatch against committed trees, so a
+    // write into a node minted by the pending draft can only be a
+    // resolve-time lazy initialization (e.g. `@Namespace` allocation): it
+    // dies with the draft by design and the replayed resolve regenerates it.
+    // Carrying it only trips the vanished-owner drop alarm (F93) on a write
+    // that was never preservable, drowning the alarm's real signal — a
+    // baseline-present owner vanishing across a restore.
+    let baselineNodes = checkpoint.index.nodesByNodeID
     var stateSlots: [StateMutationSlotKey: AnyStateSlot] = [:]
     for key in stateMutationKeys {
       var capturedSlot = false
       for viewNodeID in stateMutationNodeIDsByKey[key] ?? [] {
         guard
+          baselineNodes[viewNodeID] != nil,
           let slot = nodeIfExists(for: viewNodeID)?.stateSlotStorage(
             ordinal: key.ordinal
           )
@@ -1304,6 +1316,7 @@ package final class ViewGraph {
         capturedSlot = true
       }
       guard !capturedSlot,
+        baselineNodes[key.owner] != nil,
         let slot = nodeIfExists(for: key.owner)?.stateSlotStorage(
           ordinal: key.ordinal
         )

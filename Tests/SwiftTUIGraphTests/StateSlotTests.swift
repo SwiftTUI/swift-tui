@@ -72,6 +72,81 @@ struct StateSlotTests {
     )
   }
 
+  @Test("overlay capture carries baseline owners and excludes draft-minted owners")
+  @MainActor
+  func overlayCaptureExcludesDraftMintedOwners() {
+    // Gallery fuzzer find (2026-07-16, `--tab animations`, zero input): a
+    // `@Namespace` allocation — a resolve-time lazy state write into a node
+    // minted by the pending draft — was carried across the draft's discard,
+    // and its vanished owner tripped the F93 drop alarm on every boot of an
+    // animating tab. Input events dispatch against committed trees, so a
+    // draft-minted owner's write is never preservable: capture must skip it
+    // (the replayed resolve regenerates it), while a baseline-present
+    // owner's in-flight write must still restore alarm-free.
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let baselineNode = graph.beginEvaluation(
+      identity: testIdentity("Root", "Stable"),
+      invalidator: nil
+    )
+    let baselineSeed: Int = 1
+    _ = baselineNode.stateSlot(ordinal: 0, seed: baselineSeed)
+    let checkpoint = graph.makeCheckpoint()
+
+    let draftNode = graph.beginEvaluation(
+      identity: testIdentity("Root", "DraftMinted"),
+      invalidator: nil
+    )
+    let draftSeed: Int = 5
+    _ = draftNode.stateSlot(ordinal: 0, seed: draftSeed)
+    baselineNode.restoreStateSlot(ordinal: 0, slot: AnyStateSlot(42))
+    graph.queueDirtyForStateChange(
+      StateSlotKey(owner: baselineNode.viewNodeID, ordinal: 0)
+    )
+    draftNode.restoreStateSlot(ordinal: 0, slot: AnyStateSlot(99))
+    graph.queueDirtyForStateChange(
+      StateSlotKey(owner: draftNode.viewNodeID, ordinal: 0)
+    )
+
+    let overlay = graph.stateMutationOverlay(restorableInto: checkpoint)
+    let baselineKey = StateMutationSlotKey(
+      key: StateSlotKey(owner: baselineNode.viewNodeID, ordinal: 0)
+    )
+    let draftKey = StateMutationSlotKey(
+      key: StateSlotKey(owner: draftNode.viewNodeID, ordinal: 0)
+    )
+    #expect(overlay.stateSlots[baselineKey] != nil)
+    #expect(
+      overlay.stateSlots[draftKey] == nil,
+      "a draft-minted owner's write must die with the draft, not ride the overlay"
+    )
+
+    let dropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
+    let detail = SoundnessProbeConfiguration.lastViolationDetail
+    defer {
+      SoundnessProbeConfiguration.stateSlotRestorationDropCount = dropCount
+      SoundnessProbeConfiguration.lastViolationDetail = detail
+    }
+    _ = graph.restoreCheckpoint(checkpoint)
+    graph.applyStateMutationOverlay(overlay)
+
+    #expect(
+      SoundnessProbeConfiguration.stateSlotRestorationDropCount == dropCount,
+      "a baseline-filtered overlay must apply without tripping the drop alarm"
+    )
+    let restoredOwner = graph.nodeIfExists(for: baselineNode.viewNodeID)
+    #expect(restoredOwner != nil)
+    var restoredValue: Int = -1
+    if let restoredOwner {
+      let sentinel: Int = -1
+      restoredValue = restoredOwner.stateSlot(ordinal: 0, seed: sentinel)
+    }
+    #expect(
+      restoredValue == 42,
+      "the baseline owner's in-flight write must survive the restore"
+    )
+  }
+
   @Test("overlay application unions the dirty and invalidation bookkeeping")
   @MainActor
   func overlayApplicationUnionsBookkeeping() {
