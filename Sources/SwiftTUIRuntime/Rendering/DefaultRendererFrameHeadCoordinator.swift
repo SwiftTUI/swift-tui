@@ -171,7 +171,6 @@ struct DefaultRendererFrameHeadCoordinator {
         surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
         resolvedNodesComputed: draft.resolveContext.resolveWorkTracker?
           .snapshot.resolvedNodesComputed,
-        resolvedTreeWasFullyReused: viewGraph.evaluatedNodeIDsThisFrame.isEmpty,
         frameHeadTransaction: draft.transaction
       )
     }
@@ -716,18 +715,17 @@ private struct AnimationInjectionStage {
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
     resolvedNodesComputed: Int?,
-    resolvedTreeWasFullyReused: Bool,
     frameHeadTransaction: FrameHeadTransaction
   ) {
     let controller = animationDraft.controller
     frameHeadTransaction.measureHeadTiming(.animationProcessResolvedTree) {
       // A fully-reused resolve hands the controller a tree animation-process
-      // equivalent to the one it last processed. Prefer the work-tracker count;
-      // the graph's empty freshly-evaluated set is the tracker-independent proof
-      // used when callers omit it (F149). Animation-process equivalence
-      // deliberately ignores transaction changes when the animatable target
-      // snapshot itself is unchanged.
-      if resolvedNodesComputed == 0 || resolvedTreeWasFullyReused,
+      // equivalent to the one it last processed. Only the resolve work tracker
+      // proves that reuse: synthetic/direct composition can compute resolved
+      // nodes without adding entries to the graph's freshly-evaluated set.
+      // Animation-process equivalence deliberately ignores transaction changes
+      // when the animatable target snapshot itself is unchanged.
+      if resolvedNodesComputed == 0,
         controller.canSkipResolvedTreeProcessing(transactionPlan: transactionPlan)
       {
         controller.noteSkippedResolvedTreeProcessing(resolved: resolved)

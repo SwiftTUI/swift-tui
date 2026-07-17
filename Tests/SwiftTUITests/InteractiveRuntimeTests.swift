@@ -3893,6 +3893,59 @@ struct InteractiveRuntimeTests {
     #expect(!finalFrame.contains("Row 0"))
   }
 
+  /// Regression: the animation resolved-tree skip treated an empty
+  /// `evaluatedNodeIDsThisFrame` set as proof that the whole resolved tree was
+  /// reused. Gallery's Scroll Control tab can perform synthetic resolved-node
+  /// work below its lazy `TabBody` without freshly evaluating a graph node, so
+  /// reverse focus traversal from the scroll indicator reached animation
+  /// injection with a changed `TabBody.viewNodeID` despite that empty set.
+  /// The debug premise assertion then trapped before the frame could commit.
+  @MainActor
+  @Test("reverse focus from a tab-hosted scroll view does not take the animation reuse skip")
+  func reverseFocusFromTabHostedScrollViewDoesNotTakeAnimationReuseSkip() async throws {
+    let terminalSize = CellSize(width: 80, height: 24)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let inputReader = InjectedSceneTerminalInputReader()
+    let scene = WindowGroup("Animation Skip Scroll Focus") {
+      AnimationSkipScrollFocusFixture()
+    }
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.AnimationSkipScrollFocus",
+        presentationSurface: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    await terminal.frameSignal.wait {
+      (terminal.visibleFrames.last ?? "").contains("Scroll Control")
+    }
+
+    let inputBatches: [[UInt8]] = [
+      [0x09],
+      [0x09],
+      [0x0D],
+      [0x09],
+      [0x0D],
+      [0x1B, 0x5B, 0x5A],
+    ]
+    for bytes in inputBatches {
+      let expectedFrameCount = terminal.visibleFrames.count + 1
+      inputReader.send(bytes)
+      await terminal.frameSignal.wait {
+        terminal.visibleFrames.count >= expectedFrameCount
+      }
+    }
+
+    inputReader.finish()
+    let result = try await runTask.value
+
+    #expect(result.exitReason == .inputEnded)
+    #expect((terminal.visibleFrames.last ?? "").contains("up two rows (no change)"))
+  }
+
   /// Gallery Navigation & Collections regression (2026-07-10): entering the
   /// tab via a tab-strip *click* and then pushing the `navigationDestination`
   /// stranded the entire root page while the destination stayed presented.
@@ -6248,6 +6301,164 @@ private struct TabStripEntryScrollReaderFixture: View {
         positionBox: positionBox
       )
     }
+  }
+}
+
+private struct AnimationSkipScrollFocusFixture: View {
+  private enum Selection: Hashable {
+    case logo
+    case counter
+    case life
+    case todo
+    case forms
+    case textInput
+    case scrollControl
+    case calculator
+    case borders
+    case presentation
+    case navigation
+    case images
+    case animations
+    case fileDrop
+    case pointer
+    case focus
+    case tasks
+  }
+
+  @State private var selection = Selection.scrollControl
+  @State private var showPalette = false
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("Logo Breaker", value: Selection.logo) { Text("Logo") }
+      Tab("Counter", value: Selection.counter) { Text("Counter") }
+      Tab("Life", value: Selection.life) { Text("Life") }
+      Tab("Todo", value: Selection.todo) { Text("Todo") }
+      Tab("Forms & Containers", value: Selection.forms) { Text("Forms") }
+      Tab("Text Input", value: Selection.textInput) { Text("Text Input") }
+      Tab("Scroll Control", value: Selection.scrollControl) {
+        AnimationSkipScrollFocusContent()
+      }
+      Tab("Calculator", value: Selection.calculator) { Text("Calculator") }
+      Tab("Borders & Shapes", value: Selection.borders) { Text("Borders") }
+      Tab("Presentation Lab", value: Selection.presentation) { Text("Presentation") }
+      Tab("Navigation & Collections", value: Selection.navigation) { Text("Navigation") }
+      Tab("Images", value: Selection.images) { Text("Images") }
+      Tab("Animations", value: Selection.animations) { Text("Animations") }
+      Tab("File Drop", value: Selection.fileDrop) { Text("File Drop") }
+      Tab("Pointer Lab", value: Selection.pointer) { Text("Pointer") }
+      Tab("Focus Context", value: Selection.focus) { Text("Focus") }
+      Tab("Task Progress", value: Selection.tasks) { Text("Tasks") }
+    }
+    .tabViewStyle(.literalTabs)
+    .toolbarItem(
+      .init(
+        title: "Palette",
+        action: { showPalette = true }
+      )
+    )
+    .panel(id: "animation-skip-scroll-focus")
+    .keyCommand(
+      "Palette",
+      key: .character("k"),
+      modifiers: .ctrl,
+      action: { showPalette = true }
+    )
+    .paletteCommand(name: "Logo Breaker") { selection = .logo }
+    .paletteCommand(name: "Counter") { selection = .counter }
+    .paletteCommand(name: "Life") { selection = .life }
+    .paletteCommand(name: "Todo") { selection = .todo }
+    .paletteCommand(name: "Forms & Containers") { selection = .forms }
+    .paletteCommand(name: "Text Input") { selection = .textInput }
+    .paletteCommand(name: "Scroll Control") { selection = .scrollControl }
+    .paletteCommand(name: "Calculator") { selection = .calculator }
+    .paletteCommand(name: "Borders & Shapes") { selection = .borders }
+    .paletteCommand(name: "Presentation Lab") { selection = .presentation }
+    .paletteCommand(name: "Navigation & Collections") { selection = .navigation }
+    .paletteCommand(name: "Images") { selection = .images }
+    .paletteCommand(name: "Animations") { selection = .animations }
+    .paletteCommand(name: "File Drop") { selection = .fileDrop }
+    .paletteCommand(name: "Pointer Lab") { selection = .pointer }
+    .paletteCommand(name: "Focus Context") { selection = .focus }
+    .paletteCommand(name: "Task Progress") { selection = .tasks }
+    .toolbar(style: .defaultBottom)
+    .paletteSheet("Command palette", isPresented: $showPalette) { _ in
+      Text("Palette")
+    }
+  }
+}
+
+private struct AnimationSkipScrollFocusContent: View {
+  @State private var position = ScrollPosition.zero
+  @State private var lastCommand = "ready"
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Scroll Control")
+        HStack(spacing: 1) {
+          Button("Top") {
+            record("top edge", changed: proxy.scrollTo(edge: .top))
+          }
+          Button("Build") {
+            record(
+              "build anchored top",
+              changed: proxy.scrollTo(rowIdentity(3), anchor: .top)
+            )
+          }
+          Button("Errors") {
+            record(
+              "errors centered",
+              changed: proxy.scrollTo(rowIdentity(7), anchor: .center)
+            )
+          }
+          Button("Bottom") {
+            record("bottom edge", changed: proxy.scrollTo(edge: .bottom))
+          }
+        }
+        .focusSection()
+        HStack(spacing: 1) {
+          Button("Up 2") {
+            record("up two rows", changed: proxy.scrollBy(y: -2))
+          }
+          Button("Down 2") {
+            record("down two rows", changed: proxy.scrollBy(y: 2))
+          }
+          Button("Offset 6") {
+            record("absolute offset six", changed: proxy.scrollTo(y: 6))
+          }
+        }
+        .focusSection()
+        ScrollView(
+          .vertical,
+          showsIndicators: true,
+          position: $position
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<12) { index in
+              Text("Row \(index)")
+                .id(rowIdentity(index))
+            }
+          }
+        }
+        .frame(width: 72, height: 8, alignment: .topLeading)
+        .border(set: .rounded)
+        Text(lastCommand)
+      }
+      .padding(1)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+  }
+
+  private func rowIdentity(_ index: Int) -> Identity {
+    Identity(components: ["animation-skip-scroll-row-\(index)"])
+  }
+
+  private func record(
+    _ label: String,
+    changed: Bool
+  ) {
+    lastCommand = changed ? label : "\(label) (no change)"
   }
 }
 
