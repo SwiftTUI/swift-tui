@@ -466,9 +466,24 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
                 return false
               }())
           if shouldFlushBeforeExit {
+            // Cooperative exits (exit key, input end) keep the unbounded
+            // flush: events handled in this batch may present across several
+            // chained frames, and app-runtime tests pin that convergence. A
+            // signal exit is an external kill and must be frame-bounded
+            // instead: an ongoing self-invalidating animation keeps ready
+            // frames coming (the deadline-arm cut cannot withhold
+            // invalidation-caused frames), and an unbounded flush replays
+            // that animation to completion before the signal is honored.
+            let signalExit: Bool = {
+              if case .signal = exitReason {
+                return true
+              }
+              return false
+            }()
             if let flushedExitReason = try await renderPendingFramesAsync(
               renderedFrames: &renderedFrames,
-              eventPump: eventPump
+              eventPump: eventPump,
+              frameBudget: signalExit ? 1 : nil
             ) {
               return RunLoopResult(
                 finalState: stateContainer.state,

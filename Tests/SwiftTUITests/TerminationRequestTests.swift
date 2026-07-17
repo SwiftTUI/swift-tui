@@ -1,3 +1,4 @@
+import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -44,6 +45,41 @@ struct TerminationRequestTests {
     #expect(recorder.requests == [.signal("SIGTERM")])
   }
 
+  @Test("signal exit is honored promptly during a self-invalidating animation")
+  func signalExitIsBoundedDuringSelfInvalidatingAnimation() async throws {
+    let rootIdentity = testIdentity("TerminationAnimationRoot")
+    let signalReader = InProcessSignalReader()
+    let progress = AnimationProgressBox()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: TerminationTestInputReader(events: []),
+      signalReader: signalReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      viewBuilder: { _, _ in
+        SelfInvalidatingAnimationFixture(
+          signalReader: signalReader,
+          progress: progress
+        )
+      }
+    )
+
+    let result = try await runLoop.run()
+
+    // The exit flush is frame-bounded: the signal must end the run loop
+    // while the fixture animation still has iterations left. An unbounded
+    // flush keeps consuming the animation's invalidation-caused ready
+    // frames (the deadline-arm cut cannot withhold them) and only exits
+    // once the animation runs dry.
+    #expect(result.exitReason == .signal("SIGTERM"))
+    #expect(!progress.finished.withLock { $0 })
+  }
+
   @Test("onTerminationRequest is notified when input ends")
   func terminationRequestReceivesInputEnded() async throws {
     let recorder = TerminationRecorder()
@@ -86,6 +122,32 @@ private func runTerminationHarness(
     }
   )
   return try await runLoop.run()
+}
+
+private final class AnimationProgressBox: Sendable {
+  let finished = Mutex<Bool>(false)
+}
+
+/// Drives an invalidation-caused frame per iteration — the frame source the
+/// deadline-arm cut cannot bound — and raises SIGTERM mid-animation.
+private struct SelfInvalidatingAnimationFixture: View {
+  let signalReader: InProcessSignalReader
+  let progress: AnimationProgressBox
+  @State private var count = 0
+
+  var body: some View {
+    Text("tick \(count)")
+      .task {
+        for iteration in 0..<400 {
+          count = iteration
+          if iteration == 50 {
+            signalReader.send("SIGTERM")
+          }
+          await Task.yield()
+        }
+        progress.finished.withLock { $0 = true }
+      }
+  }
 }
 
 private final class TerminationTestTerminalHost: PresentationSurface {

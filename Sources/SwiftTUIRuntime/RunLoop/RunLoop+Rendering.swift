@@ -264,7 +264,8 @@ extension RunLoop {
 
   package func renderPendingFramesAsync(
     renderedFrames: inout Int,
-    eventPump: EventPump?
+    eventPump: EventPump?,
+    frameBudget: Int? = nil
   ) async throws -> RunLoopExitReason? {
     observationBridge.attachInvalidator(scheduler)
     registerLiveFocusedValuesProvider()
@@ -274,7 +275,19 @@ extension RunLoop {
       hasFrameSink || runtimeConfiguration.debug
     )
     let drainPass = beginDeadlineDrainPass()
-    frameLoop: while var scheduledFrame = consumeReadyFrame(for: drainPass) {
+    var consumedScheduledFrames = 0
+    frameLoop: while true {
+      // The deadline-arm cut only bounds deadline-armed frames; frames made
+      // ready by fresh invalidations (a self-invalidating animation) pass it
+      // freely, so a caller that must not linger — the exit flush — bounds
+      // the pass by frame count instead.
+      if let frameBudget, consumedScheduledFrames >= frameBudget {
+        break frameLoop
+      }
+      guard var scheduledFrame = consumeReadyFrame(for: drainPass) else {
+        break frameLoop
+      }
+      consumedScheduledFrames += 1
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
