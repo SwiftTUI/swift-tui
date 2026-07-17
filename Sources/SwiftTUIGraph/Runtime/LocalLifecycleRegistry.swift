@@ -92,6 +92,43 @@ package struct LifecycleHandlerSnapshot: Sendable {
     changeHandlers[registration.handlerID] = registration.handler
   }
 
+  /// Overlays `newer`'s registrations onto this snapshot, letting the newer
+  /// entries win on collisions. Used by the lifecycle coordinator's retained
+  /// handler store: content that re-registers replaces its retained entry,
+  /// content that reuses without re-registering keeps the last-committed one.
+  package mutating func absorbNewer(_ newer: LifecycleHandlerSnapshot) {
+    guard !newer.isEmpty else {
+      return
+    }
+    appearRegistrations.merge(newer.appearRegistrations) { _, newer in newer }
+    disappearRegistrations.merge(newer.disappearRegistrations) { _, newer in newer }
+    changeRegistrations.merge(newer.changeRegistrations) { _, newer in newer }
+    appearHandlers = Self.handlersByID(appearRegistrations)
+    disappearHandlers = Self.handlersByID(disappearRegistrations)
+    changeHandlers = Self.handlersByID(changeRegistrations)
+  }
+
+  /// Drops every registration whose identity sits at or below one of
+  /// `identities`. Used by the lifecycle coordinator's retained handler
+  /// store when a subtree's disappear dispatches — the framework's own
+  /// departure signal — so retention stays bounded by live content.
+  package mutating func prune(under identities: [Identity]) {
+    guard !identities.isEmpty else {
+      return
+    }
+    func matches(_ registration: LifecycleHandlerRegistration) -> Bool {
+      identities.contains { root in
+        registration.identity == root || registration.identity.isDescendant(of: root)
+      }
+    }
+    appearRegistrations = appearRegistrations.filter { !matches($0.value) }
+    disappearRegistrations = disappearRegistrations.filter { !matches($0.value) }
+    changeRegistrations = changeRegistrations.filter { !matches($0.value) }
+    appearHandlers = Self.handlersByID(appearRegistrations)
+    disappearHandlers = Self.handlersByID(disappearRegistrations)
+    changeHandlers = Self.handlersByID(changeRegistrations)
+  }
+
   /// Merges a departing node's lifecycle registrations into this snapshot,
   /// keeping this snapshot's own entries on key collisions. Counterpart of
   /// ``NodeHandlers/absorbAdopted(_:)`` for the absorbed-shadowed-node

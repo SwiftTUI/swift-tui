@@ -32,6 +32,18 @@ package final class LifecycleCoordinator {
   package private(set) var disappearHandlerSkipCount = 0
   package private(set) var changeHandlerSkipCount = 0
 
+  /// Cumulative count of committed change handlers dispatched from the
+  /// retained handler store because the current registry had no entry.
+  /// The known producer: a re-minted node that adopts a reused resolved
+  /// artifact never re-runs registration capture, so scoped publication
+  /// removes the departed owner's registration without a replacement while
+  /// the committed tree still names the handler (gallery fuzzer find,
+  /// 2026-07-17: sheet-presentation content). The retained closure is the
+  /// last-registered one — identical unless the body re-evaluated, which
+  /// would have re-registered. A deep fix at the reuse-adoption seam should
+  /// drive this counter back to zero.
+  package private(set) var changeHandlerSnapshotFallbackCount = 0
+
   // `assertsOnTaskStartSkip` defaults OFF. The one live skip the first armed
   // run found (TermUIPerf's synthetic-text-shimmer `…/Group[1]#task[id:1]`,
   // "no task registration at commit") is root-caused and fixed: the `.task`
@@ -68,7 +80,11 @@ package final class LifecycleCoordinator {
     currentTaskRegistry: LocalTaskRegistry
   ) -> [RuntimeIssue] {
     var skipIssues: [RuntimeIssue] = []
+    var disappearedIdentities: [Identity] = []
     for entry in plan.lifecycle {
+      if case .disappear = entry.operation {
+        disappearedIdentities.append(entry.identity)
+      }
       apply(
         entry,
         currentLifecycleRegistry: currentLifecycleRegistry,
@@ -77,7 +93,17 @@ package final class LifecycleCoordinator {
       )
     }
 
-    previousLifecycleHandlers = currentLifecycleRegistry.snapshot()
+    // Retained handler store, not a one-frame snapshot: a re-minted node
+    // that adopts a reused resolved artifact never re-runs registration
+    // capture, so publication can drop a registration frames before the
+    // committed tree stops naming its handler (gallery fuzzer find,
+    // 2026-07-17: sheet-presentation content). Retention is bounded by the
+    // framework's own departure signal — a subtree's handlers are pruned
+    // once its disappear dispatches — and re-registrations replace their
+    // retained entries. Prune before absorbing so a same-frame remount's
+    // fresh registrations survive their identity's disappear.
+    previousLifecycleHandlers.prune(under: disappearedIdentities)
+    previousLifecycleHandlers.absorbNewer(currentLifecycleRegistry.snapshot())
     return skipIssues
   }
 
@@ -119,11 +145,19 @@ package final class LifecycleCoordinator {
       }
     case .change(let handlerIDs):
       for handlerID in handlerIDs {
-        guard let handler = currentLifecycleRegistry.changeHandler(for: handlerID) else {
-          recordHandlerSkip(.change, entry: entry, handlerID: handlerID, into: &skipIssues)
+        if let handler = currentLifecycleRegistry.changeHandler(for: handlerID) {
+          handler()
           continue
         }
-        handler()
+        // Mirror the disappear path's previous-snapshot dispatch: content
+        // that did not re-register this frame still owes its committed
+        // callback (see changeHandlerSnapshotFallbackCount).
+        if let handler = previousLifecycleHandlers.changeHandlers[handlerID] {
+          changeHandlerSnapshotFallbackCount += 1
+          handler()
+          continue
+        }
+        recordHandlerSkip(.change, entry: entry, handlerID: handlerID, into: &skipIssues)
       }
     case .taskStart(let descriptor):
       let registration = currentTaskRegistry.registration(

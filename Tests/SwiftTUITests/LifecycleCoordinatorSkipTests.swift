@@ -170,6 +170,136 @@ struct LifecycleCoordinatorSkipTests {
     #expect(issues.first?.code == "lifecycle.changeHandlerSkipped")
   }
 
+  @Test("an .onChange handler absent from the current registry dispatches from the previous snapshot")
+  func changeHandlerFallsBackToPreviousSnapshot() {
+    // Gallery fuzzer find (2026-07-17, presentation-lab): a re-minted node
+    // adopting a reused resolved artifact never re-runs registration
+    // capture, so scoped publication removes the departed owner's change
+    // registration while the committed tree still names the handler. The
+    // committed callback must dispatch from the previous commit's snapshot
+    // (the disappear path's long-standing contract), not silently skip.
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let identity = testIdentity("Root", "reused")
+    var changeFired = 0
+
+    let firstRegistry = LocalLifecycleRegistry()
+    let changeID = firstRegistry.registerChange(identity: identity, ordinal: 0) {
+      changeFired += 1
+    }
+    _ = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: firstRegistry,
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+    #expect(changeFired == 1)
+
+    // Frame 2: the current registry lost the registration (scoped
+    // publication removed the departed owner; nothing re-registered), but
+    // the committed plan still fires the handler.
+    let issues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 2),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(changeFired == 2, "the committed change handler must fire from the snapshot")
+    #expect(coordinator.changeHandlerSnapshotFallbackCount == 1)
+    #expect(coordinator.changeHandlerSkipCount == 0)
+    #expect(issues.isEmpty)
+
+    // The retention must span multi-frame gaps: publication can drop the
+    // registration frames before the committed tree stops naming it, with
+    // intervening commits that carry no lifecycle entries at all.
+    _ = coordinator.applyCommittedFrame(
+      plan: CommitPlan(lifecycle: []),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+    let lateIssues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 3),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+    #expect(changeFired == 3, "retention must survive commits that republish nothing")
+    #expect(lateIssues.isEmpty)
+  }
+
+  @Test("a departed subtree's retained change handler is pruned at its disappear")
+  func retainedChangeHandlerPrunedOnDisappear() {
+    // The retained store is bounded by the framework's departure signal: once
+    // a subtree's disappear dispatches, a later (stale) plan naming its
+    // change handler must skip-and-report, not fire a departed closure.
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let identity = testIdentity("Root", "departing")
+    var changeFired = 0
+
+    let firstRegistry = LocalLifecycleRegistry()
+    let changeID = firstRegistry.registerChange(identity: identity, ordinal: 0) {
+      changeFired += 1
+    }
+    _ = coordinator.applyCommittedFrame(
+      plan: CommitPlan(lifecycle: []),
+      currentLifecycleRegistry: firstRegistry,
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    _ = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .disappear(handlerIDs: [])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 2),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(changeFired == 0, "a pruned handler must not fire after its subtree departed")
+    #expect(coordinator.changeHandlerSkipCount == 1)
+    #expect(issues.count == 1)
+  }
+
   @Test("healthy appear, disappear, and change handlers fire and report nothing")
   func healthyHandlersFireAndReportNothing() {
     let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
