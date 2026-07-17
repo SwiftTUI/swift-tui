@@ -108,8 +108,11 @@ extension UnixSignalsSequence {
           #if canImport(Darwin)
             // On Darwin platforms Dispatch's signal source uses kqueue and EVFILT_SIGNAL for
             // delivering signals. This exists alongside but with lower precedence than signal and
-            // sigaction: ignore signal handling here to kqueue can deliver signals.
-            signal(sig.rawValue, SIG_IGN)
+            // sigaction, so the default disposition must be replaced before the source can
+            // deliver. Installing SIG_IGN directly would let the kernel discard any signal that
+            // arrives before the source finishes registering; the trampoline records those
+            // receipts and replays them once every source is armed.
+            SignalRegistrationTrampoline.install(for: sig.rawValue)
           #endif
           return .init(
             // This force-unwrap is safe since Dispatch always returns a `DispatchSource`
@@ -120,6 +123,10 @@ extension UnixSignalsSequence {
             signal: sig
           )
         }
+
+        #if canImport(Darwin)
+          unsafe SignalRegistrationTrampoline.registrationGapHookForTesting?()
+        #endif
 
         let stream = AsyncStream<UnixSignal> { continuation in
           for source in sources {
@@ -186,6 +193,16 @@ extension UnixSignalsSequence {
             }
           }
         }
+
+        #if canImport(Darwin)
+          if Task.isCancelled {
+            SignalRegistrationTrampoline.abandon(
+              signalNumbers: sources.map { $0.signal.rawValue })
+          } else {
+            SignalRegistrationTrampoline.handOffToKqueue(
+              signalNumbers: sources.map { $0.signal.rawValue })
+          }
+        #endif
       #else
         let stream = AsyncStream<UnixSignal> { _ in }
         stateMachine = .init(.init(sources: [], stream: stream))

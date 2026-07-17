@@ -127,6 +127,13 @@ final class SceneRuntime {
     if isPrimary {
       installCrashGuard()
       defer { CrashSignalHandler.uninstall() }
+      // Arm the OS signal sources before the session renders its first
+      // frame: when registration instead rides the run loop's lazy startup
+      // path it races the initial render, and a SIGTERM/SIGINT landing in
+      // that window is discarded by the kernel.
+      if let armableSignalReader = resources.signalReader as? any SignalSourceArming {
+        await armableSignalReader.armSignalSources()
+      }
       return try await sessionRunner(self, sessionName)
     }
 

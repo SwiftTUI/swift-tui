@@ -57,6 +57,19 @@ public protocol SignalReading: AnyObject {
   func events() -> AsyncStream<String>
 }
 
+/// A signal reader whose OS signal sources can be installed ahead of
+/// run-loop startup.
+///
+/// When the sources instead register lazily on the run loop's own startup
+/// path, they race the first frame render; a SIGINT/SIGTERM delivered while
+/// registration is still in flight is discarded by the kernel. Session
+/// bootstrap arms conforming readers before rendering begins.
+package protocol SignalSourceArming: SignalReading {
+  /// Installs the OS signal sources and returns once they are registered
+  /// with the kernel.
+  func armSignalSources() async
+}
+
 /// Emits runtime signals from an in-process source.
 public final class InProcessSignalReader: SignalReading, Sendable {
   private struct State: Sendable {
