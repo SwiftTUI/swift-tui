@@ -858,7 +858,11 @@ package final class AnimationController: Sendable {
       path: String
     ) -> String? {
       if lhs.identity != rhs.identity { return "\(path): identity" }
-      if lhs.viewNodeID != rhs.viewNodeID { return "\(path): viewNodeID" }
+      if lhs.viewNodeID != rhs.viewNodeID {
+        let lhsStamp = lhs.viewNodeID.map { "\($0.rawValue)" } ?? "nil"
+        let rhsStamp = rhs.viewNodeID.map { "\($0.rawValue)" } ?? "nil"
+        return "\(path): viewNodeID prev=\(lhsStamp) current=\(rhsStamp)"
+      }
       if AnimatableSnapshot.extract(from: lhs).values
         != AnimatableSnapshot.extract(from: rhs).values
       {

@@ -1617,10 +1617,28 @@ package final class ViewNode {
     return snapshotRebuilding(entered: &entered)
   }
 
+  /// Whether `apply`/`applyRetainedSnapshot` ever ran on this node. Every
+  /// apply stamps `committed.viewNodeID` with this node's ID, so a nil stamp
+  /// identifies a node whose committed value is still the hollow init value —
+  /// a value-only placeholder (a styling-wrapper `ResolvedNode` minted by the
+  /// graph's identity fallback and never evaluated: its live children stay
+  /// permanently empty while its subtree lives only in the *parent's*
+  /// committed value).
+  private var hasEverApplied: Bool {
+    committed.viewNodeID != nil
+  }
+
   private func snapshotRebuilding(
     entered: inout Set<ObjectIdentifier>
   ) -> ResolvedNode {
     if isCommittedSnapshotFresh {
+      return committed
+    }
+    // A never-applied node has nothing to rebuild from: its live children are
+    // empty and its committed value is hollow. Serve the committed value
+    // as-is WITHOUT laundering freshness — marking it fresh here would let
+    // `canReuse` serve the hollow value as a retained subtree later.
+    guard hasEverApplied else {
       return committed
     }
     // Rebuild the whole-subtree snapshot by recursively pulling each
@@ -1636,7 +1654,27 @@ package final class ViewNode {
       return committed
     }
     var rebuilt = committed
-    rebuilt.children = children.map { $0.snapshotRebuilding(entered: &entered) }
+    if committed.children.count == children.count {
+      // Positional pairing (the same pairing `apply` wrote both sides from).
+      // A never-applied placeholder child must keep the PARENT's committed
+      // slice: recursing into it would serve its hollow init value and erase
+      // the interior island from the frame — the served tree then loses the
+      // subtree's runtime stamps and content wholesale (the gallery
+      // pointer-lab animation-skip SIGTRAP and the sheet change-handler-loss
+      // producer, 2026-07-17 campaign §5). The placeholder can never refresh
+      // itself — the only writer of its slice is the parent's apply — so the
+      // parent's committed slice is always the freshest truth for it.
+      rebuilt.children = zip(committed.children, children).map { valueChild, nodeChild in
+        nodeChild.hasEverApplied
+          ? nodeChild.snapshotRebuilding(entered: &entered)
+          : valueChild
+      }
+    } else {
+      // Count mismatch (mid-apply exotic states): keep the historical
+      // whole-child recursion; never-applied children still refuse to
+      // launder freshness above.
+      rebuilt.children = children.map { $0.snapshotRebuilding(entered: &entered) }
+    }
     committed = rebuilt
     isCommittedSnapshotFresh = true
     return committed
