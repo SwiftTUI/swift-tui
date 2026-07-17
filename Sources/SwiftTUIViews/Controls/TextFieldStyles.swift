@@ -259,11 +259,10 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveViewElements(
-        style.makeBody(configuration: configuration),
-        in: context
-      ),
+    // The style body must resolve through its own view node — see the
+    // matching note in `ConcreteAnyButtonStyleBox.resolveBody`.
+    resolveView(
+      style.makeBody(configuration: configuration),
       in: context
     )
   }

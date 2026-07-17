@@ -1886,20 +1886,21 @@ package final class ViewGraph {
     return node.committed
   }
 
-  /// A value-only child (a styling-wrapper ResolvedNode with no view node —
-  /// button/text-field chrome resolved without its own `resolveView`) maps to
-  /// a placeholder ViewNode that is never evaluated: its children array stays
-  /// permanently empty, so the evaluated interior nodes beneath it
-  /// (`…/ButtonBody/false/base`, `/overlay`, `/background`) are reachable only
-  /// through weak `evaluationHost` links. Anchor them with hosted-detached
-  /// edges from the EVALUATED parent (not the per-generation placeholder,
-  /// which is re-minted and discarded on every re-resolve): the parent's
-  /// teardown then reclaims the interiors, and the reachability census keeps
-  /// them absorbed while the parent lives — otherwise a departing host
-  /// generation (a dismissed presentation-overlay entry) strands one interior
-  /// generation per entry, the F04 leak-census residual. The style-seam root
-  /// fix (resolving style bodies through their own view node) supersedes this
-  /// once landed.
+  /// A value-only child (a styling-wrapper ResolvedNode with no view node)
+  /// maps to a placeholder ViewNode that is never evaluated: its children
+  /// array stays permanently empty, so the evaluated interior nodes beneath
+  /// it are reachable only through weak `evaluationHost` links. Anchor them
+  /// with hosted-detached edges from the EVALUATED parent (not the
+  /// per-generation placeholder, which is re-minted and discarded on every
+  /// re-resolve): the parent's teardown then reclaims the interiors, and the
+  /// reachability census keeps them absorbed while the parent lives —
+  /// otherwise a departing host generation strands one interior generation
+  /// per entry (the former F04 leak-census residual). The style-seam root
+  /// fix removed the dominant producer — control style bodies
+  /// (`ButtonBody`, `TabBody`, `PickerBody`, `TextFieldBody`) now resolve
+  /// through their own view node — so this anchor pass covers the remaining
+  /// value-only shapes (scoped-content group wrappers and custom
+  /// `ResolvableView`s that embed inline-built subtrees).
   private func recordValueOnlyChildInteriorAnchors(
     _ resolvedChildren: [ResolvedNode],
     hostedBy node: ViewNode

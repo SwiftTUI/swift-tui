@@ -511,11 +511,22 @@ private struct ToolbarContentNode: PrimitiveView, ResolvableView {
   let layoutBehavior: LayoutBehavior
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
+    // The hosted children are values captured from the frame's resolve, not
+    // re-resolved here — a capture-host injection. The late-preference
+    // reconcile applies this wrapper while the async frame protocol has the
+    // prepared graph suspended back to baseline, so the captured stamps can
+    // pair against superseded live nodes. Withdraw the stamp claims at every
+    // level so the apply's restamping walk stays on the slow (verifying)
+    // path instead of fast-skipping over foreign stamps.
+    var injectedChildren = children
+    for index in injectedChildren.indices {
+      injectedChildren[index].withdrawSubtreeRuntimeNodeIDStampsRecursively()
+    }
+    return [
       ResolvedNode(
         identity: context.identity,
         kind: .view("ToolbarContent"),
-        children: children,
+        children: injectedChildren,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutBehavior: layoutBehavior

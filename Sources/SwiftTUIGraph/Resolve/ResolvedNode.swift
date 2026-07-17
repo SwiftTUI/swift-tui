@@ -329,6 +329,23 @@ package struct ResolvedNode: Equatable, Sendable {
     subtreeRuntimeNodeIDsStamped = false
   }
 
+  /// Recursively withdraws the subtree-completeness claim at EVERY level of
+  /// this value tree. A capture-host injection (the toolbar reconcile
+  /// re-hosting content children captured from an earlier resolve) applies
+  /// values whose stamps were written under a DIFFERENT live-graph state —
+  /// the async frame protocol suspends the prepared graph back to baseline
+  /// while the tail reconciles, so a node the prepared resolve re-minted can
+  /// pair against its suspended predecessor. The root-only withdrawal is not
+  /// enough there: the stamping walk re-checks each level's own claim, so a
+  /// still-claimed interior would qualify for the fast skip and carry the
+  /// foreign stamps into the committed value (the stamp-coherence trap).
+  package mutating func withdrawSubtreeRuntimeNodeIDStampsRecursively() {
+    subtreeRuntimeNodeIDsStamped = false
+    for index in _storedChildren.indices {
+      _storedChildren[index].withdrawSubtreeRuntimeNodeIDStampsRecursively()
+    }
+  }
+
   private static func combinedPreferenceValues(
     for children: [ResolvedNode]
   ) -> PreferenceValues {

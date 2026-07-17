@@ -336,11 +336,12 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveViewElements(
-        style.makeBody(configuration: configuration),
-        in: context
-      ),
+    // The style body must resolve through its own view node: a value-only
+    // style child forces the graph to mint a hollow, never-evaluated
+    // placeholder whose chrome interiors outlive their anchors when a host
+    // generation departs (the F04 teardown-coherence residual).
+    resolveView(
+      style.makeBody(configuration: configuration),
       in: context
     )
   }
