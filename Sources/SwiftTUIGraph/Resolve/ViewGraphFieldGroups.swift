@@ -140,7 +140,17 @@ extension ViewGraph {
     // lands in the identity index. Persists across frames (not cleared by
     // `beginFrame`); `finalizeFrame` prunes entries whose identity no longer has
     // a live node. See `ChangeLifecycleModifier`.
-    package var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] = [:]
+    //
+    // Each entry keeps a per-pass baseline alongside the latest write: reads
+    // during the pass that wrote `current` see `baseline`, so every resolve of
+    // one `(identity, ordinal)` within a single pass computes the same
+    // should-trigger decision against the same previous value. Without this, a
+    // same-pass re-resolve (the presentation-portal reconcile re-resolves the
+    // overlay subtree) reads the first session's own write, concludes "no
+    // change", and skips the handler registration its begin-capture reset just
+    // erased — the committed change entry then dispatches into hollow stores
+    // (gallery fuzzer, 2026-07-17 §9.5: palette-sheet `onChange` skip).
+    package var changeObservationValues: [ChangeObservationValueKey: ChangeObservationSlot] = [:]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
     // Identities whose registrations were refreshed in place since the last
     // commit (`ViewGraph.refreshActionRegistration`), owed to the next
@@ -148,5 +158,23 @@ extension ViewGraph {
     // restore rolls the queued roots back alongside the node records they
     // describe.
     package var pendingRuntimeRegistrationRefreshRoots: Set<Identity> = []
+  }
+
+  /// One `onChange` previous-value entry: the latest written value, the pass
+  /// that wrote it, and the value that pass started from.
+  package struct ChangeObservationSlot {
+    /// The value observed before `passID`'s first write; `nil` when that write
+    /// was the first observation ever recorded for the key.
+    package var baseline: AnyStateSlot?
+    /// The latest written value.
+    package var current: AnyStateSlot
+    /// The `currentFrameID` of the pass that last wrote `current`.
+    package var passID: UInt64
+
+    package init(baseline: AnyStateSlot?, current: AnyStateSlot, passID: UInt64) {
+      self.baseline = baseline
+      self.current = current
+      self.passID = passID
+    }
   }
 }

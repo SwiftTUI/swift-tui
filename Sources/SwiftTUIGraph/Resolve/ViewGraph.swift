@@ -319,7 +319,7 @@ package final class ViewGraph {
     get { frameCommit.resolvedNodeReuseCache }
     set { frameCommit.resolvedNodeReuseCache = newValue }
   }
-  private var changeObservationValues: [ChangeObservationValueKey: AnyStateSlot] {
+  private var changeObservationValues: [ChangeObservationValueKey: ChangeObservationSlot] {
     get { frameCommit.changeObservationValues }
     set { frameCommit.changeObservationValues = newValue }
   }
@@ -353,38 +353,66 @@ package final class ViewGraph {
   /// Whether a previous `onChange` value has been recorded for this
   /// `(identity, ordinal)` — i.e. "this is not the first observation," a signal
   /// that survives node re-minting because it is keyed by the stable identity.
+  ///
+  /// Reads are pass-stable: within the pass that wrote the entry, the answer
+  /// reflects the pass's *baseline* (the state its first resolve saw), so a
+  /// same-pass re-resolve reproduces the first resolve's trigger decision and
+  /// therefore its handler registration (see `FrameCommitState
+  /// .changeObservationValues`).
   package func hasChangeObservationValue(
     identity: Identity,
     ordinal: Int
   ) -> Bool {
-    changeObservationValues[.init(identity: identity, ordinal: ordinal)] != nil
+    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)] else {
+      return false
+    }
+    return slot.passID == currentFrameID ? slot.baseline != nil : true
   }
 
   /// The previously-observed `onChange` value for this `(identity, ordinal)`, or
-  /// `nil` if none is recorded (or a stored value of a different type).
+  /// `nil` if none is recorded (or a stored value of a different type). Reads
+  /// are pass-stable — see ``hasChangeObservationValue(identity:ordinal:)``.
   package func changeObservationValue<Value>(
     identity: Identity,
     ordinal: Int,
     as type: Value.Type
   ) -> Value? {
-    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)],
-      slot.stores(Value.self)
-    else {
+    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)] else {
       return nil
     }
-    return slot.value(as: Value.self)
+    let stored = slot.passID == currentFrameID ? slot.baseline : slot.current
+    guard let stored, stored.stores(Value.self) else {
+      return nil
+    }
+    return stored.value(as: Value.self)
   }
 
   /// Records the latest observed `onChange` value for this `(identity, ordinal)`
   /// so the next resolve can detect a transition. Persists across frames and
   /// across `.id`-churn re-minting; pruned by `finalizeFrame` once the identity
-  /// no longer has a live node.
+  /// no longer has a live node. The first write of a pass shifts the previous
+  /// `current` into the pass baseline; later same-pass writes update `current`
+  /// only, so same-pass readers keep seeing the baseline.
   package func recordChangeObservationValue<Value>(
     _ value: Value,
     identity: Identity,
     ordinal: Int
   ) {
-    changeObservationValues[.init(identity: identity, ordinal: ordinal)] = AnyStateSlot(value)
+    let key = ChangeObservationValueKey(identity: identity, ordinal: ordinal)
+    if var slot = changeObservationValues[key] {
+      if slot.passID != currentFrameID {
+        slot.baseline = slot.current
+        slot.passID = currentFrameID
+      }
+      slot.current = AnyStateSlot(value)
+      changeObservationValues[key] = slot
+    } else {
+      changeObservationValues[key] = ChangeObservationSlot(
+        baseline: nil,
+        current: AnyStateSlot(value),
+        passID: currentFrameID
+      )
+    }
   }
 
   /// Drops `onChange` previous-value entries whose identity no longer has a live
@@ -633,7 +661,9 @@ package final class ViewGraph {
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
-      changeObservationValues: changeObservationValues.mapValues { $0.storedTypeDescription },
+      changeObservationValues: changeObservationValues.mapValues {
+        $0.current.storedTypeDescription
+      },
       committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
       pendingRuntimeRegistrationRefreshRoots: pendingRuntimeRegistrationRefreshRoots
     )
