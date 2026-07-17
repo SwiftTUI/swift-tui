@@ -23,7 +23,7 @@ extension RunLoop {
     renderedFrames: Int,
     convergence: FocusSyncConvergenceState
   ) async -> FrameAcquisitionOutcome {
-    await renderFrameArtifactsForCurrentMode(
+    let outcome = await renderFrameArtifactsForCurrentMode(
       scheduledFrame: scheduledFrame,
       currentState: currentState,
       eventPump: eventPump,
@@ -31,6 +31,31 @@ extension RunLoop {
       renderedFrames: renderedFrames,
       convergence: convergence
     )
+    switch outcome {
+    case .rendered, .elided:
+      // This acquisition COMMITTED — its registration publication just
+      // rewrote the live registries — but `applyCommittedFrame`'s
+      // retained-store absorb may never run for it: an elided commit
+      // produces no frame artifacts at all, and a focus-sync convergence
+      // re-render commits its pass, folds the unapplied commit plan into
+      // the lifecycle carry-forward, and loops. A later pass's scoped
+      // publication can then remove a registration NO store ever
+      // witnessed — the owner's record was legitimately reset by a
+      // re-evaluation that did not re-trigger — and the carried-forward
+      // committed callback skips at dispatch (gallery fuzzer find,
+      // 2026-07-17 §5 residual: sheet `onChange` under focus-sync
+      // convergence). Absorb every committed publication here, at the
+      // seam where the commit is known, so deferred plans always find
+      // their closures in the retained store.
+      lifecycleCoordinator.absorbPublishedRegistrations(
+        localLifecycleRegistry.snapshot()
+      )
+    case .skipped:
+      // Cancelled-before-start / dropped-completed: nothing committed, the
+      // live registries are unchanged — nothing new to absorb.
+      break
+    }
+    return outcome
   }
 
   private func renderFrameArtifactsForCurrentMode(

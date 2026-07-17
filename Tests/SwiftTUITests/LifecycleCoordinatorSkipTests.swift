@@ -300,6 +300,55 @@ struct LifecycleCoordinatorSkipTests {
     #expect(issues.count == 1)
   }
 
+  @Test("a commit-time absorbed registration dispatches after a later publication removes it")
+  func commitTimeAbsorbedRegistrationDispatchesAfterRemoval() {
+    // Gallery fuzzer find (2026-07-17 §5 residual, presentation-lab sheet
+    // `onChange`): a focus-sync convergence re-render (or an elided commit)
+    // publishes a frame's registrations and folds its unapplied commit plan
+    // into the lifecycle carry-forward — `applyCommittedFrame` never runs
+    // for that frame, so apply-time absorption alone never witnesses the
+    // registration. When the next pass's scoped publication removes it (the
+    // owner's record was reset by a re-evaluation that did not re-trigger),
+    // the carried-forward committed callback found it in NO store. The run
+    // loop now absorbs every committed publication into the retained store
+    // at acquisition time; this pins the coordinator-side contract.
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
+    let identity = testIdentity("Root", "sheet", "Group")
+    var changeFired = 0
+
+    let registry = LocalLifecycleRegistry()
+    let changeID = registry.registerChange(identity: identity, ordinal: 0) {
+      changeFired += 1
+    }
+    // Commit-time absorb: the publishing frame never reaches
+    // `applyCommittedFrame`.
+    coordinator.absorbPublishedRegistrations(registry.snapshot())
+
+    // A later pass's scoped publication removes the registration with
+    // nothing to restore.
+    registry.removeSubtrees(rootedAt: [testIdentity("Root", "sheet")])
+
+    // The carried-forward plan finally dispatches.
+    let issues = coordinator.applyCommittedFrame(
+      plan: CommitPlan(
+        lifecycle: [
+          .init(
+            viewNodeID: ViewNodeID(rawValue: 1),
+            identity: identity,
+            operation: .change(handlerIDs: [changeID])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: registry,
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(changeFired == 1, "the committed change handler must fire from the retained store")
+    #expect(coordinator.changeHandlerSnapshotFallbackCount == 1)
+    #expect(coordinator.changeHandlerSkipCount == 0)
+    #expect(issues.isEmpty)
+  }
+
   @Test("healthy appear, disappear, and change handlers fire and report nothing")
   func healthyHandlersFireAndReportNothing() {
     let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)

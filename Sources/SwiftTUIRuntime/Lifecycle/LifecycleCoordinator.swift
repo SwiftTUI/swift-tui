@@ -107,6 +107,24 @@ package final class LifecycleCoordinator {
     return skipIssues
   }
 
+  /// Absorbs a just-published live registry into the retained handler store
+  /// at COMMIT time, for frames whose commit plan does not reach
+  /// ``applyCommittedFrame`` with the publication still live: elided commits
+  /// publish registration state but produce no frame artifacts at all, and a
+  /// focus-sync convergence re-render commits its pass, folds the unapplied
+  /// plan into the lifecycle carry-forward, and loops. Without this, a
+  /// registration published by such a commit and removed by a later frame's
+  /// scoped publication — its owner's record was legitimately reset by a
+  /// re-evaluation that did not re-trigger — is in NO store by the time the
+  /// carried-forward plan finally dispatches, and the committed callback is
+  /// silently skipped (gallery fuzzer find, 2026-07-17 §5 residual: sheet
+  /// `onChange` under convergence/elision pressure).
+  func absorbPublishedRegistrations(
+    _ snapshot: LifecycleHandlerSnapshot
+  ) {
+    previousLifecycleHandlers.absorbNewer(snapshot)
+  }
+
   func shutdown() {
     taskRunner.cancelAll()
     previousLifecycleHandlers = .init()
