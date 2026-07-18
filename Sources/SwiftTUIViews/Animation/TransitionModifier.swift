@@ -29,6 +29,13 @@ public struct TransitionRegistrationModifier: PrimitiveViewModifier, Sendable {
     // Register the transition for every emitted identity so the
     // animation controller can look it up during insertion/removal
     // diffing.
+    //
+    // The registration deliberately keys on the enclosing evaluation host's
+    // node id when the child resolves value-only: subtree re-stamping aliases
+    // value children onto the host anyway, and only a nodeID that is live in
+    // the committed tree survives the collection barrier's prune. The
+    // registered *identity* is what the adopted-slot removal/insertion
+    // channels key conditional-presence detection on.
     if let sink = TransitionRegistrationStorage.effectiveSink {
       for node in nodes {
         sink.registerTransition(

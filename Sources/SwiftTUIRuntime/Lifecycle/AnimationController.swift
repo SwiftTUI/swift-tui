@@ -1109,11 +1109,22 @@ package final class AnimationController: Sendable {
         let transition = transitionsByNodeID[viewNodeID]
       else { continue }
       // Reparent suppression: a newly-inserted Identity whose ViewNodeID was
-      // live last frame is a node that changed parents (same ViewNodeID, new
+      // live last frame AND carried a transition registration last frame is a
+      // transition-marked node that changed parents (same ViewNodeID, new
       // Identity), not a conditional first-appearance. SwiftUI fires
       // `.transition()` only when a view's conditional presence changes, so a
       // surviving-but-reparented node must not play an insertion transition.
-      if previousLiveNodeIDs.contains(viewNodeID) {
+      //
+      // The previous-registration conjunct matters: branch flips inside a
+      // structural slot ADOPT the slot's graph node for the new occupant
+      // (that adoption is what keeps slot state stable through
+      // conditionals), so a conditionally-inserted transition child can
+      // surface with a ViewNodeID that was live last frame under the OTHER
+      // branch's occupant. That occupant carried no transition registration —
+      // a genuinely reparented transition node did.
+      if previousLiveNodeIDs.contains(viewNodeID),
+        previousTransitionsByNodeID[viewNodeID] != nil
+      {
         continue
       }
       enqueueInsertionAnimation(
@@ -1158,118 +1169,53 @@ package final class AnimationController: Sendable {
           viewNodeID: removedNodeID
         )
       else { continue }
-      let identity = previousNode.identity
-
-      // If the removed identity's matched-geometry key was
-      // consumed by a match on this frame, the counterpart insertion
-      // already owns the visual transition.  Skip the removal
-      // overlay so the old view just disappears.
-      if let removedConfig = previousNode.matchedGeometry,
-        matchedKeysConsumedByMatch.contains(removedConfig.key)
-      {
-        continue
-      }
-
-      // Resolve the injection point: the deepest disappearing ancestor (the
-      // subtree to inject) and the first surviving ancestor it attaches to.
-      // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
-      let injectionPoint = AnimationTransitionRemovalPlanning.injectionPoint(
-        for: identity,
+      planRemovalOverlay(
+        removedNodeID: removedNodeID,
+        identity: previousNode.identity,
+        matchedGeometryKey: previousNode.matchedGeometry?.key,
+        transition: transition,
         previousRoot: previousRoot,
-        previousParentByIdentity: previousParentByIdentity,
-        newIdentities: newIdentities
+        newIdentities: newIdentities,
+        matchedKeysConsumedByMatch: matchedKeysConsumedByMatch,
+        transactionPlan: transactionPlan,
+        timestamp: timestamp
       )
-      let injectionTarget = injectionPoint.target
+    }
 
-      // injectionParent must be a surviving identity in the new tree.
-      // If the walk-up stopped at a multi-child container, it may still be a
-      // removed identity — skip.
-      guard let injectionParent = injectionPoint.parent,
-        newIdentities.contains(injectionParent),
-        let subtree = AnimationTreeQueries.findResolvedSubtree(
+    // Second removal channel: adopted-slot conditional removals. Branch flips
+    // inside a structural slot ADOPT the slot's graph node for the incoming
+    // occupant, so the departing transition child's ViewNodeID stays live and
+    // the occurrence diff above cannot see it leave. The previous frame's
+    // registration map records exactly which identity the transition was
+    // authored for — if that identity left the identity set while its node
+    // survived, the conditional presence changed and the exit must play.
+    // A node re-registered THIS frame is a surviving transition node
+    // (reparent or value update), never a conditional removal, and real node
+    // departures already ran through the occurrence channel above.
+    for (nodeID, registeredIdentity) in previousTransitionIdentitiesByNodeID {
+      guard removingNodes[nodeID] == nil,
+        !departedNodeIDs.contains(nodeID),
+        !newIdentities.contains(registeredIdentity),
+        previousIdentities.contains(registeredIdentity),
+        !removingIdentitySet.contains(registeredIdentity),
+        transitionIdentitiesByNodeID[nodeID] == nil,
+        let transition = previousTransitionsByNodeID[nodeID],
+        let previousRoot = previousTreeRoot,
+        let previousNode = AnimationTreeQueries.findResolvedNode(
           in: previousRoot,
-          identity: injectionTarget
+          identity: registeredIdentity
         )
       else { continue }
-
-      // Before clearing the injected subtree's active animations, peek
-      // at any mid-flight opacity animation on the transition's
-      // registered identity (or anywhere in the subtree) so the
-      // removal can start from the displayed value instead of
-      // snapping back to 1.0.  Must run before the filter below.
-      let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
-      var initialOpacity: Double = 1.0
-      let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
-      if let existing = activeAnimations[keyOnTarget],
-        let sampled = sample(existing, at: timestamp),
-        let value = sampled.unwrap(as: Double.self)
-      {
-        initialOpacity = value
-      } else {
-        for sid in injectedIdentities {
-          let k = AnimationKey(identity: sid, slot: .opacity)
-          if let existing = activeAnimations[k],
-            let sampled = sample(existing, at: timestamp),
-            let value = sampled.unwrap(as: Double.self)
-          {
-            initialOpacity = value
-            break
-          }
-        }
-      }
-
-      // Supersede any in-flight animations on identities that are being
-      // re-injected from the removed subtree.  The unified activeAnimations
-      // map means this filter is scope-agnostic: property animations,
-      // insertion-offset animations, and matched-geometry animations are
-      // all swept together.  Any withAnimation completion closures ref-
-      // counted by these entries fire immediately here (via releaseBatch
-      // below), rather than at each animation's natural curve completion —
-      // matching SwiftUI's interrupt semantics where a removal supersedes
-      // any in-progress insertion or matched-geometry transition.
-      //
-      // Pre-Phase-4, insertion-offset and matched-geometry animations
-      // lived in separate side-channel maps and were not touched by this
-      // filter, so they would tick to natural completion (or be purged
-      // later by the placed-overlay loop's "registration missing" path)
-      // even after the exit animation started.
-      let supersededEntries = activeAnimations.filter {
-        injectedIdentities.contains($0.key.identity)
-      }
-      activeAnimations = activeAnimations.filter {
-        !injectedIdentities.contains($0.key.identity)
-      }
-      for (_, entry) in supersededEntries {
-        releaseBatch(entry.batchID)
-      }
-
-      // If a previous placed tree is cached, look up the frozen
-      // placed subtree for the same identity so the overlay can be
-      // injected post-layout (draw-only, no layout-shift).
-      let placedSnapshot: PlacedNode?
-      if let previousPlacedRoot {
-        placedSnapshot = AnimationTreeQueries.findPlacedSubtree(
-          in: previousPlacedRoot,
-          identity: injectionTarget
-        )
-      } else {
-        placedSnapshot = nil
-      }
-
-      removingNodes[removedNodeID] = RemovalEntry(
-        identity: identity,
-        snapshot: subtree,
-        parentIdentity: injectionParent,
-        childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
+      planRemovalOverlay(
+        removedNodeID: nodeID,
+        identity: registeredIdentity,
+        matchedGeometryKey: previousNode.matchedGeometry?.key,
         transition: transition,
-        animationBox: transactionForDepartedIdentity(
-          identity,
-          transactionPlan: transactionPlan
-        )
-        .animationRequest.animationBoxIfAny,
-        startTime: timestamp,
-        startOpacity: initialOpacity,
-        placedSnapshot: placedSnapshot
+        previousRoot: previousRoot,
+        newIdentities: newIdentities,
+        matchedKeysConsumedByMatch: matchedKeysConsumedByMatch,
+        transactionPlan: transactionPlan,
+        timestamp: timestamp
       )
     }
 
@@ -1453,6 +1399,135 @@ package final class AnimationController: Sendable {
         batchID: batchID
       )
     }
+  }
+
+  /// Plans one removal overlay: resolves the injection point, captures the
+  /// departing subtree and its frozen placed bounds, supersedes in-flight
+  /// animations on the injected identities, and records the `RemovalEntry`.
+  /// Shared by both removal-detection channels — departed ViewNodeID
+  /// occurrences and adopted-slot conditional removals (a registered identity
+  /// leaving the identity set while its slot node survives).
+  private func planRemovalOverlay(
+    removedNodeID: ViewNodeID,
+    identity: Identity,
+    matchedGeometryKey: MatchedGeometryKey?,
+    transition: AnyTransition,
+    previousRoot: ResolvedNode,
+    newIdentities: Set<Identity>,
+    matchedKeysConsumedByMatch: Set<MatchedGeometryKey>,
+    transactionPlan: FrameAnimationTransactionPlan,
+    timestamp: MonotonicInstant
+  ) {
+    // If the removed identity's matched-geometry key was consumed by a match
+    // on this frame, the counterpart insertion already owns the visual
+    // transition.  Skip the removal overlay so the old view just disappears.
+    if let matchedGeometryKey,
+      matchedKeysConsumedByMatch.contains(matchedGeometryKey)
+    {
+      return
+    }
+
+    // Resolve the injection point: the deepest disappearing ancestor (the
+    // subtree to inject) and the first surviving ancestor it attaches to.
+    // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
+    let injectionPoint = AnimationTransitionRemovalPlanning.injectionPoint(
+      for: identity,
+      previousRoot: previousRoot,
+      previousParentByIdentity: previousParentByIdentity,
+      newIdentities: newIdentities
+    )
+    let injectionTarget = injectionPoint.target
+
+    // injectionParent must be a surviving identity in the new tree.
+    // If the walk-up stopped at a multi-child container, it may still be a
+    // removed identity — skip.
+    guard let injectionParent = injectionPoint.parent,
+      newIdentities.contains(injectionParent),
+      let subtree = AnimationTreeQueries.findResolvedSubtree(
+        in: previousRoot,
+        identity: injectionTarget
+      )
+    else { return }
+
+    // Before clearing the injected subtree's active animations, peek
+    // at any mid-flight opacity animation on the transition's
+    // registered identity (or anywhere in the subtree) so the
+    // removal can start from the displayed value instead of
+    // snapping back to 1.0.  Must run before the filter below.
+    let injectedIdentities = AnimationTreeQueries.collectIdentities(in: subtree)
+    var initialOpacity: Double = 1.0
+    let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
+    if let existing = activeAnimations[keyOnTarget],
+      let sampled = sample(existing, at: timestamp),
+      let value = sampled.unwrap(as: Double.self)
+    {
+      initialOpacity = value
+    } else {
+      for sid in injectedIdentities {
+        let k = AnimationKey(identity: sid, slot: .opacity)
+        if let existing = activeAnimations[k],
+          let sampled = sample(existing, at: timestamp),
+          let value = sampled.unwrap(as: Double.self)
+        {
+          initialOpacity = value
+          break
+        }
+      }
+    }
+
+    // Supersede any in-flight animations on identities that are being
+    // re-injected from the removed subtree.  The unified activeAnimations
+    // map means this filter is scope-agnostic: property animations,
+    // insertion-offset animations, and matched-geometry animations are
+    // all swept together.  Any withAnimation completion closures ref-
+    // counted by these entries fire immediately here (via releaseBatch
+    // below), rather than at each animation's natural curve completion —
+    // matching SwiftUI's interrupt semantics where a removal supersedes
+    // any in-progress insertion or matched-geometry transition.
+    //
+    // Pre-Phase-4, insertion-offset and matched-geometry animations
+    // lived in separate side-channel maps and were not touched by this
+    // filter, so they would tick to natural completion (or be purged
+    // later by the placed-overlay loop's "registration missing" path)
+    // even after the exit animation started.
+    let supersededEntries = activeAnimations.filter {
+      injectedIdentities.contains($0.key.identity)
+    }
+    activeAnimations = activeAnimations.filter {
+      !injectedIdentities.contains($0.key.identity)
+    }
+    for (_, entry) in supersededEntries {
+      releaseBatch(entry.batchID)
+    }
+
+    // If a previous placed tree is cached, look up the frozen
+    // placed subtree for the same identity so the overlay can be
+    // injected post-layout (draw-only, no layout-shift).
+    let placedSnapshot: PlacedNode?
+    if let previousPlacedRoot {
+      placedSnapshot = AnimationTreeQueries.findPlacedSubtree(
+        in: previousPlacedRoot,
+        identity: injectionTarget
+      )
+    } else {
+      placedSnapshot = nil
+    }
+
+    removingNodes[removedNodeID] = RemovalEntry(
+      identity: identity,
+      snapshot: subtree,
+      parentIdentity: injectionParent,
+      childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
+      transition: transition,
+      animationBox: transactionForDepartedIdentity(
+        identity,
+        transactionPlan: transactionPlan
+      )
+      .animationRequest.animationBoxIfAny,
+      startTime: timestamp,
+      startOpacity: initialOpacity,
+      placedSnapshot: placedSnapshot
+    )
   }
 
   /// Selects animation intent for a node that no longer exists in the current

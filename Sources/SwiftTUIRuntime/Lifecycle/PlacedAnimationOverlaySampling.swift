@@ -72,12 +72,21 @@ package enum PlacedAnimationOverlaySampling {
       guard let placedSnapshot = entry.placedSnapshot,
         let parentId = entry.parentIdentity
       else {
+        // Nothing to composite (no frozen placed snapshot or no surviving
+        // parent) — and neither can ever appear later, so complete the
+        // removal now. A skipped entry would strand `removingNodes` and keep
+        // the frame pump armed for the rest of the session.
+        result.completedNodeIDs.append(viewNodeID)
         continue
       }
 
       guard let box = entry.animationBox,
         let animation = registeredAnimations[box]
       else {
+        // No animation to drive (no `withAnimation` intent, or the box's
+        // registration is gone): the exit is instantaneous — complete the
+        // removal on this sample instead of skipping it forever.
+        result.completedNodeIDs.append(viewNodeID)
         continue
       }
 
