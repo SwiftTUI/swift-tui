@@ -207,20 +207,26 @@ scroll view" fails at `FrameworkStressGestureScrollTests.swift` with
 `Expectation failed: (inner.value.y → 5) == 3` — the leaf scroll pane ends
 two rows past the expected pan target after the nested takeover hand-off.
 
-**Where it surfaces.** Linux CI lanes only, twice so far: the `0.1.5`
-release-window Repo Gate (2026-07-13, rerun green) and the `0.1.7` release
-commit's `Linux repo gate (amd64)` (2026-07-18, run 29655794779, at
-`70feb5cf`). Not reproduced on macOS arm64 — the same suite passed the
-local full gate at the same commit both times, and the deterministic value
-(`5` vs `3`, identical in both firings) suggests a load-dependent
-extra-tick class (two additional momentum/settle ticks landing before the
-assertion) rather than randomness.
+**Where it surfaces.** The `Linux repo gate (amd64)` lane only. Firings:
+the `0.1.5` release-window Repo Gate (2026-07-13, rerun green), then
+2026-07-18 at `6bce1644`/`8560d337` (pre-noon runs, before that day's fix
+batch), at `feb28468` (alongside two other slow-runner timeouts: a
+tap-composition test running 289 s so the inter-tap window decomposed a
+double into two singles, and a 300 s starvation-cap timeout), and at the
+`0.1.7` release commit `70feb5cf` (run 29655794779). The same day's
+`c6ccba5e` run escalated to the whole runtime-test lane timing out at
+1200 s. The identical `5` vs `3` overshoot in every assertion-level firing
+suggests a load-dependent extra-tick class (two additional momentum/settle
+ticks landing before the assertion) rather than randomness.
 
-**Why this is not treated as a product regression (yet).** Both firings
-were on otherwise-green trees whose local macOS gates (and, for 0.1.7, the
-1,100-case gallery fuzz census) were clean; the identical two-row
-overshoot in both firings points at a scheduling-density difference on the
-CI runner class, not a behavior change in the pans themselves.
+**Why this is not treated as a product regression.** Every firing tree was
+green on the macOS full gate, and the arm64-native Linux container gate
+(`mise run linux-gate`, worktree mode) passed in 337 s at `c6ccba5e` — the
+exact tree whose amd64 lane had just timed out wholesale. The lane was red
+at commits both before and after the 2026-07-18 changes with the same
+signature, and the amd64 runner class already hosts the quarantined
+TermUIPerf app-shell stall (entry 2). This is runner-class degradation,
+not a behavior change in the pans themselves.
 
 **How to investigate.** Reproduce under load on Linux (the arm64 container
 via `mise run linux-gate` with a parallel CPU burner, or an amd64 host);
