@@ -237,8 +237,13 @@ extension ResolvedNode {
 
     var scopeWithStrip = self
     scopeWithStrip.children = [toolbarNode]
+    // `fillsProposal: true` is load-bearing: the strip pins to the far edge
+    // of whatever region this scope claims, so a content-hugging scope would
+    // park a bottom toolbar directly under short content instead of at the
+    // bottom of the terminal.
     scopeWithStrip.layoutBehavior = .safeAreaIgnoring(
-      context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet(for: style))
+      context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet(for: style)),
+      fillsProposal: true
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts while preserving

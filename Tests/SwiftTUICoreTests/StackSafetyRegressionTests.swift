@@ -790,7 +790,7 @@ private func wrapperBehavior(for index: Int) -> LayoutBehavior {
   case 0:
     return .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 1))
   case 1:
-    return .safeAreaIgnoring(.init())
+    return .safeAreaIgnoring(.init(), fillsProposal: false)
   case 2:
     return .border(
       .single,

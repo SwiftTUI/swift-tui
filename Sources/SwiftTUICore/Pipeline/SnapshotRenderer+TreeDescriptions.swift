@@ -62,9 +62,10 @@ extension SnapshotRenderer {
       return "lazyStack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
-    case .safeAreaIgnoring(let insets):
+    case .safeAreaIgnoring(let insets, let fillsProposal):
       return
-        "safeAreaIgnoring(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
+        "safeAreaIgnoring(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing)"
+        + (fillsProposal ? ",fills" : "") + ")"
     case .safeAreaInset(let edge, let alignment, let spacing, let safeArea):
       return
         "safeAreaInset(\(edge),\(alignment.rawValue),spacing:\(spacing),safeArea:\(safeArea.top),\(safeArea.leading),\(safeArea.bottom),\(safeArea.trailing))"

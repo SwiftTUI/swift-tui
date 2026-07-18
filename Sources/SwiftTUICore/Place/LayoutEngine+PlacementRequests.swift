@@ -170,7 +170,7 @@ extension LayoutEngine {
           )
         )
       ]
-    case .safeAreaIgnoring(let insets):
+    case .safeAreaIgnoring(let insets, _):
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {

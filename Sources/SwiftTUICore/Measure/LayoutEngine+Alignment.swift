@@ -165,7 +165,7 @@ extension LayoutEngine {
           height: measured.measuredSize.height
         )
       }
-    case .safeAreaIgnoring(let insets):
+    case .safeAreaIgnoring(let insets, _):
       if let child = resolved.children.first,
         let childMeasurement = measured.childMeasurements.first
       {

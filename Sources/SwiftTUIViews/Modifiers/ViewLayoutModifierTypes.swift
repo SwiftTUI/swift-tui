@@ -92,7 +92,7 @@ public struct IgnoreSafeAreaModifier: PrimitiveViewModifier, Sendable, Equatable
         children: [contentNode],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        layoutBehavior: .safeAreaIgnoring(reclaimedInsets)
+        layoutBehavior: .safeAreaIgnoring(reclaimedInsets, fillsProposal: false)
       )
     ]
   }

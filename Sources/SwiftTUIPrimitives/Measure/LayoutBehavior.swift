@@ -17,7 +17,14 @@ package enum LayoutBehavior: Sendable {
   case padding(EdgeInsets)
   /// Expands child layout back into the container safe area reserved by an
   /// ancestor wrapper while leaving the wrapper's own measured size unchanged.
-  case safeAreaIgnoring(EdgeInsets)
+  ///
+  /// `fillsProposal` selects the wrapper's own measurement: `false` stays
+  /// intrinsic on axes with no reclaimed inset (the public
+  /// `.ignoresSafeArea()` semantics — a small view must not balloon to the
+  /// proposal), `true` claims the full finite proposal regardless of the
+  /// reclaimed insets (chrome hosts like the toolbar scope, whose
+  /// edge-pinned strip is positioned against the claimed region's far edge).
+  case safeAreaIgnoring(EdgeInsets, fillsProposal: Bool)
   /// Inserts a secondary child along one safe-area edge and shifts the primary
   /// child inward only when the inset content exceeds the reclaimed safe area.
   case safeAreaInset(edge: Edge, alignment: Alignment, spacing: Int, safeArea: EdgeInsets)
@@ -94,8 +101,11 @@ extension LayoutBehavior: Equatable {
         && lhsVerticalAlignment == rhsVerticalAlignment
     case (.padding(let lhsInsets), .padding(let rhsInsets)):
       return lhsInsets == rhsInsets
-    case (.safeAreaIgnoring(let lhsInsets), .safeAreaIgnoring(let rhsInsets)):
-      return lhsInsets == rhsInsets
+    case (
+      .safeAreaIgnoring(let lhsInsets, let lhsFills),
+      .safeAreaIgnoring(let rhsInsets, let rhsFills)
+    ):
+      return lhsInsets == rhsInsets && lhsFills == rhsFills
     case (
       .safeAreaInset(
         edge: let lhsEdge,

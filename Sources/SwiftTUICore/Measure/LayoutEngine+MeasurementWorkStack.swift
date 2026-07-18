@@ -458,7 +458,7 @@ extension LayoutEngine {
         ),
         work: &work
       )
-    case .safeAreaIgnoring(let insets):
+    case .safeAreaIgnoring(let insets, _):
       let childProposal = outset(effectiveProposal, by: insets)
       scheduleChildren(
         node.children,

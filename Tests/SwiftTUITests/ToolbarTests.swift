@@ -611,6 +611,44 @@ struct ToolbarTests {
     }
   }
 
+  @Test("Bottom toolbar pins its strip to the bottom of the proposal when content is short")
+  func bottomToolbarPinsToProposalBottom() throws {
+    // The gallery calculator regression: a bottom toolbar host whose content
+    // does not expand vertically must still claim the full proposed height so
+    // the strip renders at the terminal's bottom row, not flush under the
+    // content. de259ff0 made zero-inset `.safeAreaIgnoring` intrinsic-sized
+    // (correct for the public `.ignoresSafeArea()`), which silently removed
+    // the chrome host's fill.
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .bottom,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-bottom-pin-root")),
+      proposal: .init(width: 20, height: 12)
+    )
+    let lines = artifacts.rasterSurface.lines
+    let saveRow = try #require(lines.firstIndex { $0.contains("Save") })
+    let bodyRow = try #require(lines.firstIndex { $0.contains("body") })
+    #expect(bodyRow < saveRow)
+    #expect(
+      saveRow == 11,
+      "bottom strip must sit on the last proposed row, got row \(saveRow) of \(lines.count)"
+    )
+  }
+
   @Test(
     "Toolbar-strip buttons inherit the Panel's scope path so commands registered at the Panel are visible from toolbar focus"
   )
