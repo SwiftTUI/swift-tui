@@ -212,6 +212,36 @@ struct DropDestinationDispatchTests {
     #expect(received.value == [DroppedPath("/tmp/file.txt")])
     #expect(box.value.isEmpty)
   }
+
+  @Test("Path paste reaches a visible bare-Panel destination while focus is outside its scope")
+  func visibleBarePanelReceivesDropWhileFocusIsOutside() throws {
+    // The gallery file-drop regression: the drop Panel hosts no focusable
+    // content, and focus sits on a control outside its scope, so the
+    // focus-chain dispatch can never reach the registered handler. The
+    // visible-context fallback (the same activation rule key commands got in
+    // 335271c0) must carry the drop to the deepest visible command host.
+    let received = Box<[DroppedPath]>([])
+    let runLoop = makeDropRunLoop {
+      VStack {
+        Text("outside").focusable(true)
+        Panel(id: "dropzone") {
+          Text("drag files here")
+        }
+        .dropDestination { paths in
+          received.value = paths
+          return true
+        }
+      }
+    }
+    try renderInitial(runLoop)
+    focusLeafmostFocusable(in: runLoop)
+    // Precondition of the regression: focus exists, but its scope path does
+    // not include the drop zone's scope.
+    #expect(runLoop.focusTracker.currentFocusIdentity != nil)
+
+    runLoop.handlePaste(PasteEvent(content: "/tmp/dropped.txt"))
+    #expect(received.value == [DroppedPath("/tmp/dropped.txt")])
+  }
 }
 
 /// Moves focus to the region with the deepest `scopePath` in the

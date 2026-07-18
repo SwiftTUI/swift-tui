@@ -240,10 +240,9 @@ extension RunLoop {
   package func handlePaste(_ pasteEvent: PasteEvent) {
     let paths = parseDroppedPaths(pasteEvent.content)
     if !paths.isEmpty {
-      let consumed = dropDestinationRegistry.dispatch(
+      let consumed = dispatchNonSpatialDrop(
         paths: paths,
-        context: .init(),
-        along: currentFocusScopePath()
+        context: .init()
       )
       if consumed { return }
     }
@@ -326,11 +325,41 @@ extension RunLoop {
     paths: [DroppedPath],
     context: DropContext
   ) -> Bool {
-    let scopePath = spatialDropScopePath(for: context) ?? currentFocusScopePath()
+    if let scopePath = spatialDropScopePath(for: context) {
+      return dropDestinationRegistry.dispatch(
+        paths: paths,
+        context: context,
+        along: scopePath
+      )
+    }
+    return dispatchNonSpatialDrop(paths: paths, context: context)
+  }
+
+  /// Dispatches a location-free drop along the focused scope chain first,
+  /// then — when the focus chain declines or nothing is focused — along the
+  /// active/visible command-host chain. A drop is an attention-directed
+  /// event with no spatial anchor in a terminal, so a visible bare-`Panel`
+  /// destination with no focusable content must still be reachable; this is
+  /// the drop-side twin of key commands' activation by visible context
+  /// (`commandDispatchScopePath`).
+  private func dispatchNonSpatialDrop(
+    paths: [DroppedPath],
+    context: DropContext
+  ) -> Bool {
+    let focusPath = currentFocusScopePath()
+    if dropDestinationRegistry.dispatch(
+      paths: paths,
+      context: context,
+      along: focusPath
+    ) {
+      return true
+    }
+    let activePath = latestSemanticSnapshot.activeCommandScopePath
+    guard activePath != focusPath else { return false }
     return dropDestinationRegistry.dispatch(
       paths: paths,
       context: context,
-      along: scopePath
+      along: activePath
     )
   }
 
