@@ -2667,6 +2667,9 @@ package final class ViewGraph {
       ),
       departedNavigationSurfaceNodeIDs: teardownBarrierWork.nodeIDs(
         for: .departedNavigationSurface
+      ),
+      sparedVisitedDescentNodeIDs: teardownBarrierWork.nodeIDs(
+        for: .sparedVisitedDescent
       )
     )
   }
@@ -2730,6 +2733,54 @@ package final class ViewGraph {
     }
   }
 
+  /// Barrier verdict for nodes a departing-subtree descent spared on the
+  /// visited-this-frame keep-guard (`.sparedVisitedDescent`). The spare
+  /// protects genuine mid-frame re-adoptions, but "visited" also holds for a
+  /// node a SUPERSEDED same-frame pass resolved and the committed pass
+  /// dropped — the toolbar capture-host strand: the departing wrapper's
+  /// teardown already cleared every edge naming the spared node, so nothing
+  /// ever reclaims it and the F91 census flags it stored-but-unreachable. At
+  /// the barrier all applies have settled, so the census's own reachability
+  /// walk is the verdict: a spare reachable from the committed root (or
+  /// holding a qualified entity home) is kept; an unreachable spare is
+  /// exactly the node the leak census would flag and is removed.
+  /// Descendants spared by the reclaim's own descent re-enqueue through the
+  /// same reason, so the fixed-point iteration drains the whole island.
+  private func pruneSparedVisitedDescentStrands(
+    candidateRootID: ViewNodeID,
+    activeEntities: Set<EntityIdentity>
+  ) {
+    let candidates = teardownBarrierWork.nodeIDs(for: .sparedVisitedDescent)
+    guard !candidates.isEmpty else {
+      return
+    }
+    consumeTeardownWork(.sparedVisitedDescent, for: candidates)
+    let stored = candidates.filter { nodeID in
+      nodeIfExists(for: nodeID) != nil
+        && nodeID != candidateRootID
+        && nodeID != root?.viewNodeID
+    }
+    guard !stored.isEmpty,
+      let context = lifetimeReachabilityContext(
+        candidateRootID: candidateRootID,
+        activeEntities: activeEntities
+      )
+    else {
+      return
+    }
+    let reachableNodeIDs = lifetimeAnchors.reachableNodeIDs(context: context).nodeIDs
+    for nodeID in stored.sorted() where !reachableNodeIDs.contains(nodeID) {
+      guard let node = nodeIfExists(for: nodeID) else {
+        continue
+      }
+      removeSubtree(
+        rootedAt: node,
+        sparingVisitedNodes: true,
+        asBarrierAdjudicatedRemoval: true
+      )
+    }
+  }
+
   @discardableResult
   private func settleTeardownBarrier(
     candidateRootID: ViewNodeID,
@@ -2783,6 +2834,17 @@ package final class ViewGraph {
         tearDownDepartedNavigationSurfaces()
       }
       afterStage?(.departedNavigationSurface, iteration)
+      runTeardownStage(
+        .sparedVisitedDescent,
+        iteration: iteration,
+        trace: trace
+      ) {
+        pruneSparedVisitedDescentStrands(
+          candidateRootID: candidateRootID,
+          activeEntities: activeEntities
+        )
+      }
+      afterStage?(.sparedVisitedDescent, iteration)
 
       let madeProgress =
         nodesBefore != Set(nodesByNodeID.keys)
@@ -3596,11 +3658,42 @@ package final class ViewGraph {
   ) -> Bool {
     for invalidatedIdentity in invalidatedIdentities {
       guard let invalidatedNode = nodeIfExists(for: invalidatedIdentity) else {
+        // An invalidated identity with no live node names rerooted or
+        // departed content. Remap it to the nearest live ancestor — the node
+        // that owns the changed region — and test against that. With no live
+        // ancestor either, deny: granting reuse on an unconnectable
+        // invalidation is how a stale style-hosted subtree survived an
+        // explicit-identity state write (the 8ace32a5 wedge). The deny is
+        // deliberately frame-wide (every candidate sees the same set): an
+        // unanchored identity means the graph cannot bound the changed
+        // region, so this frame recomputes — the narrow equivalent of the
+        // full-root escalation `nearestLiveAncestorNodeID`'s caller replaced.
+        // Such identities require a live invalidator on an unmapped owner
+        // (rerooted `.id` content mid-transition), so the cost is transient,
+        // not a steady state; hoist to a once-per-frame precomputation if
+        // profiling ever bills this walk (see the PERF note above).
+        guard
+          let ancestorNodeID = nearestLiveAncestorNodeID(for: invalidatedIdentity),
+          let ancestorNode = nodesByNodeID[ancestorNodeID]
+        else {
+          return true
+        }
+        if ancestorNode === node
+          || ancestorNode.isDescendantBridgingIslandSeams(of: node)
+          || node.isDescendantBridgingIslandSeams(of: ancestorNode)
+        {
+          return true
+        }
         continue
       }
+      // Seam-bridging descent: an invalidated node living on a capture-hosted
+      // island (a node-backed style body's interior) must still deny reuse of
+      // the ancestors above the seam — the strict-parent walk cannot see it,
+      // which let Layer-A retained reuse serve a stale style-hosted subtree
+      // after an explicit-identity state write (the 8ace32a5 wedge).
       if invalidatedNode === node
-        || invalidatedNode.isDescendant(of: node)
-        || node.isDescendant(of: invalidatedNode)
+        || invalidatedNode.isDescendantBridgingIslandSeams(of: node)
+        || node.isDescendantBridgingIslandSeams(of: invalidatedNode)
       {
         return true
       }

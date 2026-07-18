@@ -259,12 +259,13 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveViewElements(
-        style.makeBody(configuration: configuration),
-        in: context
-      ),
-      in: context
+    // Node-backed with the enclosing control's authoring scope rebased onto
+    // the style-body node — see ConcreteAnyButtonStyleBox.resolveBody for the
+    // hollow-placeholder / seed-degradation constraint this pins.
+    resolveView(
+      style.makeBody(configuration: configuration),
+      in: context,
+      authoringContextOverride: currentAuthoringContext()
     )
   }
 }

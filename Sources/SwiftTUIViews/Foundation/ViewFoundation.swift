@@ -460,13 +460,33 @@ func resolveView<V: View>(
     // frontiers must reinstall the captured enclosing scope instead (the
     // same capture the lazy-subview and portal-attachment seams use).
     let capturedEnclosingScope = makeCapturedAuthoringContext()
+    // The re-run must carry the same authoring-scope override the original
+    // resolve used: a node-backed style body re-resolved without it would
+    // re-root a fresh scope onto the style-body island and re-register
+    // degraded (seed-backed) owners — the wedge this override exists to
+    // prevent. Strip the override's live `viewNode` before the long-lived
+    // evaluator closure captures it: the node's stored evaluator retaining an
+    // ancestor node forms an ARC cycle (ancestor's children already retain
+    // this node), and every fire site rebases onto its own fresh graph node
+    // anyway, so the captured `viewNode` would never be read.
+    let capturedOverride = authoringContextOverride.map {
+      rebasedAuthoringContext($0, viewNode: nil)
+    }
     context.viewGraph?.setEvaluator(for: context.identity) {
       if let capturedEnclosingScope, currentAuthoringContext() == nil {
         withAuthoringContext(capturedEnclosingScope) {
-          _ = resolveView(view, in: context)
+          _ = resolveView(
+            view,
+            in: context,
+            authoringContextOverride: capturedOverride
+          )
         }
       } else {
-        _ = resolveView(view, in: context)
+        _ = resolveView(
+          view,
+          in: context,
+          authoringContextOverride: capturedOverride
+        )
       }
     }
   }

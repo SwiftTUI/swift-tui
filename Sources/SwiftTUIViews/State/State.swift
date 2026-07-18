@@ -202,6 +202,20 @@ private final class StateGraphBindingRegistry: Sendable {
   }
 }
 
+#if DEBUG
+  /// Test-only observation of degraded `@State` locations: a seed-backed
+  /// location minted — or an imperative access left location-less — while the
+  /// authoring scope still carried a state-graph scope. That is the silent-
+  /// write failure mode of the style-seam regression (input-driven writes
+  /// landing in the detached seed box: no dirt, no invalidation, stale
+  /// retained reuse). Production behavior is unchanged; tests install the
+  /// hook to assert input-driven writes stay graph-backed.
+  @MainActor
+  package enum StateSeedFallbackProbe {
+    package static var onDegradedLocation: ((Identity) -> Void)?
+  }
+#endif
+
 @propertyWrapper
 @MainActor
 /// Local value storage owned by a view identity within a runtime graph.
@@ -317,6 +331,16 @@ public struct State<Value> {
       )
       return location
     }
+    #if DEBUG
+      // Fire only while the scope's graph is still live: a callback outliving
+      // its torn-down graph falls to the seed by long-standing design and is
+      // not the degradation this probe exists to catch.
+      if let scope = context.stateGraphScope,
+        LiveViewGraphRegistry.graph(for: scope) != nil
+      {
+        StateSeedFallbackProbe.onDegradedLocation?(context.viewIdentity)
+      }
+    #endif
     return nil
   }
 
@@ -342,6 +366,15 @@ public struct State<Value> {
       )
     }
 
+    #if DEBUG
+      // Fire only while the scope's graph is still live (see the imperative
+      // fallback's probe note above).
+      if let scope = context.stateGraphScope,
+        LiveViewGraphRegistry.graph(for: scope) != nil
+      {
+        StateSeedFallbackProbe.onDegradedLocation?(context.viewIdentity)
+      }
+    #endif
     return DynamicStateLocation(
       getValue: { box.currentSeedValue() },
       setValue: { newValue in

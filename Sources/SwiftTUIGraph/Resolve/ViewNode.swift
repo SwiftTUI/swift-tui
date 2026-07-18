@@ -1767,6 +1767,32 @@ package final class ViewNode {
     return false
   }
 
+  /// Seam-bridging variant of `isDescendant(of:)` for reuse-denial checks:
+  /// follows `parent ?? evaluationHost` so capture-hosted islands (node-backed
+  /// style bodies, portal payloads) stay visible to the ancestors deciding
+  /// retained reuse — the same bridge the event-bubble and dirty-plan walks
+  /// use. The strict-parent variant stays correct for structural-lifecycle
+  /// decisions, where an island must NOT count as a structural child.
+  package func isDescendantBridgingIslandSeams(
+    of ancestor: ViewNode
+  ) -> Bool {
+    var current = parent ?? evaluationHost
+    var visited: Set<ObjectIdentifier> = []
+
+    while let node = current {
+      let nodeID = ObjectIdentifier(node)
+      guard visited.insert(nodeID).inserted else {
+        return false
+      }
+      if node === ancestor {
+        return true
+      }
+      current = node.parent ?? node.evaluationHost
+    }
+
+    return false
+  }
+
   package func isPrepared(
     for frameID: UInt64
   ) -> Bool {

@@ -44,12 +44,15 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
     configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveViewElements(
-        style.makeBody(configuration: configuration),
-        in: context
-      ),
-      in: context
+    // Node-backed with the enclosing control's authoring scope rebased onto
+    // the style-body node — see ConcreteAnyButtonStyleBox.resolveBody for the
+    // hollow-placeholder / seed-degradation constraint this pins. TabBody is
+    // the seam the 8ace32a5 regression wedged on (tab-hosted scroll panes
+    // silently losing input-driven @State writes).
+    resolveView(
+      style.makeBody(configuration: configuration),
+      in: context,
+      authoringContextOverride: currentAuthoringContext()
     )
   }
 }

@@ -336,12 +336,18 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveViewElements(
-        style.makeBody(configuration: configuration),
-        in: context
-      ),
-      in: context
+    // The style body must resolve through its own view node: a value-only
+    // style child forces the graph to mint a hollow, never-evaluated
+    // placeholder whose chrome interiors outlive their anchors when a host
+    // generation departs (the F04 teardown-coherence residual). The interior
+    // must keep the ENCLOSING control's authoring scope, rebased onto the
+    // style-body node — a fresh scope re-roots registration owners onto the
+    // re-mintable style-body island, where input-driven @State writes degrade
+    // to detached seed boxes: no dirt, no invalidation, stale retained reuse.
+    resolveView(
+      style.makeBody(configuration: configuration),
+      in: context,
+      authoringContextOverride: currentAuthoringContext()
     )
   }
 }

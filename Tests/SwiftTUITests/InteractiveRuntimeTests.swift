@@ -3129,6 +3129,66 @@ struct InteractiveRuntimeTests {
     )
   }
 
+  /// Style-seam re-land probe: registrations inside node-backed style bodies
+  /// (`TabBody` hosts this fixture's scroll pane) must resolve live
+  /// graph-backed owners. The 8ace32a5 regression minted seed-backed
+  /// locations there, so input-driven writes vanished silently — no dirt, no
+  /// invalidation, stale retained reuse; scene-session waits then suspended
+  /// forever. This probe turns that hang class into a loud failure.
+  @MainActor
+  @Test("pointer scroll on a tab-hosted scroll pane stays graph-backed")
+  func pointerScrollOnTabHostedScrollPaneStaysGraphBacked() async throws {
+    let terminalSize = CellSize(width: 36, height: 10)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("TabHostedScrollGraphBacked")
+    let scrollIdentity = testIdentity("TabHostedScrollGraphBacked", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = TabHostedTallExternalBindingScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let degradedIdentities = LockedBox([Identity]())
+    StateSeedFallbackProbe.onDegradedLocation = { identity in
+      degradedIdentities.value.append(identity)
+    }
+    defer { StateSeedFallbackProbe.onDegradedLocation = nil }
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 3),
+            location: centerPoint(of: scrollRect)
+          ))
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(
+      positionBox.value.y >= 1,
+      "the scroll write must land on the graph-backed slot"
+    )
+    #expect(
+      degradedIdentities.value.isEmpty,
+      "no @State access during a live-graph scroll may degrade to a seed-backed location: \(degradedIdentities.value)"
+    )
+  }
+
   @MainActor
   @Test("pointer scroll updates the visible surface for a WindowGroup-hosted scroll pane")
   func pointerScrollUpdatesVisibleSurfaceForWindowGroupHostedScrollPane() async throws {
