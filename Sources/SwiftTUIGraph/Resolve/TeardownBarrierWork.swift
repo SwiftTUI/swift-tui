@@ -7,6 +7,14 @@ package enum TeardownWorkReason: CaseIterable, Hashable, Sendable {
   case entityRoutedRemoval
   case absorbedShadow
   case departedNavigationSurface
+  /// A visited node a departing-subtree descent spared (the re-adoption
+  /// keep-guard). The spare is provisional: "visited this frame" also holds
+  /// for a node a SUPERSEDED same-frame pass resolved and the committed pass
+  /// dropped (the toolbar-strip item churn strand), which the descent cannot
+  /// distinguish from a genuine re-adoption mid-frame. The barrier — where
+  /// every apply has settled — keeps the node iff a durable anchor claims
+  /// it, and reclaims the strand otherwise.
+  case sparedVisitedDescent
 }
 
 package struct TeardownBarrierWork: Equatable, Sendable {

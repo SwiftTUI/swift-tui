@@ -31,6 +31,7 @@ package enum TeardownBarrierStage: String, CaseIterable, Equatable, Sendable {
   case absorbedShadow
   case staleDetachedHostedRoot
   case departedNavigationSurface
+  case sparedVisitedDescent
 }
 
 /// A reason-projected snapshot of the typed teardown work queue.
@@ -39,17 +40,20 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
   package var entityRoutedRemovalNodeIDs: Set<ViewNodeID>
   package var absorbedShadowNodeIDs: Set<ViewNodeID>
   package var departedNavigationSurfaceNodeIDs: Set<ViewNodeID>
+  package var sparedVisitedDescentNodeIDs: Set<ViewNodeID>
 
   package init(
     resolveScopeScratchNodeIDs: Set<ViewNodeID> = [],
     entityRoutedRemovalNodeIDs: Set<ViewNodeID>,
     absorbedShadowNodeIDs: Set<ViewNodeID>,
-    departedNavigationSurfaceNodeIDs: Set<ViewNodeID>
+    departedNavigationSurfaceNodeIDs: Set<ViewNodeID>,
+    sparedVisitedDescentNodeIDs: Set<ViewNodeID> = []
   ) {
     self.resolveScopeScratchNodeIDs = resolveScopeScratchNodeIDs
     self.entityRoutedRemovalNodeIDs = entityRoutedRemovalNodeIDs
     self.absorbedShadowNodeIDs = absorbedShadowNodeIDs
     self.departedNavigationSurfaceNodeIDs = departedNavigationSurfaceNodeIDs
+    self.sparedVisitedDescentNodeIDs = sparedVisitedDescentNodeIDs
   }
 
   package var totalCount: Int {
@@ -57,6 +61,7 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
       + entityRoutedRemovalNodeIDs.count
       + absorbedShadowNodeIDs.count
       + departedNavigationSurfaceNodeIDs.count
+      + sparedVisitedDescentNodeIDs.count
   }
 
   package func subtracting(
@@ -74,6 +79,9 @@ package struct TeardownWorkSnapshot: Equatable, Sendable {
       ),
       departedNavigationSurfaceNodeIDs: departedNavigationSurfaceNodeIDs.subtracting(
         other.departedNavigationSurfaceNodeIDs
+      ),
+      sparedVisitedDescentNodeIDs: sparedVisitedDescentNodeIDs.subtracting(
+        other.sparedVisitedDescentNodeIDs
       )
     )
   }

@@ -22,6 +22,7 @@ extension ViewGraph {
     sparingVisitedNodes: Bool = false,
     isSubtreeDescent: Bool = false,
     ignoringLifetimeAnchors: Bool = false,
+    asBarrierAdjudicatedRemoval: Bool = false,
     walk: SubtreeRemovalWalk? = nil
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
@@ -102,6 +103,17 @@ extension ViewGraph {
       isSubtreeDescent,
       node.visitedThisFrame(currentFrameID)
     {
+      // The spare is provisional. "Visited this frame" also holds for a node
+      // a SUPERSEDED same-frame pass resolved and the committed pass dropped
+      // (a node-backed style-body island under the toolbar capture-host seam:
+      // an earlier reconcile pass visits the old item's ButtonBody chain, the
+      // committed pass drops the item, and this spare would strand the whole
+      // island — nothing anchors it once the departing wrapper's teardown
+      // clears its parent/committedValue/hostedDetached edges). Defer the
+      // final verdict to the teardown barrier, where every apply has settled:
+      // a genuinely re-adopted node holds a durable anchor there and is kept;
+      // an anchor-less spare is the strand and is reclaimed.
+      enqueueTeardownWork(.sparedVisitedDescent, for: node.viewNodeID)
       return
     }
 
@@ -125,6 +137,13 @@ extension ViewGraph {
     // visited, parent-detached node with neither is a stranded same-frame
     // mint whose output a chain collapse absorbed (`pruneAbsorbedShadowedNodes`)
     // — keeping it would leak it beyond every teardown path's reach.
+    // A barrier-adjudicated removal root (`pruneSparedVisitedDescentStrands`)
+    // was already proven unreachable by the census reachability walk — the
+    // keep-guard's liveness proxies must not re-spare it: a stranded island
+    // root keeps its identity index entry precisely BECAUSE no teardown path
+    // ever reached it, so index ownership is not evidence of adoption there.
+    // Every other caller keeps the guard: the proxies protect live re-rooted
+    // controls and flattened state owners mid-frame.
     let hasDurableAnchorOutsideCascade =
       !ignoringLifetimeAnchors
       && (lifetimeReachabilityContext().map { context in
@@ -134,7 +153,8 @@ extension ViewGraph {
           context: context
         )
       } ?? false)
-    if node.parent == nil,
+    if !asBarrierAdjudicatedRemoval,
+      node.parent == nil,
       node.viewNodeID != root?.viewNodeID,
       node.visitedThisFrame(currentFrameID),
       hasDurableAnchorOutsideCascade

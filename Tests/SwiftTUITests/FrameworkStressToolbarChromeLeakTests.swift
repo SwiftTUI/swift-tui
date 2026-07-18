@@ -45,6 +45,75 @@ struct FrameworkStressToolbarChromeLeakTests {
       )
     }
   }
+
+  /// The node-backed strand under the capture-host seam (gallery fuzzer
+  /// case-139): when the item COUNT shrinks, the departing item's ButtonBody
+  /// island can be visited by a superseded pass of the same frame, so the
+  /// removal descent's visited-node spare keeps the island root while the
+  /// departing wrapper's teardown clears every edge naming it — 7 stored
+  /// nodes unreachable from the committed root, one island per dropped
+  /// item. The `.sparedVisitedDescent` barrier verdict reclaims the
+  /// anchor-less spare at the frame barrier.
+  @Test("toolbar item-count churn leaves no teardown-coherence orphans")
+  func toolbarItemCountChurnLeavesNoOrphans() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ToolbarItemCountChurnRoot"),
+      size: .init(width: 72, height: 20)
+    ) {
+      ToolbarItemCountChurnFixture()
+    }
+    defer { harness.shutdown() }
+
+    for cycle in 1...4 {
+      var frame = try harness.clickText("Toggle Extras")
+      #expect(frame.contains(cycle.isMultiple(of: 2) ? "Extras on" : "Extras off"))
+      var violation = harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()
+      #expect(
+        violation == nil,
+        """
+        toolbar item-count churn stranded stored node(s) on cycle \(cycle): \
+        \(violation?.detail ?? "")
+        """
+      )
+      frame = try harness.clickText("Bump Count")
+      #expect(frame.contains("Count \(cycle)"))
+      violation = harness.runLoop.renderer.viewGraph.debugTeardownCoherenceViolation()
+      #expect(
+        violation == nil,
+        """
+        toolbar rebuild after count churn stranded stored node(s) on cycle \(cycle): \
+        \(violation?.detail ?? "")
+        """
+      )
+    }
+  }
+}
+
+private struct ToolbarItemCountChurnFixture: View {
+  @State private var count = 0
+  @State private var showsExtras = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(showsExtras ? "Extras on" : "Extras off")
+      Text("Count \(count)")
+      Button("Toggle Extras") { showsExtras.toggle() }
+      Button("Bump Count") { count += 1 }
+      Panel(id: "tools") {
+        if showsExtras {
+          Text("Tools body")
+            .toolbarItem(.init(title: "Alpha \(count)", action: {}))
+            .toolbarItem(.init(title: "Beta", action: {}))
+            .toolbarItem(.init(title: "Gamma", action: {}))
+        } else {
+          Text("Tools body")
+            .toolbarItem(.init(title: "Alpha \(count)", action: {}))
+        }
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+    }
+    .frame(width: 72, height: 20, alignment: .topLeading)
+  }
 }
 
 private struct ToolbarChromeChurnFixture: View {
