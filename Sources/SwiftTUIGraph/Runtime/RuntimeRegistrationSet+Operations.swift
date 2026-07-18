@@ -56,6 +56,18 @@ extension RuntimeRegistrationSet {
     for registry in allRegistries {
       registry.prune(keeping: liveNodeIDs)
     }
+    // The F04 retention leg: the mid-interaction teardown spares an ACTIVE
+    // recognizer's paired pointer routes, and the gesture prune above (or
+    // the departed-region pass) later releases the recognizer — the spared
+    // route needs its own liveness leg or it leaks until the next full
+    // reset. Runs AFTER the fan-out so the pairing check observes the
+    // gesture registry's post-prune population.
+    if let pointerHandlerRegistry, let gestureRegistry {
+      pointerHandlerRegistry.removeUnpairedGestureFamilyRoutes(
+        pairedIdentities: Set(gestureRegistry.snapshot().keys),
+        keeping: liveNodeIDs
+      )
+    }
   }
 
   package func restore(

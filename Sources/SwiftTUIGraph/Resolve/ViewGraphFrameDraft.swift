@@ -249,28 +249,50 @@ package final class ViewGraphFrameDraft {
       let live = liveRegistrations.publicationOracleFingerprint()
       let rebuilt = scratch.publicationOracleFingerprint()
       if live != rebuilt {
-        let diverged = Set(rebuilt.keys).union(live.keys)
+        // Mid-interaction preservation is part of the full-rebuild contract,
+        // not a divergence: every publication teardown (`resetAll`,
+        // `removeSubtrees`) spares ACTIVE recognizers and their paired
+        // pointer/hover/gesture-state entries (`preservedGestureIdentities`,
+        // F101 — a press-departed row's records vanish WITH the row while
+        // the live registries deliberately keep the in-flight interaction).
+        // The scratch is rebuilt from node records alone and cannot carry
+        // that state, so live-side extras keyed exactly by a currently-
+        // ACTIVE recognizer's identity are the designed one-interaction
+        // window, not a publication bug. The excuse dies with the
+        // interaction: the focus-sync liveness passes release a genuinely
+        // departed recognizer (and its paired routes) right after commit,
+        // so wrongful retention past the interaction still trips the oracle
+        // on the next sampled scoped restore.
+        let excusableKeys = excusableActiveInteractionKeys()
+        let divergedKeys = Set(rebuilt.keys).union(live.keys)
           .filter { live[$0] != rebuilt[$0] }
+          .filter { key in
+            !(excusableKeys.contains(key) && rebuilt[key] == nil)
+          }
           .sorted()
-          .prefix(4)
-          .map { "\($0) live=\(live[$0] ?? 0) rebuilt=\(rebuilt[$0] ?? 0)" }
-        // The forensic context rides the violation itself (F92): the cheap
-        // per-frame fields are captured regardless of the publication-
-        // diagnostics flag, so a wild violation explains which plan and
-        // checkpoint strategy produced it without a pre-set second opt-in.
-        let disabledReasons = publicationDiagnostics.selectiveEvaluationDisabledReasons
-        SoundnessProbeConfiguration.recordRegistrationPublicationViolation(
-          """
-          registration publication: scoped restore diverged from full \
-          rebuild: \(diverged.joined(separator: ", ")) \
-          [mode=\(publicationModeName) roots=\(publicationSubtreeRootCount) \
-          dirty_plan=\(publicationDiagnostics.dirtyPlanResult) \
-          selective_off=\(disabledReasons.isEmpty ? "-" : disabledReasons.joined(separator: "|")) \
-          ckpt=\(publicationDiagnostics.graphCheckpointStrategy ?? "none") \
-          portal_queued=\(publicationDiagnostics.presentationPortalRootQueued.map(String.init(describing:)) ?? "-") \
-          portal_escalated=\(publicationDiagnostics.presentationPortalEscalated.map(String.init(describing:)) ?? "-")]
-          """
-        )
+        if !divergedKeys.isEmpty {
+          let diverged =
+            divergedKeys
+            .prefix(4)
+            .map { "\($0) live=\(live[$0] ?? 0) rebuilt=\(rebuilt[$0] ?? 0)" }
+          // The forensic context rides the violation itself (F92): the cheap
+          // per-frame fields are captured regardless of the publication-
+          // diagnostics flag, so a wild violation explains which plan and
+          // checkpoint strategy produced it without a pre-set second opt-in.
+          let disabledReasons = publicationDiagnostics.selectiveEvaluationDisabledReasons
+          SoundnessProbeConfiguration.recordRegistrationPublicationViolation(
+            """
+            registration publication: scoped restore diverged from full \
+            rebuild: \(diverged.joined(separator: ", ")) \
+            [mode=\(publicationModeName) roots=\(publicationSubtreeRootCount) \
+            dirty_plan=\(publicationDiagnostics.dirtyPlanResult) \
+            selective_off=\(disabledReasons.isEmpty ? "-" : disabledReasons.joined(separator: "|")) \
+            ckpt=\(publicationDiagnostics.graphCheckpointStrategy ?? "none") \
+            portal_queued=\(publicationDiagnostics.presentationPortalRootQueued.map(String.init(describing:)) ?? "-") \
+            portal_escalated=\(publicationDiagnostics.presentationPortalEscalated.map(String.init(describing:)) ?? "-")]
+            """
+          )
+        }
       }
     }
     // Committed-handler resolution oracle (2026-07-17 campaign §5): every
@@ -505,4 +527,43 @@ package final class ViewGraphFrameDraft {
       roots.count
     }
   }
+
+  /// The oracle-fingerprint keys the live registries may legitimately hold
+  /// beyond a node-record rebuild: entries keyed by a currently-ACTIVE
+  /// recognizer's identity, exactly the families the publication teardowns
+  /// spare through `preservedGestureIdentities` (the recognizer itself, its
+  /// paired pointer/hover routes, and its gesture-state bindings). Built
+  /// from the LIVE registries so only keys that actually survived a spare
+  /// can be excused — and only in the live-extra direction (the caller
+  /// additionally requires the rebuilt side to lack the key entirely).
+  private func excusableActiveInteractionKeys() -> Set<String> {
+    guard let gestureRegistry = liveRegistrations.gestureRegistry else {
+      return []
+    }
+    let activeIdentities = Set(
+      gestureRegistry.snapshot().compactMap { identity, recognizer in
+        recognizer.isActive ? identity : nil
+      }
+    )
+    guard !activeIdentities.isEmpty else {
+      return []
+    }
+    var keys: Set<String> = []
+    for identity in activeIdentities {
+      keys.insert("gesture|\(identity.path)")
+      keys.insert("gestureState|\(identity.path)")
+    }
+    if let pointerRegistry = liveRegistrations.pointerHandlerRegistry {
+      for routeID in pointerRegistry.snapshot().keys
+      where activeIdentities.contains(routeID.identity) {
+        keys.insert("pointer|\(routeID)")
+      }
+      for routeID in pointerRegistry.snapshotHover().keys
+      where activeIdentities.contains(routeID.identity) {
+        keys.insert("hover|\(routeID)")
+      }
+    }
+    return keys
+  }
+
 }

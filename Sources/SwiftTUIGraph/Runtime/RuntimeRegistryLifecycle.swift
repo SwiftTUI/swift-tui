@@ -132,7 +132,12 @@ package protocol RuntimeRegistry: AnyObject {
   /// does NOT override this — its stale capture/hover routes are re-keyed or
   /// released by `RunLoop.processFocusSyncIteration`'s paired-region pass,
   /// which is sequenced immediately after `pruneOrphanedGestures` and must
-  /// stay there. A future `prune` override here must review that sequencing.
+  /// stay there. Its ONE liveness leg is the paired sweep
+  /// `pruneOrphanedGestures` runs after this fan-out
+  /// (``LocalPointerHandlerRegistry/removeUnpairedGestureFamilyRoutes(pairedIdentities:keeping:)``),
+  /// scoped to gesture-family routes whose recognizer is gone and whose
+  /// owner node departed. A future `prune` override here must review that
+  /// sequencing.
   func prune(keeping liveNodeIDs: Set<ViewNodeID>)
 
   /// Contributes this registry's keyed contents to the publication oracle
