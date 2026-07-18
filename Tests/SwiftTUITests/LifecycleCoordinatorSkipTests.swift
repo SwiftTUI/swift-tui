@@ -96,6 +96,191 @@ struct LifecycleCoordinatorSkipTests {
     #expect(issues.isEmpty)
   }
 
+  /// The carried-stale `.taskStart` class (gallery fuzzer, 2026-07-18,
+  /// final-mixed cases 292/302/559): a carry-forward merge dispatches an
+  /// earlier frame's start after the site's `.task(id:)` value moved on.
+  /// The registry (correctly) holds only the replacement descriptor, so the
+  /// stale start must be dropped as superseded — not started, not
+  /// skip-warned.
+  @Test("a carried start cancelled later in the same plan is superseded, not skipped")
+  func carriedStartWithLaterCancelIsSuperseded() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: true)
+    let identity = testIdentity("Root", "tab-payload")
+    let stale = TaskDescriptor(id: "\(identity)#task[id:1]", priority: .medium)
+    let replacement = TaskDescriptor(id: "\(identity)#task[id:2]", priority: .medium)
+    let taskRegistry = LocalTaskRegistry()
+    taskRegistry.register(
+      identity: identity,
+      registration: TaskRegistration(descriptor: replacement) {}
+    )
+    // The 559 shape: carried start prepended, current frame's diff cancels
+    // the stale descriptor and starts its replacement.
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskStart(stale)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskCancel(stale)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskStart(replacement)
+        ),
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: taskRegistry
+    )
+
+    #expect(issues.isEmpty)
+    #expect(coordinator.taskStartSkipCount == 0)
+    #expect(coordinator.taskStartSupersededCount == 1)
+    #expect(coordinator.activeTaskCount == 1)
+    #expect(coordinator.activeTaskDescriptors[identity]?.map(\.id) == [replacement.id])
+  }
+
+  @Test("a cancelled-and-gone carried start is superseded even when its cancel came first")
+  func carriedStartReplacedBySameSiteStartIsSuperseded() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: true)
+    let identity = testIdentity("Root", "tab-payload")
+    let stale = TaskDescriptor(id: "\(identity)#task[id:1]", priority: .medium)
+    let replacement = TaskDescriptor(id: "\(identity)#task[id:2]", priority: .medium)
+    let taskRegistry = LocalTaskRegistry()
+    taskRegistry.register(
+      identity: identity,
+      registration: TaskRegistration(descriptor: replacement) {}
+    )
+    // The 302 shape: the pairing cancel landed in an EARLIER plan section
+    // (cancel-first order), re-mints duplicated the carried stale start
+    // under fresh viewNodeIDs, and the registry has re-registered under the
+    // replacement descriptor — the cancelled-and-gone starts must drop.
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskCancel(stale)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 2),
+          identity: identity,
+          operation: .taskStart(stale)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 3),
+          identity: identity,
+          operation: .taskStart(stale)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 3),
+          identity: identity,
+          operation: .taskStart(replacement)
+        ),
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: taskRegistry
+    )
+
+    #expect(issues.isEmpty)
+    #expect(coordinator.taskStartSkipCount == 0)
+    #expect(coordinator.taskStartSupersededCount == 2)
+    #expect(coordinator.activeTaskCount == 1)
+    #expect(coordinator.activeTaskDescriptors[identity]?.map(\.id) == [replacement.id])
+  }
+
+  @Test("a restart pair (cancel then start of the same descriptor) still dispatches")
+  func restartPairStillDispatches() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: true)
+    let identity = testIdentity("Root", "restarting")
+    let descriptor = TaskDescriptor(id: "\(identity)#task[id:1]", priority: .medium)
+    let taskRegistry = LocalTaskRegistry()
+    taskRegistry.register(
+      identity: identity,
+      registration: TaskRegistration(descriptor: descriptor) {}
+    )
+    let plan = CommitPlan(
+      lifecycle: [
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskCancel(descriptor)
+        ),
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskStart(descriptor)
+        ),
+      ]
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: taskRegistry
+    )
+
+    #expect(issues.isEmpty)
+    #expect(coordinator.taskStartSupersededCount == 0)
+    #expect(coordinator.activeTaskCount == 1)
+  }
+
+  @Test("distinct task sites on one identity never supersede each other")
+  func distinctSitesOnOneIdentityDoNotSupersede() {
+    let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: true)
+    let identity = testIdentity("Root", "multi-task")
+    // One descriptor per distinct authored site, covering the ID grammar's
+    // forms (`ViewLifecycleModifiers`' minting): bare ordinal 0, labeled
+    // ordinal 0, bare ordinal 1, labeled ordinal 2. No cancels ride the
+    // plan and every registration exists, so supersession must not touch
+    // any of them (the multi-`.task` contract — stacked modifiers on one
+    // identity can even share an ordinal across chain-level owner nodes).
+    let descriptors = [
+      TaskDescriptor(id: "\(identity)#task", priority: .medium),
+      TaskDescriptor(id: "\(identity)#task[id:7]", priority: .medium),
+      TaskDescriptor(id: "\(identity)#task[1]", priority: .medium),
+      TaskDescriptor(id: "\(identity)#task[2:id:9]", priority: .medium),
+    ]
+    let taskRegistry = LocalTaskRegistry()
+    for descriptor in descriptors {
+      taskRegistry.register(
+        identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {}
+      )
+    }
+    let plan = CommitPlan(
+      lifecycle: descriptors.map { descriptor in
+        .init(
+          viewNodeID: ViewNodeID(rawValue: 1),
+          identity: identity,
+          operation: .taskStart(descriptor)
+        )
+      }
+    )
+
+    let issues = coordinator.applyCommittedFrame(
+      plan: plan,
+      currentLifecycleRegistry: LocalLifecycleRegistry(),
+      currentTaskRegistry: taskRegistry
+    )
+
+    #expect(issues.isEmpty)
+    #expect(coordinator.taskStartSupersededCount == 0)
+    #expect(coordinator.activeTaskCount == 4)
+  }
+
   @Test("an .appear handler missing from the current registry is counted and reported")
   func appearHandlerMissingIsCountedAndReported() {
     let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
@@ -170,7 +355,8 @@ struct LifecycleCoordinatorSkipTests {
     #expect(issues.first?.code == "lifecycle.changeHandlerSkipped")
   }
 
-  @Test("an .onChange handler absent from the current registry dispatches from the previous snapshot")
+  @Test(
+    "an .onChange handler absent from the current registry dispatches from the previous snapshot")
   func changeHandlerFallsBackToPreviousSnapshot() {
     // Gallery fuzzer find (2026-07-17, presentation-lab): a re-minted node
     // adopting a reused resolved artifact never re-runs registration

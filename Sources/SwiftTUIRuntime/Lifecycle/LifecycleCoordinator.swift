@@ -20,6 +20,16 @@ package final class LifecycleCoordinator {
   /// cancel that finds nothing is the expected steady state under churn.
   package private(set) var taskCancelSkipCount = 0
 
+  /// Cumulative count of committed `.taskStart` entries dropped because the
+  /// SAME merged plan also cancels the same identity + descriptor: a
+  /// carried-forward frame's start (elided/convergence commits prepend an
+  /// earlier frame's unapplied entries — `mergeLifecycleCarryForward`) whose
+  /// `.task(id:)` value moved on before the plan dispatched, so the current
+  /// frame's diff already cancels the stale descriptor and starts its
+  /// replacement. Benign by design — the graph has adjudicated that task's
+  /// tenure; see ``supersededTaskStartIndices(in:currentTaskRegistry:)``.
+  package private(set) var taskStartSupersededCount = 0
+
   /// Cumulative counts of committed appear/disappear/change handler IDs whose
   /// lookup failed at commit time (F163). Mirrors ``taskStartSkipCount``: the
   /// commit plan only carries handler IDs the graph decided must fire, so
@@ -81,9 +91,17 @@ package final class LifecycleCoordinator {
   ) -> [RuntimeIssue] {
     var skipIssues: [RuntimeIssue] = []
     var disappearedIdentities: [Identity] = []
-    for entry in plan.lifecycle {
+    let supersededStarts = supersededTaskStartIndices(
+      in: plan.lifecycle,
+      currentTaskRegistry: currentTaskRegistry
+    )
+    for (index, entry) in plan.lifecycle.enumerated() {
       if case .disappear = entry.operation {
         disappearedIdentities.append(entry.identity)
+      }
+      if supersededStarts.contains(index) {
+        taskStartSupersededCount += 1
+        continue
       }
       apply(
         entry,
@@ -202,6 +220,79 @@ package final class LifecycleCoordinator {
         return
       }
       taskRunner.cancel(viewNodeID: viewNodeID, matching: descriptor)
+    }
+  }
+
+  /// Indices of committed `.taskStart` entries superseded within their own
+  /// merged plan. Carried-forward plans (elided or convergence-looped
+  /// commits prepend an earlier frame's unapplied entries —
+  /// `mergeLifecycleCarryForward`; duplicates survive dedupe when re-mints
+  /// change `viewNodeID`) can carry a start whose `.task(id:)` value moved
+  /// on before the plan dispatched. Dispatching the stale start would run a
+  /// superseded closure just to cancel it — or, once the registry has
+  /// (correctly) re-registered under the new descriptor, skip-warn a task
+  /// that is not lost but replaced (gallery fuzzer find, 2026-07-18:
+  /// node-backed TabContent `.task(id:)` churn under carry-forward
+  /// pressure — final-mixed cases 292/302/559). Two supersession legs, both
+  /// keyed by identity + full descriptor:
+  ///
+  /// 1. **Cancel-later:** a start whose descriptor is cancelled LATER in
+  ///    the plan — the current frame's diff cancelled the carried
+  ///    descriptor. Restart pairs order cancel-then-start and dispatch
+  ///    untouched.
+  /// 2. **Cancelled-and-gone:** a start whose descriptor the same plan
+  ///    cancels ANYWHERE and whose registration no longer exists — the
+  ///    cancel proves the graph adjudicated that task's tenure, and the
+  ///    registry's silence proves the site re-registered under a
+  ///    replacement (or departed with its subtree). This covers carried
+  ///    plans whose pairing cancel landed in an earlier section
+  ///    (cancel-first orders). A genuine restart re-registers its
+  ///    descriptor, so its registration is present and it dispatches.
+  ///
+  /// The pairing cancels still dispatch: an earlier genuine start of the
+  /// same descriptor may be running.
+  private func supersededTaskStartIndices(
+    in entries: [LifecycleCommitEntry],
+    currentTaskRegistry: LocalTaskRegistry
+  ) -> Set<Int> {
+    var lastCancelIndexByKey: [SupersededTaskKey: Int] = [:]
+    for (index, entry) in entries.enumerated() {
+      if case .taskCancel(let descriptor) = entry.operation {
+        lastCancelIndexByKey[SupersededTaskKey(identity: entry.identity, descriptor: descriptor)] =
+          index
+      }
+    }
+    guard !lastCancelIndexByKey.isEmpty else {
+      return []
+    }
+    var superseded: Set<Int> = []
+    for (index, entry) in entries.enumerated() {
+      guard case .taskStart(let descriptor) = entry.operation,
+        let cancelIndex =
+          lastCancelIndexByKey[SupersededTaskKey(identity: entry.identity, descriptor: descriptor)]
+      else {
+        continue
+      }
+      if cancelIndex > index {
+        superseded.insert(index)
+        continue
+      }
+      if currentTaskRegistry.registration(for: entry.identity, descriptor: descriptor) == nil {
+        superseded.insert(index)
+      }
+    }
+    return superseded
+  }
+
+  private struct SupersededTaskKey: Hashable {
+    var identity: Identity
+    var descriptorID: String
+    var priority: TaskPriority
+
+    init(identity: Identity, descriptor: TaskDescriptor) {
+      self.identity = identity
+      descriptorID = descriptor.id
+      priority = descriptor.priority
     }
   }
 
