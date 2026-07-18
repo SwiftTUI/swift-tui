@@ -8,15 +8,20 @@ import Testing
 struct RetainedReuseInvariantTests {
   @Test("PlacedNodeResolvedMetadata round-trips every resolved projection")
   func placedNodeResolvedMetadataRoundTripsEveryProjection() {
+    let projectionIdentity = testIdentity("Projection")
     var placed = PlacedNode(
-      identity: testIdentity("Projection"),
-      resolvedMetadata: makeMetadata("first", semanticRole: .control, isTransient: true),
+      identity: projectionIdentity,
+      resolvedMetadata: makeMetadata(
+        "first", identity: projectionIdentity, semanticRole: .control, isTransient: true),
       bounds: rect(x: 1, y: 2, width: 3, height: 4)
     )
-    let replacement = makeMetadata("second", semanticRole: .scroll, isTransient: false)
+    let replacement = makeMetadata(
+      "second", identity: projectionIdentity, semanticRole: .scroll, isTransient: false)
 
     #expect(
-      placed.resolvedMetadata == makeMetadata("first", semanticRole: .control, isTransient: true)
+      placed.resolvedMetadata
+        == makeMetadata(
+          "first", identity: projectionIdentity, semanticRole: .control, isTransient: true)
     )
     #expect(
       placed.resolvedMetadata.surfaceComposition
@@ -87,6 +92,55 @@ struct RetainedReuseInvariantTests {
       refreshed.children.first?.resolvedMetadata.surfaceComposition
         == projectedMetadata(from: currentChild, using: engine).surfaceComposition
     )
+  }
+
+  @Test("retained placement re-stamps identities when content-identical siblings swap order")
+  func retainedPlacementRestampsIdentitiesOnContentIdenticalSiblingSwap() {
+    // The menu-023 leg: an open menu's duplicate-label rows reverse order.
+    // Row content is byte-identical, so the swap is invisible to the
+    // placement-equivalence geometry gate — reuse must therefore surface as
+    // `.geometryReusable` (never `.identical`), and the metadata sync must
+    // re-stamp each reused placed node's identity from the CURRENT resolved
+    // tree, or hit regions keep dispatching the departed occupant's identity.
+    let engine = LayoutEngine()
+    let rowMetadata = makeMetadata("row", semanticRole: .control, isTransient: false)
+    let parentIdentity = testIdentity("Swap", "Parent")
+    let firstIdentity = testIdentity("Swap", "First")
+    let secondIdentity = testIdentity("Swap", "Second")
+    // Positional structural paths, as a resolve pass stamps ForEach slots
+    // (`…/ForEachElement[n]`): the path names the SLOT, not the occupant, so
+    // it is identical across the swap and cannot rescue the geometry gate.
+    let slotPaths = [
+      StructuralPath(identity: parentIdentity.child("Slot[0]")),
+      StructuralPath(identity: parentIdentity.child("Slot[1]")),
+    ]
+    func row(_ identity: Identity, slot: Int) -> ResolvedNode {
+      var row = makeResolvedNode(identity: identity, metadata: rowMetadata)
+      row.structuralPath = slotPaths[slot]
+      return row
+    }
+
+    let previousParent = makeResolvedNode(
+      identity: parentIdentity,
+      metadata: rowMetadata,
+      children: [row(firstIdentity, slot: 0), row(secondIdentity, slot: 1)]
+    )
+    let currentParent = makeResolvedNode(
+      identity: parentIdentity,
+      metadata: rowMetadata,
+      children: [row(secondIdentity, slot: 0), row(firstIdentity, slot: 1)]
+    )
+
+    #expect(previousParent.placementEquivalence(to: currentParent) == .geometryReusable)
+
+    let cachedPlaced = placedTree(from: previousParent, using: engine)
+    let refreshed = engine.synchronizeRetainedPhaseMetadata(
+      placed: cachedPlaced,
+      from: currentParent
+    )
+
+    #expect(refreshed.children.map(\.bounds) == cachedPlaced.children.map(\.bounds))
+    #expect(refreshed.children.map(\.identity) == [secondIdentity, firstIdentity])
   }
 
   @Test("translated retained placement preserves surface composition")
@@ -202,6 +256,7 @@ struct RetainedReuseInvariantTests {
     #expect(
       fields == [
         "viewNodeID",
+        "identity",
         "kind",
         "environmentSnapshot",
         "semanticRole",
@@ -221,10 +276,12 @@ struct RetainedReuseInvariantTests {
 
 private func makeMetadata(
   _ token: String,
+  identity: Identity = .init(components: [String]()),
   semanticRole: SemanticRole,
   isTransient: Bool
 ) -> PlacedNodeResolvedMetadata {
   PlacedNodeResolvedMetadata(
+    identity: identity,
     kind: .view("Projection-\(token)"),
     environmentSnapshot: .init(
       debugSignature: "env-\(token)",

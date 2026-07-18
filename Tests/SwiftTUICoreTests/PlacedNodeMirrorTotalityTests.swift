@@ -48,7 +48,6 @@ struct PlacedNodeMirrorTotalityTests {
         + "children subsumes it",
     ],
     "resolvedMetadata": [
-      "identity": "placement-owned: the placement key, not resolved-projected metadata",
       "bounds": "placement-owned geometry (the type doc: placement owns final bounds)",
       "contentBounds": "placement-owned geometry",
       "clipBounds": "placement-owned geometry (clipping)",

@@ -19,6 +19,17 @@ package enum SemanticRole: String, Equatable, Sendable {
 /// storage shape.
 package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
+  /// The resolved node's identity. A retained-placement reuse pairs cached
+  /// placed nodes with current resolved nodes positionally, and a pure
+  /// identity move (two content-identical siblings swapping order — an open
+  /// menu's duplicate-label rows reversing) is invisible to the geometry
+  /// gate: `placementEquivalence` reports `.geometryReusable` and relies on
+  /// this projection to refresh every resolved mirror. Omitting identity
+  /// here left the reused placed subtree carrying the STALE identities, so
+  /// hit regions dispatched the departed occurrence's identity (menu-023).
+  /// `.identical` (the sync-skip fast path) proves identity equality per
+  /// node, so it can never serve a stale identity.
+  package var identity: Identity
   package var kind: NodeKind
   package var environmentSnapshot: EnvironmentSnapshot
   package var semanticRole: SemanticRole
@@ -35,6 +46,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
 
   package init(
     viewNodeID: ViewNodeID? = nil,
+    identity: Identity = .init(components: [String]()),
     kind: NodeKind = .view("Unknown"),
     environmentSnapshot: EnvironmentSnapshot = .init(),
     semanticRole: SemanticRole = .generic,
@@ -50,6 +62,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     matchedGeometry: MatchedGeometryConfig? = nil
   ) {
     self.viewNodeID = viewNodeID
+    self.identity = identity
     self.kind = kind
     self.environmentSnapshot = environmentSnapshot
     self.semanticRole = semanticRole
@@ -71,6 +84,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   ) {
     self.init(
       viewNodeID: resolved.viewNodeID,
+      identity: resolved.identity,
       kind: resolved.kind,
       environmentSnapshot: resolved.environmentSnapshot,
       semanticRole: semanticRole,
@@ -247,6 +261,7 @@ package struct PlacedNode: Equatable, Sendable {
     get {
       PlacedNodeResolvedMetadata(
         viewNodeID: viewNodeID,
+        identity: identity,
         kind: kind,
         environmentSnapshot: environmentSnapshot,
         semanticRole: semanticRole,
@@ -359,6 +374,7 @@ package struct PlacedNode: Equatable, Sendable {
 
   private mutating func applyResolvedMetadata(_ metadata: PlacedNodeResolvedMetadata) {
     viewNodeID = metadata.viewNodeID
+    identity = metadata.identity
     kind = metadata.kind
     environmentSnapshot = metadata.environmentSnapshot
     semanticRole = metadata.semanticRole
