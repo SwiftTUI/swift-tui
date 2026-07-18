@@ -200,6 +200,35 @@ tracker of record**. Re-open criteria:
   corruption — the guard's trap site is the lead; escalate locally on macOS
   with `DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib` on the flaky trio.
 
+### 6. `FrameworkStressGestureScrollTests` — stress gesture scroll 025 nested takeover over-pans on Linux CI
+
+**Signature.** "stress gesture scroll 025 nested takeover pans the leaf
+scroll view" fails at `FrameworkStressGestureScrollTests.swift` with
+`Expectation failed: (inner.value.y → 5) == 3` — the leaf scroll pane ends
+two rows past the expected pan target after the nested takeover hand-off.
+
+**Where it surfaces.** Linux CI lanes only, twice so far: the `0.1.5`
+release-window Repo Gate (2026-07-13, rerun green) and the `0.1.7` release
+commit's `Linux repo gate (amd64)` (2026-07-18, run 29655794779, at
+`70feb5cf`). Not reproduced on macOS arm64 — the same suite passed the
+local full gate at the same commit both times, and the deterministic value
+(`5` vs `3`, identical in both firings) suggests a load-dependent
+extra-tick class (two additional momentum/settle ticks landing before the
+assertion) rather than randomness.
+
+**Why this is not treated as a product regression (yet).** Both firings
+were on otherwise-green trees whose local macOS gates (and, for 0.1.7, the
+1,100-case gallery fuzz census) were clean; the identical two-row
+overshoot in both firings points at a scheduling-density difference on the
+CI runner class, not a behavior change in the pans themselves.
+
+**How to investigate.** Reproduce under load on Linux (the arm64 container
+via `mise run linux-gate` with a parallel CPU burner, or an amd64 host);
+if it fires, capture `SWIFTTUI_FRAME_TRACE` and check whether the two
+extra rows arrive as post-hand-off momentum ticks; if so, the fix is a
+settle-gated assertion (wait for scroll quiescence) rather than a fixed
+expected offset.
+
 ---
 
 ## Fixed flakes
