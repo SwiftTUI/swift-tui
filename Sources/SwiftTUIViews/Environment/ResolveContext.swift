@@ -602,7 +602,7 @@ public struct ResolveContext: Equatable, Sendable {
   package func trackingObservableAccess<T>(
     _ apply: () -> T
   ) -> T {
-    EnvironmentValuesStorage.$current.withValue(environmentValues) {
+    EnvironmentValuesStorage.binding(environmentValues) {
       observationBridge?.track(identity: identity, apply) ?? apply()
     }
   }

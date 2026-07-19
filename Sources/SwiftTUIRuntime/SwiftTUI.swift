@@ -797,8 +797,19 @@ public struct DefaultRenderer {
   /// Enables selective dirty-frontier evaluation for subsequent frames.
   /// Call after the first full render has established the tree and
   /// evaluator closures.
+  ///
+  /// WASI builds stay on full-root evaluation: JavaScriptCore executes wasm
+  /// calls on the host thread's native stack, and worker threads get a small
+  /// fraction of the main-thread budget (~1/16 in measurement). The selective
+  /// path re-enters stored evaluators, stacking a deeper per-level call
+  /// sandwich than a fresh root resolve — deep enough that the browser demo's
+  /// second frame overflowed the worker stack on WebKit while the first
+  /// (full-root) frame fit. Until frontier re-entry is depth-bounded, a wasm
+  /// frame must never be deeper than the boot frame; opt back in with
+  /// `SWIFTTUI_SELECTIVE_EVALUATION=1`.
   @MainActor
   package func enableSelectiveEvaluation() {
+    guard !stackLeanResolveProfile else { return }
     frameState.selectiveEvaluationEnabled = true
   }
 

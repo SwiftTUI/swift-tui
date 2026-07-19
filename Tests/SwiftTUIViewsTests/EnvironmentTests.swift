@@ -89,13 +89,13 @@ struct EnvironmentTests {
     var values = EnvironmentValues()
     values[ObjectEnvironmentModel.self] = model
 
-    EnvironmentValuesStorage.$current.withValue(values) {
+    EnvironmentValuesStorage.binding(values) {
       @Environment(ObjectEnvironmentModel.self) var optional: ObjectEnvironmentModel?
       #expect(optional === model)
       @Environment(ObjectEnvironmentModel.self) var required: ObjectEnvironmentModel
       #expect(required === model)
     }
-    EnvironmentValuesStorage.$current.withValue(EnvironmentValues()) {
+    EnvironmentValuesStorage.binding(EnvironmentValues()) {
       @Environment(ObjectEnvironmentModel.self) var absent: ObjectEnvironmentModel?
       #expect(absent == nil)
     }

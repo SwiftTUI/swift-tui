@@ -352,7 +352,8 @@ func resolveView<V: View>(
   let suppressesValueVerifiedReuse =
     suppressesRetainedReuse
     && context.effectiveSuppressesValueVerifiedReuse(at: context.identity)
-  if !context.withinChurnedSubtree,
+  if !stackLeanResolveProfile,
+    !context.withinChurnedSubtree,
     !suppressesRetainedReuse,
     let reused = context.viewGraph?.reusableSnapshot(
       for: context.identity,
@@ -392,7 +393,8 @@ func resolveView<V: View>(
   // is exactly the hazard the value-blind gate exists for. `Equatable`-only, so
   // it is inert on trees that do not opt in (a non-`Equatable` view leaves
   // `memoViewValue` nil and bails immediately).
-  if !context.withinChurnedSubtree,
+  if !stackLeanResolveProfile,
+    !context.withinChurnedSubtree,
     !suppressesValueVerifiedReuse,
     let reused = context.viewGraph?.memoizedReusableSnapshot(
       for: context.identity,
@@ -500,7 +502,7 @@ func resolveView<V: View>(
     let erased: Any = view
     var accessedStateSlots = 0
     var resolved = ViewUpdateGuard.withViewUpdate {
-      EnvironmentValuesStorage.$current.withValue(context.environmentValues) {
+      EnvironmentValuesStorage.binding(context.environmentValues) {
         ViewNodeContext.withValue(graphNode) {
           if erased is any ResolvableView {
             let resolve = {

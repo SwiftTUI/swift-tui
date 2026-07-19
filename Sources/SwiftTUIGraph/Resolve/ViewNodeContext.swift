@@ -1,6 +1,12 @@
 @MainActor
 package enum ViewNodeContext {
-  @TaskLocal package static var current: ViewNode?
+  @TaskLocal private static var taskLocalCurrent: ViewNode?
+  /// Stack-lean ambient slot; see ``stackLeanResolveProfile``.
+  private static var leanCurrent: ViewNode?
+
+  package static var current: ViewNode? {
+    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+  }
 
   @MainActor
   package static func withValue<Result>(
@@ -11,9 +17,7 @@ package enum ViewNodeContext {
     defer {
       node?.endRegistrationCapture()
     }
-    return $current.withValue(node) {
-      apply()
-    }
+    return withCurrentValue(node, apply)
   }
 
   @MainActor
@@ -21,7 +25,13 @@ package enum ViewNodeContext {
     _ node: ViewNode?,
     _ apply: () -> Result
   ) -> Result {
-    $current.withValue(node) {
+    if stackLeanResolveProfile {
+      let saved = leanCurrent
+      leanCurrent = node
+      defer { leanCurrent = saved }
+      return apply()
+    }
+    return $taskLocalCurrent.withValue(node) {
       apply()
     }
   }

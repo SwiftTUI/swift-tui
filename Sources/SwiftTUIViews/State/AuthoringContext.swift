@@ -76,7 +76,14 @@ package struct AuthoringContext {
 }
 
 package enum AuthoringContextStorage {
-  @TaskLocal static var current: AuthoringContext?
+  @TaskLocal static var taskLocalCurrent: AuthoringContext?
+  /// Stack-lean ambient slot; see ``stackLeanResolveProfile``.
+  @MainActor static var leanCurrent: AuthoringContext?
+
+  @MainActor
+  static var current: AuthoringContext? {
+    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+  }
 }
 
 @MainActor
@@ -303,7 +310,13 @@ package func withAuthoringContext<Result>(
   _ context: AuthoringContext?,
   _ apply: () -> Result
 ) -> Result {
-  AuthoringContextStorage.$current.withValue(context) {
+  if stackLeanResolveProfile {
+    let saved = AuthoringContextStorage.leanCurrent
+    AuthoringContextStorage.leanCurrent = context
+    defer { AuthoringContextStorage.leanCurrent = saved }
+    return apply()
+  }
+  return AuthoringContextStorage.$taskLocalCurrent.withValue(context) {
     apply()
   }
 }
@@ -313,7 +326,7 @@ package func withAuthoringContext<Result>(
   _ context: AuthoringContext?,
   _ apply: () async -> Result
 ) async -> Result {
-  await AuthoringContextStorage.$current.withValue(context) {
+  await AuthoringContextStorage.$taskLocalCurrent.withValue(context) {
     await apply()
   }
 }
@@ -443,7 +456,7 @@ private func withRegistrationEnvironment<Result>(
   guard let environmentValues else {
     return apply()
   }
-  return EnvironmentValuesStorage.$current.withValue(environmentValues) {
+  return EnvironmentValuesStorage.binding(environmentValues) {
     apply()
   }
 }
@@ -456,7 +469,7 @@ private func withRegistrationEnvironment<Result>(
   guard let environmentValues else {
     return await apply()
   }
-  return await EnvironmentValuesStorage.$current.withValue(environmentValues) {
+  return await EnvironmentValuesStorage.asyncBinding(environmentValues) {
     await apply()
   }
 }

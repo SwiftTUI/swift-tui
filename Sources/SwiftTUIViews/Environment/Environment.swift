@@ -48,7 +48,44 @@ private enum StackAxisKey: EnvironmentKey {
 }
 
 package enum EnvironmentValuesStorage {
-  @TaskLocal static var current: EnvironmentValues?
+  @TaskLocal private static var taskLocalCurrent: EnvironmentValues?
+  /// Stack-lean ambient slot; see ``stackLeanResolveProfile``.
+  @MainActor private static var leanCurrent: EnvironmentValues?
+
+  @MainActor
+  package static var current: EnvironmentValues? {
+    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+  }
+
+  /// Synchronous binding funnel — the only sanctioned way to install the
+  /// ambient environment for a synchronous scope. Async scopes must keep
+  /// using the task-local projection.
+  @MainActor
+  package static func binding<Result>(
+    _ values: EnvironmentValues?,
+    _ apply: () -> Result
+  ) -> Result {
+    if stackLeanResolveProfile {
+      let saved = leanCurrent
+      leanCurrent = values
+      defer { leanCurrent = saved }
+      return apply()
+    }
+    return $taskLocalCurrent.withValue(values) {
+      apply()
+    }
+  }
+
+  /// Async binding — always task-local (the scope can suspend).
+  @MainActor
+  package static func asyncBinding<Result>(
+    _ values: EnvironmentValues?,
+    _ apply: () async -> Result
+  ) async -> Result {
+    await $taskLocalCurrent.withValue(values) {
+      await apply()
+    }
+  }
 }
 
 /// The inherited environment available while resolving a view subtree.

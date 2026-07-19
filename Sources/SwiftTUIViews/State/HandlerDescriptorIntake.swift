@@ -140,7 +140,7 @@ package struct HandlerDescriptorIntake {
     guard let environmentValues = dispatchScope?.environmentValues else {
       return build()
     }
-    return EnvironmentValuesStorage.$current.withValue(environmentValues) {
+    return EnvironmentValuesStorage.binding(environmentValues) {
       build()
     }
   }
