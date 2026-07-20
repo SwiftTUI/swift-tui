@@ -93,10 +93,7 @@ function resolveWasmEngineCapabilities(signals = collectWasmEngineProbeSignals()
   };
 }
 function stackProfileEnvironmentDefaults(capabilities) {
-  if (capabilities.stackLeanRecommended) {
-    return {};
-  }
-  return { SWIFTTUI_STACK_LEAN_PROFILE: "0" };
+  return {};
 }
 
 // src/WebHostTerminalStyle.ts
