@@ -149,6 +149,13 @@ package final class ViewGraph {
   // so the groups carry the totality contract by construction.
   package private(set) var root: ViewNode?
 
+  /// Chunked-resolve driver (WASI stack-lean profile; test-forced on native).
+  /// Deliberately outside the checkpointed field groups: its state is
+  /// transient within one synchronous resolve pass — the queue is empty and
+  /// the depth is zero at every frame boundary (asserted in `beginFrame`),
+  /// so no checkpoint can ever observe non-default state.
+  package let deferredResolveDriver = DeferredResolveDriver()
+
   // Cohesive field groups (see ViewGraphFieldGroups.swift). Every original field
   // is forwarded by a private computed accessor below, so reconciliation logic
   // is unchanged while makeCheckpoint/restoreCheckpoint move whole groups.
@@ -1669,6 +1676,11 @@ package final class ViewGraph {
   }
 
   package func beginFrame() {
+    assert(
+      deferredResolveDriver.isIdle,
+      "deferred-resolve work leaked across a frame boundary"
+    )
+    deferredResolveDriver.beginFrame()
     // Diagnostic: flush the just-finished frame's reuse-denial histogram before
     // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
     ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
@@ -1865,12 +1877,16 @@ package final class ViewGraph {
       if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
-        structuralAppearEvents.append(
-          .init(
-            identity: node.identity,
-            operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
-          )
+        let event = LifecycleEvent(
+          identity: node.identity,
+          operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
         )
+        // Idempotent per frame: the chunked resolve driver's drain-and-rerun
+        // fixpoint finishes an appearing node more than once in one frame;
+        // re-appending would double-dispatch its appear handlers.
+        if !structuralAppearEvents.contains(event) {
+          structuralAppearEvents.append(event)
+        }
       }
       if emitsOwnLifecycleEvents {
         for task in node.lifecycleMetadata.tasks {
@@ -2297,12 +2313,16 @@ package final class ViewGraph {
       if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
-        structuralAppearEvents.append(
-          .init(
-            identity: node.identity,
-            operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
-          )
+        let event = LifecycleEvent(
+          identity: node.identity,
+          operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
         )
+        // Idempotent per frame: the chunked resolve driver's drain-and-rerun
+        // fixpoint finishes an appearing node more than once in one frame;
+        // re-appending would double-dispatch its appear handlers.
+        if !structuralAppearEvents.contains(event) {
+          structuralAppearEvents.append(event)
+        }
       }
       if emitsOwnLifecycleEvents {
         for task in node.lifecycleMetadata.tasks {

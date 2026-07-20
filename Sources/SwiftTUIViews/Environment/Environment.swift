@@ -54,7 +54,12 @@ package enum EnvironmentValuesStorage {
 
   @MainActor
   package static var current: EnvironmentValues? {
-    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+    // Lean reads fall back to the task-local: async scopes bind via
+    // `asyncBinding` (always task-local — a plain slot would leak across
+    // interleaved jobs at suspension points), and a slot-only read would
+    // leave those bindings invisible under the lean profile. Sync binds
+    // always restore on exit, so a non-nil slot is the innermost scope.
+    stackLeanResolveProfile ? (leanCurrent ?? taskLocalCurrent) : taskLocalCurrent
   }
 
   /// Synchronous binding funnel — the only sanctioned way to install the

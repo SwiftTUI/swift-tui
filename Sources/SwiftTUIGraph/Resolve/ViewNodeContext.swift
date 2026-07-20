@@ -5,7 +5,12 @@ package enum ViewNodeContext {
   private static var leanCurrent: ViewNode?
 
   package static var current: ViewNode? {
-    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+    // Lean reads fall back to the task-local so any async-scope binding
+    // (always task-local — a plain slot would leak across interleaved jobs
+    // at suspension points) stays visible under the lean profile. Sync
+    // binds always restore on exit, so a non-nil slot is the innermost
+    // scope.
+    stackLeanResolveProfile ? (leanCurrent ?? taskLocalCurrent) : taskLocalCurrent
   }
 
   @MainActor

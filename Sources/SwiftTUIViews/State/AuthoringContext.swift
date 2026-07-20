@@ -82,7 +82,14 @@ package enum AuthoringContextStorage {
 
   @MainActor
   static var current: AuthoringContext? {
-    stackLeanResolveProfile ? leanCurrent : taskLocalCurrent
+    // Lean reads fall back to the task-local: async scopes (task-closure
+    // dispatch, async frame protocol) always bind task-locally — a plain
+    // slot would leak across interleaved jobs at suspension points — and a
+    // slot-only read would leave their binding invisible, degrading every
+    // state write inside a `.task` closure to a detached seed box (no
+    // invalidation — the WASI Game-of-Life freeze). Sync binds always
+    // restore on exit, so a non-nil slot is genuinely the innermost scope.
+    stackLeanResolveProfile ? (leanCurrent ?? taskLocalCurrent) : taskLocalCurrent
   }
 }
 

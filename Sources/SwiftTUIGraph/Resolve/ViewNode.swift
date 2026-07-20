@@ -422,6 +422,16 @@ package final class ViewNode {
     isDirty = false
   }
 
+  /// Closes a `beginEvaluation` without committing: the chunked resolve
+  /// driver's cut serves the node's committed value as-is and defers the
+  /// real resolve to the drain, so nothing may fold the (freshly reset)
+  /// dependency tracker over the recorded dependencies or run the
+  /// subtree-deep commit walks at cut depth — the cut must stay O(1) on
+  /// the wasm stack.
+  package func abandonEvaluation() {
+    evaluationDepth = max(0, evaluationDepth - 1)
+  }
+
   package func finishEvaluation(
     accessedStateSlots: Int
   ) -> Bool {

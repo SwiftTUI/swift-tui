@@ -1,5 +1,13 @@
 #if os(WASI) && canImport(WASILibc)
   import WASILibc
+#elseif canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(Musl)
+  import Musl
 #endif
 
 /// Whether this process runs the stack-lean resolve profile.
@@ -20,15 +28,23 @@
 /// mid-scope, where a plain slot would leak across interleaved jobs).
 ///
 /// Defaults on for WASI builds; opt back out with
-/// `SWIFTTUI_STACK_LEAN_PROFILE=0`.
+/// `SWIFTTUI_STACK_LEAN_PROFILE=0`. Native processes default off but may opt
+/// IN with `SWIFTTUI_STACK_LEAN_PROFILE=1`, which runs the exact WASI resolve
+/// shape (lean ambient slots, reuse/memo/selective off, chunked descent) for
+/// composed-runtime debugging and profile-shaped gate lanes.
 @MainActor
 package let stackLeanResolveProfile: Bool = {
-  #if os(WASI) && canImport(WASILibc)
-    if let raw = unsafe getenv("SWIFTTUI_STACK_LEAN_PROFILE"),
-      unsafe String(cString: raw) == "0"
-    {
+  if let raw = unsafe getenv("SWIFTTUI_STACK_LEAN_PROFILE") {
+    switch unsafe String(cString: raw) {
+    case "0":
       return false
+    case "1":
+      return true
+    default:
+      break
     }
+  }
+  #if os(WASI) && canImport(WASILibc)
     return true
   #else
     return false

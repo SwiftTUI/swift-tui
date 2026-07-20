@@ -53,7 +53,12 @@ package func appendDeclaredChildNodes<V: View>(
   nextIndex += 1
 
   if context.viewGraph != nil {
-    let resolvedNode = resolveView(view, in: childContext)
+    let resolvedNode = resolveView(
+      view,
+      in: childContext,
+      authoringContextOverride: nil,
+      structuralChildCutEligible: true
+    )
     if resolvedNode.identity == childContext.identity,
       resolvedNode.kind == .view("EmptyView")
     {
@@ -162,7 +167,12 @@ package func enumerateDeclaredChildViews<V: View>(
   nextIndex += 1
 
   visitor(view, childContext) {
-    resolveView(view, in: childContext)
+    resolveView(
+      view,
+      in: childContext,
+      authoringContextOverride: nil,
+      structuralChildCutEligible: true
+    )
   }
 }
 
@@ -329,12 +339,33 @@ package func resolveView<V: View>(
 func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext,
-  authoringContextOverride: AuthoringContext?
+  authoringContextOverride: AuthoringContext?,
+  structuralChildCutEligible: Bool = false
 ) -> ResolvedNode {
   // Reused evaluator closures may have captured this context on a prior frame.
   // Refresh the pass-owned inputs before resolving so invalidation helpers and
   // transaction-aware reuse checks observe the current frame.
   let context = context.applyingCurrentFrameResolveInputs()
+  let deferredDriver = context.viewGraph?.deferredResolveDriver
+  deferredDriver?.enterLevel()
+  defer {
+    if let deferredDriver {
+      deferredDriver.leaveLevel()
+      // Trampoline: once the outermost call unwinds, resolve every deferred
+      // subtree from this shallow stack, then RE-RUN this resolve so every
+      // enclosing level and value consumer re-applies its post-processing
+      // over the drained subtrees (fresh chunks then serve their committed
+      // snapshots without re-enqueueing). A drained item's own epilogue
+      // lands here too and is rejected by the driver's drain latch.
+      deferredDriver.drainIfOutermost {
+        _ = resolveView(
+          view,
+          in: context,
+          authoringContextOverride: authoringContextOverride
+        )
+      }
+    }
+  }
   let routeIdentity = entityRouteIdentity(for: view, in: context)
   context.viewGraph?.setSuppressesStructuralLifecycle(
     context.suppressesStructuralLifecycle,
@@ -492,6 +523,28 @@ func resolveView<V: View>(
       }
     }
   }
+  // The cut is only sound on structural child edges, where the parent
+  // consumes the returned node verbatim. A modifier-content or style-body
+  // edge post-processes the returned value (preference merges, lifecycle
+  // metadata, wrapping) — deferring there would attach that post-processing
+  // to the placeholder and the drain's splice would discard it. Refusing
+  // here just moves the cut to the next structural edge below, so inline
+  // overshoot is bounded by the deepest non-structural chain.
+  if structuralChildCutEligible,
+    let deferredDriver, deferredDriver.shouldDeferDescent,
+    let graphNode, let graph = context.viewGraph,
+    let deferred = deferResolveDescent(
+      view,
+      in: context,
+      graph: graph,
+      graphNode: graphNode,
+      routeIdentity: routeIdentity,
+      authoringContextOverride: authoringContextOverride
+    )
+  {
+    return deferred
+  }
+
   let resolveFresh = { () -> ResolvedNode in
     context.recordResolvedComputation()
     // Memoization diagnostics: would this recomputed node have been memoizable?
@@ -686,6 +739,123 @@ func finishMemoObservation(
       )
     )
   }
+}
+
+/// Kind for a deferred subtree's first-sight placeholder. Deliberately NOT
+/// `EmptyView`/`Group` (whose own-identity shapes the parent consumes by
+/// value in `appendDeclaredChildNodes`) so the placeholder always survives
+/// into the parent's children until the drain splices the real subtree.
+private let deferredResolvePlaceholderKindName = "DeferredResolvePlaceholder"
+
+/// The depth-cap cut of the chunked resolve driver (see
+/// ``DeferredResolveDriver``). Runs *after* `beginEvaluation` claimed the
+/// node's frame-order slot at its document position. Commits the node's stale
+/// committed snapshot as a structural placeholder — a no-op child diff
+/// against the live children — enqueues a captured re-resolve of the subtree
+/// for the driver's shallow-stack drain, and returns the placeholder to the
+/// parent. Returns `nil` (resolve inline; the node's children still cut at
+/// the next level, so refusal costs exactly one extra stack level) for the
+/// two stale shapes the parent consumes by value — an own-identity
+/// `EmptyView` (dropped) or `Group` (spliced) — where serving a stale shape
+/// would desynchronize the parent's structural handling from this frame's
+/// real resolve.
+@MainActor
+private func deferResolveDescent<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  graph: ViewGraph,
+  graphNode: SwiftTUICore.ViewNode,
+  routeIdentity: EntityIdentity?,
+  authoringContextOverride: AuthoringContext?
+) -> ResolvedNode? {
+  // Entity-routed children resolve inline: the `.id` claim machinery
+  // (route bindings, occurrence claims, cross-identity adoption, co-resident
+  // escapes) is ordered against sibling resolution and the ambient claim
+  // node, and a deferred re-claim replays it against a routing table the
+  // cut-time bookkeeping already advanced. Refusing the cut here costs one
+  // stack level — the chain's descendants still cut at the next structural
+  // edge below.
+  if routeIdentity != nil {
+    return nil
+  }
+  let driver = graph.deferredResolveDriver
+  let servesFreshChunk = driver.canServeFreshChunk(context.identity)
+  // Serve the committed value AS-IS — never `snapshot()`: the rebuild
+  // recursion (and the commit path's subtree-deep walks — structural diff,
+  // committed-value anchors) is O(subtree depth) and would stack on top of
+  // the K inline levels, re-creating the very overflow the cap exists to
+  // prevent. The cut is O(1): the drain's shallow-stack commit does all
+  // real bookkeeping, and the final fixpoint pass leaves every committed
+  // value coherent for the next frame's serves.
+  var placeholder = graphNode.committed
+  if placeholder.viewNodeID == nil {
+    // Never-applied node: the hollow init value is an own-identity
+    // `EmptyView`, which the parent would consume by value. Mint a distinct
+    // placeholder kind instead so the parent's `EmptyView`-drop and
+    // `Group`-splice handling cannot consume it before the drain resolves
+    // the real subtree and the rerun re-consumes it.
+    placeholder = ResolvedNode(
+      identity: context.identity,
+      kind: .view(deferredResolvePlaceholderKindName),
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      intrinsicSize: .zero
+    )
+    placeholder.viewNodeID = graphNode.viewNodeID
+    placeholder.recomputeSubtreeRuntimeNodeIDsStamped()
+  } else if placeholder.identity == context.identity,
+    placeholder.kind == .view("EmptyView") || placeholder.kind == .view("Group")
+  {
+    return nil
+  }
+
+  // Close the begin without committing: `beginEvaluation` already claimed
+  // the node's frame-order slot at its document position, and the drain's
+  // real finish performs the structural diff, lifecycle diffs, and reindex
+  // work from a shallow stack.
+  graphNode.abandonEvaluation()
+  var resolved = placeholder
+  resolved.structuralPath = context.structuralPath
+
+  if !servesFreshChunk {
+    // Capture the per-level ambient state the drained re-resolve needs —
+    // the same set the dirty-frontier evaluator install captures, plus the
+    // entity route (a task-local the parent binds around this exact child
+    // position) and the evaluating host node (rebound via the
+    // captured-scope helper so fresh mints wire `evaluationHost` exactly
+    // as the inline descent would).
+    let capturedEnclosingScope = makeCapturedAuthoringContext()
+    let capturedOverride = authoringContextOverride.map {
+      rebasedAuthoringContext($0, viewNode: nil)
+    }
+    let capturedHost = ViewNodeContext.current
+    let capturedEntityRoute = ResolveEntityRouteStorage.current
+    driver.enqueueDeferredResolve(for: context.identity) {
+      graph.withCapturedResolveLifetimeScope(hostedBy: capturedHost) {
+        withResolveEntityRoute(capturedEntityRoute) {
+          if let capturedEnclosingScope, currentAuthoringContext() == nil {
+            withAuthoringContext(capturedEnclosingScope) {
+              _ = resolveView(
+                view,
+                in: context,
+                authoringContextOverride: capturedOverride
+              )
+            }
+          } else {
+            _ = resolveView(
+              view,
+              in: context,
+              authoringContextOverride: capturedOverride
+            )
+          }
+        }
+      }
+    }
+  }
+
+  graph.reportResolvedLifetimeNode(graphNode)
+  graph.reportResolvedLifetimeResult(resolved)
+  return resolved
 }
 
 @MainActor
