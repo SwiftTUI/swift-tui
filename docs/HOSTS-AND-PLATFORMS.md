@@ -34,7 +34,7 @@ flowchart TD
 | Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI; raster output drawn onto a canvas via the `web-surface` transport. |
 | Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI, serializes `SemanticHostFrame` snapshots, and draws styled cells/images plus a semantics overlay in Compose. `arm64-v8a` only. |
-| Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` v2 protocol. |
+| Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
 
 A binary can support more than one mode. `SwiftTUIWebHostCLI` (`WebHostCLIRunner`)
 combines terminal-native and localhost-browser launch in one executable;
@@ -84,12 +84,16 @@ flowchart LR
     commit --> shf
     shf --> t["TerminalHost<br/>(terminal command surface)"]
     shf --> r["HostedRasterSurface<br/>(raster surface)"]
-    shf --> w["WebSocketSurfaceTransport<br/>(web-surface v2)"]
+    shf --> w["WebSocketSurfaceTransport<br/>(web-surface v1–v3)"]
 ```
 
 `TerminalHost` (and `WebTerminalHost`) consume terminal command output;
 `HostedRasterSurface` consumes a raster surface; `WebSocketSurfaceTransport`
-serializes the `web-surface` v2 wire frame for the browser. Each conforms to
+serializes the `web-surface` wire frame for the browser. Full frames are wire
+v1 (base) or v2 (sequence/accessibility/scroll fields); when delta emission is
+enabled (`TUIGUI_SURFACE_DELTA`, which the browser WASI bridge sets) and a
+raster damage diff exists, steady-state frames ship as v3 `deltaRows` patches
+against the previously presented surface instead. Each transport conforms to
 the host-frame surface protocols rather than reaching into the renderer.
 
 ### Shared Raster Damage Contract

@@ -6,6 +6,85 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.1.10] - 2026-07-20
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.10.** No Swift
+  source changes. The bundle brings the JSPI main-thread wasm execution mode
+  (opt-in), holds the stack-lean profile as the default on every engine, and
+  raises the packaged wasm linear-memory stack from 1 MiB to 16 MiB. Together
+  these heal two live 0.1.9 Chromium regressions (an Animations-scene
+  shadow-stack overflow, and Life frame-emission coalescing under the
+  non-lean profile).
+
+## [0.1.9] - 2026-07-20
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.9.** No Swift
+  source changes. The bundle adds engine-family detection with an
+  engine-differentiated stack-lean default (later reverted in 0.1.10) and
+  JSPI capability detection.
+
+## [0.1.8] - 2026-07-20
+
+### Added
+
+- **WASI stack-lean resolve profile** (`SWIFTTUI_STACK_LEAN_PROFILE`):
+  default-on for WASI builds, opt-in natively. Swaps per-level task-local
+  ambient binds for MainActor save/restore slots and disables retained-reuse,
+  memoized reuse, and selective evaluation, bounding the resolve descent's
+  stack cost for JavaScriptCore's worker thread-stack budget.
+- **Depth-capped chunked resolve** (`DeferredResolveDriver`): a
+  drain-and-rerun fixpoint that cuts the resolve descent at structural child
+  edges past a depth limit (default K=6 under the lean profile;
+  `SWIFTTUI_RESOLVE_DEPTH_LIMIT` tunes or force-enables it) and re-resolves
+  deferred subtrees from a fresh shallow stack. This fixes the Safari/WebKit
+  stack overflow that broke the browser demo on JavaScriptCore.
+
+### Fixed
+
+- **Lean-profile async ambient reads.** Under the stack-lean profile,
+  ambient-context reads now fall back to the task-local slot
+  (`leanCurrent ?? taskLocalCurrent`), restoring `.task`-closure visibility of
+  authoring/environment context. Previously state writes from async tasks
+  degraded to detached boxes and produced no frames (the frozen Game of
+  Life).
+
+## [0.1.7] - 2026-07-18
+
+### Added
+
+- **Gesture composition**: inter-tap timeout for multi-tap counts, exclusive
+  gesture hand-off with replay, and `SimultaneousGesture`/`SequenceGesture`.
+- **Typed navigation data paths** and **data-driven dismissal**;
+  presentation surfaces now stack.
+- **Node-hosted collection rows** and windowed lazy-stack realization:
+  lazy stacks realize and measure only the scroll viewport's window, with
+  drift correction pinned by tests.
+- SwiftUI-parity wiring: object environment values, `withTransaction`,
+  spring `initialVelocity`; off-main `@Observable` writes are marshaled
+  instead of trapping.
+
+### Changed
+
+- Teardown reachability unified behind a single barrier entrypoint with
+  census-adjudicated spares; legacy lifetime ledgers retired.
+- Performance program: reuse-gate invalidation queries inverted to the
+  invalidated set, unchanged-commit effect republication scoped to an owner
+  index, animation deadline work scoped, collection baseline scenarios
+  (`lazy-list-1k`, `table-1kx4`) added.
+
+### Fixed
+
+- A large fix batch from the gallery fuzz campaign, including: toolbar chrome
+  proposal fill, adopted-slot conditional transitions, location-free drop
+  dispatch fallback, node-backed style bodies with adopted authoring owners,
+  superseded task starts in merged lifecycle plans, paired pointer-route
+  release with departed gesture recognizers, and pass-stable `onChange`
+  previous-value reads.
+
 ## [0.1.6] - 2026-07-13
 
 ### Removed
