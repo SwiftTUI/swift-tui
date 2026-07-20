@@ -60,6 +60,45 @@ class StdIOPipe {
   }
 }
 
+// src/wasi/WasmEngineCapabilities.ts
+function collectWasmEngineProbeSignals() {
+  const probe = new Error("wasm-engine-probe");
+  const wasm = globalThis.WebAssembly;
+  return {
+    errorStack: typeof probe.stack === "string" ? probe.stack : "",
+    errorHasGeckoFileName: "fileName" in probe,
+    errorHasJSCSourceURL: "sourceURL" in probe,
+    wasmSuspendingType: typeof wasm?.Suspending,
+    wasmPromisingType: typeof wasm?.promising
+  };
+}
+function classifyWasmEngineFamily(signals) {
+  if (/^\s*at /m.test(signals.errorStack)) {
+    return "v8";
+  }
+  if (signals.errorHasGeckoFileName) {
+    return "gecko";
+  }
+  if (signals.errorHasJSCSourceURL || /^[^\n]*@/m.test(signals.errorStack)) {
+    return "jsc";
+  }
+  return "unknown";
+}
+function resolveWasmEngineCapabilities(signals = collectWasmEngineProbeSignals()) {
+  const engine = classifyWasmEngineFamily(signals);
+  return {
+    engine,
+    supportsJSPI: signals.wasmSuspendingType === "function" && signals.wasmPromisingType === "function",
+    stackLeanRecommended: engine !== "v8"
+  };
+}
+function stackProfileEnvironmentDefaults(capabilities) {
+  if (capabilities.stackLeanRecommended) {
+    return {};
+  }
+  return { SWIFTTUI_STACK_LEAN_PROFILE: "0" };
+}
+
 // src/WebHostTerminalStyle.ts
 var defaultFontFamily = '"SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace';
 var defaultANSI = {
@@ -655,6 +694,7 @@ class BrowserWASIBridge {
       TUIGUI_SCENE: options.sceneId,
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),
+      ...stackProfileEnvironmentDefaults(options.engineCapabilities ?? resolveWasmEngineCapabilities()),
       ...options.environment,
       ...options.renderStyle ? {
         TUIGUI_RENDER_STYLE: encodeWebHostTerminalRenderStyleBase64(options.renderStyle)
