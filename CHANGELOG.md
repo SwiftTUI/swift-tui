@@ -6,6 +6,28 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.1.11] - 2026-07-20
+
+### Added
+
+- **`PerTickPresentCadenceTests`**: composed-runtime per-tick present
+  cadence coverage for completed-frame disposal — an autonomous
+  Life-shaped tick with deterministic held-tail supersession proves
+  `async-no-cancel` presents every completed frame, with a non-lean
+  `dropped_completed` red-proof naming the disposal layer, re-run under
+  the stack-lean and chunked-resolve WASI-shaped profiles.
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.11.** No
+  Swift source changes. The bundle's `BrowserWASIBridge` now defaults
+  browser sessions to `TERMUI_RENDER_MODE=async-no-cancel` (engine-blind,
+  both execution modes): completed-frame disposal under supersession —
+  not transport publication — was the 0.1.9 live coalescing, and
+  ordered commits lift deployed Life distinct-generation coverage
+  0.22 → 0.86 with per-frame cost unchanged. The `?renderMode=` page
+  seam and caller environments still override.
+
 ## [0.1.10] - 2026-07-20
 
 ### Changed

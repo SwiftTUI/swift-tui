@@ -691,6 +691,7 @@ class BrowserWASIBridge {
       TUIGUI_SCENE: options.sceneId,
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),
+      TERMUI_RENDER_MODE: "async-no-cancel",
       ...stackProfileEnvironmentDefaults(options.engineCapabilities ?? resolveWasmEngineCapabilities()),
       ...options.environment,
       ...options.renderStyle ? {
