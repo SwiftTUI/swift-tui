@@ -2271,6 +2271,9 @@ class WebHostSceneRuntime {
   pointerDownLinkTarget;
   lastSentResize;
   isVisible = false;
+  documentVisible = true;
+  runtimeSuspended = false;
+  suspendWhenHidden;
   constructor(options) {
     this.descriptor = options.descriptor;
     this.currentStyle = normalizeWebHostTerminalStyle(options.style);
@@ -2280,6 +2283,7 @@ class WebHostSceneRuntime {
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
     this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
     this.onOpenHyperlink = options.onOpenHyperlink;
+    this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
     this.element.className = "webhost-scene";
     this.element.dataset.sceneId = options.descriptor.id;
@@ -2330,7 +2334,21 @@ class WebHostSceneRuntime {
         this.terminalMount.focus?.({ preventScroll: true });
       }
     }
+    this.updateRuntimeSuspension();
   }
+  setDocumentVisible(visible) {
+    this.documentVisible = visible;
+    this.updateRuntimeSuspension();
+  }
+  updateRuntimeSuspension() {
+    const suspended = this.suspendWhenHidden && (!this.isVisible || !this.documentVisible);
+    if (suspended === this.runtimeSuspended) {
+      return;
+    }
+    this.runtimeSuspended = suspended;
+    this.onRuntimeSuspensionChange(suspended);
+  }
+  onRuntimeSuspensionChange(_suspended) {}
   setStyle(style) {
     this.currentStyle = normalizeWebHostTerminalStyle(style);
     this.applyStyle(this.currentStyle);
@@ -2643,7 +2661,9 @@ async function createWebHostApp(options) {
     bridgeFactory: options.bridgeFactory,
     initialSceneId: options.initialSceneId,
     createElement: options.createElement,
-    sceneRuntimeFactory: options.sceneRuntimeFactory ?? ((runtimeOptions) => new WebHostSceneRuntime(runtimeOptions))
+    sceneRuntimeFactory: options.sceneRuntimeFactory ?? ((runtimeOptions) => new WebHostSceneRuntime(runtimeOptions)),
+    suspendHiddenScenes: options.suspendHiddenScenes,
+    visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument()
   });
   await controller.initialize();
   return controller;
@@ -2661,6 +2681,9 @@ class InternalWebHostAppController {
   sceneRuntimeFactory;
   runtimes = new Map;
   bridges = new Map;
+  suspendHiddenScenes;
+  visibilityDocument;
+  detachVisibilityListener;
   constructor(options) {
     this.mount = options.mount;
     this.style = normalizeWebHostTerminalStyle(options.style ?? {});
@@ -2668,6 +2691,8 @@ class InternalWebHostAppController {
     this.embeddedHost = options.embeddedHost;
     this.bridgeFactory = options.bridgeFactory;
     this.sceneRuntimeFactory = options.sceneRuntimeFactory;
+    this.suspendHiddenScenes = options.suspendHiddenScenes;
+    this.visibilityDocument = options.visibilityDocument;
     this.scenes = options.manifest.scenes;
     this.selectedSceneId = options.initialSceneId && options.manifest.scenes.some((scene) => scene.id === options.initialSceneId) ? options.initialSceneId : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ?? options.manifest.defaultSceneId;
     this.sceneRoot = (options.createElement ?? defaultCreateElement)("div");
@@ -2676,6 +2701,7 @@ class InternalWebHostAppController {
     this.applyHostFrameStyle();
   }
   async initialize() {
+    this.installVisibilityListener();
     await this.ensureRuntime(this.selectedSceneId);
     await this.switchScene(this.selectedSceneId);
   }
@@ -2700,6 +2726,8 @@ class InternalWebHostAppController {
     this.applyHostFrameStyle();
   }
   async dispose() {
+    this.detachVisibilityListener?.();
+    this.detachVisibilityListener = undefined;
     for (const runtime of this.runtimes.values()) {
       runtime.dispose();
     }
@@ -2709,6 +2737,22 @@ class InternalWebHostAppController {
     this.runtimes.clear();
     this.bridges.clear();
     this.mount.replaceChildren();
+  }
+  installVisibilityListener() {
+    const visibilityDocument = this.visibilityDocument;
+    if (!visibilityDocument) {
+      return;
+    }
+    const listener = () => {
+      const visible = !visibilityDocument.hidden;
+      for (const runtime of this.runtimes.values()) {
+        runtime.setDocumentVisible(visible);
+      }
+    };
+    visibilityDocument.addEventListener("visibilitychange", listener);
+    this.detachVisibilityListener = () => {
+      visibilityDocument.removeEventListener("visibilitychange", listener);
+    };
   }
   async ensureRuntime(id) {
     const existing = this.runtimes.get(id);
@@ -2725,12 +2769,16 @@ class InternalWebHostAppController {
       descriptor,
       style: this.style,
       bridge,
-      onInput: (chunk) => bridge.sendInput(chunk)
+      onInput: (chunk) => bridge.sendInput(chunk),
+      suspendWhenHidden: this.suspendHiddenScenes
     });
     this.bridges.set(id, bridge);
     this.runtimes.set(id, runtime);
     await runtime.mount();
     runtime.setVisible(id === this.selectedSceneId);
+    if (this.visibilityDocument) {
+      runtime.setDocumentVisible(!this.visibilityDocument.hidden);
+    }
     return runtime;
   }
   makeBridge(sceneId, descriptor) {
@@ -2764,6 +2812,12 @@ class InternalWebHostAppController {
     this.mount.style.display = "block";
     this.mount.style.padding = "1rem";
   }
+}
+function defaultVisibilityDocument() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  return document;
 }
 function defaultCreateElement(tagName) {
   if (typeof document === "undefined") {
