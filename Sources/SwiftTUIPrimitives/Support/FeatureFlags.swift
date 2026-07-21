@@ -48,8 +48,12 @@ package enum FeatureGate: CaseIterable, Sendable {
       // Opt-in behavior/verification toggles: absent ⇒ off, leaving the default
       // build (and, for the raster pair, the `#if DEBUG` policy fallback at their
       // resolution sites) in effect. The presented-progress guard's default
-      // flip is gated on its pre-committed rusage A/B bound
-      // (docs/plans/2026-07-20-001, Stage 5 — land-only-on-wins).
+      // flip was measured on the drop-heavy browser regime and DECLINED
+      // (2026-07-21, docs/plans/2026-07-20-001 Stage 5): the guard closes the
+      // disposal class at zero cost in the shipped `async-no-cancel` regime,
+      // but under plain `.async` it delivers 0.674 distinct-generation
+      // coverage vs the 0.72 fix band — `async-no-cancel` stays the cadence
+      // mechanism; the guard stays opt-in insurance.
       false
     }
   }

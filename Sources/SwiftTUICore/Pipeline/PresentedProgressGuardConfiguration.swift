@@ -8,8 +8,12 @@
 /// pixels are never droppable", uniformly for every host. This is the Tier-2
 /// insurance from docs/plans/2026-07-20-001 — the browser 0.1.9 coalescing
 /// class cannot be re-entered through host configuration alone while the
-/// guard is on. The default flip is gated on the plan's pre-committed rusage
-/// A/B bound (commit-instead-of-drop runs the full commit path).
+/// guard is on. The default flip was measured against the plan's
+/// pre-committed rusage A/B bound and DECLINED (2026-07-21): in the
+/// drop-heavy browser regime the guard eliminates disposals at per-frame
+/// cost parity, but its `.async` cadence (0.674 coverage) stays below the
+/// 0.72 fix band that `async-no-cancel` reaches — so the mode remains the
+/// cadence mechanism and the guard remains opt-in insurance.
 ///
 /// The environment read latches on first access; tests set ``isEnabled``
 /// directly (serialized suites, restored in `defer`).

@@ -18,8 +18,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   completed-frame starvation backstop becomes the invariant "undelivered
   pixels are never droppable", uniformly for every host. Value-identical
   rasters (all-zero damage) stay droppable, and the pre-start cancel arm
-  is deliberately out of scope. Default off; the default flip is gated on
-  a drop-heavy-host rusage A/B (docs/plans/2026-07-20-001, Stage 5).
+  is deliberately out of scope. Default off; the pre-committed drop-heavy
+  browser rusage A/B (2026-07-21, docs/plans/2026-07-20-001 Stage 5)
+  measured the guard eliminating every disposal at per-frame cost parity
+  and byte-equivalent behavior under the shipped `async-no-cancel`
+  default, but its plain-`.async` cadence (0.674 distinct-generation
+  coverage vs the 0.72 fix band) failed the flip's benefit gate — the
+  default flip is declined; the guard remains opt-in insurance.
 
 ## [0.1.12] - 2026-07-21
 
