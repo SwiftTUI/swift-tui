@@ -25,18 +25,19 @@ package import SwiftTUIViews
 package struct PerTickAutonomousProbeView: View {
   @State private var model: PerTickProbeModel
 
-  /// Bounded so the workload goes quiet on its own: an unbounded
-  /// self-invalidating tick starves the cooperative-exit drain under the
-  /// `.async` disposal churn (measured ~26 s to honor ctrl-D in-process),
-  /// the same shape as the logo-tab flush-before-exit incident. Sized for
-  /// slow CI runners: the amd64 lane needs several seconds per frame, and
-  /// the cadence tests need the workload alive through ~14 frames (the
-  /// gate's 6th raster entry plus 8 post-release presents) — 256 ticks
-  /// (1.28 s) exhausted before the held entry was ever reached and the
-  /// suite time-limited. 4096 ticks ≈ 20 s of workload; tests stop the
-  /// tick via ``PerTickProbeModel/stopped`` before requesting exit, so the
-  /// exit drain stays short everywhere.
-  package static let tickLimit = 4096
+  /// Bounded so a leaked workload cannot tick forever, but sized to outlast
+  /// the cadence suite's 5-minute test time limit: the tick lifetime is
+  /// consumed from *task start*, and the tests need the workload alive
+  /// through ~14 frame latencies (the held raster entry plus eight
+  /// post-release presents). The amd64 CI lane proved multi-second frame
+  /// latencies twice — 256 ticks (1.28 s) and 4096 ticks (20 s) both
+  /// exhausted before the held entry was reached — so no "reasonable"
+  /// budget is safe; only outlasting the time limit is
+  /// (65536 × 5 ms ≈ 328 s > 300 s). Tests stop the tick via
+  /// ``PerTickProbeModel/stopped`` before requesting exit, so real exits
+  /// drain immediately; the budget only bounds the leak after a test
+  /// failure abandons the run loop.
+  package static let tickLimit = 65536
 
   package init(model: PerTickProbeModel = PerTickProbeModel()) {
     _model = State(initialValue: model)
