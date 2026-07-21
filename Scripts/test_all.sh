@@ -546,7 +546,23 @@ run_swift_runtime_tests_without_isolated_async_suites() {
   run_swift test "$@" \
     --skip AsyncLifecycleGenerationTests \
     --skip AsyncFrameTailRenderingTests \
-    --skip TaskReadsUnbodiedStateTests
+    --skip TaskReadsUnbodiedStateTests \
+    --skip PerTickPresentCadenceTests
+}
+
+# The per-tick cadence suite re-runs under the WASI-shaped mode profiles so
+# the browser regime (stack-lean resolve, chunked depth-capped resolve) keeps
+# native coverage: the 0.1.9 frame-coalescing incident only reproduced with
+# those profiles active. `SWIFTTUI_RESOLVE_DEPTH_LIMIT=6` is the WASI
+# stack-lean default depth cap (DeferredResolveDriver.stackLeanDefaultDepthLimit).
+run_per_tick_cadence_lean_lane() {
+  SWIFTTUI_STACK_LEAN_PROFILE=1 run_swift test \
+    --filter SwiftTUITests.PerTickPresentCadenceTests
+}
+
+run_per_tick_cadence_depth_limit_lane() {
+  SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 run_swift test \
+    --filter SwiftTUITests.PerTickPresentCadenceTests
 }
 
 require_command() {
@@ -857,8 +873,23 @@ run_function_step \
   run_swift test --filter SwiftTUITests.TaskReadsUnbodiedStateTests
 
 run_function_step \
+  "Run SwiftTUI per-tick present cadence tests" \
+  "$(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+  run_swift test --filter SwiftTUITests.PerTickPresentCadenceTests
+
+run_function_step \
+  "Run SwiftTUI per-tick present cadence tests (stack-lean profile)" \
+  "SWIFTTUI_STACK_LEAN_PROFILE=1 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+  run_per_tick_cadence_lean_lane
+
+run_function_step \
+  "Run SwiftTUI per-tick present cadence tests (chunked resolve driver)" \
+  "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+  run_per_tick_cadence_depth_limit_lane
+
+run_function_step \
   "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests)" \
+  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests)" \
   run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
 
 run_function_step \
