@@ -93,6 +93,9 @@ function resolveWasmEngineCapabilities(signals = collectWasmEngineProbeSignals()
   };
 }
 function stackProfileEnvironmentDefaults(capabilities) {
+  if (capabilities.engine === "v8") {
+    return { SWIFTTUI_STACK_LEAN_PROFILE: "0" };
+  }
   return {};
 }
 

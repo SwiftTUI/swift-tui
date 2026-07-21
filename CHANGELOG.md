@@ -6,6 +6,19 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.1.12] - 2026-07-21
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.12.** No
+  Swift source changes. The bundle exits the stack-lean hold on confirmed
+  V8 workers (`SWIFTTUI_STACK_LEAN_PROFILE: "0"` by default; JSC and
+  Gecko stay lean — Gecko by live measurement), riding 0.1.11's
+  `async-no-cancel` disposal default. Live non-lean Chromium measures the
+  same distinct-generation coverage as lean at roughly half the per-frame
+  pipeline cost, with 100% damage-scoped delta frames in the steady
+  window.
+
 ## [0.1.11] - 2026-07-20
 
 ### Added
