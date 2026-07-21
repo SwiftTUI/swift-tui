@@ -112,7 +112,9 @@ enum CommittedFrameArtifactBuilder {
         ),
         hasCompleteBarrierSignals: true,
         redundantHandlerInstallationsAreVisualOnly:
-          redundantHandlerInstallationsAreVisualOnly
+          redundantHandlerInstallationsAreVisualOnly,
+        honorsUndeliveredPresentationDamage:
+          PresentedProgressGuardConfiguration.isEnabled
       ))
   }
 

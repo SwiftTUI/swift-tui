@@ -123,6 +123,16 @@ struct PerTickPresentCadenceTests {
     .enabled(
       if: ProcessInfo.processInfo.environment["SWIFTTUI_STACK_LEAN_PROFILE"] != "1",
       "lean-profile frames are never drop-eligible; the disposal arm under test is unreachable"
+    ),
+    // A guard-on process soak (SWIFTTUI_PRESENTED_PROGRESS_GUARD=1) makes the
+    // awaited drop structurally impossible — that inverse is exactly what
+    // `presentedProgressGuardClosesDisposalArm` verifies.
+    .enabled(
+      if: {
+        let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PRESENTED_PROGRESS_GUARD"]
+        return raw == nil || raw!.isEmpty || raw == "0"
+      }(),
+      "the presented-progress guard blocks the disposal arm under test"
     )
   )
   func asyncDisposalSuppressesHeldFrame() async throws {
@@ -175,6 +185,71 @@ struct PerTickPresentCadenceTests {
         row["tail_job_state"] == "dropped_completed"
           && row["stale_frame_policy"] == "drop_completed_visual_only"
           && row["drop_decision"] == "drop_visual_only"
+      }
+    )
+  }
+
+  @MainActor
+  @Test(
+    "the presented-progress guard closes the disposal arm under plain async",
+    // Non-lean only, like the red-proof: this is its guard-on inverse on the
+    // identical harness — the same held superseded frame that `.async` drops
+    // must commit when undelivered pixels block disposal.
+    .enabled(
+      if: ProcessInfo.processInfo.environment["SWIFTTUI_STACK_LEAN_PROFILE"] != "1",
+      "lean-profile frames are never drop-eligible; the guard has nothing to close"
+    )
+  )
+  func presentedProgressGuardClosesDisposalArm() async throws {
+    let wasEnabled = PresentedProgressGuardConfiguration.isEnabled
+    PresentedProgressGuardConfiguration.isEnabled = true
+    defer { PresentedProgressGuardConfiguration.isEnabled = wasEnabled }
+
+    let harness = PerTickCadenceHarness(rootName: "PerTickCadenceGuardRoot")
+    defer { harness.removeDiagnostics() }
+    harness.runLoop.renderMode = .async
+
+    let runTask = Task {
+      try await harness.runLoop.run()
+    }
+
+    print("[per-tick-cadence] guard: awaiting held tail")
+    await harness.gate.waitUntilBlocked()
+    harness.stateContainer.replace(with: 1)
+    print("[per-tick-cadence] guard: awaiting injected pending intent")
+    await harness.scheduler.waitForPendingFrame(at: .now())
+    harness.gate.release()
+
+    // The guard's commit is observable as the held tick value presenting:
+    // under plain `.async` this exact scenario records `dropped_completed`
+    // (the red-proof above); with the guard on the frame must reach the
+    // surface instead.
+    print("[per-tick-cadence] guard: awaiting 4 distinct presented ticks")
+    await harness.terminal.frameSignal.wait {
+      distinctTickValues(in: harness.terminal.frames).count >= 4
+    }
+
+    harness.requestExit()
+    print("[per-tick-cadence] guard: awaiting run-loop exit")
+    _ = try await runTask.value
+
+    // The guard closes the completed-frame drop arm only; a legitimate
+    // pre-start cancel+replay (G2) is explicitly outside its scope
+    // (the plan pre-registers `.asyncNoCancel` as the escalation for that
+    // residual), so only `dropped_completed` skips are a failure here.
+    let skips = harness.probe.events.filter { $0.kind == .frameSkipped }
+    #expect(
+      skips.allSatisfy {
+        $0.tailJobState == FrameTailJobState.cancelledBeforeStart.rawValue
+      }
+    )
+    // The trace names the guard as the biting layer: the superseded frame's
+    // decision is `blocked` with the guard blocker, never `drop_visual_only`.
+    let rows = diagnosticRows(harness.diagnosticsText())
+    #expect(rows.allSatisfy { $0["drop_decision"] != "drop_visual_only" })
+    #expect(
+      rows.contains { row in
+        (row["drop_blockers"] ?? "").contains("undeliveredPresentationDamage")
       }
     )
   }

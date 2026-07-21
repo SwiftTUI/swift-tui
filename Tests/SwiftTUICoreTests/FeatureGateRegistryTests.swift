@@ -14,6 +14,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_OVERLAY_INCREMENTAL_DAMAGE",
         "SWIFTTUI_RASTER_VERIFY_INCREMENTAL",
         "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE",
+        "SWIFTTUI_PRESENTED_PROGRESS_GUARD",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -24,6 +25,9 @@ struct FeatureGateRegistryTests {
     #expect(!FeatureGate.overlayIncrementalDamage.defaultIsEnabled)
     #expect(!FeatureGate.rasterVerifyIncremental.defaultIsEnabled)
     #expect(!FeatureGate.rasterTrustSoundDamage.defaultIsEnabled)
+    // The presented-progress guard's default flip is gated on its rusage A/B
+    // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
+    #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
   }
 
   @Test("the soundness probe defaults on in every configuration")
@@ -38,5 +42,8 @@ struct FeatureGateRegistryTests {
     #expect(
       SoundnessProbeConfiguration.environmentVariableName
         == FeatureGate.soundnessProbe.environmentVariableName)
+    #expect(
+      PresentedProgressGuardConfiguration.environmentVariableName
+        == FeatureGate.presentedProgressGuard.environmentVariableName)
   }
 }

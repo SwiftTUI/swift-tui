@@ -21,6 +21,13 @@ public enum FrameDropBlocker: String, Sendable, CaseIterable, Hashable {
   case retainedRasterBaseline
   case presentationFullRepaint
   case graphicsReplay
+  /// Presented-Progress Guard (opt-in via `SWIFTTUI_PRESENTED_PROGRESS_GUARD`):
+  /// the completed frame carries a non-empty presentation diff against the
+  /// last presented surface. Dropping it would leave those pixels undelivered
+  /// until some later frame happens to repaint them — the bounded-starvation
+  /// coalescing class the browser 0.1.9 incident exposed. With the guard on,
+  /// undelivered pixels are never droppable, uniformly for every host.
+  case undeliveredPresentationDamage
   case diagnosticsFullRecord
   case unobservable
 }

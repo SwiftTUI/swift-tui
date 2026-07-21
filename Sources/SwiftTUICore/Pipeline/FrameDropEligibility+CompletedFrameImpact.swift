@@ -40,7 +40,7 @@ extension FrameDropEligibility {
         animation = true
       case .retainedLayoutBaseline, .retainedRasterBaseline:
         retainedBaselines = true
-      case .presentationFullRepaint, .graphicsReplay:
+      case .presentationFullRepaint, .graphicsReplay, .undeliveredPresentationDamage:
         presentationRecovery = true
       case .diagnosticsFullRecord:
         diagnostics = true

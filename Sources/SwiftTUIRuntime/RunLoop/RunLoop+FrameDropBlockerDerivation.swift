@@ -37,8 +37,13 @@ extension RunLoop {
       additionalBlockers.insert(.animationTransaction)
     }
     return FrameDropEligibility.classify(
-      artifacts,
-      additionalBlockers: additionalBlockers
+      FrameDropEligibility.Candidate(
+        artifacts: artifacts,
+        additionalBlockers: additionalBlockers,
+        hasCompleteBarrierSignals: false,
+        honorsUndeliveredPresentationDamage:
+          PresentedProgressGuardConfiguration.isEnabled
+      )
     ).blockers
   }
 

@@ -6,6 +6,21 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Added
+
+- **Presented-Progress Guard** (opt-in via
+  `SWIFTTUI_PRESENTED_PROGRESS_GUARD`): with the guard on, a completed
+  frame whose presentation diff against the last presented surface is
+  non-empty is never drop-eligible
+  (`FrameDropBlocker.undeliveredPresentationDamage`) — the bounded
+  completed-frame starvation backstop becomes the invariant "undelivered
+  pixels are never droppable", uniformly for every host. Value-identical
+  rasters (all-zero damage) stay droppable, and the pre-start cancel arm
+  is deliberately out of scope. Default off; the default flip is gated on
+  a drop-heavy-host rusage A/B (docs/plans/2026-07-20-001, Stage 5).
+
 ## [0.1.12] - 2026-07-21
 
 ### Changed

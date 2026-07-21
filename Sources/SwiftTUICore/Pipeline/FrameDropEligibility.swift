@@ -44,18 +44,27 @@ package struct FrameDropEligibility: Equatable, Sendable {
     /// with stable interactive chrome drop without reinstalling equivalent
     /// handlers.
     package var redundantHandlerInstallationsAreVisualOnly: Bool
+    /// Presented-Progress Guard (opt-in): when set, any non-empty
+    /// presentation diff against the last presented surface blocks the drop
+    /// (``FrameDropBlocker/undeliveredPresentationDamage``) — undelivered
+    /// pixels are never droppable. The caller reads the gate
+    /// (``PresentedProgressGuardConfiguration``) so classification stays a
+    /// pure function of its candidate.
+    package var honorsUndeliveredPresentationDamage: Bool
 
     package init(
       artifacts: FrameArtifacts,
       additionalBlockers: Set<Blocker> = [],
       hasCompleteBarrierSignals: Bool = false,
-      redundantHandlerInstallationsAreVisualOnly: Bool = false
+      redundantHandlerInstallationsAreVisualOnly: Bool = false,
+      honorsUndeliveredPresentationDamage: Bool = false
     ) {
       self.artifacts = artifacts
       self.additionalBlockers = additionalBlockers
       self.hasCompleteBarrierSignals = hasCompleteBarrierSignals
       self.redundantHandlerInstallationsAreVisualOnly =
         redundantHandlerInstallationsAreVisualOnly
+      self.honorsUndeliveredPresentationDamage = honorsUndeliveredPresentationDamage
     }
   }
 
@@ -182,6 +191,15 @@ package struct FrameDropEligibility: Equatable, Sendable {
       }
       if damage.requiresFullGraphicsReplay || damage.graphicsInvalidationCount > 0 {
         record(.graphicsReplay)
+      }
+      if candidate.honorsUndeliveredPresentationDamage,
+        damage.textRowCount > 0 || damage.textCellCount > 0
+          || damage.graphicsInvalidationCount > 0
+          || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay
+      {
+        // A value-identical raster produces an empty (all-zero) damage record
+        // and stays droppable; anything else is undelivered pixels.
+        record(.undeliveredPresentationDamage)
       }
     }
     if impact.isVisualOnly, candidate.hasCompleteBarrierSignals {

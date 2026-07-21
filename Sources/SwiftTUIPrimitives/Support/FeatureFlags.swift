@@ -16,6 +16,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case overlayIncrementalDamage
   case rasterVerifyIncremental
   case rasterTrustSoundDamage
+  case presentedProgressGuard
 
   package var environmentVariableName: String {
     switch self {
@@ -27,6 +28,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_RASTER_VERIFY_INCREMENTAL"
     case .rasterTrustSoundDamage:
       "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"
+    case .presentedProgressGuard:
+      "SWIFTTUI_PRESENTED_PROGRESS_GUARD"
     }
   }
 
@@ -40,10 +43,13 @@ package enum FeatureGate: CaseIterable, Sendable {
       // observable in the builds users actually run. `SWIFTTUI_SOUNDNESS_PROBE=0`
       // opts out.
       true
-    case .overlayIncrementalDamage, .rasterVerifyIncremental, .rasterTrustSoundDamage:
+    case .overlayIncrementalDamage, .rasterVerifyIncremental, .rasterTrustSoundDamage,
+      .presentedProgressGuard:
       // Opt-in behavior/verification toggles: absent ⇒ off, leaving the default
       // build (and, for the raster pair, the `#if DEBUG` policy fallback at their
-      // resolution sites) in effect.
+      // resolution sites) in effect. The presented-progress guard's default
+      // flip is gated on its pre-committed rusage A/B bound
+      // (docs/plans/2026-07-20-001, Stage 5 — land-only-on-wins).
       false
     }
   }

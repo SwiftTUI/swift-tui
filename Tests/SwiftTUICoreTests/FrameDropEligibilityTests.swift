@@ -166,6 +166,59 @@ struct FrameDropEligibilityTests {
     #expect(eligibility.canDrop == false)
   }
 
+  @Test("the presented-progress guard blocks any non-empty presentation diff")
+  func presentedProgressGuardBlocksNonEmptyPresentationDiff() {
+    let artifacts = makeArtifacts(
+      presentationDamage: PresentationDamage(
+        textRows: [.init(row: 2, columnRanges: [3..<4])]
+      )
+    )
+    // Guard off (the default): a small scoped diff stays visual-only.
+    let withoutGuard = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true
+      ))
+    #expect(withoutGuard.decision == .canDropVisualOnly)
+
+    // Guard on: undelivered pixels are never droppable.
+    let withGuard = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true,
+        honorsUndeliveredPresentationDamage: true
+      ))
+    #expect(
+      withGuard.decision == .mustCommit(blockers: [.undeliveredPresentationDamage]))
+    #expect(!withGuard.impact.isVisualOnly)
+  }
+
+  @Test("the presented-progress guard leaves an empty diff droppable")
+  func presentedProgressGuardLeavesEmptyDiffDroppable() {
+    // A value-identical raster produces a non-nil but all-zero damage record;
+    // the guard must not block it (nothing is undelivered).
+    let artifacts = makeArtifacts(presentationDamage: PresentationDamage())
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true,
+        honorsUndeliveredPresentationDamage: true
+      ))
+    #expect(eligibility.decision == .canDropVisualOnly)
+  }
+
+  @Test("the presented-progress guard without damage diagnostics stays inert")
+  func presentedProgressGuardWithoutDamageDiagnosticsStaysInert() {
+    let artifacts = makeArtifacts()
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true,
+        honorsUndeliveredPresentationDamage: true
+      ))
+    #expect(eligibility.decision == .canDropVisualOnly)
+  }
+
   @Test("every blocker maps to non-visual completed-frame impact")
   func everyBlockerMapsToNonVisualCompletedFrameImpact() {
     for blocker in FrameDropEligibility.Blocker.allCases {
