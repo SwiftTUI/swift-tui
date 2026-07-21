@@ -8,6 +8,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-07-21
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.13.** The
+  bundle gains hidden-scene suspension: a scene that cannot be seen
+  (switched to the background, or any scene while the document is hidden)
+  parks its WASI run loop between `poll_oneoff` waits and freezes its
+  monotonic clock, so hidden scenes cost no CPU and resume burst-free
+  with timers keeping their remaining time. Default on; embedders opt
+  out via `suspendHiddenScenes: false` / `suspendWhenHidden: false`.
+
 ### Added
 
 - **Presented-Progress Guard** (opt-in via
