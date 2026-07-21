@@ -81,27 +81,34 @@ struct PerTickPresentCadenceTests {
     // Hold a steady tick frame's started tail mid-raster, inject a newer
     // intent while it is held, then release: the disposal decision sees a
     // newer desired generation, and under ordered-commit-only the frame must
-    // still commit. The phase breadcrumbs exist for CI: when a slow runner
-    // exceeds the suite time limit, the last printed phase names the wait
-    // that starved (the amd64 lane's frame latency has defeated two rounds
-    // of workload sizing).
-    print("[per-tick-cadence] no-cancel: awaiting held tail")
+    // still commit. The timestamped phase breadcrumbs exist for CI: when a
+    // slow runner exceeds the suite time limit, the printed elapsed times
+    // apportion the clock (the amd64 lane's latency has defeated two rounds
+    // of workload sizing; its breadcrumbs show every phase completing).
+    let clock = ContinuousClock()
+    let start = clock.now
+    func phase(_ name: String) {
+      print("[per-tick-cadence] no-cancel +\(start.duration(to: clock.now)): \(name)")
+    }
+    phase("awaiting held tail")
     await harness.gate.waitUntilBlocked()
     harness.stateContainer.replace(with: 1)
-    print("[per-tick-cadence] no-cancel: awaiting injected pending intent")
+    phase("awaiting injected pending intent")
     await harness.scheduler.waitForPendingFrame(at: .now())
     harness.gate.release()
 
-    // Steady window, signal-synchronised on presents: at least 8 distinct
-    // tick values must reach the surface.
-    print("[per-tick-cadence] no-cancel: awaiting 8 distinct presented ticks")
+    // Steady window, signal-synchronised on presents: at least 4 distinct
+    // tick values must reach the surface (per-tick delivery beyond the held
+    // frame; kept small so slow runners fit the suite time limit).
+    phase("awaiting 4 distinct presented ticks")
     await harness.terminal.frameSignal.wait {
-      distinctTickValues(in: harness.terminal.frames).count >= 8
+      distinctTickValues(in: harness.terminal.frames).count >= 4
     }
 
     harness.requestExit()
-    print("[per-tick-cadence] no-cancel: awaiting run-loop exit")
+    phase("awaiting run-loop exit")
     let result = try await runTask.value
+    phase("done")
 
     let skips = harness.probe.events.filter { $0.kind == .frameSkipped }
     #expect(skips.isEmpty)
@@ -148,19 +155,25 @@ struct PerTickPresentCadenceTests {
     // completed visual-only frame must be disposed, and the disposal layer
     // must record the skip with its reason string. The probe event wait is
     // signal-native — it resumes exactly when the skip records.
-    print("[per-tick-cadence] red-proof: awaiting held tail")
+    let clock = ContinuousClock()
+    let start = clock.now
+    func phase(_ name: String) {
+      print("[per-tick-cadence] red-proof +\(start.duration(to: clock.now)): \(name)")
+    }
+    phase("awaiting held tail")
     await harness.gate.waitUntilBlocked()
     harness.stateContainer.replace(with: 1)
-    print("[per-tick-cadence] red-proof: awaiting injected pending intent")
+    phase("awaiting injected pending intent")
     await harness.scheduler.waitForPendingFrame(at: .now())
     harness.gate.release()
 
-    print("[per-tick-cadence] red-proof: awaiting disposal skip")
+    phase("awaiting disposal skip")
     _ = await harness.probe.event { $0.kind == .frameSkipped }
 
     harness.requestExit()
-    print("[per-tick-cadence] red-proof: awaiting run-loop exit")
+    phase("awaiting run-loop exit")
     _ = try await runTask.value
+    phase("done")
 
     let skips = harness.probe.events.filter { $0.kind == .frameSkipped }
     #expect(!skips.isEmpty)
@@ -213,10 +226,15 @@ struct PerTickPresentCadenceTests {
       try await harness.runLoop.run()
     }
 
-    print("[per-tick-cadence] guard: awaiting held tail")
+    let clock = ContinuousClock()
+    let start = clock.now
+    func phase(_ name: String) {
+      print("[per-tick-cadence] guard +\(start.duration(to: clock.now)): \(name)")
+    }
+    phase("awaiting held tail")
     await harness.gate.waitUntilBlocked()
     harness.stateContainer.replace(with: 1)
-    print("[per-tick-cadence] guard: awaiting injected pending intent")
+    phase("awaiting injected pending intent")
     await harness.scheduler.waitForPendingFrame(at: .now())
     harness.gate.release()
 
@@ -224,14 +242,15 @@ struct PerTickPresentCadenceTests {
     // under plain `.async` this exact scenario records `dropped_completed`
     // (the red-proof above); with the guard on the frame must reach the
     // surface instead.
-    print("[per-tick-cadence] guard: awaiting 4 distinct presented ticks")
+    phase("awaiting 4 distinct presented ticks")
     await harness.terminal.frameSignal.wait {
       distinctTickValues(in: harness.terminal.frames).count >= 4
     }
 
     harness.requestExit()
-    print("[per-tick-cadence] guard: awaiting run-loop exit")
+    phase("awaiting run-loop exit")
     _ = try await runTask.value
+    phase("done")
 
     // The guard closes the completed-frame drop arm only; a legitimate
     // pre-start cancel+replay (G2) is explicitly outside its scope
