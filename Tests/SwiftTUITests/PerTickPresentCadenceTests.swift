@@ -182,6 +182,7 @@ private final class PerTickCadenceHarness {
   let probe: RunLoopProgressProbe
   let scheduler: FrameScheduler
   let stateContainer: StateContainer<Int>
+  let model: PerTickProbeModel
   let runLoop: SwiftTUIRuntime.RunLoop<Int, PerTickAutonomousProbeView>
   let diagnosticsURL: URL
 
@@ -194,6 +195,7 @@ private final class PerTickCadenceHarness {
   }
 
   init(rootName: String) {
+    let model = PerTickProbeModel()
     let rootIdentity = testIdentity(rootName)
     let terminal = RecordingPresentationSurface(
       surfaceSize: CellSize(width: 32, height: 6)
@@ -231,7 +233,7 @@ private final class PerTickCadenceHarness {
       },
       proposal: ProposedSize(width: 32, height: 6),
       viewBuilder: { _, _ in
-        PerTickAutonomousProbeView()
+        PerTickAutonomousProbeView(model: model)
       }
     )
     runLoop.progressProbe = probe
@@ -246,10 +248,14 @@ private final class PerTickCadenceHarness {
     self.probe = probe
     self.scheduler = scheduler
     self.stateContainer = stateContainer
+    self.model = model
     self.runLoop = runLoop
   }
 
   func requestExit() {
+    // Stop the workload first so the cooperative-exit drain has no live
+    // tick producer left to replay (the logo-tab flush-before-exit shape).
+    model.stopped = true
     inputReader.send(.key(.character("d"), modifiers: .ctrl))
     inputReader.finish()
   }

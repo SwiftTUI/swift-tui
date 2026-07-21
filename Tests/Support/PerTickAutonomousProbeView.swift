@@ -23,18 +23,24 @@ package import SwiftTUIViews
 /// synchronise on signals (`RecordingPresentationSurface.frameSignal`,
 /// `RunLoopProgressProbe` events), never on the tick interval itself.
 package struct PerTickAutonomousProbeView: View {
-  @State private var model = PerTickProbeModel()
+  @State private var model: PerTickProbeModel
 
   /// Bounded so the workload goes quiet on its own: an unbounded
   /// self-invalidating tick starves the cooperative-exit drain under the
   /// `.async` disposal churn (measured ~26 s to honor ctrl-D in-process),
-  /// the same shape as the logo-tab flush-before-exit incident. Sized so the
-  /// budget (~1.3 s of ticking) comfortably outlasts the cadence tests'
-  /// bounded held-tail window under parallel-suite load while keeping the
-  /// exit drain short.
-  package static let tickLimit = 256
+  /// the same shape as the logo-tab flush-before-exit incident. Sized for
+  /// slow CI runners: the amd64 lane needs several seconds per frame, and
+  /// the cadence tests need the workload alive through ~14 frames (the
+  /// gate's 6th raster entry plus 8 post-release presents) — 256 ticks
+  /// (1.28 s) exhausted before the held entry was ever reached and the
+  /// suite time-limited. 4096 ticks ≈ 20 s of workload; tests stop the
+  /// tick via ``PerTickProbeModel/stopped`` before requesting exit, so the
+  /// exit drain stays short everywhere.
+  package static let tickLimit = 4096
 
-  package init() {}
+  package init(model: PerTickProbeModel = PerTickProbeModel()) {
+    _model = State(initialValue: model)
+  }
 
   package var body: some View {
     VStack(alignment: .leading) {
@@ -44,9 +50,15 @@ package struct PerTickAutonomousProbeView: View {
   }
 }
 
+/// Hoisted so the owning test can stop the workload (`stopped = true`)
+/// before requesting exit; nothing in any body reads `stopped`, so setting
+/// it mints no invalidation.
 @Observable
-private final class PerTickProbeModel {
-  var tick = 0
+package final class PerTickProbeModel {
+  package var tick = 0
+  package var stopped = false
+
+  package init() {}
 }
 
 private struct PerTickProbeLabel: View {
@@ -72,7 +84,9 @@ private struct PerTickTaskHost: View, @MainActor Equatable {
   var body: some View {
     Text("")
       .task { [model] in
-        while !Task.isCancelled && model.tick < PerTickAutonomousProbeView.tickLimit {
+        while !Task.isCancelled && !model.stopped
+          && model.tick < PerTickAutonomousProbeView.tickLimit
+        {
           try? await Task.sleep(nanoseconds: 5_000_000)
           model.tick += 1
         }
