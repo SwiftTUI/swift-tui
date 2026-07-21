@@ -1546,6 +1546,20 @@ function drawBraille(context, codePoint, rect) {
   return true;
 }
 
+// src/SurfaceRenderer.ts
+function resolvedSurfaceForeground(style, terminalStyle) {
+  if ((style?.em ?? 0) & 16) {
+    return style?.bg ?? terminalStyle.theme.background;
+  }
+  return style?.fg ?? terminalStyle.theme.foreground;
+}
+function resolvedSurfaceBackground(style, terminalStyle) {
+  if ((style?.em ?? 0) & 16) {
+    return style?.fg ?? terminalStyle.theme.foreground;
+  }
+  return style?.bg;
+}
+
 // src/CanvasSurfacePainter.ts
 class CanvasSurfacePainter {
   imageCache = new Map;
@@ -1657,8 +1671,8 @@ class CanvasSurfacePainter {
     const rectX = x * metrics.cellWidth;
     const rectY = y * metrics.cellHeight;
     const width = Math.max(1, span) * metrics.cellWidth;
-    const background = resolvedBackground(style, metrics.style);
-    const foreground = resolvedForeground(style, metrics.style);
+    const background = resolvedSurfaceBackground(style, metrics.style);
+    const foreground = resolvedSurfaceForeground(style, metrics.style);
     const opacity = style?.opacity ?? 1;
     if (background) {
       context.globalAlpha = opacity;
@@ -1819,17 +1833,280 @@ function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
   }
   return false;
 }
-function resolvedForeground(style, terminalStyle) {
-  if ((style?.em ?? 0) & 16) {
-    return style?.bg ?? terminalStyle.theme.background;
+
+// src/DomSurfacePainter.ts
+class DomSurfacePainter {
+  root;
+  rowsLayer;
+  imagesLayer;
+  rowElements = [];
+  renderedImages = new Map;
+  appliedMetricsKey;
+  renderedGridKey;
+  hasRenderedFrame = false;
+  letterSpacing;
+  attach(root) {
+    this.root = root;
+    const rowsLayer = createElement("div");
+    rowsLayer.className = "webhost-scene__surface-rows";
+    fillContainer(rowsLayer.style);
+    const imagesLayer = createElement("div");
+    imagesLayer.className = "webhost-scene__surface-images";
+    fillContainer(imagesLayer.style);
+    imagesLayer.style.pointerEvents = "none";
+    this.rowsLayer = rowsLayer;
+    this.imagesLayer = imagesLayer;
+    root.replaceChildren(rowsLayer, imagesLayer);
+    this.rowElements = [];
+    this.renderedImages = new Map;
+    this.appliedMetricsKey = undefined;
+    this.renderedGridKey = undefined;
+    this.hasRenderedFrame = false;
   }
-  return style?.fg ?? terminalStyle.theme.foreground;
+  paint(metrics, frame, damage) {
+    const root = this.root;
+    const rowsLayer = this.rowsLayer;
+    if (!root || !rowsLayer) {
+      return;
+    }
+    const metricsKey = metricsKeyFor(metrics);
+    const metricsChanged = metricsKey !== this.appliedMetricsKey;
+    if (metricsChanged) {
+      this.applyRootStyle(root, metrics);
+      this.appliedMetricsKey = metricsKey;
+    }
+    if (!frame) {
+      this.rowElements = [];
+      rowsLayer.replaceChildren();
+      this.reconcileImages([], metrics);
+      this.renderedGridKey = undefined;
+      this.hasRenderedFrame = false;
+      return;
+    }
+    const gridKey = `${frame.width}x${frame.height}x${frame.rows.length}`;
+    const fullRepaint = metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
+    this.renderedGridKey = gridKey;
+    if (fullRepaint) {
+      for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
+        this.rowElements[y - 1]?.remove();
+      }
+      this.rowElements.length = Math.min(this.rowElements.length, frame.rows.length);
+      for (let y = 0;y < frame.rows.length; y += 1) {
+        this.rebuildRow(y, frame, metrics);
+      }
+    } else {
+      for (const [row] of damage.textRows) {
+        if (row < 0 || row >= frame.rows.length) {
+          continue;
+        }
+        this.rebuildRow(row, frame, metrics);
+      }
+    }
+    this.reconcileImages(frame.images ?? [], metrics);
+    this.hasRenderedFrame = true;
+  }
+  rebuildRow(y, frame, metrics) {
+    const rowElement = this.ensureRowElement(y, metrics);
+    const children = [];
+    for (const [x, text, span, styleIndex] of frame.rows[y] ?? []) {
+      const cellElement = buildCellElement(x, text, span, frame.styles[styleIndex] ?? undefined, metrics);
+      if (cellElement) {
+        children.push(cellElement);
+      }
+    }
+    rowElement.replaceChildren(...children);
+  }
+  ensureRowElement(y, metrics) {
+    let rowElement = this.rowElements[y];
+    if (!rowElement) {
+      rowElement = createElement("div");
+      rowElement.className = "webhost-scene__surface-row";
+      rowElement.style.position = "absolute";
+      rowElement.style.left = "0";
+      this.rowElements[y] = rowElement;
+      this.rowsLayer?.appendChild(rowElement);
+    }
+    rowElement.style.top = `${y * metrics.cellHeight}px`;
+    rowElement.style.height = `${metrics.cellHeight}px`;
+    rowElement.style.width = `${metrics.columns * metrics.cellWidth}px`;
+    return rowElement;
+  }
+  applyRootStyle(root, metrics) {
+    const style = root.style;
+    style.position = "relative";
+    style.overflow = "hidden";
+    style.background = webTUITerminalBackgroundColor(metrics.style);
+    style.font = fontForStyle(metrics.style);
+    style.lineHeight = `${metrics.cellHeight}px`;
+    style.letterSpacing = this.letterSpacingFor(metrics);
+    style.fontVariantLigatures = "none";
+    style.userSelect = "text";
+  }
+  letterSpacingFor(metrics) {
+    const font = fontForStyle(metrics.style);
+    const key = `${font}|${metrics.cellWidth}`;
+    if (this.letterSpacing?.key === key) {
+      return this.letterSpacing.value;
+    }
+    let value = "0px";
+    const canvas = createElement("canvas");
+    const context = canvas.getContext?.("2d");
+    if (context) {
+      context.font = font;
+      const advance = context.measureText("W").width;
+      const correction = metrics.cellWidth - advance;
+      if (advance > 0 && Math.abs(correction) >= 0.01) {
+        value = `${Math.round(correction * 1000) / 1000}px`;
+      }
+    }
+    this.letterSpacing = { key, value };
+    return value;
+  }
+  reconcileImages(images, metrics) {
+    const layer = this.imagesLayer;
+    if (!layer) {
+      return;
+    }
+    const next = new Map;
+    for (const image of images) {
+      const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
+      const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
+      if (!image.dataBase64 || boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+        continue;
+      }
+      const existing = this.renderedImages.get(image.id);
+      const entry = existing ?? makeImageEntry();
+      entry.container.style.left = `${clipX * metrics.cellWidth}px`;
+      entry.container.style.top = `${clipY * metrics.cellHeight}px`;
+      entry.container.style.width = `${clipWidth * metrics.cellWidth}px`;
+      entry.container.style.height = `${clipHeight * metrics.cellHeight}px`;
+      entry.image.style.left = `${(boundsX - clipX) * metrics.cellWidth}px`;
+      entry.image.style.top = `${(boundsY - clipY) * metrics.cellHeight}px`;
+      entry.image.style.width = `${boundsWidth * metrics.cellWidth}px`;
+      entry.image.style.height = `${boundsHeight * metrics.cellHeight}px`;
+      const source = `data:image/${image.format};base64,${image.dataBase64}`;
+      if (entry.source !== source) {
+        entry.image.setAttribute("src", source);
+        entry.source = source;
+      }
+      if (!existing) {
+        layer.appendChild(entry.container);
+      }
+      next.set(image.id, entry);
+    }
+    for (const [id, entry] of this.renderedImages) {
+      if (!next.has(id)) {
+        entry.container.remove();
+      }
+    }
+    this.renderedImages = next;
+  }
 }
-function resolvedBackground(style, terminalStyle) {
-  if ((style?.em ?? 0) & 16) {
-    return style?.fg ?? terminalStyle.theme.foreground;
+function metricsKeyFor(metrics) {
+  return [
+    metrics.columns,
+    metrics.rows,
+    metrics.cellWidth,
+    metrics.cellHeight,
+    fontForStyle(metrics.style),
+    metrics.style.theme.foreground,
+    metrics.style.theme.background,
+    metrics.style.theme.windowBackground,
+    metrics.style.backgroundOpacity
+  ].join("|");
+}
+function buildCellElement(x, text, span, style, metrics) {
+  const background = resolvedSurfaceBackground(style, metrics.style);
+  const hasDecoration = Boolean(style?.underline || style?.strikethrough);
+  if (!background && !hasDecoration && text.trim() === "") {
+    return;
   }
-  return style?.bg;
+  const element = createElement("span");
+  element.textContent = text;
+  const elementStyle = element.style;
+  elementStyle.position = "absolute";
+  elementStyle.left = `${x * metrics.cellWidth}px`;
+  elementStyle.top = "0";
+  elementStyle.width = `${Math.max(1, span) * metrics.cellWidth}px`;
+  elementStyle.height = "100%";
+  elementStyle.whiteSpace = "pre";
+  elementStyle.color = resolvedSurfaceForeground(style, metrics.style);
+  if (background) {
+    elementStyle.backgroundColor = background;
+  }
+  const emphasis = style?.em ?? 0;
+  if (emphasis & 1) {
+    elementStyle.fontWeight = "700";
+  }
+  if (emphasis & 2) {
+    elementStyle.fontStyle = "italic";
+  }
+  const opacity = style?.opacity ?? 1;
+  if (opacity !== 1) {
+    elementStyle.opacity = String(opacity);
+  }
+  applyTextDecoration(elementStyle, style);
+  return element;
+}
+function applyTextDecoration(elementStyle, style) {
+  const lines = [];
+  if (style?.underline) {
+    lines.push("underline");
+  }
+  if (style?.strikethrough) {
+    lines.push("line-through");
+  }
+  if (lines.length === 0) {
+    return;
+  }
+  elementStyle.textDecorationLine = lines.join(" ");
+  const pattern = style?.underline?.pattern ?? style?.strikethrough?.pattern;
+  elementStyle.textDecorationStyle = decorationStyleFor(pattern);
+  const color = style?.underline?.color ?? style?.strikethrough?.color;
+  if (color) {
+    elementStyle.textDecorationColor = color;
+  }
+}
+function decorationStyleFor(pattern) {
+  switch (pattern) {
+    case "dot":
+      return "dotted";
+    case "dash":
+    case "dashDot":
+    case "dashDotDot":
+      return "dashed";
+    case "double":
+      return "double";
+    case "curly":
+      return "wavy";
+    default:
+      return "solid";
+  }
+}
+function fillContainer(style) {
+  style.position = "absolute";
+  style.left = "0";
+  style.top = "0";
+  style.width = "100%";
+  style.height = "100%";
+}
+function makeImageEntry() {
+  const container = createElement("div");
+  container.className = "webhost-scene__surface-image";
+  container.style.position = "absolute";
+  container.style.overflow = "hidden";
+  const image = createElement("img");
+  image.style.position = "absolute";
+  image.setAttribute("alt", "");
+  image.setAttribute("draggable", "false");
+  container.appendChild(image);
+  return { container, image, source: "" };
+}
+function createElement(tagName) {
+  if (typeof document === "undefined") {
+    throw new Error("document is not available");
+  }
+  return document.createElement(tagName);
 }
 
 // src/InputEventEncoder.ts
@@ -2252,10 +2529,13 @@ class WebHostSceneRuntime {
   onFrameDiagnostic;
   synchronizeAccessibilityFocus;
   wheelMode;
-  painter = new CanvasSurfacePainter;
+  rendererKind;
+  painter;
   inputEncoder = new InputEventEncoder;
   currentStyle;
   canvas;
+  domSurfaceRoot;
+  lastDomSurfaceSize;
   accessibilityTree;
   diagnosticText;
   resizeObserver;
@@ -2282,6 +2562,8 @@ class WebHostSceneRuntime {
     this.onFrameDiagnostic = options.onFrameDiagnostic;
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
     this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
+    this.rendererKind = options.renderer ?? "canvas";
+    this.painter = this.rendererKind === "dom" ? new DomSurfacePainter : new CanvasSurfacePainter;
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
@@ -2299,16 +2581,24 @@ class WebHostSceneRuntime {
     this.applyVisibility();
   }
   async mount() {
-    if (this.canvas) {
+    if (this.surfaceElement) {
       return;
     }
-    const canvas = document.createElement("canvas");
-    canvas.className = "webhost-scene__surface";
-    canvas.setAttribute("aria-hidden", "true");
-    this.canvas = canvas;
-    this.painter.attach(canvas, () => this.draw());
+    if (this.painter instanceof DomSurfacePainter) {
+      const surfaceRoot = document.createElement("div");
+      surfaceRoot.className = "webhost-scene__surface webhost-scene__surface--dom";
+      surfaceRoot.setAttribute("aria-hidden", "true");
+      this.domSurfaceRoot = surfaceRoot;
+      this.painter.attach(surfaceRoot);
+    } else {
+      const canvas = document.createElement("canvas");
+      canvas.className = "webhost-scene__surface";
+      canvas.setAttribute("aria-hidden", "true");
+      this.canvas = canvas;
+      this.painter.attach(canvas, () => this.draw());
+    }
     this.accessibilityTree = new AccessibilityTreeMounter;
-    this.terminalMount.replaceChildren(canvas, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
+    this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     this.installInputHandlers();
     this.installResizeObserver();
     this.bridge?.bindOutput({
@@ -2361,7 +2651,7 @@ class WebHostSceneRuntime {
   resize(columns, rows) {
     this.columns = Math.max(1, Math.round(columns));
     this.rows = Math.max(1, Math.round(rows));
-    this.resizeCanvas();
+    this.resizeSurface();
     this.draw();
     this.syncAccessibilityTree();
   }
@@ -2402,7 +2692,7 @@ class WebHostSceneRuntime {
     this.currentFrame = frame;
     this.columns = Math.max(1, Math.round(frame.width));
     this.rows = Math.max(1, Math.round(frame.height));
-    const resized = this.resizeCanvas();
+    const resized = this.resizeSurface();
     this.draw(previousFrame && !resized ? frame.damage : undefined);
     this.syncAccessibilityTree();
   }
@@ -2448,6 +2738,13 @@ class WebHostSceneRuntime {
       this.canvas.style.width = "100%";
       this.canvas.style.height = "100%";
     }
+    if (this.domSurfaceRoot) {
+      this.domSurfaceRoot.style.display = "block";
+      this.domSurfaceRoot.style.position = "relative";
+    }
+  }
+  get surfaceElement() {
+    return this.canvas ?? this.domSurfaceRoot;
   }
   applyVisibility() {
     this.element.hidden = !this.isVisible;
@@ -2483,6 +2780,9 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerDown = (event) => {
+      if (this.allowsNativeTextSelection(event)) {
+        return;
+      }
       const location = this.cellLocation(event);
       if (!location) {
         return;
@@ -2497,6 +2797,9 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
+      if (!this.hasCapturedPointer && this.allowsNativeTextSelection(event)) {
+        return;
+      }
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       this.terminalMount.releasePointerCapture?.(event.pointerId);
       this.hasCapturedPointer = false;
@@ -2513,6 +2816,9 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
+      if (!this.hasCapturedPointer && this.allowsNativeTextSelection(event)) {
+        return;
+      }
       const location = event.buttons && this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       if (!location) {
         return;
@@ -2561,7 +2867,7 @@ class WebHostSceneRuntime {
     this.columns = nextColumns;
     this.rows = nextRows;
     this.sendResizeIfNeeded();
-    this.resizeCanvas();
+    this.resizeSurface();
   }
   sendResizeIfNeeded() {
     const current = {
@@ -2576,12 +2882,22 @@ class WebHostSceneRuntime {
     this.lastSentResize = current;
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
-  resizeCanvas() {
+  resizeSurface() {
+    const cssWidth = Math.max(1, this.columns * this.cellWidth);
+    const cssHeight = Math.max(1, this.rows * this.cellHeight);
+    if (this.domSurfaceRoot) {
+      const last = this.lastDomSurfaceSize;
+      if (last && last.width === cssWidth && last.height === cssHeight) {
+        return false;
+      }
+      this.lastDomSurfaceSize = { width: cssWidth, height: cssHeight };
+      this.domSurfaceRoot.style.width = `${cssWidth}px`;
+      this.domSurfaceRoot.style.height = `${cssHeight}px`;
+      return true;
+    }
     if (!this.canvas) {
       return false;
     }
-    const cssWidth = Math.max(1, this.columns * this.cellWidth);
-    const cssHeight = Math.max(1, this.rows * this.cellHeight);
     const scale = globalThis.window?.devicePixelRatio || 1;
     const width = Math.ceil(cssWidth * scale);
     const height = Math.ceil(cssHeight * scale);
@@ -2634,12 +2950,15 @@ class WebHostSceneRuntime {
   }
   pointerMetrics() {
     return {
-      rect: this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.(),
+      rect: this.surfaceElement?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.(),
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight,
       columns: this.columns,
       rows: this.rows
     };
+  }
+  allowsNativeTextSelection(event) {
+    return this.rendererKind === "dom" && event.altKey;
   }
   cellLocation(event) {
     return cellLocationForEvent(event, this.pointerMetrics());
@@ -2663,7 +2982,8 @@ async function createWebHostApp(options) {
     createElement: options.createElement,
     sceneRuntimeFactory: options.sceneRuntimeFactory ?? ((runtimeOptions) => new WebHostSceneRuntime(runtimeOptions)),
     suspendHiddenScenes: options.suspendHiddenScenes,
-    visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument()
+    visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument(),
+    renderer: options.renderer
   });
   await controller.initialize();
   return controller;
@@ -2682,6 +3002,7 @@ class InternalWebHostAppController {
   runtimes = new Map;
   bridges = new Map;
   suspendHiddenScenes;
+  renderer;
   visibilityDocument;
   detachVisibilityListener;
   constructor(options) {
@@ -2692,6 +3013,7 @@ class InternalWebHostAppController {
     this.bridgeFactory = options.bridgeFactory;
     this.sceneRuntimeFactory = options.sceneRuntimeFactory;
     this.suspendHiddenScenes = options.suspendHiddenScenes;
+    this.renderer = options.renderer;
     this.visibilityDocument = options.visibilityDocument;
     this.scenes = options.manifest.scenes;
     this.selectedSceneId = options.initialSceneId && options.manifest.scenes.some((scene) => scene.id === options.initialSceneId) ? options.initialSceneId : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ?? options.manifest.defaultSceneId;
@@ -2770,7 +3092,8 @@ class InternalWebHostAppController {
       style: this.style,
       bridge,
       onInput: (chunk) => bridge.sendInput(chunk),
-      suspendWhenHidden: this.suspendHiddenScenes
+      suspendWhenHidden: this.suspendHiddenScenes,
+      renderer: this.renderer
     });
     this.bridges.set(id, bridge);
     this.runtimes.set(id, runtime);
@@ -2856,6 +3179,7 @@ async function bootstrap() {
     manifestUrl,
     initialSceneId: config.initialSceneId,
     style: config.style,
+    renderer: config.renderer ?? rendererFromQuery(pageURL),
     embeddedHost: embeddedToken ? {
       token: embeddedToken,
       webSocketBaseURL: config.embeddedHost?.webSocketBaseURL ?? new URL("./", pageURL).href
@@ -2864,6 +3188,10 @@ async function bootstrap() {
   window.__WEBTUI_APP__ = controller;
 }
 bootstrap();
+function rendererFromQuery(pageURL) {
+  const renderer = pageURL.searchParams.get("renderer");
+  return renderer === "dom" || renderer === "canvas" ? renderer : undefined;
+}
 function tokenizedURL(value, token) {
   if (!token) {
     return value;
