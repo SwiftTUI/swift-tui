@@ -123,8 +123,12 @@ struct NavigationCollectionsTabSwitchTests {
     try harness.pumpExternalWakeFrames(4)
 
     // External wakes re-resolve the whole plan (the empty-invalidation
-    // reuse denial — the -002 Stage-0 idle attribution), so the pane's lazy
-    // stacks rebuild their indexed sources each wake with unchanged data:
+    // reuse denial) BECAUSE this harness deliberately keeps the bare shape:
+    // selective evaluation is never enabled here, so wake frames root-
+    // evaluate — the composed shape fast-paths idle wakes instead (see
+    // composedIdleWakesHitNothingDirtyFastPath below). Under the root
+    // evaluation, the pane's lazy stacks rebuild their indexed sources each
+    // wake with unchanged data:
     // every rebuild must adopt the retained identity artifacts. A nil
     // `ViewNodeContext.current` at declaration time would silently
     // fresh-mint every frame — correct output, decorative retention. If
@@ -142,6 +146,65 @@ struct NavigationCollectionsTabSwitchTests {
       adoption silently disengaged
       """
     )
+  }
+
+  /// Wake-frame reuse certification (proposal 2026-07-21-001, closed via
+  /// Exit A): on the composed runtime shape — selective evaluation enabled,
+  /// as `RunLoop.run()` configures it after the first render — idle external
+  /// wakes must hit the nothing-dirty fast path (zero evaluated nodes) in
+  /// every presentation steady state: source authored but never active,
+  /// sheet steadily open, and after dismissal (once the bounded close
+  /// cascade drained inside the click's own renders). The historical
+  /// "external wakes deny retained reuse tree-wide" measurements (-002
+  /// Stage 0, 181 computed/wake; 2026-07-21-001 Stage 0, 126/wake) were
+  /// probe-harness artifacts: the bare harness never enables selective
+  /// evaluation, so every frame — wakes included — force-queues the portal
+  /// root and resolves from the root under an empty invalidation set. The
+  /// F145 probe test above deliberately keeps that bare shape.
+  @Test("composed-shape idle wakes hit the nothing-dirty fast path")
+  func composedIdleWakesHitNothingDirtyFastPath() async throws {
+    let harness = try NavCollectionsTabHarness()
+    defer { harness.shutdown() }
+
+    harness.runLoop.renderer.enableSelectiveEvaluation()
+    try harness.clickText("NavTab")
+    try await harness.renderDeadlineFrames(within: .milliseconds(200))
+
+    func expectFastPathWakes(_ state: Comment) throws {
+      for _ in 0..<4 {
+        try harness.pumpExternalWakeFrames(1)
+        let evaluated = harness.runLoop.renderer.viewGraph.evaluatedNodeIDsThisFrame
+        #expect(
+          evaluated.isEmpty,
+          "\(state): an idle wake evaluated \(evaluated.count) node(s)"
+        )
+      }
+    }
+
+    try expectFastPathWakes("never-opened sheet")
+
+    try harness.clickText("OpenPalette")
+    #expect(
+      harness.frame.contains("palette-pane"),
+      "the sheet must open; frame:\n\(harness.frame)"
+    )
+    // Sanity for the pin currency: the open transition itself must have
+    // evaluated nodes — an accessor regression would otherwise make every
+    // emptiness assertion below pass vacuously.
+    #expect(
+      !harness.runLoop.renderer.viewGraph.evaluatedNodeIDsThisFrame.isEmpty,
+      "the sheet-open frame must evaluate nodes"
+    )
+    try await harness.renderDeadlineFrames(within: .milliseconds(200))
+    try expectFastPathWakes("steadily-open sheet")
+
+    try harness.clickText("ClosePalette")
+    #expect(
+      !harness.frame.contains("palette-pane"),
+      "the sheet must close; frame:\n\(harness.frame)"
+    )
+    try await harness.renderDeadlineFrames(within: .milliseconds(200))
+    try expectFastPathWakes("dismissed sheet")
   }
 }
 
@@ -181,6 +244,10 @@ private struct NavCollectionsPane: View {
   @State private var selectedDoc = "overview"
   @State private var selectedTableRow = "queued"
   @State private var showingDetail = false
+  // Gallery-palette mirror: a portal-presentation emitter so the wake-frame
+  // fast-path pin can cover presentation steady states (never-opened,
+  // steadily open, dismissed).
+  @State private var showPalette = false
 
   var body: some View {
     NavigationStack {
@@ -238,6 +305,17 @@ private struct NavCollectionsPane: View {
           }
           Button("Open selected detail") {
             showingDetail = true
+          }
+          Button("OpenPalette") {
+            showPalette = true
+          }
+          .sheet(isPresented: $showPalette) {
+            VStack(alignment: .leading, spacing: 1) {
+              Text("palette-pane")
+              Button("ClosePalette") {
+                showPalette = false
+              }
+            }
           }
           Spacer(minLength: 0)
         }
