@@ -201,8 +201,8 @@ package enum HostWireSchema {
       .init(
         "compositing",
         web: .derived("pre-blended PNG payload replaces the raw source when compositing is set"),
-        android: .notSerialized(
-          "documented divergence: Android receives unblended payloads (no blend support yet)")
+        android: .derived(
+          "pre-blended PNG payload replaces the raw source when compositing is set (sourceKind precomposedPNG)")
       ),
     ],
     "AccessibilityNode": [

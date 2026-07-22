@@ -221,6 +221,38 @@ struct WebSurfaceWireTotalityTests {
     #expect(encoded == fixture)
   }
 
+  @Test("the canonical composited-image fixture matches the encoder output")
+  func compositedImageFixtureMatchesEncoderOutput() throws {
+    // `Fixtures/Transport/web-surface-composited-image.txt` byte-pins the
+    // image pre-blend contract: an attachment carrying `compositing` metadata
+    // is replaced on the wire by the deterministic blended PNG payload
+    // (stable `blend:png:` content-hash ID, blended bytes, visible bounds).
+    // swift-tui-web parses a byte-identical copy and the coordination root's
+    // transport_fixture_sync gate keeps the copies in lockstep. Regenerate
+    // with STUI_REGENERATE_TRANSPORT_FIXTURES=1.
+    let encoded = WebSurfaceFrameEncoder.encode(Self.compositedImageFrame())
+
+    // Red-proof that the pre-blend path engaged: a compositing-tagged
+    // attachment must emit the blended payload, not its raw source bytes.
+    let record = try Self.decodedSurfaceFrame(encoded)
+    let images = try #require(record["images"] as? [[String: Any]])
+    let imageID = try #require(images.first?["id"] as? String)
+    #expect(imageID.hasPrefix("blend:png:"))
+    #expect(images.first?["format"] as? String == "png")
+    #expect(images.first?["dataBase64"] != nil)
+
+    let url = Self.fixtureURL("web-surface-composited-image.txt")
+    if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+      try encoded
+        .replacingOccurrences(of: "\u{001E}", with: "\\u001E")
+        .write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    let fixture = try String(contentsOf: url, encoding: .utf8)
+      .replacingOccurrences(of: "\\u001E", with: "\u{001E}")
+    #expect(encoded == fixture)
+  }
+
   // MARK: - Fixtures
 
   private static func fixtureURL(
@@ -329,6 +361,44 @@ struct WebSurfaceWireTotalityTests {
           pixelSize: PixelSize(width: 1, height: 1)
         )
       ]
+    )
+  }
+
+  /// One compositing-tagged attachment over a captured blue backdrop. The
+  /// blend inputs are exact-arithmetic by construction (opaque red source,
+  /// `.normal` blend) so the blended PNG bytes are platform-stable and safe
+  /// to byte-freeze.
+  private static func compositedImageFrame() -> SemanticHostFrame {
+    let pngBytes = Self.redPixelPNGBytes()
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+    return SemanticHostFrame(
+      sequence: 41,
+      raster: RasterSurface(
+        size: CellSize(width: 2, height: 1),
+        cells: [[RasterCell(character: "i"), RasterCell(character: " ")]],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: Identity(components: ["root", "blend"]),
+            bounds: bounds,
+            source: .data(pngBytes),
+            resolvedReference: .embeddedImage(pngBytes),
+            pixelSize: PixelSize(width: 2, height: 2),
+            cellPixelSize: PixelSize(width: 2, height: 2),
+            scalingMode: .fit,
+            compositing: RasterImageCompositing(
+              blendMode: .normal,
+              destinationBackdrop: RasterImageBackdrop(
+                bounds: bounds,
+                cells: [RasterImageBackdropCell(backgroundColor: .blue)]
+              ),
+              cellPixelSize: PixelSize(width: 2, height: 2),
+              backdropSignature: 0xF18
+            )
+          )
+        ]
+      ),
+      semantics: SemanticSnapshot(),
+      focusedIdentity: nil
     )
   }
 

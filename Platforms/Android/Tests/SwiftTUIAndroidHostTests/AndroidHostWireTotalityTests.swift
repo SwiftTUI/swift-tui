@@ -113,6 +113,89 @@ func android_host_totality_fixture_matches_encoder_output() throws {
   #expect(encoded == fixture.trimmingCharacters(in: .newlines))
 }
 
+@Test
+func android_host_composited_image_fixture_matches_encoder_output() throws {
+  // `Fixtures/Transport/android-frame-composited-image.json` byte-pins the
+  // image pre-blend contract: a compositing-tagged attachment is replaced on
+  // the wire by the deterministic blended PNG payload, tagged
+  // `sourceKind:"precomposedPNG"` — the Android encoder pre-blends exactly
+  // like web (the manifest's old "unblended" divergence text was wrong).
+  // swift-tui-android's SwiftTUIFrameTest parses a byte-identical copy and
+  // the coordination root's transport_fixture_sync gate keeps the copies in
+  // lockstep. Regenerate with STUI_REGENERATE_TRANSPORT_FIXTURES=1.
+  let frame = compositedImageFrame()
+
+  // Red-proof that the pre-blend path engaged: the payload must be the
+  // blended PNG under its stable content-hash ID, not the raw source bytes.
+  let record = try decodedFrameSnapshot(frame)
+  let images = try #require(record["imageAttachments"] as? [[String: Any]])
+  #expect(images.first?["sourceKind"] as? String == "precomposedPNG")
+  let imageID = try #require(images.first?["id"] as? String)
+  #expect(imageID.hasPrefix("blend:png:"))
+  #expect(images.first?["payloadBase64"] != nil)
+
+  let encoded = String(decoding: try AndroidHostFrameEncoder.encode(frame), as: UTF8.self)
+  let url = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("Fixtures")
+    .appendingPathComponent("Transport")
+    .appendingPathComponent("android-frame-composited-image.json")
+
+  if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+    try (encoded + "\n").write(to: url, atomically: true, encoding: .utf8)
+  }
+
+  let fixture = try String(contentsOf: url, encoding: .utf8)
+  #expect(encoded == fixture.trimmingCharacters(in: .newlines))
+}
+
+/// One compositing-tagged attachment over a captured blue backdrop. The
+/// blend inputs are exact-arithmetic by construction (opaque red source,
+/// `.normal` blend) so the blended PNG bytes are platform-stable and safe to
+/// byte-freeze.
+private func compositedImageFrame() -> SemanticHostFrame {
+  let pngBytes: [UInt8] = Array(
+    Data(
+      base64Encoded:
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEElEQVR4AQEFAPr/AP8AAP8FAAH/+lyI0QAAAABJRU5ErkJggg=="
+    )!
+  )
+  let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
+  return SemanticHostFrame(
+    sequence: 41,
+    raster: RasterSurface(
+      size: CellSize(width: 2, height: 1),
+      cells: [[RasterCell(character: "i"), RasterCell(character: " ")]],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: Identity(components: ["root", "blend"]),
+          bounds: bounds,
+          source: .data(pngBytes),
+          resolvedReference: .embeddedImage(pngBytes),
+          pixelSize: PixelSize(width: 2, height: 2),
+          cellPixelSize: PixelSize(width: 2, height: 2),
+          scalingMode: .fit,
+          compositing: RasterImageCompositing(
+            blendMode: .normal,
+            destinationBackdrop: RasterImageBackdrop(
+              bounds: bounds,
+              cells: [RasterImageBackdropCell(backgroundColor: .blue)]
+            ),
+            cellPixelSize: PixelSize(width: 2, height: 2),
+            backdropSignature: 0xF18
+          )
+        )
+      ]
+    ),
+    semantics: SemanticSnapshot(),
+    focusedIdentity: nil
+  )
+}
+
 /// Every host-serialized field populated to a distinctive non-default value.
 /// Two cells cover the union of cell keys (a styled hyperlink lead and a
 /// continuation); two image attachments cover the union of image keys (an
