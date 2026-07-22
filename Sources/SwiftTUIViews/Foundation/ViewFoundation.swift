@@ -383,7 +383,7 @@ func resolveView<V: View>(
   let suppressesValueVerifiedReuse =
     suppressesRetainedReuse
     && context.effectiveSuppressesValueVerifiedReuse(at: context.identity)
-  if !stackLeanResolveProfile,
+  if !stackLeanResolveProfile || leanRetainedReuse,
     !context.withinChurnedSubtree,
     !suppressesRetainedReuse,
     let reused = context.viewGraph?.reusableSnapshot(

@@ -123,13 +123,21 @@ struct PerTickPresentCadenceTests {
   @MainActor
   @Test(
     "async disposal suppresses the held frame — the red-proof witness",
-    // Non-lean only: stack-lean frames carry drop blockers on every frame, so
-    // the visual-only disposal arm structurally never engages under the lean
-    // profile (Stage-0 live capture: 172/172 lean decisions `blocked`, zero
-    // drops/cancels — lean's only losses are scheduler intent fusion).
+    // Non-lean only: with reuse off (the bare stack-lean profile), every
+    // frame re-records its `.task` spine and carries drop blockers, so the
+    // visual-only disposal arm structurally never engages (Stage-0 live
+    // capture: 172/172 lean decisions `blocked`, zero drops/cancels —
+    // lean's only losses are scheduler intent fusion). Lean + retained
+    // reuse (`SWIFTTUI_LEAN_RETAINED_REUSE=1`) DOES re-enter the
+    // suppression family — measured in the bounded-depth-reuse Stage-2
+    // slice — but the lean pipeline's timing lands this harness's injected
+    // supersession in the pre-start-cancel arm (`cancelled_before_start`),
+    // not the completed-drop arm this witness pins, so the G4-specific
+    // red-proof stays a non-lean instrument. The shipped browser regime
+    // (`async-no-cancel`) disposes of neither arm by mode.
     .enabled(
       if: ProcessInfo.processInfo.environment["SWIFTTUI_STACK_LEAN_PROFILE"] != "1",
-      "lean-profile frames are never drop-eligible; the disposal arm under test is unreachable"
+      "lean-profile frames are never drop-eligible in this harness's arm; the G4 witness is a non-lean instrument"
     ),
     // A guard-on process soak (SWIFTTUI_PRESENTED_PROGRESS_GUARD=1) makes the
     // awaited drop structurally impossible — that inverse is exactly what
@@ -207,10 +215,13 @@ struct PerTickPresentCadenceTests {
     "the presented-progress guard closes the disposal arm under plain async",
     // Non-lean only, like the red-proof: this is its guard-on inverse on the
     // identical harness — the same held superseded frame that `.async` drops
-    // must commit when undelivered pixels block disposal.
+    // must commit when undelivered pixels block disposal. Under lean +
+    // retained reuse the harness's supersession lands in the pre-start-cancel
+    // arm instead (see the red-proof's trait note), so the guard's G4 arm
+    // stays a non-lean instrument.
     .enabled(
       if: ProcessInfo.processInfo.environment["SWIFTTUI_STACK_LEAN_PROFILE"] != "1",
-      "lean-profile frames are never drop-eligible; the guard has nothing to close"
+      "lean-profile frames are never drop-eligible in this harness's arm; the guard has nothing to close"
     )
   )
   func presentedProgressGuardClosesDisposalArm() async throws {

@@ -566,6 +566,17 @@ run_per_tick_cadence_depth_limit_lane() {
     --filter SwiftTUITests.PerTickPresentCadenceTests
 }
 
+# The lean + retained-reuse lane (bounded-depth-reuse program): the same
+# cadence suite plus the reuse-gate pin under the opt-in
+# `SWIFTTUI_LEAN_RETAINED_REUSE=1`, so the browser regime that re-enables
+# retained reuse under the stack-lean profile keeps native coverage. The
+# reuse-gate pin also runs (with inverted expectations) in the default and
+# bare-lean lanes — it is environment-adaptive.
+run_per_tick_cadence_lean_reuse_lane() {
+  SWIFTTUI_STACK_LEAN_PROFILE=1 SWIFTTUI_LEAN_RETAINED_REUSE=1 run_swift test \
+    --filter "SwiftTUITests.PerTickPresentCadenceTests|LeanRetainedReuseGateTests"
+}
+
 require_command() {
   name=$1
   if ! command -v "$name" >/dev/null 2>&1; then
@@ -887,6 +898,11 @@ run_function_step \
   "Run SwiftTUI per-tick present cadence tests (chunked resolve driver)" \
   "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
   run_per_tick_cadence_depth_limit_lane
+
+run_function_step \
+  "Run SwiftTUI per-tick present cadence tests (stack-lean + retained reuse)" \
+  "SWIFTTUI_STACK_LEAN_PROFILE=1 SWIFTTUI_LEAN_RETAINED_REUSE=1 $(swift_command_text test --filter 'SwiftTUITests.PerTickPresentCadenceTests|LeanRetainedReuseGateTests')" \
+  run_per_tick_cadence_lean_reuse_lane
 
 # Isolated like the other held-tail suites: the draft-window test parks a
 # frame-tail worker thread on the raster gate, and inside the parallel lane
