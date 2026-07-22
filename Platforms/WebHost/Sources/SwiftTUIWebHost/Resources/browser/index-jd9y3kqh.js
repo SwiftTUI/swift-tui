@@ -96,7 +96,7 @@ function stackProfileEnvironmentDefaults(capabilities) {
   if (capabilities.engine === "v8") {
     return { SWIFTTUI_STACK_LEAN_PROFILE: "0" };
   }
-  return {};
+  return { SWIFTTUI_LEAN_RETAINED_REUSE: "1" };
 }
 
 // src/WebHostTerminalStyle.ts
