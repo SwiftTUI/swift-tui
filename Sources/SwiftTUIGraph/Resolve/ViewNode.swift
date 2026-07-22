@@ -1525,11 +1525,22 @@ package final class ViewNode {
   package func restoreRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
+    // Explicit work list, never per-level recursion — this walk is subtree-
+    // height deep and reachable from reuse paths whose native-stack budget
+    // the chunked resolve driver does not bound (see the mirrored note on
+    // `ViewGraphRuntimeRegistrationRestorer.restoreResolvedSubtree`).
+    // Children push reversed to preserve the recursive walk's pre-order.
     var traversedNodes: Set<ObjectIdentifier> = []
-    restoreRuntimeRegistrations(
-      into: registrations,
-      traversedNodes: &traversedNodes
-    )
+    var work: [ViewNode] = [self]
+    while let current = work.popLast() {
+      guard traversedNodes.insert(ObjectIdentifier(current)).inserted else {
+        continue
+      }
+      current.restoreOwnRuntimeRegistrations(
+        into: registrations
+      )
+      work.append(contentsOf: current.children.reversed())
+    }
   }
 
   /// Adopts a departing node's recorded runtime registrations. Called when an
@@ -1581,27 +1592,6 @@ package final class ViewNode {
       return
     }
     registrations.restoreEffectRegistrations(from: registeredHandlers)
-  }
-
-  private func restoreRuntimeRegistrations(
-    into registrations: RuntimeRegistrationSet,
-    traversedNodes: inout Set<ObjectIdentifier>
-  ) {
-    let nodeID = ObjectIdentifier(self)
-    guard traversedNodes.insert(nodeID).inserted else {
-      return
-    }
-
-    restoreOwnRuntimeRegistrations(
-      into: registrations
-    )
-
-    for child in children {
-      child.restoreRuntimeRegistrations(
-        into: registrations,
-        traversedNodes: &traversedNodes
-      )
-    }
   }
 
   package func rebuildRuntimeRegistrations(
