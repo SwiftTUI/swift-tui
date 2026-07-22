@@ -144,6 +144,11 @@ public final class AndroidHostSceneHost {
   private let state: AndroidHostSceneHostStateBox
 
   @MainActor private var runTask: Task<Void, Never>?
+  @MainActor private var hasStartedScene = false
+  /// The Kotlin host's declared wire capabilities (``declareCapabilities``;
+  /// absence keeps the defaults — today's bytes). Nothing reads these for
+  /// emission yet — consumers arrive with the negotiated-emission stages.
+  @MainActor package private(set) var wireCapabilities = HostWireCapabilities()
 
   @MainActor
   public convenience init<A: App>(
@@ -238,11 +243,32 @@ public final class AndroidHostSceneHost {
     state.lastErrorDescription
   }
 
+  /// Declares the host's wire capabilities from a `caps`-shaped JSON object
+  /// (see `HostWireSchema.capabilityMappings` for the key set). Accepted
+  /// only before the scene starts — capability-gated emission must never
+  /// change shape mid-session. Returns whether the declaration was
+  /// accepted; a rejected or malformed declaration keeps the defaults,
+  /// which reproduce today's wire bytes exactly.
+  @MainActor
+  @discardableResult
+  public func declareCapabilities(
+    json: String
+  ) -> Bool {
+    guard !hasStartedScene,
+      let capabilities = HostWireCapabilities.fromDeclarationJSON(json)
+    else {
+      return false
+    }
+    wireCapabilities = capabilities
+    return true
+  }
+
   @MainActor
   public func start() {
     guard runTask == nil else {
       return
     }
+    hasStartedScene = true
 
     #if os(Android)
       runTask = Task.immediate { @MainActor [weak self] in

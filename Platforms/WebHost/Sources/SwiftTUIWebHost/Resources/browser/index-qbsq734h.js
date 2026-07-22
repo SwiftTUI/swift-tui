@@ -529,6 +529,10 @@ function encodeRenderStyleControlMessage(style) {
   return textEncoder.encode(`${recordPrefix}style:${encoded}
 `);
 }
+function encodeCapabilitiesControlMessage() {
+  return textEncoder.encode(`${recordPrefix}caps:{"maxWebSurfaceVersion":3,"acceptsDeltaFrames":true}
+`);
+}
 function encodeKeyInputMessage(input) {
   const modifiers = Math.max(0, Math.round(input.modifiers ?? 0));
   if (input.key === "character") {
@@ -807,6 +811,7 @@ class WebSocketSceneBridge {
     this.socket.addEventListener("message", this.handleMessage);
     this.socket.addEventListener("close", this.handleClose);
     this.socket.addEventListener("error", this.handleError);
+    this.sendInput(encodeCapabilitiesControlMessage());
   }
   bindOutput(sink) {
     this.sink = sink;

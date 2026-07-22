@@ -59,6 +59,10 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
 package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(CellSize, cellPixelSize: PixelSize?)
   case style(TerminalRenderStyle)
+  /// A host capability declaration (`caps:{json}`), sent once by the
+  /// WebSocket client after open. Absence means ``HostWireCapabilities``
+  /// defaults — today's bytes. See `HostWireSchema.capabilityMappings`.
+  case capabilities(HostWireCapabilities)
 }
 
 // `WebSurfaceInputParser` — the incremental byte/command parser — lives in

@@ -94,6 +94,34 @@ struct HostWireSchemaContractTests {
     )
   }
 
+  @Test("capability mappings match HostWireCapabilities stored properties exactly")
+  func capabilityMappingsMatchStoredProperties() {
+    let stored = Set(
+      Mirror(reflecting: HostWireCapabilities()).children.compactMap(\.label)
+    )
+    let mapped = Set(HostWireSchema.capabilityMappings.map(\.field))
+    #expect(
+      stored == mapped,
+      """
+      HostWireCapabilities and HostWireSchema.capabilityMappings diverge. \
+      Unmapped stored properties (name each transport's ingress + default): \
+      \(stored.subtracting(mapped).sorted()). \
+      Mapped-but-gone properties (stale manifest entries): \
+      \(mapped.subtracting(stored).sorted()).
+      """
+    )
+  }
+
+  @Test("every capability mapping names its default and all three ingresses")
+  func capabilityMappingsCarryDefaultsAndIngresses() {
+    for mapping in HostWireSchema.capabilityMappings {
+      #expect(!mapping.defaultValue.isEmpty, "\(mapping.field): empty default")
+      #expect(!mapping.wasiIngress.isEmpty, "\(mapping.field): empty WASI ingress")
+      #expect(!mapping.webSocketIngress.isEmpty, "\(mapping.field): empty WebSocket ingress")
+      #expect(!mapping.androidIngress.isEmpty, "\(mapping.field): empty Android ingress")
+    }
+  }
+
   @Test("every not-serialized treatment carries a rationale")
   func notSerializedTreatmentsCarryRationales() {
     for (typeName, mappings) in HostWireSchema.sourceFieldMappings {

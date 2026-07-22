@@ -27,6 +27,56 @@ func android_host_scene_host_resizes_surface_and_pointer_capabilities() throws {
 
 @MainActor
 @Test
+func android_host_capability_declaration_is_pre_start_only() throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+
+  #expect(host.wireCapabilities == HostWireCapabilities())
+  #expect(!host.declareCapabilities(json: "not json"))
+  #expect(host.wireCapabilities == HostWireCapabilities())
+
+  #expect(
+    host.declareCapabilities(
+      json: "{\"acceptsDeltaFrames\":true,\"maxAndroidSchemaVersion\":3}"
+    )
+  )
+  #expect(
+    host.wireCapabilities
+      == HostWireCapabilities(acceptsDeltaFrames: true, maxAndroidSchemaVersion: 3)
+  )
+
+  // Capability-gated emission must never change shape mid-session: once the
+  // scene starts, further declarations are rejected and the accepted one
+  // stays.
+  host.start()
+  defer { host.stop() }
+  #expect(!host.declareCapabilities(json: "{\"maxAndroidSchemaVersion\":2}"))
+  #expect(
+    host.wireCapabilities
+      == HostWireCapabilities(acceptsDeltaFrames: true, maxAndroidSchemaVersion: 3)
+  )
+}
+
+@MainActor
+@Test
+func android_host_abi_declare_capabilities_round_trips() throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+
+  let declaration = Array("{\"acceptsDeltaFrames\":true}".utf8)
+  let accepted = unsafe declaration.withUnsafeBufferPointer { buffer in
+    unsafe swift_tui_android_declare_capabilities(
+      handle, buffer.baseAddress, Int32(buffer.count))
+  }
+
+  #expect(accepted == 1)
+  #expect(host.wireCapabilities == HostWireCapabilities(acceptsDeltaFrames: true))
+}
+
+@MainActor
+@Test
 func android_host_abi_start_publishes_first_frame_bytes() async throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
   let handle = AndroidHostHandleRegistry.register(host)

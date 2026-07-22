@@ -96,6 +96,16 @@ raster damage diff exists, steady-state frames ship as v3 `deltaRows` patches
 against the previously presented surface instead. Each transport conforms to
 the host-frame surface protocols rather than reaching into the renderer.
 
+Hosts declare wire capabilities before frames flow, carried by one Swift-side
+currency (`HostWireCapabilities`) with one ingress per transport: WASI resolves
+the `TUIGUI_SURFACE_DELTA` / `TUIGUI_SURFACE_MAX_VERSION` environment keys at
+transport construction, the browser WebSocket client sends a one-shot
+`caps:{json}` control record after open, and the Android host calls
+`declareCapabilities` before scene start. Absence of a declaration keeps the
+defaults — today's wire bytes — and no emission path reads the declarations
+yet. The canonical field/ingress manifest is
+`HostWireSchema.capabilityMappings`.
+
 ### Shared Raster Damage Contract
 
 All raster frontends consume the same damage contract: `RasterSurface` plus

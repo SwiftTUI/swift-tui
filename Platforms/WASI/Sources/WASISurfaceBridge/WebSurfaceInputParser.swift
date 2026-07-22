@@ -77,6 +77,9 @@ package struct WebSurfaceInputParser {
     if let style = parseStyleCommand(text) {
       return ([], [style])
     }
+    if let capabilities = parseCapsCommand(text) {
+      return ([], [capabilities])
+    }
     if let event = parseKeyCommand(text) ?? parseMouseCommand(text) ?? parsePasteCommand(text) {
       return ([event], [])
     }
@@ -128,6 +131,26 @@ package struct WebSurfaceInputParser {
       return nil
     }
     return .style(style)
+  }
+
+  private func parseCapsCommand(
+    _ text: String
+  ) -> WebSurfaceInputControlMessage? {
+    let prefix = "caps:"
+    guard text.hasPrefix(prefix) else {
+      return nil
+    }
+
+    // A malformed declaration falls through to the unknown-command drop and
+    // the session keeps the defaults — absence-means-today, never a failure.
+    guard
+      let capabilities = HostWireCapabilities.fromDeclarationJSON(
+        String(text.dropFirst(prefix.count))
+      )
+    else {
+      return nil
+    }
+    return .capabilities(capabilities)
   }
 
   private func parseKeyCommand(

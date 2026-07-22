@@ -49,6 +49,30 @@ package func wasiSurfaceDeltaEnabled(
   }
 }
 
+/// Resolves the WASI browser host's ``HostWireCapabilities`` from the
+/// environment (the bridge owns the environment; caller-override wins —
+/// the `TERMUI_RENDER_MODE` precedent). `TUIGUI_SURFACE_DELTA` is the
+/// pre-existing delta opt-in and maps onto `acceptsDeltaFrames` (implying
+/// `maxWebSurfaceVersion >= 3` — delta is a v3 record); an explicit
+/// `TUIGUI_SURFACE_MAX_VERSION` wins over that implication. Absent keys
+/// keep the defaults — today's bytes. See
+/// `HostWireSchema.capabilityMappings`.
+package func wasiHostWireCapabilities(
+  environmentValue: (String) -> String?
+) -> HostWireCapabilities {
+  var capabilities = HostWireCapabilities()
+  if wasiSurfaceDeltaEnabled(environmentValue: environmentValue) {
+    capabilities.acceptsDeltaFrames = true
+    capabilities.maxWebSurfaceVersion = max(capabilities.maxWebSurfaceVersion, 3)
+  }
+  if let raw = environmentValue("TUIGUI_SURFACE_MAX_VERSION"),
+    let value = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+  {
+    capabilities.maxWebSurfaceVersion = value
+  }
+  return capabilities
+}
+
 package func wasiFrameDiagnosticsEnabled(
   environmentValue: (String) -> String?
 ) -> Bool {
@@ -159,6 +183,9 @@ public enum WASIRunner {
           ?? .init(appearance: .fallback),
         deltaEncodingEnabled: wasiSurfaceDeltaEnabled { name in
           environmentValue(named: name)
+        },
+        wireCapabilities: wasiHostWireCapabilities { name in
+          environmentValue(named: name)
         }
       )
       let inputReader = WebSurfaceInputReader { message in
@@ -169,6 +196,11 @@ public enum WASIRunner {
         case .style(let style):
           host.updateStyle(style)
           signalReader.send("SIGWINCH")
+        case .capabilities:
+          // The WASI ingress is environment-owned (resolved above at
+          // transport construction); a stray caps record on stdin is not a
+          // declaration channel here.
+          break
         }
       }
 

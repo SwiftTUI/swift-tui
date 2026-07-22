@@ -34,6 +34,32 @@ struct WebSocketInputReaderTests {
     #expect(transport.pointerInputCapabilities.precision.isSubCell)
   }
 
+  @Test("a caps record declares wire capabilities on the transport")
+  func capsRecordDeclaresWireCapabilities() async throws {
+    let source = InMemoryByteSource()
+    let sink = RecordingInputTestSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 1, height: 1),
+      sink: sink
+    )
+    let reader = WebSocketInputReader(source: source, transport: transport)
+    let events = reader.inputEvents()
+    var iterator = events.makeAsyncIterator()
+
+    #expect(transport.wireCapabilities == HostWireCapabilities())
+
+    await source.yield(
+      "\u{001E}caps:{\"maxWebSurfaceVersion\":3,\"acceptsDeltaFrames\":true}\n"
+    )
+    await source.finish()
+
+    #expect(await iterator.next() == nil)
+    #expect(
+      transport.wireCapabilities
+        == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+    )
+  }
+
   @Test("key and paste input yield expected input events")
   func keyAndPasteInputYieldExpectedEvents() async throws {
     let source = InMemoryByteSource()

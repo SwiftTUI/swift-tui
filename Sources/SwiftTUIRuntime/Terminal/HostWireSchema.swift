@@ -394,6 +394,81 @@ package enum HostWireSchema {
     package static let sizeKeys: Set<String> = ["width", "height"]
   }
 
+  // MARK: - Capability declarations
+
+  /// One ``HostWireCapabilities`` field and its declaration ingress on each
+  /// transport. `field` must match the `Mirror` child label exactly —
+  /// `HostWireSchemaContractTests` asserts the mapping list matches the
+  /// struct's stored properties in both directions, so a capability cannot
+  /// be added without naming how every transport declares it.
+  package struct CapabilityMapping: Sendable {
+    package let field: String
+    /// The default's meaning is load-bearing: absence of a declaration must
+    /// reproduce today's bytes exactly.
+    package let defaultValue: String
+    /// WASI browser ingress (worker + JSPI): environment keys, resolved by
+    /// `wasiHostWireCapabilities` beside the transport-mode resolution.
+    package let wasiIngress: String
+    /// WebHost WebSocket ingress: the `caps:{json}` control record, sent
+    /// once by the client after open. Absence = defaults; unknown record
+    /// types are silently dropped by `WebSurfaceInputParser`, so a new
+    /// bundle against an old server degrades to defaults.
+    package let webSocketIngress: String
+    /// Android JNI ingress: the `declareCapabilities` host call, accepted
+    /// only before scene start. The JNI glue resolves the symbol lazily, so
+    /// a new AAR against an old host library degrades to defaults.
+    package let androidIngress: String
+
+    package init(
+      _ field: String,
+      defaultValue: String,
+      wasi: String,
+      webSocket: String,
+      android: String
+    ) {
+      self.field = field
+      self.defaultValue = defaultValue
+      wasiIngress = wasi
+      webSocketIngress = webSocket
+      androidIngress = android
+    }
+  }
+
+  /// The canonical capability manifest: every ``HostWireCapabilities``
+  /// field, its per-transport declaration ingress, and its
+  /// absence-means-today default. Nothing reads capabilities for emission
+  /// until a stage lands a negotiated consumer; declaring is always safe.
+  package static let capabilityMappings: [CapabilityMapping] = [
+    .init(
+      "maxWebSurfaceVersion",
+      defaultValue: "2",
+      wasi: "env TUIGUI_SURFACE_MAX_VERSION (explicit value wins over the TUIGUI_SURFACE_DELTA implication)",
+      webSocket: "caps record key maxWebSurfaceVersion",
+      android: "not applicable (Android hosts do not consume the web surface wire)"
+    ),
+    .init(
+      "acceptsDeltaFrames",
+      defaultValue: "false",
+      wasi: "env TUIGUI_SURFACE_DELTA (pre-existing opt-in; implies maxWebSurfaceVersion >= 3)",
+      webSocket: "caps record key acceptsDeltaFrames",
+      android: "declareCapabilities key acceptsDeltaFrames"
+    ),
+    .init(
+      "supportsResync",
+      defaultValue: "false",
+      wasi: "declarable via no env key yet (reload re-instantiates the in-process transport; resync is a socket-session concern)",
+      webSocket: "caps record key supportsResync",
+      android: "declareCapabilities key supportsResync"
+    ),
+    .init(
+      "maxAndroidSchemaVersion",
+      defaultValue: "2",
+      wasi: "not applicable (browser hosts do not consume the Android wire)",
+      webSocket: "not applicable (browser hosts do not consume the Android wire)",
+      android: "declareCapabilities key maxAndroidSchemaVersion"
+    ),
+  ]
+
   // MARK: - Shared wire tokens
 
   /// The focus-semantics wire token, shared by both host wires so the two

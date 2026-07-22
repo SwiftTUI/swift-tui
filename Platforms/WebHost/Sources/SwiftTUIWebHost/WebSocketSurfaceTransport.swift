@@ -34,6 +34,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
     var transmittedImageIDs: Set<String>
+    var wireCapabilities: HostWireCapabilities
   }
 
   private let state: Mutex<State>
@@ -61,9 +62,25 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: .cellOnly,
-        transmittedImageIDs: []
+        transmittedImageIDs: [],
+        wireCapabilities: HostWireCapabilities()
       )
     )
+  }
+
+  /// The client's declared wire capabilities (`caps:` control record;
+  /// absence keeps the defaults — today's bytes). Nothing reads these for
+  /// emission yet — consumers arrive with the negotiated-emission stages.
+  package var wireCapabilities: HostWireCapabilities {
+    state.withLock(\.wireCapabilities)
+  }
+
+  package func declareCapabilities(
+    _ capabilities: HostWireCapabilities
+  ) {
+    state.withLock { state in
+      state.wireCapabilities = capabilities
+    }
   }
 
   package var surfaceSize: CellSize {

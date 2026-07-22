@@ -1,3 +1,4 @@
+import SwiftTUIRuntime
 import Testing
 
 @testable import SwiftTUIWASI
@@ -34,6 +35,39 @@ struct WASIRunnerTests {
     #expect(wasiSurfaceDeltaEnabled(environmentValue: { _ in "0" }) == false)
     #expect(wasiSurfaceDeltaEnabled(environmentValue: { _ in "false" }) == false)
     #expect(wasiSurfaceDeltaEnabled(environmentValue: { _ in "off" }) == false)
+  }
+
+  @Test("env capability resolution: absence means today's defaults")
+  func wireCapabilitiesResolution() {
+    #expect(
+      wasiHostWireCapabilities(environmentValue: { _ in nil })
+        == HostWireCapabilities()
+    )
+    // The pre-existing delta opt-in maps onto acceptsDeltaFrames and implies
+    // the v3 record shape.
+    #expect(
+      wasiHostWireCapabilities(environmentValue: { name in
+        name == "TUIGUI_SURFACE_DELTA" ? "1" : nil
+      })
+        == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+    )
+    // An explicit max version wins over the delta implication.
+    #expect(
+      wasiHostWireCapabilities(environmentValue: { name in
+        switch name {
+        case "TUIGUI_SURFACE_DELTA": "1"
+        case "TUIGUI_SURFACE_MAX_VERSION": "2"
+        default: nil
+        }
+      })
+        == HostWireCapabilities(maxWebSurfaceVersion: 2, acceptsDeltaFrames: true)
+    )
+    #expect(
+      wasiHostWireCapabilities(environmentValue: { name in
+        name == "TUIGUI_SURFACE_MAX_VERSION" ? " 3 " : nil
+      })
+        == HostWireCapabilities(maxWebSurfaceVersion: 3)
+    )
   }
 
   @Test("frame diagnostics parser rejects falsey values")

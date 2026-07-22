@@ -166,6 +166,25 @@ public func swift_tui_android_send_input(
   }
 }
 
+@_cdecl("swift_tui_android_declare_capabilities")
+public func swift_tui_android_declare_capabilities(
+  _ handle: Int64,
+  _ bytes: UnsafePointer<UInt8>?,
+  _ count: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle),
+    let bytes = unsafe bytes,
+    count > 0
+  else {
+    return 0
+  }
+
+  let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
+  return withCheckedMainActorAccess("swift_tui_android_declare_capabilities") {
+    host.declareCapabilities(json: String(decoding: payload, as: UTF8.self)) ? 1 : 0
+  }
+}
+
 @_cdecl("swift_tui_android_copy_latest_frame")
 public func swift_tui_android_copy_latest_frame(
   _ handle: Int64,

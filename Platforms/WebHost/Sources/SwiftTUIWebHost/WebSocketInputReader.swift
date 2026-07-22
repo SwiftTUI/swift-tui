@@ -27,6 +27,8 @@ package final class WebSocketInputReader: TerminalInputReading, Sendable {
         transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
       case .style(let style):
         transport.updateStyle(style)
+      case .capabilities(let capabilities):
+        transport.declareCapabilities(capabilities)
       }
     }
   }

@@ -27,13 +27,21 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     supportsSynchronizedOutput: false
   )
 
+  /// The host's declared wire capabilities (WASI ingress: environment keys,
+  /// resolved at construction). Nothing reads these for emission yet —
+  /// consumers arrive with the negotiated-emission stages; the delta opt-in
+  /// stays wired through `deltaEncodingEnabled` unchanged.
+  package let wireCapabilities: HostWireCapabilities
+
   package init(
     surfaceSize: CellSize,
     outputFileDescriptor: Int32 = webSurfaceStandardOutputFileDescriptor,
     renderStyle: TerminalRenderStyle,
-    deltaEncodingEnabled: Bool = false
+    deltaEncodingEnabled: Bool = false,
+    wireCapabilities: HostWireCapabilities = HostWireCapabilities()
   ) {
     self.outputFileDescriptor = outputFileDescriptor
+    self.wireCapabilities = wireCapabilities
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
