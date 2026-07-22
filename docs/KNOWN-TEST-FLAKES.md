@@ -246,7 +246,7 @@ recognizer emits two singles instead of one double.
 
 **Where it surfaces.** The `Linux repo gate (amd64)` lane under the full
 parallel `swift test` run. Firings: 2026-07-21 run 29871856849 (the
-`0.1.13` tag, 284 s) and run 29878019612 (`a3581786`, 279 s) — the second
+`0.1.15` tag, 284 s) and run 29878019612 (`a3581786`, 279 s) — the second
 firing met entry 6's register-on-recurrence criterion (that entry's
 `feb28468` companion observation was this same decomposition).
 

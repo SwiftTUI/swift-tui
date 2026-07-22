@@ -8,6 +8,29 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-07-22
+
+### Added
+
+- **Retained reuse under the stack-lean profile** (opt-in
+  `SWIFTTUI_LEAN_RETAINED_REUSE=1`): the browser/WASI stack-lean resolve
+  profile can now re-enable the retained-reuse gate alone — a reuse hit
+  short-circuits the resolve descent, so it only ever shallows the frame
+  relative to the lean baseline; memoized reuse and selective evaluation
+  stay off. The runtime-registration restore walks are now explicit work
+  lists (never per-level recursion), which is what keeps the reuse-hit
+  restore inside the lean stack envelope for any tree depth. Measured on
+  WebKit against the granular-observation WebExample: steady worker
+  pipeline 27.6 → 10.8 ms/frame (resolve 20.5 → 5.5 ms). Browser hosts on
+  stack-lean engines enable the flag by default via `@swifttui/web`
+  0.1.15; terminal and native hosts are unaffected (the flag is inert
+  outside the lean profile).
+
+### Changed
+
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.15**,
+  carrying the lean-engine `SWIFTTUI_LEAN_RETAINED_REUSE=1` default.
+
 ## [0.1.13] - 2026-07-21
 
 ### Changed
