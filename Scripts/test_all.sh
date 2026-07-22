@@ -547,7 +547,8 @@ run_swift_runtime_tests_without_isolated_async_suites() {
     --skip AsyncLifecycleGenerationTests \
     --skip AsyncFrameTailRenderingTests \
     --skip TaskReadsUnbodiedStateTests \
-    --skip PerTickPresentCadenceTests
+    --skip PerTickPresentCadenceTests \
+    --skip ObservationDraftWindowRuntimeTests
 }
 
 # The per-tick cadence suite re-runs under the WASI-shaped mode profiles so
@@ -887,9 +888,19 @@ run_function_step \
   "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
   run_per_tick_cadence_depth_limit_lane
 
+# Isolated like the other held-tail suites: the draft-window test parks a
+# frame-tail worker thread on the raster gate, and inside the parallel lane
+# that thread hold starves scheduling-sensitive siblings (observed: stress
+# cancellation 020's yield-budget settle losing its producer thread in the
+# Linux container lane).
+run_function_step \
+  "Run SwiftTUI observation draft-window tests" \
+  "$(swift_command_text test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests)" \
+  run_swift test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests
+
 run_function_step \
   "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests)" \
+  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
   run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
 
 run_function_step \

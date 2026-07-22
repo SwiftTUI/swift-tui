@@ -29,6 +29,16 @@ package final class ObservationBridge: Equatable {
   private weak var invalidator: (any Invalidating)?
   private weak var viewGraph: ViewGraph?
   private weak var activeDraft: ObservationBridgeDraft?
+  /// Held fires from registrations armed by a still-unpublished draft (their
+  /// pass is newer than anything published — the frame's async tail is in
+  /// flight). Promoted to real invalidations when their draft publishes,
+  /// suppressed when it discards. Losing these outright deafens the identity
+  /// permanently: the fire consumed the one-shot, so without the promoted
+  /// invalidation no frame ever re-arms tracking (the amd64 stack-lean
+  /// cadence stall — frame latency ≥ writer cadence puts every next write
+  /// inside the window).
+  private nonisolated let draftWindowChanges = Mutex<[PendingObservationChange]>([])
+
   /// Off-main change marshaling (F162): `onChange` appends here from any
   /// executor; the MainActor bookkeeping (pass-staleness filter + dirty
   /// queueing) drains at the next frame head via ``drainPendingChanges()``.
@@ -114,18 +124,42 @@ package final class ObservationBridge: Equatable {
     pass: UInt64
   ) {
     // The stale-callback filter runs at FIRE time, exactly like the old
-    // synchronous path: a superseded registration (re-rendered pass) or a
-    // never-published draft registration (aborted frame) must produce no
-    // wake and no invalidation — pass suppression is what keeps aborted
-    // drafts and repeated re-renders from looping the scheduler.
-    let isCurrent = passRecords.withLock { $0[identity]?.pass == pass }
-    guard isCurrent else {
+    // synchronous path — but it must discriminate by pass ORDER, not bare
+    // equality. An OLDER-than-published pass is a superseded registration
+    // (re-rendered, or an aborted lineage): no wake, no invalidation — pass
+    // suppression is what keeps aborted drafts and repeated re-renders from
+    // looping the scheduler. A NEWER-than-published pass (or an identity
+    // with no published record yet) is a registration armed by a draft
+    // still in flight: the fire consumed the one-shot, so the change must
+    // be HELD for the draft's commit/discard decision — dropping it here
+    // deafens the identity permanently once the draft publishes.
+    enum FireDisposition {
+      case current
+      case draftWindow
+      case superseded
+    }
+    let disposition = passRecords.withLock { records -> FireDisposition in
+      guard let published = records[identity]?.pass else {
+        return .draftWindow
+      }
+      if pass == published {
+        return .current
+      }
+      return pass > published ? .draftWindow : .superseded
+    }
+    switch disposition {
+    case .superseded:
       return
+    case .draftWindow:
+      draftWindowChanges.withLock { pen in
+        pen.append(.init(identity: identity, pass: pass))
+      }
+    case .current:
+      pendingChanges.withLock { pending in
+        pending.append(.init(identity: identity, pass: pass))
+      }
+      wakeInvalidator.withLock { $0.value }?.requestInvalidation(of: [identity])
     }
-    pendingChanges.withLock { pending in
-      pending.append(.init(identity: identity, pass: pass))
-    }
-    wakeInvalidator.withLock { $0.value }?.requestInvalidation(of: [identity])
   }
 
   /// Applies marshaled changes' MainActor bookkeeping — the graph dirty
@@ -209,6 +243,38 @@ package final class ObservationBridge: Equatable {
       }
     }
     viewGraph = draft.viewGraph
+    promoteDraftWindowChanges(publishedPass: draft.pass)
+  }
+
+  /// Held window fires whose draft just published become real invalidations:
+  /// the write raced the frame's async tail, its one-shot is consumed, and
+  /// only this promotion re-arms the identity (the next frame's resolve
+  /// re-tracks). Entries older than the published pass can never match a
+  /// future draft (passes only advance at publish) and are dropped; newer
+  /// entries belong to drafts still in flight and stay held.
+  private func promoteDraftWindowChanges(publishedPass: UInt64) {
+    let promoted = draftWindowChanges.withLock { pen -> [PendingObservationChange] in
+      let matching = pen.filter { $0.pass == publishedPass }
+      pen.removeAll { $0.pass <= publishedPass }
+      return matching
+    }
+    guard !promoted.isEmpty else {
+      return
+    }
+    pendingChanges.withLock { pending in
+      pending.append(contentsOf: promoted)
+    }
+    invalidator?.requestInvalidation(of: Set(promoted.map(\.identity)))
+  }
+
+  /// Discard-side twin of ``promoteDraftWindowChanges(publishedPass:)``: an
+  /// aborted draft's held window fires must produce no wake and no
+  /// invalidation (the load-bearing F162 suppression) — the aborted intent's
+  /// replay re-resolves and re-arms tracking independently.
+  fileprivate nonisolated func discardDraftWindowChanges(forPass pass: UInt64) {
+    draftWindowChanges.withLock { pen in
+      pen.removeAll { $0.pass == pass }
+    }
   }
 }
 
@@ -258,6 +324,7 @@ package final class ObservationBridgeDraft {
 
   package func discard() {
     precondition(!didCommit && !didDiscard)
+    bridge.discardDraftWindowChanges(forPass: pass)
     bridge.finishRecording(self)
     didDiscard = true
   }
@@ -283,6 +350,10 @@ extension ObservationBridge {
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     currentPass = checkpoint.currentPass
     passRecords.withLock { $0 = checkpoint.observedPasses }
+    // Held window fires reference passes from the rolled-back lineage; pass
+    // numbers can be re-minted after the restore, so stale holds must not
+    // survive to falsely match a future draft's publish.
+    draftWindowChanges.withLock { $0.removeAll() }
     invalidator = checkpoint.invalidator
     viewGraph = checkpoint.viewGraph
   }

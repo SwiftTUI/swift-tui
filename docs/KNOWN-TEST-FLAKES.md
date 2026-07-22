@@ -235,6 +235,32 @@ extra rows arrive as post-hand-off momentum ticks; if so, the fix is a
 settle-gated assertion (wait for scroll quiescence) rather than a fixed
 expected offset.
 
+### 7. `GestureRunLoopDispatchTests` — Exclusive tap inter-tap window expiry under parallel-gate starvation
+
+**Signature.** "Exclusive tap composition works through the full RunLoop
+mouse path" fails with exactly `(counts.double → 0) == 1` plus
+`(counts.single → 2) == 0` after a multi-hundred-second test duration
+(~279–284 s observed): under heavy parallel-gate starvation the double
+tap's second press lands after the 350 ms inter-tap window expires, so the
+recognizer emits two singles instead of one double.
+
+**Where it surfaces.** The `Linux repo gate (amd64)` lane under the full
+parallel `swift test` run. Firings: 2026-07-21 run 29871856849 (the
+`0.1.13` tag, 284 s) and run 29878019612 (`a3581786`, 279 s) — the second
+firing met entry 6's register-on-recurrence criterion (that entry's
+`feb28468` companion observation was this same decomposition).
+
+**Why this is not treated as a product regression.** The suite's waits are
+signal-native, but the inter-tap window is wall-clock by design (F158: the
+window resolves at recognizer construction). The test passes in isolation
+and on every other lane; the failure only appears when the test itself is
+starved for hundreds of seconds on the degraded amd64 runner class.
+
+**How to investigate / candidate hardening.** Drive the second tap through
+the `interTapWindowOverride` package seam (F158) so the gate-load wall
+clock cannot expire the window, or move the composed Exclusive leg to a
+solo lane (the entry-2 pattern).
+
 ---
 
 ## Fixed flakes
@@ -273,6 +299,14 @@ entry is closed.
 ScenarioSmokeTests`; instrument with the run-loop hang diagnostics
 (`STUI_HANG_DIAGNOSTICS`) to capture where the loop parks after the
 close-menu click; bisect the 2026-07-11 window if it reproduces.
+2026-07-21 update: a Rosetta amd64 container (`docker run --platform
+linux/amd64 swift:6.3.1` with the tree rsync'd out) deterministically
+reproduced the *other* amd64-only quiet stall (the stack-lean cadence
+lane; root-caused to observation draft-window deafness and fixed) — use
+the same container recipe to re-test this scenario. Note this harness
+runs `.sync` render mode, where the draft-window mechanism should not
+apply, so treat that fix as untested against this entry until the
+container run says otherwise.
 
 ### 3. `OffscreenFrameElisionRuntimeTests` — off-screen deadline tick (real-time deadline race) — FIXED 2026-05-30
 

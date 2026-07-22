@@ -71,4 +71,90 @@ struct ObservationOffMainMarshalTests {
     bridge.drainPendingChanges()
     #expect(scheduler.pendingInvalidatedIdentities.contains(identity))
   }
+
+  // MARK: Draft-window fires (the amd64 lean-lane deafness class)
+
+  // A registration armed during a draft carries the draft's pass, which is
+  // newer than anything published until the frame commits. A model write in
+  // that window fires (and consumes) the one-shot; dropping the fire outright
+  // permanently deafens observation for the identity — no invalidation, no
+  // next frame, no re-arm (the amd64 stack-lean cadence stall: frame latency
+  // ≥ writer cadence puts every next write inside the window).
+
+  @Test("a write landing in the draft window survives to invalidate at publish")
+  func draftWindowWritePromotesOnPublish() {
+    let bridge = ObservationBridge()
+    let scheduler = FrameScheduler()
+    bridge.attachInvalidator(scheduler)
+    let identity = Identity(components: ["draft-window-model"])
+    let model = MarshalModel()
+    // Prior frame's published registration, consumed by the write that would
+    // schedule the next frame (the steady-tick shape).
+    _ = bridge.track(identity: identity) { model.count }
+    model.count += 1
+    scheduler.reset()
+
+    // Next frame's head: the draft records the re-arm, then the head
+    // suspends for its async tail (the window).
+    let draft = bridge.makeDraft(attaching: nil)
+    _ = bridge.track(identity: identity) { model.count }
+    draft.suspendRecording()
+
+    // The window write: fires the draft-pass one-shot. It must be HELD, not
+    // dropped — but also not invalidate yet (an aborted draft must be able
+    // to suppress it, the F162 load-bearing behavior).
+    model.count += 1
+    #expect(!scheduler.pendingInvalidatedIdentities.contains(identity))
+
+    draft.resumeRecording()
+    draft.commit()
+    // Publish promotes the held write: the invalidation survives, so the
+    // next frame re-resolves and re-arms tracking.
+    #expect(scheduler.pendingInvalidatedIdentities.contains(identity))
+  }
+
+  @Test("a discarded draft still suppresses its window fires")
+  func discardedDraftSuppressesWindowFires() {
+    let bridge = ObservationBridge()
+    let scheduler = FrameScheduler()
+    bridge.attachInvalidator(scheduler)
+    let identity = Identity(components: ["draft-discard-model"])
+    let model = MarshalModel()
+    _ = bridge.track(identity: identity) { model.count }
+    model.count += 1
+    scheduler.reset()
+
+    let draft = bridge.makeDraft(attaching: nil)
+    _ = bridge.track(identity: identity) { model.count }
+    draft.suspendRecording()
+    model.count += 1
+
+    draft.discard()
+    // Aborted-draft suppression is load-bearing (F162): the never-published
+    // registration's fire produces no wake and no invalidation — the
+    // aborted intent's replay re-resolves and re-arms independently.
+    #expect(!scheduler.pendingInvalidatedIdentities.contains(identity))
+  }
+
+  @Test("a first-ever registration's window write also survives to publish")
+  func firstRegistrationWindowWritePromotesOnPublish() {
+    // The bootstrap shape: no published record exists yet for the identity,
+    // so the fire-time filter has no entry to compare against. It must hold
+    // the change for the draft's publish, not drop it.
+    let bridge = ObservationBridge()
+    let scheduler = FrameScheduler()
+    bridge.attachInvalidator(scheduler)
+    let identity = Identity(components: ["draft-bootstrap-model"])
+    let model = MarshalModel()
+
+    let draft = bridge.makeDraft(attaching: nil)
+    _ = bridge.track(identity: identity) { model.count }
+    draft.suspendRecording()
+    model.count += 1
+    #expect(!scheduler.pendingInvalidatedIdentities.contains(identity))
+
+    draft.resumeRecording()
+    draft.commit()
+    #expect(scheduler.pendingInvalidatedIdentities.contains(identity))
+  }
 }
