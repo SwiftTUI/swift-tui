@@ -1,4 +1,4 @@
-@_spi(Runners) package import SwiftTUIRuntime
+import SwiftTUICore
 
 // Web-surface image encoding.
 //

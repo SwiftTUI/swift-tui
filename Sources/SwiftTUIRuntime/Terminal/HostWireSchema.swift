@@ -297,7 +297,7 @@ package enum HostWireSchema {
     package static let fullFrameOptionalKeys: Set<String> = [
       "sequence", "damage", "accessibilityTree", "accessibilityAnnouncements",
       "scrollRegions", "links", "linkTargets", "focusPresentation",
-      "preferredGridWidth", "preferredGridHeight",
+      "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
     package static let deltaFrameKeys: Set<String> = [
       "version", "encoding", "width", "height", "styles", "deltaRows", "images",
@@ -306,7 +306,7 @@ package enum HostWireSchema {
     package static let deltaFrameOptionalKeys: Set<String> = [
       "sequence", "accessibilityTree", "accessibilityAnnouncements",
       "scrollRegions", "links", "linkTargets", "focusPresentation",
-      "preferredGridWidth", "preferredGridHeight",
+      "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
     package static let styleKeys: Set<String> = [
       "fg", "bg", "em", "underline", "strikethrough", "opacity",
@@ -332,6 +332,12 @@ package enum HostWireSchema {
     package static let focusPresentationKeys: Set<String> = [
       "focusedIdentity", "semantics", "prefersTextInput", "hasFocusedRegion",
     ]
+    /// Additive-optional: emitted only on streams whose host consumes a
+    /// runtime-owned appearance (the converged Android path).
+    package static let terminalStyleKeys: Set<String> = [
+      "foregroundColor", "backgroundColor", "tintColor",
+    ]
+    package static let colorKeys: Set<String> = ["hex"]
     /// `[x, text, spanWidth, styleIndex]` — FROZEN; see the tuple policy above.
     package static let cellTupleArity = 4
     /// `[rowIndex, runs]`.
@@ -444,7 +450,7 @@ package enum HostWireSchema {
       defaultValue: "2",
       wasi: "env TUIGUI_SURFACE_MAX_VERSION (explicit value wins over the TUIGUI_SURFACE_DELTA implication)",
       webSocket: "caps record key maxWebSurfaceVersion",
-      android: "not applicable (Android hosts do not consume the web surface wire)"
+      android: "declareCapabilities key maxWebSurfaceVersion (>= 2 selects the converged web-surface wire; absence keeps the legacy keyed-JSON frames)"
     ),
     .init(
       "acceptsDeltaFrames",

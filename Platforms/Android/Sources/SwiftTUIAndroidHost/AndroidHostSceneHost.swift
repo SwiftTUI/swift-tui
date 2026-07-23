@@ -16,6 +16,19 @@ private struct AndroidHostSceneHostState: Sendable {
   var encodedFrameSequence: UInt64?
   var encodedFrameCount = 0
   var latestEncodingErrorDescription: String?
+  // Converged web-surface emission (convergence proposal 2026-07-22-002
+  // Stage C1): non-nil once the Kotlin host's declaration selected the
+  // web-surface wire. The encoding state carries the transmit-once image
+  // set and, when delta was declared, the persistent style table and
+  // baseline.
+  var wireCapabilities = HostWireCapabilities()
+  var webEncodingState: HostWireEncodingState?
+  // Damage accumulated across committed-but-unconsumed frames: the poll
+  // model skips frames, so a consumed frame's own damage (relative to the
+  // previous COMMIT) under-covers the diff against the previous CONSUMED
+  // frame. `nil` while valid means full repaint. Reset per consumed encode.
+  var pendingDamage: PresentationDamage?
+  var hasPendingDamage = false
   var focusPresentation: FocusPresentation = .none
   var surfaceSize: CellSize
   var cellPixelSize: PixelSize?
@@ -77,7 +90,47 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       // Encoding is deferred to the copy path (encode-at-copy): the poll
       // model deliberately skips intermediate frames, so encoding here
       // would pay full serialization for frames no consumer ever sees.
+      // Damage accumulates so a later consumed frame's diff covers every
+      // skipped commit; any frame without damage means full repaint.
+      if state.hasPendingDamage {
+        state.pendingDamage = Self.unionDamage(state.pendingDamage, frame.rasterDamage)
+      } else {
+        state.pendingDamage = frame.rasterDamage
+        state.hasPendingDamage = true
+      }
     }
+  }
+
+  func declareWireCapabilities(
+    _ capabilities: HostWireCapabilities
+  ) {
+    state.withLock { state in
+      state.wireCapabilities = capabilities
+      state.webEncodingState =
+        capabilities.maxWebSurfaceVersion >= 2
+        ? HostWireEncodingState(
+          deltaEnabled: capabilities.acceptsDeltaFrames
+            && capabilities.maxWebSurfaceVersion >= 3
+        )
+        : nil
+    }
+  }
+
+  private static func unionDamage(
+    _ accumulated: PresentationDamage?,
+    _ next: PresentationDamage?
+  ) -> PresentationDamage? {
+    guard let accumulated, let next else {
+      // Either side demanding a full repaint keeps the union at full.
+      return nil
+    }
+    return PresentationDamage(
+      textRows: accumulated.textRows + next.textRows,
+      requiresFullTextRepaint: accumulated.requiresFullTextRepaint
+        || next.requiresFullTextRepaint,
+      requiresFullGraphicsReplay: accumulated.requiresFullGraphicsReplay
+        || next.requiresFullGraphicsReplay
+    )
   }
 
   /// Serves the latest frame's encoded bytes, encoding at most once per
@@ -92,20 +145,45 @@ private final class AndroidHostSceneHostStateBox: Sendable {
         return 0
       }
       if state.encodedFrameSequence != frame.sequence || state.encodedFrameBytes == nil {
-        do {
-          state.encodedFrameBytes = try AndroidHostFrameEncoder.encode(
-            frame,
-            style: state.encodingStyle ?? .default
+        let style = state.encodingStyle ?? .default
+        if var webEncodingState = state.webEncodingState {
+          // Converged web-surface emission: the accumulated damage makes the
+          // record's diff consumption-relative, which is what keeps delta
+          // records sound under the skipping poll (Stage C3).
+          let model = HostWireFrameModel(
+            surface: frame.raster,
+            sequence: frame.sequence,
+            semanticSnapshot: frame.semantics,
+            focusedIdentity: frame.focusedIdentity,
+            damage: state.hasPendingDamage ? state.pendingDamage : frame.rasterDamage,
+            preferredLayoutSize: frame.preferredLayoutSize,
+            terminalStyle: style.renderStyle
           )
+          let output = WebSurfaceFrameEncoder.encode(
+            model,
+            fallbackBackground: style.renderStyle.appearance.backgroundColor,
+            state: &webEncodingState
+          )
+          state.webEncodingState = webEncodingState
+          state.encodedFrameBytes = Array(output.utf8)
           state.encodedFrameSequence = frame.sequence
           state.encodedFrameCount += 1
           state.latestEncodingErrorDescription = nil
-        } catch {
-          state.encodedFrameBytes = nil
-          state.encodedFrameSequence = nil
-          state.latestEncodingErrorDescription = String(describing: error)
-          return 0
+        } else {
+          do {
+            state.encodedFrameBytes = try AndroidHostFrameEncoder.encode(frame, style: style)
+            state.encodedFrameSequence = frame.sequence
+            state.encodedFrameCount += 1
+            state.latestEncodingErrorDescription = nil
+          } catch {
+            state.encodedFrameBytes = nil
+            state.encodedFrameSequence = nil
+            state.latestEncodingErrorDescription = String(describing: error)
+            return 0
+          }
         }
+        state.pendingDamage = nil
+        state.hasPendingDamage = false
       }
       guard let bytes = state.encodedFrameBytes else {
         return 0
@@ -192,8 +270,10 @@ public final class AndroidHostSceneHost {
   @MainActor private var runTask: Task<Void, Never>?
   @MainActor private var hasStartedScene = false
   /// The Kotlin host's declared wire capabilities (``declareCapabilities``;
-  /// absence keeps the defaults — today's bytes). Nothing reads these for
-  /// emission yet — consumers arrive with the negotiated-emission stages.
+  /// absence keeps the defaults — today's bytes). A declared
+  /// `maxWebSurfaceVersion >= 2` selects the converged web-surface wire for
+  /// frame serialization; `>= 3` with delta acceptance enables delta
+  /// records.
   @MainActor package private(set) var wireCapabilities = HostWireCapabilities()
 
   @MainActor
@@ -316,6 +396,7 @@ public final class AndroidHostSceneHost {
       return false
     }
     wireCapabilities = capabilities
+    state.declareWireCapabilities(capabilities)
     return true
   }
 

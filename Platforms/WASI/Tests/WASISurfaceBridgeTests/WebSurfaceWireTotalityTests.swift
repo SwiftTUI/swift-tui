@@ -14,8 +14,16 @@ import Testing
 struct WebSurfaceWireTotalityTests {
   @Test("a fully-populated full frame emits exactly the manifest key sets")
   func fullFrameEmitsExactlyTheManifestSurface() throws {
+    var knownImageIDs: Set<String> = []
     let record = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(Self.fullyPopulatedFrame())
+      WebSurfaceFrameEncoder.encode(
+        HostWireFrameModel(
+          Self.fullyPopulatedFrame().hostProjection,
+          terminalStyle: Self.totalityTerminalStyle
+        ),
+        fallbackBackground: TerminalAppearance.fallback.backgroundColor,
+        knownImageIDs: &knownImageIDs
+      )
     )
 
     #expect(
@@ -75,6 +83,12 @@ struct WebSurfaceWireTotalityTests {
 
     #expect(record["preferredGridWidth"] as? Int == 9)
     #expect(record["preferredGridHeight"] as? Int == 8)
+
+    let terminalStyle = try #require(record["terminalStyle"] as? [String: Any])
+    #expect(Set(terminalStyle.keys) == HostWireSchema.WebWire.terminalStyleKeys)
+    let tintColor = try #require(terminalStyle["tintColor"] as? [String: Any])
+    #expect(Set(tintColor.keys) == HostWireSchema.WebWire.colorKeys)
+    #expect(tintColor["hex"] as? String == "#708090FF")
   }
 
   @Test("hyperlink cells emit deduplicated link targets and per-row runs")
@@ -107,16 +121,27 @@ struct WebSurfaceWireTotalityTests {
   @Test("a fully-populated delta frame emits exactly the manifest key sets")
   func deltaFrameEmitsExactlyTheManifestSurface() throws {
     var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.fullyPopulatedFrame(), state: &state)
+    _ = WebSurfaceFrameEncoder.encode(
+      HostWireFrameModel(
+        Self.fullyPopulatedFrame().hostProjection,
+        terminalStyle: Self.totalityTerminalStyle
+      ),
+      fallbackBackground: TerminalAppearance.fallback.backgroundColor,
+      state: &state
+    )
 
     let record = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
-        Self.fullyPopulatedFrame(
-          sequence: 100,
-          damage: PresentationDamage(
-            textRows: [PresentationDamage.TextRow(row: 0, columnRanges: [0..<2])]
-          )
+        HostWireFrameModel(
+          Self.fullyPopulatedFrame(
+            sequence: 100,
+            damage: PresentationDamage(
+              textRows: [PresentationDamage.TextRow(row: 0, columnRanges: [0..<2])]
+            )
+          ).hostProjection,
+          terminalStyle: Self.totalityTerminalStyle
         ),
+        fallbackBackground: TerminalAppearance.fallback.backgroundColor,
         state: &state
       )
     )
@@ -207,7 +232,15 @@ struct WebSurfaceWireTotalityTests {
     // propagate loudly to the sibling repo instead of silently drifting.
     // Regenerate with STUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
     // sync flow described in docs/DEVELOPMENT.md.
-    let encoded = WebSurfaceFrameEncoder.encode(Self.fullyPopulatedFrame())
+    var knownImageIDs: Set<String> = []
+    let encoded = WebSurfaceFrameEncoder.encode(
+      HostWireFrameModel(
+        Self.fullyPopulatedFrame().hostProjection,
+        terminalStyle: Self.totalityTerminalStyle
+      ),
+      fallbackBackground: TerminalAppearance.fallback.backgroundColor,
+      knownImageIDs: &knownImageIDs
+    )
     let url = Self.fixtureURL("web-surface-totality.txt")
 
     if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
@@ -268,6 +301,18 @@ struct WebSurfaceWireTotalityTests {
       .appendingPathComponent("Transport")
       .appendingPathComponent(filename)
   }
+
+  /// A distinctive resolved appearance for the terminalStyle additive key —
+  /// emitted only on streams whose host consumes a runtime-owned style (the
+  /// converged Android path); the browser-path tests above never pass one.
+  private static let totalityTerminalStyle = TerminalRenderStyle(
+    appearance: TerminalAppearance(
+      foregroundColor: try! .hex("#102030"),
+      backgroundColor: try! .hex("#405060"),
+      tintColor: try! .hex("#708090"),
+      source: .override
+    )
+  )
 
   /// Every host-serialized field populated to a distinctive non-default value,
   /// including the fields the web wire historically dropped: hyperlinks, a

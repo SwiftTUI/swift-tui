@@ -25,6 +25,11 @@ package struct HostWireFrameModel {
   /// semantic snapshot). Emission gates stay adapter-owned: web emits only
   /// when a focused identity exists; Android always emits.
   package let focusPresentation: FocusPresentation?
+  /// The resolved terminal appearance for hosts that consume a
+  /// runtime-owned style (the converged Android stream). Host config, not
+  /// frame content — `nil` everywhere the host owns its appearance, and the
+  /// encoder omits the additive key entirely.
+  package let terminalStyle: TerminalRenderStyle?
 
   // MARK: - Cell surface
 
@@ -122,7 +127,8 @@ package struct HostWireFrameModel {
   // MARK: - Construction
 
   package init(
-    _ projection: HostFrameProjection
+    _ projection: HostFrameProjection,
+    terminalStyle: TerminalRenderStyle? = nil
   ) {
     self.init(
       surface: projection.raster,
@@ -130,7 +136,8 @@ package struct HostWireFrameModel {
       semanticSnapshot: projection.semantics,
       focusedIdentity: projection.focusedIdentity,
       damage: projection.rasterDamage,
-      preferredLayoutSize: projection.preferredLayoutSize
+      preferredLayoutSize: projection.preferredLayoutSize,
+      terminalStyle: terminalStyle
     )
   }
 
@@ -140,7 +147,8 @@ package struct HostWireFrameModel {
     semanticSnapshot: SemanticSnapshot?,
     focusedIdentity: Identity?,
     damage: PresentationDamage?,
-    preferredLayoutSize: CellSize?
+    preferredLayoutSize: CellSize?,
+    terminalStyle: TerminalRenderStyle? = nil
   ) {
     self.sequence = sequence
     self.surface = surface
@@ -149,6 +157,7 @@ package struct HostWireFrameModel {
     self.focusedIdentity = focusedIdentity
     self.damage = damage
     focusPresentation = semanticSnapshot?.focusPresentation(for: focusedIdentity)
+    self.terminalStyle = terminalStyle
     accessibilityNodes = (semanticSnapshot?.accessibilityNodes ?? []).map { node in
       WireAccessibilityNode(node, focusedIdentity: focusedIdentity)
     }

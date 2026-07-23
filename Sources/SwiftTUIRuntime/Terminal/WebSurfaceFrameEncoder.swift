@@ -1,4 +1,4 @@
-@_spi(Runners) package import SwiftTUIRuntime
+import SwiftTUICore
 
 // `WebSurfaceImageFormat` and the image-attachment encoding cluster live in
 // `WebSurfaceImageEncoder.swift`. `encodeRect` and `jsonString` are widened to
@@ -9,7 +9,10 @@
 // (F18): every emitted value — traversal, style table, link runs, semantic
 // projections — is read from the model, while the RS-framed hand-rolled JSON
 // byte shape (key order, tuple arities, whitespace) stays owned here and
-// frozen by the transport fixtures.
+// frozen by the transport fixtures. It lives in the runtime (not the WASI
+// bridge) because the wire is host-neutral: the WASI/WebHost transports and
+// the converged Android host all emit it (convergence proposal
+// 2026-07-22-002).
 
 package enum WebSurfaceFrameEncoder {
   package static func encodeClipboard(
@@ -92,7 +95,7 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ surface: RasterSurface,
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     encode(
       surface,
@@ -109,7 +112,7 @@ package enum WebSurfaceFrameEncoder {
     _ surface: RasterSurface,
     damage: PresentationDamage?,
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     encode(
       surface,
@@ -149,7 +152,7 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ frame: SemanticHostFrame,
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     encode(
       HostWireFrameModel(frame.hostProjection),
@@ -166,7 +169,7 @@ package enum WebSurfaceFrameEncoder {
     damage: PresentationDamage?,
     preferredLayoutSize: CellSize? = nil,
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     encode(
       HostWireFrameModel(
@@ -182,10 +185,10 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
-  private static func encode(
+  package static func encode(
     _ model: HostWireFrameModel,
     fallbackBackground: Color,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     guard state.deltaEnabled else {
       return encode(
@@ -216,7 +219,7 @@ package enum WebSurfaceFrameEncoder {
     }
   }
 
-  private static func encode(
+  package static func encode(
     _ model: HostWireFrameModel,
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>
@@ -296,7 +299,7 @@ package enum WebSurfaceFrameEncoder {
     _ model: HostWireFrameModel,
     damage: PresentationDamage,
     fallbackBackground: Color,
-    state: inout WebSurfaceFrameEncodingState
+    state: inout HostWireEncodingState
   ) -> String {
     let deltaRows = model.deltaRowIndexes.map { rowIndex in
       "[\(rowIndex),\(encodeRow(model.surface.cells[rowIndex], interningInto: &state.persistentStyles))]"
@@ -371,7 +374,25 @@ package enum WebSurfaceFrameEncoder {
       json += ",\"preferredGridWidth\":\(preferredLayoutSize.width)"
       json += ",\"preferredGridHeight\":\(preferredLayoutSize.height)"
     }
+    if let terminalStyle = model.terminalStyle {
+      json += ",\"terminalStyle\":\(encodeTerminalStyle(terminalStyle))"
+    }
     return json
+  }
+
+  /// The resolved terminal appearance, emitted only on streams whose host
+  /// consumes a runtime-owned style (the converged Android path); browser
+  /// hosts own their appearance and never receive the key, so browser-path
+  /// bytes are unchanged. Additive-optional per the wire-evolution policy.
+  private static func encodeTerminalStyle(
+    _ style: TerminalRenderStyle
+  ) -> String {
+    let appearance = style.appearance
+    return "{"
+      + "\"foregroundColor\":{\"hex\":\(jsonString(appearance.foregroundColor.hexString(format: .rrggbbaa)))},"
+      + "\"backgroundColor\":{\"hex\":\(jsonString(appearance.backgroundColor.hexString(format: .rrggbbaa)))},"
+      + "\"tintColor\":{\"hex\":\(jsonString(appearance.tintColor.hexString(format: .rrggbbaa)))}"
+      + "}"
   }
 
   /// Per-row hyperlink runs plus a deduplicated URL table. The run and
