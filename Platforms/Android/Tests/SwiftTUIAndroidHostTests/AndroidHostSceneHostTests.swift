@@ -77,6 +77,46 @@ func android_host_abi_declare_capabilities_round_trips() throws {
 
 @MainActor
 @Test
+func android_host_encodes_frames_only_at_consumption() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+
+  swift_tui_android_start(handle)
+  _ = await host.surface.waitForFrame { frame in
+    rasterText(in: frame).contains("Android")
+  }
+  await Task.yield()
+
+  // Encode-at-copy: a committed-but-unconsumed frame is never serialized —
+  // the poll model deliberately skips frames, and skipped frames must not
+  // pay encoding (convergence proposal 2026-07-22-002, Stage C0).
+  #expect(host.consumedFrameEncodeCount == 0)
+  #expect(host.latestFrameBytes == nil)
+
+  // The two-phase ABI handshake (size query, then copy) encodes exactly
+  // once for the consumed frame.
+  let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
+  #expect(required > 0)
+  #expect(host.consumedFrameEncodeCount == 1)
+
+  var bytes = [UInt8](repeating: 0, count: Int(required))
+  let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
+  }
+  #expect(copied == required)
+  #expect(host.consumedFrameEncodeCount == 1)
+
+  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
+  #expect(snapshot.rows.joined(separator: "\n").contains("Android"))
+
+  swift_tui_android_stop(handle)
+}
+
+@MainActor
+@Test
 func android_host_abi_start_publishes_first_frame_bytes() async throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
   let handle = AndroidHostHandleRegistry.register(host)

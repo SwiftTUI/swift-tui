@@ -7,7 +7,14 @@ import Synchronization
 
 private struct AndroidHostSceneHostState: Sendable {
   var latestFrame: SemanticHostFrame?
-  var latestFrameBytes: [UInt8]?
+  var encodingStyle: AndroidHostStyle?
+  // Encode-at-copy scratch: the bytes of the last frame a consumer actually
+  // copied, keyed by that frame's sequence. Frames the host never polls are
+  // never encoded, and a future delta baseline tracks consumed frames by
+  // construction (convergence proposal 2026-07-22-002, Stage C0).
+  var encodedFrameBytes: [UInt8]?
+  var encodedFrameSequence: UInt64?
+  var encodedFrameCount = 0
   var latestEncodingErrorDescription: String?
   var focusPresentation: FocusPresentation = .none
   var surfaceSize: CellSize
@@ -33,7 +40,11 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   }
 
   var latestFrameBytes: [UInt8]? {
-    state.withLock(\.latestFrameBytes)
+    state.withLock(\.encodedFrameBytes)
+  }
+
+  var encodedFrameCount: Int {
+    state.withLock(\.encodedFrameCount)
   }
 
   var latestEncodingErrorDescription: String? {
@@ -62,13 +73,48 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   ) {
     state.withLock { state in
       state.latestFrame = frame
-      do {
-        state.latestFrameBytes = try AndroidHostFrameEncoder.encode(frame, style: style)
-        state.latestEncodingErrorDescription = nil
-      } catch {
-        state.latestFrameBytes = nil
-        state.latestEncodingErrorDescription = String(describing: error)
+      state.encodingStyle = style
+      // Encoding is deferred to the copy path (encode-at-copy): the poll
+      // model deliberately skips intermediate frames, so encoding here
+      // would pay full serialization for frames no consumer ever sees.
+    }
+  }
+
+  /// Serves the latest frame's encoded bytes, encoding at most once per
+  /// consumed frame: the two-phase ABI copy (size query, then copy) and
+  /// repeated polls of an unchanged frame all reuse the scratch.
+  func copyEncodedFrameBytes(
+    to outBuffer: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) -> Int {
+    state.withLock { state in
+      guard let frame = state.latestFrame else {
+        return 0
       }
+      if state.encodedFrameSequence != frame.sequence || state.encodedFrameBytes == nil {
+        do {
+          state.encodedFrameBytes = try AndroidHostFrameEncoder.encode(
+            frame,
+            style: state.encodingStyle ?? .default
+          )
+          state.encodedFrameSequence = frame.sequence
+          state.encodedFrameCount += 1
+          state.latestEncodingErrorDescription = nil
+        } catch {
+          state.encodedFrameBytes = nil
+          state.encodedFrameSequence = nil
+          state.latestEncodingErrorDescription = String(describing: error)
+          return 0
+        }
+      }
+      guard let bytes = state.encodedFrameBytes else {
+        return 0
+      }
+      guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
+        return bytes.count
+      }
+      unsafe outBuffer.update(from: bytes, count: bytes.count)
+      return bytes.count
     }
   }
 
@@ -219,8 +265,18 @@ public final class AndroidHostSceneHost {
     state.latestFrame
   }
 
+  /// The bytes of the last frame a consumer copied across the ABI. `nil`
+  /// until the host first consumes a frame — encoding happens at copy time
+  /// (encode-at-copy), so frames the poll skips are never serialized.
   public var latestFrameBytes: [UInt8]? {
     state.latestFrameBytes
+  }
+
+  /// How many distinct frames have been encoded for consumption — the
+  /// encode-at-copy test seam: committed-but-never-copied frames must not
+  /// advance it.
+  package var consumedFrameEncodeCount: Int {
+    state.encodedFrameCount
   }
 
   public var latestEncodingErrorDescription: String? {
@@ -367,14 +423,7 @@ public final class AndroidHostSceneHost {
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int
   ) -> Int {
-    guard let bytes = latestFrameBytes else {
-      return 0
-    }
-    guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
-      return bytes.count
-    }
-    unsafe outBuffer.update(from: bytes, count: bytes.count)
-    return bytes.count
+    unsafe state.copyEncodedFrameBytes(to: outBuffer, capacity: capacity)
   }
 
   /// Drains the latest app-requested clipboard text as UTF-8 bytes. The client
