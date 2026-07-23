@@ -4,6 +4,12 @@
 // `WebSurfaceImageEncoder.swift`. `encodeRect` and `jsonString` are widened to
 // `package` (still namespaced under `WebSurfaceFrameEncoder`) so that file can
 // reach them.
+//
+// This encoder is a *format adapter* over the shared `HostWireFrameModel`
+// (F18): every emitted value — traversal, style table, link runs, semantic
+// projections — is read from the model, while the RS-framed hand-rolled JSON
+// byte shape (key order, tuple arities, whitespace) stays owned here and
+// frozen by the transport fixtures.
 
 package enum WebSurfaceFrameEncoder {
   package static func encodeClipboard(
@@ -70,11 +76,14 @@ package enum WebSurfaceFrameEncoder {
     knownImageIDs: inout Set<String>
   ) -> String {
     encode(
-      surface,
-      sequence: nil,
-      semanticSnapshot: nil,
-      focusedIdentity: nil,
-      damage: damage,
+      HostWireFrameModel(
+        surface: surface,
+        sequence: nil,
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: damage,
+        preferredLayoutSize: nil
+      ),
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
@@ -130,14 +139,8 @@ package enum WebSurfaceFrameEncoder {
   ) -> String {
     // Decompose the frame through the shared host-content projection so the
     // host-serialized field set lives in one place (see `HostFrameProjection`).
-    let projection = frame.hostProjection
-    return encode(
-      projection.raster,
-      sequence: projection.sequence,
-      semanticSnapshot: projection.semantics,
-      focusedIdentity: projection.focusedIdentity,
-      damage: projection.rasterDamage,
-      preferredLayoutSize: projection.preferredLayoutSize,
+    encode(
+      HostWireFrameModel(frame.hostProjection),
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     )
@@ -148,14 +151,8 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
-    let projection = frame.hostProjection
-    return encode(
-      projection.raster,
-      sequence: projection.sequence,
-      semanticSnapshot: projection.semantics,
-      focusedIdentity: projection.focusedIdentity,
-      damage: projection.rasterDamage,
-      preferredLayoutSize: projection.preferredLayoutSize,
+    encode(
+      HostWireFrameModel(frame.hostProjection),
       fallbackBackground: fallbackBackground,
       state: &state
     )
@@ -171,93 +168,93 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
-    guard state.deltaEnabled else {
-      return encode(
-        surface,
+    encode(
+      HostWireFrameModel(
+        surface: surface,
         sequence: sequence,
         semanticSnapshot: semanticSnapshot,
         focusedIdentity: focusedIdentity,
         damage: damage,
-        preferredLayoutSize: preferredLayoutSize,
-        fallbackBackground: fallbackBackground,
-        knownImageIDs: &state.knownImageIDs
-      )
-    }
-
-    guard let damage,
-      state.hasBaseline,
-      let baselineSize = state.baselineSize,
-      baselineSize == surface.size,
-      !damage.requiresFullTextRepaint,
-      !damage.requiresFullGraphicsReplay
-    else {
-      let output = encode(
-        surface,
-        sequence: sequence,
-        semanticSnapshot: semanticSnapshot,
-        focusedIdentity: focusedIdentity,
-        damage: damage,
-        preferredLayoutSize: preferredLayoutSize,
-        fallbackBackground: fallbackBackground,
-        knownImageIDs: &state.knownImageIDs
-      )
-      updateBaseline(for: surface, state: &state)
-      return output
-    }
-
-    let output = encodeDelta(
-      surface,
-      sequence: sequence,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      damage: damage,
-      preferredLayoutSize: preferredLayoutSize,
+        preferredLayoutSize: preferredLayoutSize
+      ),
       fallbackBackground: fallbackBackground,
       state: &state
     )
-    state.hasBaseline = true
-    state.baselineSize = surface.size
-    return output
   }
 
   private static func encode(
-    _ surface: RasterSurface,
-    sequence: UInt64?,
-    semanticSnapshot: SemanticSnapshot?,
-    focusedIdentity: Identity?,
-    damage: PresentationDamage?,
-    preferredLayoutSize: CellSize? = nil,
+    _ model: HostWireFrameModel,
+    fallbackBackground: Color,
+    state: inout WebSurfaceFrameEncodingState
+  ) -> String {
+    guard state.deltaEnabled else {
+      return encode(
+        model,
+        fallbackBackground: fallbackBackground,
+        knownImageIDs: &state.knownImageIDs
+      )
+    }
+
+    switch model.deltaDecision(for: state) {
+    case .full:
+      let full = encodeFull(
+        model,
+        fallbackBackground: fallbackBackground,
+        knownImageIDs: &state.knownImageIDs
+      )
+      state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
+      return full.output
+    case .delta(let damage):
+      let output = encodeDelta(
+        model,
+        damage: damage,
+        fallbackBackground: fallbackBackground,
+        state: &state
+      )
+      state.recordDeltaBaseline(gridSize: model.gridSize)
+      return output
+    }
+  }
+
+  private static func encode(
+    _ model: HostWireFrameModel,
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>
   ) -> String {
-    let encoded = encodedRowsAndStyles(for: surface)
-    let styles = encoded.styles
-    let rows = encoded.rows
-    let accessibilityTree = semanticSnapshot.map {
-      encodeAccessibilityTree(
-        $0.accessibilityNodes,
-        focusedIdentity: focusedIdentity
-      )
+    encodeFull(
+      model,
+      fallbackBackground: fallbackBackground,
+      knownImageIDs: &knownImageIDs
+    ).output
+  }
+
+  private static func encodeFull(
+    _ model: HostWireFrameModel,
+    fallbackBackground: Color,
+    knownImageIDs: inout Set<String>
+  ) -> (output: String, styles: [ResolvedTextStyle?]) {
+    var styles: [ResolvedTextStyle?] = [nil]
+    let rows = model.surface.cells.map { row in
+      encodeRow(row, interningInto: &styles)
     }
-    let accessibilityAnnouncements = semanticSnapshot.map {
-      encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
-    }
-    let scrollRegions = semanticSnapshot.map {
-      encodeScrollRegions($0.scrollRoutes)
-    }
+    let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
+    let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
+      model.accessibilityAnnouncements
+    )
+    let scrollRegions = encodeScrollRegions(model.scrollRegions)
     let hasV2Fields =
-      sequence != nil || accessibilityTree?.isEmpty == false
-      || accessibilityAnnouncements?.isEmpty == false
-      || scrollRegions?.isEmpty == false
+      model.sequence != nil || !accessibilityTree.isEmpty
+      || !accessibilityAnnouncements.isEmpty
+      || !scrollRegions.isEmpty
     let version = hasV2Fields ? 2 : 1
 
     var json = "\u{001E}surface:{"
     json += "\"version\":\(version)"
-    if let sequence {
+    if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }
-    json += ",\"width\":\(max(0, surface.size.width))"
-    json += ",\"height\":\(max(0, surface.size.height))"
+    json += ",\"width\":\(max(0, model.gridSize.width))"
+    json += ",\"height\":\(max(0, model.gridSize.height))"
     json += ",\"styles\":["
     json += styles.map(encodeStyle).joined(separator: ",")
     json += "]"
@@ -266,78 +263,58 @@ package enum WebSurfaceFrameEncoder {
     json += "]"
     json += ",\"images\":["
     json += encodeImages(
-      surface.imageAttachments,
+      model.imageAttachments,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs
     ).joined(separator: ",")
     json += "]"
-    if let damage {
+    if let damage = model.damage {
       json += ",\"damage\":"
       json += encodeDamage(damage)
     }
-    if let accessibilityTree, !accessibilityTree.isEmpty {
+    if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")
       json += "]"
     }
-    if let accessibilityAnnouncements, !accessibilityAnnouncements.isEmpty {
+    if !accessibilityAnnouncements.isEmpty {
       json += ",\"accessibilityAnnouncements\":["
       json += accessibilityAnnouncements.joined(separator: ",")
       json += "]"
     }
-    if let scrollRegions, !scrollRegions.isEmpty {
+    if !scrollRegions.isEmpty {
       json += ",\"scrollRegions\":["
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
-    json += encodeAdditiveFields(
-      for: surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      preferredLayoutSize: preferredLayoutSize
-    )
+    json += encodeAdditiveFields(for: model)
     json += "}\n"
-    return json
+    return (json, styles)
   }
 
   private static func encodeDelta(
-    _ surface: RasterSurface,
-    sequence: UInt64?,
-    semanticSnapshot: SemanticSnapshot?,
-    focusedIdentity: Identity?,
+    _ model: HostWireFrameModel,
     damage: PresentationDamage,
-    preferredLayoutSize: CellSize? = nil,
     fallbackBackground: Color,
     state: inout WebSurfaceFrameEncodingState
   ) -> String {
-    let rowIndexes = uniqueSortedRowIndexes(
-      from: damage,
-      height: surface.size.height
+    let deltaRows = model.deltaRowIndexes.map { rowIndex in
+      "[\(rowIndex),\(encodeRow(model.surface.cells[rowIndex], interningInto: &state.persistentStyles))]"
+    }
+    let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
+    let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
+      model.accessibilityAnnouncements
     )
-    let deltaRows = rowIndexes.map { rowIndex in
-      "[\(rowIndex),\(encodeRow(surface.cells[rowIndex], y: rowIndex, styles: &state.persistentStyles))]"
-    }
-    let accessibilityTree = semanticSnapshot.map {
-      encodeAccessibilityTree(
-        $0.accessibilityNodes,
-        focusedIdentity: focusedIdentity
-      )
-    }
-    let accessibilityAnnouncements = semanticSnapshot.map {
-      encodeAccessibilityAnnouncements($0.accessibilityAnnouncements)
-    }
-    let scrollRegions = semanticSnapshot.map {
-      encodeScrollRegions($0.scrollRoutes)
-    }
+    let scrollRegions = encodeScrollRegions(model.scrollRegions)
 
     var json = "\u{001E}surface:{"
     json += "\"version\":3"
     json += ",\"encoding\":\"delta\""
-    if let sequence {
+    if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }
-    json += ",\"width\":\(max(0, surface.size.width))"
-    json += ",\"height\":\(max(0, surface.size.height))"
+    json += ",\"width\":\(max(0, model.gridSize.width))"
+    json += ",\"height\":\(max(0, model.gridSize.height))"
     json += ",\"styles\":["
     json += state.persistentStyles.map(encodeStyle).joined(separator: ",")
     json += "]"
@@ -346,34 +323,29 @@ package enum WebSurfaceFrameEncoder {
     json += "]"
     json += ",\"images\":["
     json += encodeImages(
-      surface.imageAttachments,
+      model.imageAttachments,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &state.knownImageIDs
     ).joined(separator: ",")
     json += "]"
     json += ",\"damage\":"
     json += encodeDamage(damage)
-    if let accessibilityTree, !accessibilityTree.isEmpty {
+    if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")
       json += "]"
     }
-    if let accessibilityAnnouncements, !accessibilityAnnouncements.isEmpty {
+    if !accessibilityAnnouncements.isEmpty {
       json += ",\"accessibilityAnnouncements\":["
       json += accessibilityAnnouncements.joined(separator: ",")
       json += "]"
     }
-    if let scrollRegions, !scrollRegions.isEmpty {
+    if !scrollRegions.isEmpty {
       json += ",\"scrollRegions\":["
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
-    json += encodeAdditiveFields(
-      for: surface,
-      semanticSnapshot: semanticSnapshot,
-      focusedIdentity: focusedIdentity,
-      preferredLayoutSize: preferredLayoutSize
-    )
+    json += encodeAdditiveFields(for: model)
     json += "}\n"
     return json
   }
@@ -383,84 +355,44 @@ package enum WebSurfaceFrameEncoder {
   /// reject them, and none of them move the `version` literal — see the
   /// `HostWireSchema` wire-evolution policy.
   private static func encodeAdditiveFields(
-    for surface: RasterSurface,
-    semanticSnapshot: SemanticSnapshot?,
-    focusedIdentity: Identity?,
-    preferredLayoutSize: CellSize?
+    for model: HostWireFrameModel
   ) -> String {
     var json = ""
-    if let links = encodeLinks(for: surface) {
+    if let links = encodeLinks(for: model) {
       json += ",\"links\":[\(links.rows)]"
       json += ",\"linkTargets\":[\(links.targets)]"
     }
-    if let presentation = semanticSnapshot?.focusPresentation(for: focusedIdentity),
+    if let presentation = model.focusPresentation,
       presentation.focusedIdentity != nil
     {
       json += ",\"focusPresentation\":\(encodeFocusPresentation(presentation))"
     }
-    if let preferredLayoutSize {
+    if let preferredLayoutSize = model.preferredLayoutSize {
       json += ",\"preferredGridWidth\":\(preferredLayoutSize.width)"
       json += ",\"preferredGridHeight\":\(preferredLayoutSize.height)"
     }
     return json
   }
 
-  /// Per-row hyperlink runs plus a deduplicated URL table, derived from
-  /// consecutive same-target `RasterCell.hyperlink` values. Continuation cells
-  /// are covered by their lead cell's span, mirroring `encodeRow`.
+  /// Per-row hyperlink runs plus a deduplicated URL table. The run and
+  /// target derivation lives in `HostWireFrameModel`; this formats the
+  /// frozen `[y,[[start,span,target]…]]` tuple shape.
   private static func encodeLinks(
-    for surface: RasterSurface
+    for model: HostWireFrameModel
   ) -> (rows: String, targets: String)? {
-    var targets: [String] = []
-    var rows: [String] = []
-    for (y, row) in surface.cells.enumerated() {
-      var runs: [String] = []
-      var runStart = 0
-      var runSpan = 0
-      var runTarget = -1
-      func closeRun() {
-        guard runSpan > 0 else {
-          return
-        }
-        runs.append("[\(runStart),\(runSpan),\(runTarget)]")
-        runSpan = 0
-      }
-      for (x, cell) in row.enumerated() {
-        guard !cell.isContinuation else {
-          continue
-        }
-        guard let hyperlink = cell.hyperlink else {
-          closeRun()
-          continue
-        }
-        let target: Int
-        if let existing = targets.firstIndex(of: hyperlink) {
-          target = existing
-        } else {
-          targets.append(hyperlink)
-          target = targets.count - 1
-        }
-        let span = max(1, cell.spanWidth)
-        if runSpan > 0, runTarget == target, runStart + runSpan == x {
-          runSpan += span
-        } else {
-          closeRun()
-          runStart = x
-          runSpan = span
-          runTarget = target
-        }
-      }
-      closeRun()
-      if !runs.isEmpty {
-        rows.append("[\(y),[\(runs.joined(separator: ","))]]")
-      }
-    }
-    guard !rows.isEmpty else {
+    let table = model.linkTable()
+    guard !table.rows.isEmpty else {
       return nil
+    }
+    let rows = table.rows.map { row in
+      let runs = row.runs.map { run in
+        "[\(run.start),\(run.span),\(run.target)]"
+      }.joined(separator: ",")
+      return "[\(row.y),[\(runs)]]"
     }
     return (
       rows.joined(separator: ","),
-      targets.map(jsonString).joined(separator: ",")
+      table.targets.map(jsonString).joined(separator: ",")
     )
   }
 
@@ -476,38 +408,6 @@ package enum WebSurfaceFrameEncoder {
     fields.append("\"prefersTextInput\":\(presentation.prefersTextInput ? "true" : "false")")
     fields.append("\"hasFocusedRegion\":\(presentation.hasFocusedRegion ? "true" : "false")")
     return "{" + fields.joined(separator: ",") + "}"
-  }
-
-  private static func encodedRowsAndStyles(
-    for surface: RasterSurface
-  ) -> (rows: [String], styles: [ResolvedTextStyle?]) {
-    var styles: [ResolvedTextStyle?] = [nil]
-    let rows = surface.cells.enumerated().map { y, row in
-      encodeRow(
-        row,
-        y: y,
-        styles: &styles
-      )
-    }
-    return (rows, styles)
-  }
-
-  private static func updateBaseline(
-    for surface: RasterSurface,
-    state: inout WebSurfaceFrameEncodingState
-  ) {
-    state.persistentStyles = encodedRowsAndStyles(for: surface).styles
-    state.hasBaseline = true
-    state.baselineSize = surface.size
-  }
-
-  private static func uniqueSortedRowIndexes(
-    from damage: PresentationDamage,
-    height: Int
-  ) -> [Int] {
-    Array(Set(damage.textRows.map(\.row)))
-      .filter { $0 >= 0 && $0 < height }
-      .sorted()
   }
 
   private static func encodeDamage(
@@ -530,10 +430,13 @@ package enum WebSurfaceFrameEncoder {
     return "[\(row.row),[\(ranges)]]"
   }
 
+  /// One wire row: continuation cells are skipped (their lead cell's span
+  /// covers them) and each emitted cell's style is interned through the
+  /// shared `HostWireFrameModel.styleIndex` — the full path interns into the
+  /// frame table, the delta path into the persistent cross-frame table.
   private static func encodeRow(
     _ row: [RasterCell],
-    y _: Int,
-    styles: inout [ResolvedTextStyle?]
+    interningInto styles: inout [ResolvedTextStyle?]
   ) -> String {
     var encodedCells: [String] = []
     encodedCells.reserveCapacity(row.count)
@@ -542,7 +445,7 @@ package enum WebSurfaceFrameEncoder {
       guard !cell.isContinuation else {
         continue
       }
-      let styleIndex = index(of: cell.style, in: &styles)
+      let styleIndex = HostWireFrameModel.styleIndex(of: cell.style, in: &styles)
       encodedCells.append(
         "[\(x),\(jsonString(String(cell.character))),\(max(1, cell.spanWidth)),\(styleIndex)]"
       )
@@ -552,18 +455,17 @@ package enum WebSurfaceFrameEncoder {
   }
 
   private static func encodeAccessibilityTree(
-    _ nodes: [AccessibilityNode],
-    focusedIdentity: Identity?
+    _ nodes: [HostWireFrameModel.WireAccessibilityNode]
   ) -> [String] {
     nodes.map { node in
       var fields = [
-        "\"id\":\(jsonString(node.identity.path))",
+        "\"id\":\(jsonString(node.idPath))",
         "\"rect\":\(encodeRect(node.rect))",
-        "\"role\":\(jsonString(node.role.description))",
-        "\"isFocused\":\(node.identity == focusedIdentity ? "true" : "false")",
+        "\"role\":\(jsonString(node.roleToken))",
+        "\"isFocused\":\(node.isFocused ? "true" : "false")",
       ]
-      if let parentIdentity = node.parentIdentity {
-        fields.append("\"parentId\":\(jsonString(parentIdentity.path))")
+      if let parentIDPath = node.parentIDPath {
+        fields.append("\"parentId\":\(jsonString(parentIDPath))")
       }
       if let label = node.label {
         fields.append("\"label\":\(jsonString(label))")
@@ -574,8 +476,8 @@ package enum WebSurfaceFrameEncoder {
       if node.hidden {
         fields.append("\"hidden\":true")
       }
-      if let liveRegion = node.liveRegion {
-        fields.append("\"liveRegion\":\(jsonString(liveRegion.description))")
+      if let liveRegionToken = node.liveRegionToken {
+        fields.append("\"liveRegion\":\(jsonString(liveRegionToken))")
       }
       if let cursorAnchor = node.cursorAnchor {
         fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
@@ -591,25 +493,25 @@ package enum WebSurfaceFrameEncoder {
   /// to capture the wheel or let it chain to the page. See
   /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
   private static func encodeScrollRegions(
-    _ routes: [ScrollRoute]
+    _ regions: [HostWireFrameModel.WireScrollRegion]
   ) -> [String] {
-    routes.map { route in
+    regions.map { region in
       "{"
-        + "\"id\":\(jsonString(route.identity.path)),"
-        + "\"rect\":\(encodeRect(route.viewportRect)),"
-        + "\"offset\":\(encodePoint(route.contentOffset)),"
-        + "\"content\":[\(route.contentBounds.size.width),\(route.contentBounds.size.height)]"
+        + "\"id\":\(jsonString(region.idPath)),"
+        + "\"rect\":\(encodeRect(region.viewportRect)),"
+        + "\"offset\":\(encodePoint(region.contentOffset)),"
+        + "\"content\":[\(region.contentSize.width),\(region.contentSize.height)]"
         + "}"
     }
   }
 
   private static func encodeAccessibilityAnnouncements(
-    _ announcements: [AccessibilityAnnouncement]
+    _ announcements: [HostWireFrameModel.WireAnnouncement]
   ) -> [String] {
     announcements.map { announcement in
       "{"
         + "\"message\":\(jsonString(announcement.message)),"
-        + "\"politeness\":\(jsonString(announcement.politeness.description))"
+        + "\"politeness\":\(jsonString(announcement.politenessToken))"
         + "}"
     }
   }
@@ -626,17 +528,6 @@ package enum WebSurfaceFrameEncoder {
     _ point: CellPoint
   ) -> String {
     "[\(point.x),\(point.y)]"
-  }
-
-  private static func index(
-    of style: ResolvedTextStyle?,
-    in styles: inout [ResolvedTextStyle?]
-  ) -> Int {
-    if let existing = styles.firstIndex(where: { $0 == style }) {
-      return existing
-    }
-    styles.append(style)
-    return styles.count - 1
   }
 
   private static func encodeStyle(

@@ -103,12 +103,11 @@ extension WebSurfaceFrameEncoder {
     for attachment: RasterImageAttachment,
     fallbackBackground: Color
   ) -> ImagePayload? {
-    if attachment.compositing != nil,
-      let blended = webSurfaceImageBlendCompositor.encodedPNGPayload(
-        for: attachment,
-        fallbackBackground: fallbackBackground
-      )
-    {
+    if let blended = HostWireFrameModel.blendedImagePayload(
+      for: attachment,
+      compositor: webSurfaceImageBlendCompositor,
+      fallbackBackground: fallbackBackground
+    ) {
       return ImagePayload(
         bytes: blended.bytes,
         format: .png,

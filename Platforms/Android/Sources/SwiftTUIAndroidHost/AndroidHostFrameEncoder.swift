@@ -117,6 +117,7 @@ public struct AndroidHostCellSnapshot: Codable, Equatable, Sendable {
     style = cell.style.map(AndroidHostTextStyleSnapshot.init)
     hyperlink = cell.hyperlink
   }
+
 }
 
 public struct AndroidHostCellRectSnapshot: Codable, Equatable, Sendable {
@@ -187,10 +188,16 @@ public struct AndroidHostScrollRegionSnapshot: Codable, Equatable, Sendable {
   public init(
     _ route: ScrollRoute
   ) {
-    id = route.identity.path
-    rect = AndroidHostCellRectSnapshot(route.viewportRect)
-    offset = AndroidHostCellPointSnapshot(route.contentOffset)
-    content = AndroidHostCellSizeSnapshot(route.contentBounds.size)
+    self.init(HostWireFrameModel.WireScrollRegion(route))
+  }
+
+  init(
+    _ region: HostWireFrameModel.WireScrollRegion
+  ) {
+    id = region.idPath
+    rect = AndroidHostCellRectSnapshot(region.viewportRect)
+    offset = AndroidHostCellPointSnapshot(region.contentOffset)
+    content = AndroidHostCellSizeSnapshot(region.contentSize)
   }
 }
 
@@ -289,16 +296,22 @@ public struct AndroidHostAccessibilityNodeSnapshot: Codable, Equatable, Sendable
     _ node: AccessibilityNode,
     focusedIdentity: Identity?
   ) {
-    id = node.identity.path
-    parentID = node.parentIdentity?.path
+    self.init(HostWireFrameModel.WireAccessibilityNode(node, focusedIdentity: focusedIdentity))
+  }
+
+  init(
+    _ node: HostWireFrameModel.WireAccessibilityNode
+  ) {
+    id = node.idPath
+    parentID = node.parentIDPath
     rect = AndroidHostCellRectSnapshot(node.rect)
-    role = node.role.description
+    role = node.roleToken
     label = node.label
     hint = node.hint
     hidden = node.hidden
-    liveRegion = node.liveRegion?.description
+    liveRegion = node.liveRegionToken
     cursorAnchor = node.cursorAnchor.map(AndroidHostCellPointSnapshot.init)
-    isFocused = node.identity == focusedIdentity
+    isFocused = node.isFocused
   }
 }
 
@@ -309,8 +322,14 @@ public struct AndroidHostAccessibilityAnnouncementSnapshot: Codable, Equatable, 
   public init(
     _ announcement: AccessibilityAnnouncement
   ) {
+    self.init(HostWireFrameModel.WireAnnouncement(announcement))
+  }
+
+  init(
+    _ announcement: HostWireFrameModel.WireAnnouncement
+  ) {
     message = announcement.message
-    politeness = announcement.politeness.description
+    politeness = announcement.politenessToken
   }
 }
 
@@ -324,7 +343,9 @@ public struct AndroidHostFocusPresentationSnapshot: Codable, Equatable, Sendable
     _ presentation: FocusPresentation
   ) {
     focusedIdentity = presentation.focusedIdentity?.path
-    semantics = presentation.semantics.androidHostDescription
+    // The shared wire token map — the web wire consumes the same function,
+    // so the two hosts' focus-semantics tokens cannot drift.
+    semantics = HostWireSchema.focusSemanticsToken(presentation.semantics)
     prefersTextInput = presentation.prefersTextInput
     hasFocusedRegion = presentation.hasFocusedRegion
   }
@@ -404,37 +425,44 @@ public enum AndroidHostFrameEncoder {
     for frame: SemanticHostFrame,
     style: AndroidHostStyle = .default
   ) -> AndroidHostFrameSnapshot {
-    // Read every frame/semantic value through the shared host-content
-    // projection; `style` stays separate (terminal appearance is host config,
-    // not frame content). Sourcing from the projection — rather than reaching
-    // into `frame`/`frame.semantics` directly — is what keeps the host-
-    // serialized field set enumerable in one place.
-    let projection = frame.hostProjection
-    let damage = projection.rasterDamage
+    // Every frame/semantic value is read through the shared wire model
+    // (built from the host-content projection); `style` stays separate
+    // (terminal appearance is host config, not frame content). Sourcing from
+    // the model — rather than reaching into `frame`/`frame.semantics`
+    // directly — is what keeps the host-serialized derivations shared with
+    // the web wire.
+    let model = HostWireFrameModel(frame.hostProjection)
+    let damage = model.damage
     return AndroidHostFrameSnapshot(
-      sequence: projection.sequence,
-      gridWidth: projection.raster.size.width,
-      gridHeight: projection.raster.size.height,
-      preferredGridWidth: projection.preferredLayoutSize?.width,
-      preferredGridHeight: projection.preferredLayoutSize?.height,
+      sequence: frame.sequence,
+      gridWidth: model.gridSize.width,
+      gridHeight: model.gridSize.height,
+      preferredGridWidth: model.preferredLayoutSize?.width,
+      preferredGridHeight: model.preferredLayoutSize?.height,
       terminalStyle: AndroidHostTerminalStyleSnapshot(renderStyle: style.renderStyle),
-      rows: rows(from: projection.raster),
-      cells: cells(from: projection.raster),
+      rows: model.plainTextRows(),
+      cells: model.surface.cells.enumerated().flatMap { y, row in
+        row.enumerated().map { x, cell in
+          AndroidHostCellSnapshot(x: x, y: y, cell: cell)
+        }
+      },
       imageAttachments: imageAttachments(
-        from: projection.raster.imageAttachments,
+        from: model.imageAttachments,
         fallbackBackground: style.renderStyle.appearance.backgroundColor
       ),
-      focusedIdentity: projection.focusedIdentity?.path,
-      focusPresentation: AndroidHostFocusPresentationSnapshot(projection.focusPresentation),
-      accessibilityNodes: projection.accessibilityNodes.map {
-        AndroidHostAccessibilityNodeSnapshot($0, focusedIdentity: projection.focusedIdentity)
-      },
-      accessibilityAnnouncements: projection.accessibilityAnnouncements.map(
+      focusedIdentity: model.focusedIdentity?.path,
+      focusPresentation: AndroidHostFocusPresentationSnapshot(
+        model.focusPresentation ?? FocusPresentation.none
+      ),
+      accessibilityNodes: model.accessibilityNodes.map(
+        AndroidHostAccessibilityNodeSnapshot.init
+      ),
+      accessibilityAnnouncements: model.accessibilityAnnouncements.map(
         AndroidHostAccessibilityAnnouncementSnapshot.init
       ),
-      scrollRegions: projection.scrollRoutes.isEmpty
+      scrollRegions: model.scrollRegions.isEmpty
         ? nil
-        : projection.scrollRoutes.map(AndroidHostScrollRegionSnapshot.init),
+        : model.scrollRegions.map(AndroidHostScrollRegionSnapshot.init),
       dirtyRows: damage?.dirtyRows.sorted() ?? [],
       textDamageRows: damage?.textRows.map(AndroidHostTextDamageRowSnapshot.init) ?? [],
       requiresFullTextRepaint: damage?.requiresFullTextRepaint ?? true,
@@ -449,24 +477,6 @@ public enum AndroidHostFrameEncoder {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
     return Array(try encoder.encode(snapshot(for: frame, style: style)))
-  }
-
-  private static func rows(
-    from surface: RasterSurface
-  ) -> [String] {
-    surface.cells.map { row in
-      String(row.map(\.character))
-    }
-  }
-
-  private static func cells(
-    from surface: RasterSurface
-  ) -> [AndroidHostCellSnapshot] {
-    surface.cells.enumerated().flatMap { y, row in
-      row.enumerated().map { x, cell in
-        AndroidHostCellSnapshot(x: x, y: y, cell: cell)
-      }
-    }
   }
 
   private static func imageAttachments(
@@ -485,8 +495,9 @@ public enum AndroidHostFrameEncoder {
     for attachment: RasterImageAttachment,
     fallbackBackground: Color
   ) -> AndroidHostImagePayload? {
-    if let payload = imageBlendCompositor.encodedPNGPayload(
+    if let payload = HostWireFrameModel.blendedImagePayload(
       for: attachment,
+      compositor: imageBlendCompositor,
       fallbackBackground: fallbackBackground
     ) {
       return AndroidHostImagePayload(
@@ -549,17 +560,3 @@ private struct AndroidHostImagePayload {
   var pixelSize: PixelSize?
 }
 
-extension FocusPresentation.Semantics {
-  fileprivate var androidHostDescription: String {
-    switch self {
-    case .none:
-      "none"
-    case .automatic:
-      "automatic"
-    case .activate:
-      "activate"
-    case .edit:
-      "edit"
-    }
-  }
-}

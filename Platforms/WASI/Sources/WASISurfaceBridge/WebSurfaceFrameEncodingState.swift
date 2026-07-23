@@ -1,23 +1,8 @@
 @_spi(Runners) package import SwiftTUIRuntime
 
-package struct WebSurfaceFrameEncodingState: Sendable {
-  package var deltaEnabled: Bool
-  package var knownImageIDs: Set<String>
-  package var persistentStyles: [ResolvedTextStyle?]
-  package var hasBaseline: Bool
-  package var baselineSize: CellSize?
-
-  package init(
-    deltaEnabled: Bool,
-    knownImageIDs: Set<String> = [],
-    persistentStyles: [ResolvedTextStyle?] = [nil],
-    hasBaseline: Bool = false,
-    baselineSize: CellSize? = nil
-  ) {
-    self.deltaEnabled = deltaEnabled
-    self.knownImageIDs = knownImageIDs
-    self.persistentStyles = persistentStyles.isEmpty ? [nil] : persistentStyles
-    self.hasBaseline = hasBaseline
-    self.baselineSize = baselineSize
-  }
-}
+/// The web wire's instantiation of the shared cross-frame encoding state.
+/// The state shape (persistent style table, transmitted-image dedup set,
+/// delta baseline) is host-neutral and lives beside `HostWireFrameModel` so
+/// a second delta-capable wire can instantiate the same machinery instead
+/// of re-implementing it.
+package typealias WebSurfaceFrameEncodingState = HostWireEncodingState

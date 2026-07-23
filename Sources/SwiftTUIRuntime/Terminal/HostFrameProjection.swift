@@ -27,7 +27,9 @@ import SwiftTUICore
 ///   derivation.
 ///
 /// The projection carries values untransformed — each encoder keeps its own
-/// serialization, so its exact wire bytes are unchanged. It retains the full
+/// serialization, so its exact wire bytes are unchanged. The shared
+/// ``HostWireFrameModel`` builds on this seam: it derives every emitted
+/// value once per frame, and the encoders are format adapters over it. It retains the full
 /// ``semantics`` snapshot (not a copy of the subset) so snapshot-threaded
 /// encoders pass it through identically.
 ///
