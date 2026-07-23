@@ -90,12 +90,15 @@ extension ViewNode {
 
   /// Reuse/freshness gating consumed by the reconciler's skip fast-paths:
   /// whether the node needs re-evaluation, whether its committed-children
-  /// snapshot still reflects the live descendants, and whether an island-seam
-  /// descendant was dirtied (which denies retained reuse).
+  /// snapshot still reflects the live descendants, whether an island-seam
+  /// descendant was dirtied (which denies retained reuse), and whether a
+  /// listed child was adopted under a different live parent (which denies
+  /// value-blind retained reuse until this node's own apply re-owns it).
   package struct ReuseState {
     package var isDirty: Bool = true
     package var isCommittedSnapshotFresh: Bool = false
     package var hasStaleIslandDescendant: Bool = false
+    package var hasForeignParentedChild: Bool = false
   }
 
   /// The node's retained per-node state that survives across frames: its `@State`

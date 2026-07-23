@@ -135,10 +135,10 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    // 13 FrameState + 7 EvaluationState + 3 ReuseState + 5 PersistentState
+    // 13 FrameState + 7 EvaluationState + 4 ReuseState + 5 PersistentState
     // (the checkpoint mutation generation is tracker metadata stored outside
     // the groups; see ViewNode.checkpointMutationGeneration).
-    #expect(groupMembers.count == 28)
+    #expect(groupMembers.count == 29)
 
     let snapshotBody = SourceParsingTestSupport.functionBodyText(
       named: "debugTotalStateSnapshot",

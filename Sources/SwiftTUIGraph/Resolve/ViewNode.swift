@@ -47,6 +47,23 @@ package final class ViewNode {
     set { reuseState.hasStaleIslandDescendant = newValue }
   }
 
+  /// Set when a child this node lists was adopted under a DIFFERENT live
+  /// parent (`noteChildReseatedAway`). The upward staleness walks follow the
+  /// child's single `parent` slot, so they can never reach this node again
+  /// through that child — its committed snapshot may silently age while the
+  /// child's subtree evolves under the other spine. Consumed by `canReuse`
+  /// only: value-blind Layer-A retained reuse must not serve such a snapshot
+  /// (the divergent-resolvedIdentity capture-host orphaning bug — the gallery
+  /// strip-click + Tab-wrap stamp-coherence crash). The *memoized* gate is
+  /// deliberately exempt: its view-value equality is an independent freshness
+  /// proof for the served subtree, and `.equatable()` boundaries routinely
+  /// have their single child absorbed into an ancestor's pairing. Cleared by
+  /// this node's own next apply, which re-seats every listed child.
+  package private(set) var hasForeignParentedChild: Bool {
+    get { reuseState.hasForeignParentedChild }
+    set { reuseState.hasForeignParentedChild = newValue }
+  }
+
   /// The most-recently-committed `ResolvedNode` for this node.
   ///
   /// This is the single source of truth for the per-node render-tree
@@ -825,6 +842,14 @@ package final class ViewNode {
     // snapshot and bail. Structural changes (reorder/add/remove) fail the check and
     // take the full reconciliation path.
     if childrenReferToSameNodes(as: children) {
+      // Same nodes, same order — but a competing apply may have re-seated a
+      // child's `parent` since this node last committed. Reclaim before
+      // asserting freshness: a foreign-parented child routes its future
+      // staleness walks up the OTHER spine, which would leave the freshness
+      // claim set below unrevokable (the strip-click stamp-coherence crash
+      // class).
+      reclaimForeignParentedChildren(children)
+      hasForeignParentedChild = false
       committed = resolved
       isCommittedSnapshotFresh = true
       hasStaleIslandDescendant = false
@@ -846,13 +871,42 @@ package final class ViewNode {
       guard child !== self else {
         continue
       }
+      if let abandoned = child.parent, abandoned !== self {
+        abandoned.noteChildReseatedAway()
+      }
       child.parent = self
     }
+    // Every listed child is seated to this node now.
+    hasForeignParentedChild = false
     ownerGraph?.replaceParentTargets(
       of: viewNodeID,
       with: children.filter { $0 !== self }
     )
     invalidateAncestorCachedSnapshots()
+  }
+
+  /// Re-adopts children whose `parent` link was stolen by a competing apply,
+  /// notifying the loser. Only contested children pay; the common all-owned
+  /// case is a pointer-compare scan.
+  private func reclaimForeignParentedChildren(_ children: [ViewNode]) {
+    for child in children {
+      guard child !== self else {
+        continue
+      }
+      if let abandoned = child.parent, abandoned !== self {
+        abandoned.noteChildReseatedAway()
+        child.parent = self
+      }
+    }
+  }
+
+  /// A child this node still lists was adopted under a different live parent.
+  /// Marks the sticky foreign-parented flag (see `hasForeignParentedChild`) so
+  /// value-blind Layer-A retained reuse stops serving this node's committed
+  /// snapshot by identity; the node's own next apply re-owns its children and
+  /// clears the flag.
+  package func noteChildReseatedAway() {
+    hasForeignParentedChild = true
   }
 
   package func applyRetainedSnapshot(
@@ -1120,6 +1174,7 @@ package final class ViewNode {
       && !isDirty
       && isCommittedSnapshotFresh
       && !hasStaleIslandDescendant
+      && !hasForeignParentedChild
       && committed.supportsRetainedReuse
       && committed.environmentSnapshot == environment
       // Compare resolve-time transaction *intent* (animation request + batch),
@@ -1145,6 +1200,7 @@ package final class ViewNode {
     if isDirty { return "dirty" }
     if !isCommittedSnapshotFresh { return "stale-snapshot" }
     if hasStaleIslandDescendant { return "stale-island-descendant" }
+    if hasForeignParentedChild { return "foreign-parented-child" }
     if !committed.supportsRetainedReuse { return "no-retained-support" }
     if committed.environmentSnapshot != environment {
       recordEnvironmentSnapshotDiff(committed.environmentSnapshot, environment)
@@ -1953,6 +2009,7 @@ extension ViewNode {
       committed: committed,
       isCommittedSnapshotFresh: isCommittedSnapshotFresh,
       hasStaleIslandDescendant: hasStaleIslandDescendant,
+      hasForeignParentedChild: hasForeignParentedChild,
       children: children.map(\.identity),
       stateSlots: stateSlots.map { ordinal, slot in
         DebugTotalStateSnapshot.StateSlotSnapshot(
