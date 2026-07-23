@@ -16,13 +16,12 @@ private struct AndroidHostSceneHostState: Sendable {
   var encodedFrameSequence: UInt64?
   var encodedFrameCount = 0
   var latestEncodingErrorDescription: String?
-  // Converged web-surface emission (convergence proposal 2026-07-22-002
-  // Stage C1): non-nil once the Kotlin host's declaration selected the
-  // web-surface wire. The encoding state carries the transmit-once image
-  // set and, when delta was declared, the persistent style table and
-  // baseline.
+  // Converged web-surface emission (convergence proposal 2026-07-22-002;
+  // the legacy keyed-JSON wire retired in Stage C4): the encoding state
+  // carries the transmit-once image set and, once the declaration enabled
+  // delta, the persistent style table and baseline.
   var wireCapabilities = HostWireCapabilities()
-  var webEncodingState: HostWireEncodingState?
+  var webEncodingState = HostWireEncodingState(deltaEnabled: false)
   // Damage accumulated across committed-but-unconsumed frames: the poll
   // model skips frames, so a consumed frame's own damage (relative to the
   // previous COMMIT) under-covers the diff against the previous CONSUMED
@@ -106,13 +105,13 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   ) {
     state.withLock { state in
       state.wireCapabilities = capabilities
-      state.webEncodingState =
-        capabilities.maxWebSurfaceVersion >= 2
-        ? HostWireEncodingState(
-          deltaEnabled: capabilities.acceptsDeltaFrames
-            && capabilities.maxWebSurfaceVersion >= 3
-        )
-        : nil
+      // The declaration negotiates the record shape ceiling: v3 + delta
+      // acceptance flips steady frames to delta records. Undeclared hosts
+      // keep receiving v1/v2 full web-surface frames.
+      state.webEncodingState = HostWireEncodingState(
+        deltaEnabled: capabilities.acceptsDeltaFrames
+          && capabilities.maxWebSurfaceVersion >= 3
+      )
     }
   }
 
@@ -146,42 +145,28 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       }
       if state.encodedFrameSequence != frame.sequence || state.encodedFrameBytes == nil {
         let style = state.encodingStyle ?? .default
-        if var webEncodingState = state.webEncodingState {
-          // Converged web-surface emission: the accumulated damage makes the
-          // record's diff consumption-relative, which is what keeps delta
-          // records sound under the skipping poll (Stage C3).
-          let model = HostWireFrameModel(
-            surface: frame.raster,
-            sequence: frame.sequence,
-            semanticSnapshot: frame.semantics,
-            focusedIdentity: frame.focusedIdentity,
-            damage: state.hasPendingDamage ? state.pendingDamage : frame.rasterDamage,
-            preferredLayoutSize: frame.preferredLayoutSize,
-            terminalStyle: style.renderStyle
-          )
-          let output = WebSurfaceFrameEncoder.encode(
-            model,
-            fallbackBackground: style.renderStyle.appearance.backgroundColor,
-            state: &webEncodingState
-          )
-          state.webEncodingState = webEncodingState
-          state.encodedFrameBytes = Array(output.utf8)
-          state.encodedFrameSequence = frame.sequence
-          state.encodedFrameCount += 1
-          state.latestEncodingErrorDescription = nil
-        } else {
-          do {
-            state.encodedFrameBytes = try AndroidHostFrameEncoder.encode(frame, style: style)
-            state.encodedFrameSequence = frame.sequence
-            state.encodedFrameCount += 1
-            state.latestEncodingErrorDescription = nil
-          } catch {
-            state.encodedFrameBytes = nil
-            state.encodedFrameSequence = nil
-            state.latestEncodingErrorDescription = String(describing: error)
-            return 0
-          }
-        }
+        // Converged web-surface emission (the only Android wire since the
+        // Stage C4 retirement): the accumulated damage makes the record's
+        // diff consumption-relative, which is what keeps delta records
+        // sound under the skipping poll (Stage C3).
+        let model = HostWireFrameModel(
+          surface: frame.raster,
+          sequence: frame.sequence,
+          semanticSnapshot: frame.semantics,
+          focusedIdentity: frame.focusedIdentity,
+          damage: state.hasPendingDamage ? state.pendingDamage : frame.rasterDamage,
+          preferredLayoutSize: frame.preferredLayoutSize,
+          terminalStyle: style.renderStyle
+        )
+        let output = WebSurfaceFrameEncoder.encode(
+          model,
+          fallbackBackground: style.renderStyle.appearance.backgroundColor,
+          state: &state.webEncodingState
+        )
+        state.encodedFrameBytes = Array(output.utf8)
+        state.encodedFrameSequence = frame.sequence
+        state.encodedFrameCount += 1
+        state.latestEncodingErrorDescription = nil
         state.pendingDamage = nil
         state.hasPendingDamage = false
       }

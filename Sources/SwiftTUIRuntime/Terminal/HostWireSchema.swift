@@ -4,29 +4,33 @@ import SwiftTUICore
 /// fields each host wire carries, under which key, and which divergences are
 /// deliberate.
 ///
-/// ``HostFrameProjection`` is the single seam both host encoders *read* a frame
+/// ``HostFrameProjection`` is the single seam host serialization reads a frame
 /// through; this manifest is the single place the *serialized* surface is
-/// named. The two are pinned against reality by three totality suites:
-/// - `WebSurfaceWireTotalityTests` (WASI) and `AndroidHostWireTotalityTests`
-///   (Android) encode a fully-populated frame and assert the emitted JSON key
-///   sets equal the manifest's — both directions, so an encoder-only field or
-///   a manifest-only field each fail.
+/// named. Since the Android host converged onto the web-surface wire and the
+/// legacy keyed-JSON format was retired (convergence proposal
+/// 2026-07-22-002, Stage C4), every host speaks ONE wire. It is pinned
+/// against reality by two suites:
+/// - `WebSurfaceWireTotalityTests` encodes a fully-populated frame and
+///   asserts the emitted JSON key sets equal the manifest's — both
+///   directions, so an encoder-only field and a manifest-only field each
+///   fail.
 /// - `HostWireSchemaContractTests` (runtime) mirrors the source-of-truth types
 ///   and asserts every stored property has a mapping here — the ratchet for
-///   the "add a field, wire one encoder, forget the other" bug class.
+///   the "add a field and forget its wire treatment" bug class.
 ///
 /// ## Wire-evolution policy (load-bearing)
 ///
 /// Deployed decoders (browser `WebHostSurfaceTransport.ts`, Android
-/// `SwiftTUIFrame.parse`) are positive-check allowlists:
+/// `SwiftTUIWebSurfaceSession`) are positive-check allowlists:
 /// - Unknown *object keys* are ignored, so new data MUST ship as new optional
 ///   object keys (additive evolution). Absent means "feature not present".
-/// - The web cell/rect/point/size *tuples* are validated with exact-length
+/// - The cell/rect/point/size *tuples* are validated with exact-length
 ///   guards; an extra element degrades the whole record to a text diagnostic
 ///   on deployed clients. Never extend a tuple — add a parallel keyed field.
-/// - The web `version` literals are hard-matched (`1|2` full, `3` delta) and
+/// - The `version` literals are hard-matched (`1|2` full, `3` delta) and
 ///   describe the record *shape*, not the contract revision. Never bump them
-///   for an additive field. Android `schemaVersion` is tolerant-defaulted.
+///   for an additive field; anything newer is negotiated via
+///   ``HostWireCapabilities``.
 package enum HostWireSchema {
   // MARK: - Source-of-truth field mappings
 
@@ -44,21 +48,18 @@ package enum HostWireSchema {
     case notSerialized(String)
   }
 
-  /// One stored property of a source-of-truth type and its treatment on each
-  /// host wire. `property` must match the `Mirror` child label exactly.
+  /// One stored property of a source-of-truth type and its treatment on the
+  /// converged wire. `property` must match the `Mirror` child label exactly.
   package struct FieldMapping: Sendable {
     package let property: String
-    package let web: WireTreatment
-    package let android: WireTreatment
+    package let wire: WireTreatment
 
     package init(
       _ property: String,
-      web: WireTreatment,
-      android: WireTreatment
+      wire: WireTreatment
     ) {
       self.property = property
-      self.web = web
-      self.android = android
+      self.wire = wire
     }
   }
 
@@ -67,221 +68,154 @@ package enum HostWireSchema {
   /// type's `Mirror` children exactly, in both directions.
   package static let sourceFieldMappings: [String: [FieldMapping]] = [
     "HostFrameProjection": [
-      .init("sequence", web: .key("sequence"), android: .key("sequence")),
+      .init("sequence", wire: .key("sequence")),
       .init(
         "raster",
-        web: .decomposed("width/height/styles/rows|deltaRows/images/links/linkTargets"),
-        android: .decomposed("gridWidth/gridHeight/rows/cells/imageAttachments")
-      ),
+        wire: .decomposed("width/height/styles/rows|deltaRows/images/links/linkTargets")),
       .init(
         "preferredLayoutSize",
-        web: .decomposed("preferredGridWidth/preferredGridHeight"),
-        android: .decomposed("preferredGridWidth/preferredGridHeight")
-      ),
+        wire: .decomposed("preferredGridWidth/preferredGridHeight")),
       .init(
         "semantics",
-        web: .decomposed(
-          "accessibilityTree/accessibilityAnnouncements/scrollRegions/focusPresentation"),
-        android: .decomposed(
-          "accessibilityNodes/accessibilityAnnouncements/scrollRegions/focusPresentation")
-      ),
+        wire: .decomposed(
+          "accessibilityTree/accessibilityAnnouncements/scrollRegions/focusPresentation")),
       .init(
         "focusedIdentity",
-        web: .derived("per-node isFocused + focusPresentation.focusedIdentity"),
-        android: .key("focusedIdentity")
-      ),
+        wire: .derived("per-node isFocused + focusPresentation.focusedIdentity")),
       .init(
         "rasterDamage",
-        web: .key("damage"),
-        android: .decomposed(
-          "dirtyRows/textDamageRows/requiresFullTextRepaint/requiresFullGraphicsReplay")
-      ),
+        wire: .key("damage")),
     ],
     "RasterSurface": [
       .init(
         "size",
-        web: .decomposed("width/height"),
-        android: .decomposed("gridWidth/gridHeight")
-      ),
+        wire: .decomposed("width/height")),
       .init(
         "cells",
-        web: .decomposed("rows|deltaRows + links/linkTargets"),
-        android: .decomposed("rows (plain text) + cells (styled)")
-      ),
+        wire: .decomposed("rows|deltaRows + links/linkTargets")),
       .init(
         "attachments",
-        web: .notSerialized("legacy debug strings; not part of any host render contract"),
-        android: .notSerialized("legacy debug strings; not part of any host render contract")
-      ),
+        wire: .notSerialized("legacy debug strings; not part of any host render contract")),
       .init(
         "imageAttachments",
-        web: .key("images"),
-        android: .key("imageAttachments")
-      ),
+        wire: .key("images")),
       .init(
         "metadata",
-        web: .notSerialized("diagnostic key-values; hosts render cells, not metadata"),
-        android: .notSerialized("diagnostic key-values; hosts render cells, not metadata")
-      ),
+        wire: .notSerialized("diagnostic key-values; hosts render cells, not metadata")),
       .init(
         "presentationLayers",
-        web: .notSerialized("package-internal compositing intermediates, flattened into cells"),
-        android: .notSerialized("package-internal compositing intermediates, flattened into cells")
-      ),
+        wire: .notSerialized("package-internal compositing intermediates, flattened into cells")),
     ],
     "RasterCell": [
       .init(
         "character",
-        web: .tupleSlot(1, of: "cell"),
-        android: .key("character")
-      ),
+        wire: .tupleSlot(1, of: "cell")),
       .init(
         "spanWidth",
-        web: .tupleSlot(2, of: "cell"),
-        android: .key("spanWidth")
-      ),
+        wire: .tupleSlot(2, of: "cell")),
       .init(
         "continuationLeadX",
-        web: .notSerialized("web drops continuation cells; the lead cell's spanWidth covers them"),
-        android: .key("continuationLeadX")
-      ),
+        wire: .notSerialized("web drops continuation cells; the lead cell's spanWidth covers them")),
       .init(
         "style",
-        web: .tupleSlot(3, of: "cell"),
-        android: .key("style")
-      ),
+        wire: .tupleSlot(3, of: "cell")),
       .init(
         "hyperlink",
-        web: .decomposed("links (per-row runs) + linkTargets (deduplicated URLs)"),
-        android: .key("hyperlink")
-      ),
+        wire: .decomposed("links (per-row runs) + linkTargets (deduplicated URLs)")),
     ],
     "ResolvedTextStyle": [
-      .init("foregroundColor", web: .key("fg"), android: .key("foregroundColor")),
-      .init("backgroundColor", web: .key("bg"), android: .key("backgroundColor")),
+      .init("foregroundColor", wire: .key("fg")),
+      .init("backgroundColor", wire: .key("bg")),
       .init(
         "emphasis",
-        web: .key("em"),
-        android: .key("emphasis")
-      ),
-      .init("underlineStyle", web: .key("underline"), android: .key("underlineStyle")),
-      .init("strikethroughStyle", web: .key("strikethrough"), android: .key("strikethroughStyle")),
-      .init("opacity", web: .key("opacity"), android: .key("opacity")),
+        wire: .key("em")),
+      .init("underlineStyle", wire: .key("underline")),
+      .init("strikethroughStyle", wire: .key("strikethrough")),
+      .init("opacity", wire: .key("opacity")),
     ],
     "TextLineStyle": [
-      .init("pattern", web: .key("pattern"), android: .key("pattern")),
-      .init("color", web: .key("color"), android: .key("color")),
+      .init("pattern", wire: .key("pattern")),
+      .init("color", wire: .key("color")),
     ],
     "RasterImageAttachment": [
-      .init("identity", web: .key("id"), android: .key("id")),
-      .init("bounds", web: .key("bounds"), android: .key("bounds")),
-      .init("visibleBounds", web: .key("visibleBounds"), android: .key("visibleBounds")),
+      .init("identity", wire: .key("id")),
+      .init("bounds", wire: .key("bounds")),
+      .init("visibleBounds", wire: .key("visibleBounds")),
       .init(
         "source",
-        web: .derived("format + dataBase64 via the resolved reference"),
-        android: .decomposed("sourceKind/sourceIdentifier")
-      ),
+        wire: .derived("format + dataBase64 via the resolved reference")),
       .init(
         "resolvedReference",
-        web: .decomposed("format/dataBase64"),
-        android: .decomposed("payloadBase64/payloadByteCount")
-      ),
-      .init("pixelSize", web: .key("pixelSize"), android: .key("pixelSize")),
+        wire: .decomposed("format/dataBase64")),
+      .init("pixelSize", wire: .key("pixelSize")),
       .init(
         "cellPixelSize",
-        web: .notSerialized("the browser derives cell metrics from its own font raster"),
-        android: .key("cellPixelSize")
-      ),
+        wire: .notSerialized("the browser derives cell metrics from its own font raster")),
       .init(
         "isResizable",
-        web: .notSerialized("web resizes are round-tripped through the runtime, not host-local"),
-        android: .key("isResizable")
-      ),
-      .init("scalingMode", web: .key("scalingMode"), android: .key("scalingMode")),
+        wire: .notSerialized("web resizes are round-tripped through the runtime, not host-local")),
+      .init("scalingMode", wire: .key("scalingMode")),
       .init(
         "compositing",
-        web: .derived("pre-blended PNG payload replaces the raw source when compositing is set"),
-        android: .derived(
-          "pre-blended PNG payload replaces the raw source when compositing is set (sourceKind precomposedPNG)")
-      ),
+        wire: .derived("pre-blended PNG payload replaces the raw source when compositing is set")),
     ],
     "AccessibilityNode": [
       .init(
         "viewNodeID",
-        web: .notSerialized("package-internal graph plumbing"),
-        android: .notSerialized("package-internal graph plumbing")
-      ),
-      .init("identity", web: .key("id"), android: .key("id")),
+        wire: .notSerialized("package-internal graph plumbing")),
+      .init("identity", wire: .key("id")),
       .init(
         "parentIdentity",
-        web: .key("parentId"),
-        android: .key("parentID")
-      ),
-      .init("rect", web: .key("rect"), android: .key("rect")),
-      .init("role", web: .key("role"), android: .key("role")),
-      .init("label", web: .key("label"), android: .key("label")),
-      .init("hint", web: .key("hint"), android: .key("hint")),
-      .init("hidden", web: .key("hidden"), android: .key("hidden")),
-      .init("liveRegion", web: .key("liveRegion"), android: .key("liveRegion")),
-      .init("cursorAnchor", web: .key("cursorAnchor"), android: .key("cursorAnchor")),
+        wire: .key("parentId")),
+      .init("rect", wire: .key("rect")),
+      .init("role", wire: .key("role")),
+      .init("label", wire: .key("label")),
+      .init("hint", wire: .key("hint")),
+      .init("hidden", wire: .key("hidden")),
+      .init("liveRegion", wire: .key("liveRegion")),
+      .init("cursorAnchor", wire: .key("cursorAnchor")),
     ],
     "AccessibilityAnnouncement": [
-      .init("message", web: .key("message"), android: .key("message")),
-      .init("politeness", web: .key("politeness"), android: .key("politeness")),
+      .init("message", wire: .key("message")),
+      .init("politeness", wire: .key("politeness")),
     ],
     "ScrollRoute": [
-      .init("identity", web: .key("id"), android: .key("id")),
+      .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",
-        web: .notSerialized("package-internal graph plumbing"),
-        android: .notSerialized("package-internal graph plumbing")
-      ),
-      .init("viewportRect", web: .key("rect"), android: .key("rect")),
+        wire: .notSerialized("package-internal graph plumbing")),
+      .init("viewportRect", wire: .key("rect")),
       .init(
         "contentBounds",
-        web: .derived("content = contentBounds.size"),
-        android: .derived("content = contentBounds.size")
-      ),
-      .init("contentOffset", web: .key("offset"), android: .key("offset")),
+        wire: .derived("content = contentBounds.size")),
+      .init("contentOffset", wire: .key("offset")),
       .init(
         "structuralHostChain",
-        web: .notSerialized("package-internal scope-containment routing"),
-        android: .notSerialized("package-internal scope-containment routing")
-      ),
+        wire: .notSerialized("package-internal scope-containment routing")),
     ],
     "FocusPresentation": [
-      .init("focusedIdentity", web: .key("focusedIdentity"), android: .key("focusedIdentity")),
-      .init("semantics", web: .key("semantics"), android: .key("semantics")),
+      .init("focusedIdentity", wire: .key("focusedIdentity")),
+      .init("semantics", wire: .key("semantics")),
     ],
     "PresentationDamage": [
-      .init("textRows", web: .key("textRows"), android: .key("textDamageRows")),
+      .init("textRows", wire: .key("textRows")),
       .init(
         "graphicsInvalidation",
-        web: .notSerialized("package-internal invalidation bookkeeping"),
-        android: .notSerialized("package-internal invalidation bookkeeping")
-      ),
+        wire: .notSerialized("package-internal invalidation bookkeeping")),
       .init(
         "requiresFullTextRepaint",
-        web: .key("requiresFullTextRepaint"),
-        android: .key("requiresFullTextRepaint")
-      ),
+        wire: .key("requiresFullTextRepaint")),
       .init(
         "requiresFullGraphicsReplay",
-        web: .key("requiresFullGraphicsReplay"),
-        android: .key("requiresFullGraphicsReplay")
-      ),
+        wire: .key("requiresFullGraphicsReplay")),
     ],
     "PresentationDamage.TextRow": [
       .init(
         "row",
-        web: .tupleSlot(0, of: "textRow"),
-        android: .key("row")
-      ),
+        wire: .tupleSlot(0, of: "textRow")),
       .init(
         "columnRanges",
-        web: .tupleSlot(1, of: "textRow"),
-        android: .key("columnRanges")
-      ),
+        wire: .tupleSlot(1, of: "textRow")),
     ],
   ]
 
@@ -346,60 +280,6 @@ package enum HostWireSchema {
     package static let linkRunTupleArity = 3
   }
 
-  // MARK: - Android wire key sets (frame snapshot)
-
-  /// The Android frame snapshot surface. Optional keys are nil-omitted by
-  /// `JSONEncoder`; the totality test fully populates a frame so required ∪
-  /// optional must all be present on the wire.
-  package enum AndroidWire {
-    package static let frameKeys: Set<String> = [
-      "schemaVersion", "sequence", "gridWidth", "gridHeight", "terminalStyle",
-      "rows", "cells", "imageAttachments", "focusPresentation",
-      "accessibilityNodes", "accessibilityAnnouncements", "dirtyRows",
-      "textDamageRows", "requiresFullTextRepaint", "requiresFullGraphicsReplay",
-    ]
-    package static let frameOptionalKeys: Set<String> = [
-      "preferredGridWidth", "preferredGridHeight", "focusedIdentity",
-      "scrollRegions",
-    ]
-    package static let cellKeys: Set<String> = [
-      "x", "y", "character", "spanWidth", "continuationLeadX", "style",
-      "hyperlink",
-    ]
-    package static let styleKeys: Set<String> = [
-      "foregroundColor", "backgroundColor", "emphasis", "underlineStyle",
-      "strikethroughStyle", "opacity",
-    ]
-    package static let lineStyleKeys: Set<String> = ["pattern", "color"]
-    package static let terminalStyleKeys: Set<String> = [
-      "foregroundColor", "backgroundColor", "tintColor",
-    ]
-    package static let colorKeys: Set<String> = ["hex"]
-    package static let imageAttachmentKeys: Set<String> = [
-      "id", "bounds", "visibleBounds", "sourceKind", "sourceIdentifier",
-      "payloadBase64", "payloadByteCount", "pixelSize", "cellPixelSize",
-      "isResizable", "scalingMode",
-    ]
-    package static let focusPresentationKeys: Set<String> = [
-      "focusedIdentity", "semantics", "prefersTextInput", "hasFocusedRegion",
-    ]
-    package static let accessibilityNodeKeys: Set<String> = [
-      "id", "parentID", "rect", "role", "label", "hint", "hidden", "liveRegion",
-      "cursorAnchor", "isFocused",
-    ]
-    package static let accessibilityAnnouncementKeys: Set<String> = [
-      "message", "politeness",
-    ]
-    package static let scrollRegionKeys: Set<String> = [
-      "id", "rect", "offset", "content",
-    ]
-    package static let textDamageRowKeys: Set<String> = ["row", "columnRanges"]
-    package static let rangeKeys: Set<String> = ["lowerBound", "upperBound"]
-    package static let rectKeys: Set<String> = ["x", "y", "width", "height"]
-    package static let pointKeys: Set<String> = ["x", "y"]
-    package static let sizeKeys: Set<String> = ["width", "height"]
-  }
-
   // MARK: - Capability declarations
 
   /// One ``HostWireCapabilities`` field and its declaration ingress on each
@@ -450,7 +330,7 @@ package enum HostWireSchema {
       defaultValue: "2",
       wasi: "env TUIGUI_SURFACE_MAX_VERSION (explicit value wins over the TUIGUI_SURFACE_DELTA implication)",
       webSocket: "caps record key maxWebSurfaceVersion",
-      android: "declareCapabilities key maxWebSurfaceVersion (>= 2 selects the converged web-surface wire; absence keeps the legacy keyed-JSON frames)"
+      android: "declareCapabilities key maxWebSurfaceVersion (>= 3 with delta acceptance enables delta records; every Android host receives web-surface frames)"
     ),
     .init(
       "acceptsDeltaFrames",
@@ -466,20 +346,13 @@ package enum HostWireSchema {
       webSocket: "caps record key supportsResync",
       android: "declareCapabilities key supportsResync"
     ),
-    .init(
-      "maxAndroidSchemaVersion",
-      defaultValue: "2",
-      wasi: "not applicable (browser hosts do not consume the Android wire)",
-      webSocket: "not applicable (browser hosts do not consume the Android wire)",
-      android: "declareCapabilities key maxAndroidSchemaVersion"
-    ),
   ]
 
   // MARK: - Shared wire tokens
 
-  /// The focus-semantics wire token, shared by both host wires so the two
-  /// encoders cannot drift. Android's encoder is asserted against this map by
-  /// `AndroidHostWireTotalityTests`; the web encoder consumes it directly.
+  /// The focus-semantics wire token for the converged wire; the encoder
+  /// consumes it directly and `WebSurfaceWireTotalityTests` pins the emitted
+  /// values.
   package static func focusSemanticsToken(
     _ semantics: FocusPresentation.Semantics
   ) -> String {

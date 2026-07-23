@@ -2,20 +2,20 @@ import SwiftTUICore
 
 /// The host-neutral **serialization seam** for a ``SemanticHostFrame``.
 ///
-/// Non-terminal hosts (WASI/WebHost, Android) each serialize a committed frame
-/// into their own wire format — `WebSurfaceFrameEncoder` emits hand-rolled,
-/// delta-encoded JSON; `AndroidHostFrameEncoder` emits `Codable` snapshots. The
-/// two wire formats are unrelated, but they serialize the **same subset** of a
-/// frame: the raster, the sequence, the focus, the damage, and exactly three of
-/// `SemanticSnapshot`'s ten fields — accessibility nodes, announcements, and
-/// scroll routes. The remaining semantic records (interaction/focus/navigation/
-/// selection regions, scroll targets, named coordinate spaces, accessibility
-/// warnings) are routing/diagnostic data that hosts do not serialize.
+/// Non-terminal hosts (WASI/WebHost, Android) serialize a committed frame
+/// into the converged web-surface wire (`WebSurfaceFrameEncoder`; the legacy
+/// Android keyed-JSON format retired with convergence Stage C4). The wire
+/// serializes a defined **subset** of a frame: the raster, the sequence, the
+/// focus, the damage, and exactly three of `SemanticSnapshot`'s ten fields —
+/// accessibility nodes, announcements, and scroll routes. The remaining
+/// semantic records (interaction/focus/navigation/selection regions, scroll
+/// targets, named coordinate spaces, accessibility warnings) are
+/// routing/diagnostic data that hosts do not serialize.
 ///
-/// Historically each encoder reached into `SemanticHostFrame`/`SemanticSnapshot`
-/// independently, so a field added to the host contract had to be wired into two
-/// ~570-line encoders by hand — and a forgotten one silently dropped data on one
-/// host with no compile error. `HostFrameProjection` is the single seam both
+/// Historically each host's encoder reached into `SemanticHostFrame`/
+/// `SemanticSnapshot` independently, so a field added to the host contract
+/// had to be wired into two encoders by hand — and a forgotten one silently
+/// dropped data on one host with no compile error. `HostFrameProjection` is the single seam both
 /// encoders read a frame through, and it names the host-serialized surface
 /// explicitly:
 /// - the host-serialized semantic lists are surfaced as the named accessors

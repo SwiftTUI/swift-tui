@@ -33,7 +33,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI; raster output drawn onto a canvas via the `web-surface` transport. |
-| Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI, serializes `SemanticHostFrame` snapshots, and draws styled cells/images plus a semantics overlay in Compose. `arm64-v8a` only. |
+| Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI, serializes committed frames as web-surface records (the converged wire), and draws styled cells/images plus a semantics overlay in Compose. `arm64-v8a` only. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
 
 A binary can support more than one mode. `SwiftTUIWebHostCLI` (`WebHostCLIRunner`)
@@ -75,7 +75,7 @@ of focused contracts.
 | Terminal-native | `TerminalHost` uses damage to limit row/span diffing and terminal byte emission. |
 | WASI / browser | `WebSurfaceTransport` serializes damage into the web-surface frame; the browser canvas clears and redraws dirty rects only. |
 | Localhost WebHost | `WebSocketSurfaceTransport` serializes the same web-surface damage over WebSocket. |
-| Host-managed Android | `SwiftTUIAndroidHost` serializes damage rows/ranges into the Android frame snapshot; the Compose renderer keeps a retained bitmap and repaints only the damaged rows when a frame's damage is contiguous, falling back to a full repaint otherwise (size change, full-repaint flag, images present, or a skipped sequence). |
+| Host-managed Android | `SwiftTUIAndroidHost` serializes the same web-surface damage object (the converged wire); the Compose renderer keeps a retained bitmap and repaints only the damaged rows when consumption is contiguous, falling back to a full repaint otherwise (size change, full-repaint flag, images present, or a skipped render). |
 
 ```mermaid
 flowchart LR

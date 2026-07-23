@@ -36,12 +36,12 @@ func android_host_capability_declaration_is_pre_start_only() throws {
 
   #expect(
     host.declareCapabilities(
-      json: "{\"acceptsDeltaFrames\":true,\"maxAndroidSchemaVersion\":3}"
+      json: "{\"acceptsDeltaFrames\":true,\"maxWebSurfaceVersion\":3}"
     )
   )
   #expect(
     host.wireCapabilities
-      == HostWireCapabilities(acceptsDeltaFrames: true, maxAndroidSchemaVersion: 3)
+      == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
   )
 
   // Capability-gated emission must never change shape mid-session: once the
@@ -49,10 +49,10 @@ func android_host_capability_declaration_is_pre_start_only() throws {
   // stays.
   host.start()
   defer { host.stop() }
-  #expect(!host.declareCapabilities(json: "{\"maxAndroidSchemaVersion\":2}"))
+  #expect(!host.declareCapabilities(json: "{\"maxWebSurfaceVersion\":2}"))
   #expect(
     host.wireCapabilities
-      == HostWireCapabilities(acceptsDeltaFrames: true, maxAndroidSchemaVersion: 3)
+      == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
   )
 }
 
@@ -109,8 +109,8 @@ func android_host_encodes_frames_only_at_consumption() async throws {
   #expect(copied == required)
   #expect(host.consumedFrameEncodeCount == 1)
 
-  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
-  #expect(snapshot.rows.joined(separator: "\n").contains("Android"))
+  let record = try decodedWebSurfaceRecord(bytes)
+  #expect(rowText(in: record).joined(separator: "\n").contains("Android"))
 
   swift_tui_android_stop(handle)
 }
@@ -260,9 +260,9 @@ func android_host_abi_start_publishes_first_frame_bytes() async throws {
   }
 
   #expect(copied == required)
-  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
-  #expect(snapshot.sequence == 0)
-  #expect(snapshot.rows.joined(separator: "\n").contains("Android"))
+  let record = try decodedWebSurfaceRecord(bytes)
+  #expect(record["sequence"] as? Int == 0)
+  #expect(rowText(in: record).joined(separator: "\n").contains("Android"))
 
   swift_tui_android_stop(handle)
 }
@@ -332,9 +332,11 @@ func android_host_handle_registry_copies_latest_frame_bytes() async throws {
   }
 
   #expect(copied == required)
-  let snapshot = try JSONDecoder().decode(AndroidHostFrameSnapshot.self, from: Data(bytes))
-  #expect(snapshot.sequence == 7)
-  #expect(snapshot.rows == ["OK"])
+  // The converged web-surface record is the only Android wire since the
+  // legacy keyed-JSON format retired (Stage C4) — no declaration needed.
+  let record = try decodedWebSurfaceRecord(bytes)
+  #expect(record["sequence"] as? Int == 7)
+  #expect(rowText(in: record) == ["OK"])
 }
 
 @MainActor
@@ -479,4 +481,30 @@ private func rasterText(
   in frame: SemanticHostFrame
 ) -> String {
   frame.raster.lines.joined(separator: "\n")
+}
+
+private func decodedWebSurfaceRecord(
+  _ bytes: [UInt8]
+) throws -> [String: Any] {
+  let record = String(decoding: bytes, as: UTF8.self)
+  #expect(record.hasPrefix("\u{001E}surface:"))
+  return try #require(
+    try JSONSerialization.jsonObject(
+      with: Data(record.dropFirst("\u{001E}surface:".count).utf8)
+    ) as? [String: Any]
+  )
+}
+
+/// Joins a converged record's cell tuples back into per-row text.
+private func rowText(
+  in record: [String: Any]
+) -> [String] {
+  guard let rows = record["rows"] as? [[Any]] else {
+    return []
+  }
+  return rows.map { row in
+    row.compactMap { cell in
+      (cell as? [Any])?[1] as? String
+    }.joined()
+  }
 }

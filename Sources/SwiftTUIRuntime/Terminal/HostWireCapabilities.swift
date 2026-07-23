@@ -21,20 +21,15 @@ package struct HostWireCapabilities: Equatable, Sendable {
   /// full keyframe re-transmission). Semantics land with the resync stage;
   /// until a consumer exists this is plumbing only.
   package var supportsResync: Bool
-  /// Highest Android `schemaVersion` the host accepts. The deployed decoder
-  /// hard-rejects anything newer than its supported version.
-  package var maxAndroidSchemaVersion: Int
 
   package init(
     maxWebSurfaceVersion: Int = 2,
     acceptsDeltaFrames: Bool = false,
-    supportsResync: Bool = false,
-    maxAndroidSchemaVersion: Int = 2
+    supportsResync: Bool = false
   ) {
     self.maxWebSurfaceVersion = maxWebSurfaceVersion
     self.acceptsDeltaFrames = acceptsDeltaFrames
     self.supportsResync = supportsResync
-    self.maxAndroidSchemaVersion = maxAndroidSchemaVersion
   }
 
   /// Parses the JSON object payload of a `caps:` declaration.
@@ -89,12 +84,6 @@ package struct HostWireCapabilities: Equatable, Sendable {
       case "supportsResync":
         if let value = scanner.consumeBool() {
           capabilities.supportsResync = value
-        } else {
-          guard scanner.skipValue() else { return nil }
-        }
-      case "maxAndroidSchemaVersion":
-        if let value = scanner.consumeInteger() {
-          capabilities.maxAndroidSchemaVersion = value
         } else {
           guard scanner.skipValue() else { return nil }
         }

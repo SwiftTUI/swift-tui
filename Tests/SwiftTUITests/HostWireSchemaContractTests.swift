@@ -126,13 +126,11 @@ struct HostWireSchemaContractTests {
   func notSerializedTreatmentsCarryRationales() {
     for (typeName, mappings) in HostWireSchema.sourceFieldMappings {
       for mapping in mappings {
-        for treatment in [mapping.web, mapping.android] {
-          if case .notSerialized(let rationale) = treatment {
-            #expect(
-              !rationale.isEmpty,
-              "\(typeName).\(mapping.property): empty not-serialized rationale"
-            )
-          }
+        if case .notSerialized(let rationale) = mapping.wire {
+          #expect(
+            !rationale.isEmpty,
+            "\(typeName).\(mapping.property): empty not-serialized rationale"
+          )
         }
       }
     }

@@ -15,7 +15,6 @@ struct HostWireCapabilitiesTests {
     #expect(defaults.maxWebSurfaceVersion == 2)
     #expect(!defaults.acceptsDeltaFrames)
     #expect(!defaults.supportsResync)
-    #expect(defaults.maxAndroidSchemaVersion == 2)
   }
 
   @Test("a full declaration parses every field")
@@ -26,13 +25,14 @@ struct HostWireCapabilitiesTests {
       "supportsResync":true,"maxAndroidSchemaVersion":3}
       """
     )
+    // maxAndroidSchemaVersion retired with the legacy keyed-JSON wire; old
+    // declarations still carrying it are skipped as an unknown key.
     #expect(
       parsed
         == HostWireCapabilities(
           maxWebSurfaceVersion: 3,
           acceptsDeltaFrames: true,
-          supportsResync: true,
-          maxAndroidSchemaVersion: 3
+          supportsResync: true
         )
     )
   }

@@ -4,15 +4,14 @@ import SwiftTUICore
 /// emit, derived **once** per presented frame from the
 /// ``HostFrameProjection`` seam.
 ///
-/// `WebSurfaceFrameEncoder` and `AndroidHostFrameEncoder` are *format
-/// adapters* over this model: each keeps its own byte shape (hand-rolled
-/// RS-framed JSON with a deduplicated style table; `Codable` snapshots
-/// through `JSONEncoder` with sorted keys) but reads every emitted value
-/// from here — row/cell traversal and span math, style-table interning,
-/// hyperlink run derivation, accessibility/scroll/focus projections, and
-/// the image pre-blend gate — so a derivation cannot drift between hosts.
-/// The transport fixtures byte-freeze both formats; this model changes
-/// where values come from, never what bytes leave the process.
+/// `WebSurfaceFrameEncoder` — the converged wire every host emits since the
+/// legacy Android keyed-JSON format retired — is a *format adapter* over
+/// this model: it owns the RS-framed byte shape while reading every emitted
+/// value from here — row/cell traversal and span math, style-table
+/// interning, hyperlink run derivation, accessibility/scroll/focus
+/// projections, and the image pre-blend gate. The transport fixtures
+/// byte-freeze the format; this model changes where values come from,
+/// never what bytes leave the process.
 package struct HostWireFrameModel {
   // MARK: - Frame-level values
 

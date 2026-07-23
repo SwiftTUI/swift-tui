@@ -810,7 +810,7 @@ App.body  ->  RunLoop (one per host, identical engine)
 | WASI static bundle | `Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift:80`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift:147` | `WebSurfaceTransport.present(_:)` JSON-encodes the frame via `WebSurfaceFrameEncoder` and writes it to a stdout file descriptor. |
 | localhost WebHost | `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift:97`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift:142` | Same `WebSurfaceFrameEncoder` wire frame as WASI, but bytes go over a WebSocket pump instead of a file descriptor. |
 | Native SwiftUI host | `swift-tui-swiftui/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift:159`, `swift-tui-swiftui/Sources/SwiftUIHost/NativeRasterSurfaceRenderer.swift:30` | `HostedRasterSurface.onFrame` stores the frame on an `@Observable`; SwiftUI repaints by drawing the `RasterSurface` cell-by-cell into a `CGContext` (NSView/UIView). |
-| Android Compose host | `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidHostSceneHost.swift:159`, `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidHostFrameEncoder.swift`, `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidMainExecutorPump.swift` | `HostedRasterSurface.onFrame` encodes to a `Codable` `AndroidHostFrameSnapshot`; Kotlin pulls bytes across the ABI each tick and *drives the Swift main executor* manually. |
+| Android Compose host | `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidHostSceneHost.swift`, `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidMainExecutorPump.swift` | `HostedRasterSurface.onFrame` stores the frame; the ABI copy path encodes it as a converged web-surface record (encode-at-copy); Kotlin pulls bytes across the ABI each tick and *drives the Swift main executor* manually. |
 
 **Step 0 — Everything above the boundary is shared.** Each host builds a
 `SceneSessionResources(presentationSurface:…)` and runs the **same** `SceneSession →
@@ -890,10 +890,10 @@ native accessibility overlay.
 **Step 5 — Android Compose host: `Codable` snapshot, host-driven main executor.** The
 Android host (`Platforms/Android/`) also wraps a `HostedRasterSurface` via
 `AndroidHostSceneHost` (`AndroidHostSceneHost.swift:159`), with
-`frameDelivery: .assumedMainActor`. Each frame runs `AndroidHostFrameEncoder.encode(frame)`
-to produce a `Codable` `AndroidHostFrameSnapshot` (rows, cells, styles, image
-attachments — precomposed PNG when blended — accessibility, scroll regions, damage),
-which Kotlin pulls across the ABI (`copyLatestFrameBytes`, `AndroidHostSceneHost.swift:340`)
+`frameDelivery: .assumedMainActor`. Consumed frames are encoded at copy time as
+converged web-surface records (style-table cells, image attachments —
+precomposed PNG when blended — accessibility, scroll regions, damage,
+terminalStyle), which Kotlin pulls across the ABI (`copyLatestFrameBytes`, `AndroidHostSceneHost.swift:340`)
 and renders into a Compose surface. The Android-only twist is *scheduling*, not
 rendering (cross-reference [3c](#3c-app-bootstrap--run-loop-lifecycle)'s WASI/Android
 gotcha): there is **no CFRunLoop on a bare JNI embedding**, so the Swift main-actor job
