@@ -33,7 +33,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
-    var transmittedImageIDs: Set<String>
+    var encodingState: HostWireEncodingState
     var wireCapabilities: HostWireCapabilities
   }
 
@@ -62,24 +62,35 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: .cellOnly,
-        transmittedImageIDs: [],
+        encodingState: HostWireEncodingState(deltaEnabled: false),
         wireCapabilities: HostWireCapabilities()
       )
     )
   }
 
   /// The client's declared wire capabilities (`caps:` control record;
-  /// absence keeps the defaults — today's bytes). Nothing reads these for
-  /// emission yet — consumers arrive with the negotiated-emission stages.
+  /// absence keeps the defaults — today's bytes).
   package var wireCapabilities: HostWireCapabilities {
     state.withLock(\.wireCapabilities)
   }
 
+  /// Declaring capabilities marks a fresh client connection: the browser
+  /// client sends `caps:` exactly once, first, per socket, so its arrival
+  /// re-anchors the cross-connection encoding state — the next frame is a
+  /// full keyframe with image payloads re-transmitted (the F55 reload
+  /// defect), and delta emission is negotiated from the declaration (a
+  /// client that declares v3 + delta acceptance receives v3 `deltaRows`
+  /// records for steady frames; undeclared clients keep today's full
+  /// frames, byte for byte).
   package func declareCapabilities(
     _ capabilities: HostWireCapabilities
   ) {
     state.withLock { state in
       state.wireCapabilities = capabilities
+      state.encodingState = HostWireEncodingState(
+        deltaEnabled: capabilities.acceptsDeltaFrames
+          && capabilities.maxWebSurfaceVersion >= 3
+      )
     }
   }
 
@@ -143,7 +154,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
           surface,
           damage: nil,
           fallbackBackground: state.renderStyle.appearance.backgroundColor,
-          knownImageIDs: &state.transmittedImageIDs
+          state: &state.encodingState
         ).utf8
       )
     }
@@ -162,7 +173,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         WebSurfaceFrameEncoder.encode(
           frame,
           fallbackBackground: state.renderStyle.appearance.backgroundColor,
-          knownImageIDs: &state.transmittedImageIDs
+          state: &state.encodingState
         ).utf8
       )
     }

@@ -102,9 +102,13 @@ the `TUIGUI_SURFACE_DELTA` / `TUIGUI_SURFACE_MAX_VERSION` environment keys at
 transport construction, the browser WebSocket client sends a one-shot
 `caps:{json}` control record after open, and the Android host calls
 `declareCapabilities` before scene start. Absence of a declaration keeps the
-defaults — today's wire bytes — and no emission path reads the declarations
-yet. The canonical field/ingress manifest is
-`HostWireSchema.capabilityMappings`.
+defaults — today's wire bytes. On the WebSocket path the declaration also
+marks a fresh client connection: its arrival re-anchors the transport's
+cross-connection encoding state (a reloaded client receives a full keyframe
+with image payloads re-transmitted), and a client that declares v3 + delta
+acceptance receives v3 `deltaRows` records for steady frames. The WASI and
+Android ingresses remain declaration-only. The canonical field/ingress
+manifest is `HostWireSchema.capabilityMappings`.
 
 ### Shared Raster Damage Contract
 

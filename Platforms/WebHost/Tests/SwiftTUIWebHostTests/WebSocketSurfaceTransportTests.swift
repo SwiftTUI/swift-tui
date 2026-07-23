@@ -46,6 +46,156 @@ struct WebSocketSurfaceTransportTests {
     #expect(metrics.bytesWritten == record.utf8.count)
   }
 
+  @Test("a capability declaration re-anchors image transmission for the new client")
+  func capabilityDeclarationReanchorsImageTransmission() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.present(Self.imageFrame(sequence: 1))
+    try transport.present(Self.imageFrame(sequence: 2))
+    try await transport.drain()
+    var records = await sink.strings()
+    #expect(records.count == 2)
+    // First transmission carries the payload; the repeat is deduplicated by
+    // the persistent image-ID set.
+    #expect(records[0].contains("dataBase64"))
+    #expect(!records[1].contains("dataBase64"))
+
+    // A capability declaration marks a fresh client connection (the browser
+    // client sends caps: exactly once, first, per socket). The reconnected
+    // client's decoder starts empty, so the transport must re-anchor its
+    // cross-connection encoding state and re-transmit image payloads — the
+    // F55 reload defect.
+    transport.declareCapabilities(HostWireCapabilities())
+    try transport.present(Self.imageFrame(sequence: 3))
+    try await transport.drain()
+    records = await sink.strings()
+    #expect(records.count == 3)
+    #expect(records[2].contains("dataBase64"))
+  }
+
+  @Test("declared v3+delta clients receive delta records after the keyframe")
+  func negotiatedDeltaEmitsDeltaRecordsAfterKeyframe() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+    transport.declareCapabilities(
+      HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+    )
+
+    try transport.present(Self.steadyFrame(sequence: 1))
+    try transport.present(Self.steadyFrame(sequence: 2))
+    try await transport.drain()
+    let records = await sink.strings()
+    #expect(records.count == 2)
+    // The first frame after the declaration is the keyframe; the steady
+    // frame with narrow damage ships as a v3 delta record — the first
+    // emission behavior negotiation unlocks.
+    let keyframe = try decodedSurfaceFrame(records[0])
+    #expect(keyframe["version"] as? Int == 2)
+    #expect(keyframe["encoding"] == nil)
+    let delta = try decodedSurfaceFrame(records[1])
+    #expect(delta["version"] as? Int == 3)
+    #expect(delta["encoding"] as? String == "delta")
+    #expect(delta["deltaRows"] != nil)
+  }
+
+  @Test("undeclared clients keep receiving full frames")
+  func undeclaredClientsKeepFullFrames() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.present(Self.steadyFrame(sequence: 1))
+    try transport.present(Self.steadyFrame(sequence: 2))
+    try await transport.drain()
+    let records = await sink.strings()
+    #expect(records.count == 2)
+    for record in records {
+      let frame = try decodedSurfaceFrame(record)
+      #expect(frame["version"] as? Int == 2)
+      #expect(frame["encoding"] == nil)
+    }
+  }
+
+  @Test("a redeclaration re-keyframes a delta stream")
+  func redeclarationRekeyframesDeltaStream() async throws {
+    let sink = RecordingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+    let capabilities = HostWireCapabilities(
+      maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+    transport.declareCapabilities(capabilities)
+    try transport.present(Self.steadyFrame(sequence: 1))
+    try transport.present(Self.steadyFrame(sequence: 2))
+
+    // A reconnecting client re-declares; its decoder has no baseline, so
+    // the stream must restart with a full keyframe.
+    transport.declareCapabilities(capabilities)
+    try transport.present(Self.steadyFrame(sequence: 3))
+    try await transport.drain()
+    let records = await sink.strings()
+    #expect(records.count == 3)
+    let rekeyframe = try decodedSurfaceFrame(records[2])
+    #expect(rekeyframe["version"] as? Int == 2)
+    #expect(rekeyframe["encoding"] == nil)
+  }
+
+  private static func steadyFrame(
+    sequence: UInt64
+  ) -> SemanticHostFrame {
+    SemanticHostFrame(
+      sequence: sequence,
+      raster: RasterSurface(
+        size: CellSize(width: 2, height: 1),
+        cells: [[RasterCell(character: "s"), RasterCell(character: " ")]]
+      ),
+      semantics: SemanticSnapshot(),
+      focusedIdentity: nil,
+      rasterDamage: PresentationDamage(
+        textRows: [PresentationDamage.TextRow(row: 0, columnRanges: [0..<1])]
+      )
+    )
+  }
+
+  private static func imageFrame(
+    sequence: UInt64
+  ) -> SemanticHostFrame {
+    let pngBytes: [UInt8] = Array(
+      Data(
+        base64Encoded:
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEElEQVR4AQEFAPr/AP8AAP8FAAH/+lyI0QAAAABJRU5ErkJggg=="
+      )!
+    )
+    return SemanticHostFrame(
+      sequence: sequence,
+      raster: RasterSurface(
+        size: CellSize(width: 2, height: 1),
+        cells: [[RasterCell(character: "i"), RasterCell(character: " ")]],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: Identity(components: ["root", "image"]),
+            bounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
+            source: .data(pngBytes),
+            resolvedReference: .embeddedImage(pngBytes),
+            pixelSize: PixelSize(width: 1, height: 1)
+          )
+        ]
+      ),
+      semantics: SemanticSnapshot(),
+      focusedIdentity: nil
+    )
+  }
+
   @Test("semantic host-frame present emits damage and partial repaint metrics")
   func semanticHostFramePresentEmitsDamageAndPartialMetrics() async throws {
     let sink = RecordingByteSink()
