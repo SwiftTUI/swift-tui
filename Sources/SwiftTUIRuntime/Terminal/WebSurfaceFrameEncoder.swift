@@ -208,14 +208,22 @@ package enum WebSurfaceFrameEncoder {
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
       return full.output
     case .delta(let damage):
-      let output = encodeDelta(
+      if let output = encodeDelta(
         model,
         damage: damage,
         fallbackBackground: fallbackBackground,
         state: &state
+      ) {
+        state.recordDeltaBaseline(gridSize: model.gridSize)
+        return output
+      }
+      let full = encodeFull(
+        model,
+        fallbackBackground: fallbackBackground,
+        knownImageIDs: &state.knownImageIDs
       )
-      state.recordDeltaBaseline(gridSize: model.gridSize)
-      return output
+      state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
+      return full.output
     }
   }
 
@@ -235,10 +243,15 @@ package enum WebSurfaceFrameEncoder {
     _ model: HostWireFrameModel,
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>
-  ) -> (output: String, styles: [ResolvedTextStyle?]) {
-    var styles: [ResolvedTextStyle?] = [nil]
-    let rows = model.surface.cells.map { row in
-      encodeRow(row, interningInto: &styles)
+  ) -> (output: String, styles: HostWireStyleTable) {
+    var styles = HostWireStyleTable(gridSize: model.gridSize)
+    var rows: [String] = []
+    rows.reserveCapacity(model.surface.cells.count)
+    for row in model.surface.cells {
+      guard let encoded = encodeRow(row, interningInto: &styles) else {
+        preconditionFailure("one full frame exceeded its grid-sized wire-style budget")
+      }
+      rows.append(encoded)
     }
     let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
     let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
@@ -259,7 +272,7 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"width\":\(max(0, model.gridSize.width))"
     json += ",\"height\":\(max(0, model.gridSize.height))"
     json += ",\"styles\":["
-    json += styles.map(encodeStyle).joined(separator: ",")
+    json += styles.encodedElements.joined(separator: ",")
     json += "]"
     json += ",\"rows\":["
     json += rows.joined(separator: ",")
@@ -300,9 +313,20 @@ package enum WebSurfaceFrameEncoder {
     damage: PresentationDamage,
     fallbackBackground: Color,
     state: inout HostWireEncodingState
-  ) -> String {
-    let deltaRows = model.deltaRowIndexes.map { rowIndex in
-      "[\(rowIndex),\(encodeRow(model.surface.cells[rowIndex], interningInto: &state.persistentStyles))]"
+  ) -> String? {
+    var candidate = state
+    var deltaRows: [String] = []
+    deltaRows.reserveCapacity(model.deltaRowIndexes.count)
+    for rowIndex in model.deltaRowIndexes {
+      guard
+        let encodedRow = encodeRow(
+          model.surface.cells[rowIndex],
+          interningInto: &candidate.persistentStyles
+        )
+      else {
+        return nil
+      }
+      deltaRows.append("[\(rowIndex),\(encodedRow)]")
     }
     let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
     let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
@@ -319,7 +343,7 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"width\":\(max(0, model.gridSize.width))"
     json += ",\"height\":\(max(0, model.gridSize.height))"
     json += ",\"styles\":["
-    json += state.persistentStyles.map(encodeStyle).joined(separator: ",")
+    json += candidate.persistentStyles.encodedElements.joined(separator: ",")
     json += "]"
     json += ",\"deltaRows\":["
     json += deltaRows.joined(separator: ",")
@@ -328,7 +352,7 @@ package enum WebSurfaceFrameEncoder {
     json += encodeImages(
       model.imageAttachments,
       fallbackBackground: fallbackBackground,
-      knownImageIDs: &state.knownImageIDs
+      knownImageIDs: &candidate.knownImageIDs
     ).joined(separator: ",")
     json += "]"
     json += ",\"damage\":"
@@ -350,6 +374,7 @@ package enum WebSurfaceFrameEncoder {
     }
     json += encodeAdditiveFields(for: model)
     json += "}\n"
+    state = candidate
     return json
   }
 
@@ -453,12 +478,12 @@ package enum WebSurfaceFrameEncoder {
 
   /// One wire row: continuation cells are skipped (their lead cell's span
   /// covers them) and each emitted cell's style is interned through the
-  /// shared `HostWireFrameModel.styleIndex` — the full path interns into the
-  /// frame table, the delta path into the persistent cross-frame table.
+  /// shared `HostWireStyleTable` — the full path interns into the frame
+  /// table, the delta path into the persistent cross-frame epoch.
   private static func encodeRow(
     _ row: [RasterCell],
-    interningInto styles: inout [ResolvedTextStyle?]
-  ) -> String {
+    interningInto styles: inout HostWireStyleTable
+  ) -> String? {
     var encodedCells: [String] = []
     encodedCells.reserveCapacity(row.count)
 
@@ -466,7 +491,9 @@ package enum WebSurfaceFrameEncoder {
       guard !cell.isContinuation else {
         continue
       }
-      let styleIndex = HostWireFrameModel.styleIndex(of: cell.style, in: &styles)
+      guard let styleIndex = styles.index(for: cell.style) else {
+        return nil
+      }
       encodedCells.append(
         "[\(x),\(jsonString(String(cell.character))),\(max(1, cell.spanWidth)),\(styleIndex)]"
       )
@@ -549,46 +576,6 @@ package enum WebSurfaceFrameEncoder {
     _ point: CellPoint
   ) -> String {
     "[\(point.x),\(point.y)]"
-  }
-
-  private static func encodeStyle(
-    _ style: ResolvedTextStyle?
-  ) -> String {
-    guard let style else {
-      return "null"
-    }
-
-    var fields: [String] = []
-    if let foregroundColor = style.foregroundColor {
-      fields.append("\"fg\":\(jsonString(foregroundColor.hexString(format: .rrggbbaa)))")
-    }
-    if let backgroundColor = style.backgroundColor {
-      fields.append("\"bg\":\(jsonString(backgroundColor.hexString(format: .rrggbbaa)))")
-    }
-    if !style.emphasis.isEmpty {
-      fields.append("\"em\":\(style.emphasis.rawValue)")
-    }
-    if let underlineStyle = style.underlineStyle {
-      fields.append("\"underline\":\(encodeLineStyle(underlineStyle))")
-    }
-    if let strikethroughStyle = style.strikethroughStyle {
-      fields.append("\"strikethrough\":\(encodeLineStyle(strikethroughStyle))")
-    }
-    if style.opacity < 1 {
-      fields.append("\"opacity\":\(style.opacity)")
-    }
-
-    return "{" + fields.joined(separator: ",") + "}"
-  }
-
-  private static func encodeLineStyle(
-    _ style: TextLineStyle
-  ) -> String {
-    var fields = ["\"pattern\":\(jsonString(style.pattern.rawValue))"]
-    if let color = style.color {
-      fields.append("\"color\":\(jsonString(color.hexString(format: .rrggbbaa)))")
-    }
-    return "{" + fields.joined(separator: ",") + "}"
   }
 
   // Widened from `private` to `package` so `WebSurfaceImageEncoder.swift` can

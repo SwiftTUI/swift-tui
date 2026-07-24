@@ -39,7 +39,7 @@ package struct HostWireFrameModel {
   /// live here so they cannot drift between hosts.
   package let surface: RasterSurface
 
-    // MARK: - Hyperlink runs
+  // MARK: - Hyperlink runs
 
   package struct LinkRun {
     package let start: Int
@@ -51,7 +51,6 @@ package struct HostWireFrameModel {
     package let y: Int
     package let runs: [LinkRun]
   }
-
 
   // MARK: - Semantic projections
 
@@ -176,7 +175,7 @@ package struct HostWireFrameModel {
     }
   }
 
-    /// Derives the hyperlink run table: deduplicated targets plus per-row runs
+  /// Derives the hyperlink run table: deduplicated targets plus per-row runs
   /// of consecutive same-target cells (rows with no links are omitted).
   /// Continuation cells neither extend nor close a run — their lead cell's
   /// span already covers them.
@@ -228,22 +227,6 @@ package struct HostWireFrameModel {
     return (linkRows, linkTargets)
   }
 
-  // MARK: - Shared derivation helpers
-
-  /// Interns `style` into a first-appearance style table (slot 0 = nil).
-  /// Shared by the frame table above and the web delta path's persistent
-  /// cross-frame table.
-  package static func styleIndex(
-    of style: ResolvedTextStyle?,
-    in styles: inout [ResolvedTextStyle?]
-  ) -> Int {
-    if let existing = styles.firstIndex(where: { $0 == style }) {
-      return existing
-    }
-    styles.append(style)
-    return styles.count - 1
-  }
-
   /// The damaged row indexes a delta record re-transmits: unique, sorted,
   /// bounded to the grid.
   package var deltaRowIndexes: [Int] {
@@ -279,20 +262,19 @@ package struct HostWireFrameModel {
 package struct HostWireEncodingState: Sendable {
   package var deltaEnabled: Bool
   package var knownImageIDs: Set<String>
-  package var persistentStyles: [ResolvedTextStyle?]
+  package var persistentStyles: HostWireStyleTable
   package var hasBaseline: Bool
   package var baselineSize: CellSize?
 
   package init(
     deltaEnabled: Bool,
     knownImageIDs: Set<String> = [],
-    persistentStyles: [ResolvedTextStyle?] = [nil],
     hasBaseline: Bool = false,
     baselineSize: CellSize? = nil
   ) {
     self.deltaEnabled = deltaEnabled
     self.knownImageIDs = knownImageIDs
-    self.persistentStyles = persistentStyles.isEmpty ? [nil] : persistentStyles
+    persistentStyles = HostWireStyleTable(gridSize: baselineSize)
     self.hasBaseline = hasBaseline
     self.baselineSize = baselineSize
   }
@@ -329,7 +311,7 @@ extension HostWireEncodingState {
   /// Re-anchors the delta baseline after a full-frame emission: the
   /// persistent style table restarts from the emitted frame's table.
   package mutating func rebaseline(
-    onFrameStyles styles: [ResolvedTextStyle?],
+    onFrameStyles styles: HostWireStyleTable,
     gridSize: CellSize
   ) {
     persistentStyles = styles

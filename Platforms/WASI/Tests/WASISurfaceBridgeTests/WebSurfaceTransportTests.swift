@@ -253,6 +253,218 @@ struct WebSurfaceTransportTests {
     #expect(delta.utf8.count < full.utf8.count)
   }
 
+  @Test("a below-budget delta keeps the established byte shape")
+  func belowBudgetDeltaKeepsEstablishedByteShape() {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+    let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+
+    let output = WebSurfaceFrameEncoder.encode(
+      Self.changedSurface(),
+      damage: damage,
+      state: &state
+    )
+
+    #expect(
+      output
+        == "\u{001E}surface:{\"version\":3,\"encoding\":\"delta\",\"width\":2,"
+        + "\"height\":2,\"styles\":[null],\"deltaRows\":[[1,[[0,\" \",1,0],"
+        + "[1,\"!\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[1,2]]]],"
+        + "\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"
+    )
+  }
+
+  @Test("wire style indexes follow first encoded appearance")
+  func wireStyleIndexesFollowFirstEncodedAppearance() {
+    var state = HostWireEncodingState(deltaEnabled: true)
+    let blue = ResolvedTextStyle(foregroundColor: .blue)
+    let red = ResolvedTextStyle(foregroundColor: .red)
+
+    #expect(state.persistentStyles.index(for: blue) == 1)
+    #expect(state.persistentStyles.index(for: red) == 2)
+    #expect(state.persistentStyles.index(for: blue) == 1)
+    #expect(
+      state.persistentStyles.encodedElements == [
+        "null",
+        "{\"fg\":\"#5BA3FFFF\"}",
+        "{\"fg\":\"#E05757FF\"}",
+      ])
+  }
+
+  @Test("every encoded style field participates in wire interning")
+  func everyEncodedStyleFieldParticipatesInWireInterning() {
+    var state = HostWireEncodingState(deltaEnabled: true)
+    let styles = [
+      ResolvedTextStyle(foregroundColor: .red),
+      ResolvedTextStyle(backgroundColor: .red),
+      ResolvedTextStyle(emphasis: .bold),
+      ResolvedTextStyle(underlineStyle: .init(pattern: .dash, color: .red)),
+      ResolvedTextStyle(strikethroughStyle: .init(pattern: .dash, color: .red)),
+      ResolvedTextStyle(opacity: 0.5),
+    ]
+
+    let indexes = styles.compactMap { state.persistentStyles.index(for: $0) }
+
+    #expect(indexes == [1, 2, 3, 4, 5, 6])
+    #expect(state.persistentStyles.count == 7)
+  }
+
+  @Test("colors that quantize to the same wire bytes share a style index")
+  func quantizedEquivalentColorsShareAStyleIndex() {
+    var state = HostWireEncodingState(deltaEnabled: true)
+    let first = ResolvedTextStyle(
+      foregroundColor: Color(red: 0.5, green: 0.25, blue: 0.75)
+    )
+    let second = ResolvedTextStyle(
+      foregroundColor: Color(red: 0.500_01, green: 0.250_01, blue: 0.750_01)
+    )
+
+    #expect(state.persistentStyles.index(for: first) == 1)
+    #expect(state.persistentStyles.index(for: second) == 1)
+    #expect(state.persistentStyles.count == 2)
+  }
+
+  @Test("an overflowing style epoch rekeys with a full v2 frame")
+  func overflowingStyleEpochRekeysWithAFullV2Frame() throws {
+    let size = CellSize(width: 1, height: 1)
+    var state = HostWireEncodingState(
+      deltaEnabled: true,
+      hasBaseline: true,
+      baselineSize: size
+    )
+    for identifier in 0..<1_023 {
+      #expect(
+        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+      )
+    }
+    #expect(state.persistentStyles.count == 1_024)
+
+    let full = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.singleCellSurface(
+          size: size,
+          style: Self.wireStyle(identifier: 10_000)
+        ),
+        sequence: 2,
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+
+    #expect(full["version"] as? Int == 2)
+    #expect(full["encoding"] == nil)
+    #expect(full["rows"] != nil)
+    #expect(state.persistentStyles.count == 2)
+
+    let next = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.singleCellSurface(
+          size: size,
+          style: Self.wireStyle(identifier: 10_001)
+        ),
+        sequence: 3,
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+    #expect(next["version"] as? Int == 3)
+    #expect(next["encoding"] as? String == "delta")
+    #expect(state.persistentStyles.count == 3)
+  }
+
+  @Test("style overflow preserves image payload state for the replacement full frame")
+  func styleOverflowPreservesImagePayloadState() throws {
+    let size = CellSize(width: 4, height: 2)
+    var state = HostWireEncodingState(
+      deltaEnabled: true,
+      hasBaseline: true,
+      baselineSize: size
+    )
+    for identifier in 0..<1_023 {
+      #expect(
+        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+      )
+    }
+    var surface = Self.imageSurface()
+    surface.cells[0][0].style = Self.wireStyle(identifier: 10_000)
+
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        surface,
+        sequence: 2,
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+    let image = try #require((frame["images"] as? [[String: Any]])?.first)
+    let imageID = try #require(image["id"] as? String)
+
+    #expect(frame["version"] as? Int == 2)
+    #expect(image["dataBase64"] as? String == "iVBORw==")
+    #expect(state.knownImageIDs == Set([imageID]))
+  }
+
+  @Test("300 animated 80x24 frames keep style epochs and record bytes bounded")
+  func animatedFramesKeepStyleEpochsAndRecordBytesBounded() throws {
+    let size = CellSize(width: 80, height: 24)
+    let damage = PresentationDamage(
+      textRows: (0..<size.height).map { .init(row: $0) }
+    )
+    var state = HostWireEncodingState(deltaEnabled: true)
+    var maximumStyleCount = 0
+    var maximumRecordBytes = 0
+    var fullFrameCount = 0
+
+    for frameIndex in 0..<300 {
+      let output = WebSurfaceFrameEncoder.encode(
+        Self.animatedStyleSurface(frameIndex: frameIndex, size: size),
+        sequence: UInt64(frameIndex + 1),
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: damage,
+        state: &state
+      )
+      let frame = try Self.decodedSurfaceFrame(output)
+      maximumStyleCount = max(maximumStyleCount, state.persistentStyles.count)
+      maximumRecordBytes = max(maximumRecordBytes, output.utf8.count)
+      if frame["encoding"] == nil {
+        fullFrameCount += 1
+      }
+    }
+
+    #expect(maximumStyleCount <= (size.width * size.height) + 1)
+    #expect(state.persistentStyles.count <= (size.width * size.height) + 1)
+    #expect(maximumRecordBytes < 150_000)
+    #expect(fullFrameCount > 1)
+  }
+
+  @Test("a resized full frame starts a grid-sized style epoch")
+  func resizedFullFrameStartsGridSizedStyleEpoch() {
+    var state = HostWireEncodingState(deltaEnabled: true)
+    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+    let resizedSize = CellSize(width: 40, height: 40)
+
+    _ = WebSurfaceFrameEncoder.encode(
+      Self.singleCellSurface(size: resizedSize, style: Self.wireStyle(identifier: 20_000)),
+      damage: PresentationDamage(textRows: [.init(row: 0)]),
+      state: &state
+    )
+
+    for identifier in 0..<1_599 {
+      #expect(
+        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+      )
+    }
+    #expect(state.persistentStyles.count == 1_601)
+    #expect(state.persistentStyles.index(for: Self.wireStyle(identifier: 30_000)) == nil)
+  }
+
   @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
   func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
     let host = WebSurfaceTransport(
@@ -922,6 +1134,47 @@ struct WebSurfaceTransportTests {
         "OK  ",
         " !  ",
       ]
+    )
+  }
+
+  private static func singleCellSurface(
+    size: CellSize,
+    style: ResolvedTextStyle
+  ) -> RasterSurface {
+    RasterSurface(
+      size: size,
+      cells: [[RasterCell(character: "X", style: style)]]
+    )
+  }
+
+  private static func animatedStyleSurface(
+    frameIndex: Int,
+    size: CellSize
+  ) -> RasterSurface {
+    let styles = (0..<16).map { offset in
+      Self.wireStyle(identifier: frameIndex * 16 + offset)
+    }
+    return RasterSurface(
+      size: size,
+      cells: (0..<size.height).map { y in
+        (0..<size.width).map { x in
+          RasterCell(
+            character: " ",
+            style: styles[(y * size.width + x) % styles.count]
+          )
+        }
+      }
+    )
+  }
+
+  private static func wireStyle(
+    identifier: Int
+  ) -> ResolvedTextStyle {
+    let red = Double(identifier & 0xFF) / 255
+    let green = Double((identifier >> 8) & 0xFF) / 255
+    let blue = Double((identifier >> 16) & 0xFF) / 255
+    return ResolvedTextStyle(
+      foregroundColor: Color(red: red, green: green, blue: blue)
     )
   }
 
