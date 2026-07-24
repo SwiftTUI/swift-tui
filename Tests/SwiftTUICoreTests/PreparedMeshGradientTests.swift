@@ -295,6 +295,38 @@ func preparedMeshAlphaIsBounded() {
   }
 }
 
+@Test("device-space smoothing keeps sampled channels in gamut")
+func preparedMeshDeviceChannelsAreBounded() {
+  // Bicubic color smoothing overshoots the control values, so a device-space
+  // mesh can interpolate past 1.0 between a saturated and a white control
+  // point. Perceptual sampling gamut-maps on the way out; device sampling has
+  // to clamp, or the overshoot reaches the renderer as an out-of-range channel.
+  var points = identityPoints(width: 3, height: 3)
+  points[4] = .init(0.35, 0.55)
+  let mesh = preparedMesh(
+    width: 3,
+    height: 3,
+    points: points,
+    colors: [
+      .blue, .cyan, .green,
+      .magenta, .white, .yellow,
+      .red, .magenta, .blue,
+    ],
+    background: .black,
+    bounds: meshBounds(width: 30, height: 9),
+    colorSpace: .device
+  )
+
+  for y in 0..<9 {
+    for x in 0..<30 {
+      let color = mesh.color(atCellX: x, y: y)
+      #expect((0...1).contains(color.red))
+      #expect((0...1).contains(color.green))
+      #expect((0...1).contains(color.blue))
+    }
+  }
+}
+
 @Test("repeat preparation produces identical quantized cell colors")
 func preparedMeshIsDeterministic() {
   let inputPoints: [SIMD2<Float>] = [

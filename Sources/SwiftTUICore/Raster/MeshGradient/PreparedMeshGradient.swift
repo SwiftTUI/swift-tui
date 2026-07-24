@@ -182,10 +182,15 @@ package struct PreparedMeshGradient: Sendable {
       let alpha = Double(Self.clampFinite(vector.w))
       switch colorSpace {
       case .device:
+        // Bicubic smoothing is not range-preserving: interpolating through a
+        // saturated control color overshoots past it, so device channels can
+        // leave 0...1 even though every control color is in gamut. The
+        // perceptual branch below absorbs the same overshoot by gamut mapping;
+        // device space clamps, which is what the channels mean there.
         return Color(
-          red: Double(Self.finite(vector.x)),
-          green: Double(Self.finite(vector.y)),
-          blue: Double(Self.finite(vector.z)),
+          red: Double(Self.clampFinite(vector.x)),
+          green: Double(Self.clampFinite(vector.y)),
+          blue: Double(Self.clampFinite(vector.z)),
           alpha: alpha,
           profile: profile
         )

@@ -7,14 +7,26 @@ import SwiftTUICore
 // `Color` into a concrete palette code: nearest-ANSI-16 matching with a small
 // delta-E cache, and the ANSI-256 6×6×6 cube mapping.
 //
-// `backgroundCode`, `closestANSI16ForegroundCode`, and `ansi256Code` are
-// file-internal rather than `private` so the SGR assembler can reach them; the
-// cache and palette stay `private` to this file.
+// `backgroundCode`, `closestANSI16ForegroundCode`, `ansi256Code`, and
+// `colorByte` are file-internal rather than `private` so the SGR assembler can
+// reach them; the cache and palette stay `private` to this file.
 extension TerminalCellTextRenderer {
   func backgroundCode(
     forForegroundCode code: Int
   ) -> Int {
     code + 10
+  }
+
+  /// The 0...255 SGR parameter for one color component.
+  ///
+  /// `Color` deliberately keeps out-of-gamut components — wide-gamut profiles
+  /// and bicubic gradient interpolation both produce them — but SGR has no room
+  /// for that range, and terminals truncate an out-of-range parameter into an
+  /// unrelated color. Gamut clamping belongs at this boundary.
+  func colorByte(
+    _ component: Double
+  ) -> Int {
+    Int(min(1, max(0, component)) * 255)
   }
 
   /// Cache for recent ANSI16 color lookups. The deltaE computation is
@@ -103,9 +115,19 @@ extension TerminalCellTextRenderer {
       break
     }
 
-    let red = Int((color.red * 5).rounded())
-    let green = Int((color.green * 5).rounded())
-    let blue = Int((color.blue * 5).rounded())
+    let red = cubeIndex(color.red)
+    let green = cubeIndex(color.green)
+    let blue = cubeIndex(color.blue)
     return 16 + (36 * red) + (6 * green) + blue
+  }
+
+  /// The 0...5 axis index for one component of the ANSI-256 color cube.
+  ///
+  /// Clamped for the same reason as ``colorByte(_:)``: an out-of-gamut
+  /// component would index outside the cube and select an unrelated code.
+  private func cubeIndex(
+    _ component: Double
+  ) -> Int {
+    Int((min(1, max(0, component)) * 5).rounded())
   }
 }

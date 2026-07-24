@@ -276,9 +276,9 @@ struct TerminalCellTextRenderer {
     case .trueColor:
       appendCode(isBackground ? 48 : 38)
       appendCode(2)
-      appendCode(Int(color.red * 255))
-      appendCode(Int(color.green * 255))
-      appendCode(Int(color.blue * 255))
+      appendCode(colorByte(color.red))
+      appendCode(colorByte(color.green))
+      appendCode(colorByte(color.blue))
     }
   }
 
@@ -305,9 +305,9 @@ struct TerminalCellTextRenderer {
     case .trueColor:
       appendCode("58")
       appendCode("2")
-      appendCode(String(Int(color.red * 255)))
-      appendCode(String(Int(color.green * 255)))
-      appendCode(String(Int(color.blue * 255)))
+      appendCode(String(colorByte(color.red)))
+      appendCode(String(colorByte(color.green)))
+      appendCode(String(colorByte(color.blue)))
     }
   }
 

@@ -298,4 +298,42 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
 
     #expect(rendered == "?")
   }
+
+  @Test("stress terminal protocol 026 out-of-gamut colors cannot emit invalid SGR parameters")
+  func terminalProtocol026OutOfGamutColorsCannotEmitInvalidSGRParameters() {
+    // Hypothesis: a channel outside 0...1 reaches the wire as an SGR parameter
+    // above 255 or below 0, which terminals truncate into an unrelated color.
+    let rendered = TerminalSurfaceRenderer(capabilityProfile: .trueColor).render(
+      RasterSurface(
+        size: .init(width: 1, height: 1),
+        cells: [
+          [
+            RasterCell(
+              character: "X",
+              style: ResolvedTextStyle(
+                foregroundColor: Color(red: 1.05, green: 0.5, blue: -0.2),
+                backgroundColor: Color(red: -0.4, green: 1.9, blue: 0.25),
+                underlineStyle: TextLineStyle(
+                  color: Color(red: 2, green: -1, blue: 0.5)
+                )
+              )
+            )
+          ]
+        ]
+      )
+    )
+
+    let parameters =
+      rendered
+      .split(separator: "\u{001B}")
+      .filter { $0.hasPrefix("[") }
+      .compactMap { chunk -> Substring? in
+        guard let terminator = chunk.firstIndex(of: "m") else { return nil }
+        return chunk[chunk.index(after: chunk.startIndex)..<terminator]
+      }
+      .flatMap { $0.split(separator: ";") }
+      .compactMap { Int($0) }
+    #expect(parameters.count > 6)
+    #expect(parameters.allSatisfy { (0...255).contains($0) })
+  }
 }
