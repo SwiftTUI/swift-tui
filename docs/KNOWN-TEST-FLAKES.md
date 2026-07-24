@@ -236,7 +236,7 @@ the leaf by two more rows before the assertion. The test now sends `.down` and
 drag, then sends `.up` for cleanup. The arm64 Linux worktree gate passed all
 native lanes in 310 s with this boundary.
 
-### 7. `GestureRunLoopDispatchTests` — Exclusive tap inter-tap window expiry under parallel-gate starvation
+### 7. `GestureRunLoopDispatchTests` — Exclusive tap inter-tap window expiry under parallel-gate starvation — FIXED 2026-07-24
 
 **Signature.** "Exclusive tap composition works through the full RunLoop
 mouse path" fails with exactly `(counts.double → 0) == 1` plus
@@ -257,10 +257,26 @@ window resolves at recognizer construction). The test passes in isolation
 and on every other lane; the failure only appears when the test itself is
 starved for hundreds of seconds on the degraded amd64 runner class.
 
-**How to investigate / candidate hardening.** Drive the second tap through
-the `interTapWindowOverride` package seam (F158) so the gate-load wall
-clock cannot expire the window, or move the composed Exclusive leg to a
-solo lane (the entry-2 pattern).
+**Fix (2026-07-24).** The `interTapWindowOverride` seam was *already* in use
+here — the test set a 120 s window — so the hardening this entry recommended
+was in place when both firings happened; 279–284 s of starvation simply
+outlasted it. The 120 s came from the original gesture-composition commit
+(`ac86232d`), not from a considered starvation budget.
+
+Because the window is wall-clock by design (F158: it resolves at recognizer
+construction), *any* finite budget is a race against gate load rather than a
+margin, so the window is now `.seconds(86_400)` — no starvation outlasts a
+day. Nothing in the test waits on expiry: a lone single tap is only reported
+once the window closes, and the test asserts `single == 0`, so the run loop
+still exits on input end (verified: the test completes in 0.015 s).
+
+Mechanism confirmed locally by bite check rather than by reproducing the
+starvation: with the override at `.zero` the test fails with
+`(counts.double → 0) == 1` / `(counts.single → 1) == 0`, the same
+decomposition signature; at `.milliseconds(1)` it still passes, because
+locally both scripted presses land inside the same millisecond. That is why
+this only ever fired on a starved runner, and why the window value — not the
+event script — is the controlling variable.
 
 ---
 
@@ -316,6 +332,44 @@ re-measure before changing the depth, and prefer iterative teardown for deep
 `DrawNode` arrays (the move that fixed deep *construction* paths: the WASI
 depth-capped chunked resolve, and `6431a966`'s iterative runtime-registration
 restore walks) if the fixtures cannot shrink further.
+
+### 9. `Run SwiftTUI runtime tests` — lane exceeds the 1200 s per-step gate cap under parallel load
+
+**Signature.** The gate step `Run SwiftTUI runtime tests` is killed by the
+`Scripts/test_all.sh` watchdog: `TIMEOUT: command timed out after 1200s;
+terminating process tree rooted at pid …`, reported as `exit=124`. No test
+reports a failure — the lane is cut off mid-run, so the log ends with
+passing tests and a terminated process tree. Distinct from entries 1 and 8:
+those are signals (SIGSEGV/SIGBUS), this is a watchdog kill with status 124.
+
+**Where it surfaces.** The runtime lane is by far the largest single step
+(2,816 tests / 284 suites). Observed hitting the 1200 s cap on **both**
+platforms under full parallel gate load (2026-07-23), while passing solo in
+~221 s. Measured again 2026-07-24 on macOS arm64 inside a passing
+`bun run test`: **238.9 s** — a ~5× margin locally, which is why this is
+invisible on a developer machine and only bites a loaded runner.
+
+**Why this reads as a budget problem, not a wedge.** The same lane completes
+normally whenever it is not competing for cores (~221 s solo, 238.9 s inside
+a sequential gate), and the cap is a fixed per-step wall clock rather than a
+progress check — so a lane that merely runs 5× slower under contention is
+killed exactly like one that parked. The watchdog runs `dump_hang_diagnostics`
+against the process tree before terminating it; read that dump in the failing
+run's log to tell a genuine park from slow progress, rather than assuming
+either.
+
+**How to confirm it's this, not your change.** Look for `exit=124` and the
+`TIMEOUT:` line for this specific step. If the step exits on a signal, or a
+named test actually fails, it is not this entry.
+
+**How to investigate / candidate hardening.** Split the runtime lane (it is
+the only step whose test count is an order of magnitude above its
+neighbours), or raise this step's budget specifically via
+`STUI_TEST_STEP_TIMEOUT_SECONDS` on the loaded lanes. A fix cannot be
+validated on an idle developer machine — the 5× local margin means only a
+loaded runner exercises it.
+
+---
 
 ---
 

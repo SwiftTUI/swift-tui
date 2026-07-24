@@ -302,7 +302,17 @@ struct GestureRunLoopDispatchTests {
     // first render alone can exceed the real inter-tap window), so widen
     // the window: the test exercises dispatch plumbing, not tap timing —
     // the timing behavior is pinned by the recognizer unit tests.
-    TapGesture.interTapWindowOverride = .seconds(120)
+    //
+    // The window is wall-clock by design (F158: it resolves at recognizer
+    // construction), so any finite budget is a race against gate load, not a
+    // margin. A 120s window lost that race twice on the degraded amd64 runner
+    // class, where this test itself has been starved for 279-284s: the second
+    // press landed after expiry and the recognizer emitted two singles instead
+    // of one double. Pick a window no starvation can outlast rather than a
+    // larger guess. Nothing here waits on expiry — a lone single tap is only
+    // reported once the window closes, and this test asserts `single == 0` —
+    // so the run loop still exits on input end.
+    TapGesture.interTapWindowOverride = .seconds(86_400)
     defer { TapGesture.interTapWindowOverride = nil }
     let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopExclusiveTap")])
