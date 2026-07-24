@@ -197,7 +197,7 @@ extension Color {
     _fromXYZPreservingGamut(_labToXYZ(lab), alpha: alpha, profile: profile)
   }
 
-  internal static func _fromOklab(_ lab: OklabColor, alpha: Double, profile: RGBColorProfile)
+  package static func _fromOklab(_ lab: OklabColor, alpha: Double, profile: RGBColorProfile)
     -> Color
   {
     let xyz = _oklabToXYZD65(lab)
