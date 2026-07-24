@@ -104,6 +104,29 @@ func preparedMeshCurvedGeometry() {
   #expect(mesh.diagnostics.maximumSubdivisionDepth < 8)
 }
 
+@Test("folded 3x3 mesh with an identity boundary covers every cell")
+func preparedMeshFoldedIdentityBoundaryCoverage() {
+  let background = Color(red: 0.0123, green: 0.0234, blue: 0.0345)
+  let mesh = preparedMesh(
+    width: 3,
+    height: 3,
+    points: [
+      .init(0, 0), .init(0.5, 0), .init(1, 0),
+      .init(0, 0.5), .init(0.65, 0.05), .init(1, 0.5),
+      .init(0, 1), .init(0.5, 1), .init(1, 1),
+    ],
+    colors: Array(repeating: .cyan, count: 9),
+    background: background,
+    bounds: meshBounds(width: 30, height: 9)
+  )
+
+  for y in 0..<9 {
+    for x in 0..<30 {
+      #expect(mesh.color(atCellX: x, y: y) != background)
+    }
+  }
+}
+
 @Test("folded patches use deterministic row-major later-wins ordering")
 func preparedMeshFoldedLaterWins() {
   let mesh = preparedMesh(

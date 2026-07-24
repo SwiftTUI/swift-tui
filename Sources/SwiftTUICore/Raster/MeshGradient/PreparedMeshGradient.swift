@@ -62,6 +62,27 @@ package struct PreparedMeshGradient: Sendable {
     var patchIndex: Int
   }
 
+  private struct Leaf: Sendable {
+    var patchIndex: Int
+    var u0: Float
+    var u1: Float
+    var v0: Float
+    var v1: Float
+  }
+
+  private struct EdgeBreakpoints {
+    var horizontal: [Int: Set<Int>] = [:]
+    var vertical: [Int: Set<Int>] = [:]
+  }
+
+  private struct GridPoint {
+    var x: Int
+    var y: Int
+  }
+
+  private static let maximumSubdivisionDepth = 8
+  private static let tessellationGridScale = 1 << maximumSubdivisionDepth
+
   private struct HermitePatch: Sendable {
     var f00: SIMD2<Float>
     var f10: SIMD2<Float>
@@ -268,7 +289,7 @@ package struct PreparedMeshGradient: Sendable {
     }
     self.patches = preparedPatches
 
-    var preparedTriangles: [Triangle] = []
+    var preparedLeaves: [Leaf] = []
     var maximumDepth = 0
     for patchIndex in preparedPatches.indices {
       Self.tessellate(
@@ -280,6 +301,20 @@ package struct PreparedMeshGradient: Sendable {
         v1: 1,
         depth: 0,
         maximumDepth: &maximumDepth,
+        leaves: &preparedLeaves
+      )
+    }
+    let edgeBreakpoints = Self.edgeBreakpoints(
+      leaves: preparedLeaves,
+      patches: preparedPatches
+    )
+    var preparedTriangles: [Triangle] = []
+    preparedTriangles.reserveCapacity(preparedLeaves.count * 2)
+    for leaf in preparedLeaves {
+      Self.appendLeaf(
+        leaf,
+        patch: preparedPatches[leaf.patchIndex],
+        edgeBreakpoints: edgeBreakpoints,
         triangles: &preparedTriangles
       )
     }
@@ -474,7 +509,7 @@ package struct PreparedMeshGradient: Sendable {
     v1: Float,
     depth: Int,
     maximumDepth: inout Int,
-    triangles: inout [Triangle]
+    leaves: inout [Leaf]
   ) {
     maximumDepth = max(maximumDepth, depth)
     let um = (u0 + u1) * 0.5
@@ -507,15 +542,15 @@ package struct PreparedMeshGradient: Sendable {
       splitV = true
     }
 
-    guard depth < 8, splitU || splitV else {
-      appendLeaf(
-        patch: patch,
-        patchIndex: patchIndex,
-        u0: u0,
-        u1: u1,
-        v0: v0,
-        v1: v1,
-        triangles: &triangles
+    guard depth < maximumSubdivisionDepth, splitU || splitV else {
+      leaves.append(
+        Leaf(
+          patchIndex: patchIndex,
+          u0: u0,
+          u1: u1,
+          v0: v0,
+          v1: v1
+        )
       )
       return
     }
@@ -524,37 +559,37 @@ package struct PreparedMeshGradient: Sendable {
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: u0, u1: um, v0: v0, v1: vm,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: um, u1: u1, v0: v0, v1: vm,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: u0, u1: um, v0: vm, v1: v1,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: um, u1: u1, v0: vm, v1: v1,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
     } else if splitU {
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: u0, u1: um, v0: v0, v1: v1,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: um, u1: u1, v0: v0, v1: v1,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
     } else {
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: u0, u1: u1, v0: v0, v1: vm,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
       tessellate(
         patch: patch, patchIndex: patchIndex,
         u0: u0, u1: u1, v0: vm, v1: v1,
-        depth: depth + 1, maximumDepth: &maximumDepth, triangles: &triangles)
+        depth: depth + 1, maximumDepth: &maximumDepth, leaves: &leaves)
     }
   }
 
@@ -593,21 +628,113 @@ package struct PreparedMeshGradient: Sendable {
     return length(actual - diagonal)
   }
 
+  private static func edgeBreakpoints(
+    leaves: [Leaf],
+    patches: [Patch]
+  ) -> EdgeBreakpoints {
+    // Adaptive neighbors can stop at different depths. Collecting their endpoints in one
+    // mesh-wide dyadic grid lets both sides emit the same edge segments.
+    var result = EdgeBreakpoints()
+    for leaf in leaves {
+      let patch = patches[leaf.patchIndex]
+      let x0 = gridCoordinate(leaf.u0, offset: patch.column)
+      let x1 = gridCoordinate(leaf.u1, offset: patch.column)
+      let y0 = gridCoordinate(leaf.v0, offset: patch.row)
+      let y1 = gridCoordinate(leaf.v1, offset: patch.row)
+      result.horizontal[y0, default: Set<Int>()].formUnion([x0, x1])
+      result.horizontal[y1, default: Set<Int>()].formUnion([x0, x1])
+      result.vertical[x0, default: Set<Int>()].formUnion([y0, y1])
+      result.vertical[x1, default: Set<Int>()].formUnion([y0, y1])
+    }
+    return result
+  }
+
   private static func appendLeaf(
-    patch: HermitePatch,
-    patchIndex: Int,
-    u0: Float,
-    u1: Float,
-    v0: Float,
-    v1: Float,
+    _ leaf: Leaf,
+    patch: Patch,
+    edgeBreakpoints: EdgeBreakpoints,
     triangles: inout [Triangle]
   ) {
-    let p00 = Vertex(position: patch.evaluate(u: u0, v: v0), parameter: .init(u0, v0))
-    let p10 = Vertex(position: patch.evaluate(u: u1, v: v0), parameter: .init(u1, v0))
-    let p01 = Vertex(position: patch.evaluate(u: u0, v: v1), parameter: .init(u0, v1))
-    let p11 = Vertex(position: patch.evaluate(u: u1, v: v1), parameter: .init(u1, v1))
-    appendOrientedTriangle(a: p00, b: p10, c: p11, patchIndex: patchIndex, to: &triangles)
-    appendOrientedTriangle(a: p00, b: p11, c: p01, patchIndex: patchIndex, to: &triangles)
+    let x0 = gridCoordinate(leaf.u0, offset: patch.column)
+    let x1 = gridCoordinate(leaf.u1, offset: patch.column)
+    let y0 = gridCoordinate(leaf.v0, offset: patch.row)
+    let y1 = gridCoordinate(leaf.v1, offset: patch.row)
+    let xRange = x0...x1
+    let yRange = y0...y1
+    let top = edgeBreakpoints.horizontal[y0, default: []]
+      .filter { xRange.contains($0) }
+      .sorted()
+    let right = edgeBreakpoints.vertical[x1, default: []]
+      .filter { yRange.contains($0) }
+      .sorted()
+    let bottom = edgeBreakpoints.horizontal[y1, default: []]
+      .filter { xRange.contains($0) }
+      .sorted(by: >)
+    let left = edgeBreakpoints.vertical[x0, default: []]
+      .filter { yRange.contains($0) }
+      .sorted(by: >)
+
+    var boundary: [GridPoint] = top.map { GridPoint(x: $0, y: y0) }
+    boundary.append(contentsOf: right.lazy.filter { $0 > y0 }.map { GridPoint(x: x1, y: $0) })
+    boundary.append(contentsOf: bottom.lazy.filter { $0 < x1 }.map { GridPoint(x: $0, y: y1) })
+    boundary.append(
+      contentsOf: left.lazy.filter { $0 > y0 && $0 < y1 }.map { GridPoint(x: x0, y: $0) }
+    )
+    precondition(boundary.count >= 4)
+
+    let vertices = boundary.map { vertex(at: $0, patch: patch) }
+    if vertices.count == 4 {
+      appendOrientedTriangle(
+        a: vertices[0],
+        b: vertices[1],
+        c: vertices[2],
+        patchIndex: leaf.patchIndex,
+        to: &triangles
+      )
+      appendOrientedTriangle(
+        a: vertices[0],
+        b: vertices[2],
+        c: vertices[3],
+        patchIndex: leaf.patchIndex,
+        to: &triangles
+      )
+      return
+    }
+
+    let centerParameter = SIMD2<Float>(
+      (leaf.u0 + leaf.u1) * 0.5,
+      (leaf.v0 + leaf.v1) * 0.5
+    )
+    let center = Vertex(
+      position: patch.positions.evaluate(u: centerParameter.x, v: centerParameter.y),
+      parameter: centerParameter
+    )
+    for index in vertices.indices {
+      appendOrientedTriangle(
+        a: center,
+        b: vertices[index],
+        c: vertices[(index + 1) % vertices.count],
+        patchIndex: leaf.patchIndex,
+        to: &triangles
+      )
+    }
+  }
+
+  private static func gridCoordinate(_ parameter: Float, offset: Int) -> Int {
+    let scale = tessellationGridScale
+    return (offset * scale) + Int((parameter * Float(scale)).rounded())
+  }
+
+  private static func vertex(at point: GridPoint, patch: Patch) -> Vertex {
+    let scale = tessellationGridScale
+    let parameter = SIMD2<Float>(
+      Float(point.x - (patch.column * scale)) / Float(scale),
+      Float(point.y - (patch.row * scale)) / Float(scale)
+    )
+    return Vertex(
+      position: patch.positions.evaluate(u: parameter.x, v: parameter.y),
+      parameter: parameter
+    )
   }
 
   private static func appendOrientedTriangle(
