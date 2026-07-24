@@ -18,19 +18,22 @@ public struct PerfRunConfig: Equatable, Sendable {
   public var iterations: Int
   public var artifactsRoot: String
   public var configuration: String
+  public var terminalSize: PerfTerminalSize?
 
   public init(
     scenario: PerfScenarioName,
     modes: [RuntimeRenderMode] = defaultModes,
     iterations: Int = defaultIterations,
     artifactsRoot: String = defaultArtifactsRoot,
-    configuration: String = defaultConfiguration
+    configuration: String = defaultConfiguration,
+    terminalSize: PerfTerminalSize? = nil
   ) {
     self.scenario = scenario
     self.modes = modes
     self.iterations = iterations
     self.artifactsRoot = artifactsRoot
     self.configuration = configuration
+    self.terminalSize = terminalSize
   }
 }
 
@@ -79,6 +82,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticTextShimmer = "synthetic-text-shimmer"
   case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
   case syntheticObservableFanout = "synthetic-observable-fanout"
+  case syntheticMeshGradient = "synthetic-mesh-gradient"
   case sheetOpenLatency = "sheet-open-latency"
   case galleryTabSwitch = "gallery-tab-switch"
   case fileBrowserSelection = "file-browser-selection"
@@ -108,6 +112,7 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
   case unknownScenario(String)
   case compareArgumentCount(Int)
   case invalidSigma(String)
+  case invalidTerminalSize(String)
 
   public var description: String {
     switch self {
@@ -135,6 +140,8 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
       return "compare expects 2 run directories, got \(count)."
     case .invalidSigma(let value):
       return "invalid sigma '\(value)'. Use a non-negative number."
+    case .invalidTerminalSize(let value):
+      return "invalid terminal size '\(value)'. Use positive CxR dimensions."
     }
   }
 
@@ -180,6 +187,7 @@ public enum PerfCommandParser {
     var iterations = PerfRunConfig.defaultIterations
     var artifactsRoot = PerfRunConfig.defaultArtifactsRoot
     var configuration = PerfRunConfig.defaultConfiguration
+    var terminalSize: PerfTerminalSize?
 
     var index = arguments.startIndex
     while index < arguments.endIndex {
@@ -204,6 +212,9 @@ public enum PerfCommandParser {
         artifactsRoot = try value(after: argument, in: arguments, at: &index)
       case "--configuration":
         configuration = try value(after: argument, in: arguments, at: &index)
+      case "--terminal-size":
+        let value = try value(after: argument, in: arguments, at: &index)
+        terminalSize = try parseTerminalSize(value)
       default:
         if argument.hasPrefix("-") {
           throw PerfParseError.unknownOption(argument)
@@ -222,7 +233,8 @@ public enum PerfCommandParser {
       modes: modes,
       iterations: iterations,
       artifactsRoot: artifactsRoot,
-      configuration: configuration
+      configuration: configuration,
+      terminalSize: terminalSize
     )
   }
 
@@ -279,6 +291,23 @@ public enum PerfCommandParser {
     guard arguments.isEmpty else {
       throw PerfParseError.unexpectedArgument(arguments[0])
     }
+  }
+
+  private static func parseTerminalSize(_ value: String) throws -> PerfTerminalSize {
+    let parts = value.split(
+      omittingEmptySubsequences: false,
+      whereSeparator: { $0 == "x" || $0 == "X" }
+    )
+    guard
+      parts.count == 2,
+      let columns = Int(parts[0]),
+      let rows = Int(parts[1]),
+      columns > 0,
+      rows > 0
+    else {
+      throw PerfParseError.invalidTerminalSize(value)
+    }
+    return PerfTerminalSize(columns: columns, rows: rows)
   }
 
   private static func value(

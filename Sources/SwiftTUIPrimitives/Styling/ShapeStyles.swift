@@ -89,6 +89,7 @@ public enum AnyShapeStyle: Equatable, Sendable {
   case color(Color)
   case linearGradient(LinearGradient)
   case radialGradient(RadialGradient)
+  case meshGradient(MeshGradient)
   indirect case tileStyle(TileStyle)
   case terminalChrome(TerminalChromeStyle)
   indirect case opacity(AnyShapeStyle, Double)
@@ -130,6 +131,17 @@ extension ShapeStyle {
           center: gradient.center,
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
+        ))
+    case .meshGradient(let gradient):
+      return .meshGradient(
+        .init(
+          width: gradient.width,
+          height: gradient.height,
+          points: gradient.points,
+          colors: gradient.colors.map { $0.opacity(clamped) },
+          background: gradient.background.opacity(clamped),
+          smoothsColors: gradient.smoothsColors,
+          colorSpace: gradient.colorSpace
         ))
     case .tileStyle(let tile):
       return .tileStyle(tile.applyingOpacity(clamped))

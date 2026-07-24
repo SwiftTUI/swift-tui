@@ -25,7 +25,8 @@ extension Rasterizer {
     }
     let foregroundColorMode = resolvedColorMode(
       from: style,
-      environment: environment
+      environment: environment,
+      bounds: shapeBounds
     )
 
     // Curved shapes draw their outline onto a Braille canvas so the
@@ -246,7 +247,8 @@ extension Rasterizer {
 
     let foregroundColorMode = resolvedColorMode(
       from: style,
-      environment: environment
+      environment: environment,
+      bounds: bounds
     )
     let resolvedSet = strokeStyle.borderSet
     let glyphs = BorderGlyphSet(borderSet: resolvedSet)

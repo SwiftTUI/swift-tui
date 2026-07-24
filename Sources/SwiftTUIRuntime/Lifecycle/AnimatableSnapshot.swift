@@ -168,6 +168,8 @@ package struct AnimatableSnapshot: Sendable {
       return AnyAnimatable(gradient)
     case .radialGradient(let gradient):
       return AnyAnimatable(gradient)
+    case .meshGradient(let gradient):
+      return AnyAnimatable(gradient)
     case .tileStyle(let tile):
       return AnyAnimatable(tile)
     case .opacity(let inner, _):

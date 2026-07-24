@@ -552,6 +552,7 @@ classifications:
     - SwiftTUIGraph.MatchedGeometryKey
     - SwiftTUIGraph.MatchedGeometryNamespace
     - SwiftTUIPrimitives.Matrix3x3
+    - SwiftTUIPrimitives.MeshGradient
     - SwiftTUICore.MeasurementCacheMetrics
     - SwiftTUIPrimitives.MixingMethod
     - SwiftTUIPrimitives.MonotonicInstant

@@ -137,6 +137,11 @@ private func resolveStyleColorResult(
       return .failure(.emptyGradient)
     }
     return .success(firstColor)
+  case .meshGradient(let gradient):
+    guard let firstColor = gradient.colors.first else {
+      return .failure(.emptyGradient)
+    }
+    return .success(firstColor)
   case .tileStyle(let tile):
     return resolveStyleColorResult(
       style: tile.foreground.style,

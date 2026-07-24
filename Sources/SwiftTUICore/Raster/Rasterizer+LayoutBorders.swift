@@ -56,47 +56,47 @@ extension Rasterizer {
       perimeterColors = nil
     }
 
-    // Pre-resolve per-side foreground colors so we don't re-run the
-    // shape-style resolver once per cell.  A nil per-side color falls
-    // back to the theme foreground at draw time.  When a perimeter
+    // Prepare each distinct side style once so gradient geometry is shared
+    // by every perimeter sample. A nil per-side mode falls back to the theme
+    // foreground at draw time. When a perimeter
     // blend is active these are unused (the per-cell lookup wins).
-    let topForeground = resolvedBorderSideColor(
+    let topForeground = resolvedBorderSideColorMode(
       foreground?.foregroundStyle(for: .top),
       environment: environment,
       bounds: outer
     )
-    let bottomForeground = resolvedBorderSideColor(
+    let bottomForeground = resolvedBorderSideColorMode(
       foreground?.foregroundStyle(for: .bottom),
       environment: environment,
       bounds: outer
     )
-    let leftForeground = resolvedBorderSideColor(
+    let leftForeground = resolvedBorderSideColorMode(
       foreground?.foregroundStyle(for: .left),
       environment: environment,
       bounds: outer
     )
-    let rightForeground = resolvedBorderSideColor(
+    let rightForeground = resolvedBorderSideColorMode(
       foreground?.foregroundStyle(for: .right),
       environment: environment,
       bounds: outer
     )
 
-    let topBackground = resolvedBorderSideColor(
+    let topBackground = resolvedBorderSideColorMode(
       background?.backgroundStyle(for: .top),
       environment: environment,
       bounds: outer
     )
-    let bottomBackground = resolvedBorderSideColor(
+    let bottomBackground = resolvedBorderSideColorMode(
       background?.backgroundStyle(for: .bottom),
       environment: environment,
       bounds: outer
     )
-    let leftBackground = resolvedBorderSideColor(
+    let leftBackground = resolvedBorderSideColorMode(
       background?.backgroundStyle(for: .left),
       environment: environment,
       bounds: outer
     )
-    let rightBackground = resolvedBorderSideColor(
+    let rightBackground = resolvedBorderSideColorMode(
       background?.backgroundStyle(for: .right),
       environment: environment,
       bounds: outer
@@ -123,12 +123,14 @@ extension Rasterizer {
             width: outer.size.width,
             height: outer.size.height,
             perimeter: perimeterColors
-          ) ?? topForeground ?? environment.theme.foreground
+          )
+          ?? resolvedBorderSideColor(topForeground, bounds: outer, x: x, y: y)
+          ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: glyphWidth,
           foreground: cellForeground,
-          background: topBackground,
+          background: resolvedBorderSideColor(topBackground, bounds: outer, x: x, y: y),
           atX: x,
           y: y,
           cells: &cells,
@@ -164,12 +166,14 @@ extension Rasterizer {
             width: outer.size.width,
             height: outer.size.height,
             perimeter: perimeterColors
-          ) ?? bottomForeground ?? environment.theme.foreground
+          )
+          ?? resolvedBorderSideColor(bottomForeground, bounds: outer, x: x, y: y)
+          ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: glyphWidth,
           foreground: cellForeground,
-          background: bottomBackground,
+          background: resolvedBorderSideColor(bottomBackground, bounds: outer, x: x, y: y),
           atX: x,
           y: y,
           cells: &cells,
@@ -204,12 +208,14 @@ extension Rasterizer {
             width: outer.size.width,
             height: outer.size.height,
             perimeter: perimeterColors
-          ) ?? leftForeground ?? environment.theme.foreground
+          )
+          ?? resolvedBorderSideColor(leftForeground, bounds: outer, x: x, y: y)
+          ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: leftWidth,
           foreground: cellForeground,
-          background: leftBackground,
+          background: resolvedBorderSideColor(leftBackground, bounds: outer, x: x, y: y),
           atX: x,
           y: y,
           cells: &cells,
@@ -244,12 +250,14 @@ extension Rasterizer {
             width: outer.size.width,
             height: outer.size.height,
             perimeter: perimeterColors
-          ) ?? rightForeground ?? environment.theme.foreground
+          )
+          ?? resolvedBorderSideColor(rightForeground, bounds: outer, x: x, y: y)
+          ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: rightWidth,
           foreground: cellForeground,
-          background: rightBackground,
+          background: resolvedBorderSideColor(rightBackground, bounds: outer, x: x, y: y),
           atX: x,
           y: y,
           cells: &cells,
@@ -293,10 +301,10 @@ extension Rasterizer {
     bottomWidth: Int,
     leftWidth: Int,
     rightWidth: Int,
-    topForeground: Color?,
-    bottomForeground: Color?,
-    topBackground: Color?,
-    bottomBackground: Color?,
+    topForeground: ResolvedShapeColorMode?,
+    bottomForeground: ResolvedShapeColorMode?,
+    topBackground: ResolvedShapeColorMode?,
+    bottomBackground: ResolvedShapeColorMode?,
     perimeterColors: [Color]?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
@@ -316,13 +324,25 @@ extension Rasterizer {
           width: outer.size.width,
           height: outer.size.height,
           perimeter: perimeterColors
-        ) ?? topForeground ?? environment.theme.foreground
+        )
+        ?? resolvedBorderSideColor(
+          topForeground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        )
+        ?? environment.theme.foreground
       writeBorderGlyphs(
         set.topLeading,
         atX: cornerX,
         y: cornerY,
         foreground: cornerForeground,
-        background: topBackground,
+        background: resolvedBorderSideColor(
+          topBackground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        ),
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
@@ -341,13 +361,25 @@ extension Rasterizer {
           width: outer.size.width,
           height: outer.size.height,
           perimeter: perimeterColors
-        ) ?? topForeground ?? environment.theme.foreground
+        )
+        ?? resolvedBorderSideColor(
+          topForeground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        )
+        ?? environment.theme.foreground
       writeBorderGlyphs(
         set.topTrailing,
         atX: cornerX,
         y: cornerY,
         foreground: cornerForeground,
-        background: topBackground,
+        background: resolvedBorderSideColor(
+          topBackground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        ),
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
@@ -366,13 +398,25 @@ extension Rasterizer {
           width: outer.size.width,
           height: outer.size.height,
           perimeter: perimeterColors
-        ) ?? bottomForeground ?? environment.theme.foreground
+        )
+        ?? resolvedBorderSideColor(
+          bottomForeground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        )
+        ?? environment.theme.foreground
       writeBorderGlyphs(
         set.bottomLeading,
         atX: cornerX,
         y: cornerY,
         foreground: cornerForeground,
-        background: bottomBackground,
+        background: resolvedBorderSideColor(
+          bottomBackground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        ),
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
@@ -391,13 +435,25 @@ extension Rasterizer {
           width: outer.size.width,
           height: outer.size.height,
           perimeter: perimeterColors
-        ) ?? bottomForeground ?? environment.theme.foreground
+        )
+        ?? resolvedBorderSideColor(
+          bottomForeground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        )
+        ?? environment.theme.foreground
       writeBorderGlyphs(
         set.bottomTrailing,
         atX: cornerX,
         y: cornerY,
         foreground: cornerForeground,
-        background: bottomBackground,
+        background: resolvedBorderSideColor(
+          bottomBackground,
+          bounds: outer,
+          x: cornerX,
+          y: cornerY
+        ),
         cells: &cells,
         clip: clip,
         blendMode: blendMode,
@@ -459,21 +515,35 @@ extension Rasterizer {
     return nil
   }
 
-  internal func resolvedBorderSideColor(
+  internal func resolvedBorderSideColorMode(
     _ style: AnyShapeStyle?,
     environment: StyleEnvironmentSnapshot,
     bounds: CellRect
-  ) -> Color? {
+  ) -> ResolvedShapeColorMode? {
     guard let style else {
       return nil
     }
-    return resolveColor(
+    return resolvedColorMode(
       from: style,
       environment: environment,
-      bounds: bounds,
-      sampleX: bounds.origin.x,
-      sampleY: bounds.origin.y
+      bounds: bounds
     )
+  }
+
+  internal func resolvedBorderSideColor(
+    _ mode: ResolvedShapeColorMode?,
+    bounds: CellRect,
+    x: Int,
+    y: Int
+  ) -> Color? {
+    mode.flatMap {
+      resolveColor(
+        from: $0,
+        bounds: bounds,
+        sampleX: x,
+        sampleY: y
+      )
+    }
   }
 
   internal func writeBorderGlyph(

@@ -67,8 +67,43 @@ struct PerfRunConfigTests {
             modes: [.sync, .async, .asyncNoCancel, .asyncNoDrop],
             iterations: 7,
             artifactsRoot: ".perf/custom",
-            configuration: "debug"
+            configuration: "debug",
+            terminalSize: nil
           )))
+  }
+
+  @Test("run command parses a terminal size")
+  func runCommandParsesTerminalSize() throws {
+    let command = try PerfCommandParser.parse([
+      "run",
+      "--scenario",
+      "synthetic-mesh-gradient",
+      "--terminal-size",
+      "160x48",
+    ])
+
+    #expect(
+      command
+        == .run(
+          PerfRunConfig(
+            scenario: .syntheticMeshGradient,
+            terminalSize: PerfTerminalSize(columns: 160, rows: 48)
+          )))
+  }
+
+  @Test("run command rejects malformed terminal sizes")
+  func runCommandRejectsMalformedTerminalSizes() {
+    for value in ["160", "0x48", "80x-1", "widex24", "80x24x2"] {
+      #expect(throws: PerfParseError.invalidTerminalSize(value)) {
+        try PerfCommandParser.parse([
+          "run",
+          "--scenario",
+          "synthetic-mesh-gradient",
+          "--terminal-size",
+          value,
+        ])
+      }
+    }
   }
 
   @Test("run command rejects unknown scenario with known names")
@@ -83,7 +118,7 @@ struct PerfRunConfigTests {
 
     #expect(
       error?.description
-        == "unknown scenario 'missing-scenario'. Known scenarios: canvas-partial-reuse, example-app-shell-workflow, file-browser-selection, gallery-animation-click, gallery-tab-switch, gif-playback, layout-scroll-burst, lazy-list-1k, lazy-vstack-scroll, memo-equatable-boundary, sheet-open-latency, synthetic-continuous-animation, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-single-tween, synthetic-text-shimmer, table-1kx4, text-input-editing."
+        == "unknown scenario 'missing-scenario'. Known scenarios: canvas-partial-reuse, example-app-shell-workflow, file-browser-selection, gallery-animation-click, gallery-tab-switch, gif-playback, layout-scroll-burst, lazy-list-1k, lazy-vstack-scroll, memo-equatable-boundary, sheet-open-latency, synthetic-continuous-animation, synthetic-mesh-gradient, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-single-tween, synthetic-text-shimmer, table-1kx4, text-input-editing."
     )
   }
 

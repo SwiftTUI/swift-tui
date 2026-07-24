@@ -33,11 +33,18 @@ package struct Rasterizer: Sendable {
     }
   }
 
-  internal enum ResolvedShapeColorMode {
+  internal indirect enum ResolvedShapeColorMode {
     case constant(Color?)
     case sampled(LinearGradient)
     case sampledRadial(RadialGradient)
-    case tile(TileStyle)
+    case sampledMesh(PreparedMeshGradient)
+    case tile(ResolvedTileColorMode)
+  }
+
+  internal struct ResolvedTileColorMode {
+    var pattern: TileStyle.Pattern
+    var foreground: ResolvedShapeColorMode
+    var background: ResolvedShapeColorMode?
   }
 
   private var incrementalVerificationPolicy: IncrementalRasterVerificationPolicy

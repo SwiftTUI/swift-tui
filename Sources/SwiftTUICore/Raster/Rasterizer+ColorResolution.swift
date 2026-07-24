@@ -283,6 +283,7 @@ extension Rasterizer {
       from: resolvedColorMode(
         from: style,
         environment: environment,
+        bounds: bounds,
         depth: depth
       ),
       bounds: bounds,
@@ -294,6 +295,7 @@ extension Rasterizer {
   internal func resolvedColorMode(
     from style: AnyShapeStyle,
     environment: StyleEnvironmentSnapshot,
+    bounds: CellRect,
     depth: Int = 0
   ) -> ResolvedShapeColorMode {
     guard depth < 8 else {
@@ -307,8 +309,39 @@ extension Rasterizer {
       return .sampled(gradient)
     case .radialGradient(let gradient):
       return .sampledRadial(gradient)
+    case .meshGradient(let gradient):
+      return .sampledMesh(
+        PreparedMeshGradient(
+          input: MeshGradientRasterInput(
+            width: gradient.width,
+            height: gradient.height,
+            points: gradient.points,
+            colors: gradient.colors,
+            background: gradient.background,
+            smoothsColors: gradient.smoothsColors,
+            colorSpace: gradient.colorSpace == .device ? .device : .perceptual
+          ),
+          bounds: bounds
+        ))
     case .tileStyle(let tile):
-      return .tile(tile)
+      return .tile(
+        ResolvedTileColorMode(
+          pattern: tile.pattern,
+          foreground: resolvedColorMode(
+            from: tile.foreground.style,
+            environment: environment,
+            bounds: bounds,
+            depth: depth + 1
+          ),
+          background: tile.background.map {
+            resolvedColorMode(
+              from: $0.style,
+              environment: environment,
+              bounds: bounds,
+              depth: depth + 1
+            )
+          }
+        ))
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
@@ -316,6 +349,7 @@ extension Rasterizer {
           appearance: environment.appearance
         ),
         environment: environment,
+        bounds: bounds,
         depth: depth + 1
       )
     case .semantic(let role):
@@ -334,15 +368,35 @@ extension Rasterizer {
       return resolvedColorMode(
         from: resolvedStyle,
         environment: environment,
+        bounds: bounds,
         depth: depth + 1
       )
     case .opacity(let inner, let amount):
       guard amount > 0 else {
         return .constant(nil)
       }
+      if case .meshGradient(let gradient) = inner {
+        return resolvedColorMode(
+          from: .meshGradient(
+            MeshGradient(
+              width: gradient.width,
+              height: gradient.height,
+              points: gradient.points,
+              colors: gradient.colors.map { $0.opacity(amount) },
+              background: gradient.background.opacity(amount),
+              smoothsColors: gradient.smoothsColors,
+              colorSpace: gradient.colorSpace
+            )
+          ),
+          environment: environment,
+          bounds: bounds,
+          depth: depth + 1
+        )
+      }
       let innerMode = resolvedColorMode(
         from: inner,
         environment: environment,
+        bounds: bounds,
         depth: depth + 1
       )
       switch innerMode {
@@ -370,8 +424,15 @@ extension Rasterizer {
           endRadius: gradient.endRadius
         )
         return .sampledRadial(faded)
+      case .sampledMesh(let gradient):
+        return .sampledMesh(gradient.applyingOpacity(amount))
       case .tile(let tile):
-        return .tile(tile.applyingOpacity(amount))
+        return .tile(
+          ResolvedTileColorMode(
+            pattern: tile.pattern,
+            foreground: applyingOpacity(amount, to: tile.foreground),
+            background: tile.background.map { applyingOpacity(amount, to: $0) }
+          ))
       }
     }
   }
@@ -399,31 +460,37 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
+    case .sampledMesh(let gradient):
+      return gradient.color(atCellX: sampleX, y: sampleY)
     case .tile(let tile):
       // Callers that reduce a tile style to a scalar color use the
       // foreground's representative color when one is available. The
       // per-cell glyph write path bypasses this helper and consults the
       // ``TileStyle`` directly via ``resolvedTileCellStyle``.
-      return tile.foreground.representativeColor
+      return resolveColor(
+        from: tile.foreground,
+        bounds: bounds,
+        sampleX: sampleX,
+        sampleY: sampleY
+      )
     }
   }
 
   internal func resolvedTileCellStyle(
-    _ tile: TileStyle,
+    _ tile: ResolvedTileColorMode,
     bounds: CellRect,
     sampleX: Int,
-    sampleY: Int,
-    environment: StyleEnvironmentSnapshot
+    sampleY: Int
   ) -> ResolvedTextStyle? {
     let fg = resolveColor(
-      from: resolvedColorMode(from: tile.foreground.style, environment: environment),
+      from: tile.foreground,
       bounds: bounds,
       sampleX: sampleX,
       sampleY: sampleY
     )
     let bg = tile.background.flatMap {
       resolveColor(
-        from: resolvedColorMode(from: $0.style, environment: environment),
+        from: $0,
         bounds: bounds,
         sampleX: sampleX,
         sampleY: sampleY
@@ -451,6 +518,46 @@ extension Rasterizer {
       )
     )
     return resolvedStyle.isDefault ? nil : resolvedStyle
+  }
+
+  private func applyingOpacity(
+    _ amount: Double,
+    to mode: ResolvedShapeColorMode
+  ) -> ResolvedShapeColorMode {
+    switch mode {
+    case .constant(let color):
+      return .constant(color?.opacity(amount))
+    case .sampled(let gradient):
+      return .sampled(
+        LinearGradient(
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
+          startPoint: gradient.startPoint,
+          endPoint: gradient.endPoint
+        ))
+    case .sampledRadial(let gradient):
+      return .sampledRadial(
+        RadialGradient(
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius
+        ))
+    case .sampledMesh(let gradient):
+      return .sampledMesh(gradient.applyingOpacity(amount))
+    case .tile(let tile):
+      return .tile(
+        ResolvedTileColorMode(
+          pattern: tile.pattern,
+          foreground: applyingOpacity(amount, to: tile.foreground),
+          background: tile.background.map { applyingOpacity(amount, to: $0) }
+        ))
+    }
   }
 
   internal func semanticStyleCandidate(

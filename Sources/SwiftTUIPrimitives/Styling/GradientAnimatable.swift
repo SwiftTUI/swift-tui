@@ -90,3 +90,56 @@ extension RadialGradient: Animatable {
     }
   }
 }
+
+extension MeshGradient: Animatable {
+  public typealias PointData = AnimatablePair<Double, Double>
+  public typealias PointsData = AnimatableArray<PointData>
+  public typealias ColorsData = AnimatableArray<Color.AnimatableData>
+  public typealias ControlsData = AnimatablePair<PointsData, ColorsData>
+  public typealias AnimatableData = AnimatablePair<ControlsData, Color.AnimatableData>
+
+  public var animatableData: AnimatableData {
+    get {
+      AnimatablePair(
+        ControlsData(
+          PointsData(points.map { PointData(Double($0.x), Double($0.y)) }),
+          ColorsData(colors.map(\.animatableData))
+        ),
+        background.animatableData
+      )
+    }
+    set {
+      guard
+        newValue.first.first.elements.count == points.count,
+        newValue.first.second.elements.count == colors.count
+      else {
+        return
+      }
+      var newPoints = points
+      var newColors = colors
+      var newBackground = background
+      for index in newPoints.indices {
+        let point = newValue.first.first.elements[index]
+        newPoints[index] = SIMD2<Float>(Float(point.first), Float(point.second))
+      }
+      for index in newColors.indices {
+        newColors[index].animatableData = newValue.first.second.elements[index]
+      }
+      newBackground.animatableData = newValue.second
+      replaceAnimatedValues(
+        points: newPoints,
+        colors: newColors,
+        background: newBackground
+      )
+    }
+  }
+
+  package func isInterpolable(to other: MeshGradient) -> Bool {
+    width == other.width
+      && height == other.height
+      && points.count == other.points.count
+      && colors.count == other.colors.count
+      && smoothsColors == other.smoothsColors
+      && colorSpace == other.colorSpace
+  }
+}

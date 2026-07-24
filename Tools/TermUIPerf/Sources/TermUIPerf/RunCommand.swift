@@ -35,7 +35,8 @@ public enum RunCommand {
             renderMode: mode,
             iterations: 1,
             artifactRoot: artifactRoot,
-            configuration: config.configuration
+            configuration: config.configuration,
+            terminalSize: config.terminalSize
           ))
         modeSummaries.append(result.summary)
         perIteration.append(result)

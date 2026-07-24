@@ -23,7 +23,8 @@ extension Rasterizer {
     }
     let colorMode = resolvedColorMode(
       from: style,
-      environment: environment
+      environment: environment,
+      bounds: shapeBounds
     )
 
     // A nil constant color means the fill is fully transparent — skip painting.
@@ -91,13 +92,13 @@ extension Rasterizer {
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
-    let tileStyle: TileStyle?
+    let tileStyle: ResolvedTileColorMode?
     switch colorMode {
     case .constant(let color):
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
       tileStyle = nil
-    case .sampled, .sampledRadial:
+    case .sampled, .sampledRadial, .sampledMesh:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
@@ -137,8 +138,7 @@ extension Rasterizer {
               tileStyle,
               bounds: shapeBounds,
               sampleX: x,
-              sampleY: y,
-              environment: environment
+              sampleY: y
             ),
             atX: x,
             y: y,
@@ -473,7 +473,11 @@ extension Rasterizer {
       .flatMap { $0.backgroundStyle(for: .top) }
       .flatMap { style in
         resolveColor(
-          from: resolvedColorMode(from: style, environment: environment),
+          from: resolvedColorMode(
+            from: style,
+            environment: environment,
+            bounds: shapeBounds
+          ),
           bounds: shapeBounds,
           sampleX: originX,
           sampleY: originY

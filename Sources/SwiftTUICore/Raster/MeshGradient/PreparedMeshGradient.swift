@@ -210,8 +210,8 @@ package struct PreparedMeshGradient: Sendable {
   private let patches: [Patch]
   private let triangles: [Triangle]
   private let rowBins: [[Int]]
-  private let colors: ColorField
-  private let background: Color
+  private var colors: ColorField
+  private var background: Color
   package let diagnostics: Diagnostics
 
   package init(input: MeshGradientRasterInput, bounds: CellRect) {
@@ -388,6 +388,25 @@ package struct PreparedMeshGradient: Sendable {
       u: min(1, max(0, match.parameter.x)),
       v: min(1, max(0, match.parameter.y))
     )
+  }
+
+  package func applyingOpacity(_ amount: Double) -> PreparedMeshGradient {
+    var copy = self
+    let factor = Float(amount)
+    copy.colors.values = copy.colors.values.map { value in
+      SIMD4<Float>(value.x, value.y, value.z, value.w * factor)
+    }
+    copy.colors.du = copy.colors.du.map { value in
+      SIMD4<Float>(value.x, value.y, value.z, value.w * factor)
+    }
+    copy.colors.dv = copy.colors.dv.map { value in
+      SIMD4<Float>(value.x, value.y, value.z, value.w * factor)
+    }
+    copy.colors.duv = copy.colors.duv.map { value in
+      SIMD4<Float>(value.x, value.y, value.z, value.w * factor)
+    }
+    copy.background = copy.background.opacity(amount)
+    return copy
   }
 
   private static func derivatives<Vector: SIMD>(

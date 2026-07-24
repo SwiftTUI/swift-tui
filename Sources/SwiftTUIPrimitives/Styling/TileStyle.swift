@@ -242,7 +242,7 @@ extension AnyShapeStyle {
       return true
     case .opacity(let inner, _):
       return inner.containsTileStyle
-    case .semantic, .color, .linearGradient, .radialGradient, .terminalChrome:
+    case .semantic, .color, .linearGradient, .radialGradient, .meshGradient, .terminalChrome:
       return false
     }
   }
@@ -255,6 +255,8 @@ extension AnyShapeStyle {
       return gradient.gradient.stops.first?.color
     case .radialGradient(let gradient):
       return gradient.gradient.stops.first?.color
+    case .meshGradient(let gradient):
+      return gradient.colors.first
     case .opacity(let inner, let amount):
       return inner.representativeTilePaintColor?.opacity(amount)
     case .semantic, .terminalChrome, .tileStyle:
@@ -270,6 +272,8 @@ extension AnyShapeStyle {
       return a.gradient.stops.count == b.gradient.stops.count
     case (.radialGradient(let a), .radialGradient(let b)):
       return a.gradient.stops.count == b.gradient.stops.count
+    case (.meshGradient(let a), .meshGradient(let b)):
+      return a.isInterpolable(to: b)
     default:
       return false
     }
@@ -316,6 +320,18 @@ extension AnyShapeStyle {
       data += delta
       a.animatableData = data
       return .radialGradient(a)
+
+    case (.meshGradient(var a), .meshGradient(let b)):
+      guard a.isInterpolable(to: b) else {
+        return .meshGradient(b)
+      }
+      var delta = b.animatableData
+      delta -= a.animatableData
+      delta.scale(by: t)
+      var data = a.animatableData
+      data += delta
+      a.animatableData = data
+      return .meshGradient(a)
 
     default:
       return other

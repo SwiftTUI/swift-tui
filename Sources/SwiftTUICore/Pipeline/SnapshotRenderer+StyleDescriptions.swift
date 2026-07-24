@@ -55,6 +55,8 @@ extension SnapshotRenderer {
       return "linearGradient(\(describe(gradient)))"
     case .radialGradient(let gradient):
       return "radialGradient(\(describe(gradient)))"
+    case .meshGradient(let gradient):
+      return "meshGradient(\(describe(gradient)))"
     case .tileStyle(let tile):
       return "tileStyle(\(describe(tile)))"
     case .terminalChrome(let chromeStyle):
@@ -114,6 +116,19 @@ extension SnapshotRenderer {
     return
       "center=(\(gradient.center.x),\(gradient.center.y)),"
       + "startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
+  }
+
+  private func describe(_ gradient: MeshGradient) -> String {
+    let points = gradient.points.map { "(\($0.x),\($0.y))" }.joined(separator: ",")
+    let colors = gradient.colors.map(describeMeshColor).joined(separator: ",")
+    return
+      "size=\(gradient.width)x\(gradient.height),points=[\(points)],colors=[\(colors)],"
+      + "background=\(describeMeshColor(gradient.background)),"
+      + "smoothsColors=\(gradient.smoothsColors),colorSpace=\(gradient.colorSpace)"
+  }
+
+  private func describeMeshColor(_ color: Color) -> String {
+    "\(color.red),\(color.green),\(color.blue),\(color.alpha)@\(String(reflecting: color.profile))"
   }
 
   private func describe(_ lineStyle: TextLineStyle) -> String {

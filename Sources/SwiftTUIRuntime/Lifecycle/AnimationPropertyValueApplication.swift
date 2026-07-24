@@ -335,6 +335,9 @@ package enum AnimationPropertyValueApplication {
     if let radial = value.unwrap(as: RadialGradient.self) {
       return .radialGradient(radial)
     }
+    if let mesh = value.unwrap(as: MeshGradient.self) {
+      return .meshGradient(mesh)
+    }
     if let tile = value.unwrap(as: TileStyle.self) {
       return .tileStyle(tile)
     }
