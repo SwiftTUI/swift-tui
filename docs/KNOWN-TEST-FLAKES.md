@@ -264,7 +264,7 @@ solo lane (the entry-2 pattern).
 
 ---
 
-### 8. `SwiftTUICoreTests` runner `SIGBUS` — recursive `DrawNode` array dealloc stack overflow
+### 8. `SwiftTUICoreTests` runner `SIGBUS` — recursive `DrawNode` array dealloc stack overflow — FIXED 2026-07-24
 
 **Signature.** The swiftpm test-runner process for the `SwiftTUICoreTests`
 lane dies with `signal code 10` (`SIGBUS`) mid-suite with **zero test
@@ -292,10 +292,30 @@ machine that day.
 DrawNode` frames are the signature. If the faulting stack differs, treat
 it as a new problem.
 
-**Fix shape.** Iterative teardown for deep `DrawNode` arrays — the same
-move that fixed deep *construction* paths (the WASI depth-capped chunked
-resolve, and `6431a966`'s iterative runtime-registration restore walks) —
-or capping the stress fixtures' chain depth below the dealloc budget.
+**Root cause and fix (2026-07-24).** Attributed by re-running the lane with
+`--no-parallel`: the producer is `DrawExtractorTraversalTests` "deeply nested
+placed trees extract without recursion limits", which built a **2000**-deep
+tree. Measured teardown budget for a bare `DrawNode` chain, releasing it on a
+Swift Testing worker (512 KB stack): **OK at 1950, SIGBUS at 2000** — the
+fixture sat ~2% past the cliff, which is exactly why it read as
+load-dependent, and why it went deterministic once `DrawNode` grew. The same
+chain releases fine at **2000 and 8000** on an 8 MB stack, i.e. the budget a
+runtime-owned draw tree actually gets on the main thread — so this was a test
+worker's stack budget, not a product depth limit, and no product change was
+warranted.
+
+Fixed by capping that fixture to `1_024`, the depth every other deep-tree
+stack-safety fixture already uses. The test keeps its teeth: *recursive*
+extraction exhausts the same worker stack at roughly depth 300, so 1024 still
+falsifies a recursive extractor, with ~2× headroom under the cliff for the
+type to keep growing. Verified 3/3 green (668 tests) where the lane had been
+3/3 red, including at a pristine baseline worktree.
+
+If this signature returns, the type has grown enough to move the cliff again —
+re-measure before changing the depth, and prefer iterative teardown for deep
+`DrawNode` arrays (the move that fixed deep *construction* paths: the WASI
+depth-capped chunked resolve, and `6431a966`'s iterative runtime-registration
+restore walks) if the fixtures cannot shrink further.
 
 ---
 

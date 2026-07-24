@@ -7,7 +7,16 @@ import Testing
 struct DrawExtractorTraversalTests {
   @Test("deeply nested placed trees extract without recursion limits")
   func deeplyNestedPlacedTreesExtract() {
-    let depth = 2_000
+    // Matches the 1024 used by every other deep-tree stack-safety fixture.
+    // Extraction is iterative at any depth, but *releasing* the extracted tree
+    // is not: `[DrawNode]` storage tears down one stack frame per level, and a
+    // Swift Testing worker gets a 512 KB stack — measured cliff is 1950...2000
+    // for a bare chain, so the former depth of 2000 killed the runner process
+    // (no assertion failure, just SIGBUS) as soon as `DrawNode` grew. A tree
+    // released on the runtime's 8 MB main thread tears down past 8000 levels.
+    // 1024 keeps this test's teeth — recursive extraction would exhaust the
+    // same worker stack around depth 300 — with room for the type to grow.
+    let depth = 1_024
     let root = makeDeepPlacedTree(depth: depth)
 
     let draw = DrawExtractor().extract(from: root)
