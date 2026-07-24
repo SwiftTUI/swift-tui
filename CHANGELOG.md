@@ -8,6 +8,31 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-24
+
+### Added
+
+- **Mesh gradients.** `MeshGradient` is a public, animatable `ShapeStyle` for
+  validated rectangular point-and-color grids. It renders through fills,
+  strokes, borders, tiles, clipping, blending, retained rendering, terminal,
+  WebHost/WASI, SwiftUI, and Android paths. Device-space and perceptual Oklab
+  interpolation are available through the new `Gradient.ColorSpace` enum.
+  Same-topology meshes interpolate points, colors, and background; incompatible
+  topology or discrete settings snap to the target value.
+- **Mesh performance scenario.** `TermUIPerf synthetic-mesh-gradient` measures
+  static, retained, and animated mesh phases at configurable terminal sizes.
+  The release implementation measured 0.96x the 3-stop linear-gradient CPU
+  cost at 80×24 and 0.89x at 160×48 on the release host, with no dropped frames.
+
+### Changed
+
+- **Host wire styles are appearance-keyed and area-bounded.** Style lookup is
+  now O(1), and a full v2 keyframe rebases the epoch before animated
+  high-cardinality styles can grow transport state without bound.
+- **Source compatibility note:** `AnyShapeStyle` gains the additive
+  `meshGradient` case. Downstream exhaustive switches over this pre-1.0 public
+  enum must handle the new case.
+
 ## [0.1.15] - 2026-07-22
 
 ### Added
