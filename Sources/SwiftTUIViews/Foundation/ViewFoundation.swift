@@ -371,108 +371,43 @@ func resolveView<V: View>(
     context.suppressesStructuralLifecycle,
     for: context.identity
   )
-  // The run loop suppresses retained reuse for focus/press runtime readers and
-  // the old/new focus or press identities. Each reached node still chooses
-  // reuse independently here, so affected nodes additionally skip this path.
+  // Subtree reuse goes through the graph's one door: layer ordering,
+  // profile/suppression policy, the memo exemption, and the graph-side accept
+  // plumbing live in `ViewGraph.reuseResolvedSubtree` next to the
+  // `CommittedFreshness` stamps. This entry point only assembles the seam
+  // inputs from the context and tallies a serve.
   let suppressesRetainedReuse = context.effectiveSuppressesRetainedReuse(
     at: context.identity
   )
-  // The memo layer may additionally be exempted below a focus-presentation
-  // value-verified slot (suppresses-value-verified ⊆ suppresses-retained, so
-  // the extra walk only runs for identities the broad gate already denied).
+  // suppresses-value-verified ⊆ suppresses-retained, so the extra walk only
+  // runs for identities the broad gate already denied.
   let suppressesValueVerifiedReuse =
     suppressesRetainedReuse
     && context.effectiveSuppressesValueVerifiedReuse(at: context.identity)
-  if !stackLeanResolveProfile || leanRetainedReuse,
-    !context.withinChurnedSubtree,
-    !suppressesRetainedReuse,
-    let reused = context.viewGraph?.reusableSnapshot(
-      for: context.identity,
+  if let decision = context.viewGraph?.reuseResolvedSubtree(
+    inputs: ReuseDecisionInputs(
+      identity: context.identity,
       invalidatedIdentities: context.effectiveInvalidatedIdentities,
       invalidationSummary: context.effectiveInvalidationSummary,
       environment: context.environment,
       transaction: context.transaction,
       allowsEmptyInvalidation:
         context.effectiveFiniteSuppressionScopeNamesForcedEvaluation,
-      invalidator: context.invalidationProxy?.invalidator
-    )
-  {
-    // `reusableSnapshot` already recorded this subtree — every non-nil return
-    // routes through `recordReusedSubtree` — so re-recording here only hit the
-    // `wasVisitedThisFrame` guard and returned at the root (a no-op). Drop it
-    // and just restore registrations + tally the reuse.
-    context.viewGraph?.restoreRuntimeRegistrations(
-      for: reused,
-      into: context.runtimeRegistrations
-    )
-    context.recordResolvedReuse(
-      count: reused.subtreeNodeCount
-    )
-    var structurallyStamped = reused
-    structurallyStamped.structuralPath = context.structuralPath
-    context.viewGraph?.reportResolvedLifetimeResult(structurallyStamped)
-    return structurallyStamped
-  }
-
-  // Memoized-body reuse: Layer A above rejected this node, but if it is only a
-  // structural descendant of an invalidated ancestor whose own view value is
-  // structurally unchanged (and it has no recorded dependencies and passes every
-  // non-dirty reuse guard), the body re-run is redundant — reuse the committed
-  // subtree via the same path as Layer A. Behind the focus/press suppression
-  // gate's *value-verified* variant: below a focus-presentation value-verified
-  // slot the memo compare itself proves the handed-down value unchanged, which
-  // is exactly the hazard the value-blind gate exists for. `Equatable`-only, so
-  // it is inert on trees that do not opt in (a non-`Equatable` view leaves
-  // `memoViewValue` nil and bails immediately).
-  if !stackLeanResolveProfile,
-    !context.withinChurnedSubtree,
-    !suppressesValueVerifiedReuse,
-    let reused = context.viewGraph?.memoizedReusableSnapshot(
-      for: context.identity,
-      viewValue: view,
-      environment: context.environment,
-      transaction: context.transaction,
-      invalidatedIdentities: context.effectiveInvalidatedIdentities,
+      invalidator: context.invalidationProxy?.invalidator,
       // Focus/press env keys are excluded from `environmentSnapshot` equality
-      // (they change every focus move), so a node reading them is not verified by
-      // the gate's snapshot conjunct — keep such readers memo-ineligible on every
-      // render path (the run loop's suppression scope is not computed one-shot).
+      // (they change every focus move) — see the door's field doc.
       uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys,
-      invalidator: context.invalidationProxy?.invalidator
-    )
-  {
-    #if DEBUG
-      if suppressesRetainedReuse {
-        // This reuse went through a value-verified-slot exemption; pin the
-        // invariant that makes it sound (see the oracle's doc).
-        context.viewGraph?.debugAssertMemoReuseSubtreeFreeOfRuntimeFocusDependencies(
-          reused,
-          uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys
-        )
-      }
-    #endif
-    context.viewGraph?.restoreRuntimeRegistrations(
-      for: reused,
-      into: context.runtimeRegistrations
-    )
-    context.recordResolvedReuse(count: reused.subtreeNodeCount)
-    var structurallyStamped = reused
-    structurallyStamped.structuralPath = context.structuralPath
-    context.viewGraph?.reportResolvedLifetimeResult(structurallyStamped)
-    return structurallyStamped
-  }
-
-  // Diagnostic (inert unless SWIFTTUI_REUSE_TRACE): this node is being recomputed
-  // rather than reused — record why, to find what re-resolves the background on
-  // sheet/palette open.
-  if ReuseDenialTrace.isEnabled {
-    context.viewGraph?.recordReuseDenialIfTracing(
-      for: context.identity,
-      suppressed: suppressesRetainedReuse,
-      environment: context.environment,
-      transaction: context.transaction,
-      invalidatedIdentities: context.effectiveInvalidatedIdentities
-    )
+      suppressesRetainedReuse: suppressesRetainedReuse,
+      suppressesValueVerifiedReuse: suppressesValueVerifiedReuse,
+      withinChurnedSubtree: context.withinChurnedSubtree,
+      structuralPath: context.structuralPath,
+      runtimeRegistrations: context.runtimeRegistrations
+    ),
+    viewValue: view
+  ) {
+    let served = decision.servedSubtree
+    context.recordResolvedReuse(count: served.subtreeNodeCount)
+    return served
   }
 
   let graphNode = context.viewGraph?.beginEvaluation(
