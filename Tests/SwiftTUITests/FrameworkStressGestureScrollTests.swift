@@ -1260,11 +1260,17 @@ extension FrameworkStressGestureScrollTests {
     defer { harness.shutdown() }
 
     let start = try #require(harness.point(forText: "Nested takeover button"))
-    _ = try harness.drag(from: start, to: Point(x: start.x, y: start.y - 3))
+    let end = Point(x: start.x, y: start.y - 3)
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: end)
 
     #expect(activations.value == 0)
     #expect(outer.value == .zero)
     #expect(inner.value.y == 3)
+
+    // Assert the takeover result before release: `.up` may start a wall-clock
+    // momentum tick, which is outside this test's nested-route ownership scope.
+    _ = try harness.sendMouse(.up(.primary), at: end)
   }
 }
 

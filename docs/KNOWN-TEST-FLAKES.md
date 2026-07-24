@@ -200,7 +200,7 @@ tracker of record**. Re-open criteria:
   corruption — the guard's trap site is the lead; escalate locally on macOS
   with `DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib` on the flaky trio.
 
-### 6. `FrameworkStressGestureScrollTests` — stress gesture scroll 025 nested takeover over-pans on Linux CI
+### 6. `FrameworkStressGestureScrollTests` — stress gesture scroll 025 nested takeover over-pans on Linux CI (resolved 2026-07-23)
 
 **Signature.** "stress gesture scroll 025 nested takeover pans the leaf
 scroll view" fails at `FrameworkStressGestureScrollTests.swift` with
@@ -228,12 +228,13 @@ signature, and the amd64 runner class already hosts the quarantined
 TermUIPerf app-shell stall (entry 2). This is runner-class degradation,
 not a behavior change in the pans themselves.
 
-**How to investigate.** Reproduce under load on Linux (the arm64 container
-via `mise run linux-gate` with a parallel CPU burner, or an amd64 host);
-if it fires, capture `SWIFTTUI_FRAME_TRACE` and check whether the two
-extra rows arrive as post-hand-off momentum ticks; if so, the fix is a
-settle-gated assertion (wait for scroll quiescence) rather than a fixed
-expected offset.
+**Resolution.** The test used `harness.drag`, which sent `.down`, `.dragged`,
+and `.up` before checking the nested scroll offsets. The `.up` event may start
+wall-clock momentum; on the slow amd64 runner, its first 33 ms tick advanced
+the leaf by two more rows before the assertion. The test now sends `.down` and
+`.dragged` directly, asserts nested-route ownership at the end of the authored
+drag, then sends `.up` for cleanup. The arm64 Linux worktree gate passed all
+native lanes in 310 s with this boundary.
 
 ### 7. `GestureRunLoopDispatchTests` — Exclusive tap inter-tap window expiry under parallel-gate starvation
 
