@@ -146,42 +146,18 @@ struct TabStripReuseStampCoherenceTests {
     #expect(runLoop.focusTracker.currentFocusIdentity != nil)
   }
 
-  /// Content-slot nodes (the literal-tabs style's payload wrapper — a resolve
-  /// root the style body re-creates every shell re-resolve, so retained reuse
-  /// consults it by identity) that value-blind Layer-A reuse would still serve
-  /// (`fresh` and not flagged foreign-parented) while the payload child has
-  /// been adopted under a DIFFERENT live parent. Such a node can no longer
-  /// hear the payload subtree change (the upward staleness walks follow the
-  /// child's single `parent` slot), so serving it commits superseded interior
-  /// content and stamps — the divergent-resolvedIdentity capture-host
-  /// orphaning seam behind the gallery crash. Scoped to the slot rather than
-  /// the whole graph: route- and chain-absorb co-listings elsewhere are
-  /// covered by their own soundness protocols (value verification, stamp-claim
-  /// withdrawal) and are not consulted as value-blind reuse roots.
+  /// The graph's stranded-listing freshness oracle
+  /// (``ViewGraph/debugStrandedFreshServableViolations(identityPathSuffix:)``),
+  /// scoped to the literal-tabs style's content slot — the resolve root the
+  /// style body re-creates on every shell re-resolve, so retained reuse
+  /// consults it by identity. Invariant rationale and the slot-scoping
+  /// justification live on the oracle.
   private static func strandedContentSlotViolations(
     in viewGraph: ViewGraph
   ) -> [String] {
-    let graph = viewGraph.debugTotalStateSnapshot()
-    var violations: [String] = []
-    for (nodeID, node) in graph.nodesByNodeID {
-      guard node.isCommittedSnapshotFresh, !node.hasForeignParentedChild else { continue }
-      guard let identity = graph.identityByNodeID[nodeID] else { continue }
-      guard identity.path.hasSuffix("TabBody/ZStack[0]/VStack[1]") else { continue }
-      for childIdentity in node.children where childIdentity != identity {
-        guard
-          let childID = graph.nodeIDByIdentity[childIdentity],
-          childID != nodeID,
-          let child = graph.nodesByNodeID[childID],
-          let childParent = child.parentIdentity,
-          childParent != identity
-        else { continue }
-        violations.append(
-          "servable \(nodeID) at \(identity.path) lists child \(childID) at "
-            + "\(childIdentity.path) whose parent is \(childParent.path)"
-        )
-      }
-    }
-    return violations.sorted()
+    viewGraph.debugStrandedFreshServableViolations(
+      identityPathSuffix: "TabBody/ZStack[0]/VStack[1]"
+    )
   }
 }
 

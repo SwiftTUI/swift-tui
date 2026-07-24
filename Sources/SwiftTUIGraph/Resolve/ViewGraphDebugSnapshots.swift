@@ -67,6 +67,49 @@ extension ViewGraph {
   }
 }
 
+extension ViewGraph {
+  /// Debug oracle for the ``CommittedFreshness`` stranded-listing invariant:
+  /// nodes whose committed snapshot freshness still admits value-blind
+  /// consultation (`isCommittedSnapshotFresh` and NOT flagged
+  /// foreign-parented) while a listed child has been adopted under a
+  /// DIFFERENT live parent. Such a node can no longer hear the child's
+  /// subtree change — the upward staleness walks follow the child's single
+  /// `parent` slot — so serving it commits superseded interior content and
+  /// stamps (the divergent-resolvedIdentity capture-host orphaning seam
+  /// behind the gallery Tab-wrap stamp-coherence crash).
+  ///
+  /// `identityPathSuffix` scopes the walk to one authored slot. A graph-wide
+  /// sweep is NOT globally assertable: route- and chain-absorb co-listings
+  /// legitimately list nodes seated elsewhere and are covered by their own
+  /// soundness protocols (value verification, stamp-claim withdrawal), so
+  /// callers name the resolve-root slot whose listings must stay owned.
+  package func debugStrandedFreshServableViolations(
+    identityPathSuffix: String
+  ) -> [String] {
+    let graph = debugTotalStateSnapshot()
+    var violations: [String] = []
+    for (nodeID, node) in graph.nodesByNodeID {
+      guard node.isCommittedSnapshotFresh, !node.hasForeignParentedChild else { continue }
+      guard let identity = graph.identityByNodeID[nodeID] else { continue }
+      guard identity.path.hasSuffix(identityPathSuffix) else { continue }
+      for childIdentity in node.children where childIdentity != identity {
+        guard
+          let childID = graph.nodeIDByIdentity[childIdentity],
+          childID != nodeID,
+          let child = graph.nodesByNodeID[childID],
+          let childParent = child.parentIdentity,
+          childParent != identity
+        else { continue }
+        violations.append(
+          "servable \(nodeID) at \(identity.path) lists child \(childID) at "
+            + "\(childIdentity.path) whose parent is \(childParent.path)"
+        )
+      }
+    }
+    return violations.sorted()
+  }
+}
+
 func debugObjectDependencySnapshot(
   _ dependencies: [ObjectIdentifier: Set<ViewNodeID>]
 ) -> [ViewGraph.ObjectDependencySnapshot] {

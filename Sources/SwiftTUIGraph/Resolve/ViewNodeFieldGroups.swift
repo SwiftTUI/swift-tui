@@ -89,16 +89,17 @@ extension ViewNode {
   }
 
   /// Reuse/freshness gating consumed by the reconciler's skip fast-paths:
-  /// whether the node needs re-evaluation, whether its committed-children
+  /// whether the node needs re-evaluation, plus the committed-snapshot
+  /// freshness stamps (``CommittedFreshness``) — whether the committed
   /// snapshot still reflects the live descendants, whether an island-seam
-  /// descendant was dirtied (which denies retained reuse), and whether a
-  /// listed child was adopted under a different live parent (which denies
-  /// value-blind retained reuse until this node's own apply re-owns it).
+  /// descendant was dirtied, and whether a listed child was adopted under a
+  /// different live parent. The stamps are owned by `CommittedFreshness`,
+  /// which exposes named transitions and the service queries the reuse gates
+  /// consume; this group stores it whole so checkpoint/restore stay
+  /// compiler-complete.
   package struct ReuseState {
     package var isDirty: Bool = true
-    package var isCommittedSnapshotFresh: Bool = false
-    package var hasStaleIslandDescendant: Bool = false
-    package var hasForeignParentedChild: Bool = false
+    package var freshness: CommittedFreshness = .init()
   }
 
   /// The node's retained per-node state that survives across frames: its `@State`

@@ -135,10 +135,14 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    // 13 FrameState + 7 EvaluationState + 4 ReuseState + 5 PersistentState
-    // (the checkpoint mutation generation is tracker metadata stored outside
-    // the groups; see ViewNode.checkpointMutationGeneration).
-    #expect(groupMembers.count == 29)
+    // 13 FrameState + 7 EvaluationState + 2 ReuseState + 5 PersistentState.
+    // ReuseState nests the three freshness stamps inside its single
+    // `freshness: CommittedFreshness` member; the whole-struct copy keeps
+    // them checkpoint-complete, and the flat debug snapshot still mirrors
+    // each stamp by reading through `reuseState.freshness`. (The checkpoint
+    // mutation generation is tracker metadata stored outside the groups; see
+    // ViewNode.checkpointMutationGeneration.)
+    #expect(groupMembers.count == 27)
 
     let snapshotBody = SourceParsingTestSupport.functionBodyText(
       named: "debugTotalStateSnapshot",

@@ -264,6 +264,41 @@ solo lane (the entry-2 pattern).
 
 ---
 
+### 8. `SwiftTUICoreTests` runner `SIGBUS` — recursive `DrawNode` array dealloc stack overflow
+
+**Signature.** The swiftpm test-runner process for the `SwiftTUICoreTests`
+lane dies with `signal code 10` (`SIGBUS`) mid-suite with **zero test
+assertion failures** — hundreds of tests report `passed`, then the process
+vanishes. The crash report (`~/Library/Logs/DiagnosticReports/
+swiftpm-testing-helper-*.ips`) shows the faulting thread cycling
+`destroy for DrawNode → swift_arrayDestroy →
+_ContiguousArrayStorage.__deallocating_deinit → _swift_release_dealloc`
+all the way down: **stack exhaustion while recursively releasing a deep
+`DrawNode` children chain** (the deep-wrapper-chain layout stress fixtures
+build ~2000-deep trees). Distinct mechanism from entry 1 (torn-pointer
+corruption): same signal family, different producer — check the faulting
+stack before attributing to either.
+
+**Evidence it predates unrelated changes.** 2026-07-23: reproduced
+identically at pristine `8415e3bb` (baseline worktree) and with the
+`CommittedFreshness` refactor applied — same signal, same lane, ~690 tests
+green before death in both. Also observed and baseline-A/B'd as
+pre-existing during the 2026-07-23 Tab-wrap stamp-coherence session.
+Load-dependent: historically intermittent, but reproduced 3/3 on this
+machine that day.
+
+**How to confirm it's this, not your change.** Read the newest
+`swiftpm-testing-helper` crash report; the recursive `destroy for
+DrawNode` frames are the signature. If the faulting stack differs, treat
+it as a new problem.
+
+**Fix shape.** Iterative teardown for deep `DrawNode` arrays — the same
+move that fixed deep *construction* paths (the WASI depth-capped chunked
+resolve, and `6431a966`'s iterative runtime-registration restore walks) —
+or capping the stress fixtures' chain depth below the dealloc budget.
+
+---
+
 ## Fixed flakes
 
 ### 2. TermUIPerf app-shell scenario stall on amd64 CI — QUARANTINED 2026-07-13
