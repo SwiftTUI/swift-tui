@@ -436,9 +436,11 @@ public struct DefaultRenderer {
       frameInstant: frameInstant,
       mode: .abortable
     )
-    return await RuntimeRenderPipeline().renderCancellable(
+    return await RuntimeRenderPipeline().renderAsync(
       head: draft,
-      handlers: CancellableRenderStageHandlers(
+      handlers: AsyncRenderStageHandlers<
+        CancellableFrameTailLayoutStageOutput, CancellableRenderOutcome
+      >(
         animationInjection: { draft in
           renderer.injectAnimations(
             into: draft,
@@ -458,12 +460,26 @@ public struct DefaultRenderer {
             )
           ) {
           case .cancelledBeforeStart:
-            return .cancelledBeforeStart
+            // Finishing here is what "cancelled before start" means: the tail
+            // never runs, so the prepared head is abandoned and the frame
+            // reports the cancellation as its outcome.
+            renderer.abortPreparedFrameHead(draft)
+            return .finished(
+              CancellableRenderOutcome(
+                artifacts: nil,
+                runtimeIssues: draft.runtimeIssues,
+                renderGeneration: draft.renderGeneration,
+                newestDesiredGeneration: nil,
+                tailJobState: .cancelledBeforeStart,
+                tailCancelReason: "newer_render_intent",
+                completedFrameDropDecision: nil
+              )
+            )
           case .output(let layoutStage, let cancellationToken):
             guard let cancellationToken else {
               preconditionFailure("Cancellable layout stage completed without a token.")
             }
-            return .output(
+            return .layout(
               CancellableFrameTailLayoutStageOutput(
                 layoutStage: layoutStage,
                 cancellationToken: cancellationToken
@@ -478,19 +494,7 @@ public struct DefaultRenderer {
             completionToken: layoutStage.cancellationToken
           )
         },
-        cancelledBeforeStart: { draft in
-          renderer.abortPreparedFrameHead(draft)
-          return CancellableRenderOutcome(
-            artifacts: nil,
-            runtimeIssues: draft.runtimeIssues,
-            renderGeneration: draft.renderGeneration,
-            newestDesiredGeneration: nil,
-            tailJobState: .cancelledBeforeStart,
-            tailCancelReason: "newer_render_intent",
-            completedFrameDropDecision: nil
-          )
-        },
-        commitOrDrop: { draft, tailOutput in
+        commit: { draft, tailOutput in
           let newestGeneration = newestDesiredGeneration() ?? draft.renderGeneration
           switch renderer.resolveCompletedFrameCandidate(
             draft: draft,
@@ -736,9 +740,11 @@ public struct DefaultRenderer {
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(draft) {
           case .cancelledBeforeStart:
-            return nil
+            // This path passes no cancellation strategy, so the layout stage
+            // has nothing to cancel against.
+            preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
           case .output(let layoutStage, _):
-            return layoutStage
+            return .layout(layoutStage)
           }
         },
         fusedFrameTail: { draft, layoutStage in

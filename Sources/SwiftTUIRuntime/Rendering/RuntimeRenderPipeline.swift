@@ -34,31 +34,36 @@ struct CancellableFrameTailLayoutStageOutput {
   var cancellationToken: FrameTailJobCancellationToken
 }
 
-enum CancellableFrameTailLayoutStageResult {
-  case output(CancellableFrameTailLayoutStageOutput)
-  case cancelledBeforeStart
+/// What the reconciliation stage produced.
+///
+/// `.layout` continues into the frame tail. `.finished` ends the frame there,
+/// before the tail starts — the cancellable path's cancelled-before-start leg.
+/// A path that cannot be cancelled simply never returns `.finished`, which is
+/// how one executor serves both without a cancellation-shaped special case.
+enum ReconciledLayoutStage<Layout, Outcome> {
+  case layout(Layout)
+  case finished(Outcome)
 }
 
-/// Result of a non-cancellable executor that may elide the frame.
+/// Result of an executor that may elide the frame.
 ///
-/// `.rendered` carries the committed artifacts; `.elided` reports that the
-/// off-screen elision gate fired right after animation injection — the
-/// handler's `commitElidedFrameIfOffscreen` closure has already run the reduced commit
-/// (`commitElidedFrame`), so no tail, present, or artifacts are produced.
-package enum RenderExecutionResult {
-  case rendered(FrameArtifacts)
+/// `.rendered` carries whatever the path's commit stage produced; `.elided`
+/// reports that the off-screen elision gate fired right after animation
+/// injection — the handler's `commitElidedFrameIfOffscreen` closure has already
+/// run the reduced commit (`commitElidedFrame`), so no tail, present, or
+/// artifacts are produced.
+package enum RenderExecutionOutcome<Outcome> {
+  case rendered(Outcome)
   case elided
 }
 
-/// Result of the cancellable executor that may elide the frame.
-///
-/// `.rendered` carries the cancellable outcome (committed, cancelled, or
-/// dropped); `.elided` reports that the off-screen elision gate fired right
-/// after animation injection — see ``RenderExecutionResult``.
-package enum CancellableRenderExecutionResult {
-  case rendered(CancellableRenderOutcome)
-  case elided
-}
+/// The non-cancellable paths commit artifacts directly.
+package typealias RenderExecutionResult = RenderExecutionOutcome<FrameArtifacts>
+
+/// The cancellable path commits an outcome that may instead be cancelled or
+/// dropped.
+package typealias CancellableRenderExecutionResult =
+  RenderExecutionOutcome<CancellableRenderOutcome>
 
 /// Per-stage handlers for the synchronous one-shot render path, keyed by stage.
 ///
@@ -75,31 +80,29 @@ struct OneShotRenderStageHandlers {
   var commit: (FrameHeadDraft, ReconciledFrameTailLayout, FrameTailOutput) -> FrameArtifacts
 }
 
-/// Per-stage handlers for the abortable async render path, keyed by stage.
-struct AsyncRenderStageHandlers {
+/// Per-stage handlers for an asynchronous render path, keyed by stage.
+///
+/// `Layout` is what this path's reconciliation stage hands to its frame tail,
+/// and `Outcome` is what its commit stage produces. The abortable path uses
+/// (`AsyncFrameTailLayoutStageOutput`, `FrameArtifacts`); the cancellable path
+/// carries a cancellation token in its layout and may commit *or drop*, so it
+/// uses (`CancellableFrameTailLayoutStageOutput`, `CancellableRenderOutcome`).
+///
+/// Those two axes were the whole difference between the former `renderAsync`
+/// and `renderCancellable` executors — everything else about the walk was
+/// duplicated, including the stage-order loop and its precondition messages.
+struct AsyncRenderStageHandlers<Layout, Outcome> {
   var animationInjection: (FrameHeadDraft) -> FrameHeadDraft
   /// See ``OneShotRenderStageHandlers/commitElidedFrameIfOffscreen``.
   var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
-  var latePreferenceReconciliation: (FrameHeadDraft) async -> AsyncFrameTailLayoutStageOutput?
-  var fusedFrameTail:
-    (FrameHeadDraft, AsyncFrameTailLayoutStageOutput) async ->
-      AsyncFrameTailDraftOutput
-  var commit: (FrameHeadDraft, AsyncFrameTailDraftOutput) -> FrameArtifacts
-}
-
-/// Per-stage handlers for the cancellable async render path, keyed by stage.
-struct CancellableRenderStageHandlers {
-  var animationInjection: (FrameHeadDraft) -> FrameHeadDraft
-  /// See ``OneShotRenderStageHandlers/commitElidedFrameIfOffscreen``.
-  var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
-  var latePreferenceReconciliation:
-    (FrameHeadDraft) async ->
-      CancellableFrameTailLayoutStageResult
-  var fusedFrameTail:
-    (FrameHeadDraft, CancellableFrameTailLayoutStageOutput) async ->
-      AsyncFrameTailDraftOutput
-  var cancelledBeforeStart: (FrameHeadDraft) -> CancellableRenderOutcome
-  var commitOrDrop: (FrameHeadDraft, AsyncFrameTailDraftOutput) -> CancellableRenderOutcome
+  /// Produces the layout for the tail, or finishes the frame before it starts.
+  ///
+  /// A path with no cancellation returns `.layout` unconditionally; where the
+  /// former executor asserted "non-cancellable frame unexpectedly cancelled",
+  /// that claim now lives in the handler that actually knows it holds.
+  var latePreferenceReconciliation: (FrameHeadDraft) async -> ReconciledLayoutStage<Layout, Outcome>
+  var fusedFrameTail: (FrameHeadDraft, Layout) async -> AsyncFrameTailDraftOutput
+  var commit: (FrameHeadDraft, AsyncFrameTailDraftOutput) -> Outcome
 }
 
 /// Sequenced executor for the composed runtime render path.
@@ -171,69 +174,28 @@ struct RuntimeRenderPipeline: Sendable {
     return .rendered(result)
   }
 
+  /// The asynchronous executor, shared by the abortable and cancellable paths.
+  ///
+  /// The two differ only in what their stages carry — see
+  /// ``AsyncRenderStageHandlers`` — so the walk itself, its early-exit rule,
+  /// and its precondition vocabulary exist once.
   @MainActor
-  func renderAsync(
+  func renderAsync<Layout, Outcome>(
     head draft: FrameHeadDraft,
-    handlers: AsyncRenderStageHandlers
-  ) async -> RenderExecutionResult {
+    handlers: AsyncRenderStageHandlers<Layout, Outcome>
+  ) async -> RenderExecutionOutcome<Outcome> {
     var currentDraft = draft
-    var layoutStage: AsyncFrameTailLayoutStageOutput?
+    var layoutStage: Layout?
     var tailOutput: AsyncFrameTailDraftOutput?
-    var artifacts: FrameArtifacts?
+    var outcome: Outcome?
     var elided = false
 
     for stage in RuntimeRenderStageName.orderedComposition {
-      if elided { break }
-
-      switch stage {
-      case .head:
-        break
-      case .animationInjection:
-        currentDraft = handlers.animationInjection(currentDraft)
-        elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
-      case .latePreferenceReconciliation:
-        guard let layout = await handlers.latePreferenceReconciliation(currentDraft) else {
-          preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
-        }
-        layoutStage = layout
-      case .fusedFrameTail:
-        guard let layout = layoutStage else {
-          preconditionFailure(
-            "fusedFrameTail stage ran before latePreferenceReconciliation.")
-        }
-        tailOutput = await handlers.fusedFrameTail(currentDraft, layout)
-      case .commit:
-        guard let tail = tailOutput else {
-          preconditionFailure("commit stage ran before the frame tail completed.")
-        }
-        artifacts = handlers.commit(currentDraft, tail)
-      }
-    }
-
-    if elided {
-      return .elided
-    }
-    guard let result = artifacts else {
-      preconditionFailure("Render pipeline finished without a commit stage.")
-    }
-    return .rendered(result)
-  }
-
-  @MainActor
-  func renderCancellable(
-    head draft: FrameHeadDraft,
-    handlers: CancellableRenderStageHandlers
-  ) async -> CancellableRenderExecutionResult {
-    var currentDraft = draft
-    var layoutStage: CancellableFrameTailLayoutStageOutput?
-    var tailOutput: AsyncFrameTailDraftOutput?
-    var outcome: CancellableRenderOutcome?
-    var elided = false
-
-    for stage in RuntimeRenderStageName.orderedComposition {
-      // A cancellation observed at the reconciliation stage, or an off-screen
-      // elision observed after animation injection, skips every remaining
-      // stage: the loop stops dispatching work once either is recorded.
+      // A frame finished at the reconciliation stage (cancellation), or an
+      // off-screen elision observed after animation injection, skips every
+      // remaining stage: the loop stops dispatching work once either is
+      // recorded. A path that cannot be cancelled only ever records an outcome
+      // at `.commit`, the last stage, so the first disjunct is vacuous there.
       if outcome != nil || elided { break }
 
       switch stage {
@@ -244,9 +206,9 @@ struct RuntimeRenderPipeline: Sendable {
         elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
       case .latePreferenceReconciliation:
         switch await handlers.latePreferenceReconciliation(currentDraft) {
-        case .cancelledBeforeStart:
-          outcome = handlers.cancelledBeforeStart(currentDraft)
-        case .output(let layout):
+        case .finished(let finished):
+          outcome = finished
+        case .layout(let layout):
           layoutStage = layout
         }
       case .fusedFrameTail:
@@ -259,7 +221,7 @@ struct RuntimeRenderPipeline: Sendable {
         guard let tail = tailOutput else {
           preconditionFailure("commit stage ran before the frame tail completed.")
         }
-        outcome = handlers.commitOrDrop(currentDraft, tail)
+        outcome = handlers.commit(currentDraft, tail)
       }
     }
 

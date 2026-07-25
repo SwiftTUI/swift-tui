@@ -561,7 +561,7 @@ struct OffscreenFrameElisionRuntimeTests {
 
     let result = await RuntimeRenderPipeline().renderAsync(
       head: draft,
-      handlers: AsyncRenderStageHandlers(
+      handlers: AsyncRenderStageHandlers<AsyncFrameTailLayoutStageOutput, FrameArtifacts>(
         animationInjection: { $0 },
         commitElidedFrameIfOffscreen: { _ in true },
         latePreferenceReconciliation: { _ in
