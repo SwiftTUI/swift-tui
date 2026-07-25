@@ -43,7 +43,11 @@ extension TabView {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
-    let options = resolvedOptions(in: context.child(component: .named("TabOptions")))
+    var optionTraversalDivergence: DeclaredChildTraversalDivergence?
+    let options = resolvedOptions(
+      in: context.child(component: .named("TabOptions")),
+      divergence: &optionTraversalDivergence
+    )
     let optionSignature = TabOptionSignature(
       tags: options.map(\.tag),
       labels: options.map(\.label)
@@ -374,7 +378,7 @@ extension TabView {
       in: tabBodyContext
     )
 
-    return ResolvedNode(
+    var node = ResolvedNode(
       identity: context.identity,
       kind: .view("TabView"),
       children: [child],
@@ -382,6 +386,23 @@ extension TabView {
       transactionSnapshot: context.transaction,
       semanticMetadata: tabViewSemanticMetadata()
     )
+    if let optionTraversalDivergence {
+      // Observability-first, like the F166 placement mismatch: a tab showing a
+      // sibling's body is better reported than crashed, and the report names
+      // the shape that produced it.
+      var preferences = node.preferenceValues
+      var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+      let issue = optionTraversalDivergence.runtimeIssue(
+        container: "TabView",
+        identity: context.identity
+      )
+      if !runtimeIssues.contains(issue) {
+        runtimeIssues.append(issue)
+      }
+      preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+      node.preferenceValues = preferences
+    }
+    return node
   }
 
   @MainActor
@@ -487,50 +508,35 @@ extension TabView {
   }
 
   private func resolvedOptions(
-    in context: ResolveContext
+    in context: ResolveContext,
+    divergence: inout DeclaredChildTraversalDivergence?
   ) -> [TabOption] {
-    // Phase 1: walk declared children and peek metadata (tab label + tag)
-    // off each without resolving. Only the active tab's lazy payload enters
-    // the resolve pipeline — inactive tabs never call `beginEvaluation`, so
-    // their `.onAppear` / `.task` handlers do not fire until selected.
-    var peekedEntries: [PeekedTabChildMetadata] = []
-    let declaredContentPayloads = lazyDeclaredBuilderChildren(
+    // Peek each declared child's metadata (tab label + tag) without resolving
+    // it, and carry the deferred payload that will resolve it if selected.
+    // Only the active tab's payload enters the resolve pipeline — inactive
+    // tabs never call `beginEvaluation`, so their `.onAppear` / `.task`
+    // handlers do not fire until selected.
+    let declared = pairedLazyDeclaredChildren(
       from: content,
+      in: context.child(component: .named("TabOptions")),
+      kindName: "Tab",
       debugName: "TabBody"
     )
-    var contentPayloads: [LazySubviewPayload?] = []
-    var nextIndex = 0
-    let childContext = context.child(component: .named("TabOptions"))
-    enumerateDeclaredChildViews(
-      content,
-      in: childContext,
-      kindName: "Tab",
-      nextIndex: &nextIndex
-    ) { child, _, _ in
-      peekedEntries.append(peekTabChildMetadata(from: child))
-      let payloadIndex = contentPayloads.count
-      let contentPayload =
-        declaredContentPayloads.indices.contains(payloadIndex)
-        ? declaredContentPayloads[payloadIndex]
-        : nil
-      contentPayloads.append(contentPayload)
-    }
+    divergence = declared.divergence
 
-    return peekedEntries.enumerated().compactMap { index, entry in
+    // Untagged children are dropped, but their declared position is not: the
+    // payload was already paired by declared index, so a tagless child cannot
+    // shift its siblings' content.
+    return declared.children.enumerated().compactMap { index, child in
+      let entry = peekTabChildMetadata(from: child.view)
       guard let tag = entry.tag else {
         return nil
-      }
-      let label: TabItemLabel
-      if let peekedLabel = entry.label {
-        label = peekedLabel
-      } else {
-        label = TabItemLabel("Tab \(index + 1)")
       }
 
       return TabOption(
         tag: tag,
-        label: label,
-        contentPayload: contentPayloads[index]
+        label: entry.label ?? TabItemLabel("Tab \(index + 1)"),
+        contentPayload: child.payload
       )
     }
   }
