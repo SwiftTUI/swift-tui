@@ -17,6 +17,7 @@ extension RunLoop {
   /// the cancelled/dropped diagnostic records carry the correct frame number.
   func acquireFrameArtifactsAsync(
     scheduledFrame: ScheduledFrame,
+    frameInstant: MonotonicInstant,
     currentState: State,
     eventPump: EventPump?,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
@@ -25,6 +26,7 @@ extension RunLoop {
   ) async -> FrameAcquisitionOutcome {
     let outcome = await renderFrameArtifactsForCurrentMode(
       scheduledFrame: scheduledFrame,
+      frameInstant: frameInstant,
       currentState: currentState,
       eventPump: eventPump,
       renderIntentDiagnostics: renderIntentDiagnostics,
@@ -60,6 +62,7 @@ extension RunLoop {
 
   private func renderFrameArtifactsForCurrentMode(
     scheduledFrame: ScheduledFrame,
+    frameInstant: MonotonicInstant,
     currentState: State,
     eventPump: EventPump?,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
@@ -73,8 +76,9 @@ extension RunLoop {
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
-        context: resolveContext(for: scheduledFrame),
+        context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
         proposal: proposal(),
+        frameInstant: frameInstant,
         elisionCauses: scheduledFrame.causes,
         elisionHasExplicitAnimationTransactions: scheduledFrame
           .hasExplicitAnimationTransactions
@@ -92,8 +96,9 @@ extension RunLoop {
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
-        context: resolveContext(for: scheduledFrame),
+        context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
         proposal: proposal(),
+        frameInstant: frameInstant,
         elisionCauses: scheduledFrame.causes,
         elisionHasExplicitAnimationTransactions: scheduledFrame
           .hasExplicitAnimationTransactions
@@ -108,6 +113,7 @@ extension RunLoop {
     let renderOutcome: CancellableRenderOutcome
     switch await acquireCancellableFrameArtifacts(
       scheduledFrame: scheduledFrame,
+      frameInstant: frameInstant,
       currentState: currentState,
       renderIntentDiagnostics: renderIntentDiagnostics
     ) {
@@ -139,6 +145,7 @@ extension RunLoop {
 
   private func acquireCancellableFrameArtifacts(
     scheduledFrame: ScheduledFrame,
+    frameInstant: MonotonicInstant,
     currentState: State,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics
   ) async -> CancellableRenderExecutionResult {
@@ -148,14 +155,15 @@ extension RunLoop {
           state: currentState,
           focusedIdentity: focusTracker.currentFocusIdentity
         )),
-      context: resolveContext(for: scheduledFrame),
+      context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
       proposal: proposal(),
+      frameInstant: frameInstant,
       elisionCauses: scheduledFrame.causes,
       elisionHasExplicitAnimationTransactions: scheduledFrame
         .hasExplicitAnimationTransactions,
       newestDesiredGeneration: {
         RenderGeneration(
-          self.scheduler.hasPendingFrame(at: .now())
+          self.scheduler.hasPendingFrame(at: frameInstant)
             ? self.nextRenderIntentGeneration
             : renderIntentDiagnostics.desiredGeneration
         )
@@ -171,13 +179,19 @@ extension RunLoop {
       redundantHandlerInstallationsAreVisualOnly: { artifacts in
         self.completedFrameHasStableInteractionRouting(artifacts: artifacts)
       },
-      awaitQueuedCancellationSignal: awaitQueuedTailCancellationSignalForMode,
-      shouldCancelQueued: shouldCancelQueuedTailForMode
+      awaitQueuedCancellationSignal: {
+        await self.awaitQueuedTailCancellationSignalForMode(at: frameInstant)
+      },
+      shouldCancelQueued: {
+        await self.shouldCancelQueuedTailForMode(at: frameInstant)
+      }
     )
   }
 
   @MainActor
-  private func shouldCancelQueuedTailForMode() async -> Bool {
+  private func shouldCancelQueuedTailForMode(
+    at frameInstant: MonotonicInstant
+  ) async -> Bool {
     guard renderMode != .asyncNoCancel else {
       return false
     }
@@ -201,10 +215,12 @@ extension RunLoop {
       )
       return false
     }
-    return scheduler.hasPendingFrame(at: .now())
+    return scheduler.hasPendingFrame(at: frameInstant)
   }
 
-  private func awaitQueuedTailCancellationSignalForMode() async {
+  private func awaitQueuedTailCancellationSignalForMode(
+    at frameInstant: MonotonicInstant
+  ) async {
     guard renderMode != .asyncNoCancel else {
       return
     }
@@ -213,12 +229,16 @@ extension RunLoop {
     guard consecutivePreStartCancelCount < Self.maxConsecutivePreStartCancels else {
       return
     }
-    guard !scheduler.hasPendingFrame(at: .now()) else {
+    guard !scheduler.hasPendingFrame(at: frameInstant) else {
       return
     }
     guard let pendingFrameAwaiter = scheduler as? any PendingFrameAwaiting else {
       return
     }
+    // Deliberately the wall clock, unlike the gate above: this is real-time
+    // waiting for a frame that does not exist yet, not a decision about the
+    // frame in hand. Virtualizing it would suspend forever under a frozen
+    // clock.
     await pendingFrameAwaiter.waitForPendingFrame(at: .now())
   }
 

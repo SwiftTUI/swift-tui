@@ -5890,7 +5890,7 @@ private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
 }
 
 /// A mutable virtual clock for deterministic momentum tests. The run loop's
-/// `frameReadinessClock` reads `now`, which the test steps by the 33 ms tick
+/// `frameClock` reads `now`, which the test steps by the 33 ms tick
 /// cadence so a fling decays in virtual time with no sleeps and no async loop.
 @MainActor
 private final class VirtualClock {
@@ -5936,7 +5936,7 @@ private func mountedMomentumRunLoop<V: View>(
       viewBuilder()
     }
   )
-  runLoop.frameReadinessClock = { [clock] in clock.now }
+  runLoop.frameClock = { [clock] in clock.now }
 
   // Mount the tree synchronously (mirrors RunLoop.run()'s pre-loop bootstrap).
   runLoop.scheduler.requestInvalidation(of: [rootIdentity])

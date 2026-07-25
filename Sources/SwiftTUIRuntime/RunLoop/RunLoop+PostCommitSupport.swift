@@ -128,13 +128,14 @@ extension RunLoop {
   }
 
   func requestNextAnimationFrameIfNeeded(
-    _ animationTick: AnimationTickResult
+    _ animationTick: AnimationTickResult,
+    at frameInstant: MonotonicInstant
   ) {
     guard runtimeConfiguration.motion == .normal else {
       return
     }
 
-    let now = MonotonicInstant.now()
+    let now = frameInstant
     if animationTick.hasPendingWork, let nextDeadline = animationTick.nextDeadline {
       let scheduledDeadline =
         if nextDeadline > now {
@@ -174,14 +175,16 @@ extension RunLoop {
   /// unrelated event happens to wake the loop — the "stuck until you scroll"
   /// symptom. Keep the pump alive so the animation re-drains and its completion
   /// fires on the next committed frame.
-  func requestNextAnimationFrameAfterSkippedFrameIfNeeded() {
+  func requestNextAnimationFrameAfterSkippedFrameIfNeeded(
+    at frameInstant: MonotonicInstant
+  ) {
     let animationController = renderer.internalAnimationController
     guard runtimeConfiguration.motion == .normal,
       animationController.requiresContinuedAnimationFrames
     else {
       return
     }
-    let now = MonotonicInstant.now()
+    let now = frameInstant
     let nextTick = now.advanced(by: animationController.animationFrameInterval)
     // CLAMP, don't guard (F79): this used to decline when
     // `scheduler.hasPendingFrame(at: nextTick)` — but a pending CAUSE

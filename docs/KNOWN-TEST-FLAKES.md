@@ -438,12 +438,14 @@ with zero retained reuse (3/3 under full-gate load on `3aaa8282`), independent o
 the H2 work; passed in isolation.
 
 **Fix.** Two parts:
-1. **Injectable frame-readiness clock.** `RunLoop.frameReadinessClock` (default
-   real `.now()`) now supplies the instant both frame drivers compare against
-   pending scheduler deadlines (`consumeReadyFrame(at:)`). Production behaviour
-   is unchanged; a runtime test can pin it to drive virtual time. Only *frame
-   readiness* routes through it — real-time waiting (the event-pump sleeps) still
-   uses the wall clock.
+1. **Injectable frame clock.** `RunLoop.frameClock` (default real `.now()`, and
+   named `frameReadinessClock` when this flake was fixed) supplies the instant
+   both frame drivers compare against pending scheduler deadlines
+   (`consumeReadyFrame(at:)`). Production behaviour is unchanged; a runtime test
+   can pin it to drive virtual time. The seam has since widened from readiness
+   to the whole frame: it is sampled once per frame and carried as
+   `frameInstant`. Real-time *waiting* (the event-pump sleeps,
+   `waitForPendingFrame`) still uses the wall clock.
 2. **Pinned-instant test.** The test freezes the clock to a single `frozenNow`
    captured before any frame is consumed. Every deadline the off-screen
    animation auto-reschedules lands at the real future (`> frozenNow`), so it is
@@ -577,12 +579,14 @@ sources of test flake:
   primitives in `Tests/Support` instead of `sleep`/polling — see
   `SwiftTUITestSupport.docc` ("Poll-free synchronisation primitives for
   deterministic, flake-resistant tests") and `Synchronising-Without-Polling.md`.
-- **Injectable frame-readiness clock.** A runtime test that drives animation
-  deadlines can pin `RunLoop.frameReadinessClock` to a frozen instant, so the
-  loop decides frame readiness against virtual time instead of the wall clock.
-  Self-rescheduled animation deadlines then land in the real future relative to
-  the frozen instant and stay invisible to the drain, so CPU contention cannot
-  perturb frame counts (see fixed flake #2).
+- **Injectable frame clock.** A runtime test that drives animation deadlines can
+  pin `RunLoop.frameClock` to a frozen instant, so the loop decides frame
+  readiness against virtual time instead of the wall clock. Self-rescheduled
+  animation deadlines then land in the real future relative to the frozen
+  instant and stay invisible to the drain, so CPU contention cannot perturb
+  frame counts (see fixed flake #2). The seam is sampled once per frame and
+  carried as `frameInstant`, so a pinned clock governs the whole frame — the
+  animation stamp and the scheduling gates included — not just readiness.
 - **No wall-clock budget assertions in the gate.** The one wall-clock
   blunder-detector (`RenderPipelineStructureTests.composedRenderTimeBudget`) is
   opt-in behind `STUI_RUN_WALLCLOCK_PERF` and **skipped** by the repo gate; do

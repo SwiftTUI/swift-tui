@@ -106,11 +106,11 @@ extension RunLoop {
     }
     guard scheduledFrame.causes.contains(.deadline) else {
       // Not our cadence tick — keep a deadline armed so the loop wakes to tick.
-      rearmScrollMomentumDeadline(from: frameReadinessClock())
+      rearmScrollMomentumDeadline(from: frameClock())
       return
     }
 
-    let now = scheduledFrame.triggeredDeadline ?? frameReadinessClock()
+    let now = scheduledFrame.triggeredDeadline ?? frameClock()
     for tick in scrollMomentum.step(to: now) where tick.deltaX != 0 || tick.deltaY != 0 {
       let moved = localScrollPositionRegistry.scrollBy(
         x: tick.deltaX,

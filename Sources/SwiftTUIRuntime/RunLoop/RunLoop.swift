@@ -120,16 +120,39 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
   package var lastSeenSoundnessViolationCounts = SoundnessViolationCounts()
 
-  /// Test seam for the **frame-readiness clock**: the instant the drain compares
-  /// against pending scheduler deadlines when deciding which frames are ready to
-  /// consume (`scheduler.consumeReadyFrame(at:)`). Production reads the real
-  /// monotonic clock. A runtime test can pin it to a frozen instant to drive
-  /// virtual time deterministically — an off-screen animation's auto-rescheduled
+  /// Test seam for the **frame clock**: the one clock everything inside a
+  /// frame's lifetime reads. Production reads the real monotonic clock; a
+  /// runtime test can pin it to a frozen or stepped instant to drive virtual
+  /// time deterministically — an off-screen animation's auto-rescheduled
   /// deadlines all land in the real future relative to a frozen `t0`, so they
   /// stay invisible to the drain and cannot perturb frame counts under load.
-  /// Only *frame readiness* routes through this seam; real-time waiting (the
-  /// event-pump sleeps) still uses the wall clock. See `docs/KNOWN-TEST-FLAKES.md`.
-  package var frameReadinessClock: () -> MonotonicInstant = { .now() }
+  ///
+  /// Sampled **once per frame**, at the consume, and carried from there as
+  /// `frameInstant` (`scheduledFrame.triggeredDeadline ?? consumedAt`). Every
+  /// frame-scoped consumer reads that value rather than the clock: readiness,
+  /// the animation timestamp, deadline re-arms, superseded-batch parks, and
+  /// the pre-start-cancel / supersession gates. Re-sampling inside a frame is
+  /// the defect this seam exists to prevent — the gate deciding a frame's fate
+  /// and the consume it gates must agree about what time it is, and under a
+  /// virtual clock two samples do not.
+  ///
+  /// Real-time *waiting* is deliberately outside: the event-pump sleeps, the
+  /// outer wake computation, `waitForPendingFrame`, and input/pointer event
+  /// stamping all still use the wall clock, because they are about the real
+  /// world rather than about this frame.
+  ///
+  /// So are the *between-frames* readiness probes — `run()`'s
+  /// `hasPendingFrame(at:)` checks and the event pump's
+  /// `hadReadyFrameBeforeEvent` — which ask "is there work at all" with no
+  /// frame in hand, and predate this seam. They are consistent in production
+  /// (where this closure *is* the wall clock) but not under a pinned one: a
+  /// far-future `frameClock` makes the drain consume frames the outer probe
+  /// says are not ready. Harmless today because every runtime test that pins
+  /// the clock drives the drain directly rather than through `run()` — but if
+  /// a test ever pins the clock *and* runs the full loop, route these through
+  /// the seam rather than debugging the frame counts.
+  /// See `docs/KNOWN-TEST-FLAKES.md`.
+  package var frameClock: () -> MonotonicInstant = { .now() }
 
   /// Active per-frame diagnostics sink. Installed by the profiling product (via
   /// ``ProfilingRegistry``) or by a runner (via `SceneSessionResources.frameSink`)

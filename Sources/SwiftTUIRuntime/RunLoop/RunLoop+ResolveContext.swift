@@ -5,7 +5,8 @@ import SwiftTUIViews
 // live in `RunLoop+EnvironmentActions.swift`.
 extension RunLoop {
   package func resolveContext(
-    for scheduledFrame: ScheduledFrame
+    for scheduledFrame: ScheduledFrame,
+    frameInstant: MonotonicInstant = .now()
   ) -> ResolveContext {
     let causeSummary = scheduledFrame.causes
       .map(\.rawValue)
@@ -53,7 +54,7 @@ extension RunLoop {
     if !scheduledFrame.supersededAnimationBatchIDs.isEmpty {
       renderer.internalAnimationController.parkSupersededBatchCompletions(
         scheduledFrame.supersededAnimationBatchIDs,
-        at: .now()
+        at: frameInstant
       )
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
@@ -72,7 +73,7 @@ extension RunLoop {
       if !reducedBatchIDs.isEmpty {
         renderer.internalAnimationController.parkSupersededBatchCompletions(
           reducedBatchIDs,
-          at: .now()
+          at: frameInstant
         )
       }
       transactionSnapshot.animationRequest = .disabled

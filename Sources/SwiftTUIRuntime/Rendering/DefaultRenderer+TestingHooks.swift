@@ -14,12 +14,14 @@ extension DefaultRenderer {
   package func prepareFrameHeadForCancellationTesting<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
+    proposal: ProposedSize = .unspecified,
+    frameInstant: MonotonicInstant = .now()
   ) -> FrameHeadDraft {
     prepareFrameHead(
       root,
       context: context,
-      proposal: proposal
+      proposal: proposal,
+      frameInstant: frameInstant
     )
   }
 

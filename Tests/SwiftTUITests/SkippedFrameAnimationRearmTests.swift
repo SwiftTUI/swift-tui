@@ -54,19 +54,22 @@ struct SkippedFrameAnimationRearmTests {
     // The park shape: a pending CAUSE (input) with NO armed deadline.
     scheduler.requestInput()
 
-    runLoop.requestNextAnimationFrameAfterSkippedFrameIfNeeded()
+    // One instant for the whole frame, as the drivers derive it: the re-arm
+    // and the consume that must observe it have to agree about the time.
+    let frameInstant = MonotonicInstant.now()
+    runLoop.requestNextAnimationFrameAfterSkippedFrameIfNeeded(at: frameInstant)
 
     // Draining the pending cause must reveal an armed animation deadline —
     // the guard used to decline here (`hasPendingFrame` was true via the
     // cause alone), leaving nothing armed once this frame was consumed.
-    let frame = try #require(scheduler.consumeReadyFrame(at: .now()))
+    let frame = try #require(scheduler.consumeReadyFrame(at: frameInstant))
     #expect(frame.causes.contains(.input))
     #expect(
       frame.nextDeadline != nil,
       "live animation work must keep a deadline armed across a skipped frame"
     )
-    #expect(!scheduler.hasPendingFrame(at: .now()))
-    #expect(scheduler.nextWakeInstant(after: .now()) != nil)
+    #expect(!scheduler.hasPendingFrame(at: frameInstant))
+    #expect(scheduler.nextWakeInstant(after: frameInstant) != nil)
   }
 }
 

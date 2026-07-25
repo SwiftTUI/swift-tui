@@ -248,7 +248,7 @@ private final class StripWriteHarness<Root: View> {
     runLoop.installFocusTrackerInvalidator()
     // Far-future readiness: every scheduled follow-up frame is consumable in
     // the same drain, so `settle()` reaches a true steady state.
-    runLoop.frameReadinessClock = { .now().advanced(by: .seconds(3600)) }
+    runLoop.frameClock = { .now().advanced(by: .seconds(3600)) }
     self.terminal = terminal
     self.runLoop = runLoop
 

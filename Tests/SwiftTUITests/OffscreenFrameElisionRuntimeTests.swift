@@ -638,7 +638,7 @@ struct OffscreenFrameElisionRuntimeTests {
         OffscreenAnimatedProbe()
       }
     )
-    runLoop.frameReadinessClock = { frozenNow }
+    runLoop.frameClock = { frozenNow }
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
@@ -1289,7 +1289,7 @@ struct OffscreenFrameElisionRuntimeTests {
   /// machine.
   ///
   /// Machine speed is simulated, not assumed: the injectable
-  /// `frameReadinessClock` advances 40 ms per read — past the animation
+  /// `frameClock` advances 40 ms per read — past the animation
   /// cadence — so every in-pass re-arm is already due at the next consume,
   /// exactly the CI-class runner shape, however fast the real host is.
   @Test(
@@ -1351,7 +1351,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // return vacuously, never establishing the re-arm chain under test.
       let drainStart = MonotonicInstant.now()
       let clock = SteppingReadinessClock(start: drainStart, step: .milliseconds(40))
-      runLoop.frameReadinessClock = { [clock] in clock.nextReading() }
+      runLoop.frameClock = { [clock] in clock.nextReading() }
 
       // One drain pass on the simulated slow machine. RETURNING is the
       // regression assertion: without the drain-pass deadline cut this awaits

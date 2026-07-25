@@ -2289,8 +2289,8 @@ SwiftTUIRuntime.ConditionalScene.Storage.trueScene(_:)
 SwiftTUIRuntime.ConditionalScene.body
 SwiftTUIRuntime.DefaultRenderer
 SwiftTUIRuntime.DefaultRenderer.init()
-SwiftTUIRuntime.DefaultRenderer.render(_:context:proposal:)
-SwiftTUIRuntime.DefaultRenderer.renderAsync(_:context:proposal:)
+SwiftTUIRuntime.DefaultRenderer.render(_:context:proposal:frameInstant:)
+SwiftTUIRuntime.DefaultRenderer.renderAsync(_:context:proposal:frameInstant:)
 SwiftTUIRuntime.EmptyScene
 SwiftTUIRuntime.EmptyScene.Body
 SwiftTUIRuntime.EmptyScene.body

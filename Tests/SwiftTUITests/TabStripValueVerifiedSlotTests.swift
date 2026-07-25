@@ -381,7 +381,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
       viewBuilder: { _, _ in viewBuilder(counters) }
     )
     runLoop.installFocusTrackerInvalidator()
-    runLoop.frameReadinessClock = { .now().advanced(by: .seconds(3600)) }
+    runLoop.frameClock = { .now().advanced(by: .seconds(3600)) }
     self.terminal = terminal
     self.runLoop = runLoop
 

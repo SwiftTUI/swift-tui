@@ -28,6 +28,7 @@ struct DefaultRendererFrameHeadCoordinator {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
     let clock = ContinuousClock()
@@ -84,6 +85,7 @@ struct DefaultRendererFrameHeadCoordinator {
     let resolveInputs = storeResolveInputs(
       in: &resolveContext,
       proposal: proposal,
+      frameInstant: frameInstant,
       animationController: animationDraft.controller
     )
     let observationDraft = beginGraphEvaluation(
@@ -148,7 +150,7 @@ struct DefaultRendererFrameHeadCoordinator {
       resolved: resolvedHead.resolved,
       frameTailInput: frameProducts.frameTailInput,
       runtimeIssues: [],
-      animationTimestamp: MonotonicInstant.now(),
+      animationTimestamp: frameInstant,
       resolveDuration: resolvedHead.resolveDuration
     )
   }
@@ -159,7 +161,12 @@ struct DefaultRendererFrameHeadCoordinator {
   ) -> FrameHeadDraft {
     var draft = draft
     var resolved = draft.resolved
-    let animationTimestamp = MonotonicInstant.now()
+    // The head already carries this frame's instant; injection animates to the
+    // same one rather than re-reading the clock. Sampling here used to
+    // overwrite `draft.animationTimestamp`, so a single frame stamped two
+    // instants and the later one won — invisible under the real clock, and a
+    // guaranteed mismatch under a virtual one.
+    let animationTimestamp = draft.animationTimestamp
     elidedFrameTimingRecorder.measure(.animationTick) {
       AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
         to: &resolved,
@@ -199,12 +206,14 @@ struct DefaultRendererFrameHeadCoordinator {
   func prepareFrameHead<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    frameInstant: MonotonicInstant = .now()
   ) -> FrameHeadDraft {
     let draft = computeFrameHead(
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       mode: .abortable
     )
     return injectAnimations(
@@ -237,6 +246,7 @@ struct DefaultRendererFrameHeadCoordinator {
   private func storeResolveInputs(
     in resolveContext: inout ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     animationController: AnimationController
   ) -> FrameResolveInputs {
     var resolveInputs = frameState.prepareInputs(
@@ -248,6 +258,7 @@ struct DefaultRendererFrameHeadCoordinator {
       in: &resolveInputs,
       contentRootIdentity: resolveContext.identity,
       portalRootIdentity: presentationPortalIdentity(for: resolveContext.identity),
+      frameInstant: frameInstant,
       animationController: animationController
     )
     // Diagnostic (inert unless SWIFTTUI_INVAL_TRACE): decompose how this frame's
@@ -269,6 +280,7 @@ struct DefaultRendererFrameHeadCoordinator {
     in resolveInputs: inout FrameResolveInputs,
     contentRootIdentity: Identity,
     portalRootIdentity: Identity,
+    frameInstant: MonotonicInstant,
     animationController: AnimationController
   ) {
     guard !resolveInputs.invalidatedIdentities.isEmpty else {
@@ -290,7 +302,7 @@ struct DefaultRendererFrameHeadCoordinator {
     if !displacedBatchIDs.isEmpty {
       animationController.parkSupersededBatchCompletions(
         displacedBatchIDs,
-        at: .now()
+        at: frameInstant
       )
     }
     guard

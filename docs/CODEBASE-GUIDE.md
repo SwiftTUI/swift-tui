@@ -452,8 +452,11 @@ that state; `hasPendingFrame`/`nextWakeInstant` let the loop decide whether to r
 now, sleep to a deadline, or block.
 
 **Step 6 — The loop re-resolves the dirty frontier.** In
-`RunLoop.renderPendingFramesAsync(...)` (`RunLoop+Rendering.swift:229`) the driver
-loops `while var scheduledFrame = scheduler.consumeReadyFrame(at: frameReadinessClock())`,
+`RunLoop.renderPendingFramesAsync(...)` (`RunLoop+Rendering.swift:293`) the driver
+samples `frameClock()` once as `consumedAt`, consumes with it
+(`consumeReadyFrame(for:at:)`), and derives this frame's `frameInstant` as
+`scheduledFrame.triggeredDeadline ?? consumedAt` — the one instant every
+frame-scoped consumer downstream reads instead of the clock. It then
 builds a `ResolveContext` carrying `scheduledFrame.invalidatedIdentities`
 (`RunLoop+ResolveContext.swift:64`), then acquires artifacts via
 `acquireFrameArtifactsAsync → DefaultRenderer.render*`. Inside resolve,

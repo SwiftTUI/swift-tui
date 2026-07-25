@@ -200,12 +200,14 @@ public struct DefaultRenderer {
   public func render<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
+    proposal: ProposedSize = .unspecified,
+    frameInstant: MonotonicInstant = .now()
   ) -> RenderSnapshot {
     renderArtifacts(
       root,
       context: context,
-      proposal: proposal
+      proposal: proposal,
+      frameInstant: frameInstant
     ).renderSnapshot
   }
 
@@ -215,12 +217,14 @@ public struct DefaultRenderer {
   package func renderArtifacts<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
+    proposal: ProposedSize = .unspecified,
+    frameInstant: MonotonicInstant = .now()
   ) -> FrameArtifacts {
     switch renderView(
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: [],
       elisionHasExplicitAnimationTransactions: false
     ) {
@@ -239,12 +243,14 @@ public struct DefaultRenderer {
   public func renderAsync<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
+    proposal: ProposedSize = .unspecified,
+    frameInstant: MonotonicInstant = .now()
   ) async -> RenderSnapshot {
     await renderArtifactsAsync(
       root,
       context: context,
-      proposal: proposal
+      proposal: proposal,
+      frameInstant: frameInstant
     ).renderSnapshot
   }
 
@@ -254,12 +260,14 @@ public struct DefaultRenderer {
   package func renderArtifactsAsync<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified
+    proposal: ProposedSize = .unspecified,
+    frameInstant: MonotonicInstant = .now()
   ) async -> FrameArtifacts {
     switch await renderViewAsync(
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: [],
       elisionHasExplicitAnimationTransactions: false
     ) {
@@ -281,6 +289,7 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
@@ -288,6 +297,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     )
@@ -301,6 +311,7 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
@@ -308,6 +319,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
     )
@@ -318,6 +330,7 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant = .now(),
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
     completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
@@ -333,6 +346,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: [],
       elisionHasExplicitAnimationTransactions: false,
       newestDesiredGeneration: newestDesiredGeneration,
@@ -360,6 +374,7 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
@@ -377,6 +392,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
       newestDesiredGeneration: newestDesiredGeneration,
@@ -393,6 +409,7 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration?,
@@ -407,7 +424,8 @@ public struct DefaultRenderer {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      frameInstant: frameInstant
     ) {
       return .elided
     }
@@ -415,6 +433,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       mode: .abortable
     )
     return await RuntimeRenderPipeline().renderCancellable(
@@ -551,7 +570,8 @@ public struct DefaultRenderer {
   @MainActor
   private func elideOffscreenAnimationBeforeFrameHeadIfPossible(
     elisionCauses: Set<WakeCause>,
-    elisionHasExplicitAnimationTransactions: Bool
+    elisionHasExplicitAnimationTransactions: Bool,
+    frameInstant: MonotonicInstant
   ) -> Bool {
     guard
       let redrawIdentities =
@@ -573,7 +593,7 @@ public struct DefaultRenderer {
     elidedFrameTimingRecorder.reset()
     let tickStart = elidedFrameTimingRecorder.start()
     animationController.advancePreFrameHeadOffscreenPropertyAnimationTick(
-      at: MonotonicInstant.now()
+      at: frameInstant
     )
     elidedFrameTimingRecorder.record(.animationTick, since: tickStart)
     recordElidedFrame()
@@ -585,13 +605,15 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      frameInstant: frameInstant
     ) {
       return .elided
     }
@@ -599,6 +621,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       mode: .oneShot
     )
     return RuntimeRenderPipeline().renderOneShot(
@@ -678,13 +701,15 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
     let renderer = self
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
-      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+      elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      frameInstant: frameInstant
     ) {
       return .elided
     }
@@ -692,6 +717,7 @@ public struct DefaultRenderer {
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       mode: .abortable
     )
     return await RuntimeRenderPipeline().renderAsync(
@@ -753,12 +779,14 @@ public struct DefaultRenderer {
     _ root: V,
     context: ResolveContext,
     proposal: ProposedSize,
+    frameInstant: MonotonicInstant,
     mode: FrameHeadMode
   ) -> FrameHeadDraft {
     frameHeadCoordinator.computeFrameHead(
       root,
       context: context,
       proposal: proposal,
+      frameInstant: frameInstant,
       mode: mode
     )
   }
@@ -780,12 +808,14 @@ public struct DefaultRenderer {
   func prepareFrameHead<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    frameInstant: MonotonicInstant = .now()
   ) -> FrameHeadDraft {
     frameHeadCoordinator.prepareFrameHead(
       root,
       context: context,
-      proposal: proposal
+      proposal: proposal,
+      frameInstant: frameInstant
     )
   }
 

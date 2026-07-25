@@ -21,7 +21,12 @@ extension RunLoop {
       hasFrameSink || runtimeConfiguration.debug
     )
     let drainPass = beginDeadlineDrainPass()
-    while var scheduledFrame = consumeReadyFrame(for: drainPass) {
+    while true {
+      let consumedAt = frameClock()
+      guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
+        break
+      }
+      let frameInstant = deriveFrameInstant(for: scheduledFrame, consumedAt: consumedAt)
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
         scheduledFrame,
@@ -54,7 +59,7 @@ extension RunLoop {
               state: currentState,
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
-          context: resolveContext(for: passScheduledFrame),
+          context: resolveContext(for: passScheduledFrame, frameInstant: frameInstant),
           proposal: proposal()
         )
         artifacts = renderedArtifacts
@@ -79,6 +84,7 @@ extension RunLoop {
       try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
+        frameInstant: frameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: FrameAcquisitionState(),
@@ -110,13 +116,34 @@ extension RunLoop {
     (scheduler, scheduler.deadlineArmCut)
   }
 
+  /// Consumes at an instant the caller has already sampled.
+  ///
+  /// The instant is a parameter rather than a `frameClock()` read in here so
+  /// that one frame corresponds to exactly one sample: the caller derives
+  /// `frameInstant` from the same reading it consumed with, and every
+  /// frame-scoped consumer downstream reads that value. Sampling again inside
+  /// the frame would let the readiness decision and the work it admits
+  /// disagree about the time — invisibly under the real clock, and
+  /// deterministically wrong under a virtual one.
   private func consumeReadyFrame(
-    for drainPass: (scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut)
+    for drainPass: (scheduler: any DrainPassDeadlineCutting, cut: DeadlineArmCut),
+    at instant: MonotonicInstant
   ) -> ScheduledFrame? {
     drainPass.scheduler.consumeReadyFrame(
-      at: frameReadinessClock(),
+      at: instant,
       armedBefore: drainPass.cut
     )
+  }
+
+  /// The instant this frame is *about*: its triggering deadline when it has
+  /// one, otherwise the reading it was consumed at. Deadline-triggered frames
+  /// use the deadline so a frame that ran late still animates to the time it
+  /// was scheduled for, rather than to the time it happened to be serviced.
+  private func deriveFrameInstant(
+    for scheduledFrame: ScheduledFrame,
+    consumedAt: MonotonicInstant
+  ) -> MonotonicInstant {
+    scheduledFrame.triggeredDeadline ?? consumedAt
   }
 
   /// Publishes this run loop's `currentFocusedValues` as the live
@@ -143,6 +170,7 @@ extension RunLoop {
   private func applyAcquiredFrame(
     _ acquiredArtifacts: FrameArtifacts,
     scheduledFrame: ScheduledFrame,
+    frameInstant: MonotonicInstant,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     convergence: FocusSyncConvergenceState,
     acquisition: FrameAcquisitionState,
@@ -203,7 +231,7 @@ extension RunLoop {
     // dirty-region calculation; only the wake-up decision is
     // unconditional now.
     let animationTick = renderer.internalAnimationController.lastTickResult
-    requestNextAnimationFrameIfNeeded(animationTick)
+    requestNextAnimationFrameIfNeeded(animationTick, at: frameInstant)
     observationBridge.prune(
       keeping: renderer.liveNodeIDSnapshot()
     )
@@ -284,9 +312,11 @@ extension RunLoop {
       if let frameBudget, consumedScheduledFrames >= frameBudget {
         break frameLoop
       }
-      guard var scheduledFrame = consumeReadyFrame(for: drainPass) else {
+      let consumedAt = frameClock()
+      guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break frameLoop
       }
+      let frameInstant = deriveFrameInstant(for: scheduledFrame, consumedAt: consumedAt)
       consumedScheduledFrames += 1
       let currentState = stateContainer.state
       scheduledFrame = scheduledFrameByReconcilingExternalState(
@@ -322,6 +352,7 @@ extension RunLoop {
         convergence.pendingInvalidationsAtPassStart = schedulerPendingInvalidations()
         let acquired = await acquireFrameArtifactsAsync(
           scheduledFrame: passScheduledFrame,
+          frameInstant: frameInstant,
           currentState: currentState,
           eventPump: eventPump,
           renderIntentDiagnostics: renderIntentDiagnostics,
@@ -339,7 +370,7 @@ extension RunLoop {
           // frame draining an active animation, the live controller still holds
           // that animation but nothing is armed to re-drain it; keep the pump
           // alive so its deferred withAnimation completion still fires.
-          requestNextAnimationFrameAfterSkippedFrameIfNeeded()
+          requestNextAnimationFrameAfterSkippedFrameIfNeeded(at: frameInstant)
           continue frameLoop
         case .elided:
           // Off-screen elision fired: `commitElidedFrame` (inside the gate
@@ -354,7 +385,8 @@ extension RunLoop {
             into: &deferredLifecycleCarryForward
           )
           requestNextAnimationFrameIfNeeded(
-            renderer.internalAnimationController.lastTickResult
+            renderer.internalAnimationController.lastTickResult,
+            at: frameInstant
           )
           renderedFrames += 1
           emitElidedFrame(
@@ -402,6 +434,7 @@ extension RunLoop {
       try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
+        frameInstant: frameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: acquisition,
