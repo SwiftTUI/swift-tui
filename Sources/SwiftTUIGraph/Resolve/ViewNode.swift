@@ -895,6 +895,31 @@ package final class ViewNode {
   package func applyRetainedSnapshot(
     _ snapshot: ResolvedNode
   ) {
+    // The reuse gate cleared all three freshness verdicts earlier this frame;
+    // the refresh below restores only the first. If either of the other two
+    // flipped in between, this write-back would leave a node stamped fresh
+    // while still carrying a denial — no wrong serve, since the queries AND
+    // the stamps, but a state reachable only by that interleaving.
+    #if DEBUG
+      assert(
+        reuseState.freshness.admitsRetainedWriteBack,
+        """
+        retained write-back onto a node whose freshness verdict flipped since \
+        the gate: \(reuseState.freshness.retainedWriteBackDenialReason ?? "-") \
+        node=\(viewNodeID) identity=\(identity.path)
+        """
+      )
+    #else
+      // Release: the same read-only check, only on sampled frames when the
+      // soundness probe is opted in. Off by default → a single Bool read.
+      if SoundnessProbeConfiguration.isSampledFrame,
+        let denial = reuseState.freshness.retainedWriteBackDenialReason
+      {
+        SoundnessProbeConfiguration.recordStampCoherenceViolation(
+          "retained write-back with \(denial) node=\(viewNodeID) identity=\(identity.path)"
+        )
+      }
+    #endif
     var snapshot = snapshot
     snapshot.viewNodeID = viewNodeID
     snapshot.recomputeSubtreeRuntimeNodeIDsStamped()

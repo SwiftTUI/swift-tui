@@ -96,6 +96,33 @@ package struct CommittedFreshness: Equatable {
     isCommittedSnapshotFresh
   }
 
+  /// Whether the verdicts a refresh does NOT re-adjudicate still admit
+  /// value-blind service.
+  ///
+  /// ``snapshotRefreshed()`` restores freshness alone, so a retained
+  /// write-back inherits these two unchanged. Landing one on a node carrying
+  /// either verdict produces `fresh ∧ hasStaleIslandDescendant` or
+  /// `fresh ∧ hasForeignParentedChild` — representable states that the service
+  /// queries above deny, so no wrong serve follows. They are reachable only if
+  /// a verdict flipped between the gate that admitted the reuse and the
+  /// write-back that completes it, which is why the write-back checks rather
+  /// than assumes.
+  ///
+  /// Deliberately not consulted by `snapshot()`'s rebuild path: a
+  /// rebuild-from-live-children legitimately runs on an island-stale node —
+  /// that mirror stays servable-for-rebuild by design.
+  package var admitsRetainedWriteBack: Bool {
+    !hasStaleIslandDescendant && !hasForeignParentedChild
+  }
+
+  /// Diagnostic mirror of ``admitsRetainedWriteBack``: the first denying
+  /// verdict, or `nil` when a retained write-back is admissible.
+  package var retainedWriteBackDenialReason: String? {
+    if hasStaleIslandDescendant { return "stale-island-descendant" }
+    if hasForeignParentedChild { return "foreign-parented-child" }
+    return nil
+  }
+
   /// Diagnostic mirror of ``canServeValueBlind``: the first denying stamp as
   /// a `ReuseDenialTrace` label, or `nil` when freshness would serve.
   /// Label strings and check order are load-bearing for trace stability.

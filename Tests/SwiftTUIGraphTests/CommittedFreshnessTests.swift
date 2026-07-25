@@ -95,6 +95,53 @@ struct CommittedFreshnessTests {
     #expect(freshness.valueBlindDenialReason == "stale-island-descendant")
   }
 
+  @Test("retained write-back admissibility ignores freshness itself")
+  func retainedWriteBackAdmissibility() {
+    // The write-back restores freshness, so a stale snapshot is exactly the
+    // case it exists to fix and must not deny. Only the two verdicts the
+    // refresh carries forward unchanged can deny.
+    var freshness = CommittedFreshness()
+    #expect(freshness.admitsRetainedWriteBack)
+    #expect(freshness.retainedWriteBackDenialReason == nil)
+
+    freshness.markDescendantChanged(crossingIslandSeam: false)
+    #expect(!freshness.isCommittedSnapshotFresh)
+    #expect(freshness.admitsRetainedWriteBack)
+
+    freshness.markDescendantChanged(crossingIslandSeam: true)
+    #expect(!freshness.admitsRetainedWriteBack)
+    #expect(freshness.retainedWriteBackDenialReason == "stale-island-descendant")
+  }
+
+  @Test("a foreign-parented listing denies a retained write-back")
+  func foreignParentedDeniesWriteBack() {
+    var freshness = CommittedFreshness()
+    freshness.markChildReseated()
+    #expect(!freshness.admitsRetainedWriteBack)
+    #expect(freshness.retainedWriteBackDenialReason == "foreign-parented-child")
+
+    // Sticky until the node's own apply re-owns its children.
+    freshness.commitApplied()
+    #expect(freshness.admitsRetainedWriteBack)
+  }
+
+  @Test("write-back admissibility follows the value-blind verdicts, minus freshness")
+  func admissibilityMirrorsValueBlindMinusFreshness() {
+    // The invariant the write-back assert encodes: once freshness is restored,
+    // admitting the write-back and admitting value-blind service are the same
+    // question. If these ever diverge, the assert is guarding the wrong thing.
+    for island in [false, true] {
+      for foreign in [false, true] {
+        var freshness = CommittedFreshness()
+        if island { freshness.markDescendantChanged(crossingIslandSeam: true) }
+        if foreign { freshness.markChildReseated() }
+        let admits = freshness.admitsRetainedWriteBack
+        freshness.snapshotRefreshed()
+        #expect(admits == freshness.canServeValueBlind)
+      }
+    }
+  }
+
   @Test("denial reasons report in the load-bearing trace order")
   func denialReasonOrder() {
     var freshness = CommittedFreshness()
