@@ -359,15 +359,7 @@ private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
     guard let other = other as? Self else {
       return false
     }
-    if style is AutomaticPickerStyle
-      || style is InlinePickerStyle
-      || style is SegmentedPickerStyle
-      || style is RadioGroupPickerStyle
-      || style is MenuPickerStyle
-    {
-      return true
-    }
-    return typedValuesAreEqualForReuse(style, other.style)
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 
   @MainActor
@@ -387,13 +379,13 @@ private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    // Node-backed with the enclosing control's authoring scope rebased onto
-    // the style-body node — see ConcreteAnyButtonStyleBox.resolveBody for the
-    // hollow-placeholder / seed-degradation constraint this pins.
-    resolveView(
-      style.makeBody(configuration: configuration),
-      in: context,
-      authoringContextOverride: currentAuthoringContext()
-    )
+    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
   }
 }
+
+// The builtin picker styles: stateless, so type identity settles reuse.
+extension AutomaticPickerStyle: ReuseTransparentStyle {}
+extension InlinePickerStyle: ReuseTransparentStyle {}
+extension SegmentedPickerStyle: ReuseTransparentStyle {}
+extension RadioGroupPickerStyle: ReuseTransparentStyle {}
+extension MenuPickerStyle: ReuseTransparentStyle {}

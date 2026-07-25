@@ -245,13 +245,7 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
     guard let other = other as? Self else {
       return false
     }
-    if style is AutomaticTextFieldStyle
-      || style is PlainTextFieldStyle
-      || style is RoundedBorderTextFieldStyle
-    {
-      return true
-    }
-    return typedValuesAreEqualForReuse(style, other.style)
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 
   @MainActor
@@ -259,16 +253,14 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    // Node-backed with the enclosing control's authoring scope rebased onto
-    // the style-body node — see ConcreteAnyButtonStyleBox.resolveBody for the
-    // hollow-placeholder / seed-degradation constraint this pins.
-    resolveView(
-      style.makeBody(configuration: configuration),
-      in: context,
-      authoringContextOverride: currentAuthoringContext()
-    )
+    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
   }
 }
+
+// The builtin text-field styles: stateless, so type identity settles reuse.
+extension AutomaticTextFieldStyle: ReuseTransparentStyle {}
+extension PlainTextFieldStyle: ReuseTransparentStyle {}
+extension RoundedBorderTextFieldStyle: ReuseTransparentStyle {}
 
 package struct PlainTextFieldStyleBody: View {
   let configuration: TextFieldStyleConfiguration

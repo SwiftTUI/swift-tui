@@ -313,15 +313,7 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     guard let other = other as? Self else {
       return false
     }
-    if style is AutomaticButtonStyle
-      || style is PlainButtonStyle
-      || style is BorderedButtonStyle
-      || style is BorderedProminentButtonStyle
-      || style is LinkButtonStyle
-    {
-      return true
-    }
-    return typedValuesAreEqualForReuse(style, other.style)
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 
   @MainActor
@@ -336,18 +328,13 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    // The style body must resolve through its own view node: a value-only
-    // style child forces the graph to mint a hollow, never-evaluated
-    // placeholder whose chrome interiors outlive their anchors when a host
-    // generation departs (the F04 teardown-coherence residual). The interior
-    // must keep the ENCLOSING control's authoring scope, rebased onto the
-    // style-body node — a fresh scope re-roots registration owners onto the
-    // re-mintable style-body island, where input-driven @State writes degrade
-    // to detached seed boxes: no dirt, no invalidation, stale retained reuse.
-    resolveView(
-      style.makeBody(configuration: configuration),
-      in: context,
-      authoringContextOverride: currentAuthoringContext()
-    )
+    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
   }
 }
+
+// The builtin button styles: stateless, so type identity settles reuse.
+extension AutomaticButtonStyle: ReuseTransparentStyle {}
+extension PlainButtonStyle: ReuseTransparentStyle {}
+extension BorderedButtonStyle: ReuseTransparentStyle {}
+extension BorderedProminentButtonStyle: ReuseTransparentStyle {}
+extension LinkButtonStyle: ReuseTransparentStyle {}

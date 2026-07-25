@@ -22,14 +22,7 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
     guard let other = other as? Self else {
       return false
     }
-    if style is AutomaticTabViewStyle
-      || style is UnderlineTabViewStyle
-      || style is LiteralTabsTabViewStyle
-      || style is PowerlineTabViewStyle
-    {
-      return true
-    }
-    return typedValuesAreEqualForReuse(style, other.style)
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 
   @MainActor
@@ -44,18 +37,17 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
     configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    // Node-backed with the enclosing control's authoring scope rebased onto
-    // the style-body node — see ConcreteAnyButtonStyleBox.resolveBody for the
-    // hollow-placeholder / seed-degradation constraint this pins. TabBody is
-    // the seam the 8ace32a5 regression wedged on (tab-hosted scroll panes
-    // silently losing input-driven @State writes).
-    resolveView(
-      style.makeBody(configuration: configuration),
-      in: context,
-      authoringContextOverride: currentAuthoringContext()
-    )
+    // TabBody is the seam the `8ace32a5` regression wedged on, and so the
+    // reason `resolveStyleBody` rebases rather than mints a fresh scope.
+    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
   }
 }
+
+// The builtin tab-view styles: stateless, so type identity settles reuse.
+extension AutomaticTabViewStyle: ReuseTransparentStyle {}
+extension UnderlineTabViewStyle: ReuseTransparentStyle {}
+extension LiteralTabsTabViewStyle: ReuseTransparentStyle {}
+extension PowerlineTabViewStyle: ReuseTransparentStyle {}
 
 package func tabItemIdentity(
   for controlIdentity: Identity,
