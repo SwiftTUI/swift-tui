@@ -62,23 +62,15 @@ struct DefaultRendererFrameHeadCoordinator {
       checkpoint: graphCheckpoint
     )
     let animationDraft = animationController.makeFrameDraft()
-    // Imperative scroll commands must keep reaching the pre-draft registry —
-    // the one `updateCommittedScrollGeometry` publishes into — even from
-    // stored evaluator contexts replayed frames later. Stash it before the
-    // draft replacement hides it (see `ResolveContext.liveScrollPositionRegistry`).
-    let preDraftScrollPositionRegistry = resolveContext.localScrollPositionRegistry
-    // Default-focus arrivals need the same pre-draft survival: focus-sync
-    // arbitrates them on the live registry after the draft is discarded.
-    let preDraftFocusBindingRegistry = resolveContext.localFocusBindingRegistry
-    resolveContext = resolveContext.replacingRuntimeRegistrations(
-      registrationDraft.draftRegistrations
-    )
-    if resolveContext.liveScrollPositionRegistry == nil {
-      resolveContext.liveScrollPositionRegistry = preDraftScrollPositionRegistry
-    }
-    if resolveContext.liveFocusBindingRegistry == nil {
-      resolveContext.liveFocusBindingRegistry = preDraftFocusBindingRegistry
-    }
+    // Imperative bridges must keep reaching the pre-draft registries — the
+    // ones the commit publishes into — even from stored evaluator contexts
+    // replayed frames later. Capture them before the draft replacement hides
+    // them (see `ResolveContext.DraftSurvivingRegistries`).
+    let draftSurvivingRegistries = resolveContext.capturingDraftSurvivingRegistries()
+    resolveContext =
+      resolveContext
+      .replacingRuntimeRegistrations(registrationDraft.draftRegistrations)
+      .seedingDraftSurvivingRegistries(from: draftSurvivingRegistries)
     resolveContext.imageAssetResolver = imageRepository.resolver()
 
     let baselineCheckpoints = baselineCheckpoints(for: mode)

@@ -160,6 +160,49 @@ public struct ResolveContext: Equatable, Sendable {
   package var focusArrivalRegistry: LocalFocusBindingRegistry? {
     liveFocusBindingRegistry ?? localFocusBindingRegistry
   }
+
+  /// The pre-draft registries a frame head must carry across the draft swap.
+  ///
+  /// Capturing and re-seeding are one operation split over the swap that
+  /// happens between them, so they live together here rather than as loose
+  /// statements around the call to ``replacingRuntimeRegistrations(_:)``.
+  ///
+  /// Adding a draft-surviving registry means adding a field here and to
+  /// ``seedingDraftSurvivingRegistries(from:)`` — the two are checked against
+  /// the `live*` roster by `ResolveContextDraftSurvivalTests`. Getting this
+  /// wrong is quiet: an unseeded `live*` stays `nil`, its `?? local*` accessor
+  /// falls through to the *draft* registry, and imperative bridges resume
+  /// talking to an instance that is discarded at the end of the frame.
+  package struct DraftSurvivingRegistries {
+    fileprivate var scrollPosition: LocalScrollPositionRegistry?
+    fileprivate var focusBinding: LocalFocusBindingRegistry?
+  }
+
+  /// Captures the registries that must outlive the frame head's draft swap.
+  package func capturingDraftSurvivingRegistries() -> DraftSurvivingRegistries {
+    DraftSurvivingRegistries(
+      scrollPosition: localScrollPositionRegistry,
+      focusBinding: localFocusBindingRegistry
+    )
+  }
+
+  /// Re-seeds captured pre-draft registries after a draft swap.
+  ///
+  /// Only fills empty slots: a context that already carries a live instance is
+  /// nested under one that captured it earlier, and the outer capture is the
+  /// older — therefore the correct — instance.
+  package func seedingDraftSurvivingRegistries(
+    from captured: DraftSurvivingRegistries
+  ) -> Self {
+    var seeded = self
+    if seeded.liveScrollPositionRegistry == nil {
+      seeded.liveScrollPositionRegistry = captured.scrollPosition
+    }
+    if seeded.liveFocusBindingRegistry == nil {
+      seeded.liveFocusBindingRegistry = captured.focusBinding
+    }
+    return seeded
+  }
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry? {
     get { propagated.localPreferenceObservationRegistry }
     set { propagated.localPreferenceObservationRegistry = newValue }
