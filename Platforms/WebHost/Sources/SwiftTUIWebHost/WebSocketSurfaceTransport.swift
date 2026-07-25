@@ -62,7 +62,7 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: .cellOnly,
-        encodingState: HostWireEncodingState(deltaEnabled: false),
+        encodingState: HostWireCapabilities().negotiatedEncodingState(),
         wireCapabilities: HostWireCapabilities()
       )
     )
@@ -79,18 +79,17 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
   /// re-anchors the cross-connection encoding state — the next frame is a
   /// full keyframe with image payloads re-transmitted (the F55 reload
   /// defect), and delta emission is negotiated from the declaration (a
-  /// client that declares v3 + delta acceptance receives v3 `deltaRows`
-  /// records for steady frames; undeclared clients keep today's full
-  /// frames, byte for byte).
+  /// client that declares delta acceptance receives v3 `deltaRows` records
+  /// for steady frames; undeclared clients keep today's full frames, byte
+  /// for byte).
+  ///
+  /// Ingress lifecycle: accepted at any time, and every arrival is an epoch.
   package func declareCapabilities(
     _ capabilities: HostWireCapabilities
   ) {
     state.withLock { state in
       state.wireCapabilities = capabilities
-      state.encodingState = HostWireEncodingState(
-        deltaEnabled: capabilities.acceptsDeltaFrames
-          && capabilities.maxWebSurfaceVersion >= 3
-      )
+      state.encodingState = capabilities.negotiatedEncodingState()
     }
   }
 

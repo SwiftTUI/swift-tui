@@ -49,14 +49,13 @@ struct WebSocketInputReaderTests {
     #expect(transport.wireCapabilities == HostWireCapabilities())
 
     await source.yield(
-      "\u{001E}caps:{\"maxWebSurfaceVersion\":3,\"acceptsDeltaFrames\":true}\n"
+      "\u{001E}caps:{\"acceptsDeltaFrames\":true}\n"
     )
     await source.finish()
 
     #expect(await iterator.next() == nil)
     #expect(
-      transport.wireCapabilities
-        == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+      transport.wireCapabilities == HostWireCapabilities(acceptsDeltaFrames: true)
     )
   }
 

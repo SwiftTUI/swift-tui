@@ -36,24 +36,20 @@ func android_host_capability_declaration_is_pre_start_only() throws {
 
   #expect(
     host.declareCapabilities(
-      json: "{\"acceptsDeltaFrames\":true,\"maxWebSurfaceVersion\":3}"
+      json: "{\"acceptsDeltaFrames\":true}"
     )
   )
-  #expect(
-    host.wireCapabilities
-      == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
-  )
+  #expect(host.wireCapabilities == HostWireCapabilities(acceptsDeltaFrames: true))
 
   // Capability-gated emission must never change shape mid-session: once the
   // scene starts, further declarations are rejected and the accepted one
-  // stays.
+  // stays. This is the Android ingress lifecycle — pre-start only — and it
+  // is deliberately narrower than the WebSocket transport's, which accepts a
+  // declaration at any time and treats each arrival as a connection epoch.
   host.start()
   defer { host.stop() }
-  #expect(!host.declareCapabilities(json: "{\"maxWebSurfaceVersion\":2}"))
-  #expect(
-    host.wireCapabilities
-      == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
-  )
+  #expect(!host.declareCapabilities(json: "{\"acceptsDeltaFrames\":false}"))
+  #expect(host.wireCapabilities == HostWireCapabilities(acceptsDeltaFrames: true))
 }
 
 @MainActor
@@ -124,9 +120,11 @@ func android_host_declared_web_surface_emits_converged_records() async throws {
     swift_tui_android_destroy(handle)
   }
 
-  // The Kotlin host's declaration selects the converged web-surface wire
-  // (convergence proposal 2026-07-22-002 Stage C1).
-  #expect(host.declareCapabilities(json: "{\"maxWebSurfaceVersion\":2}"))
+  // Every Android host receives converged web-surface frames since the
+  // legacy keyed-JSON wire retired (convergence proposal 2026-07-22-002
+  // Stage C4). A declaration that accepts no delta records therefore still
+  // gets web-surface bytes — full ones.
+  #expect(host.declareCapabilities(json: "{\"acceptsDeltaFrames\":false}"))
 
   _ = try host.surface.present(
     SemanticHostFrame(
@@ -174,7 +172,7 @@ func android_host_delta_accumulates_damage_across_skipped_polls() async throws {
 
   #expect(
     host.declareCapabilities(
-      json: "{\"maxWebSurfaceVersion\":3,\"acceptsDeltaFrames\":true}"
+      json: "{\"acceptsDeltaFrames\":true}"
     )
   )
 

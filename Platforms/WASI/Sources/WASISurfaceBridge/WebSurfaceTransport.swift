@@ -27,17 +27,23 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     supportsSynchronizedOutput: false
   )
 
-  /// The host's declared wire capabilities (WASI ingress: environment keys,
-  /// resolved at construction). Nothing reads these for emission yet —
-  /// consumers arrive with the negotiated-emission stages; the delta opt-in
-  /// stays wired through `deltaEncodingEnabled` unchanged.
+  /// The host's declared wire capabilities.
+  ///
+  /// Ingress lifecycle: environment keys, resolved once at construction.
+  /// There is no runtime declaration channel here — a browser reload
+  /// re-instantiates the in-process transport rather than reconnecting, so a
+  /// `caps:` record arriving on stdin is deliberately dropped by the runner.
+  ///
+  /// Emission is negotiated from this value and nothing else. It previously
+  /// sat beside an independently-resolved `deltaEncodingEnabled` flag, which
+  /// let the transport enable delta records the declaration had not asked
+  /// for; the two answers are now one.
   package let wireCapabilities: HostWireCapabilities
 
   package init(
     surfaceSize: CellSize,
     outputFileDescriptor: Int32 = webSurfaceStandardOutputFileDescriptor,
     renderStyle: TerminalRenderStyle,
-    deltaEncodingEnabled: Bool = false,
     wireCapabilities: HostWireCapabilities = HostWireCapabilities()
   ) {
     self.outputFileDescriptor = outputFileDescriptor
@@ -48,7 +54,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: Self.pointerInputCapabilities(for: nil),
-        encodingState: WebSurfaceFrameEncodingState(deltaEnabled: deltaEncodingEnabled)
+        encodingState: wireCapabilities.negotiatedEncodingState()
       )
     )
   }

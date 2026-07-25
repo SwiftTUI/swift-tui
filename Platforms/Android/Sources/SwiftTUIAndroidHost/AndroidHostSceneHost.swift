@@ -21,7 +21,7 @@ private struct AndroidHostSceneHostState: Sendable {
   // carries the transmit-once image set and, once the declaration enabled
   // delta, the persistent style table and baseline.
   var wireCapabilities = HostWireCapabilities()
-  var webEncodingState = HostWireEncodingState(deltaEnabled: false)
+  var webEncodingState = HostWireCapabilities().negotiatedEncodingState()
   // Damage accumulated across committed-but-unconsumed frames: the poll
   // model skips frames, so a consumed frame's own damage (relative to the
   // previous COMMIT) under-covers the diff against the previous CONSUMED
@@ -105,13 +105,14 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   ) {
     state.withLock { state in
       state.wireCapabilities = capabilities
-      // The declaration negotiates the record shape ceiling: v3 + delta
-      // acceptance flips steady frames to delta records. Undeclared hosts
-      // keep receiving v1/v2 full web-surface frames.
-      state.webEncodingState = HostWireEncodingState(
-        deltaEnabled: capabilities.acceptsDeltaFrames
-          && capabilities.maxWebSurfaceVersion >= 3
-      )
+      // The declaration negotiates the record shape: delta acceptance flips
+      // steady frames to delta records. Undeclared hosts keep receiving full
+      // web-surface frames.
+      //
+      // Ingress lifecycle: accepted only before scene start (see
+      // `declareCapabilities(json:)`), so this re-anchor always lands before
+      // any frame has been emitted.
+      state.webEncodingState = capabilities.negotiatedEncodingState()
     }
   }
 
@@ -255,10 +256,9 @@ public final class AndroidHostSceneHost {
   @MainActor private var runTask: Task<Void, Never>?
   @MainActor private var hasStartedScene = false
   /// The Kotlin host's declared wire capabilities (``declareCapabilities``;
-  /// absence keeps the defaults — today's bytes). A declared
-  /// `maxWebSurfaceVersion >= 2` selects the converged web-surface wire for
-  /// frame serialization; `>= 3` with delta acceptance enables delta
-  /// records.
+  /// absence keeps the defaults — today's bytes). Every Android host receives
+  /// converged web-surface frames since the legacy keyed-JSON wire retired in
+  /// Stage C4; the declaration's one bit chooses full or delta records.
   @MainActor package private(set) var wireCapabilities = HostWireCapabilities()
 
   @MainActor

@@ -11,30 +11,69 @@ import Testing
 struct HostWireCapabilitiesTests {
   @Test("defaults reproduce today's deployed-decoder contract")
   func defaultsReproduceTodaysContract() {
-    let defaults = HostWireCapabilities()
-    #expect(defaults.maxWebSurfaceVersion == 2)
-    #expect(!defaults.acceptsDeltaFrames)
-    #expect(!defaults.supportsResync)
+    #expect(!HostWireCapabilities().acceptsDeltaFrames)
   }
 
   @Test("a full declaration parses every field")
   func fullDeclarationParses() {
     let parsed = HostWireCapabilities.fromDeclarationJSON(
       """
+      {"acceptsDeltaFrames":true}
+      """
+    )
+    #expect(parsed == HostWireCapabilities(acceptsDeltaFrames: true))
+  }
+
+  @Test("retired keys are skipped, so clients still sending them are unaffected")
+  func retiredKeysAreSkipped() {
+    // The tolerance that lets keys arrive early also lets them leave late.
+    // `maxAndroidSchemaVersion` retired with the legacy keyed-JSON wire;
+    // `maxWebSurfaceVersion` and `supportsResync` retired when capabilities
+    // became named feature bits. A client emitting any of them parses
+    // exactly as if it had emitted none.
+    let parsed = HostWireCapabilities.fromDeclarationJSON(
+      """
       {"maxWebSurfaceVersion":3,"acceptsDeltaFrames":true,\
       "supportsResync":true,"maxAndroidSchemaVersion":3}
       """
     )
-    // maxAndroidSchemaVersion retired with the legacy keyed-JSON wire; old
-    // declarations still carrying it are skipped as an unknown key.
-    #expect(
-      parsed
-        == HostWireCapabilities(
-          maxWebSurfaceVersion: 3,
-          acceptsDeltaFrames: true,
-          supportsResync: true
-        )
+    #expect(parsed == HostWireCapabilities(acceptsDeltaFrames: true))
+  }
+
+  @Test("a retired version ceiling cannot suppress a declared capability")
+  func retiredCeilingDoesNotSuppressDeclaredCapability() {
+    // The shape of the defect this collapse removed: a host declaring delta
+    // acceptance under a v2 ceiling was a contradiction two fields could
+    // express and each transport resolved for itself. One bit cannot
+    // contradict itself, and the ceiling is now inert.
+    let parsed = HostWireCapabilities.fromDeclarationJSON(
+      """
+      {"maxWebSurfaceVersion":2,"acceptsDeltaFrames":true}
+      """
     )
+    #expect(parsed == HostWireCapabilities(acceptsDeltaFrames: true))
+    #expect(parsed?.negotiatedEncodingState().deltaEnabled == true)
+  }
+
+  @Test("the negotiated encoding state derives from the declaration alone")
+  func negotiatedEncodingStateDerivesFromDeclaration() {
+    #expect(!HostWireCapabilities().negotiatedEncodingState().deltaEnabled)
+    #expect(
+      HostWireCapabilities(acceptsDeltaFrames: true)
+        .negotiatedEncodingState().deltaEnabled
+    )
+  }
+
+  @Test("negotiating always yields a fresh epoch")
+  func negotiatingYieldsFreshEpoch() {
+    // Every transport routes both its undeclared default and its
+    // post-declaration reset through here, so the re-anchor is structural: a
+    // negotiated state never inherits a baseline or a transmitted-image set.
+    let negotiated = HostWireCapabilities(acceptsDeltaFrames: true)
+      .negotiatedEncodingState()
+    #expect(!negotiated.hasBaseline)
+    #expect(negotiated.baselineSize == nil)
+    #expect(negotiated.knownImageIDs.isEmpty)
   }
 
   @Test("an empty declaration keeps the defaults")
@@ -58,10 +97,10 @@ struct HostWireCapabilitiesTests {
   func mistypedKnownKeysAreSkipped() {
     let parsed = HostWireCapabilities.fromDeclarationJSON(
       """
-      {"maxWebSurfaceVersion":"three","acceptsDeltaFrames":true}
+      {"acceptsDeltaFrames":"yes","renderer":"dom"}
       """
     )
-    #expect(parsed == HostWireCapabilities(acceptsDeltaFrames: true))
+    #expect(parsed == HostWireCapabilities())
   }
 
   @Test("malformed declarations are rejected whole")

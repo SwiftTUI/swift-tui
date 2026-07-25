@@ -37,9 +37,7 @@ struct WebSurfaceCapabilityIngressTests {
     #expect(parsed.events.isEmpty)
     #expect(
       parsed.controlMessages == [
-        .capabilities(
-          HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
-        )
+        .capabilities(HostWireCapabilities(acceptsDeltaFrames: true))
       ]
     )
   }
@@ -67,9 +65,14 @@ struct WebSurfaceCapabilityIngressTests {
     #expect(parsed.events == [.key(.init(.return))])
   }
 
-  @Test("the WASI transport stores threaded capabilities without reading them")
-  func transportStoresThreadedCapabilities() {
-    let declared = HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+  @Test("the WASI transport carries the capabilities it was constructed with")
+  func transportCarriesThreadedCapabilities() {
+    // This assertion used to be titled "stores threaded capabilities without
+    // reading them" — it certified the defect, because not reading them is
+    // exactly how a separately-resolved delta flag contradicted the
+    // declaration. What the transport *does* with them is now pinned
+    // end-to-end by `WebSurfaceTransportTests`, against emitted bytes.
+    let declared = HostWireCapabilities(acceptsDeltaFrames: true)
     let transport = WebSurfaceTransport(
       surfaceSize: .init(width: 2, height: 1),
       renderStyle: .init(appearance: .fallback),

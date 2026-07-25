@@ -43,31 +43,36 @@ struct WASIRunnerTests {
       wasiHostWireCapabilities(environmentValue: { _ in nil })
         == HostWireCapabilities()
     )
-    // The pre-existing delta opt-in maps onto acceptsDeltaFrames and implies
-    // the v3 record shape.
+    // TUIGUI_SURFACE_DELTA is the whole WASI declaration.
     #expect(
       wasiHostWireCapabilities(environmentValue: { name in
         name == "TUIGUI_SURFACE_DELTA" ? "1" : nil
       })
-        == HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+        == HostWireCapabilities(acceptsDeltaFrames: true)
     )
-    // An explicit max version wins over the delta implication.
-    #expect(
-      wasiHostWireCapabilities(environmentValue: { name in
-        switch name {
-        case "TUIGUI_SURFACE_DELTA": "1"
-        case "TUIGUI_SURFACE_MAX_VERSION": "2"
-        default: nil
-        }
-      })
-        == HostWireCapabilities(maxWebSurfaceVersion: 2, acceptsDeltaFrames: true)
-    )
-    #expect(
-      wasiHostWireCapabilities(environmentValue: { name in
-        name == "TUIGUI_SURFACE_MAX_VERSION" ? " 3 " : nil
-      })
-        == HostWireCapabilities(maxWebSurfaceVersion: 3)
-    )
+  }
+
+  @Test("the retired version-ceiling key is inert")
+  func retiredVersionCeilingKeyIsInert() {
+    // This pins the resolution of a real defect rather than a hypothetical.
+    // TUIGUI_SURFACE_MAX_VERSION used to overwrite a declared ceiling while
+    // the transport took its delta switch from a second, independently
+    // resolved env read — so this exact pairing declared a v2 ceiling and
+    // then emitted v3 delta records into it. The ceiling is gone and the
+    // transport has only one answer to take, so the key now does nothing.
+    let withCeiling = wasiHostWireCapabilities(environmentValue: { name in
+      switch name {
+      case "TUIGUI_SURFACE_DELTA": "1"
+      case "TUIGUI_SURFACE_MAX_VERSION": "2"
+      default: nil
+      }
+    })
+    #expect(withCeiling == HostWireCapabilities(acceptsDeltaFrames: true))
+
+    let ceilingAlone = wasiHostWireCapabilities(environmentValue: { name in
+      name == "TUIGUI_SURFACE_MAX_VERSION" ? " 3 " : nil
+    })
+    #expect(ceilingAlone == HostWireCapabilities())
   }
 
   @Test("frame diagnostics parser rejects falsey values")

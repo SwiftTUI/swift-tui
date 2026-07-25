@@ -294,15 +294,26 @@ package enum HostWireSchema {
     package let defaultValue: String
     /// WASI browser ingress (worker + JSPI): environment keys, resolved by
     /// `wasiHostWireCapabilities` beside the transport-mode resolution.
+    ///
+    /// Lifecycle: construction only. There is no runtime declaration
+    /// channel — a reload re-instantiates the in-process transport — so a
+    /// `caps:` record on stdin is deliberately dropped.
     package let wasiIngress: String
     /// WebHost WebSocket ingress: the `caps:{json}` control record, sent
     /// once by the client after open. Absence = defaults; unknown record
     /// types are silently dropped by `WebSurfaceInputParser`, so a new
     /// bundle against an old server degrades to defaults.
+    ///
+    /// Lifecycle: accepted at any time, and every arrival is a connection
+    /// epoch — it re-anchors the delta baseline and the transmitted-image
+    /// set.
     package let webSocketIngress: String
     /// Android JNI ingress: the `declareCapabilities` host call, accepted
     /// only before scene start. The JNI glue resolves the symbol lazily, so
     /// a new AAR against an old host library degrades to defaults.
+    ///
+    /// Lifecycle: pre-start only. The poll-model host cannot change record
+    /// shape mid-session, so a post-start declaration is rejected.
     package let androidIngress: String
 
     package init(
@@ -322,30 +333,28 @@ package enum HostWireSchema {
 
   /// The canonical capability manifest: every ``HostWireCapabilities``
   /// field, its per-transport declaration ingress, and its
-  /// absence-means-today default. Nothing reads capabilities for emission
-  /// until a stage lands a negotiated consumer; declaring is always safe.
+  /// absence-means-today default.
+  ///
+  /// All three transports negotiate emission from the declaration, through
+  /// `HostWireCapabilities.negotiatedEncodingState()`. Declaring is always
+  /// safe: the defaults reproduce today's bytes.
+  ///
+  /// Capabilities are named feature bits, so this list grows one entry per
+  /// negotiable record shape. It does **not** carry a version ceiling: the
+  /// retired `maxWebSurfaceVersion` was an integer only ever compared
+  /// against one threshold, duplicating — more weakly — the decoder-side
+  /// skew guard that hard-rejects a `surface` record newer than the decoder
+  /// understands. `supportsResync` retired with it, never sent by any
+  /// client and never read; it returns with the resync stage, when it has
+  /// semantics to encode.
   package static let capabilityMappings: [CapabilityMapping] = [
-    .init(
-      "maxWebSurfaceVersion",
-      defaultValue: "2",
-      wasi: "env TUIGUI_SURFACE_MAX_VERSION (explicit value wins over the TUIGUI_SURFACE_DELTA implication)",
-      webSocket: "caps record key maxWebSurfaceVersion",
-      android: "declareCapabilities key maxWebSurfaceVersion (>= 3 with delta acceptance enables delta records; every Android host receives web-surface frames)"
-    ),
     .init(
       "acceptsDeltaFrames",
       defaultValue: "false",
-      wasi: "env TUIGUI_SURFACE_DELTA (pre-existing opt-in; implies maxWebSurfaceVersion >= 3)",
+      wasi: "env TUIGUI_SURFACE_DELTA",
       webSocket: "caps record key acceptsDeltaFrames",
       android: "declareCapabilities key acceptsDeltaFrames"
-    ),
-    .init(
-      "supportsResync",
-      defaultValue: "false",
-      wasi: "declarable via no env key yet (reload re-instantiates the in-process transport; resync is a socket-session concern)",
-      webSocket: "caps record key supportsResync",
-      android: "declareCapabilities key supportsResync"
-    ),
+    )
   ]
 
   // MARK: - Shared wire tokens

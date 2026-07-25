@@ -110,6 +110,50 @@ struct WebSurfaceTransportTests {
     #expect(fields.first == "7")
   }
 
+  @Test("transport emission follows the declaration it was handed")
+  func transportEmissionFollowsTheDeclaration() throws {
+    // The end-to-end half of the negotiation contract, and the regression
+    // shape for the defect this pins: the transport once took its delta
+    // switch from a second, independently resolved source, so emission could
+    // disagree with the declaration. Asserted on emitted bytes rather than
+    // internal state, because bytes are what the host has to decode.
+    func steadyFrameOutput(declaring capabilities: HostWireCapabilities) throws -> String {
+      let pipe = Pipe()
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+        renderStyle: .init(appearance: .fallback),
+        wireCapabilities: capabilities
+      )
+      // First frame always establishes the baseline as a full record; the
+      // second is the one whose shape the declaration decides.
+      _ = try host.present(Self.basicSurface())
+      _ = try host.present(
+        SemanticHostFrame(
+          sequence: 2,
+          raster: Self.changedSurface(),
+          semantics: .init(),
+          focusedIdentity: nil,
+          rasterDamage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])])
+        )
+      )
+      pipe.fileHandleForWriting.closeFile()
+      let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      pipe.fileHandleForReading.closeFile()
+      return output
+    }
+
+    let deltaMarker = "\"encoding\":\"delta\""
+    #expect(
+      try steadyFrameOutput(declaring: HostWireCapabilities(acceptsDeltaFrames: true))
+        .contains(deltaMarker)
+    )
+    #expect(
+      try !steadyFrameOutput(declaring: HostWireCapabilities())
+        .contains(deltaMarker)
+    )
+  }
+
   @Test("delta-enabled encoder sends the first frame as a full frame")
   func deltaEnabledEncoderSendsFirstFrameFull() throws {
     var state = WebSurfaceFrameEncodingState(deltaEnabled: true)

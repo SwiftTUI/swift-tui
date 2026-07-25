@@ -85,7 +85,7 @@ struct WebSocketSurfaceTransportTests {
       sink: sink
     )
     transport.declareCapabilities(
-      HostWireCapabilities(maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+      HostWireCapabilities(acceptsDeltaFrames: true)
     )
 
     try transport.present(Self.steadyFrame(sequence: 1))
@@ -132,8 +132,7 @@ struct WebSocketSurfaceTransportTests {
       surfaceSize: .init(width: 2, height: 1),
       sink: sink
     )
-    let capabilities = HostWireCapabilities(
-      maxWebSurfaceVersion: 3, acceptsDeltaFrames: true)
+    let capabilities = HostWireCapabilities(acceptsDeltaFrames: true)
     transport.declareCapabilities(capabilities)
     try transport.present(Self.steadyFrame(sequence: 1))
     try transport.present(Self.steadyFrame(sequence: 2))

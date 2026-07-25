@@ -4,32 +4,40 @@
 /// This is the single Swift-side currency behind the three capability
 /// ingresses (WASI environment keys, the WebSocket `caps:` control record,
 /// and the Android `declareCapabilities` host call — see
-/// ``HostWireSchema/capabilityMappings`` for the canonical field/ingress
+/// ``HostWireSchema/capabilityMappings`` for the canonical key/ingress
 /// manifest). The defaults reproduce today's behavior exactly: a host that
-/// declares nothing gets today's bytes, byte for byte. Anything newer than
-/// the deployed decoder versions may be emitted **only** after the host has
-/// declared it acceptable here — deployed decoders hard-reject unknown
-/// versions, so a version literal must never move outside a
-/// capability-gated branch.
+/// declares nothing gets today's bytes, byte for byte.
+///
+/// Capabilities are **named feature bits, not a version ceiling.** A record
+/// shape newer than the deployed decoders may be emitted only after the host
+/// declared that shape acceptable, and the safety net beneath that is
+/// decoder-side: both deployed decoders hard-reject a `surface` record whose
+/// `version` exceeds what they understand (the F57 skew guard), which does
+/// not depend on a client declaring its ceiling honestly. A declared ceiling
+/// would be a second, weaker copy of that guard — and, being an integer only
+/// ever compared against one threshold, a boolean wearing an integer.
 package struct HostWireCapabilities: Equatable, Sendable {
-  /// Highest web `surface` record version the host accepts. Deployed
-  /// decoders hard-match `1|2` (full) and `3` (delta).
-  package var maxWebSurfaceVersion: Int
-  /// Whether the host accepts v3 `deltaRows` surface records.
+  /// Whether the host accepts v3 `deltaRows` surface records. The one bit
+  /// the declaration carries: it gates the delta record shape and nothing
+  /// else.
   package var acceptsDeltaFrames: Bool
-  /// Whether the host understands the resync flow (encoder-state reset +
-  /// full keyframe re-transmission). Semantics land with the resync stage;
-  /// until a consumer exists this is plumbing only.
-  package var supportsResync: Bool
 
   package init(
-    maxWebSurfaceVersion: Int = 2,
-    acceptsDeltaFrames: Bool = false,
-    supportsResync: Bool = false
+    acceptsDeltaFrames: Bool = false
   ) {
-    self.maxWebSurfaceVersion = maxWebSurfaceVersion
     self.acceptsDeltaFrames = acceptsDeltaFrames
-    self.supportsResync = supportsResync
+  }
+
+  /// The encoding state a host with these capabilities receives.
+  ///
+  /// Constructing one **always** re-anchors the delta baseline and the
+  /// transmitted-image set: a declaration marks a connection epoch. That is
+  /// why every transport routes both its undeclared default and its
+  /// post-declaration reset through here rather than building an encoding
+  /// state itself — a transport that assembles its own can, and once did,
+  /// disagree with the declaration it was handed.
+  package func negotiatedEncodingState() -> HostWireEncodingState {
+    HostWireEncodingState(deltaEnabled: acceptsDeltaFrames)
   }
 
   /// Parses the JSON object payload of a `caps:` declaration.
@@ -41,6 +49,12 @@ package struct HostWireCapabilities: Equatable, Sendable {
   /// defaults, which is exactly the absence-means-today contract. Hand
   /// parsed because this type ships in the WASI-compiled runtime, which
   /// carries no JSON dependency.
+  ///
+  /// The tolerance is load-bearing for retirement, not just for growth: the
+  /// retired `maxWebSurfaceVersion` and `supportsResync` keys now fall
+  /// through to the unknown-key skip, so a client still sending either one
+  /// parses exactly as if it had not. That is what lets the Swift side land
+  /// this collapse ahead of the clients that emit those keys.
   package static func fromDeclarationJSON(
     _ text: String
   ) -> HostWireCapabilities? {
@@ -69,21 +83,9 @@ package struct HostWireCapabilities: Equatable, Sendable {
       scanner.skipWhitespace()
 
       switch key {
-      case "maxWebSurfaceVersion":
-        if let value = scanner.consumeInteger() {
-          capabilities.maxWebSurfaceVersion = value
-        } else {
-          guard scanner.skipValue() else { return nil }
-        }
       case "acceptsDeltaFrames":
         if let value = scanner.consumeBool() {
           capabilities.acceptsDeltaFrames = value
-        } else {
-          guard scanner.skipValue() else { return nil }
-        }
-      case "supportsResync":
-        if let value = scanner.consumeBool() {
-          capabilities.supportsResync = value
         } else {
           guard scanner.skipValue() else { return nil }
         }

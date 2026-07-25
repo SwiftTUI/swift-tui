@@ -530,7 +530,7 @@ function encodeRenderStyleControlMessage(style) {
 `);
 }
 function encodeCapabilitiesControlMessage() {
-  return textEncoder.encode(`${recordPrefix}caps:{"maxWebSurfaceVersion":3,"acceptsDeltaFrames":true}
+  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true}
 `);
 }
 function encodeKeyInputMessage(input) {
