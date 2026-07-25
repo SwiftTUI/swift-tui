@@ -6,6 +6,39 @@ import PackageDescription
 
 let explicitPlatforms = ProcessInfo.processInfo.environment["DISABLE_EXPLICIT_PLATFORMS"] != "1"
 
+// Warnings-as-errors is opt-in (`SWIFTTUI_WARNINGS_AS_ERRORS=1`), not
+// unconditional, and the reason is that `.treatAllWarnings(as: .error)` leaks
+// into other people's builds.
+//
+// SE-0480 specifies that warning-control settings are stripped for targets a
+// package consumes as a dependency. Two holes make that unsafe to lean on:
+//
+//   * The stripping does not cover `path:` dependencies, which SwiftPM treats
+//     as local rather than remote. Verified on Swift 6.3.1: a consumer with a
+//     `path:` dependency inherits `-warnings-as-errors` and fails on the
+//     dependency's warnings. `path:` is exactly how this repo's coordination
+//     overlay consumes swift-tui, and how Xcode's "Add Local Package…" does.
+//     Unconditionally, every swift-tui warning would become a hard build
+//     failure in those builds, for code the consumer cannot edit.
+//   * Even for tagged dependencies the stripping has shipped broken: the
+//     substituted `-suppress-warnings` collided with `-warnings-as-errors` as
+//     `error: conflicting options '-warnings-as-errors' and
+//     '-suppress-warnings'` (swiftlang/swift-package-manager#9517, reported
+//     against Swift 6.3.0 and fixed only in March 2026 snapshots). Consumers
+//     on a slightly older toolchain than ours would not build at all.
+//
+// Gating on an environment variable keeps the policy where it belongs: on for
+// the repo gate (Scripts/test_all.sh) and CI, off for every consumer and for a
+// plain `swift build`. New warnings fail the gate; nobody downstream inherits
+// the policy, and a future toolchain's new diagnostics cannot break consumers.
+let warningsAsErrors = ProcessInfo.processInfo.environment["SWIFTTUI_WARNINGS_AS_ERRORS"] == "1"
+
+let warningSwiftSettings: [PackageDescription.SwiftSetting] =
+  warningsAsErrors ? [.treatAllWarnings(as: .error)] : []
+
+let warningCSettings: [PackageDescription.CSetting] =
+  warningsAsErrors ? [.treatAllWarnings(as: .error)] : []
+
 let packagePlatforms: [SupportedPlatform]? = {
   if !explicitPlatforms {
     return nil
@@ -76,7 +109,7 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
     .enableUpcomingFeature("InternalImportsByDefault"),
     .enableUpcomingFeature("MemberImportVisibility"),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
-  ] + settings
+  ] + warningSwiftSettings + settings
 }
 
 let packageProducts: [Product] =
@@ -191,7 +224,8 @@ let package = Package(
     ),
     .target(
       name: "SwiftTUIPTYCPrimitives",
-      path: "Platforms/Embedding/Sources/SwiftTUIPTYCPrimitives"
+      path: "Platforms/Embedding/Sources/SwiftTUIPTYCPrimitives",
+      cSettings: warningCSettings
     ),
     // C shim that exposes `dladdr` to `EntryPointLaunchTests` so the suite can
     // resolve the loaded test-bundle path and locate sibling fixture
@@ -201,6 +235,7 @@ let package = Package(
     .target(
       name: "CEntryPointImageLocator",
       path: "Tests/CEntryPointImageLocator",
+      cSettings: warningCSettings,
       linkerSettings: [
         .linkedLibrary("dl", .when(platforms: [.linux]))
       ]

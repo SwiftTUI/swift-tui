@@ -37,6 +37,39 @@ coordination overlay.
 Set `SWIFTTUI_TEST_TIMEOUT_SCALE` to widen async test timeouts on a slow or
 loaded machine.
 
+### Warnings are errors in the gate
+
+The repo gate builds with `SWIFTTUI_WARNINGS_AS_ERRORS=1`, which turns on
+`.treatAllWarnings(as: .error)` for every Swift and C target in
+`Package.swift`. A new compiler warning fails `bun run test`, so warnings
+cannot accumulate. A plain `swiftly run swift build` leaves them as warnings;
+export the variable yourself to reproduce a gate failure locally:
+
+```bash
+SWIFTTUI_WARNINGS_AS_ERRORS=1 swiftly run swift build --build-tests
+```
+
+The setting is deliberately **opt-in rather than unconditional**. SE-0480 says
+warning-control settings are stripped when a package is consumed as a
+dependency, but that guarantee has two holes:
+
+- It does not cover `path:` dependencies, which SwiftPM treats as local. On
+  Swift 6.3.1 a consumer with a `path:` dependency inherits
+  `-warnings-as-errors` and fails on *our* warnings. `path:` is how the
+  `swift-tui-org` coordination overlay and Xcode's "Add Local Package…" consume
+  this repo.
+- The stripping itself shipped broken:
+  [swiftlang/swift-package-manager#9517](https://github.com/swiftlang/swift-package-manager/issues/9517)
+  had the substituted `-suppress-warnings` collide with `-warnings-as-errors`
+  as `error: conflicting options`. Reported against Swift 6.3.0, fixed only in
+  March 2026 snapshots — so consumers on an older toolchain than ours would not
+  build at all.
+
+`.unsafeFlags(["-warnings-as-errors"])` is strictly worse than either: SwiftPM
+refuses a package that uses unsafe flags as a versioned dependency outright.
+
+Never promote the setting to unconditional; add it to a gate lane instead.
+
 The repo gate also has a command-level watchdog around every sub-suite. By
 default, `STUI_TEST_STEP_TIMEOUT_SECONDS=1200`; set it to `0` only for local
 diagnosis when you intentionally want an unbounded run. On timeout, the runner

@@ -164,6 +164,15 @@ if [ "$host_os" = "Linux" ]; then
   export DISABLE_EXPLICIT_PLATFORMS=1
 fi
 
+# Compiler warnings fail the gate. The Package.swift setting behind this is
+# opt-in rather than unconditional because `.treatAllWarnings(as: .error)` is
+# NOT stripped for `path:` dependencies, so an unconditional setting would turn
+# swift-tui warnings into hard failures inside overlay and Xcode local-package
+# builds that consume this repo. See the comment on `warningsAsErrors` in
+# Package.swift. The gate is where the policy is meant to bind, so it is turned
+# on here for every SwiftPM step below.
+export SWIFTTUI_WARNINGS_AS_ERRORS=1
+
 usage() {
   cat <<'EOF'
 Usage: Scripts/test_all.sh [--clean] [--skip-bun-install]
