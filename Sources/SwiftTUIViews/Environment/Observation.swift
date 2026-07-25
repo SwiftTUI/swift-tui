@@ -1,5 +1,5 @@
 import Observation
-package import SwiftTUICore
+import SwiftTUICore
 import Synchronization
 
 /// One marshaled observation change: the payload `onChange` records from

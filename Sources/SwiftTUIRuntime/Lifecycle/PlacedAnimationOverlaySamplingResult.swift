@@ -1,4 +1,4 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 package import SwiftTUIViews
 
 /// The product of one placed-overlay sampling pass.

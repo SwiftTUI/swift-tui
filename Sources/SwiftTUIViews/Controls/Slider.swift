@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Adjusts a numeric binding along a bounded linear range.
 public struct Slider<Label: View>: PrimitiveView, ResolvableView {
@@ -102,9 +102,13 @@ extension Slider {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isPressed =
+      context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)
     let chrome = styleEnvironment.rowChrome(

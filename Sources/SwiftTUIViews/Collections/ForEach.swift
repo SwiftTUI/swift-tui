@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Generates repeated content from a random-access collection.
 public struct ForEach<Data, ID, Content>: PrimitiveView, ResolvableView

@@ -1,4 +1,4 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 import SwiftTUIViews
 
 package enum AnimationPropertyValueApplication {

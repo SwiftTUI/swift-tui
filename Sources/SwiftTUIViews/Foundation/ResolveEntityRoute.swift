@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct ResolveEntityRoute: Sendable {
   package var identity: EntityIdentity

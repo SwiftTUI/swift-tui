@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package enum NavigationTitlePreferenceKey: PreferenceKey {
   package static var defaultValue: String? { nil }

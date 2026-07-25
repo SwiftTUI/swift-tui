@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Increments or decrements a numeric binding.
 public struct Stepper<Label: View>: PrimitiveView, ResolvableView {

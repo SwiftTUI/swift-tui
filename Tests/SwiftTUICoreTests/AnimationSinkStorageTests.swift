@@ -13,7 +13,7 @@ struct AnimationSinkStorageTests {
     // deliberately NO sink.
     let taskLocal = RecordingAnimationSink()
 
-    let observedInside = await AnimationRegistrationStorage.withSink(taskLocal) {
+    let observedInside = AnimationRegistrationStorage.withSink(taskLocal) {
       sinkID(AnimationRegistrationStorage.effectiveSink)
     }
 
@@ -54,10 +54,10 @@ struct AnimationSinkStorageTests {
   func completionAndTransitionSinksAreTaskLocalOnly() async throws {
     let taskLocal = RecordingAnimationSink()
 
-    let observedCompletion = await AnimationCompletionStorage.withSink(taskLocal) {
+    let observedCompletion = AnimationCompletionStorage.withSink(taskLocal) {
       sinkID(AnimationCompletionStorage.effectiveSink)
     }
-    let observedTransition = await TransitionRegistrationStorage.withSink(taskLocal) {
+    let observedTransition = TransitionRegistrationStorage.withSink(taskLocal) {
       sinkID(TransitionRegistrationStorage.effectiveSink)
     }
 

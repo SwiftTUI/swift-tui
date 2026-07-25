@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Frame-scoped record of every presentation declaration emitter resolved
 /// this head attempt, used by the frame head to decide whether the

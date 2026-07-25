@@ -1,5 +1,6 @@
-@testable import SwiftTUIAnimatedImage
 import Testing
+
+@testable import SwiftTUIAnimatedImage
 
 /// F153 — `AnimatedImageSequence` caches each frame's encoded PNG bytes so
 /// playback ticks stop re-running the encoder. These tests pin the cache
@@ -43,9 +44,9 @@ struct AnimatedImageEncodedCacheTests {
     // Same storage instance proves the second read was a cache hit rather
     // than a fresh encode (equal values could come from either).
     #expect(
-      first.withUnsafeBufferPointer { firstBuffer in
-        second.withUnsafeBufferPointer { secondBuffer in
-          firstBuffer.baseAddress == secondBuffer.baseAddress
+      unsafe first.withUnsafeBufferPointer { firstBuffer in
+        unsafe second.withUnsafeBufferPointer { secondBuffer in
+          unsafe firstBuffer.baseAddress == secondBuffer.baseAddress
         }
       }
     )

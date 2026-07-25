@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 import Synchronization
 
 /// A focusable multiline text editor that accepts terminal keyboard input.

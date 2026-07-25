@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package enum BuiltInButtonStyleKind {
   case automatic

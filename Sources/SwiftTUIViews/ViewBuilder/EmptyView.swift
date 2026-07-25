@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A view with no rendered content.
 public struct EmptyView: PrimitiveView, ResolvableView {

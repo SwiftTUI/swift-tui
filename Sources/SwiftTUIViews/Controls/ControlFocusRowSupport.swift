@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // Shared control chrome: the focus rail, highlighted rows, and the text-editor
 // body.

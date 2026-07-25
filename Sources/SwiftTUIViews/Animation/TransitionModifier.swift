@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 extension View {
   /// Associates a transition with this view for insertion/removal

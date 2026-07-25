@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package func progressFraction(
   value: Double,

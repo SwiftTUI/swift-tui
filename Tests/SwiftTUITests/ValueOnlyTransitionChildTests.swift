@@ -33,8 +33,8 @@ struct ValueOnlyTransitionChildTests {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
 
-    try AnimationRegistrationStorage.withSink(controller) {
-      try TransitionRegistrationStorage.withSink(controller) {
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
         let animation = Animation.linear(duration: .milliseconds(1200))
         controller.register(animation)
         let rootIdentity = testIdentity("value-only-transition-removal")
@@ -82,8 +82,8 @@ struct ValueOnlyTransitionChildTests {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
 
-    try AnimationRegistrationStorage.withSink(controller) {
-      try TransitionRegistrationStorage.withSink(controller) {
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
         let animation = Animation.linear(duration: .milliseconds(1200))
         controller.register(animation)
         let rootIdentity = testIdentity("value-only-transition-insertion")
@@ -115,8 +115,8 @@ struct ValueOnlyTransitionChildTests {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
 
-    try AnimationRegistrationStorage.withSink(controller) {
-      try TransitionRegistrationStorage.withSink(controller) {
+    AnimationRegistrationStorage.withSink(controller) {
+      TransitionRegistrationStorage.withSink(controller) {
         let rootIdentity = testIdentity("value-only-transition-unanimated")
 
         _ = renderer.render(

@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A view that compares equal to its previous value by its wrapped content's
 /// `==`, letting the renderer reuse the whole wrapped subtree without

@@ -1,4 +1,4 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 
 protocol AnyTabViewStyleBox: Sendable {
   func isEqualForReuse(to other: any AnyTabViewStyleBox) -> Bool

@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 @MainActor
 package struct DismissStack {

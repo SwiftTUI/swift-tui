@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A compact progress bar with optional label and current-value content.
 public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView, ResolvableView {

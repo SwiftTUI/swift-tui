@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A typed scoped view wrapper that preserves the original authoring scope.
 package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {

@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// The builder artifact produced by conditional branches inside a
 /// ``ViewBuilder``.

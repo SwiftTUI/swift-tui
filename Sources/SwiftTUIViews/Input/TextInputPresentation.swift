@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct TextInputDisplayRun: Equatable, Sendable {
   package var text: String

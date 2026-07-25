@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A focusable command menu whose expanded content floats above the
 /// surrounding layout as an overlay — opening and closing the menu
@@ -56,9 +56,13 @@ extension Menu {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isPressed =
+      context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,

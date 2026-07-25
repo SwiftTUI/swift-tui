@@ -59,9 +59,12 @@ struct MemoComparatorAgreementTests {
     pairs.append(("enum-case", Payload.value(3), Payload.none, false))
     pairs.append(("enum-assoc", Payload.labeled("x", 1), Payload.labeled("x", 2), false))
 
-    pairs.append(("optional-some-equal", Optional(base), Optional(base), true))
-    pairs.append(("optional-some-nil", Optional(base), Plain?.none, false))
-    pairs.append(("optional-nil-nil", Plain?.none, Plain?.none, true))
+    // `as Any` is the explicit form of the coercion the tuple's `Any` slots
+    // perform anyway; naming it keeps the optional-boxing cases (which are the
+    // point of these rows) free of an implicit-coercion warning.
+    pairs.append(("optional-some-equal", Optional(base) as Any, Optional(base) as Any, true))
+    pairs.append(("optional-some-nil", Optional(base) as Any, Plain?.none as Any, false))
+    pairs.append(("optional-nil-nil", Plain?.none as Any, Plain?.none as Any, true))
 
     pairs.append(("array-equal", [1, 2, 3], [1, 2, 3], true))
     pairs.append(("array-order", [1, 2, 3], [3, 2, 1], false))

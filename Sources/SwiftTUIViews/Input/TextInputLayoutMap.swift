@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct TextInputLayoutMap: Equatable, Sendable {
   package var lines: [TextInputLayoutLine]

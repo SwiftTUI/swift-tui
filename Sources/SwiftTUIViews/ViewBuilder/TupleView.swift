@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.

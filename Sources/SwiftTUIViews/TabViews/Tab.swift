@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Declares a single tab inside a `TabView`.
 public struct Tab<SelectionValue: Hashable & Sendable, Content: View>: View {

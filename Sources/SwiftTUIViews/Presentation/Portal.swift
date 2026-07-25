@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Destination-owned content payload for portal-hosted UI.
 @MainActor

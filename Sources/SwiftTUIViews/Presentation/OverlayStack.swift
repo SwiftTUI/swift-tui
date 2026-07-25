@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct OverlayStackEntry: Sendable {
   package var id: String

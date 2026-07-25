@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Resolve-authored runtime issues collected at the committed root alongside
 /// layout-authored issues.

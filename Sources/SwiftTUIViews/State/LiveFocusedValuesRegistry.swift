@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Live focused-values lookup for imperative callbacks, keyed by graph scope
 /// (the ``LiveViewGraphRegistry`` pattern).

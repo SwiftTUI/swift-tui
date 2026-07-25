@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// An animation that can be applied to state changes.
 public struct Animation: Equatable, Hashable, Sendable {

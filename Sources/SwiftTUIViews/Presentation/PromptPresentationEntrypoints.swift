@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct PromptPresentationSpec: Sendable {
   package var token: String

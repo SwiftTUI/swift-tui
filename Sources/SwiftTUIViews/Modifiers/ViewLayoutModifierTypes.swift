@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // The layout modifier implementation types.
 //

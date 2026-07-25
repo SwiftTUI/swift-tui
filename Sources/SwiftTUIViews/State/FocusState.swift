@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value

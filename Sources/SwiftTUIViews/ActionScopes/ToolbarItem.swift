@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A declarative description of a single toolbar item contributed by a
 /// descendant view via `.toolbarItem(_:)`.

@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // Navigation-destination preference plumbing.
 //

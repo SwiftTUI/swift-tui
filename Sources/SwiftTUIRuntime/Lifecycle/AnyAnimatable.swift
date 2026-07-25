@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Type-erased wrapper around a value conforming to ``Animatable``.
 ///

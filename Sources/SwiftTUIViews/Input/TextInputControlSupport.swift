@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 @MainActor
 package func registerTextInputBinding(

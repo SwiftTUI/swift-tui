@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // MARK: - Shared Item Storage
 

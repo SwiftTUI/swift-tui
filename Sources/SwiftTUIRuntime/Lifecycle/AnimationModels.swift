@@ -1,4 +1,4 @@
-@_spi(Testing) package import SwiftTUICore
+@_spi(Testing) import SwiftTUICore
 import SwiftTUIViews
 
 /// Identifies a logical animatable slot on a ``ResolvedNode``.  Each

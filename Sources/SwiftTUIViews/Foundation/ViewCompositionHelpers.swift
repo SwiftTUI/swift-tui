@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// A scoped authored child payload that preserves authoring scope without
 /// exposing `AnyView` as the transport type.

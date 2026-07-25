@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 // F16 — the single authoring-context capture point for runtime handler
 // registration.

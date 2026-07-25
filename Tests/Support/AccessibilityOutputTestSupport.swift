@@ -1,6 +1,5 @@
 public import SwiftTUICore
-
-package import SwiftTUIRuntime
+import SwiftTUIRuntime
 
 /// Renders a committed frame's semantic snapshot to the linear
 /// accessibility reading-order string (the accessible runtime's output

@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Selects one value from a set of tagged options.
 public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: PrimitiveView,
@@ -49,7 +49,9 @@ extension Picker {
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let pickerStyle = context.environmentValues.pickerStyle
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let options = resolvedOptions(in: context.child(component: .named("PickerOptions")))

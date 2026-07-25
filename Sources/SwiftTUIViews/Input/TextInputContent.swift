@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct TextInputContent: View, Sendable {
   package var displayText: String

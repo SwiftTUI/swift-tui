@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 package struct ErasedViewTypeID: Hashable, Sendable, CustomStringConvertible {
   package let identityComponent: IdentityComponent

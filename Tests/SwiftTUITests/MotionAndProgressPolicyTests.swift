@@ -209,7 +209,7 @@ private func transitionAnimationCount(reducedMotion: Bool) async -> Int {
   let rootIdentity = testIdentity(reducedMotion ? "ReducedTransition" : "NormalTransition")
   let environmentValues = policyEnvironment(accessibilityReduceMotion: reducedMotion)
 
-  return await TransitionRegistrationStorage.withSink(controller) {
+  return TransitionRegistrationStorage.withSink(controller) {
     _ = renderer.render(
       transitionProbe(show: false),
       context: ResolveContext(

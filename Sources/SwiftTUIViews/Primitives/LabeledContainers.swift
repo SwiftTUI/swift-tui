@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 /// Displays a title paired with an icon or glyph view.
 public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {

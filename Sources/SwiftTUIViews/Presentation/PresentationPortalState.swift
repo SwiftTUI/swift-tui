@@ -1,4 +1,4 @@
-package import SwiftTUICore
+import SwiftTUICore
 
 @MainActor
 package final class PresentationPortalState {
@@ -21,8 +21,8 @@ package final class PresentationPortalState {
   /// makes that window routine, not exotic. `publish` replays the operations
   /// recorded after the committing draft's floor onto the incoming registry
   /// (the same shape as the graph draft's state-mutation overlay).
-  private var pendingImperativeOperations:
-    [@MainActor (PresentationCoordinatorRegistry) -> Void] = []
+  private var pendingImperativeOperations: [@MainActor (PresentationCoordinatorRegistry) -> Void] =
+    []
 
   package init() {}
 
