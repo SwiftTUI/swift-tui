@@ -139,7 +139,6 @@ struct DefaultRendererFrameHeadCoordinator {
       resolveContext: resolveContext,
       graphRootIdentity: portal.graphRootIdentity,
       frameContext: frameProducts.frameContext,
-      resolved: resolvedHead.resolved,
       frameTailInput: frameProducts.frameTailInput,
       runtimeIssues: [],
       animationTimestamp: frameInstant,
@@ -174,24 +173,19 @@ struct DefaultRendererFrameHeadCoordinator {
       )
     }
 
-    var frameTailInput = draft.frameTailInput
-    frameTailInput.resolved = resolved
+    draft.resolved = resolved
     // Worker-safe snapshotting of lazy indexed child sources is only needed
     // when the frame tail runs off-main. One-shot renders run the tail
     // synchronously on the main actor, so they skip it.
     if mode == .abortable,
-      frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput)
+      frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(draft.frameTailInput)
     {
       draft.transaction.materializePreparedState()
-      resolved = indexedChildSourceWorkerSnapshot(of: resolved)
-      frameTailInput.resolved = resolved
+      draft.resolved = indexedChildSourceWorkerSnapshot(of: draft.resolved)
       draft.transaction.recordPreparedGraphState()
       draft.transaction.suspendPreparedState()
     }
 
-    draft.resolved = resolved
-    draft.frameTailInput = frameTailInput
-    draft.animationTimestamp = animationTimestamp
     return draft
   }
 

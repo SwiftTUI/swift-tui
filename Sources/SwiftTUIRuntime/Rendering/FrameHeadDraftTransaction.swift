@@ -304,11 +304,24 @@ package struct FrameHeadDraft {
   var resolveContext: ResolveContext
   var graphRootIdentity: Identity
   var frameContext: FrameContext
-  var resolved: ResolvedNode
   var frameTailInput: FrameTailInput
   var runtimeIssues: [RuntimeIssue]
   var animationTimestamp: MonotonicInstant
   var resolveDuration: Duration
+
+  /// This frame's resolved tree.
+  ///
+  /// Projected onto the tail input rather than stored alongside it. The two
+  /// were separate stored properties holding the same value, seeded from one
+  /// source at construction and then hand-synced — animation injection wrote
+  /// the pair three times in one function, and a worker snapshot rewrote both
+  /// again. Nothing checked they agreed, and consumers read whichever was
+  /// nearer: the tail coordinator reads `draft.resolved` and
+  /// `draft.frameTailInput` in adjacent arguments of the same call.
+  var resolved: ResolvedNode {
+    get { frameTailInput.resolved }
+    set { frameTailInput.resolved = newValue }
+  }
 
   var graphDraft: ViewGraphFrameDraft { transaction.graphDraft }
   var registrationDraft: FrameHeadRegistrationDraft { transaction.registrationDraft }
