@@ -94,10 +94,11 @@ struct DeclaredChildConsumptionTests {
 
   @Test("the shipped policies differ only where they are documented to")
   func policiesArePinned() {
-    // These three are the whole reporting matrix. `forEachIteration` not
-    // anchoring a dropped empty is an unexplained divergence preserved from
-    // the pre-existing code, flagged in its doc comment; this pins it so it
-    // cannot drift further without a decision.
+    // These three are the whole reporting matrix. The differences are about
+    // EAGERNESS only — `closeResolveLifetimeScope` anchors any observed node
+    // that reaches close unowned, so no preset decides whether a mint survives
+    // (see DroppedElementAnchoringTests). Pinned so the matrix cannot drift
+    // without a decision.
     #expect(DeclaredChildConsumptionPolicy.declaredBuilder.reportsDroppedEmpty)
     #expect(DeclaredChildConsumptionPolicy.declaredBuilder.reportsSplicedGroup)
 
