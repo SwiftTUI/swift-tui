@@ -6,6 +6,85 @@
 // state accessors; the comment-justified special cases inside are
 // load-bearing and ordered — see each guard's rationale before reordering.
 
+/// Which liveness guards a removal cascade trusts.
+///
+/// Removal reaches a node for several different reasons, and each reason
+/// believes a different set of liveness proxies. These were three independent
+/// boolean parameters threaded through every recursive call: eight expressible
+/// combinations, four of them meant by anyone. Each preset below is exactly one
+/// real call shape.
+///
+/// Note what a descent does NOT inherit: ``ignoringLifetimeAnchors(_:)`` and
+/// the barrier adjudication apply to the node they were chosen for, never to
+/// its descendants. The barrier proved *that root* unreachable; a collapse
+/// absorbed *that target*. Descendants start from ``ordinary`` again, carrying
+/// only the spare decision. That was previously an accident of default
+/// parameter values at each recursive call.
+struct SubtreeRemovalPolicy: Sendable, Equatable {
+  /// Spare a visited node reached by descent, deferring its verdict to the
+  /// teardown barrier instead of removing it now.
+  var sparesVisitedDescendants: Bool
+  /// Consult durable lifetime anchors as a liveness proxy for a
+  /// parent-detached node.
+  var consultsLifetimeAnchors: Bool
+  /// Apply the parent-detached keep-guard at all.
+  var appliesParentDetachedKeepGuard: Bool
+
+  /// Every guard applies and nothing is spared for having been visited.
+  static let ordinary = Self(
+    sparesVisitedDescendants: false,
+    consultsLifetimeAnchors: true,
+    appliesParentDetachedKeepGuard: true
+  )
+
+  /// Reconciliation teardown: a visited descendant may belong to the arriving
+  /// tree, so its verdict is deferred rather than decided here.
+  static let sparingVisitedDescendants = Self(
+    sparesVisitedDescendants: true,
+    consultsLifetimeAnchors: true,
+    appliesParentDetachedKeepGuard: true
+  )
+
+  /// Chain collapse and absorbed shadows: the target's remaining anchors are
+  /// inside the cascade, so anchors prove nothing about its liveness. Visited
+  /// descendants are still spared — absorption is a fact about the target, not
+  /// about the tree beneath it.
+  static let absorbingIntoCollapse = Self(
+    sparesVisitedDescendants: true,
+    consultsLifetimeAnchors: false,
+    appliesParentDetachedKeepGuard: true
+  )
+
+  /// Barrier strand pruning: the census reachability walk already proved this
+  /// root dead, so the keep-guard's liveness proxies must not re-spare it — a
+  /// stranded island root keeps its identity index entry precisely BECAUSE no
+  /// teardown path ever reached it. Descendants are a separate question and are
+  /// still spared: only the root was adjudicated.
+  static let barrierAdjudicated = Self(
+    sparesVisitedDescendants: true,
+    consultsLifetimeAnchors: true,
+    appliesParentDetachedKeepGuard: false
+  )
+
+  /// The policy a descendant inherits: this cascade's spare decision, and
+  /// nothing else.
+  var forDescent: Self {
+    Self.ordinary.sparingVisitedDescendants(sparesVisitedDescendants)
+  }
+
+  func sparingVisitedDescendants(_ spares: Bool) -> Self {
+    var policy = self
+    policy.sparesVisitedDescendants = spares
+    return policy
+  }
+
+  func ignoringLifetimeAnchors(_ ignores: Bool) -> Self {
+    var policy = self
+    policy.consultsLifetimeAnchors = !ignores
+    return policy
+  }
+}
+
 extension ViewGraph {
   /// Per-cascade re-entrancy guard for subtree removal. One walk instance is
   /// created at each removal root and threaded through the descent, so aliased
@@ -19,10 +98,8 @@ extension ViewGraph {
   func removeSubtree(
     rootedAt node: ViewNode,
     committedSnapshot: ResolvedNode? = nil,
-    sparingVisitedNodes: Bool = false,
+    policy: SubtreeRemovalPolicy = .ordinary,
     isSubtreeDescent: Bool = false,
-    ignoringLifetimeAnchors: Bool = false,
-    asBarrierAdjudicatedRemoval: Bool = false,
     walk: SubtreeRemovalWalk? = nil
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
@@ -66,7 +143,7 @@ extension ViewGraph {
       }
       guard !interiorNodes.isEmpty else {
         for child in committedSnapshot.children {
-          removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
+          removeResolvedSubtree(child, policy: policy.forDescent, walk: walk)
         }
         return
       }
@@ -80,7 +157,7 @@ extension ViewGraph {
         removeSubtree(
           rootedAt: interior,
           committedSnapshot: committedSnapshot,
-          sparingVisitedNodes: sparingVisitedNodes,
+          policy: policy.forDescent,
           isSubtreeDescent: true,
           walk: walk
         )
@@ -99,7 +176,7 @@ extension ViewGraph {
     // is still removed unconditionally, and callers that do not opt in keep
     // the narrower parent-detached keep-guard below (some removals — e.g. a
     // pruned navigation destination — legitimately tear down visited roots).
-    if sparingVisitedNodes,
+    if policy.sparesVisitedDescendants,
       isSubtreeDescent,
       node.visitedThisFrame(currentFrameID)
     {
@@ -145,7 +222,7 @@ extension ViewGraph {
     // Every other caller keeps the guard: the proxies protect live re-rooted
     // controls and flattened state owners mid-frame.
     let hasDurableAnchorOutsideCascade =
-      !ignoringLifetimeAnchors
+      policy.consultsLifetimeAnchors
       && (lifetimeReachabilityContext().map { context in
         lifetimeAnchors.hasAnchorOutside(
           node.viewNodeID,
@@ -153,7 +230,7 @@ extension ViewGraph {
           context: context
         )
       } ?? false)
-    if !asBarrierAdjudicatedRemoval,
+    if policy.appliesParentDetachedKeepGuard,
       node.parent == nil,
       node.viewNodeID != root?.viewNodeID,
       node.visitedThisFrame(currentFrameID),
@@ -199,14 +276,14 @@ extension ViewGraph {
       for child in node.children {
         removeSubtree(
           rootedAt: child,
-          sparingVisitedNodes: sparingVisitedNodes,
+          policy: policy.forDescent,
           isSubtreeDescent: true,
           walk: walk
         )
       }
     } else {
       for child in snapshot.children {
-        removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
+        removeResolvedSubtree(child, policy: policy.forDescent, walk: walk)
       }
       // A chain collapse can absorb an interior node's output as the
       // absorber's own resolved value: the committed value tree then names
@@ -221,7 +298,7 @@ extension ViewGraph {
       for child in node.children where child.parent === node {
         removeSubtree(
           rootedAt: child,
-          sparingVisitedNodes: sparingVisitedNodes,
+          policy: policy.forDescent,
           isSubtreeDescent: true,
           walk: walk
         )
@@ -259,7 +336,7 @@ extension ViewGraph {
         } ?? false
       removeSubtree(
         rootedAt: target,
-        sparingVisitedNodes: anchorSurvivesRemoval,
+        policy: .ordinary.sparingVisitedDescendants(anchorSurvivesRemoval),
         isSubtreeDescent: true,
         walk: walk
       )
@@ -296,9 +373,8 @@ extension ViewGraph {
       }
       removeSubtree(
         rootedAt: target,
-        sparingVisitedNodes: sparingVisitedNodes,
+        policy: policy.forDescent.ignoringLifetimeAnchors(targetIsAbsorbed),
         isSubtreeDescent: true,
-        ignoringLifetimeAnchors: targetIsAbsorbed,
         walk: walk
       )
     }
@@ -396,7 +472,7 @@ extension ViewGraph {
 
   private func removeResolvedSubtree(
     _ resolved: ResolvedNode,
-    sparingVisitedNodes: Bool = false,
+    policy: SubtreeRemovalPolicy = .ordinary,
     walk: SubtreeRemovalWalk? = nil
   ) {
     let walk = walk ?? SubtreeRemovalWalk()
@@ -413,7 +489,7 @@ extension ViewGraph {
         removeSubtree(
           rootedAt: node,
           committedSnapshot: resolved,
-          sparingVisitedNodes: sparingVisitedNodes,
+          policy: policy.forDescent,
           isSubtreeDescent: true,
           walk: walk
         )
@@ -425,7 +501,7 @@ extension ViewGraph {
       removeSubtree(
         rootedAt: node,
         committedSnapshot: resolved,
-        sparingVisitedNodes: sparingVisitedNodes,
+        policy: policy.forDescent,
         isSubtreeDescent: true,
         walk: walk
       )
@@ -433,7 +509,7 @@ extension ViewGraph {
     }
 
     for child in resolved.children {
-      removeResolvedSubtree(child, sparingVisitedNodes: sparingVisitedNodes, walk: walk)
+      removeResolvedSubtree(child, policy: policy.forDescent, walk: walk)
     }
   }
 }

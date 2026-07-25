@@ -160,7 +160,7 @@ struct ResolveLifetimeScopeTests {
       graph.reportResolvedLifetimeNode(removed)
       graph.removeSubtree(
         rootedAt: removed,
-        ignoringLifetimeAnchors: true
+        policy: .ordinary.ignoringLifetimeAnchors(true)
       )
     }
 

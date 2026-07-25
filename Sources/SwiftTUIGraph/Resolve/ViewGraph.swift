@@ -2011,7 +2011,7 @@ package final class ViewGraph {
       if node.visitedThisFrame(currentFrameID) {
         continue
       }
-      removeSubtree(rootedAt: node, sparingVisitedNodes: true)
+      removeSubtree(rootedAt: node, policy: .sparingVisitedDescendants)
     }
   }
 
@@ -2115,7 +2115,7 @@ package final class ViewGraph {
       guard evaluatedNodeIDsThisFrame.contains(host) else {
         continue
       }
-      removeSubtree(rootedAt: rootNode, sparingVisitedNodes: true)
+      removeSubtree(rootedAt: rootNode, policy: .sparingVisitedDescendants)
     }
   }
 
@@ -2747,8 +2747,7 @@ package final class ViewGraph {
       }
       removeSubtree(
         rootedAt: node,
-        sparingVisitedNodes: true,
-        ignoringLifetimeAnchors: true
+        policy: .absorbingIntoCollapse
       )
     }
   }
@@ -2795,8 +2794,7 @@ package final class ViewGraph {
       }
       removeSubtree(
         rootedAt: node,
-        sparingVisitedNodes: true,
-        asBarrierAdjudicatedRemoval: true
+        policy: .barrierAdjudicated
       )
     }
   }
@@ -3926,7 +3924,7 @@ package final class ViewGraph {
       removeSubtree(
         rootedAt: removedNode,
         committedSnapshot: removal.committedSnapshot,
-        sparingVisitedNodes: true
+        policy: .sparingVisitedDescendants
       )
     }
   }

@@ -87,8 +87,7 @@ extension ViewGraph {
       adoptAbsorbedRuntimeRegistrations(from: node)
       removeSubtree(
         rootedAt: node,
-        sparingVisitedNodes: true,
-        ignoringLifetimeAnchors: true
+        policy: .absorbingIntoCollapse
       )
     }
   }

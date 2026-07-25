@@ -261,7 +261,7 @@ extension ViewGraph {
         if relationKeeps {
           continue
         }
-        removeSubtree(rootedAt: node, sparingVisitedNodes: true)
+        removeSubtree(rootedAt: node, policy: .sparingVisitedDescendants)
       }
     }
   }
