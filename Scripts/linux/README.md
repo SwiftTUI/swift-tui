@@ -62,12 +62,12 @@ runtime.
 ## What's in the image
 
 `Scripts/linux/Dockerfile` layers the following onto the upstream
-`swift:6.3.1` base:
+`swift:6.3.3` base:
 
 | Tool          | Why it's preinstalled                                       |
 |---------------|-------------------------------------------------------------|
 | Swiftly       | Selects the repo-pinned Swift toolchain                     |
-| Swift 6.3.1   | Installed and selected through Swiftly                      |
+| Swift 6.3.3   | Installed and selected through Swiftly                      |
 | bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
 | binaryen      | Provides `wasm-opt` for local primary-repo Wasm diagnostics |
@@ -191,7 +191,7 @@ Each successful publish emits a manifest containing both `linux/amd64` and
 | Tag                | When                              | Purpose                       |
 |--------------------|-----------------------------------|-------------------------------|
 | `:latest`          | `main` only                       | What `linux.sh` defaults to   |
-| `:swift-6.3.1`     | every successful build            | Pin to a Swift toolchain      |
+| `:swift-6.3.3`     | every successful build            | Pin to a Swift toolchain      |
 | `:sha-<7-char-sha> | every successful build            | Pin to an exact image build   |
 
 Pin to `:sha-…` from `linux.sh`:
@@ -276,8 +276,8 @@ If GHCR is unavailable (rate limits, auth issues, fork without write
 access), point `LINUX_IMAGE` at the upstream image:
 
 ```bash
-LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh start
-LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh full
+LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh start
+LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh full
 ```
 
 `linux.sh` keeps lazy installers for Swiftly, bun, and the Wasm SDK
@@ -382,7 +382,7 @@ The container name encodes the image and requested platform, so switching
 first rather than reconfiguring. To free disk space when you're done with one:
 
 ```bash
-LINUX_IMAGE=swift:6.3.1 ./Scripts/linux.sh nuke
+LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh nuke
 ```
 
 If you pulled the old amd64-only `:latest` image on Apple Silicon before the
@@ -410,7 +410,7 @@ command is:
 docker build \
   -f Scripts/linux/Dockerfile \
   -t ghcr.io/swifttui/swift-tui-linux:latest \
-  --build-arg SWIFT_VERSION=6.3.1 \
+  --build-arg SWIFT_VERSION=6.3.3 \
   --build-arg SWIFTLY_VERSION=1.1.1 \
   Scripts/linux
 ```

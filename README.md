@@ -232,7 +232,7 @@ Scripts/build_docc_archive.sh
 ## Contributing
 
 Small, well-scoped issues and pull requests are easiest to review. The repo uses
-the pinned Swift 6.3.1 toolchain through `swiftly`; build and test with:
+the pinned Swift 6.3.3 toolchain through `swiftly`; build and test with:
 
 ```bash
 swiftly run swift test

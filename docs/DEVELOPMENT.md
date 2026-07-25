@@ -6,14 +6,14 @@ process.
 
 ## Toolchains
 
-- **Swift `6.3.1`**, pinned in `.swift-version`. The package builds in Swift 6
+- **Swift `6.3.3`**, pinned in `.swift-version`. The package builds in Swift 6
   language mode with `.defaultIsolation(.none)` and a set of upcoming features
   enabled (`ExistentialAny`, `InternalImportsByDefault`, and others).
 - Use **`swiftly`** to run the toolchain: `swiftly run swift build`,
   `swiftly run swift test`. Building the repo with `xcrun swift` is **not
   supported** — the pinned toolchain is the source of truth.
 - **Bun `1.3.13`** orchestrates the test and policy scripts.
-- **WASI** builds use the `swift-6.3.1-RELEASE_wasm` SDK.
+- **WASI** builds use the `swift-6.3.3-RELEASE_wasm` SDK.
 - Extracted examples resolve the public `swift-tui` release tag by default. Keep
   `swift-tui`, `swift-tui-web`, and `swift-tui-examples` as sibling checkouts
   only when you are deliberately running coordination-local pre-tag integration

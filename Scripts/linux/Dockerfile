@@ -15,13 +15,13 @@
 # IMPORTANT: keep these defaults in sync with .swift-version and the
 # SWIFTLY_* / WASM_SDK_* vars at the top of Scripts/linux.sh.
 
-ARG SWIFT_VERSION=6.3.1
+ARG SWIFT_VERSION=6.3.3
 FROM swift:${SWIFT_VERSION}
 
-ARG SWIFT_VERSION=6.3.1
+ARG SWIFT_VERSION=6.3.3
 ARG SWIFTLY_VERSION=1.1.1
-ARG WASM_SDK_URL=https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz
-ARG WASM_SDK_CHECKSUM=bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
+ARG WASM_SDK_URL=https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz
+ARG WASM_SDK_CHECKSUM=cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
 ARG BUN_INSTALL=/usr/local/bun
 
 LABEL org.opencontainers.image.title="swift-tui-linux" \
