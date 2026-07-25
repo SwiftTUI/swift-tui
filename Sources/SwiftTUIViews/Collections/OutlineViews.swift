@@ -446,25 +446,16 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, Resolvable
     let resolved = withAuthoringContext(authoringScope) {
       resolveView(content, in: context)
     }
-    if resolved.identity == context.identity,
-      resolved.kind == .view("EmptyView")
-    {
-      // A dropped value still minted a stored node that lives in no children
-      // array; resolve-lifetime scope owns it at the nearest declaring host.
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(resolved)
-      return []
-    }
-    if resolved.identity == context.identity,
-      resolved.kind == .view("Group")
-    {
-      // Splicing lifts the row content's children into the enclosing outline
-      // container, so the group's own minted node — this row's `@State` owner
-      // — lives in no children slot. Resolve-lifetime scope owns it
-      // automatically before this splice returns.
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(resolved)
-      return resolved.children
-    }
-    return [resolved]
+    // Splicing lifts the row content's children into the enclosing outline
+    // container, so the group's own minted node — this row's `@State` owner —
+    // lives in no children slot, and a dropped value's mint lives in none
+    // either. Both are anchored at the nearest declaring host.
+    return consumeDeclaredChild(
+      resolved,
+      resolvedUnder: context.identity,
+      in: context.viewGraph,
+      policy: .declaredBuilder
+    )
   }
 }
 

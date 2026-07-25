@@ -76,20 +76,12 @@ package struct ForEachIteration<Element> {
     case .normalizedNode:
       return [resolved]
     case .declaredChildren:
-      if resolved.identity == context.identity,
-        resolved.kind == .view("EmptyView")
-      {
-        return []
-      }
-      if resolved.identity == context.identity,
-        resolved.kind == .view("Group")
-      {
-        if reportDetachedGroup {
-          context.viewGraph?.reportDetachedResolvedLifetimeResult(resolved)
-        }
-        return resolved.children
-      }
-      return [resolved]
+      return consumeDeclaredChild(
+        resolved,
+        resolvedUnder: context.identity,
+        in: context.viewGraph,
+        policy: reportDetachedGroup ? .forEachIteration : .indexedChildRealization
+      )
     }
   }
 }

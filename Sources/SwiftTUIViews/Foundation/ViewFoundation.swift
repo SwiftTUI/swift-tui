@@ -59,28 +59,14 @@ package func appendDeclaredChildNodes<V: View>(
       authoringContextOverride: nil,
       structuralChildCutEligible: true
     )
-    if resolvedNode.identity == childContext.identity,
-      resolvedNode.kind == .view("EmptyView")
-    {
-      // The value is dropped, but `resolveView` already minted/visited a
-      // stored node for it (a `_ = state` Void expression or an explicit
-      // `EmptyView` element — TimelineView's `timelineBody` is the shipped
-      // shape). Resolve-lifetime scope closes after this host applies and
-      // automatically owns the otherwise-detached mint.
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(resolvedNode)
-      return
-    }
-    if resolvedNode.identity == childContext.identity,
-      resolvedNode.kind == .view("Group")
-    {
-      // Same detached shape as the dropped `EmptyView` above: the spliced
-      // group's children are re-parented by the enclosing apply while the
-      // group's own mint is owned automatically by resolve-lifetime scope.
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(resolvedNode)
-      resolved.append(contentsOf: resolvedNode.children)
-      return
-    }
-    resolved.append(resolvedNode)
+    resolved.append(
+      contentsOf: consumeDeclaredChild(
+        resolvedNode,
+        resolvedUnder: childContext.identity,
+        in: context.viewGraph,
+        policy: .declaredBuilder
+      )
+    )
     return
   }
 
