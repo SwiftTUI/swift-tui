@@ -54,6 +54,27 @@ struct CommittedFreshnessTests {
     #expect(!freshness.canServeMemo)
   }
 
+  @Test("the ownership claim needs freshness AND an unrecorded re-seat")
+  func ownershipClaimPredicate() {
+    var freshness = CommittedFreshness()
+    // Never committed: the listing is not load-bearing, so there is no claim.
+    #expect(!freshness.claimsOwnershipOfListedChildren)
+
+    freshness.commitApplied()
+    #expect(freshness.claimsOwnershipOfListedChildren)
+
+    // An island-stale descendant denies service on its own but does not
+    // withdraw the ownership claim — the stranded-listing sweep must keep
+    // watching such a node, since its missing re-seat mark is the defect.
+    freshness.markDescendantChanged(crossingIslandSeam: true)
+    #expect(freshness.claimsOwnershipOfListedChildren)
+    #expect(!freshness.canServeValueBlind)
+
+    // A recorded re-seat is what withdraws it.
+    freshness.markChildReseated()
+    #expect(!freshness.claimsOwnershipOfListedChildren)
+  }
+
   @Test("the memo exemption: foreign-parented denies value-blind but not memo")
   func memoExemptionDivergence() {
     var freshness = CommittedFreshness()

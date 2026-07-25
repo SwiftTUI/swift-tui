@@ -3077,6 +3077,18 @@ package final class ViewGraph {
         }
       #endif
     }
+    if SoundnessProbeConfiguration.isSampledFrame {
+      for violation in strandedFreshServableViolations() {
+        SoundnessProbeConfiguration.recordStrandedListingViolation(violation)
+        #if DEBUG
+          // Measured zero across the whole suite when introduced (4768 tests),
+          // and neutering `noteChildReseatedAway` produces exactly one report —
+          // the Tab-wrap strand — so a hit is a regression of that fix, not a
+          // legitimate shape the sweep never saw.
+          assertionFailure(violation)
+        #endif
+      }
+    }
     return latestLifecycleEvents
   }
 

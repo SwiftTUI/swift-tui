@@ -10,6 +10,7 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
   package var teardownCoherence = 0
   package var registrationPublication = 0
   package var memoUnsoundSkip = 0
+  package var strandedListing = 0
 
   package init() {}
 
@@ -28,6 +29,7 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
     counts.registrationPublication =
       SoundnessProbeConfiguration.registrationPublicationViolationCount
     counts.memoUnsoundSkip = SoundnessProbeConfiguration.memoUnsoundSkipCount
+    counts.strandedListing = SoundnessProbeConfiguration.strandedListingViolationCount
     return counts
   }
 }
@@ -76,6 +78,11 @@ extension RunLoop {
       kind: "memoUnsoundSkip",
       total: SoundnessProbeConfiguration.memoUnsoundSkipCount,
       lastSeen: &counts.memoUnsoundSkip
+    )
+    reportSoundnessViolationGrowth(
+      kind: "strandedListing",
+      total: SoundnessProbeConfiguration.strandedListingViolationCount,
+      lastSeen: &counts.strandedListing
     )
     lastSeenSoundnessViolationCounts = counts
   }

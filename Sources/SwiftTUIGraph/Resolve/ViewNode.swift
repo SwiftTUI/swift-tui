@@ -48,6 +48,13 @@ package final class ViewNode {
     reuseState.freshness.hasForeignParentedChild
   }
 
+  /// Read-only mirror of
+  /// ``CommittedFreshness/claimsOwnershipOfListedChildren``; the
+  /// stranded-listing sweep's population predicate.
+  package var claimsOwnershipOfListedChildren: Bool {
+    reuseState.freshness.claimsOwnershipOfListedChildren
+  }
+
   /// The most-recently-committed `ResolvedNode` for this node.
   ///
   /// This is the single source of truth for the per-node render-tree

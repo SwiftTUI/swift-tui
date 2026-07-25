@@ -96,6 +96,18 @@ package struct CommittedFreshness: Equatable {
     isCommittedSnapshotFresh
   }
 
+  /// Whether the stamps *claim* every child the node lists is still seated
+  /// under it: the committed snapshot is fresh (so the listing is
+  /// load-bearing) and no re-seat was ever recorded against it.
+  ///
+  /// The stranded-listing oracle's population. Deliberately ignores
+  /// `hasStaleIslandDescendant` — that stamp denies service on its own, and
+  /// including it would hide exactly the nodes whose *missing*
+  /// ``markChildReseated()`` the oracle exists to find.
+  package var claimsOwnershipOfListedChildren: Bool {
+    isCommittedSnapshotFresh && !hasForeignParentedChild
+  }
+
   /// Whether the verdicts a refresh does NOT re-adjudicate still admit
   /// value-blind service.
   ///

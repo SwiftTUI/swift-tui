@@ -69,6 +69,7 @@ package enum SoundnessProbeConfiguration {
   package static var lifecycleHandlerSkipCount = 0
   package static var ambientEnvironmentFallbackReadCount = 0
   package static var committedHandlerResolutionViolationCount = 0
+  package static var strandedListingViolationCount = 0
   package static var lastViolationDetail: String?
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
@@ -278,6 +279,21 @@ package enum SoundnessProbeConfiguration {
     committedHandlerResolutionViolationCount += 1
     lastViolationDetail = detail()
     emitTrace("committed-handler-resolution")
+  }
+
+  /// Records one stranded listing (residual 2 of the reuse/freshness quirk
+  /// register): a node still claims ownership of every child it lists while
+  /// one of those children is seated under a different live parent. Nothing
+  /// can carry that child's subtree change up to the claimant, so a later
+  /// value-blind serve commits superseded interior content and stamps — the
+  /// gallery Tab-wrap stamp-coherence crash's precursor state, previously
+  /// observable only from a test that named the affected slot by hand.
+  package static func recordStrandedListingViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    strandedListingViolationCount += 1
+    lastViolationDetail = detail()
+    emitTrace("stranded-listing")
   }
 
   /// `SWIFTTUI_SOUNDNESS_PROBE_TRACE=1` emits one `[SOUNDNESS]` line per

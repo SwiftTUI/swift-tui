@@ -146,18 +146,19 @@ struct TabStripReuseStampCoherenceTests {
     #expect(runLoop.focusTracker.currentFocusIdentity != nil)
   }
 
-  /// The graph's stranded-listing freshness oracle
-  /// (``ViewGraph/debugStrandedFreshServableViolations(identityPathSuffix:)``),
-  /// scoped to the literal-tabs style's content slot — the resolve root the
-  /// style body re-creates on every shell re-resolve, so retained reuse
-  /// consults it by identity. Invariant rationale and the slot-scoping
-  /// justification live on the oracle.
+  /// The graph's stranded-listing oracle
+  /// (``ViewGraph/strandedFreshServableViolations()``), swept graph-wide.
+  ///
+  /// This assertion used to name the literal-tabs content slot by hand,
+  /// because the sweep read a dozen-odd violations on a healthy graph and was
+  /// believed un-assertable globally. Those reports were an artifact of the
+  /// oracle naming the lister by `resolvedIdentity` and the child's parent by
+  /// its authored identity; comparing the objects the staleness walk follows
+  /// reads zero, so the scope is gone and this test now pins the whole graph.
   private static func strandedContentSlotViolations(
     in viewGraph: ViewGraph
   ) -> [String] {
-    viewGraph.debugStrandedFreshServableViolations(
-      identityPathSuffix: "TabBody/ZStack[0]/VStack[1]"
-    )
+    viewGraph.strandedFreshServableViolations()
   }
 }
 
