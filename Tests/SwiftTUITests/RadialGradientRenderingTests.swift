@@ -54,6 +54,40 @@ struct RadialGradientRenderingTests {
     #expect(artifacts.rasterSurface.size.height == 5)
   }
 
+  @Test("Radial gradient falloff is circular in device-pixel space")
+  func radialGradientFalloffIsCircular() {
+    let view =
+      Rectangle()
+      .fill(
+        RadialGradient(
+          colors: [.red, .blue],
+          center: .center,
+          startRadius: 0,
+          endRadius: 8
+        )
+      )
+      .frame(width: 21, height: 21)
+    let artifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("RadialGradientCircular"))
+    )
+    let cells = artifacts.rasterSurface.cells
+
+    // The center cell is (10, 10).  At the default 8x16 metrics a cell is
+    // twice as tall as it is wide, so four cells right and two cells down
+    // are the same *device-pixel* distance from the center: a circular
+    // falloff must give them the same color.
+    let right = cells[10][14].style?.backgroundColor
+    let down = cells[12][10].style?.backgroundColor
+    #expect(right != nil)
+    #expect(right == down)
+
+    // ...and the same offset counted in raw cells must *not* match, which
+    // is precisely the vertical over-reach the correction removes.
+    let downUncorrected = cells[14][10].style?.backgroundColor
+    #expect(right != downUncorrected)
+  }
+
   @Test("Radial gradient in a wide frame still samples by distance")
   func radialGradientWideFrame() {
     let view =

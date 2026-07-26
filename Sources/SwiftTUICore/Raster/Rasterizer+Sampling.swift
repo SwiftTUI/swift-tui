@@ -62,9 +62,12 @@ extension Rasterizer {
     return stops.last?.color
   }
 
+  /// - Parameter aspectRatio: Cell height divided by cell width, from the
+  ///   resolved style environment's ``CellPixelMetrics``.
   internal func sample(
     _ gradient: RadialGradient,
     in bounds: CellRect,
+    aspectRatio: Double,
     x: Int,
     y: Int
   ) -> Color? {
@@ -82,13 +85,19 @@ extension Rasterizer {
       y: Double(bounds.origin.y) + gradient.center.y * Double(bounds.size.height)
     )
 
-    // Distance from the sample cell's center to the gradient center
-    // in raw cell space (no aspect-ratio compensation — matches the
-    // linear gradient sampler's cell-space conventions).
+    // Distance from the sample cell's center to the gradient center.
+    // Vertical offsets are scaled by the cell aspect ratio so falloff is
+    // measured in device-pixel space rather than raw cell space: a terminal
+    // cell is roughly twice as tall as it is wide, so an uncorrected
+    // distance paints a circle as a ~2:1 vertical ellipse.  This matches how
+    // `Circle` and `Capsule` correct curved geometry through
+    // ``CellPixelMetrics``.  Radii stay denominated in horizontal cells, so
+    // the horizontal reach of an existing gradient is unchanged and only the
+    // vertical over-reach is corrected.
     let px = Double(x) + 0.5
     let py = Double(y) + 0.5
     let dx = px - center.x
-    let dy = py - center.y
+    let dy = (py - center.y) * aspectRatio
     let distance = (dx * dx + dy * dy).squareRoot()
 
     // Normalize to [0, 1] using startRadius and endRadius.  Guard the

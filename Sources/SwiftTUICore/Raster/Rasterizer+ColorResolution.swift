@@ -308,7 +308,10 @@ extension Rasterizer {
     case .linearGradient(let gradient):
       return .sampled(gradient)
     case .radialGradient(let gradient):
-      return .sampledRadial(gradient)
+      return .sampledRadial(
+        gradient,
+        aspectRatio: environment.cellPixelMetrics.aspectRatio
+      )
     case .meshGradient(let gradient):
       return .sampledMesh(
         PreparedMeshGradient(
@@ -413,7 +416,7 @@ extension Rasterizer {
           endPoint: gradient.endPoint
         )
         return .sampled(faded)
-      case .sampledRadial(let gradient):
+      case .sampledRadial(let gradient, let aspectRatio):
         let faded = RadialGradient(
           gradient: Gradient(
             stops: gradient.gradient.stops.map {
@@ -423,7 +426,7 @@ extension Rasterizer {
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
         )
-        return .sampledRadial(faded)
+        return .sampledRadial(faded, aspectRatio: aspectRatio)
       case .sampledMesh(let gradient):
         return .sampledMesh(gradient.applyingOpacity(amount))
       case .tile(let tile):
@@ -453,10 +456,11 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
-    case .sampledRadial(let gradient):
+    case .sampledRadial(let gradient, let aspectRatio):
       return sample(
         gradient,
         in: bounds,
+        aspectRatio: aspectRatio,
         x: sampleX,
         y: sampleY
       )
@@ -537,7 +541,7 @@ extension Rasterizer {
           startPoint: gradient.startPoint,
           endPoint: gradient.endPoint
         ))
-    case .sampledRadial(let gradient):
+    case .sampledRadial(let gradient, let aspectRatio):
       return .sampledRadial(
         RadialGradient(
           gradient: Gradient(
@@ -547,7 +551,8 @@ extension Rasterizer {
           center: gradient.center,
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
-        ))
+        ),
+        aspectRatio: aspectRatio)
     case .sampledMesh(let gradient):
       return .sampledMesh(gradient.applyingOpacity(amount))
     case .tile(let tile):

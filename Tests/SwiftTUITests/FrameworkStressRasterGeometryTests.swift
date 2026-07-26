@@ -280,6 +280,7 @@ struct FrameworkStressRasterGeometryTests {
       Rasterizer().sample(
         gradient,
         in: CellRect(origin: .zero, size: CellSize(width: 9, height: 9)),
+        aspectRatio: CellPixelMetrics.estimated.aspectRatio,
         x: 4,
         y: 4
       ) == nil
@@ -298,7 +299,15 @@ struct FrameworkStressRasterGeometryTests {
     )
     let bounds = CellRect(origin: .zero, size: CellSize(width: 10, height: 10))
 
-    #expect(Rasterizer().sample(gradient, in: bounds, x: 4, y: 4) == .red)
+    #expect(
+      Rasterizer().sample(
+        gradient,
+        in: bounds,
+        aspectRatio: CellPixelMetrics.estimated.aspectRatio,
+        x: 4,
+        y: 4
+      ) == .red
+    )
   }
 
   @Test("stress raster geometry 017 radial samples beyond end radius clamp to last stop")
@@ -313,7 +322,15 @@ struct FrameworkStressRasterGeometryTests {
     )
     let bounds = CellRect(origin: .zero, size: CellSize(width: 10, height: 10))
 
-    #expect(Rasterizer().sample(gradient, in: bounds, x: 9, y: 9) == .blue)
+    #expect(
+      Rasterizer().sample(
+        gradient,
+        in: bounds,
+        aspectRatio: CellPixelMetrics.estimated.aspectRatio,
+        x: 9,
+        y: 9
+      ) == .blue
+    )
   }
 
   @Test("stress raster geometry 018 open path fill closes only for rasterization")

@@ -8,6 +8,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Radial gradients now fall off in circles.** `RadialGradient` measured
+  distance in raw cell space, so a gradient that was circular in cells painted
+  as a roughly 2:1 vertical ellipse on screen. The sampler now scales vertical
+  offsets by the cell aspect ratio from `CellPixelMetrics`, matching how
+  `Circle`, `Ellipse`, and `Capsule` already correct curved geometry. Radii
+  stay denominated in horizontal cells: the horizontal reach of an existing
+  gradient is unchanged, and only the vertical over-reach is corrected. Fills
+  that relied on the old vertical spread should roughly double `endRadius` to
+  restore it.
+
 ## [0.2.0] - 2026-07-24
 
 ### Added
