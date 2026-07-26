@@ -97,9 +97,9 @@ image-layer blending, or direct GIF byte blending.
 ## Preview And Inspection
 
 When you want to inspect authored output without running a full terminal
-session, use ``Resolver`` from `SwiftTUIViews`, or the higher-level
-`DefaultRenderer` type from `SwiftTUIRuntime` or `SwiftTUI`, from the main actor
-to produce resolved trees, frame artifacts, or rendered terminal text.
+session, use the `DefaultRenderer` type from `SwiftTUIRuntime` or `SwiftTUI`,
+from the main actor, to produce resolved trees, frame artifacts, or rendered
+terminal text.
 
 See also:
 
@@ -107,4 +107,3 @@ See also:
 - <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
 - ``AnyView``
-- ``Resolver``

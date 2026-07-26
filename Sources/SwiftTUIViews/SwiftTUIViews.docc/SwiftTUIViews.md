@@ -8,7 +8,7 @@ The `SwiftTUIViews` module is the authoring surface of SwiftTUI.
 
 It provides:
 
-- body-only ``View/View`` definitions
+- body-only ``View`` definitions
 - first-class public modifier algebra through ``ViewModifier``,
   ``View/modifier(_:)``, and ``ModifiedContent``
 - typed builders through ``ViewBuilder``
@@ -22,7 +22,7 @@ It provides:
   the single-``ForEach`` full-lazy path
 - continuous cell-space gestures and drawing through ``DragGesture``,
   ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
-  ``CanvasDrawing`` / ``CanvasClosureDrawing``
+  `CanvasDrawing` / ``CanvasClosureDrawing``
 - the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `fullScreenCover`, `popover`, `popoverTip`, `toast`)
 - ASCII-art banner text through ``TextFigure``, backed by embedded FIGlet fonts that participate in normal layout proposals without requiring external font files
 
@@ -53,10 +53,9 @@ Lowering helpers remain package-only implementation details.
 
 ### Essentials
 
-- ``View/View``
+- ``View``
 - ``ViewBuilder``
 - ``AnyView``
-- ``Resolver``
 - ``TextFigure``
 
 ### State And Data Flow
@@ -79,15 +78,12 @@ Lowering helpers remain package-only implementation details.
 ### Input And Drawing
 
 - ``Canvas``
-- ``CanvasDrawing``
 - ``CanvasClosureDrawing``
-- ``CanvasContext``
 - ``DragGesture``
 - ``SpatialTapGesture``
-- ``HoverPhase``
 - <doc:Pointer-And-Canvas>
 
-### Shapes
+### Shape Primitives
 
 - ``Shape``
 - ``InsettableShape``

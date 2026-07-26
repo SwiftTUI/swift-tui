@@ -5,7 +5,7 @@ public import SwiftTUICore
 /// A schedule describing the moments at which a ``TimelineView``
 /// re-evaluates its content.
 ///
-/// Conforming types produce a sequence of ``MonotonicInstant``s; the
+/// Conforming types produce a sequence of `MonotonicInstant`s; the
 /// view sleeps until each successive instant and then re-resolves the
 /// body with the updated context.  Schedules are free to return an
 /// infinite sequence — `TimelineView` will keep walking it until the
@@ -22,7 +22,7 @@ public import SwiftTUICore
 ///
 /// Custom schedules can be defined by conforming a `Sendable` type
 /// with a `Sendable` `Entries` sequence whose elements are
-/// ``MonotonicInstant``.
+/// `MonotonicInstant`.
 public protocol TimelineSchedule: Sendable {
   /// A sequence of instants at which the timeline view should update.
   associatedtype Entries: Sequence & Sendable
@@ -300,7 +300,7 @@ public struct TimelineViewContext: Sendable, Hashable {
 /// `TimelineView` is the SwiftTUI analogue of SwiftUI's `TimelineView`
 /// — it lets a view compute its body from "the current time" without
 /// hand-rolling a tick loop in `@State`.  Combine it with
-/// ``LinearGradient`` and `Color/interpolated(to:progress:method:)` to
+/// `LinearGradient` and `Color/interpolated(to:progress:method:)` to
 /// build shimmer/marquee/clock surfaces that pause cleanly when the
 /// view leaves the hierarchy (the underlying `.task` cancels on
 /// teardown).

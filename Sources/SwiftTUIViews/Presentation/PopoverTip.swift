@@ -19,7 +19,7 @@ public struct PopoverTipAction: Identifiable, Equatable, Sendable {
   }
 }
 
-/// A small, source-attached guidance item for ``View/popoverTip(_:isPresented:attachmentAnchor:arrowEdge:action:)``.
+/// A small, source-attached guidance item for ``View/popoverTip(_:isPresented:onDismiss:attachmentAnchor:arrowEdge:action:)``.
 public protocol PopoverTip: Identifiable, Sendable where ID: Sendable {
   @MainActor
   var title: Text { get }

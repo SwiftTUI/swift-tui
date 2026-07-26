@@ -76,7 +76,7 @@ public struct TerminalInputParser: Sendable {
 
   /// Drains a lingering lone ESC as an Escape key press.
   ///
-  /// A bare ESC stays buffered by ``parseNextEvent()`` because it is
+  /// A bare ESC stays buffered by `parseNextEvent()` because it is
   /// byte-identical to the first byte of a real Escape keypress and of every
   /// escape sequence. The run loop calls this on a short idle timeout (the vim
   /// `ttimeoutlen` model) to commit a bare Escape once no continuation byte has

@@ -90,7 +90,7 @@ escape-sequence knowledge, and runtime presentation can evolve without
 rewriting layout.
 
 Layout products are integer-cell based. Pointer and Canvas APIs can still carry
-continuous ``Point`` values because the runtime normalizes pointer input after
+continuous `Point` values because the runtime normalizes pointer input after
 semantic routing and Canvas packs continuous cell-space samples during raster.
 
 Later phases may carry named snapshots of earlier data, but those snapshots are
@@ -122,6 +122,5 @@ frontend contract.
 ## Public Contracts
 
 - ``FrameDiagnostics``
-- ``FrameDropBlocker``
 - ``SemanticSnapshot``
 - ``RasterSurface``

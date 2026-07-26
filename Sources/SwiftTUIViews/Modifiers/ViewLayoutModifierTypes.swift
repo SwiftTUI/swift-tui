@@ -151,7 +151,7 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
   }
 }
 
-/// Wrapper that installs a ``LayoutBehavior/border`` on its child so the
+/// Wrapper that installs a `LayoutBehavior.border` on its child so the
 /// layout engine reserves frame space for the border glyphs and the
 /// rasterizer paints them into the reserved cells.
 public struct BorderModifier: PrimitiveViewModifier, Sendable, Equatable {

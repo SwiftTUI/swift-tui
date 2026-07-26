@@ -84,9 +84,9 @@ Local and global coordinate spaces preserve fractional values. Named spaces are
 available with ``View/coordinateSpace(name:)``; unresolved names fall back to
 global coordinates so authored code keeps working while views are refactored.
 
-Use ``View/contentShape(_:)`` when a view's pointer target is not its full
+Use `View.contentShape(_:)` when a view's pointer target is not its full
 placed rectangle. Rectangular shapes remain cell-denominated through
-`CellRect`; path shapes use continuous ``Path`` values.
+`CellRect`; path shapes use continuous `Path` values.
 
 ## Runtime Capability Display
 
@@ -103,9 +103,9 @@ the base layout contract.
 
 ## Canvas
 
-``Canvas`` drawings receive a ``CanvasContext`` sized in terminal cells.
+``Canvas`` drawings receive a `CanvasContext` sized in terminal cells.
 Drawing methods such as `setPixel(at:)` and `line(from:to:)` accept continuous
-cell-space ``Point`` values and pack them into the selected ``CanvasGrid``.
+cell-space `Point` values and pack them into the selected `CanvasGrid`.
 
 For small ad-hoc drawings, use the closure form:
 
@@ -116,7 +116,7 @@ Canvas { context in
 ```
 
 Closure drawings compare by identity. Use a value type conforming to
-``CanvasDrawing`` when a drawing should compare structurally equal across
+`CanvasDrawing` when a drawing should compare structurally equal across
 rerenders.
 
 Dense pixel-grid helpers are still terminal-cell abstractions. Use them for

@@ -93,7 +93,7 @@ extension View {
   ///
   /// Matches SwiftUI's `.matchedGeometryEffect(id:in:isSource:)`
   /// API shape.  Scope keys with `@Namespace` or pass a
-  /// ``MatchedGeometryNamespace`` value explicitly.
+  /// `MatchedGeometryNamespace` value explicitly.
   ///
   /// `isSource: false` lets you have multiple views with the same
   /// key where only the designated source view contributes its

@@ -1,4 +1,4 @@
-/// Phase delivered to ``View/onPointerHover(_:)`` handlers.
+/// Phase delivered to `View.onPointerHover(_:)` handlers.
 public enum HoverPhase: Equatable, Sendable {
   /// The pointer entered the view's hit region at the supplied local point.
   case entered(Point)

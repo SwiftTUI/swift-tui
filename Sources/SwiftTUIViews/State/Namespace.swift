@@ -37,7 +37,7 @@ private enum NamespaceStorageKey: Hashable {
 @MainActor
 public struct Namespace: Sendable {
   /// Opaque identifier type exposed to user code.  Equal to
-  /// ``MatchedGeometryNamespace`` so it can flow through the Core
+  /// `MatchedGeometryNamespace` so it can flow through the Core
   /// module's matched-geometry machinery.
   public typealias ID = MatchedGeometryNamespace
 

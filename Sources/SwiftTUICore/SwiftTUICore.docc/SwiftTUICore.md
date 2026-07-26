@@ -20,6 +20,14 @@ package-only; public callers usually reach committed output through
 `SwiftTUIRuntime.RenderSnapshot`, ``RasterSurface``, ``SemanticSnapshot``, and
 diagnostics types.
 
+Geometry, pointer metadata, color, and draw payload vocabulary — `CellPoint`,
+`Point`, `Rect`, `Path`, `Color`, `CellPixelMetrics`, `PointerLocation`, and the
+rest — is *not* declared here. It lives one layer down in `SwiftTUIPrimitives`
+and reaches you through `@_exported import`, so `import SwiftTUICore` puts it in
+scope. See the `SwiftTUIPrimitives` reference for those types. Reconciliation
+vocabulary such as `PreferenceKey`, `FocusedValues`, and
+`MatchedGeometryNamespace` comes from `SwiftTUIGraph` the same way.
+
 ## Design Boundary
 
 `SwiftTUICore` should not talk to the terminal directly.
@@ -38,25 +46,8 @@ That means this module can be reused for:
 
 - ``FrameContext``
 - ``FrameDiagnostics``
-- ``FrameDropBlocker``
 - ``SemanticSnapshot``
 - ``RasterSurface``
-
-### Geometry And Pointer Metadata
-
-- ``CellPoint``
-- ``CellSize``
-- ``CellRect``
-- ``Point``
-- ``Size``
-- ``Rect``
-- ``Vector``
-- ``Path``
-- ``PixelPoint``
-- ``PixelSize``
-- ``CellPixelMetrics``
-- ``PointerLocation``
-- ``PointerInputCapabilities``
 
 ### Guides
 

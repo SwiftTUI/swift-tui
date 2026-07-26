@@ -1,12 +1,12 @@
 # Shapes
 
 Fill, stroke, and inset terminal shapes — the built-in primitives and custom
-``SwiftTUICore/Path``-based shapes — rasterized to Braille subpixels.
+`Path`-based shapes — rasterized to Braille subpixels.
 
 ## Overview
 
-Conform to ``Shape`` by implementing **either** ``path(in:)`` (SwiftUI-style —
-return the outline for the proposed rect) **or** ``geometry`` (one of the
+Conform to ``Shape`` by implementing **either** ``Shape/path(in:)`` (SwiftUI-style —
+return the outline for the proposed rect) **or** ``Shape/geometry`` (one of the
 analytic primitive cases). The two are bridged automatically, so a custom shape
 usually implements only `path(in:)`. SwiftTUI ships the primitives
 ``Rectangle``, ``RoundedRectangle``, ``Circle``, ``Ellipse``, and ``Capsule``;
@@ -34,7 +34,7 @@ RoundedRectangle(cornerRadius: 1)
 ```
 
 `fill`, `stroke`, and `strokeBorder` each come in two families: one taking an
-explicit ``SwiftTUICore/ShapeStyle`` and one with no style that resolves through
+explicit `ShapeStyle` and one with no style that resolves through
 the inherited `foregroundStyle` (and ultimately a semantic role) — the same way
 a bare `Circle()` fills with the foreground. `strokeBorder` is available on
 ``InsettableShape`` only, because it insets before stroking so the ring stays
@@ -42,11 +42,11 @@ inside the frame.
 
 ## Custom paths
 
-Build a ``SwiftTUICore/Path`` from lines and Bézier curves (`move(to:)`,
+Build a `Path` from lines and Bézier curves (`move(to:)`,
 `addLine(to:)`, `addQuadCurve(to:control:)`, `addCurve(to:control1:control2:)`,
 `closeSubpath()`) or the shape constructors (`Path(_: Rect)`,
 `Path(roundedRect:cornerRadius:)`, `Path(ellipseIn:)`). Curves are flattened to
-polylines and filled with a winding rule (``SwiftTUICore/FillRule`` — `.nonZero`
+polylines and filled with a winding rule (`FillRule` — `.nonZero`
 by default, `.evenOdd` available). A custom shape composes with the full
 modifier algebra (`fill` / `stroke` / `strokeBorder` / `foregroundStyle` /
 `inset(by:)`), and a custom-path `strokeBorder` clips a background to the shape's
@@ -73,7 +73,7 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 - **No `trim(from:to:)`, `offset`, `rotation`, `scale`, or `transform`.** These
   are path/vector transforms with no faithful meaning over discrete cells.
 - **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide;
-  ``SwiftTUICore/StrokeStyle`` carries `lineWidth` only as a reserved field.
+  `StrokeStyle` carries `lineWidth` only as a reserved field.
   Stroke weight is expressed through the glyph palette (`borderSet`: `.single`,
   `.heavy`, `.double`, …) instead.
 - **No `addArc` (yet).** Arc construction needs an angle type; it is a planned
@@ -95,11 +95,6 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 - ``Circle``
 - ``Ellipse``
 - ``Capsule``
-
-### Custom paths
-
-- ``SwiftTUICore/Path``
-- ``SwiftTUICore/FillRule``
 
 ## See Also
 

@@ -190,7 +190,7 @@ public struct DefaultRenderer {
   /// state are runtime side-fields excluded from the reuse-equality snapshot, and
   /// their correctness under memoized-body reuse depends on the run loop's
   /// retained-reuse suppression scope, which the one-shot path does not compute.
-  /// So an `Equatable`/``SwiftUICore/View/equatable()`` boundary wrapping a
+  /// So an `Equatable`/`View.equatable()` boundary wrapping a
   /// focus/press-reading control can serve a stale pressed/focused visual across
   /// one-shot frames where focus/press changed and an ancestor was invalidated.
   /// For interactive rendering, drive frames through the run loop

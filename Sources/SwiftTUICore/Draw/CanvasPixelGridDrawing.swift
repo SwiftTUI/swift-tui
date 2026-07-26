@@ -19,7 +19,7 @@ public enum CanvasPixelGridMode: Equatable, Sendable {
   }
 }
 
-/// A dense row-major pixel grid that renders through ``Canvas``.
+/// A dense row-major pixel grid that renders through `Canvas`.
 ///
 /// The grid stores pre-resolved terminal colors. Callers with indexed
 /// colors or transparency policies should resolve those choices before

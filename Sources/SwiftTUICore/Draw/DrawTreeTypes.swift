@@ -92,7 +92,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
   ///
   /// When `blend` is non-nil the rasterizer ignores the per-side
   /// `foreground` and instead samples a color for every perimeter cell
-  /// from ``BorderBlend/samplePerimeter(width:height:phase:)``, walking
+  /// from `BorderBlend.samplePerimeter(width:height:phase:)`, walking
   /// the cells clockwise.  `blendPhase` rotates the gradient start
   /// point around the perimeter for chasing-light animation.
   case border(
@@ -105,10 +105,10 @@ public indirect enum DrawCommand: Equatable, Sendable {
     sides: Edge.Set
   )
   /// A `Canvas` view's draw payload + the cell bounds the rasterizer
-  /// should size a ``CanvasGrid`` buffer to before invoking the user's
-  /// ``CanvasDrawing/draw(into:)``. The rasterizer resolves the
-  /// `foregroundStyle` to a concrete ``Color`` at paint time and
-  /// passes it to the ``CanvasContext`` as its initial foreground.
+  /// should size a `CanvasGrid` buffer to before invoking the user's
+  /// `CanvasDrawing.draw(into:)`. The rasterizer resolves the
+  /// `foregroundStyle` to a concrete `Color` at paint time and
+  /// passes it to the `CanvasContext` as its initial foreground.
   case canvas(
     bounds: CellRect,
     payload: CanvasPayload,

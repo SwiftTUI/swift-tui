@@ -30,5 +30,3 @@ require pixel accuracy.
 ### Fallback value
 
 - ``estimated``
-
-## See Also

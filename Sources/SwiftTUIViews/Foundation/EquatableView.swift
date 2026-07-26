@@ -44,7 +44,7 @@ import SwiftTUICore
 /// a `ForEach`/conditional shifts identity vs. the unwrapped form; conform the
 /// boundary view to `Equatable` directly when identity continuity matters.
 ///
-/// Usually applied through ``SwiftUICore/View/equatable()`` rather than
+/// Usually applied through ``View/equatable()`` rather than
 /// constructed directly.
 public struct EquatableView<Content: View & Equatable>: PrimitiveView, ResolvableView {
   package var content: Content

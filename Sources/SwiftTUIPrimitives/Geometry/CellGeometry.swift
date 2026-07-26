@@ -17,7 +17,7 @@ public struct CellPoint: Equatable, Hashable, Sendable {
 
 /// An integer coordinate in a canvas's grid-sample space.
 ///
-/// A ``Canvas`` is sized in terminal cells, but its ``CanvasGrid`` subdivides
+/// A `Canvas` is sized in terminal cells, but its ``CanvasGrid`` subdivides
 /// each cell into a fixed number of drawing samples (for example, 2×4 for
 /// Braille). `GridSample` addresses one of those sub-cell samples directly.
 ///

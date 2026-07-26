@@ -347,8 +347,8 @@ struct RecipeCommands: View {
 
 The important parts of the model:
 
-- ``FocusedValueKey`` defines the key space.
-- ``FocusedValues`` is the container.
+- `FocusedValueKey` defines the key space.
+- `FocusedValues` is the container.
 - `.focusedValue(...)` publishes a value for the currently focused subtree.
 - `.focusedSceneValue(...)` publishes scene-level context for the active scene.
 - ``FocusedValue`` reads an optional value.

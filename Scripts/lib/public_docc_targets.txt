@@ -5,6 +5,8 @@
 # Every root package library product in Package.swift must appear here. The
 # list may also include support targets whose symbols are part of the published
 # reference through re-exported or dependent public APIs.
+SwiftTUIPrimitives|Sources/SwiftTUIPrimitives/SwiftTUIPrimitives.docc
+SwiftTUIGraph|Sources/SwiftTUIGraph/SwiftTUIGraph.docc
 SwiftTUICore|Sources/SwiftTUICore/SwiftTUICore.docc
 SwiftTUIViews|Sources/SwiftTUIViews/SwiftTUIViews.docc
 SwiftTUIRuntime|Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc

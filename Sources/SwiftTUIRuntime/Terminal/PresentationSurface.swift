@@ -176,7 +176,7 @@ public protocol RasterPresentationSurface: AnyObject {
 ///
 /// Non-terminal hosts should conform to the narrower roles they need, such as
 /// ``PresentationSurfaceMetricsProvider`` and
-/// ``SemanticHostFramePresentationSurface``.
+/// `SemanticHostFramePresentationSurface`.
 public protocol PresentationSurface:
   PresentationSurfaceMetricsProvider, TerminalCommandPresentationSurface,
   RasterPresentationSurface
