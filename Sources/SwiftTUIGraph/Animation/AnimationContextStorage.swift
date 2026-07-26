@@ -21,7 +21,7 @@ package enum AnimationContextStorage {
 package protocol AnimationCompletionSink: AnyObject, Sendable {
   func registerCompletion(
     batchID: AnimationBatchID,
-    closure: @escaping @Sendable () -> Void
+    closure: @escaping @MainActor @Sendable () -> Void
   )
 }
 

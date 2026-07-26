@@ -18,7 +18,7 @@ enum AnimationCompletionScheduling {
     timestamp: MonotonicInstant,
     registeredAnimations: [AnimationBox: Animation],
     batchRefCounts: [AnimationBatchID: Int],
-    completionClosures: [AnimationBatchID: @Sendable () -> Void],
+    completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void],
     pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
   ) -> StrandedBatchDecision {
     // A single withAnimation scope opens at most one completion-bearing batch

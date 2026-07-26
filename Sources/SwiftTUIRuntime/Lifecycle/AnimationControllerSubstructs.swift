@@ -108,7 +108,7 @@ extension AnimationController {
   package struct CompletionLedger: Sendable {
     /// Completion closures registered by `withAnimation` overloads, keyed by
     /// batch ID; fired once every animation tagged with the batch ID drains.
-    package var completionClosures: [AnimationBatchID: @Sendable () -> Void] = [:]
+    package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void] = [:]
     /// Animation boxes registered for the current frame, keyed by box.
     package var registeredAnimations: [AnimationBox: Animation] = [:]
 
@@ -147,7 +147,7 @@ extension AnimationController {
 
     /// The carried async registrations between two ledger snapshots.
     package struct ConcurrentRegistrations: Sendable {
-      package var completionClosures: [AnimationBatchID: @Sendable () -> Void]
+      package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void]
       package var registeredAnimations: [AnimationBox: Animation]
     }
   }
@@ -157,7 +157,7 @@ extension AnimationController {
   /// completions fired by the most recent frame head.
   package struct FrameHeadTransactionState: Sendable {
     package var isActive = false
-    package var deferredCompletions: [@Sendable () -> Void] = []
+    package var deferredCompletions: [@MainActor @Sendable () -> Void] = []
     package var lastCompletionCount = 0
 
     package init() {}

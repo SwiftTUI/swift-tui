@@ -101,7 +101,7 @@ package final class AnimationController: Sendable {
   /// Completion closures registered by ``withAnimation`` overloads.
   /// The controller fires and removes the entry once every animation
   /// (and every removal overlay) tagged with the batch ID has drained.
-  private var completionClosures: [AnimationBatchID: @Sendable () -> Void] {
+  private var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void] {
     get { completionLedger.completionClosures }
     set { completionLedger.completionClosures = newValue }
   }
@@ -172,7 +172,7 @@ package final class AnimationController: Sendable {
     get { frameHead.isActive }
     set { frameHead.isActive = newValue }
   }
-  private var deferredFrameHeadCompletions: [@Sendable () -> Void] {
+  private var deferredFrameHeadCompletions: [@MainActor @Sendable () -> Void] {
     get { frameHead.deferredCompletions }
     set { frameHead.deferredCompletions = newValue }
   }
@@ -219,7 +219,7 @@ package final class AnimationController: Sendable {
 
   fileprivate func finishFrameHeadTransaction(
     _ checkpoint: Checkpoint
-  ) -> [@Sendable () -> Void] {
+  ) -> [@MainActor @Sendable () -> Void] {
     precondition(
       isFrameHeadTransactionActive,
       "No AnimationController frame-head transaction is active."
@@ -1801,7 +1801,7 @@ package final class AnimationController: Sendable {
     }
   }
 
-  private func fireOrDeferCompletion(_ completion: @escaping @Sendable () -> Void) {
+  private func fireOrDeferCompletion(_ completion: @escaping @MainActor @Sendable () -> Void) {
     guard isFrameHeadTransactionActive else {
       lastFrameHeadCompletionCount += 1
       completion()
@@ -2250,7 +2250,7 @@ extension AnimationController: AnimationCompletionSink {
 
   package func registerCompletion(
     batchID: AnimationBatchID,
-    closure: @escaping @Sendable () -> Void
+    closure: @escaping @MainActor @Sendable () -> Void
   ) {
     // Store the closure; it fires when the batch's ref count hits zero
     // in ``releaseBatch``.  Registering a second closure for the same

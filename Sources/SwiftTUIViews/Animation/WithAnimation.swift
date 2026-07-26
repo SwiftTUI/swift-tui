@@ -114,13 +114,21 @@ public func withTransaction<Result>(
 /// treats both as "curve returned nil for every animation in the
 /// batch"; callers using `.removed` on a non-removing state change
 /// will fire at the same time as `.logicallyComplete`.
+///
+/// `completion` is main-actor isolated, matching every other authored
+/// action closure on this surface (``Button``'s `action`, `.onAppear`,
+/// toolbar and key-command handlers).  The controller only ever fires it
+/// from the main actor, so the isolation costs nothing at the call site
+/// and lets the closure write view state directly — without it the
+/// closure would be `nonisolated` and every `@State` write inside would
+/// need a `MainActor.assumeIsolated` hop.
 @MainActor
 @discardableResult
 public func withAnimation<Result>(
   _ animation: Animation? = .default,
   completionCriteria: AnimationCompletionCriteria = .logicallyComplete,
   _ body: () throws -> Result,
-  completion: @escaping @Sendable () -> Void
+  completion: @escaping @MainActor @Sendable () -> Void
 ) rethrows -> Result {
   _ = completionCriteria  // reserved for when logically/removed diverge
   let batchID = AnimationBatchIDAllocator.next()
