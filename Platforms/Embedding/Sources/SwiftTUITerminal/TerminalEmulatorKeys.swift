@@ -143,6 +143,9 @@ extension TerminalEmulatorKey.Code {
     case .pageDown:
       self = .pageDown
     case .functionKey(let number):
+      guard number > 0 else {
+        return nil
+      }
       self = .function(number)
     }
   }

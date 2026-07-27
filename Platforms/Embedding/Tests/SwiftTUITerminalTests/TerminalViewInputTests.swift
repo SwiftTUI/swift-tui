@@ -1,10 +1,108 @@
 import SwiftTUICore
+import SwiftTUIRuntime
+@_spi(Testing) import SwiftTUITestSupport
+import Synchronization
 import Testing
 
 @testable import SwiftTUITerminal
 
+@MainActor
 @Suite("TerminalView input")
 struct TerminalViewInputTests {
+  @Test("configured host interception consumes Escape before the child")
+  func hostInterceptionConsumesEscape() async throws {
+    let session = RecordingTerminalSession()
+    let routedKeyPresses = Mutex<[KeyPress]>([])
+    let runLoop = try makeTerminalViewRunLoop(
+      TerminalView(
+        session: session,
+        keyRouting: { keyPress in
+          routedKeyPresses.withLock { $0.append(keyPress) }
+          return keyPress == KeyPress(.escape) ? .handledByHost : .forwardToChild
+        }
+      )
+    )
+
+    #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+    await Task.yield()
+    #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.escape)])
+    #expect(session.sentKeys.isEmpty)
+  }
+
+  @Test("default key routing forwards Escape to the child")
+  func defaultRoutingForwardsEscape() async throws {
+    let session = RecordingTerminalSession()
+    let runLoop = try makeTerminalViewRunLoop(TerminalView(session: session))
+
+    #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+    await session.sentKeySignal.wait {
+      session.sentKeys == [TerminalEmulatorKey(code: .escape)]
+    }
+
+    #expect(session.sentKeys == [TerminalEmulatorKey(code: .escape)])
+  }
+
+  @Test("host routing sees character, navigation, and modified input before conversion")
+  func hostRoutingSeesOriginalKeyPresses() async throws {
+    let session = RecordingTerminalSession()
+    let routedKeyPresses = Mutex<[KeyPress]>([])
+    let runLoop = try makeTerminalViewRunLoop(
+      TerminalView(
+        session: session,
+        keyRouting: { keyPress in
+          routedKeyPresses.withLock { $0.append(keyPress) }
+          return .forwardToChild
+        }
+      )
+    )
+    let keyPresses = [
+      KeyPress(.character("x")),
+      KeyPress(.pageDown),
+      KeyPress(.character("c"), modifiers: [.ctrl, .alt, .shift]),
+    ]
+
+    for keyPress in keyPresses {
+      #expect(runLoop.handleKeyPress(keyPress) == nil)
+    }
+    await session.sentKeySignal.wait {
+      session.sentKeys.count == keyPresses.count
+    }
+
+    #expect(routedKeyPresses.withLock { $0 } == keyPresses)
+    #expect(
+      Set(session.sentKeys)
+        == Set([
+          TerminalEmulatorKey(code: .character("x")),
+          TerminalEmulatorKey(code: .pageDown),
+          TerminalEmulatorKey(
+            code: .character("c"),
+            modifiers: [.control, .option, .shift]
+          ),
+        ])
+    )
+  }
+
+  @Test("forwarded unmappable input remains ignored")
+  func forwardedUnmappableInputRemainsIgnored() throws {
+    let session = RecordingTerminalSession()
+    let routedKeyPresses = Mutex<[KeyPress]>([])
+    let runLoop = try makeTerminalViewRunLoop(
+      TerminalView(
+        session: session,
+        keyRouting: { keyPress in
+          routedKeyPresses.withLock { $0.append(keyPress) }
+          return .forwardToChild
+        }
+      )
+    )
+    let invalidFunctionKey = KeyPress(.functionKey(0))
+
+    #expect(TerminalEmulatorKey(keyPress: invalidFunctionKey) == nil)
+    #expect(runLoop.handleKeyPress(invalidFunctionKey) == nil)
+    #expect(routedKeyPresses.withLock { $0 } == [invalidFunctionKey])
+    #expect(session.sentKeys.isEmpty)
+  }
+
   @Test("maps focused character key presses to emulator keys")
   func mapsCharacterKeyPresses() {
     #expect(
@@ -39,4 +137,107 @@ struct TerminalViewInputTests {
     #expect(TerminalEmulatorKey(keyPress: KeyPress(.home))?.code == .home)
     #expect(TerminalEmulatorKey(keyPress: KeyPress(.end))?.code == .end)
   }
+}
+
+@MainActor
+private func makeTerminalViewRunLoop(
+  _ terminalView: TerminalView<RecordingTerminalSession>
+) throws -> SwiftTUIRuntime.RunLoop<Int, TerminalView<RecordingTerminalSession>> {
+  let terminalSize = CellSize(width: 20, height: 4)
+  let rootIdentity = Identity(components: [.named("TerminalViewInputRoot")])
+  let runLoop = SwiftTUIRuntime.RunLoop(
+    rootIdentity: rootIdentity,
+    presentationSurface: TerminalViewInputHost(surfaceSize: terminalSize),
+    terminalInputReader: TerminalViewInputReader(),
+    stateContainer: StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    ),
+    focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+    proposal: ProposedSize(width: terminalSize.width, height: terminalSize.height),
+    exitKeyBindings: .none,
+    viewBuilder: { _, _ in terminalView }
+  )
+  runLoop.installFocusTrackerInvalidator()
+  runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+  var renderedFrames = 0
+  try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+  runLoop.renderer.enableSelectiveEvaluation()
+  for _ in 0..<5 {
+    let previousFrameCount = renderedFrames
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    if previousFrameCount == renderedFrames {
+      break
+    }
+  }
+  return runLoop
+}
+
+private final class RecordingTerminalSession: TerminalSession {
+  private let sentKeyStorage = Mutex<[TerminalEmulatorKey]>([])
+  let sentKeySignal = ConditionSignal()
+
+  var sentKeys: [TerminalEmulatorKey] {
+    sentKeyStorage.withLock { $0 }
+  }
+
+  var cachedSnapshot: ForeignGrid {
+    .empty
+  }
+
+  func start() async throws {}
+
+  func snapshot() async -> ForeignGrid {
+    cachedSnapshot
+  }
+
+  func currentTitle() async -> String? {
+    nil
+  }
+
+  func currentWorkingDirectory() async -> String? {
+    nil
+  }
+
+  func currentLifecycle() async -> TerminalLifecycle {
+    .notStarted
+  }
+
+  func send(key: TerminalEmulatorKey) async {
+    sentKeyStorage.withLock { $0.append(key) }
+    sentKeySignal.notify()
+  }
+
+  func send(paste _: String) async {}
+
+  func send(mouse _: TerminalEmulatorMouse) async {}
+
+  func resize(_: CellSize) async throws {}
+
+  func events() -> AsyncStream<TerminalEmulatorEvent> {
+    AsyncStream { $0.finish() }
+  }
+}
+
+private final class TerminalViewInputReader: TerminalInputReading {
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { $0.finish() }
+  }
+}
+
+private final class TerminalViewInputHost: PresentationSurface {
+  var surfaceSize: CellSize
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+
+  init(surfaceSize: CellSize) {
+    self.surfaceSize = surfaceSize
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
 }

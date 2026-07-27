@@ -26,6 +26,12 @@ hanging forever — these primitives measure it in *runtime stages* rather than
 seconds (see ``StageClock``). A stage count is identical on fast and slow
 hardware, so the bound is deterministic and never fails spuriously.
 
+Real-terminal journeys are the exception: a PTY is an operating-system
+resource outside the runtime stage model.
+``waitForANSIVisibleScreen(on:screen:deadline:condition:)`` therefore combines
+readable events with an explicit wall-clock deadline and a bounded drain
+budget. It never uses fixed sleeps.
+
 The package is exposed through `@_spi(Testing)`; it is test scaffolding, not
 part of the public SwiftTUI surface.
 
@@ -48,6 +54,14 @@ part of the public SwiftTUI surface.
 - ``StageBudgetExceeded``
 - ``ManualStageClock``
 - ``ExhaustedStageClock``
+
+### Real Terminal Journeys
+
+- ``RealTerminalPTYPair``
+- ``RealTerminalPTYReadableSource``
+- ``ANSIVisibleScreen``
+- ``waitForANSIVisibleScreen(on:screen:deadline:condition:)``
+- ``writeAllBytes(_:to:)``
 
 ### Guides
 

@@ -8,8 +8,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-27
+
+### Added
+
+- **Host-owned key routing for embedded terminals.** `TerminalView` now offers
+  an additive initializer whose routing closure can consume the original
+  `KeyPress` before terminal-emulator conversion. The original initializer
+  remains source-compatible and forwards every key to the child session.
+- **Shared real-terminal journey support.** `SwiftTUITestSupport` now owns the
+  PTY pair, bounded ANSI-visible-screen wait, exact-write helper, deadline, and
+  cancellation-safe descriptor teardown used by downstream application tests.
+
 ### Changed
 
+- **Nested custom and scrolling layouts keep their asynchronous measurement
+  stack pointer-sized.** Measurement work items are indirect, preventing the
+  released FilePreviewer/Sextant navigation path from exhausting a Dispatch
+  worker stack during frame-tail layout.
 - **Environment variables now use the single `SWIFTTUI_*` namespace.**
   Framework, host-wire, performance, fixture, and test-harness controls that
   previously used shorter or legacy project prefixes have been renamed without
@@ -340,5 +356,6 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.0.18...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.3.4...HEAD
+[0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18

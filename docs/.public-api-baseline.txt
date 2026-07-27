@@ -2921,7 +2921,11 @@ SwiftTUITerminal.TerminalSession.snapshot()
 SwiftTUITerminal.TerminalSession.start()
 SwiftTUITerminal.TerminalView
 SwiftTUITerminal.TerminalView.body
+SwiftTUITerminal.TerminalView.init(session:keyRouting:onTitleChange:onExit:)
 SwiftTUITerminal.TerminalView.init(session:onTitleChange:onExit:)
+SwiftTUITerminal.TerminalViewKeyDisposition
+SwiftTUITerminal.TerminalViewKeyDisposition.forwardToChild
+SwiftTUITerminal.TerminalViewKeyDisposition.handledByHost
 SwiftTUITerminal.View.terminalTitleChanged(_:)
 SwiftTUITerminal.View.terminalWorkingDirectoryChanged(_:)
 SwiftTUITerminalWorkspace.TerminalPaneID

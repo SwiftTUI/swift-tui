@@ -1,19 +1,60 @@
 import SwiftTUICore
 import SwiftTUIRuntime
 
+/// Chooses whether a `TerminalView` key press belongs to its host or child session.
+public enum TerminalViewKeyDisposition: Equatable, Sendable {
+  /// Convert the key press to a ``TerminalEmulatorKey`` and send it to the child session.
+  case forwardToChild
+  /// Consume the key press without sending it to the child session.
+  case handledByHost
+}
+
 public struct TerminalView<Session: TerminalSession>: View {
   @State private var updateGeneration: UInt64 = 0
 
   private let session: Session
+  private let keyRouting: @MainActor @Sendable (KeyPress) -> TerminalViewKeyDisposition
   private let onTitleChange: (@MainActor @Sendable (String) -> Void)?
   private let onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)?
 
+  /// Creates a view that presents and drives a terminal session, forwarding focused keys to the
+  /// child.
+  ///
+  /// - Parameters:
+  ///   - session: The child terminal session to present.
+  ///   - onTitleChange: An optional callback for child terminal title changes.
+  ///   - onExit: An optional callback when the child session exits.
   public init(
     session: Session,
     onTitleChange: (@MainActor @Sendable (String) -> Void)? = nil,
     onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)? = nil
   ) {
+    self.init(
+      session: session,
+      keyRouting: { _ in .forwardToChild },
+      onTitleChange: onTitleChange,
+      onExit: onExit
+    )
+  }
+
+  /// Creates a view that presents and drives a terminal session with host-level key routing.
+  ///
+  /// - Parameters:
+  ///   - session: The child terminal session to present.
+  ///   - keyRouting: A host-level interceptor called with the original focused key press, before
+  ///     conversion to ``TerminalEmulatorKey``. Return
+  ///     ``TerminalViewKeyDisposition/handledByHost`` to consume it in the host or
+  ///     ``TerminalViewKeyDisposition/forwardToChild`` to preserve terminal forwarding.
+  ///   - onTitleChange: An optional callback for child terminal title changes.
+  ///   - onExit: An optional callback when the child session exits.
+  public init(
+    session: Session,
+    keyRouting: @escaping @MainActor @Sendable (KeyPress) -> TerminalViewKeyDisposition,
+    onTitleChange: (@MainActor @Sendable (String) -> Void)? = nil,
+    onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)? = nil
+  ) {
     self.session = session
+    self.keyRouting = keyRouting
     self.onTitleChange = onTitleChange
     self.onExit = onExit
   }
@@ -26,6 +67,9 @@ public struct TerminalView<Session: TerminalSession>: View {
           ForeignSurface(payload: SessionGridPayload(session: session, generation: generation))
             .focusable(true)
             .onKeyPress { keyPress in
+              guard keyRouting(keyPress) == .forwardToChild else {
+                return .handled
+              }
               guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
                 return .ignored
               }
