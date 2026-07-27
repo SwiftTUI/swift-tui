@@ -8,6 +8,36 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- **A `SwiftTUICommand` can claim its own subcommand verbs from raw arguments.**
+  A root command that declares an `@Argument` shadows its own subcommands,
+  because swift-argument-parser parses the current command's arguments before it
+  looks for a verb — `myapp info x.gif` means "open the file named `info`".
+  Implement the new `swiftTUIRootSubcommand(forRawArguments:)` requirement,
+  typically by delegating to the new `registeredSubcommand(forRawArguments:)`
+  helper, and the verb wins. The default implementation returns `nil`, so an app
+  that does not implement it is unchanged. Apps no longer need to hand-write a
+  `static func main()` restating the framework's launch sequence.
+
+  `completions` is resolved before the hook and cannot be shadowed. Only the
+  first argument is examined, and a leading `-` disqualifies a match, so
+  `--help`, `--version`, and the `--` terminator fall through by construction. A
+  verb beats a same-named file with no filesystem probe; `myapp ./name` and
+  `myapp -- name` are the escapes. Two attribution quirks are documented rather
+  than papered over: `myapp help verb` stays shadowed (use `myapp verb --help`),
+  and a dispatched verb's `--version` reports the verb's own version, failing
+  with an unknown-flag error when the verb declares none.
+
+### Fixed
+
+- **A dispatched verb's usage text is attributed to the verb, not the root.**
+  Errors carrying their own command stack were already correct, but two cases
+  were not: `ParserError.noArguments` (a verb invoked with its required argument
+  missing) is rendered against the type passed to `exit(withError:)`, and a
+  `ValidationError` thrown from a verb's `run()` carries no stack at all. Both
+  now render the verb's usage across all three launch layers.
+
 ## [0.3.7] - 2026-07-27
 
 ### Added

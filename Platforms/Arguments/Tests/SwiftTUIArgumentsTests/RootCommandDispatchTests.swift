@@ -278,6 +278,57 @@ struct RootCommandDispatchTests {
     #expect(root.path == "")
   }
 
+  // MARK: - T-15…T-17 — --version attribution
+  //
+  // `--version` is recognized only when some command in the stack declares a
+  // non-empty `configuration.version`. A raw-dispatched stack has exactly one
+  // element — the verb — so the root's version is neither consulted nor
+  // inherited. This is a property of raw-verb interception, not of the hook:
+  // `myapp completions --version` has always behaved this way.
+
+  @Test("T-15 a dispatched verb reports its own version, not the root's")
+  func dispatchedVerbReportsOwnVersion() throws {
+    let error = try #require(
+      captureError {
+        _ = try VersionedRootFixture.parseSwiftTUIRootCommand(arguments: ["ver", "--version"])
+      }
+    )
+    let dispatchError = try #require(error as? DispatchedSubcommandError)
+    let text = dispatchError.subcommandType.fullMessage(for: dispatchError.underlying)
+    #expect(text.contains("4.5.6"))
+    #expect(!text.contains("1.2.3"))
+  }
+
+  @Test("T-16 a versionless dispatched verb does not inherit the root's version")
+  func versionlessDispatchedVerbDoesNotInheritRootVersion() throws {
+    // `info` declares no version, so `--version` is simply an unknown flag once
+    // the verb owns the parse. Worth pinning: the failure mode is a parse error,
+    // not a silent fallback to the root's version string.
+    let error = try #require(
+      captureError {
+        _ = try VersionedRootFixture.parseSwiftTUIRootCommand(arguments: ["info", "--version"])
+      }
+    )
+    let dispatchError = try #require(error as? DispatchedSubcommandError)
+    let text = dispatchError.subcommandType.fullMessage(for: dispatchError.underlying)
+    #expect(!text.contains("1.2.3"))
+    #expect(text.contains("Usage: info"))
+  }
+
+  @Test("T-17 the root still reports its own version")
+  func rootStillReportsOwnVersion() throws {
+    // Note the asymmetry with `--help`, which resolves to a help *command* the
+    // launch layer then runs: `--version` throws straight out of the parse.
+    let error = try #require(
+      captureError {
+        _ = try VersionedRootFixture.parseSwiftTUIRootCommand(arguments: ["--version"])
+      }
+    )
+    #expect(VersionedRootFixture.exitCode(for: error) == ExitCode.success)
+    let text = VersionedRootFixture.fullMessage(for: error)
+    #expect(text.contains("1.2.3"))
+  }
+
   @Test("T-14 the default hook claims nothing")
   func defaultHookClaimsNothing() throws {
     // The no-op proof at the seam itself: the fixture that declares no hook
@@ -376,6 +427,42 @@ struct ShadowingCompletionsFixture: App, SwiftTUICommand {
     guard !arguments.isEmpty else { return nil }
     return try FixtureInfoCommand.parseAsRoot(Array(arguments.dropFirst()))
   }
+}
+
+/// A dispatching root that declares a version, alongside one verb that declares
+/// its own and one that declares none.
+struct VersionedRootFixture: App, SwiftTUICommand {
+  nonisolated static let configuration = CommandConfiguration(
+    commandName: "versionroot",
+    version: "1.2.3",
+    subcommands: [CompletionsCommand.self, FixtureInfoCommand.self, VersionedVerbCommand.self]
+  )
+
+  @OptionGroup(title: "SwiftTUI Options") var swiftTUIOptions: SwiftTUIOptions
+  @Argument var path: String?
+
+  init() {}
+  var body: some Scene {
+    WindowGroup {
+      EmptyView()
+    }
+  }
+
+  nonisolated static func swiftTUIRootSubcommand(
+    forRawArguments arguments: [String]
+  ) throws -> (any ParsableCommand)? {
+    try registeredSubcommand(forRawArguments: arguments)
+  }
+}
+
+/// A verb with its own version string.
+struct VersionedVerbCommand: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "ver",
+    version: "4.5.6"
+  )
+
+  func run() throws {}
 }
 
 /// A headless verb, shaped like the ones a real consumer registers.
