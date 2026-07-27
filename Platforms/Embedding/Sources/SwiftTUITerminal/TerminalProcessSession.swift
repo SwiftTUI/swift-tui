@@ -93,8 +93,20 @@ public final class TerminalProcessSession: TerminalSession {
   }
 
   /// Requests termination of the child process group backing this session.
+  ///
+  /// Calling this before ``start()`` closes the session without launching a
+  /// child. Subsequent calls to ``start()`` are no-ops. If startup has begun
+  /// but has not installed its process identifier yet, the signal is retained
+  /// and delivered as soon as the child is available.
   public func terminate(signal: Int32 = 15) async {
-    try? await pty.sendSignal(signal)
+    switch state.requestTermination() {
+    case .closeBeforeStart:
+      eventBroadcaster.finish()
+    case .signalRunningProcess:
+      await pty.requestSignal(signal)
+    case .alreadyExited:
+      break
+    }
   }
 
   public func send(key: TerminalEmulatorKey) async {
@@ -193,6 +205,20 @@ private final class TerminalProcessSessionStateStore: Sendable {
     }
   }
 
+  func requestTermination() -> TerminalProcessTerminationDisposition {
+    storage.withLock { state in
+      switch state.lifecycle {
+      case .notStarted:
+        state.lifecycle = .exited(reason: .sessionClosed)
+        return .closeBeforeStart
+      case .running:
+        return .signalRunningProcess
+      case .exited:
+        return .alreadyExited
+      }
+    }
+  }
+
   func markExited(reason: TerminalExitReason) {
     storage.withLock { state in
       state.lifecycle = .exited(reason: reason)
@@ -214,6 +240,12 @@ private final class TerminalProcessSessionStateStore: Sendable {
       state.apply(events: events)
     }
   }
+}
+
+private enum TerminalProcessTerminationDisposition {
+  case closeBeforeStart
+  case signalRunningProcess
+  case alreadyExited
 }
 
 private struct TerminalProcessSessionState: Sendable {

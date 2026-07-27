@@ -30,6 +30,7 @@ public actor ChildProcessPty {
   private var exitTask: Task<Void, Never>?
   private var exitStatus: ExitStatus?
   private var hasStarted = false
+  private var pendingSignal: Int32?
 
   public init(
     executable: String,
@@ -89,6 +90,10 @@ public actor ChildProcessPty {
     pid = Int32(forkedPID)
     installExitWatcher(pid: forkedPID)
     await Self.waitUntilProcessGroupExists(pid: forkedPID)
+    if let pendingSignal {
+      self.pendingSignal = nil
+      try? sendSignalToStartedProcess(pendingSignal)
+    }
     await childPair.releaseAndCloseSlaveFD()
   }
 
@@ -112,7 +117,24 @@ public actor ChildProcessPty {
     guard pid > 0 else {
       throw .notStarted
     }
+    try sendSignalToStartedProcess(signal)
+  }
 
+  /// Delivers `signal` once startup has installed a child pid.
+  ///
+  /// `TerminalProcessSession` marks its lifecycle running before awaiting
+  /// `start()`. A concurrent termination can therefore reach this actor before
+  /// `start()` or while PTY setup is suspended. Remembering the signal closes
+  /// that race without publishing a child that can outlive its session.
+  func requestSignal(_ signal: Int32) {
+    guard pid > 0 else {
+      pendingSignal = signal
+      return
+    }
+    try? sendSignalToStartedProcess(signal)
+  }
+
+  private func sendSignalToStartedProcess(_ signal: Int32) throws(PTYError) {
     let processGroupResult = kill(-pid, signal)
     let processGroupErrno = errno
     let processResult = kill(pid, signal)

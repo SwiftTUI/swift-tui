@@ -1,3 +1,4 @@
+import Foundation
 import SwiftTUIRuntime
 import Testing
 
@@ -44,5 +45,70 @@ struct SessionLifecycleTests {
     let firstRow = try #require(snap.cells.first)
     let firstTwo = firstRow.prefix(2).map(\.character)
     #expect(firstTwo == ["h", "i"])
+  }
+
+  @Test("termination before start closes the session and prevents a later child launch")
+  func terminateBeforeStartPreventsLaunch() async throws {
+    let marker = FileManager.default.temporaryDirectory
+      .appendingPathComponent("swift-tui-terminal-never-started-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: marker) }
+    let session = TerminalProcessSession(
+      command: "/bin/sh",
+      arguments: ["-c", "touch \"\(marker.path)\""],
+      initialSize: CellSize(width: 40, height: 10)
+    )
+    let sessionEvents = session.events()
+
+    await session.terminate()
+    try await session.start()
+    for await _ in sessionEvents {}
+
+    #expect(
+      await session.currentLifecycle()
+        == .exited(reason: .sessionClosed)
+    )
+    #expect(!FileManager.default.fileExists(atPath: marker.path))
+  }
+
+  @Test("start racing termination cannot lose the termination request")
+  func startRacingTerminationDoesNotLoseSignal() async throws {
+    for _ in 0..<20 {
+      let session = TerminalProcessSession(
+        command: "/bin/sleep",
+        arguments: ["10"],
+        initialSize: CellSize(width: 40, height: 10)
+      )
+
+      async let start: Void = session.start()
+      async let terminate: Void = session.terminate()
+      _ = try await (start, terminate)
+
+      let clock = ContinuousClock()
+      let deadline = clock.now + .seconds(2)
+      while clock.now < deadline {
+        if case .exited = await session.currentLifecycle() {
+          break
+        }
+        await Task.yield()
+      }
+      if case .exited = await session.currentLifecycle() {
+        continue
+      }
+
+      await session.terminate(signal: 9)
+      let cleanupDeadline = clock.now + .seconds(2)
+      while clock.now < cleanupDeadline {
+        if case .exited = await session.currentLifecycle() {
+          break
+        }
+        await Task.yield()
+      }
+      if case .exited = await session.currentLifecycle() {
+        Issue.record("session required fallback SIGKILL after a raced termination request")
+      } else {
+        Issue.record("session remained running after fallback SIGKILL")
+      }
+      return
+    }
   }
 }

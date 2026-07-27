@@ -64,4 +64,21 @@ struct ChildProcessPtyTests {
     let exit = await pty.waitForExit()
     #expect(exit == .signalled(signal: SIGTERM))
   }
+
+  @Test("a signal requested before start is delivered after pid installation")
+  func requestSignalBeforeStart() async throws {
+    let pty = ChildProcessPty(
+      executable: "/bin/sleep",
+      arguments: ["10"],
+      environment: nil,
+      workingDirectory: nil,
+      initialSize: CellSize(width: 80, height: 24)
+    )
+
+    await pty.requestSignal(SIGTERM)
+    try await pty.start()
+
+    let exit = await pty.waitForExit()
+    #expect(exit == .signalled(signal: SIGTERM))
+  }
 }
