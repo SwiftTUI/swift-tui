@@ -98,6 +98,194 @@ struct EntryPointLaunchTests {
     #expect(code != 0)
   }
 
+  // MARK: - Verb dispatch
+  //
+  // A root command that declares an `@Argument` shadows its own subcommands,
+  // because swift-argument-parser parses the current command's arguments before
+  // it looks for a verb. `swiftTUIRootSubcommand(forRawArguments:)` claims the
+  // verb from raw argv first. Which command runs, and which command's usage a
+  // failure is attributed to, are both decided inside `App.main()` — invisible
+  // to a unit test, because the deciding code paths end in `exit`.
+
+  @Test("T-20 a claimed verb runs instead of the runtime")
+  func claimedVerbRunsInsteadOfRuntime() async throws {
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["probe", "ok"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("PROBEOK ok"),
+      "expected the verb's output; got:\n\(result.output)"
+    )
+    // The runtime must not have started.
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
+  @Test("T-21 a non-verb value still launches the runtime")
+  func nonVerbValueStillLaunchesRuntime() async throws {
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["some.gif"],
+      stoppingAt: Self.frameMarker,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("ENTRYPOINTOK some.gif"),
+      "expected a rendered frame carrying the path; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("PROBEOK"))
+  }
+
+  @Test("T-22 a terminator pushes a verb name back to the positional")
+  func terminatorPushesVerbNameToPositional() async throws {
+    // The documented escape for naming a file after a verb. `--` is disqualified
+    // from matching, so the root parses `probe` as its positional value.
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["--", "probe"],
+      stoppingAt: Self.frameMarker,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("ENTRYPOINTOK probe"),
+      "expected the verb name rendered as the path; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("PROBEOK"))
+  }
+
+  @Test("T-23 a claimed verb's --help prints the verb's help and exits cleanly")
+  func claimedVerbHelpPrintsVerbHelp() async throws {
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["probe", "--help"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("USAGE: probe"),
+      "expected the verb's help; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("verbdispatch"))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
+  @Test("T-24 a claimed verb missing its argument prints the verb's usage")
+  func claimedVerbMissingArgumentPrintsVerbUsage() async throws {
+    // The `ParserError.noArguments` case: the verb is invoked with nothing
+    // after it, so the parse fails before any instance of it exists, and
+    // swift-argument-parser renders help for whichever type is handed to
+    // `exit(withError:)` rather than for the stack on the error. Without the
+    // dispatched-verb attribution this prints the *root's* usage under the
+    // verb's error message.
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["probe"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("USAGE: probe"),
+      "expected the verb's usage; got:\n\(result.output)"
+    )
+    #expect(
+      !result.output.contains("verbdispatch"),
+      "usage was attributed to the root command; got:\n\(result.output)"
+    )
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code != 0)
+  }
+
+  @Test("T-25 a ValidationError from a claimed verb is attributed to the verb")
+  func validationErrorFromClaimedVerbIsAttributedToVerb() async throws {
+    // A `ValidationError` thrown from a dispatched `run()` carries no command
+    // stack, so it is rendered through whichever type `exit(withError:)`
+    // receives. This is the row that fails if the launch layers stop routing
+    // through the dispatched command's dynamic type.
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["probe", "ok", "--fail-validation"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("probe rejected the input"),
+      "expected the validation message; got:\n\(result.output)"
+    )
+    #expect(
+      result.output.contains("Usage: probe"),
+      "expected usage attributed to the verb; got:\n\(result.output)"
+    )
+    #expect(
+      !result.output.contains("verbdispatch"),
+      "usage was attributed to the root command; got:\n\(result.output)"
+    )
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code != 0)
+  }
+
+  @Test("T-26 completions still works from a root that dispatches verbs")
+  func completionsStillWorksAlongsideVerbDispatch() async throws {
+    // The framework resolves `completions` before the hook, so a consumer's
+    // table can never displace it — including for a root whose own positional
+    // would otherwise swallow the verb.
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["completions", "print", "zsh"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("#compdef"),
+      "expected a zsh completion script; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
+  @Test("T-28 the hook is honored without a stored swiftTUIOptions")
+  func hookIsHonoredWithoutStoredOptions() async throws {
+    // `App.main()` skips `parseSwiftTUIRootCommand` entirely when the conformer
+    // declares no stored `swiftTUIOptions`. That branch has to consult the hook
+    // itself, or an app on it loses verb dispatch silently.
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatchNoOptions",
+      arguments: ["probe", "ok"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("BAREPROBEOK ok"),
+      "expected the verb's output; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
   @Test("the diagnostic message is accurate and framework-specific")
   func diagnosticMessageIsAccurate() {
     let message = synchronousLaunchDiagnosticMessage(commandTypeName: "MyApp")
@@ -125,13 +313,14 @@ struct EntryPointLaunchTests {
   /// ends the read loop deterministically.
   private func runFixture(
     _ name: String,
+    arguments: [String] = [],
     stoppingAt marker: String?,
     watchdog: Duration
   ) async throws -> FixtureRun {
     let binary = try Self.fixtureExecutableURL(named: name)
     let pty = ChildProcessPty(
       executable: binary.path,
-      arguments: [],
+      arguments: arguments,
       environment: Self.fixtureEnvironment(),
       workingDirectory: nil,
       initialSize: CellSize(width: 100, height: 30)

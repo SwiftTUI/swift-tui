@@ -438,6 +438,23 @@ let package = Package(
       path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureWebHostCLIBare",
       swiftSettings: swiftSettings()
     ),
+    // Verb dispatch: a root command with both a positional argument and its own
+    // subcommands. Which command runs, and which command's usage a failure is
+    // attributed to, are decisions made inside `App.main()`, so only a real
+    // process can observe them. The pair covers both branches of `main()`'s
+    // `usesStoredSwiftTUIOptions` test.
+    .executableTarget(
+      name: "EntryPointFixtureVerbDispatch",
+      dependencies: ["SwiftTUI"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureVerbDispatch",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "EntryPointFixtureVerbDispatchNoOptions",
+      dependencies: ["SwiftTUI"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureVerbDispatchNoOptions",
+      swiftSettings: swiftSettings()
+    ),
 
     .testTarget(
       // The reconciliation-engine unit suites (F108): depends on
