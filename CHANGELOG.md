@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-07-27
+
 ### Added
 
 - **A `SwiftTUICommand` can claim its own subcommand verbs from raw arguments.**
