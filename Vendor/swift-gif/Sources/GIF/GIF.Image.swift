@@ -17,14 +17,27 @@ extension GIF {
     /// color table at the LSD's `backgroundColorIndex`).
     public let backgroundColor: (r: UInt8, g: UInt8, b: UInt8)?
 
+    /// The loop count the file's `NETSCAPE2.0` application extension
+    /// declares, or `nil` when it carries no such extension.
+    ///
+    /// Zero means "repeat forever"; a positive count is the number of
+    /// plays. **Absent is not zero** — the format defines a GIF with no
+    /// looping extension as playing through exactly once — so a caller
+    /// that needs a number wants `loopCount ?? 1` rather than the type's
+    /// zero. The optional is what lets each caller pick its own default
+    /// instead of inheriting one baked in here.
+    public let loopCount: Int?
+
     init(
       size: (Int, Int),
       frames: [GIF.Frame],
-      backgroundColor: (r: UInt8, g: UInt8, b: UInt8)?
+      backgroundColor: (r: UInt8, g: UInt8, b: UInt8)?,
+      loopCount: Int?
     ) {
       self.size = size
       self.frames = frames
       self.backgroundColor = backgroundColor
+      self.loopCount = loopCount
     }
 
     /// Decodes the GIF bytestream produced by `stream`.
@@ -37,7 +50,8 @@ extension GIF {
       return GIF.Image(
         size: (result.screenWidth, result.screenHeight),
         frames: result.frames,
-        backgroundColor: result.backgroundColor
+        backgroundColor: result.backgroundColor,
+        loopCount: result.loopCount
       )
     }
 

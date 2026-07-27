@@ -173,6 +173,253 @@ func lzwGrowth() throws {
   _ = try GIF.LZW.decode(bytes: [0x04, 0x05], minCodeSize: 2, expectedCount: 0)
 }
 
+// MARK: - Application extensions / loop count
+
+/// Where the hand-assembled `redPixelGIF` above stops being header and
+/// starts being the image descriptor: 6 signature + 7 logical screen
+/// descriptor + 6 global color table. Extensions are legal anywhere in
+/// that gap.
+private let redPixelImageDescriptorOffset = 19
+
+private func redPixelGIFCarrying(_ extensions: [UInt8]) -> [UInt8] {
+  Array(redPixelGIF[0..<redPixelImageDescriptorOffset])
+    + extensions
+    + Array(redPixelGIF[redPixelImageDescriptorOffset...])
+}
+
+/// `21 FF <len> <identifier> <sub-blocks…> 00` — the exact block shape the
+/// spec describes, so a test can build one no encoder here writes.
+private func applicationExtension(identifier: String, subBlocks: [[UInt8]]) -> [UInt8] {
+  var out: [UInt8] = [0x21, 0xFF, UInt8(identifier.utf8.count)]
+  out.append(contentsOf: Array(identifier.utf8))
+  for block in subBlocks {
+    out.append(UInt8(block.count))
+    out.append(contentsOf: block)
+  }
+  out.append(0x00)
+  return out
+}
+
+private func loopExtension(identifier: String = "NETSCAPE2.0", count: Int) -> [UInt8] {
+  applicationExtension(
+    identifier: identifier,
+    subBlocks: [[0x01, UInt8(count & 0xFF), UInt8((count >> 8) & 0xFF)]]
+  )
+}
+
+private func decoded(_ bytes: [UInt8]) throws -> GIF.Image {
+  var src = ArraySource(bytes: bytes)
+  return try GIF.Image.decompress(stream: &src)
+}
+
+@Test("A GIF with no application extension declares no loop count")
+func absentLoopCountIsNil() throws {
+  // Not zero: the format says such a file plays through exactly once, and
+  // collapsing that onto the "forever" value is the bug the optional
+  // exists to prevent.
+  #expect(try decoded(redPixelGIF).loopCount == nil)
+}
+
+@Test("The Netscape loop count survives an encode / decode round trip", arguments: [0, 1, 3])
+func loopCountRoundTrips(loopCount: Int) throws {
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: 2, y: 1),
+      globalColorTable: [(r: 0, g: 0, b: 0), (r: 255, g: 255, b: 255)],
+      loopCount: loopCount,
+      frames: [
+        GIF.IndexedFrame(width: 2, height: 1, indices: [0, 1], delayCentiseconds: 4),
+        GIF.IndexedFrame(width: 2, height: 1, indices: [1, 0], delayCentiseconds: 4),
+      ]
+    )
+  )
+  #expect(try decoded(bytes).loopCount == loopCount)
+}
+
+@Test("A single-frame image that plays once carries no looping extension")
+func singleFramePlayOnceWritesNoBlock() throws {
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: 1, y: 1),
+      globalColorTable: [(r: 255, g: 0, b: 0)],
+      loopCount: 1,
+      frames: [GIF.IndexedFrame(width: 1, height: 1, indices: [0])]
+    )
+  )
+  #expect(try decoded(bytes).loopCount == nil)
+}
+
+@Test("The loop count is little-endian")
+func loopCountIsLittleEndian() throws {
+  #expect(try decoded(redPixelGIFCarrying(loopExtension(count: 256))).loopCount == 256)
+  #expect(try decoded(redPixelGIFCarrying(loopExtension(count: 65535))).loopCount == 65535)
+}
+
+@Test("The older ANIMEXTS1.0 spelling of the looping block is honored")
+func animextsLoopCount() throws {
+  let bytes = redPixelGIFCarrying(loopExtension(identifier: "ANIMEXTS1.0", count: 7))
+  #expect(try decoded(bytes).loopCount == 7)
+}
+
+@Test("Unknown application extensions are skipped rather than choked on")
+func unknownApplicationExtensionsAreSkipped() throws {
+  // An XMP packet (long, and full of bytes that look like block
+  // introducers) plus a comment, ahead of the looping block. All three
+  // have to be walked correctly for the loop count behind them to be
+  // found at all.
+  let xmp = applicationExtension(
+    identifier: "XMP DataXMP",
+    subBlocks: [
+      Array(repeating: 0x21, count: 255),
+      Array("<x:xmpmeta/>".utf8),
+    ]
+  )
+  let comment: [UInt8] = [0x21, 0xFE, 0x05] + Array("hello".utf8) + [0x00]
+
+  let withoutLoop = try decoded(redPixelGIFCarrying(xmp + comment))
+  #expect(withoutLoop.loopCount == nil)
+  #expect(withoutLoop.frames.count == 1)
+  #expect(withoutLoop.unpack(as: GIF.RGBA<UInt8>.self) == [GIF.RGBA<UInt8>(255, 0, 0, 255)])
+
+  let withLoop = try decoded(
+    redPixelGIFCarrying(xmp + comment + loopExtension(count: 2))
+  )
+  #expect(withLoop.loopCount == 2)
+  #expect(withLoop.unpack(as: GIF.RGBA<UInt8>.self) == [GIF.RGBA<UInt8>(255, 0, 0, 255)])
+}
+
+@Test("A NETSCAPE block without a looping sub-block declares no loop count")
+func netscapeWithoutLoopSubBlock() throws {
+  // Sub-block `02` is the buffering-size block, which says nothing about
+  // looping. Reading the count off the first sub-block regardless of its
+  // ID would turn a buffer size into a play count.
+  let bytes = redPixelGIFCarrying(
+    applicationExtension(
+      identifier: "NETSCAPE2.0",
+      subBlocks: [[0x02, 0x10, 0x27, 0x00, 0x00]]
+    )
+  )
+  #expect(try decoded(bytes).loopCount == nil)
+}
+
+// MARK: - Global color table sizing
+
+/// `entries` visibly different colors, so a pixel that decoded to the
+/// wrong slot decodes to an obviously wrong color.
+private func distinctPalette(entries: Int) -> [(r: UInt8, g: UInt8, b: UInt8)] {
+  var out: [(r: UInt8, g: UInt8, b: UInt8)] = []
+  out.reserveCapacity(entries)
+  for i in 0..<entries {
+    let red = UInt8(i)
+    let green = UInt8(255 - i)
+    let blue = UInt8((i &* 7) % 256)
+    out.append((r: red, g: green, b: blue))
+  }
+  return out
+}
+
+@Test(
+  "The global color table and LZW code size follow the palette size",
+  arguments: [2, 4, 16, 32, 256]
+)
+func globalColorTableIsSizedToThePalette(entries: Int) throws {
+  let palette = distinctPalette(entries: entries)
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: entries, y: 1),
+      globalColorTable: palette,
+      // Play-once so no looping extension sits between the fields the
+      // offsets below step through.
+      loopCount: 1,
+      frames: [
+        GIF.IndexedFrame(
+          width: entries,
+          height: 1,
+          indices: (0..<entries).map { UInt8($0) }
+        )
+      ]
+    )
+  )
+
+  // Logical screen descriptor: packed flags are the 11th byte, and the
+  // low three bits are `log2(entries) - 1`.
+  let sizeBits = Int(bytes[10] & 0b0000_0111) + 1
+  #expect(1 << sizeBits == entries)
+
+  // The LZW minimum code size sits behind the 6-byte signature, the
+  // 7-byte LSD, the table, an 8-byte GCE and a 10-byte image descriptor.
+  let minCodeSize = Int(bytes[13 + entries * 3 + 18])
+  #expect(minCodeSize == max(2, sizeBits))
+
+  let image = try decoded(bytes)
+  #expect(image.frames[0].palette.count == entries)
+  let pixels = image.unpack(as: GIF.RGBA<UInt8>.self)
+  #expect(pixels.count == entries)
+  for i in 0..<entries {
+    #expect(pixels[i] == GIF.RGBA<UInt8>(palette[i].r, palette[i].g, palette[i].b, 255))
+  }
+}
+
+@Test(
+  "A non-power-of-two palette is padded up to the next power of two",
+  arguments: [(1, 2), (3, 4), (5, 8), (17, 32), (100, 128)]
+)
+func nonPowerOfTwoPaletteIsPadded(entries: Int, padded: Int) throws {
+  let palette = distinctPalette(entries: entries)
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: entries, y: 1),
+      globalColorTable: palette,
+      loopCount: 1,
+      frames: [
+        GIF.IndexedFrame(
+          width: entries,
+          height: 1,
+          indices: (0..<entries).map { UInt8($0) }
+        )
+      ]
+    )
+  )
+
+  let sizeBits = Int(bytes[10] & 0b0000_0111) + 1
+  #expect(1 << sizeBits == padded)
+  #expect(Int(bytes[13 + padded * 3 + 18]) == max(2, sizeBits))
+
+  let image = try decoded(bytes)
+  #expect(image.frames[0].palette.count == padded)
+  // Padding duplicates the last authored color and is never referenced,
+  // so every authored index still decodes to the color it was given.
+  let pixels = image.unpack(as: GIF.RGBA<UInt8>.self)
+  for i in 0..<entries {
+    #expect(pixels[i] == GIF.RGBA<UInt8>(palette[i].r, palette[i].g, palette[i].b, 255))
+  }
+}
+
+@Test("A frame may reference an index past the authored table")
+func indexPastTheAuthoredTablePadsTheTable() throws {
+  // The encoder's floor: the table has to cover the highest index any
+  // frame actually uses, whatever the caller handed over. Index 5 with a
+  // 2-color table means a 8-entry table, not a rejection.
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: 2, y: 1),
+      globalColorTable: [(r: 1, g: 2, b: 3), (r: 4, g: 5, b: 6)],
+      loopCount: 1,
+      frames: [
+        GIF.IndexedFrame(
+          width: 2,
+          height: 1,
+          indices: [0, 5],
+          transparentIndex: 5
+        )
+      ]
+    )
+  )
+  let image = try decoded(bytes)
+  #expect(image.frames[0].palette.count == 8)
+  #expect(image.frames[0].transparentIndex == 5)
+}
+
 @Test("Deinterlace reorders rows correctly") func deinterlace() {
   let dec = GIF.Decoder(bytes: [])
   // 8-row image; in interlaced storage rows are: pass1(0,8 rows), pass2(4),

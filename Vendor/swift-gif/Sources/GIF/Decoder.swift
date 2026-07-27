@@ -51,6 +51,10 @@ extension GIF {
     // Decoded frames.
     var frames: [Frame] = []
 
+    /// The loop count declared by a looping application extension, or
+    /// `nil` while none has been seen.
+    var loopCount: Int? = nil
+
     init(bytes: [UInt8]) {
       self.bytes = bytes
     }
@@ -59,6 +63,7 @@ extension GIF {
       screenWidth: Int,
       screenHeight: Int,
       backgroundColor: (r: UInt8, g: UInt8, b: UInt8)?,
+      loopCount: Int?,
       frames: [Frame]
     ) {
       try parseHeader()
@@ -90,7 +95,7 @@ extension GIF {
         bg = nil
       }
 
-      return (screenWidth, screenHeight, bg, frames)
+      return (screenWidth, screenHeight, bg, loopCount, frames)
     }
 
     // MARK: byte/word helpers
@@ -165,10 +170,58 @@ extension GIF {
       switch label {
       case 0xF9:  // GCE
         try parseGraphicsControlExtension()
-      case 0xFE, 0xFF, 0x01:  // Comment, App, Plain Text
+      case 0xFF:  // Application
+        try parseApplicationExtension()
+      case 0xFE, 0x01:  // Comment, Plain Text
         try skipSubBlocks(stage: "extension body")
       default:
         try skipSubBlocks(stage: "unknown extension body")
+      }
+    }
+
+    /// Application identifiers whose sub-block `01` carries a loop count.
+    ///
+    /// `NETSCAPE2.0` is what every encoder writes. `ANIMEXTS1.0` is the
+    /// older spelling of the same block, emitted by a handful of
+    /// mid-nineties authoring tools, and decoders have honored both for as
+    /// long as GIFs have looped.
+    static let loopingApplicationIdentifiers: [[UInt8]] = [
+      Array("NETSCAPE2.0".utf8),
+      Array("ANIMEXTS1.0".utf8),
+    ]
+
+    /// Parses an application extension, keeping the loop count a looping
+    /// block declares and discarding every other application's payload
+    /// (XMP, ICC, and whatever else a producer attached).
+    ///
+    /// The block is a length-prefixed identifier — 11 bytes by the spec,
+    /// an 8-byte application name followed by a 3-byte authentication
+    /// code — and then ordinary data sub-blocks. The looping block's
+    /// payload is one sub-block, `01` followed by a little-endian count
+    /// where zero means "repeat forever".
+    ///
+    /// A file carrying **no** such block is not the same as one declaring
+    /// zero: the format defines it as playing through exactly once. That
+    /// distinction is why ``GIF/Image/loopCount`` is optional, and it is
+    /// preserved here by leaving `loopCount` alone rather than defaulting
+    /// it.
+    mutating func parseApplicationExtension() throws(GIF.DecodingError) {
+      let identifierLength = Int(try readByte(stage: "application extension block size"))
+      guard identifierLength > 0 else {
+        // A zero length is the sub-block terminator: an empty extension,
+        // already fully consumed.
+        return
+      }
+      let identifier = try readBytes(count: identifierLength, stage: "application identifier")
+      guard Decoder.loopingApplicationIdentifiers.contains(identifier) else {
+        try skipSubBlocks(stage: "application extension body")
+        return
+      }
+
+      let subBlocks = try readSubBlockList(stage: "application extension body")
+      for block in subBlocks where block.count >= 3 && block[0] == 0x01 {
+        loopCount = Int(block[1]) | (Int(block[2]) << 8)
+        return
       }
     }
 
@@ -206,6 +259,21 @@ extension GIF {
           throw .truncated(stage: stage)
         }
         pos += Int(n)
+      }
+    }
+
+    /// Reads sub-blocks until the zero terminator, keeping each block's
+    /// bytes separate.
+    ///
+    /// Application extensions key on the first byte of an *individual*
+    /// sub-block, which the concatenation ``readSubBlocks(stage:)``
+    /// performs would blur into whatever preceded it.
+    mutating func readSubBlockList(stage: String) throws(GIF.DecodingError) -> [[UInt8]] {
+      var out: [[UInt8]] = []
+      while true {
+        let n = Int(try readByte(stage: stage))
+        if n == 0 { return out }
+        out.append(try readBytes(count: n, stage: stage))
       }
     }
 
