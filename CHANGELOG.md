@@ -8,6 +8,16 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-07-27
+
+### Added
+
+- **Terminal handoffs temporarily return the real terminal to an external
+  operation.** `TerminalHandoffAction` suspends the runtime input reader,
+  restores terminal modes and the primary screen, awaits an editor or other
+  interactive operation, then re-enters raw mode and repaints. Calls outside a
+  live terminal runtime fail explicitly instead of competing for the TTY.
+
 ## [0.3.5] - 2026-07-27
 
 ### Added

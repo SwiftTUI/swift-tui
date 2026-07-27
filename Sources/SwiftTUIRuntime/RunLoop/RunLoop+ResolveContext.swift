@@ -47,6 +47,9 @@ extension RunLoop {
     if effectiveEnvironmentValues.clipboardReadAction.isPlaceholder {
       effectiveEnvironmentValues.clipboardReadAction = runtimeClipboardReadAction()
     }
+    if effectiveEnvironmentValues.terminalHandoff.isPlaceholder {
+      effectiveEnvironmentValues.terminalHandoff = runtimeTerminalHandoffAction()
+    }
     // Batches the scheduler's latest-wins coalescing displaced never ride a
     // frame, so their `withAnimation` completions must be parked here or
     // they would never fire (F117). Parked regardless of reduced motion —

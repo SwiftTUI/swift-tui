@@ -144,6 +144,8 @@ classifications:
     - SwiftTUIViews.Tab
     - SwiftTUIViews.Table
     - SwiftTUIViews.TabView
+    - SwiftTUIViews.TerminalHandoffAction
+    - SwiftTUIViews.TerminalHandoffError
     - SwiftTUIViews.Text
     - SwiftTUIViews.TextEditor
     - SwiftTUIViews.TextField

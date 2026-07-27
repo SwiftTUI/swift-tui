@@ -3419,6 +3419,7 @@ SwiftTUIViews.EnvironmentValues.subscript(_:)
 SwiftTUIViews.EnvironmentValues.tabViewStyle
 SwiftTUIViews.EnvironmentValues.tableHeaderVisibility
 SwiftTUIViews.EnvironmentValues.terminalAppearance
+SwiftTUIViews.EnvironmentValues.terminalHandoff
 SwiftTUIViews.EnvironmentValues.terminalSize
 SwiftTUIViews.EnvironmentValues.textFieldStyle
 SwiftTUIViews.EnvironmentValues.tintStyle
@@ -4165,6 +4166,17 @@ SwiftTUIViews.TapGesture.count
 SwiftTUIViews.TapGesture.init(count:)
 SwiftTUIViews.TapGesture.interTapWindow
 SwiftTUIViews.TaskLifecycleModifier
+SwiftTUIViews.TerminalHandoffAction
+SwiftTUIViews.TerminalHandoffAction.callAsFunction(_:)
+SwiftTUIViews.TerminalHandoffAction.debugDescription
+SwiftTUIViews.TerminalHandoffAction.description
+SwiftTUIViews.TerminalHandoffAction.init(_:)
+SwiftTUIViews.TerminalHandoffAction.perform(_:)
+SwiftTUIViews.TerminalHandoffError
+SwiftTUIViews.TerminalHandoffError.alreadyInProgress
+SwiftTUIViews.TerminalHandoffError.description
+SwiftTUIViews.TerminalHandoffError.failedToRestoreTerminal
+SwiftTUIViews.TerminalHandoffError.unavailable
 SwiftTUIViews.TerminationRequestModifier
 SwiftTUIViews.Text
 SwiftTUIViews.Text.LineStyle

@@ -12,3 +12,16 @@
 package protocol TerminalInputSuspending: Sendable {
   func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T
 }
+
+/// Extends descriptor-probe suspension across an awaited terminal handoff.
+package protocol TerminalInputHandoffSuspending: TerminalInputSuspending {
+  /// Suspends the live reader across an asynchronous terminal-ownership handoff.
+  ///
+  /// The suspension remains balanced when `body` throws or observes
+  /// cancellation. The body stays on the main actor because terminal mode and
+  /// run-loop ownership are main-actor-confined.
+  @MainActor
+  func withInputSuspended<T: Sendable>(
+    _ body: @MainActor @Sendable () async throws -> T
+  ) async rethrows -> T
+}

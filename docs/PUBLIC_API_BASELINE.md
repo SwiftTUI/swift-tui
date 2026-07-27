@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 61 | 533 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 274 | 1498 |
+| `SwiftTUIViews` | 276 | 1510 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -124,7 +124,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (274)
+### Canonical surface (276)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -200,7 +200,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 1 member
 - `EnvironmentTransformModifier` — struct
-- `EnvironmentValues` — struct — 30 members
+- `EnvironmentValues` — struct — 31 members
 - `EnvironmentWritingModifier` — struct
 - `EquatableView` — struct — 2 members
 - `ExclusiveGesture` — struct — 6 members
@@ -351,6 +351,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TagValueModifier` — struct
 - `TapGesture` — struct — 6 members
 - `TaskLifecycleModifier` — struct
+- `TerminalHandoffAction` — struct — 5 members
+- `TerminalHandoffError` — enum — 4 members
 - `TerminationRequestModifier` — struct
 - `Text` — struct — 33 members
 - `TextEditor` — struct — 2 members

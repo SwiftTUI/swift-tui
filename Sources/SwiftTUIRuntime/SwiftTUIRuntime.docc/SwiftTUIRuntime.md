@@ -57,6 +57,7 @@ are re-exported from the core pipeline layer.
 - ``RunLoop``
 - ``RunLoopResult``
 - ``RunLoopExitReason``
+- ``TerminalHandoffAction``
 
 ### App And Scene Declarations
 
@@ -75,3 +76,4 @@ are re-exported from the core pipeline layer.
 - <doc:Host-Integration>
 - <doc:Running-Apps>
 - <doc:TerminalEmbedding>
+- <doc:Terminal-Handoffs>

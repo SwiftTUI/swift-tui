@@ -490,7 +490,7 @@ extension InputReader {
   #endif
 }
 
-extension InputReader: TerminalInputSuspending {
+extension InputReader: TerminalInputHandoffSuspending {
   /// Suspends every live read source, barriers their queues so no in-flight
   /// drain can still consume the probe's reply, runs `body`, then resumes.
   /// Called from the main-actor capability probe; not reentrant.
@@ -513,6 +513,33 @@ extension InputReader: TerminalInputSuspending {
         }
       }
       return try body()
+    #endif
+  }
+
+  /// Suspends every live read source for an awaited terminal handoff, then
+  /// balances every source on success, failure, and cooperative cancellation.
+  @MainActor
+  package func withInputSuspended<T: Sendable>(
+    _ body: @MainActor @Sendable () async throws -> T
+  ) async rethrows -> T {
+    #if canImport(WASILibc)
+      return try await body()
+    #else
+      let entries = suspendableSources.withLockUnchecked { registry in
+        Array(registry.sources.values)
+      }
+      for entry in entries {
+        entry.source.suspend()
+      }
+      for entry in entries {
+        entry.queue.sync {}
+      }
+      defer {
+        for entry in entries {
+          entry.source.resume()
+        }
+      }
+      return try await body()
     #endif
   }
 }

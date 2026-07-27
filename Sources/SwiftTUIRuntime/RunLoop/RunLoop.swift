@@ -45,6 +45,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
+  package var terminalHandoffInProgress = false
+  package var terminalRenderPassInProgress = false
+  package var terminalRenderPassWaiters: [CheckedContinuation<Void, Never>] = []
+  package var nextTerminalHandoffSessionGeneration: UInt64 = 0
+  package var activeTerminalHandoffSessionGeneration: UInt64?
 
   package var latestSemanticSnapshot = SemanticSnapshot()
   /// The most recent keyboard focus traversal, kept until the next input
@@ -288,11 +293,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     // registration storage so concurrent hosted scenes cannot steal
     // each other's animation, transition, or completion registrations.
     let animationController = renderer.internalAnimationController
-    return try await AccessibilityAnnouncementStorage.withSink(self) {
-      try await AnimationRegistrationStorage.withSink(animationController) {
-        try await TransitionRegistrationStorage.withSink(animationController) {
-          try await AnimationCompletionStorage.withSink(animationController) {
-            try await runWithInstalledAnimationSinks()
+    let terminalHandoff = runtimeTerminalHandoffAction()
+    return try await TerminalHandoffAction.$current.withValue(terminalHandoff) {
+      try await AccessibilityAnnouncementStorage.withSink(self) {
+        try await AnimationRegistrationStorage.withSink(animationController) {
+          try await TransitionRegistrationStorage.withSink(animationController) {
+            try await AnimationCompletionStorage.withSink(animationController) {
+              try await runWithInstalledAnimationSinks()
+            }
           }
         }
       }
@@ -333,9 +341,13 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     if usesRawTerminalMode {
       try terminalCommandSurface?.enableRawMode()
       synchronizeInputCapabilities()
+      if terminalCommandSurface != nil {
+        activateTerminalHandoffSession()
+      }
     }
     defer {
       lifecycleCoordinator.shutdown()
+      deactivateTerminalHandoffSession()
       if usesRawTerminalMode {
         try? terminalCommandSurface?.disableRawMode()
       }
@@ -559,7 +571,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     )
   }
 
-  private func synchronizeInputCapabilities() {
+  package func synchronizeInputCapabilities() {
     guard let provider = presentationSurface as? any TerminalInputCapabilityProviding,
       let configurableReader = terminalInputReader as? any TerminalInputCapabilityConfiguring
     else {

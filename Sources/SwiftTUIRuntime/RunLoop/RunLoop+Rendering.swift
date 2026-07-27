@@ -13,6 +13,13 @@ extension RunLoop {
   /// function is only invoked from synchronous test helpers; adding elision
   /// complexity here would serve no production path.
   package func renderPendingFrames(renderedFrames: inout Int) throws {
+    guard beginTerminalRenderPassIfAvailable() else {
+      return
+    }
+    defer {
+      endTerminalRenderPass()
+    }
+
     observationBridge.attachInvalidator(scheduler)
     registerLiveFocusedValuesProvider()
 
@@ -92,6 +99,9 @@ extension RunLoop {
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
+      if terminalHandoffInProgress {
+        break
+      }
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
   }
@@ -295,6 +305,13 @@ extension RunLoop {
     eventPump: EventPump?,
     frameBudget: Int? = nil
   ) async throws -> RunLoopExitReason? {
+    guard beginTerminalRenderPassIfAvailable() else {
+      return nil
+    }
+    defer {
+      endTerminalRenderPass()
+    }
+
     observationBridge.attachInvalidator(scheduler)
     registerLiveFocusedValuesProvider()
 
@@ -305,6 +322,9 @@ extension RunLoop {
     let drainPass = beginDeadlineDrainPass()
     var consumedScheduledFrames = 0
     frameLoop: while true {
+      if terminalHandoffInProgress {
+        break frameLoop
+      }
       // The deadline-arm cut only bounds deadline-armed frames; frames made
       // ready by fresh invalidations (a self-invalidating animation) pass it
       // freely, so a caller that must not linger — the exit flush — bounds

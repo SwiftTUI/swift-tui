@@ -46,6 +46,12 @@ Environment updates can affect:
 
 Environment writes are part of authored structure. They are not a late-stage rendering override.
 
+Runtime-injected environment actions expose host-owned verbs without putting
+host mechanics in views. For example, ``EnvironmentValues/terminalHandoff``
+temporarily restores the user's terminal while an asynchronous external
+operation runs. The “Terminal Handoffs” guide in `SwiftTUIRuntime` describes
+the ownership and restoration contract.
+
 ## Focus
 
 Use ``FocusState`` to model authored focus ownership, and use ``FocusedValue`` or ``FocusedBinding`` when the currently focused subtree should export context upward.
@@ -68,3 +74,4 @@ The runtime is keyboard-first, but focus also matters for:
 - ``FocusState``
 - ``FocusedValue``
 - ``FocusedBinding``
+- ``TerminalHandoffAction``

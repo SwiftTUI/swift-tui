@@ -3,7 +3,8 @@ public import SwiftTUICore
 // Semantic environment actions and their environment keys.
 //
 // These public action values are the runtime-injected verbs a view can pull
-// out of the environment: open a link, reset focus, write/read the clipboard.
+// out of the environment: open a link, reset focus, write/read the clipboard,
+// or temporarily hand terminal ownership to an external operation.
 // Each ships as an inert `.placeholder` until a run loop installs the live
 // implementation (see `RunLoop+EnvironmentActions.swift` in SwiftTUIRuntime).
 //
@@ -225,6 +226,121 @@ private enum ClipboardReadActionKey: EnvironmentKey {
   static let defaultValue = ClipboardReadAction.placeholder
 }
 
+/// An error reported before or while handing the active terminal to an external operation.
+public enum TerminalHandoffError: Error, Equatable, Sendable, CustomStringConvertible {
+  /// No live terminal run loop is installed in the calling task.
+  case unavailable
+  /// The active terminal session is already running another handoff operation.
+  case alreadyInProgress
+  /// SwiftTUI could not reclaim terminal ownership after the operation completed.
+  case failedToRestoreTerminal
+
+  public var description: String {
+    switch self {
+    case .unavailable:
+      "terminal handoff is unavailable outside an active terminal session"
+    case .alreadyInProgress:
+      "the active terminal session is already handed off"
+    case .failedToRestoreTerminal:
+      "SwiftTUI could not restore terminal ownership after the handoff"
+    }
+  }
+}
+
+/// Temporarily hands the active terminal to an asynchronous external operation.
+///
+/// The live terminal runtime suspends its input reader, restores cooked mode
+/// and the primary screen, awaits `operation`, then re-enters its presentation
+/// mode and schedules a full redraw. Restoration also runs when `operation`
+/// throws or cooperatively observes cancellation.
+///
+/// Read this value through ``EnvironmentValues/terminalHandoff`` when a view
+/// performs the operation directly. Model-owned dependencies that cannot read
+/// the environment during initialization can call
+/// ``perform(_:)`` instead. The static entry point is task-local to the active
+/// run loop, so concurrent terminal scenes cannot hand off each other's host.
+public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler:
+    @MainActor @Sendable (@escaping @MainActor @Sendable () async throws -> Void) async throws
+      -> Void
+
+  @TaskLocal package static var current: TerminalHandoffAction?
+
+  /// Creates a custom terminal handoff action.
+  ///
+  /// A custom action owns the complete handoff contract. Prefer the
+  /// runtime-injected environment value for terminal applications.
+  @MainActor
+  public init(
+    _ handler:
+      @escaping @MainActor @Sendable (
+        @escaping @MainActor @Sendable () async throws -> Void
+      ) async throws -> Void
+  ) {
+    snapshotLabel = "TerminalHandoffAction.custom"
+    isPlaceholder = false
+    self.handler = handler
+  }
+
+  /// Performs `operation` using this action's terminal session.
+  @MainActor
+  public func callAsFunction(
+    _ operation: @escaping @MainActor @Sendable () async throws -> Void
+  ) async throws {
+    try await handler(operation)
+  }
+
+  /// Performs `operation` using the terminal session scoped to the current task.
+  ///
+  /// Child tasks inherit the active session. Detached tasks do not; they throw
+  /// ``TerminalHandoffError/unavailable`` rather than consulting process-global
+  /// state that could belong to another scene.
+  @MainActor
+  public static func perform(
+    _ operation: @escaping @MainActor @Sendable () async throws -> Void
+  ) async throws {
+    guard let current else {
+      throw TerminalHandoffError.unavailable
+    }
+    try await current(operation)
+  }
+
+  public var description: String {
+    snapshotLabel
+  }
+
+  public var debugDescription: String {
+    snapshotLabel
+  }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler:
+      @escaping @MainActor @Sendable (
+        @escaping @MainActor @Sendable () async throws -> Void
+      ) async throws -> Void
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "TerminalHandoffAction.default",
+    isPlaceholder: true,
+    handler: { _ in throw TerminalHandoffError.unavailable }
+  )
+}
+
+private enum TerminalHandoffActionKey: EnvironmentKey {
+  static let defaultValue = TerminalHandoffAction.placeholder
+}
+
 // Framework-supplied action carriers are rebuilt around stable runtime verbs
 // every frame. Their package labels are an explicit semantic proof; public
 // custom actions deliberately compare unequal so a changed closure capture can
@@ -281,6 +397,19 @@ extension ClipboardReadAction: TypedReuseEqualityProviding {
   }
 }
 
+extension TerminalHandoffAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "TerminalHandoffAction.custom",
+      other.snapshotLabel != "TerminalHandoffAction.custom"
+    else {
+      return false
+    }
+    return snapshotLabel == other.snapshotLabel
+      && isPlaceholder == other.isPlaceholder
+  }
+}
+
 extension EnvironmentValues {
   public var openLinkAction: OpenLinkAction {
     get { self[OpenLinkActionKey.self] }
@@ -300,5 +429,11 @@ extension EnvironmentValues {
   package var clipboardReadAction: ClipboardReadAction {
     get { self[ClipboardReadActionKey.self] }
     set { self[ClipboardReadActionKey.self] = newValue }
+  }
+
+  /// The active runtime's asynchronous terminal-ownership handoff action.
+  public var terminalHandoff: TerminalHandoffAction {
+    get { self[TerminalHandoffActionKey.self] }
+    set { self[TerminalHandoffActionKey.self] = newValue }
   }
 }
