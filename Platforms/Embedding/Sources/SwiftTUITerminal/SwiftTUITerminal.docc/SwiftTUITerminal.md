@@ -30,6 +30,31 @@ TerminalView(
 )
 ```
 
+If the embedding host owns an enum-valued focus model, bind it directly to the
+terminal input member:
+
+```swift
+enum PaneFocus: Hashable {
+  case browser
+  case preview
+}
+
+@FocusState private var focus: PaneFocus?
+
+TerminalView(
+  session: session,
+  keyRouting: { keyPress in
+    keyPress == KeyPress(.escape) ? .handledByHost : .forwardToChild
+  }
+)
+.hostFocused($focus, equals: .preview)
+```
+
+`hostFocused` replaces an application-owned `.focusable`/`.onKeyPress`
+forwarding wrapper. It preserves `TerminalView`'s framework-owned key
+conversion and session delivery while participating in the host's single focus
+binding.
+
 The closure receives the original `KeyPress` before conversion to
 ``TerminalEmulatorKey``, so it can distinguish characters, navigation keys,
 and modifier combinations. Returning

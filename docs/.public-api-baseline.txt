@@ -2921,6 +2921,7 @@ SwiftTUITerminal.TerminalSession.snapshot()
 SwiftTUITerminal.TerminalSession.start()
 SwiftTUITerminal.TerminalView
 SwiftTUITerminal.TerminalView.body
+SwiftTUITerminal.TerminalView.hostFocused(_:equals:)
 SwiftTUITerminal.TerminalView.init(session:keyRouting:onTitleChange:onExit:)
 SwiftTUITerminal.TerminalView.init(session:onTitleChange:onExit:)
 SwiftTUITerminal.TerminalViewKeyDisposition

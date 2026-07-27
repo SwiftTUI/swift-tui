@@ -16,6 +16,7 @@ public struct TerminalView<Session: TerminalSession>: View {
   private let keyRouting: @MainActor @Sendable (KeyPress) -> TerminalViewKeyDisposition
   private let onTitleChange: (@MainActor @Sendable (String) -> Void)?
   private let onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)?
+  private let acceptsFocusedInput: Bool
 
   /// Creates a view that presents and drives a terminal session, forwarding focused keys to the
   /// child.
@@ -53,10 +54,27 @@ public struct TerminalView<Session: TerminalSession>: View {
     onTitleChange: (@MainActor @Sendable (String) -> Void)? = nil,
     onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)? = nil
   ) {
+    self.init(
+      session: session,
+      keyRouting: keyRouting,
+      onTitleChange: onTitleChange,
+      onExit: onExit,
+      acceptsFocusedInput: true
+    )
+  }
+
+  private init(
+    session: Session,
+    keyRouting: @escaping @MainActor @Sendable (KeyPress) -> TerminalViewKeyDisposition,
+    onTitleChange: (@MainActor @Sendable (String) -> Void)?,
+    onExit: (@MainActor @Sendable (TerminalExitReason) -> Void)?,
+    acceptsFocusedInput: Bool
+  ) {
     self.session = session
     self.keyRouting = keyRouting
     self.onTitleChange = onTitleChange
     self.onExit = onExit
+    self.acceptsFocusedInput = acceptsFocusedInput
   }
 
   public var body: some View {
@@ -64,48 +82,110 @@ public struct TerminalView<Session: TerminalSession>: View {
     EnvironmentReader(\.terminalEventHandlers) { terminalEventHandlers in
       EnvironmentReader(\.clipboardWriteAction) { clipboardWriteAction in
         GeometryReader { proxy in
-          ForeignSurface(payload: SessionGridPayload(session: session, generation: generation))
-            .focusable(true)
-            .onKeyPress { keyPress in
-              guard keyRouting(keyPress) == .forwardToChild else {
-                return .handled
-              }
-              guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
-                return .ignored
-              }
-              Task {
-                await session.send(key: key)
-              }
-              return .handled
-            }
+          let surface =
+            ForeignSurface(payload: SessionGridPayload(session: session, generation: generation))
             .task(id: TerminalViewLifecycleID(session: ObjectIdentifier(session), size: proxy.size))
-          {
-            let events = session.events()
-            try? await session.start()
-            try? await session.resize(proxy.size)
+            {
+              let events = session.events()
+              try? await session.start()
+              try? await session.resize(proxy.size)
 
-            for await event in events {
-              updateGeneration &+= 1
-              switch event {
-              case .titleChanged(let title):
-                onTitleChange?(title)
-                terminalEventHandlers.titleChanged?(title)
-              case .workingDirectoryChanged(let directory):
-                terminalEventHandlers.workingDirectoryChanged?(directory)
-              case .clipboardWriteRequested(let bytes):
-                _ = clipboardWriteAction(String(decoding: bytes, as: UTF8.self))
-              default:
-                break
+              for await event in events {
+                updateGeneration &+= 1
+                switch event {
+                case .titleChanged(let title):
+                  onTitleChange?(title)
+                  terminalEventHandlers.titleChanged?(title)
+                case .workingDirectoryChanged(let directory):
+                  terminalEventHandlers.workingDirectoryChanged?(directory)
+                case .clipboardWriteRequested(let bytes):
+                  _ = clipboardWriteAction(String(decoding: bytes, as: UTF8.self))
+                default:
+                  break
+                }
+              }
+
+              if case .exited(let reason) = await session.currentLifecycle() {
+                onExit?(reason)
               }
             }
 
-            if case .exited(let reason) = await session.currentLifecycle() {
-              onExit?(reason)
+          surface
+            .focusable(acceptsFocusedInput)
+            .onKeyPress { keyPress in
+              acceptsFocusedInput ? handleFocusedKey(keyPress) : .ignored
             }
-          }
         }
       }
     }
+  }
+
+  @MainActor
+  fileprivate func withoutFocusedInput() -> TerminalView<Session> {
+    TerminalView(
+      session: session,
+      keyRouting: keyRouting,
+      onTitleChange: onTitleChange,
+      onExit: onExit,
+      acceptsFocusedInput: false
+    )
+  }
+
+  @MainActor
+  fileprivate func handleFocusedKey(_ keyPress: KeyPress) -> KeyPressResult {
+    guard keyRouting(keyPress) == .forwardToChild else {
+      return .handled
+    }
+    guard let key = TerminalEmulatorKey(keyPress: keyPress) else {
+      return .ignored
+    }
+    Task {
+      await session.send(key: key)
+    }
+    return .handled
+  }
+}
+
+extension TerminalView {
+  /// Binds host focus directly to this terminal's framework-owned input member.
+  ///
+  /// Use this modifier when an embedding host owns an enum-valued focus model.
+  /// The focused member still applies ``TerminalViewKeyDisposition`` before
+  /// forwarding keys to the child session.
+  @MainActor
+  public func hostFocused<Value: Hashable>(
+    _ binding: FocusState<Value?>.Binding,
+    equals value: Value
+  ) -> some View {
+    TerminalViewHostFocused(
+      terminalView: self,
+      binding: binding,
+      value: value
+    )
+  }
+}
+
+@MainActor
+private struct TerminalViewHostFocused<Session: TerminalSession, Value: Hashable>: View {
+  private let terminalView: TerminalView<Session>
+  private let binding: FocusState<Value?>.Binding
+  private let value: Value
+
+  fileprivate init(
+    terminalView: TerminalView<Session>,
+    binding: FocusState<Value?>.Binding,
+    value: Value
+  ) {
+    self.terminalView = terminalView
+    self.binding = binding
+    self.value = value
+  }
+
+  public var body: some View {
+    terminalView.withoutFocusedInput()
+      .focusable(true)
+      .focused(binding, equals: value)
+      .onKeyPress(perform: terminalView.handleFocusedKey)
   }
 }
 

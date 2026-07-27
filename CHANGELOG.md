@@ -8,6 +8,15 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-07-27
+
+### Added
+
+- **Host focus binding for embedded terminals.** `TerminalView.hostFocused`
+  binds the framework-owned terminal input member to an enum-valued
+  `@FocusState`, preserving host key interception and child forwarding without
+  an application-owned forwarding wrapper.
+
 ## [0.3.4] - 2026-07-27
 
 ### Added

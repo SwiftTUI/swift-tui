@@ -24,7 +24,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
-| `SwiftTUITerminal` | 14 | 130 |
+| `SwiftTUITerminal` | 14 | 131 |
 | `SwiftTUITerminalWorkspace` | 14 | 118 |
 | `SwiftTUICLI` | 6 | 25 |
 | `SwiftTUIWASI` | 3 | 8 |
@@ -446,7 +446,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalMouseMode` — enum — 5 members
 - `TerminalProcessSession` — class — 13 members
 - `TerminalSession` — protocol — 11 members
-- `TerminalView` — struct — 3 members
+- `TerminalView` — struct — 4 members
 - `TerminalViewKeyDisposition` — enum — 2 members
 - `View` — extension — 2 members
 

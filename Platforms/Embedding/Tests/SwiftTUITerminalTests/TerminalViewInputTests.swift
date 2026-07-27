@@ -103,6 +103,47 @@ struct TerminalViewInputTests {
     #expect(session.sentKeys.isEmpty)
   }
 
+  @Test("host-focused terminal routes through the framework member without state-slot aliasing")
+  func hostFocusedTerminalRoutesThroughFrameworkMember() async throws {
+    let session = RecordingTerminalSession()
+    let routedKeyPresses = Mutex<[KeyPress]>([])
+    let runLoop = try makeTerminalViewRunLoop(
+      HostFocusedTerminalFixture(
+        session: session,
+        keyRouting: { keyPress in
+          routedKeyPresses.withLock { $0.append(keyPress) }
+          return keyPress == KeyPress(.escape) ? .handledByHost : .forwardToChild
+        }
+      )
+    )
+
+    // The sibling owns initial focus, so terminal input must remain dormant.
+    #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+    await Task.yield()
+    #expect(routedKeyPresses.withLock { $0 }.isEmpty)
+    #expect(session.sentKeys.isEmpty)
+
+    runLoop.focusTracker.focusNext()
+    try settleTerminalViewRunLoop(runLoop)
+
+    #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+    await session.sentKeySignal.wait {
+      session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)]
+    }
+    #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+    await Task.yield()
+
+    #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.arrowDown), KeyPress(.escape)])
+    #expect(session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)])
+
+    runLoop.focusTracker.focusPrevious()
+    try settleTerminalViewRunLoop(runLoop)
+    #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+    await Task.yield()
+    #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.arrowDown), KeyPress(.escape)])
+    #expect(session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)])
+  }
+
   @Test("maps focused character key presses to emulator keys")
   func mapsCharacterKeyPresses() {
     #expect(
@@ -140,9 +181,9 @@ struct TerminalViewInputTests {
 }
 
 @MainActor
-private func makeTerminalViewRunLoop(
-  _ terminalView: TerminalView<RecordingTerminalSession>
-) throws -> SwiftTUIRuntime.RunLoop<Int, TerminalView<RecordingTerminalSession>> {
+private func makeTerminalViewRunLoop<Content: View>(
+  _ terminalView: Content
+) throws -> SwiftTUIRuntime.RunLoop<Int, Content> {
   let terminalSize = CellSize(width: 20, height: 4)
   let rootIdentity = Identity(components: [.named("TerminalViewInputRoot")])
   let runLoop = SwiftTUIRuntime.RunLoop(
@@ -172,6 +213,50 @@ private func makeTerminalViewRunLoop(
     }
   }
   return runLoop
+}
+
+@MainActor
+private func settleTerminalViewRunLoop<State, Content: View>(
+  _ runLoop: SwiftTUIRuntime.RunLoop<State, Content>
+) throws {
+  var renderedFrames = 0
+  for _ in 0..<5 {
+    let previousFrameCount = renderedFrames
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    if previousFrameCount == renderedFrames {
+      break
+    }
+  }
+}
+
+private enum HostFocusedTerminalFixtureFocus: Hashable {
+  case browser
+  case preview
+}
+
+@MainActor
+private struct HostFocusedTerminalFixture: View {
+  // Deliberately collides with TerminalView.updateGeneration's authored slot
+  // ordinal. The host-focused boundary must keep these differently typed slots
+  // on distinct identities.
+  @FocusState(line: 13, column: 3) private var focus: HostFocusedTerminalFixtureFocus?
+
+  let session: RecordingTerminalSession
+  let keyRouting: @MainActor @Sendable (KeyPress) -> TerminalViewKeyDisposition
+
+  var body: some View {
+    HStack {
+      Text("Browser")
+        .focusable(true)
+        .focused($focus, equals: .browser)
+      TerminalView(
+        session: session,
+        keyRouting: keyRouting
+      )
+      .hostFocused($focus, equals: .preview)
+    }
+    .defaultFocus($focus, .browser)
+  }
 }
 
 private final class RecordingTerminalSession: TerminalSession {

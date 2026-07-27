@@ -44,6 +44,31 @@ The initial cell size seeds the emulator before layout reports the placed view
 size. `TerminalView` starts the session, resizes the pty from layout, and
 invalidates itself as emulator events arrive.
 
+When a host owns an enum-valued focus model, bind that focus to the terminal's
+framework-owned input member:
+
+```swift
+enum PaneFocus: Hashable {
+  case browser
+  case preview
+}
+
+@FocusState private var focus: PaneFocus?
+
+TerminalView(
+  session: session,
+  keyRouting: { keyPress in
+    keyPress == KeyPress(.escape) ? .handledByHost : .forwardToChild
+  }
+)
+.hostFocused($focus, equals: .preview)
+```
+
+`keyRouting` receives the original `KeyPress` before terminal conversion.
+Returning `.handledByHost` consumes the key; `.forwardToChild` preserves the
+ordinary terminal input path. `hostFocused` should replace, rather than wrap,
+an application-owned `.focusable` and `.onKeyPress` forwarding layer.
+
 Arguments, environment, and working directory can be supplied at construction:
 
 ```swift
