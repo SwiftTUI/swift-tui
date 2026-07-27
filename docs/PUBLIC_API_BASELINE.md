@@ -22,7 +22,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 276 | 1510 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
-| `SwiftTUIArguments` | 4 | 46 |
+| `SwiftTUIArguments` | 4 | 49 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminal` | 14 | 131 |
 | `SwiftTUITerminalWorkspace` | 14 | 118 |
@@ -419,7 +419,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 - `CompletionsCommand` — struct — 13 members
 - `SwiftTUIApp` — typealias
-- `SwiftTUICommand` — protocol — 8 members
+- `SwiftTUICommand` — protocol — 11 members
 - `SwiftTUIOptions` — struct — 21 members
 
 ## SwiftTUIPTYPrimitives

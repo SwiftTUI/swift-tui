@@ -95,9 +95,12 @@ SwiftTUIArguments.SwiftTUICommand.completionScript(forParsedCommand:)
 SwiftTUIArguments.SwiftTUICommand.configuration
 SwiftTUIArguments.SwiftTUICommand.installCompletionScript(forParsedCommand:)
 SwiftTUIArguments.SwiftTUICommand.parseSwiftTUIRootCommand(arguments:)
+SwiftTUIArguments.SwiftTUICommand.registeredSubcommand(forRawArguments:)
 SwiftTUIArguments.SwiftTUICommand.runtimeConfiguration(environment:isStdoutTTY:)
 SwiftTUIArguments.SwiftTUICommand.runtimeConfiguration(environment:isStdoutTTY:)
 SwiftTUIArguments.SwiftTUICommand.swiftTUIOptions
+SwiftTUIArguments.SwiftTUICommand.swiftTUIRootSubcommand(forRawArguments:)
+SwiftTUIArguments.SwiftTUICommand.swiftTUIRootSubcommand(forRawArguments:)
 SwiftTUIArguments.SwiftTUIOptions
 SwiftTUIArguments.SwiftTUIOptions.accessible
 SwiftTUIArguments.SwiftTUIOptions.ascii

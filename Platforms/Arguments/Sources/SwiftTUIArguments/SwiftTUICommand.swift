@@ -45,6 +45,37 @@ public protocol SwiftTUICommand: AsyncParsableCommand {
     environment: [String: String],
     isStdoutTTY: Bool
   ) -> RuntimeConfiguration
+
+  /// Claims a subcommand verb from raw arguments, before this root command's
+  /// own positional parsing runs.
+  ///
+  /// Returns the parsed subcommand to run, or `nil` to parse `arguments` as
+  /// this root command. **The default implementation returns `nil`**, so an app
+  /// that does not implement this behaves exactly as it did before.
+  ///
+  /// Implement it when the root command declares an `@Argument` *and*
+  /// registers subcommands. swift-argument-parser parses the current command's
+  /// arguments before it looks for a verb, so a leading bare value binds to the
+  /// root's positional and the parser never descends — `myapp info x.gif` means
+  /// "open the file named `info`". Most apps want the one-line body:
+  ///
+  /// ```swift
+  /// nonisolated static func swiftTUIRootSubcommand(
+  ///   forRawArguments arguments: [String]
+  /// ) throws -> (any ParsableCommand)? {
+  ///   try registeredSubcommand(forRawArguments: arguments)
+  /// }
+  /// ```
+  ///
+  /// This routes; it does not register. `--help` and the generated completion
+  /// scripts are both built from ``configuration``, so the verbs must still be
+  /// listed in its `subcommands`.
+  ///
+  /// `completions` is resolved by the framework *before* this is called and
+  /// cannot be shadowed, disabled, or forgotten by an implementation.
+  nonisolated static func swiftTUIRootSubcommand(
+    forRawArguments arguments: [String]
+  ) throws -> (any ParsableCommand)?
 }
 
 @available(*, deprecated, renamed: "SwiftTUICommand")
@@ -100,6 +131,13 @@ extension SwiftTUICommand {
   ) throws -> any ParsableCommand {
     if let completionsCommand = try completionCommand(forRawArguments: arguments) {
       return completionsCommand
+    }
+
+    // Resolved after `completions` so a conformer's hook can never shadow it,
+    // and before `parseAsRoot` so a claimed verb is not first swallowed by the
+    // root's own positional.
+    if let subcommand = try swiftTUIRootSubcommand(forRawArguments: arguments) {
+      return subcommand
     }
 
     return try parseAsRoot(arguments)

@@ -27,14 +27,27 @@ extension App {
 
   /// Default entry point for batteries-included apps.
   public static func main() async {
+    var dispatched: (any ParsableCommand)?
     do {
       if usesStoredSwiftTUIOptions {
-        try await runParsedCommand()
+        try await runParsedCommand(dispatched: &dispatched)
       } else {
+        // An app with no stored `swiftTUIOptions` skips
+        // `parseSwiftTUIRootCommand` entirely, so its verb-dispatch hook would
+        // otherwise be silently ignored on this path. Consult it here too. The
+        // default hook returns nil, so this is a no-op for every app that
+        // declares none.
+        if var subcommand = try swiftTUIRootSubcommand(
+          forRawArguments: Array(CommandLine.arguments.dropFirst())
+        ) {
+          dispatched = subcommand
+          try subcommand.run()
+          return
+        }
         try await WebHostCLIRunner.run(Self.self)
       }
     } catch {
-      Self.exit(withError: error)
+      exitAttributingDispatchedSubcommand(error, dispatchedCommand: dispatched, root: Self.self)
     }
   }
 
@@ -66,8 +79,15 @@ extension App {
     }
   }
 
+  /// Resolves and runs the parsed command.
+  ///
+  /// Reports the dispatched subcommand through `dispatched` *before* running
+  /// it, not as a return value, so the caller's `catch` can attribute an error
+  /// thrown by `run()` to the command that threw it.
   @MainActor
-  private static func runParsedCommand() async throws {
+  private static func runParsedCommand(
+    dispatched: inout (any ParsableCommand)?
+  ) async throws {
     var command = try parseSwiftTUIRootCommand()
     if let script = completionScript(forParsedCommand: command) {
       writeToStandardOutput(script)
@@ -84,6 +104,10 @@ extension App {
       )
       return
     }
+    // Anything reaching here is not the root app: a verb the hook claimed, or
+    // swift-argument-parser's own help command. Record it so a failure from
+    // `run()` is rendered with that command's usage rather than the app's.
+    dispatched = command
     try command.run()
   }
 }

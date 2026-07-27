@@ -94,6 +94,7 @@ extension App where Self: SwiftTUICommand {
   /// Default entry point for apps that opt into both `SwiftTUICommand`
   /// argument parsing and the combined terminal/WebHost runner.
   public static func main() async {
+    var dispatched: (any ParsableCommand)?
     do {
       var command = try parseSwiftTUIRootCommand()
       if let script = completionScript(forParsedCommand: command) {
@@ -109,9 +110,13 @@ extension App where Self: SwiftTUICommand {
         try await appCommand.run()
         return
       }
+      // Not the root app: a verb the hook claimed, or swift-argument-parser's
+      // own help command. Record it before running so a failure is rendered
+      // with that command's usage rather than the app's.
+      dispatched = command
       try command.run()
     } catch {
-      exit(withError: error)
+      exitAttributingDispatchedSubcommand(error, dispatchedCommand: dispatched, root: Self.self)
     }
   }
 
