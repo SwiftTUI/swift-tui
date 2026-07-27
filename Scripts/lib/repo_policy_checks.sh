@@ -156,7 +156,7 @@ run_repo_policy_phase() {
     "./Scripts/check_test_sync_policies.sh" \
     ./Scripts/check_test_sync_policies.sh
 
-  if [ "${STUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
+  if [ "${SWIFTTUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
     skip_repo_policy_check \
       "$mode" \
       "Check public-API baseline" \

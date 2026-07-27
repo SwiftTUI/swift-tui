@@ -134,7 +134,7 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
   }
 
   private static func resolvedTaskCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_APP_SHELL_TASKS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_APP_SHELL_TASKS"),
       let parsed = Int(raw),
       parsed > 0
     else {

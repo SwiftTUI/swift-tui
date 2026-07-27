@@ -136,7 +136,7 @@ private struct PerfMeshGradientProbeView: View {
   }
 
   private var fillStyle: AnyShapeStyle {
-    if ProcessInfo.processInfo.environment["TERMUI_PERF_MESH_REFERENCE_LINEAR"] == "1" {
+    if ProcessInfo.processInfo.environment["SWIFTTUI_PERF_MESH_REFERENCE_LINEAR"] == "1" {
       return LinearGradient(
         colors: animated ? [.red, .cyan, .blue] : [.blue, .white, .red],
         startPoint: animated ? .topTrailing : .topLeading,

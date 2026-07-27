@@ -113,7 +113,7 @@ jobs:
           # coverage is green on these same runners. Tracked in
           # docs/KNOWN-TEST-FLAKES.md ("TermUIPerf app-shell scenario stall on
           # amd64 CI"); remove this skip when that entry is closed.
-          TERMUI_PERF_SMOKE_SKIP: "example-app-shell-workflow"
+          SWIFTTUI_PERF_SMOKE_SKIP: "example-app-shell-workflow"
         run: |
           set -euo pipefail
           swiftly run swift test --package-path Tools/TermUIPerf

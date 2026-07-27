@@ -351,7 +351,7 @@ package enum HostWireSchema {
     .init(
       "acceptsDeltaFrames",
       defaultValue: "false",
-      wasi: "env TUIGUI_SURFACE_DELTA",
+      wasi: "env SWIFTTUI_SURFACE_DELTA",
       webSocket: "caps record key acceptsDeltaFrames",
       android: "declareCapabilities key acceptsDeltaFrames"
     )

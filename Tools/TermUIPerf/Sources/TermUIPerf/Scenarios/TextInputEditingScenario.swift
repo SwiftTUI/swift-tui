@@ -15,7 +15,7 @@
 /// A `buf:<text>|` mirror line gives the driver a deterministic settle marker
 /// that is independent of the field's own cursor/style rendering. The static
 /// sibling-form row count is fixed by default (smoke-test friendly) but can be
-/// overridden with `TERMUI_PERF_TEXT_EDIT_TREE_ROWS` to show whether per-keystroke
+/// overridden with `SWIFTTUI_PERF_TEXT_EDIT_TREE_ROWS` to show whether per-keystroke
 /// cost scales with the surrounding form rather than the edited text.
 public struct TextInputEditingScenario: PerfScenario {
   public let name: PerfScenarioName = .textInputEditing
@@ -104,7 +104,7 @@ public struct TextInputEditingScenario: PerfScenario {
   }
 
   private static func resolvedTreeRows() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_TEXT_EDIT_TREE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_TEXT_EDIT_TREE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {

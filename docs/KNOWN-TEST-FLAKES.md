@@ -53,7 +53,7 @@ injected delays) — see issue #12 for the investigation and suspect seams.
 frame-tail worker immediately before the off-main overlay write, so a test can
 park the worker inside that window and race a concurrent main-actor read. Wired +
 ordering-guarded by `Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift`. To
-serialize a repro run, set `STUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--num-workers
+serialize a repro run, set `SWIFTTUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--num-workers
 1`). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
 semantics (worker copies-on-write its own box; the shared `_BoxStorage` is
 `Mutex`-guarded with atomic refcount).
@@ -365,7 +365,7 @@ named test actually fails, it is not this entry.
 **How to investigate / candidate hardening.** Split the runtime lane (it is
 the only step whose test count is an order of magnitude above its
 neighbours), or raise this step's budget specifically via
-`STUI_TEST_STEP_TIMEOUT_SECONDS` on the loaded lanes. A fix cannot be
+`SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS` on the loaded lanes. A fix cannot be
 validated on an idle developer machine — the 5× local margin means only a
 loaded runner exercises it.
 
@@ -399,7 +399,7 @@ Suspect window: the 2026-07-11 stress-campaign batch (presentation
 dispatch / recognizer adoption / hover re-root routing changes).
 
 **Quarantine.** The workflow sets
-`TERMUI_PERF_SMOKE_SKIP=example-app-shell-workflow` (consumed by
+`SWIFTTUI_PERF_SMOKE_SKIP=example-app-shell-workflow` (consumed by
 `ScenarioSmokeTests`); every other scenario stays covered on amd64, and the
 app-shell scenario stays covered on arm64/macOS. Remove the skip when this
 entry is closed.
@@ -407,7 +407,7 @@ entry is closed.
 **How to investigate.** Reproduce on an amd64 host (or emulation) with
 `swiftly run swift test --package-path Tools/TermUIPerf --filter
 ScenarioSmokeTests`; instrument with the run-loop hang diagnostics
-(`STUI_HANG_DIAGNOSTICS`) to capture where the loop parks after the
+(`SWIFTTUI_HANG_DIAGNOSTICS`) to capture where the loop parks after the
 close-menu click; bisect the 2026-07-11 window if it reproduces.
 2026-07-21 update: a Rosetta amd64 container (`docker run --platform
 linux/amd64 swift:6.3.1` with the tree rsync'd out) deterministically
@@ -589,7 +589,7 @@ sources of test flake:
   animation stamp and the scheduling gates included — not just readiness.
 - **No wall-clock budget assertions in the gate.** The one wall-clock
   blunder-detector (`RenderPipelineStructureTests.composedRenderTimeBudget`) is
-  opt-in behind `STUI_RUN_WALLCLOCK_PERF` and **skipped** by the repo gate; do
+  opt-in behind `SWIFTTUI_RUN_WALLCLOCK_PERF` and **skipped** by the repo gate; do
   not tighten its 2× multiplier. Timing-sensitive coverage instead uses
   hang-detection against the CI job timeout (e.g.
   `FrameSchedulerIntentCoalescingTests` waits on a far-future deadline) or

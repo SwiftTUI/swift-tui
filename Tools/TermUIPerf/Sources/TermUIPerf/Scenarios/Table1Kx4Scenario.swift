@@ -5,7 +5,7 @@
 /// auto-width columns exercise visible-window width discovery.
 ///
 /// A `sel:<tag>|` mirror line gives the driver a deterministic settle marker
-/// independent of row chrome. Row count is `TERMUI_PERF_TABLE_ROWS`-
+/// independent of row chrome. Row count is `SWIFTTUI_PERF_TABLE_ROWS`-
 /// overridable for scaling probes; the default stays at the scenario's named
 /// 1k so committed baselines mean what the name says.
 public struct Table1Kx4Scenario: PerfScenario {
@@ -58,7 +58,7 @@ public struct Table1Kx4Scenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_TABLE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_TABLE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -68,7 +68,7 @@ public struct Table1Kx4Scenario: PerfScenario {
   }
 
   private static func usesEagerBuilder() -> Bool {
-    environmentValue("TERMUI_PERF_COLLECTION_SOURCE_MODE") == "eager"
+    environmentValue("SWIFTTUI_PERF_COLLECTION_SOURCE_MODE") == "eager"
   }
 }
 

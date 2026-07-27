@@ -30,7 +30,7 @@ package enum WASITransportMode: Equatable, Sendable {
 package func resolveWASITransportMode(
   environmentValue: (String) -> String?
 ) -> WASITransportMode {
-  switch environmentValue("TUIGUI_TRANSPORT")?.lowercased() {
+  switch environmentValue("SWIFTTUI_TRANSPORT")?.lowercased() {
   case "ansi", "terminal", "xterm", "ghostty-web":
     return .ansi
   default:
@@ -41,7 +41,7 @@ package func resolveWASITransportMode(
 package func wasiSurfaceDeltaEnabled(
   environmentValue: (String) -> String?
 ) -> Bool {
-  switch environmentValue("TUIGUI_SURFACE_DELTA")?.lowercased() {
+  switch environmentValue("SWIFTTUI_SURFACE_DELTA")?.lowercased() {
   case "1", "true", "yes", "on":
     return true
   default:
@@ -51,11 +51,11 @@ package func wasiSurfaceDeltaEnabled(
 
 /// Resolves the WASI browser host's ``HostWireCapabilities`` from the
 /// environment — the WASI capability ingress, named so the manifest has a
-/// declaration site to point at. `TUIGUI_SURFACE_DELTA` is the pre-existing
+/// declaration site to point at. `SWIFTTUI_SURFACE_DELTA` is the pre-existing
 /// delta opt-in and is the whole declaration; an absent key keeps the
 /// default, which is today's bytes. See `HostWireSchema.capabilityMappings`.
 ///
-/// The retired `TUIGUI_SURFACE_MAX_VERSION` key used to override a declared
+/// The retired `SWIFTTUI_SURFACE_MAX_VERSION` key used to override a declared
 /// version ceiling. Capabilities are named feature bits now, so there is no
 /// ceiling to override: setting it has no effect.
 package func wasiHostWireCapabilities(
@@ -69,8 +69,8 @@ package func wasiHostWireCapabilities(
 package func wasiFrameDiagnosticsEnabled(
   environmentValue: (String) -> String?
 ) -> Bool {
-  parseDiagnosticsFlag(environmentValue("TUIGUI_FRAME_DIAGNOSTICS"))
-    ?? parseDiagnosticsFlag(environmentValue("TERMUI_DIAGNOSTICS"))
+  parseDiagnosticsFlag(environmentValue("SWIFTTUI_FRAME_DIAGNOSTICS"))
+    ?? parseDiagnosticsFlag(environmentValue("SWIFTTUI_DIAGNOSTICS"))
     ?? false
 }
 
@@ -253,7 +253,7 @@ public enum WASIRunner {
     }
 
     private static func wasiRenderStyle() -> TerminalRenderStyle? {
-      guard let encoded = environmentValue(named: "TUIGUI_RENDER_STYLE"),
+      guard let encoded = environmentValue(named: "SWIFTTUI_RENDER_STYLE"),
         !encoded.isEmpty
       else {
         return nil
@@ -263,11 +263,7 @@ public enum WASIRunner {
     }
 
     private static func wasiSceneSelector() -> String? {
-      if let selector = environmentValue(named: "TUIGUI_SCENE"), !selector.isEmpty {
-        return selector
-      }
-
-      if let selector = environmentValue(named: "WEBAPP_SCENE"), !selector.isEmpty {
+      if let selector = environmentValue(named: "SWIFTTUI_SCENE"), !selector.isEmpty {
         return selector
       }
 
@@ -278,15 +274,13 @@ public enum WASIRunner {
       let width = max(
         40,
         integerEnvironmentValue(named: "COLUMNS")
-          ?? integerEnvironmentValue(named: "TUIGUI_COLUMNS")
-          ?? integerEnvironmentValue(named: "WEBAPP_COLUMNS")
+          ?? integerEnvironmentValue(named: "SWIFTTUI_COLUMNS")
           ?? 120
       )
       let height = max(
         20,
         integerEnvironmentValue(named: "LINES")
-          ?? integerEnvironmentValue(named: "TUIGUI_ROWS")
-          ?? integerEnvironmentValue(named: "WEBAPP_ROWS")
+          ?? integerEnvironmentValue(named: "SWIFTTUI_ROWS")
           ?? 36
       )
 
@@ -296,7 +290,7 @@ public enum WASIRunner {
 }
 
 private func requestedManifestMode() -> Bool {
-  environmentValue(named: "TUIGUI_MODE") == "manifest"
+  environmentValue(named: "SWIFTTUI_MODE") == "manifest"
 }
 
 private func integerEnvironmentValue(

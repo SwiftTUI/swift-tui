@@ -44,7 +44,7 @@ for argument; do
   command_text="$command_text $argument"
 done
 
-export STUI_TEST_RUNNER_NAME=test-gate
-export STUI_TEST_COMMAND_TEXT="$command_text"
+export SWIFTTUI_TEST_RUNNER_NAME=test-gate
+export SWIFTTUI_TEST_COMMAND_TEXT="$command_text"
 
 exec sh "$repo_root/Scripts/test_all.sh" "$@"

@@ -7,7 +7,7 @@
 ///
 /// A `sel:<tag>|` mirror line gives the driver a deterministic settle marker
 /// for selection moves that is independent of row focus chrome. Row count is
-/// `TERMUI_PERF_LAZY_LIST_ROWS`-overridable for scaling probes. The default
+/// `SWIFTTUI_PERF_LAZY_LIST_ROWS`-overridable for scaling probes. The default
 /// is 1k because that is the largest scale HEAD can drive today: the Stage-0
 /// doubling probe measured total-CPU ratios of 2.39x (500->1k) and 2.89x
 /// (1k->2k) — a dominating quadratic term — and a 10k initial frame does not
@@ -125,7 +125,7 @@ public struct LazyList1KScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_LAZY_LIST_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_LAZY_LIST_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -135,7 +135,7 @@ public struct LazyList1KScenario: PerfScenario {
   }
 
   private static func usesEagerBuilder() -> Bool {
-    environmentValue("TERMUI_PERF_COLLECTION_SOURCE_MODE") == "eager"
+    environmentValue("SWIFTTUI_PERF_COLLECTION_SOURCE_MODE") == "eager"
   }
 }
 

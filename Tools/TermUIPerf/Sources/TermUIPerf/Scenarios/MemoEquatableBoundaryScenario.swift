@@ -7,7 +7,7 @@
 /// sits beside the counter as a descendant of that invalidated root — exactly
 /// the population the memo gate can reuse.
 ///
-/// The grid is presented one of two ways, selected by `TERMUI_PERF_MEMO_BOUNDARY`:
+/// The grid is presented one of two ways, selected by `SWIFTTUI_PERF_MEMO_BOUNDARY`:
 ///
 /// - `equatable` (default): the grid is an author `View & Equatable` struct
 ///   (`EquatableGrid`). The memo gate compares the boundary with a single `==`
@@ -22,7 +22,7 @@
 /// `equatable` mode should drop `resolve_ms` well below the gate-off baseline
 /// (cheap `==` + whole-subtree reuse); the `plain` mode should stay at/above
 /// baseline (blocked → recompute, plus the comparator's wasted work) — the
-/// Stage-2 finding in miniature. Grid size is `TERMUI_PERF_MEMO_GRID_ROWS`
+/// Stage-2 finding in miniature. Grid size is `SWIFTTUI_PERF_MEMO_GRID_ROWS`
 /// (default 18) × 8 columns.
 public struct MemoEquatableBoundaryScenario: PerfScenario {
   public let name: PerfScenarioName = .memoEquatableBoundary
@@ -80,7 +80,7 @@ public struct MemoEquatableBoundaryScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_MEMO_GRID_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_MEMO_GRID_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -90,7 +90,7 @@ public struct MemoEquatableBoundaryScenario: PerfScenario {
   }
 
   private static func resolvedUseEquatableBoundary() -> Bool {
-    guard let raw = environmentValue("TERMUI_PERF_MEMO_BOUNDARY") else {
+    guard let raw = environmentValue("SWIFTTUI_PERF_MEMO_BOUNDARY") else {
       return true
     }
     return raw != "plain"

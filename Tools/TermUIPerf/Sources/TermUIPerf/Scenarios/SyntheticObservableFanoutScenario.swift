@@ -26,9 +26,9 @@ import Observation
 /// the large body cost.
 ///
 /// Knobs:
-///   - `TERMUI_PERF_OBSERVABLE_ROWS` (default: 12)
-///   - `TERMUI_PERF_OBSERVABLE_COLUMNS` (default: 4)
-///   - `TERMUI_PERF_OBSERVABLE_SHAPE=fanout|bindable-fanout|large-body`
+///   - `SWIFTTUI_PERF_OBSERVABLE_ROWS` (default: 12)
+///   - `SWIFTTUI_PERF_OBSERVABLE_COLUMNS` (default: 4)
+///   - `SWIFTTUI_PERF_OBSERVABLE_SHAPE=fanout|bindable-fanout|large-body`
 ///     (default: fanout)
 public struct SyntheticObservableFanoutScenario: PerfScenario {
   public let name: PerfScenarioName = .syntheticObservableFanout
@@ -94,7 +94,7 @@ public struct SyntheticObservableFanoutScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_OBSERVABLE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_OBSERVABLE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -104,7 +104,7 @@ public struct SyntheticObservableFanoutScenario: PerfScenario {
   }
 
   private static func resolvedColumnCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_OBSERVABLE_COLUMNS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_OBSERVABLE_COLUMNS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -114,7 +114,7 @@ public struct SyntheticObservableFanoutScenario: PerfScenario {
   }
 
   private static func resolvedShape() -> PerfObservableFanoutShape {
-    PerfObservableFanoutShape(rawValue: environmentValue("TERMUI_PERF_OBSERVABLE_SHAPE") ?? "")
+    PerfObservableFanoutShape(rawValue: environmentValue("SWIFTTUI_PERF_OBSERVABLE_SHAPE") ?? "")
       ?? .fanout
   }
 }

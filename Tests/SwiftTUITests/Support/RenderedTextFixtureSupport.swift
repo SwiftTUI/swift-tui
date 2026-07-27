@@ -10,9 +10,9 @@ enum RenderedTextFixtureMode: Sendable {
   case record
   case verify
 
-  private static let recordEnvironmentVariable = "STUI_RECORD_RENDERED_TEXT_FIXTURES"
+  private static let recordEnvironmentVariable = "SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES"
   private static let recordScriptEnvironmentVariable =
-    "STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT"
+    "SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT"
   static let recordCommand = "Scripts/record_rendered_text_fixtures.sh"
 
   var isRecording: Bool {

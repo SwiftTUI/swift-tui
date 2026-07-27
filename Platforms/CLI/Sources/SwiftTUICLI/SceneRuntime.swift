@@ -218,7 +218,7 @@ final class SceneRuntime {
   }
 
   /// Returns a diagnostics output file path when debug instrumentation or the
-  /// legacy `TERMUI_DIAGNOSTICS` environment variable is enabled.
+  /// `SWIFTTUI_DIAGNOSTICS` environment variable is enabled.
   ///
   /// A value of `1` or `true` writes to `/tmp/termui-diagnostics.tsv`; any
   /// other truthy value is treated as a custom file path. `--debug` /
@@ -228,7 +228,7 @@ final class SceneRuntime {
     configuration: RuntimeConfiguration,
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> String? {
-    if let string = environment["TERMUI_DIAGNOSTICS"],
+    if let string = environment["SWIFTTUI_DIAGNOSTICS"],
       let path = diagnosticsFilePath(from: string)
     {
       return path

@@ -10,6 +10,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- **Environment variables now use the single `SWIFTTUI_*` namespace.**
+  Framework, host-wire, performance, fixture, and test-harness controls that
+  previously used shorter or legacy project prefixes have been renamed without
+  compatibility aliases.
 - **Radial gradients now fall off in circles.** `RadialGradient` measured
   distance in raw cell space, so a gradient that was circular in cells painted
   as a roughly 2:1 vertical ellipse on screen. The sampler now scales vertical
@@ -126,7 +130,7 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 - **WebHost browser bundle re-vendored at `swift-tui-web` 0.1.11.** No
   Swift source changes. The bundle's `BrowserWASIBridge` now defaults
-  browser sessions to `TERMUI_RENDER_MODE=async-no-cancel` (engine-blind,
+  browser sessions to `SWIFTTUI_RENDER_MODE=async-no-cancel` (engine-blind,
   both execution modes): completed-frame disposal under supersession —
   not transport publication — was the 0.1.9 live coalescing, and
   ordered commits lift deployed Life distinct-generation coverage

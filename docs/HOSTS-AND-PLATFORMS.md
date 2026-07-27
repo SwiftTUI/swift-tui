@@ -91,14 +91,14 @@ flowchart LR
 `HostedRasterSurface` consumes a raster surface; `WebSocketSurfaceTransport`
 serializes the `web-surface` wire frame for the browser. Full frames are wire
 v1 (base) or v2 (sequence/accessibility/scroll fields); when delta emission is
-enabled (`TUIGUI_SURFACE_DELTA`, which the browser WASI bridge sets) and a
+enabled (`SWIFTTUI_SURFACE_DELTA`, which the browser WASI bridge sets) and a
 raster damage diff exists, steady-state frames ship as v3 `deltaRows` patches
 against the previously presented surface instead. Each transport conforms to
 the host-frame surface protocols rather than reaching into the renderer.
 
 Hosts declare wire capabilities before frames flow, carried by one Swift-side
 currency (`HostWireCapabilities`) with one ingress per transport: WASI resolves
-the `TUIGUI_SURFACE_DELTA` / `TUIGUI_SURFACE_MAX_VERSION` environment keys at
+the `SWIFTTUI_SURFACE_DELTA` / `SWIFTTUI_SURFACE_MAX_VERSION` environment keys at
 transport construction, the browser WebSocket client sends a one-shot
 `caps:{json}` control record after open, and the Android host calls
 `declareCapabilities` before scene start. Absence of a declaration keeps the

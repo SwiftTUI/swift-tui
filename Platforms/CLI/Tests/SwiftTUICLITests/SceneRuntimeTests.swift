@@ -29,22 +29,22 @@ struct SceneRuntimeTests {
       ) == nil)
   }
 
-  @Test("TERMUI_DIAGNOSTICS custom path still controls diagnostics output")
+  @Test("SWIFTTUI_DIAGNOSTICS custom path still controls diagnostics output")
   func termuiDiagnosticsCustomPathControlsDiagnosticsOutput() {
     #expect(
       SceneRuntime.diagnosticsFilePath(
         configuration: .init(debug: true),
-        environment: ["TERMUI_DIAGNOSTICS": "/tmp/custom-swifttui.tsv"]
+        environment: ["SWIFTTUI_DIAGNOSTICS": "/tmp/custom-swifttui.tsv"]
       ) == "/tmp/custom-swifttui.tsv")
     #expect(
       SceneRuntime.diagnosticsFilePath(
         configuration: .default,
-        environment: ["TERMUI_DIAGNOSTICS": "yes"]
+        environment: ["SWIFTTUI_DIAGNOSTICS": "yes"]
       ) == "/tmp/termui-diagnostics.tsv")
     #expect(
       SceneRuntime.diagnosticsFilePath(
         configuration: .default,
-        environment: ["TERMUI_DIAGNOSTICS": "0"]
+        environment: ["SWIFTTUI_DIAGNOSTICS": "0"]
       ) == nil)
   }
 

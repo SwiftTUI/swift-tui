@@ -9,7 +9,7 @@
 /// drives wheel bursts that move the VIEWPORT — not a selection binding, the
 /// List-scenario trap — so window-shift work is exercised directly.
 ///
-/// Row count is `TERMUI_PERF_LAZY_VSTACK_ROWS`-overridable for scaling
+/// Row count is `SWIFTTUI_PERF_LAZY_VSTACK_ROWS`-overridable for scaling
 /// probes. The default is 10k — the Stage-2 exit criterion, flipped when
 /// windowed measurement landed: the pre-windowing HEAD could not present a
 /// 10k first frame within 120 seconds; the windowed pipeline completes the
@@ -100,7 +100,7 @@ public struct LazyVStackScrollScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_LAZY_VSTACK_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_LAZY_VSTACK_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {

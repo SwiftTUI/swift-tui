@@ -4,9 +4,9 @@ set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 
-iterations=${STUI_ASYNC_FLAKE_ITERATIONS:-2}
-load_workers=${STUI_ASYNC_FLAKE_LOAD_WORKERS:-0}
-output_root=${STUI_ASYNC_FLAKE_OUTPUT_ROOT:-/tmp}
+iterations=${SWIFTTUI_ASYNC_FLAKE_ITERATIONS:-2}
+load_workers=${SWIFTTUI_ASYNC_FLAKE_LOAD_WORKERS:-0}
+output_root=${SWIFTTUI_ASYNC_FLAKE_OUTPUT_ROOT:-/tmp}
 allow_failures=0
 
 usage() {
@@ -24,9 +24,9 @@ Options:
   -h, --help           Show this help
 
 Environment:
-  STUI_ASYNC_FLAKE_ITERATIONS
-  STUI_ASYNC_FLAKE_LOAD_WORKERS
-  STUI_ASYNC_FLAKE_OUTPUT_ROOT
+  SWIFTTUI_ASYNC_FLAKE_ITERATIONS
+  SWIFTTUI_ASYNC_FLAKE_LOAD_WORKERS
+  SWIFTTUI_ASYNC_FLAKE_OUTPUT_ROOT
   SWIFTTUI_TEST_TIMEOUT_SCALE
 EOF
 }

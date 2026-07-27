@@ -18,7 +18,7 @@
 /// This is the canvas analogue of ``SyntheticNarrowInvalidationScenario``: the
 /// click invalidates only the `CounterControl`, so the grid and Canvas are both
 /// disjoint from the invalidation. The grid row count is overridable with
-/// `TERMUI_PERF_CANVAS_REUSE_TREE_ROWS` to sweep tree sizes and show the saved
+/// `SWIFTTUI_PERF_CANVAS_REUSE_TREE_ROWS` to sweep tree sizes and show the saved
 /// draw/semantic extraction scaling with the reusable subtree size.
 public struct CanvasPartialReuseScenario: PerfScenario {
   public let name: PerfScenarioName = .canvasPartialReuse
@@ -76,7 +76,7 @@ public struct CanvasPartialReuseScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_CANVAS_REUSE_TREE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_CANVAS_REUSE_TREE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {

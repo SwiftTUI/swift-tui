@@ -14,8 +14,8 @@
 /// in the 2026-06-16 perf signal representativeness pass.
 ///
 /// Column and per-column row counts are fixed by default (smoke-test friendly)
-/// but can be overridden with `TERMUI_PERF_BROWSER_COLUMNS` and
-/// `TERMUI_PERF_BROWSER_ROWS` to sweep the static-tree size and show whether the
+/// but can be overridden with `SWIFTTUI_PERF_BROWSER_COLUMNS` and
+/// `SWIFTTUI_PERF_BROWSER_ROWS` to sweep the static-tree size and show whether the
 /// per-move cost scales with the columns that are *not* changing.
 public struct FileBrowserSelectionScenario: PerfScenario {
   public let name: PerfScenarioName = .fileBrowserSelection
@@ -79,11 +79,11 @@ public struct FileBrowserSelectionScenario: PerfScenario {
   }
 
   private static func resolvedColumnCount() -> Int {
-    resolvedPositiveInt("TERMUI_PERF_BROWSER_COLUMNS", default: defaultColumnCount)
+    resolvedPositiveInt("SWIFTTUI_PERF_BROWSER_COLUMNS", default: defaultColumnCount)
   }
 
   private static func resolvedRowsPerColumn() -> Int {
-    resolvedPositiveInt("TERMUI_PERF_BROWSER_ROWS", default: defaultRowsPerColumn)
+    resolvedPositiveInt("SWIFTTUI_PERF_BROWSER_ROWS", default: defaultRowsPerColumn)
   }
 
   private static func resolvedPositiveInt(_ key: String, default fallback: Int) -> Int {

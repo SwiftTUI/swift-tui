@@ -37,7 +37,7 @@ import Testing
 ///   4. PASS criterion = process survival; a repro is a `SIGSEGV`/`SIGBUS`. Run
 ///      in **release/optimized** mode under
 ///      `Scripts/repeat_async_flake_registry.sh` with
-///      `STUI_SWIFT_TEST_SERIALIZED=1`.
+///      `SWIFTTUI_SWIFT_TEST_SERIALIZED=1`.
 ///
 /// Open question the experiment settles empirically: whether `Boxed`'s
 /// copy-on-write (`isKnownUniquelyReferenced` + non-atomic `_storage` store,

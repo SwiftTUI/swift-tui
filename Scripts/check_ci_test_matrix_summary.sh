@@ -20,9 +20,9 @@ golden_file=$tmp_dir/golden.md
 mkdir -p "$results_dir"
 
 cat >"$expected_file" <<'EOF'
-linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-macos|macOS repo gate|macOS|-|macos-26|STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+macos|macOS repo gate|macOS|-|macos-26|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
 EOF
 
 cat >"$results_dir/linux-amd64.result" <<'EOF'
@@ -42,9 +42,9 @@ cat >"$golden_file" <<'EOF'
 
 | Lane | Platform | Arch | Runner | Result | Duration | Command |
 | --- | --- | --- | --- | --- | --- | --- |
-| Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | 14m 0s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
-| Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | 1m 5s | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
-| macOS repo gate | macOS | - | macos-26 | success | - | `STUI_SKIP_PUBLIC_API_BASELINE=1 STUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | 14m 0s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | 1m 5s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| macOS repo gate | macOS | - | macos-26 | success | - | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
 
 Overall result: failure (2 success, 1 failure)
 EOF

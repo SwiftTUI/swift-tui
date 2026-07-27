@@ -9,7 +9,7 @@ struct ScenarioSmokeTests {
   /// docs/KNOWN-TEST-FLAKES.md for the active entries; every skip must map to
   /// a register entry with its reproduction evidence.
   private static var quarantinedScenarioNames: Set<String> {
-    guard let raw = ProcessInfo.processInfo.environment["TERMUI_PERF_SMOKE_SKIP"] else {
+    guard let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PERF_SMOKE_SKIP"] else {
       return []
     }
     return Set(
@@ -24,13 +24,13 @@ struct ScenarioSmokeTests {
     // The collection baselines default to their measurement scale (1k rows —
     // seconds per frame in debug by design); pin the smoke sweep to a small
     // tree so this test stays a wiring check, not a benchmark.
-    setenv("TERMUI_PERF_LAZY_LIST_ROWS", "120", 1)
-    setenv("TERMUI_PERF_TABLE_ROWS", "120", 1)
-    setenv("TERMUI_PERF_LAZY_VSTACK_ROWS", "200", 1)
+    setenv("SWIFTTUI_PERF_LAZY_LIST_ROWS", "120", 1)
+    setenv("SWIFTTUI_PERF_TABLE_ROWS", "120", 1)
+    setenv("SWIFTTUI_PERF_LAZY_VSTACK_ROWS", "200", 1)
     defer {
-      unsetenv("TERMUI_PERF_LAZY_LIST_ROWS")
-      unsetenv("TERMUI_PERF_TABLE_ROWS")
-      unsetenv("TERMUI_PERF_LAZY_VSTACK_ROWS")
+      unsetenv("SWIFTTUI_PERF_LAZY_LIST_ROWS")
+      unsetenv("SWIFTTUI_PERF_TABLE_ROWS")
+      unsetenv("SWIFTTUI_PERF_LAZY_VSTACK_ROWS")
     }
     let artifactRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("termui-perf-scenarios-\(UUID().uuidString)", isDirectory: true)

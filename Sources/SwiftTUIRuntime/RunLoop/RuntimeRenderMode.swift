@@ -17,7 +17,7 @@ public enum RuntimeRenderMode: String, Sendable {
   case asyncNoCancel = "async-no-cancel"
   case asyncNoDrop = "async-no-drop"
 
-  public static let environmentVariableName = "TERMUI_RENDER_MODE"
+  public static let environmentVariableName = "SWIFTTUI_RENDER_MODE"
   public static let defaultMode: Self = .async
 
   public static func parse(_ rawValue: String?) -> Self {

@@ -71,7 +71,7 @@ refuses a package that uses unsafe flags as a versioned dependency outright.
 Never promote the setting to unconditional; add it to a gate lane instead.
 
 The repo gate also has a command-level watchdog around every sub-suite. By
-default, `STUI_TEST_STEP_TIMEOUT_SECONDS=1200`; set it to `0` only for local
+default, `SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS=1200`; set it to `0` only for local
 diagnosis when you intentionally want an unbounded run. On timeout, the runner
 prints the captured sub-suite log and exits immediately so later suites do not
 keep spending CI minutes.
@@ -147,7 +147,7 @@ own `Fixtures/Transport/`, and `swift-tui-android` mirrors
 `//:transport_fixture_sync` gate byte-compares every mirrored copy, so a
 wire-contract change here goes red in org CI until the sibling copies are
 re-synced. The two `*-totality.*` fixtures are generated — re-run their pin
-tests with `STUI_REGENERATE_TRANSPORT_FIXTURES=1` after an intentional wire
+tests with `SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1` after an intentional wire
 change, copy the results to the sibling repos, and commit all sides. The
 hand-authored fixtures (`web-surface-basic/styled`, terminal style) are edited
 in place and copied the same way.

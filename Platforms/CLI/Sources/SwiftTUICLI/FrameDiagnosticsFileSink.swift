@@ -7,7 +7,7 @@
 #endif
 
 /// Writes per-frame diagnostics as tab-separated values to a file, for the
-/// CLI's `TERMUI_DIAGNOSTICS` / `--debug` instrumentation. It derives the rich
+/// CLI's `SWIFTTUI_DIAGNOSTICS` / `--debug` instrumentation. It derives the rich
 /// record from the runtime's neutral ``RuntimeFrameSample`` and reuses the
 /// shared TSV formatting, so the runtime carries no diagnostics logger of its
 /// own. Apps that want richer profiling use `SwiftTUIProfiling`'s `.profiling()`.

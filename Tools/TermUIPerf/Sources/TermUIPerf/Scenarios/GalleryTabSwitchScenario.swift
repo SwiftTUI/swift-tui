@@ -15,8 +15,8 @@
 /// The switch sequence revisits earlier tabs so reuse of an already-built tab
 /// body can be observed (`resolved_reused`). The per-tab content row count is
 /// fixed by default (smoke-test friendly) but can be overridden with
-/// `TERMUI_PERF_TAB_SWITCH_CONTENT_ROWS` to sweep content size, and the tab
-/// count with `TERMUI_PERF_TAB_SWITCH_TABS`.
+/// `SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS` to sweep content size, and the tab
+/// count with `SWIFTTUI_PERF_TAB_SWITCH_TABS`.
 public struct GalleryTabSwitchScenario: PerfScenario {
   public let name: PerfScenarioName = .galleryTabSwitch
   public let defaultTerminalSize = PerfTerminalSize(columns: 100, rows: 36)
@@ -77,11 +77,11 @@ public struct GalleryTabSwitchScenario: PerfScenario {
   }
 
   private static func resolvedTabCount() -> Int {
-    resolvedPositiveInt("TERMUI_PERF_TAB_SWITCH_TABS", default: defaultTabCount)
+    resolvedPositiveInt("SWIFTTUI_PERF_TAB_SWITCH_TABS", default: defaultTabCount)
   }
 
   private static func resolvedContentRows() -> Int {
-    resolvedPositiveInt("TERMUI_PERF_TAB_SWITCH_CONTENT_ROWS", default: defaultContentRows)
+    resolvedPositiveInt("SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS", default: defaultContentRows)
   }
 
   private static func resolvedPositiveInt(_ key: String, default fallback: Int) -> Int {

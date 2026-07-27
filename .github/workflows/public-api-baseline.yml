@@ -138,7 +138,7 @@ jobs:
       - name: Check public API baseline
         shell: bash
         env:
-          STUI_PUBLIC_API_SWIFT_JOBS: "4"
+          SWIFTTUI_PUBLIC_API_SWIFT_JOBS: "4"
         run: |
           set -euo pipefail
           Scripts/generate_public_api_inventory.sh --check

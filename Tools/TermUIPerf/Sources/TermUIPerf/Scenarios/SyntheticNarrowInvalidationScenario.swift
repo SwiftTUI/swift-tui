@@ -18,7 +18,7 @@
 /// active-animation state; see the H2/H3 findings report.
 ///
 /// The static-grid row count is fixed by default (smoke-test friendly) but can be
-/// overridden with `TERMUI_PERF_INVALIDATION_TREE_ROWS` to sweep tree sizes and
+/// overridden with `SWIFTTUI_PERF_INVALIDATION_TREE_ROWS` to sweep tree sizes and
 /// show whether `resolve_ms` scales with the grid.
 public struct SyntheticNarrowInvalidationScenario: PerfScenario {
   public let name: PerfScenarioName = .syntheticNarrowInvalidation
@@ -74,7 +74,7 @@ public struct SyntheticNarrowInvalidationScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_INVALIDATION_TREE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_INVALIDATION_TREE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {

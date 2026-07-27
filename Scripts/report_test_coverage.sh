@@ -36,8 +36,8 @@ else
   echo "Line coverage: unavailable in SwiftPM coverage JSON"
 fi
 
-if [ -n "${STUI_COVERAGE_ARTIFACT_PATH:-}" ]; then
-  artifact_path=$STUI_COVERAGE_ARTIFACT_PATH
+if [ -n "${SWIFTTUI_COVERAGE_ARTIFACT_PATH:-}" ]; then
+  artifact_path=$SWIFTTUI_COVERAGE_ARTIFACT_PATH
   artifact_dir=$(dirname "$artifact_path")
   mkdir -p "$artifact_dir"
   cp "$coverage_json" "$artifact_path"

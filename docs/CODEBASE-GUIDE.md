@@ -863,7 +863,7 @@ two transports differ **only in where the bytes go**:
 
 - **WASI** (`WebSurfaceTransport`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift:147`) writes to a
   stdout file descriptor — the statically-linked `wasm32-wasi` bundle. `WASIRunner`
-  (`WASIRunner.swift:80`) also has a *manifest mode* (`TUIGUI_MODE=manifest`) that
+  (`WASIRunner.swift:80`) also has a *manifest mode* (`SWIFTTUI_MODE=manifest`) that
   prints the `SceneManifest` JSON without running, so a static site can enumerate an
   app's scenes ahead of time.
 - **WebHost** (`WebSocketSurfaceTransport`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift:142`)

@@ -230,7 +230,7 @@ struct WebSurfaceWireTotalityTests {
     // copy, and the coordination root's transport_fixture_sync gate keeps the
     // copies in lockstep — so this pin is what makes an encoder change
     // propagate loudly to the sibling repo instead of silently drifting.
-    // Regenerate with STUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
+    // Regenerate with SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
     // sync flow described in docs/DEVELOPMENT.md.
     var knownImageIDs: Set<String> = []
     let encoded = WebSurfaceFrameEncoder.encode(
@@ -243,7 +243,7 @@ struct WebSurfaceWireTotalityTests {
     )
     let url = Self.fixtureURL("web-surface-totality.txt")
 
-    if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+    if ProcessInfo.processInfo.environment["SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
       try encoded
         .replacingOccurrences(of: "\u{001E}", with: "\\u001E")
         .write(to: url, atomically: true, encoding: .utf8)
@@ -262,7 +262,7 @@ struct WebSurfaceWireTotalityTests {
     // (stable `blend:png:` content-hash ID, blended bytes, visible bounds).
     // swift-tui-web parses a byte-identical copy and the coordination root's
     // transport_fixture_sync gate keeps the copies in lockstep. Regenerate
-    // with STUI_REGENERATE_TRANSPORT_FIXTURES=1.
+    // with SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1.
     let encoded = WebSurfaceFrameEncoder.encode(Self.compositedImageFrame())
 
     // Red-proof that the pre-blend path engaged: a compositing-tagged
@@ -275,7 +275,7 @@ struct WebSurfaceWireTotalityTests {
     #expect(images.first?["dataBase64"] != nil)
 
     let url = Self.fixtureURL("web-surface-composited-image.txt")
-    if ProcessInfo.processInfo.environment["STUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+    if ProcessInfo.processInfo.environment["SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
       try encoded
         .replacingOccurrences(of: "\u{001E}", with: "\\u001E")
         .write(to: url, atomically: true, encoding: .utf8)

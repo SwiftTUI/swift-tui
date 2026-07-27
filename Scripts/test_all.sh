@@ -5,9 +5,9 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
-runner_name=${STUI_TEST_RUNNER_NAME:-test-all}
-step_timeout_seconds=${STUI_TEST_STEP_TIMEOUT_SECONDS:-1200}
-step_timeout_kill_grace_seconds=${STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
+runner_name=${SWIFTTUI_TEST_RUNNER_NAME:-test-all}
+step_timeout_seconds=${SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS:-1200}
+step_timeout_kill_grace_seconds=${SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
 
 write_full_log_report() {
   body_log=$1
@@ -73,14 +73,14 @@ write_full_log_report() {
   rm -f "$marker_file"
 }
 
-if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
+if [ "${SWIFTTUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
   timestamp=$(date '+%Y%m%d-%H%M%S')
   full_log_path="/tmp/swift-tui-$runner_name-$timestamp-$$.log"
   body_log=$(mktemp "/tmp/swift-tui-$runner_name-body.XXXXXX")
   status_file=$(mktemp "/tmp/swift-tui-$runner_name-status.XXXXXX")
   results_report=$(mktemp "/tmp/swift-tui-$runner_name-results.XXXXXX")
-  if [ -n "${STUI_TEST_COMMAND_TEXT:-}" ]; then
-    command_text=$STUI_TEST_COMMAND_TEXT
+  if [ -n "${SWIFTTUI_TEST_COMMAND_TEXT:-}" ]; then
+    command_text=$SWIFTTUI_TEST_COMMAND_TEXT
   else
     command_text="sh $0"
 
@@ -98,9 +98,9 @@ if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
   : >"$full_log_path"
   : >"$results_report"
 
-  export STUI_TEST_ALL_CAPTURED=1
-  export STUI_TEST_ALL_FINAL_LOG=$full_log_path
-  export STUI_TEST_ALL_RESULTS_REPORT=$results_report
+  export SWIFTTUI_TEST_ALL_CAPTURED=1
+  export SWIFTTUI_TEST_ALL_FINAL_LOG=$full_log_path
+  export SWIFTTUI_TEST_ALL_RESULTS_REPORT=$results_report
 
   (
     set +e
@@ -133,8 +133,8 @@ step_index=0
 
 for name in \
   PARALLEL_RECORD_RENDERED_FIXTURES \
-  STUI_RECORD_RENDERED_TEXT_FIXTURES \
-  STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
+  SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES \
+  SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
   eval "is_set=\${$name+x}"
   if [ -n "$is_set" ]; then
     >&2 echo "$name must not be set when running the repo gate."
@@ -151,8 +151,8 @@ any_failed=0
 : >"$results_file"
 
 cleanup() {
-  if [ -n "${STUI_TEST_ALL_RESULTS_REPORT:-}" ] && [ -f "$results_file" ]; then
-    cp "$results_file" "$STUI_TEST_ALL_RESULTS_REPORT" || true
+  if [ -n "${SWIFTTUI_TEST_ALL_RESULTS_REPORT:-}" ] && [ -f "$results_file" ]; then
+    cp "$results_file" "$SWIFTTUI_TEST_ALL_RESULTS_REPORT" || true
   fi
   rm -rf "$log_root"
 }
@@ -212,17 +212,17 @@ across that package boundary can leave a stale object linked against a
 since-changed symbol. --clean trades a from-scratch rebuild for a run that
 cannot be tripped by that staleness.
 
-Each step is bounded by STUI_TEST_STEP_TIMEOUT_SECONDS, defaulting to 1200
+Each step is bounded by SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS, defaulting to 1200
 seconds. Set it to 0 to disable the per-step watchdog for local diagnosis.
 After a timeout, the runner sends SIGTERM to the step's process tree, waits
-STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS seconds, then sends SIGKILL before
+SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS seconds, then sends SIGKILL before
 printing the captured log and failing the gate.
 
 For the curated repo gate, use Scripts/test_gate.sh. That runner keeps the same
 post-split non-example surface and writes a shorter test-gate log name.
 
-Set STUI_SKIP_PUBLIC_API_BASELINE=1 when the public API baseline is covered by
-the separate CI workflow. Set STUI_SKIP_TERMUIPERF=1 when Tools/TermUIPerf is
+Set SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 when the public API baseline is covered by
+the separate CI workflow. Set SWIFTTUI_SKIP_TERMUIPERF=1 when Tools/TermUIPerf is
 covered by its path-filtered or scheduled workflow.
 EOF
 }
@@ -264,12 +264,12 @@ is_non_negative_integer() {
 
 validate_timeout_configuration() {
   if ! is_non_negative_integer "$step_timeout_seconds"; then
-    >&2 echo "STUI_TEST_STEP_TIMEOUT_SECONDS must be a non-negative integer."
+    >&2 echo "SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS must be a non-negative integer."
     exit 1
   fi
 
   if ! is_non_negative_integer "$step_timeout_kill_grace_seconds"; then
-    >&2 echo "STUI_TEST_TIMEOUT_KILL_GRACE_SECONDS must be a non-negative integer."
+    >&2 echo "SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS must be a non-negative integer."
     exit 1
   fi
 }
@@ -319,7 +319,7 @@ descendant_pids() {
   done
 }
 
-# Pre-kill hang diagnostics (STUI_HANG_DIAGNOSTICS=1): when the step watchdog
+# Pre-kill hang diagnostics (SWIFTTUI_HANG_DIAGNOSTICS=1): when the step watchdog
 # fires, capture per-thread kernel wait channels and full thread backtraces of
 # the test-runner processes BEFORE terminating them, so a wedged step leaves
 # evidence of WHAT it was blocked on instead of just "timed out". Linux-only
@@ -327,7 +327,7 @@ descendant_pids() {
 dump_hang_diagnostics() {
   root_pid=$1
 
-  [ "${STUI_HANG_DIAGNOSTICS:-0}" = "1" ] || return 0
+  [ "${SWIFTTUI_HANG_DIAGNOSTICS:-0}" = "1" ] || return 0
 
   pid_list=$root_pid
   for pid in $(descendant_pids "$root_pid"); do
@@ -535,15 +535,15 @@ run_swift() {
   # default off, so the gate's behaviour is unchanged unless an operator sets
   # them deliberately (e.g. to bisect a load-sensitive flake such as the
   # run-loop SIGSEGV in docs/KNOWN-TEST-FLAKES.md):
-  #   STUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
-  #   STUI_SWIFT_TEST_SERIALIZED — run tests serially (--num-workers 1) so a
+  #   SWIFTTUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
+  #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--num-workers 1) so a
   #     timing-dependent interleaving is reproducible/bisectable rather than
   #     racing across parallel workers.
   if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
-    if [ -n "${STUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
-      set -- "$@" --skip "$STUI_SWIFT_TEST_SKIP_REGEX"
+    if [ -n "${SWIFTTUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
+      set -- "$@" --skip "$SWIFTTUI_SWIFT_TEST_SKIP_REGEX"
     fi
-    if [ -n "${STUI_SWIFT_TEST_SERIALIZED:-}" ]; then
+    if [ -n "${SWIFTTUI_SWIFT_TEST_SERIALIZED:-}" ]; then
       set -- "$@" --num-workers 1
     fi
   fi
@@ -718,8 +718,8 @@ check_bun_environment() {
 check_fixture_recording_environment_disabled() {
   for name in \
     PARALLEL_RECORD_RENDERED_FIXTURES \
-    STUI_RECORD_RENDERED_TEXT_FIXTURES \
-    STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
+    SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES \
+    SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
     eval "is_set=\${$name+x}"
     if [ -n "$is_set" ]; then
       >&2 echo "$name must not be set when running the repo gate."
@@ -793,8 +793,8 @@ print_summary() {
     esac
   done <"$results_file"
 
-  if [ -n "${STUI_TEST_ALL_FINAL_LOG:-}" ]; then
-    echo "Full log: $STUI_TEST_ALL_FINAL_LOG"
+  if [ -n "${SWIFTTUI_TEST_ALL_FINAL_LOG:-}" ]; then
+    echo "Full log: $SWIFTTUI_TEST_ALL_FINAL_LOG"
   fi
 
   if [ "$any_failed" -eq 0 ]; then
@@ -826,7 +826,7 @@ run_function_step \
 
 run_function_step \
   "Check rendered fixture recording is disabled" \
-  "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|STUI_RECORD_RENDERED_TEXT_FIXTURES|STUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
+  "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES|SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
   check_fixture_recording_environment_disabled
 
 if [ "$clean_builds" -eq 1 ]; then
@@ -1029,7 +1029,7 @@ run_function_step \
   "$(swift_command_text test --filter SwiftTUIVendorPNGTests)" \
   run_swift test --filter SwiftTUIVendorPNGTests
 
-if [ "${STUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
+if [ "${SWIFTTUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
   skip_step \
     "Run Tools/TermUIPerf tests" \
     "covered by the separate TermUIPerf workflow"

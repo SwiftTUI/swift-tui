@@ -12,7 +12,7 @@
 /// pure waste.
 ///
 /// The background grid row count is fixed by default (smoke-test friendly) but
-/// can be swept with `TERMUI_PERF_SHEET_TREE_ROWS` to show whether the
+/// can be swept with `SWIFTTUI_PERF_SHEET_TREE_ROWS` to show whether the
 /// transition-frame `raster_ms`, `present_cells`, and `damage_rows` scale with
 /// the background/surface size.
 ///
@@ -137,7 +137,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
   }
 
   private static func resolvedRowCount() -> Int {
-    guard let raw = environmentValue("TERMUI_PERF_SHEET_TREE_ROWS"),
+    guard let raw = environmentValue("SWIFTTUI_PERF_SHEET_TREE_ROWS"),
       let parsed = Int(raw),
       parsed > 0
     else {
@@ -150,21 +150,21 @@ public struct SheetOpenLatencyScenario: PerfScenario {
     // `palette` (dropdown, fill-available — the user's reported case) is the
     // default; `popover` is a compact intrinsic-sized overlay that exercises the
     // regime where incremental raster reuse wins large.
-    environmentValue("TERMUI_PERF_SHEET_OVERLAY") == "popover" ? .popover : .palette
+    environmentValue("SWIFTTUI_PERF_SHEET_OVERLAY") == "popover" ? .popover : .palette
   }
 
-  // THROWAWAY SPIKE knob (TERMUI_PERF_SHEET_SPIKE=1): replace the standard
+  // THROWAWAY SPIKE knob (SWIFTTUI_PERF_SHEET_SPIKE=1): replace the standard
   // `.sheet`/`.paletteSheet` (which makes the background a DESCENDANT of the
   // @State owner) with an "ideal" structure where the toggle @State is owned by
   // a SIBLING of the background. Tests the hypothesis that, with the toggle
   // owned off the background's ancestor chain, the existing reuse machinery
-  // spares the background and resolve_ms goes flat across TERMUI_PERF_SHEET_TREE_ROWS.
+  // spares the background and resolve_ms goes flat across SWIFTTUI_PERF_SHEET_TREE_ROWS.
   private static func resolvedSpikeMode() -> Bool {
-    guard let raw = environmentValue("TERMUI_PERF_SHEET_SPIKE") else { return false }
+    guard let raw = environmentValue("SWIFTTUI_PERF_SHEET_SPIKE") else { return false }
     return !raw.isEmpty && raw != "0"
   }
 
-  // De-amplified calibration knob (TERMUI_PERF_SHEET_TRIGGER=sibling): keep the
+  // De-amplified calibration knob (SWIFTTUI_PERF_SHEET_TRIGGER=sibling): keep the
   // REAL `.sheet`/`.paletteSheet` presentation (unlike the SPIKE knob, which
   // bypasses it), but host the open-sheet trigger in a container that is a
   // SIBLING of the background grid instead of co-located inside it. The
@@ -174,7 +174,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
   // default vs sibling calibrates how much of the settle-frame recompute is
   // scenario amplification vs real-world cost.
   private static func resolvedSiblingTriggerMode() -> Bool {
-    environmentValue("TERMUI_PERF_SHEET_TRIGGER") == "sibling"
+    environmentValue("SWIFTTUI_PERF_SHEET_TRIGGER") == "sibling"
   }
 }
 
