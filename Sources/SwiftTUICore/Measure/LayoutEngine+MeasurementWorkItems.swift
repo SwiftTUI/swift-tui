@@ -1,4 +1,14 @@
-enum MeasurementWorkItem {
+/// Heap-boxes the iterative work-stack payload as one unit.
+///
+/// Every case carries at least one ``ResolvedNode`` (currently a large value),
+/// and a direct multi-payload enum makes debug builds reserve enough native
+/// stack for the largest case at each `measureIterative` invocation. Custom
+/// layouts may re-enter measurement through `LayoutSubview.sizeThatFits`; a
+/// shallow WindowHostLayout -> author layout -> ScrollView chain could
+/// therefore exhaust Dispatch's worker stack while comparing the retained
+/// measurement cache. Indirection keeps each work-stack element pointer-sized
+/// while preserving the existing heap-backed iterative traversal.
+indirect enum MeasurementWorkItem {
   case measure(ResolvedNode, ProposedSize)
   case measureFresh(ResolvedNode, ProposedSize)
   case finishNode(

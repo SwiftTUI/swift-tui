@@ -1204,6 +1204,46 @@ struct AsyncFrameTailRenderingTests {
     )
   }
 
+  @Test("nested custom and scroll layouts survive a structural second frame on the worker")
+  func nestedCustomAndScrollLayoutsSurviveStructuralSecondFrameOnWorker() async throws {
+    let rootIdentity = testIdentity("AsyncNestedCustomScrollLayoutRoot")
+    let renderer = DefaultRenderer()
+    let terminal = AsyncFrameTailTerminalHost(
+      size: .init(width: 96, height: 12)
+    )
+    let stateContainer = StateContainer(
+      initialState: 1,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { columnCount, _ in
+        WindowHostLayout {
+          AsyncFrameTailNestedScrollColumns(columnCount: columnCount)
+        }
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    #expect(terminal.frames.last?.contains("column 0") == true)
+
+    stateContainer.replace(with: 2)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+
+    #expect(renderedFrames == 2)
+    #expect(terminal.frames.last?.contains("column 1") == true)
+  }
+
   @Test("lazy indexed ScrollView content snapshots before worker layout")
   func lazyIndexedScrollViewContentSnapshotsBeforeWorkerLayout() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
@@ -4073,6 +4113,80 @@ private struct AsyncFrameTailCustomLayout: Layout {
   }
 }
 
+private struct AsyncFrameTailNestedScrollColumns: View {
+  var columnCount: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      AsyncFrameTailMillerLayout {
+        ForEach(0..<columnCount) { column in
+          VStack(alignment: .leading, spacing: 0) {
+            Text("column \(column)")
+            Divider()
+            ScrollView(.vertical, showsIndicators: true) {
+              LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<12) { row in
+                  Text("row \(row)")
+                }
+              }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        Text("preview")
+      }
+      Text("footer")
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct AsyncFrameTailMillerLayout: Layout {
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    let width =
+      finiteDimension(proposal.width)
+      ?? subviews.map { $0.sizeThatFits(.unspecified).width }.reduce(0, +)
+    let columnWidth = subviews.isEmpty ? 0 : width / subviews.count
+    let height =
+      finiteDimension(proposal.height)
+      ?? subviews.map {
+        $0.sizeThatFits(.init(width: columnWidth, height: nil)).height
+      }.max()
+      ?? 0
+    return .init(width: width, height: height)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    let columnWidth = subviews.isEmpty ? 0 : bounds.size.width / subviews.count
+    for (index, subview) in subviews.enumerated() {
+      subview.place(
+        at: .init(x: bounds.origin.x + index * columnWidth, y: bounds.origin.y),
+        anchor: .topLeading,
+        proposal: .init(width: columnWidth, height: bounds.size.height)
+      )
+    }
+  }
+
+  private func finiteDimension(_ dimension: ProposedDimension) -> Int? {
+    switch dimension {
+    case .finite(let value):
+      max(0, value)
+    case .infinity, .unspecified:
+      nil
+    }
+  }
+}
+
 private struct AsyncFrameTailRecursiveCustomLayout: PrimitiveView, ResolvableView {
   var depth: Int
 
@@ -4606,11 +4720,17 @@ private final class AsyncFrameTailTerminalHost: PresentationSurface {
   var surfaceSize: CellSize {
     size
   }
-  let size = CellSize(width: 32, height: 6)
-  let proposal = ProposedSize(width: 32, height: 6)
+  let size: CellSize
+  var proposal: ProposedSize {
+    ProposedSize(width: size.width, height: size.height)
+  }
   let capabilityProfile = TerminalCapabilityProfile.previewUnicode
   let appearance = TerminalAppearance.fallback
   private(set) var frames: [String] = []
+
+  init(size: CellSize = .init(width: 32, height: 6)) {
+    self.size = size
+  }
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
