@@ -1,11 +1,13 @@
 import Foundation
 @_spi(Testing) import SwiftTUICore
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct BoundedReconciliationTests {
   @Test("Late-preference reconciliation converges within the documented bound")
   func reconciliationConvergesWithinBound() {

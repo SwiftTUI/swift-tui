@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -16,7 +17,11 @@ private final class CancellationStressCounter: Sendable {
   var count: Int { value.withLock { $0 } }
 }
 
-@Suite("SwiftTUI cancellation state-machine stress behavior", .serialized)
+@Suite(
+  "SwiftTUI cancellation state-machine stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressCancellationStateMachineTests {
   @Test("stress cancellation state machine 001 cancel-before-start is idempotent")
   func cancellationState001CancelBeforeStartIsIdempotent() {

@@ -1,3 +1,204 @@
+/// A complete point-in-time mirror of the soundness probe's process-global
+/// counters.
+///
+/// Keep this as the single counter mirror for runtime reporting and test
+/// attribution. `automaticLifetimeAnchorCount` is intentionally captured but
+/// excluded from ``violationGrowth(since:)`` because it is informational, not
+/// a violation. `lastTeardownLeakUnreachableCount` is census currency rather
+/// than a monotonic counter, so it supplies context for leak growth instead of
+/// producing an independent growth event.
+package struct SoundnessCounterSnapshot: Sendable, Equatable {
+  package var stampCoherenceViolationCount: Int
+  package var deltaCheckpointViolationCount: Int
+  package var checkpointStoreViolationCount: Int
+  package var rasterDamageMismatchCount: Int
+  package var teardownCoherenceViolationCount: Int
+  package var teardownCoherenceLeakCount: Int
+  package var barrierNonConvergenceCount: Int
+  package var automaticLifetimeAnchorCount: Int
+  package var unclassifiedResolvedNodeCount: Int
+  package var lastTeardownLeakUnreachableCount: Int
+  package var registrationPublicationViolationCount: Int
+  package var memoUnsoundSkipCount: Int
+  package var duplicateRegistrationOverwriteCount: Int
+  package var stateSlotRestorationDropCount: Int
+  package var plannerTargetlessFrontierEscalationCount: Int
+  package var lifecycleHandlerSkipCount: Int
+  package var ambientEnvironmentFallbackReadCount: Int
+  package var committedHandlerResolutionViolationCount: Int
+  package var strandedListingViolationCount: Int
+  package var lastViolationDetailByKind: [String: String]
+
+  @MainActor
+  package static func current() -> Self {
+    Self(
+      stampCoherenceViolationCount: SoundnessProbeConfiguration.stampCoherenceViolationCount,
+      deltaCheckpointViolationCount: SoundnessProbeConfiguration.deltaCheckpointViolationCount,
+      checkpointStoreViolationCount: SoundnessProbeConfiguration.checkpointStoreViolationCount,
+      rasterDamageMismatchCount: SoundnessProbeConfiguration.rasterDamageMismatchCount,
+      teardownCoherenceViolationCount:
+        SoundnessProbeConfiguration.teardownCoherenceViolationCount,
+      teardownCoherenceLeakCount: SoundnessProbeConfiguration.teardownCoherenceLeakCount,
+      barrierNonConvergenceCount: SoundnessProbeConfiguration.barrierNonConvergenceCount,
+      automaticLifetimeAnchorCount: SoundnessProbeConfiguration.automaticLifetimeAnchorCount,
+      unclassifiedResolvedNodeCount: SoundnessProbeConfiguration.unclassifiedResolvedNodeCount,
+      lastTeardownLeakUnreachableCount:
+        SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount,
+      registrationPublicationViolationCount:
+        SoundnessProbeConfiguration.registrationPublicationViolationCount,
+      memoUnsoundSkipCount: SoundnessProbeConfiguration.memoUnsoundSkipCount,
+      duplicateRegistrationOverwriteCount:
+        SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount,
+      stateSlotRestorationDropCount:
+        SoundnessProbeConfiguration.stateSlotRestorationDropCount,
+      plannerTargetlessFrontierEscalationCount:
+        SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount,
+      lifecycleHandlerSkipCount: SoundnessProbeConfiguration.lifecycleHandlerSkipCount,
+      ambientEnvironmentFallbackReadCount:
+        SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount,
+      committedHandlerResolutionViolationCount:
+        SoundnessProbeConfiguration.committedHandlerResolutionViolationCount,
+      strandedListingViolationCount:
+        SoundnessProbeConfiguration.strandedListingViolationCount,
+      lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
+    )
+  }
+
+  package func violationGrowth(since previous: Self) -> [SoundnessCounterGrowth] {
+    var growth: [SoundnessCounterGrowth] = []
+    appendGrowth(
+      kind: "stamp-coherence",
+      previous: previous.stampCoherenceViolationCount,
+      current: stampCoherenceViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "delta-checkpoint",
+      previous: previous.deltaCheckpointViolationCount,
+      current: deltaCheckpointViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "checkpoint-store",
+      previous: previous.checkpointStoreViolationCount,
+      current: checkpointStoreViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "raster-damage",
+      previous: previous.rasterDamageMismatchCount,
+      current: rasterDamageMismatchCount,
+      to: &growth
+    )
+    let teardownGrowth =
+      teardownCoherenceViolationCount - previous.teardownCoherenceViolationCount
+    let leakGrowth = teardownCoherenceLeakCount - previous.teardownCoherenceLeakCount
+    appendGrowth(
+      kind: "teardown-coherence",
+      count: max(0, teardownGrowth - leakGrowth),
+      to: &growth
+    )
+    appendGrowth(
+      kind: "teardown-barrier-non-convergence",
+      previous: previous.barrierNonConvergenceCount,
+      current: barrierNonConvergenceCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "resolve-lifetime-scope-unclassified",
+      previous: previous.unclassifiedResolvedNodeCount,
+      current: unclassifiedResolvedNodeCount,
+      to: &growth
+    )
+    // Registration-publication and teardown-leak are census-pinned T-ratchet
+    // residuals. The lane scan owns those budgets; suite attribution must not
+    // turn known residual growth into an unquarantined test failure. Combined
+    // teardown growth still reports its zero-census over-removal direction
+    // after subtracting leak growth above.
+    appendGrowth(
+      kind: "memo-unsound-skip",
+      previous: previous.memoUnsoundSkipCount,
+      current: memoUnsoundSkipCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "duplicate-registration",
+      previous: previous.duplicateRegistrationOverwriteCount,
+      current: duplicateRegistrationOverwriteCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "state-slot-restoration-drop",
+      previous: previous.stateSlotRestorationDropCount,
+      current: stateSlotRestorationDropCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "planner-targetless-frontier",
+      previous: previous.plannerTargetlessFrontierEscalationCount,
+      current: plannerTargetlessFrontierEscalationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "lifecycle-handler-skip",
+      previous: previous.lifecycleHandlerSkipCount,
+      current: lifecycleHandlerSkipCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "ambient-environment-fallback",
+      previous: previous.ambientEnvironmentFallbackReadCount,
+      current: ambientEnvironmentFallbackReadCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "committed-handler-resolution",
+      previous: previous.committedHandlerResolutionViolationCount,
+      current: committedHandlerResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "stranded-listing",
+      previous: previous.strandedListingViolationCount,
+      current: strandedListingViolationCount,
+      to: &growth
+    )
+    return growth
+  }
+
+  private func appendGrowth(
+    kind: String,
+    previous: Int,
+    current: Int,
+    to growth: inout [SoundnessCounterGrowth]
+  ) {
+    appendGrowth(kind: kind, count: current - previous, to: &growth)
+  }
+
+  private func appendGrowth(
+    kind: String,
+    count: Int,
+    to growth: inout [SoundnessCounterGrowth]
+  ) {
+    guard count > 0 else {
+      return
+    }
+    growth.append(
+      SoundnessCounterGrowth(
+        kind: kind,
+        count: count,
+        detail: lastViolationDetailByKind[kind]
+      )
+    )
+  }
+}
+
+package struct SoundnessCounterGrowth: Sendable, Equatable {
+  package var kind: String
+  package var count: Int
+  package var detail: String?
+}
+
 /// Gates the **reconciliation soundness probe**: the framework's reuse/skip
 /// fast paths are guarded by oracles (stamp coherence, delta-checkpoint
 /// equality, …) that historically ran only under `#if DEBUG` — so the
@@ -70,7 +271,12 @@ package enum SoundnessProbeConfiguration {
   package static var ambientEnvironmentFallbackReadCount = 0
   package static var committedHandlerResolutionViolationCount = 0
   package static var strandedListingViolationCount = 0
-  package static var lastViolationDetail: String?
+  package static var lastViolationDetailByKind: [String: String] = [:]
+  private static var lastViolationDetailStorage: String?
+  package static var lastViolationDetail: String? {
+    get { lastViolationDetailStorage }
+    set { lastViolationDetailStorage = newValue }
+  }
 
   /// Latch this frame's sampling decision from the monotonic frame counter.
   /// Short-circuits to a single `Bool` store when the probe is off.
@@ -84,13 +290,13 @@ package enum SoundnessProbeConfiguration {
 
   package static func recordStampCoherenceViolation(_ detail: @autoclosure () -> String) {
     stampCoherenceViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "stamp-coherence")
     emitTrace("stamp-coherence")
   }
 
   package static func recordDeltaCheckpointViolation(_ detail: @autoclosure () -> String) {
     deltaCheckpointViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "delta-checkpoint")
     emitTrace("delta-checkpoint")
   }
 
@@ -99,7 +305,7 @@ package enum SoundnessProbeConfiguration {
   /// went stale without its owner's generation moving, or membership drifted.
   package static func recordCheckpointStoreViolation(_ detail: @autoclosure () -> String) {
     checkpointStoreViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "checkpoint-store")
     emitTrace("checkpoint-store")
   }
 
@@ -110,7 +316,7 @@ package enum SoundnessProbeConfiguration {
   /// coordinator, which records it here.
   package static func recordRasterDamageMismatch(_ detail: @autoclosure () -> String) {
     rasterDamageMismatchCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "raster-damage")
     emitTrace("raster-damage")
   }
 
@@ -122,7 +328,7 @@ package enum SoundnessProbeConfiguration {
   /// fixture-enumerated stress shapes.
   package static func recordTeardownCoherenceViolation(_ detail: @autoclosure () -> String) {
     teardownCoherenceViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "teardown-coherence")
     emitTrace("teardown-coherence")
   }
 
@@ -138,7 +344,9 @@ package enum SoundnessProbeConfiguration {
     teardownCoherenceViolationCount += 1
     teardownCoherenceLeakCount += 1
     lastTeardownLeakUnreachableCount = unreachableCount
-    lastViolationDetail = detail()
+    let detail = detail()
+    recordViolationDetail(detail, for: "teardown-coherence")
+    recordViolationDetail(detail, for: "teardown-coherence-leak")
     emitTrace("teardown-coherence-leak")
   }
 
@@ -146,7 +354,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     barrierNonConvergenceCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "teardown-barrier-non-convergence")
     emitTrace("teardown-barrier-non-convergence")
   }
 
@@ -158,7 +366,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     unclassifiedResolvedNodeCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "resolve-lifetime-scope-unclassified")
     emitTrace("resolve-lifetime-scope-unclassified")
   }
 
@@ -169,7 +377,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     registrationPublicationViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "registration-publication")
     emitTrace("registration-publication")
   }
 
@@ -184,7 +392,7 @@ package enum SoundnessProbeConfiguration {
   /// raise this alarm.
   package static func recordMemoUnsoundSkip(_ detail: @autoclosure () -> String) {
     memoUnsoundSkipCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "memo-unsound-skip")
     emitTrace("memo-unsound-skip")
   }
 
@@ -200,7 +408,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     duplicateRegistrationOverwriteCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "duplicate-registration")
     emitTrace("duplicate-registration")
   }
 
@@ -218,7 +426,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     plannerTargetlessFrontierEscalationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "planner-targetless-frontier")
     emitTrace("planner-targetless-frontier")
   }
 
@@ -232,7 +440,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     lifecycleHandlerSkipCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "lifecycle-handler-skip")
     emitTrace("lifecycle-handler-skip")
   }
 
@@ -249,7 +457,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     ambientEnvironmentFallbackReadCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "ambient-environment-fallback")
     emitTrace("ambient-environment-fallback")
   }
 
@@ -261,7 +469,7 @@ package enum SoundnessProbeConfiguration {
   /// potential user-visible lost write.
   package static func recordStateSlotRestorationDrop(_ detail: @autoclosure () -> String) {
     stateSlotRestorationDropCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "state-slot-restoration-drop")
     emitTrace("state-slot-restoration-drop")
   }
 
@@ -277,7 +485,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     committedHandlerResolutionViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "committed-handler-resolution")
     emitTrace("committed-handler-resolution")
   }
 
@@ -292,7 +500,7 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     strandedListingViolationCount += 1
-    lastViolationDetail = detail()
+    recordViolationDetail(detail(), for: "stranded-listing")
     emitTrace("stranded-listing")
   }
 
@@ -312,9 +520,14 @@ package enum SoundnessProbeConfiguration {
       return
     }
     DiagnosticTraceSink.emit(
-      "[SOUNDNESS] \(kind): \(lastViolationDetail ?? "")\n",
+      "[SOUNDNESS] \(kind): \(lastViolationDetailByKind[kind] ?? "")\n",
       toFileAt: FeatureFlags.environmentValue(named: traceFileEnvironmentVariableName)
     )
+  }
+
+  private static func recordViolationDetail(_ detail: String, for kind: String) {
+    lastViolationDetailByKind[kind] = detail
+    lastViolationDetailStorage = detail
   }
 
   private static func environmentDefault() -> Bool {

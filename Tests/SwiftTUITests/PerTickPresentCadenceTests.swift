@@ -157,11 +157,13 @@ struct PerTickPresentCadenceTests {
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let memoAlarmBefore = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     SoundnessProbeConfiguration.isTraceEnabled = false
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoAlarmBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
     }
 
     let harness = PerTickCadenceHarness(rootName: "PerTickCadenceAsyncRoot")

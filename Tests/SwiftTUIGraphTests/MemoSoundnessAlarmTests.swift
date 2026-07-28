@@ -21,6 +21,7 @@ struct MemoSoundnessAlarmTests {
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let alarmCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       MemoSkipTrace.isEnabled = enabled
       MemoSkipTrace.sampleEveryNFrames = sample
@@ -29,6 +30,7 @@ struct MemoSoundnessAlarmTests {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.memoUnsoundSkipCount = alarmCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     // This suite asserts the alarm channel itself, so its synthetic records
     // must not become gate findings.

@@ -37,6 +37,7 @@ struct SoundnessProbeConfigurationTests {
     let automaticAnchorCount = SoundnessProbeConfiguration.automaticLifetimeAnchorCount
     let unclassifiedCount = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
@@ -56,6 +57,7 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.automaticLifetimeAnchorCount = automaticAnchorCount
       SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailByKind
     }
     // These tests deliberately exercise recorder plumbing. Keep the counters
     // live while excluding their synthetic records from gate-owned traces.
@@ -70,6 +72,10 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.recordMemoUnsoundSkip("drawPayload diverged")
       #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == before + 1)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "drawPayload diverged")
+      #expect(
+        SoundnessProbeConfiguration.lastViolationDetailByKind["memo-unsound-skip"]
+          == "drawPayload diverged"
+      )
     }
   }
 
@@ -101,6 +107,10 @@ struct SoundnessProbeConfigurationTests {
       #expect(SoundnessProbeConfiguration.teardownCoherenceLeakCount == leakBefore + 1)
       #expect(SoundnessProbeConfiguration.lastTeardownLeakUnreachableCount == 3)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "census orphan")
+      #expect(
+        SoundnessProbeConfiguration.lastViolationDetailByKind["teardown-coherence-leak"]
+          == "census orphan"
+      )
     }
   }
 
@@ -123,6 +133,29 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.recordRasterDamageMismatch("rows [3] diverged")
       #expect(SoundnessProbeConfiguration.rasterDamageMismatchCount == before + 1)
       #expect(SoundnessProbeConfiguration.lastViolationDetail == "rows [3] diverged")
+    }
+  }
+
+  @Test("snapshot captures informational and ratchet currencies without failing them")
+  func snapshotPreservesNonFailingTiers() {
+    withRestoredProbeState {
+      let before = SoundnessCounterSnapshot.current()
+      SoundnessProbeConfiguration.recordAutomaticLifetimeAnchor()
+      SoundnessProbeConfiguration.recordRegistrationPublicationViolation("known publication")
+      SoundnessProbeConfiguration.recordTeardownCoherenceLeak(
+        "known leak",
+        unreachableCount: 7
+      )
+
+      let after = SoundnessCounterSnapshot.current()
+      #expect(after.automaticLifetimeAnchorCount == before.automaticLifetimeAnchorCount + 1)
+      #expect(
+        after.registrationPublicationViolationCount
+          == before.registrationPublicationViolationCount + 1
+      )
+      #expect(after.teardownCoherenceLeakCount == before.teardownCoherenceLeakCount + 1)
+      #expect(after.lastTeardownLeakUnreachableCount == 7)
+      #expect(after.violationGrowth(since: before).isEmpty)
     }
   }
 

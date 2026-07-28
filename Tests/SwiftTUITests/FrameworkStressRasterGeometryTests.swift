@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -5,7 +6,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI raster and geometry stress behavior", .serialized)
+@Suite(
+  "SwiftTUI raster and geometry stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressRasterGeometryTests {
   @Test("stress raster geometry 001 negative-origin clip intersection stays half-open")
   func rasterGeometry001NegativeOriginClipIntersectionStaysHalfOpen() {

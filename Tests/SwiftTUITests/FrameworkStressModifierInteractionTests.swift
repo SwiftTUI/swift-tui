@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -5,7 +6,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI modifier interaction stress behavior", .serialized)
+@Suite(
+  "SwiftTUI modifier interaction stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressModifierInteractionTests {}
 
 private enum ModifierInteractionStringKey: EnvironmentKey {

@@ -1,9 +1,10 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressKittyCommandEnvelopeTests {
   @Test("stress kitty command envelope 001 single PNG chunk carries complete control data")
   func kittyCommand001SinglePNGChunkCarriesCompleteControlData() throws {

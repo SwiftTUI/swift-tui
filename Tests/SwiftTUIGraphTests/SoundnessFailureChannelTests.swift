@@ -280,6 +280,7 @@ private struct ProbeState {
   let committedHandlerResolutionViolationCount: Int
   let strandedListingViolationCount: Int
   let lastViolationDetail: String?
+  let lastViolationDetailByKind: [String: String]
 
   static func capture() -> Self {
     Self(
@@ -312,7 +313,8 @@ private struct ProbeState {
         SoundnessProbeConfiguration.committedHandlerResolutionViolationCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
-      lastViolationDetail: SoundnessProbeConfiguration.lastViolationDetail
+      lastViolationDetail: SoundnessProbeConfiguration.lastViolationDetail,
+      lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
     )
   }
 
@@ -347,5 +349,6 @@ private struct ProbeState {
     SoundnessProbeConfiguration.strandedListingViolationCount =
       strandedListingViolationCount
     SoundnessProbeConfiguration.lastViolationDetail = lastViolationDetail
+    SoundnessProbeConfiguration.lastViolationDetailByKind = lastViolationDetailByKind
   }
 }

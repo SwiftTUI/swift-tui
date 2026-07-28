@@ -1,9 +1,10 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressTerminalAppearanceQueryTests {
   @Test("stress terminal appearance query 001 foreground selection ignores leading probe noise")
   func appearanceQuery001ForegroundSelectionIgnoresLeadingProbeNoise() {

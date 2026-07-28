@@ -8,7 +8,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI scene and host stress behavior", .serialized)
+@Suite(
+  "SwiftTUI scene and host stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressSceneHostTests {}
 
 // MARK: - Attempt 001: default scene through builder churn

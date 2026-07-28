@@ -20,16 +20,16 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
   /// re-report earlier fixtures' violations as its own first-frame findings.
   @MainActor
   package static func currentTotals() -> SoundnessViolationCounts {
+    let snapshot = SoundnessCounterSnapshot.current()
     var counts = SoundnessViolationCounts()
-    counts.stampCoherence = SoundnessProbeConfiguration.stampCoherenceViolationCount
-    counts.deltaCheckpoint = SoundnessProbeConfiguration.deltaCheckpointViolationCount
-    counts.checkpointStore = SoundnessProbeConfiguration.checkpointStoreViolationCount
-    counts.rasterDamage = SoundnessProbeConfiguration.rasterDamageMismatchCount
-    counts.teardownCoherence = SoundnessProbeConfiguration.teardownCoherenceViolationCount
-    counts.registrationPublication =
-      SoundnessProbeConfiguration.registrationPublicationViolationCount
-    counts.memoUnsoundSkip = SoundnessProbeConfiguration.memoUnsoundSkipCount
-    counts.strandedListing = SoundnessProbeConfiguration.strandedListingViolationCount
+    counts.stampCoherence = snapshot.stampCoherenceViolationCount
+    counts.deltaCheckpoint = snapshot.deltaCheckpointViolationCount
+    counts.checkpointStore = snapshot.checkpointStoreViolationCount
+    counts.rasterDamage = snapshot.rasterDamageMismatchCount
+    counts.teardownCoherence = snapshot.teardownCoherenceViolationCount
+    counts.registrationPublication = snapshot.registrationPublicationViolationCount
+    counts.memoUnsoundSkip = snapshot.memoUnsoundSkipCount
+    counts.strandedListing = snapshot.strandedListingViolationCount
     return counts
   }
 }
@@ -43,45 +43,54 @@ extension RunLoop {
   /// actually run.
   @MainActor
   package func reportNewSoundnessProbeViolations() {
+    let snapshot = SoundnessCounterSnapshot.current()
     var counts = lastSeenSoundnessViolationCounts
     reportSoundnessViolationGrowth(
       kind: "stampCoherence",
-      total: SoundnessProbeConfiguration.stampCoherenceViolationCount,
+      total: snapshot.stampCoherenceViolationCount,
+      detail: snapshot.lastViolationDetailByKind["stamp-coherence"],
       lastSeen: &counts.stampCoherence
     )
     reportSoundnessViolationGrowth(
       kind: "deltaCheckpoint",
-      total: SoundnessProbeConfiguration.deltaCheckpointViolationCount,
+      total: snapshot.deltaCheckpointViolationCount,
+      detail: snapshot.lastViolationDetailByKind["delta-checkpoint"],
       lastSeen: &counts.deltaCheckpoint
     )
     reportSoundnessViolationGrowth(
       kind: "checkpointStore",
-      total: SoundnessProbeConfiguration.checkpointStoreViolationCount,
+      total: snapshot.checkpointStoreViolationCount,
+      detail: snapshot.lastViolationDetailByKind["checkpoint-store"],
       lastSeen: &counts.checkpointStore
     )
     reportSoundnessViolationGrowth(
       kind: "rasterDamage",
-      total: SoundnessProbeConfiguration.rasterDamageMismatchCount,
+      total: snapshot.rasterDamageMismatchCount,
+      detail: snapshot.lastViolationDetailByKind["raster-damage"],
       lastSeen: &counts.rasterDamage
     )
     reportSoundnessViolationGrowth(
       kind: "teardownCoherence",
-      total: SoundnessProbeConfiguration.teardownCoherenceViolationCount,
+      total: snapshot.teardownCoherenceViolationCount,
+      detail: snapshot.lastViolationDetailByKind["teardown-coherence"],
       lastSeen: &counts.teardownCoherence
     )
     reportSoundnessViolationGrowth(
       kind: "registrationPublication",
-      total: SoundnessProbeConfiguration.registrationPublicationViolationCount,
+      total: snapshot.registrationPublicationViolationCount,
+      detail: snapshot.lastViolationDetailByKind["registration-publication"],
       lastSeen: &counts.registrationPublication
     )
     reportSoundnessViolationGrowth(
       kind: "memoUnsoundSkip",
-      total: SoundnessProbeConfiguration.memoUnsoundSkipCount,
+      total: snapshot.memoUnsoundSkipCount,
+      detail: snapshot.lastViolationDetailByKind["memo-unsound-skip"],
       lastSeen: &counts.memoUnsoundSkip
     )
     reportSoundnessViolationGrowth(
       kind: "strandedListing",
-      total: SoundnessProbeConfiguration.strandedListingViolationCount,
+      total: snapshot.strandedListingViolationCount,
+      detail: snapshot.lastViolationDetailByKind["stranded-listing"],
       lastSeen: &counts.strandedListing
     )
     lastSeenSoundnessViolationCounts = counts
@@ -91,6 +100,7 @@ extension RunLoop {
   private func reportSoundnessViolationGrowth(
     kind: String,
     total: Int,
+    detail: String?,
     lastSeen: inout Int
   ) {
     guard total > lastSeen else {
@@ -108,7 +118,7 @@ extension RunLoop {
         code: "soundness.\(kind)",
         message:
           "\(newViolations) sampled soundness violation(s): "
-          + (SoundnessProbeConfiguration.lastViolationDetail ?? "no detail recorded"),
+          + (detail ?? "no detail recorded"),
         source: "SoundnessProbe"
       )
     )

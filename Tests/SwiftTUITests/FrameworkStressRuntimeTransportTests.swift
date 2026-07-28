@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -5,7 +6,11 @@ import Testing
 @_spi(Runners) @testable import SwiftTUIRuntime
 
 @MainActor
-@Suite("SwiftTUI runtime and transport stress behavior", .serialized)
+@Suite(
+  "SwiftTUI runtime and transport stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressRuntimeTransportTests {}
 
 // MARK: - Attempt 001: scroll-location alternation

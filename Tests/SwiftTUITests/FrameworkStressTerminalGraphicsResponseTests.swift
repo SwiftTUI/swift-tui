@@ -1,9 +1,10 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressTerminalGraphicsResponseTests {
   @Test("stress terminal graphics response 001 kitty selection uses the exact query id")
   func graphicsResponse001KittySelectionUsesExactQueryID() {

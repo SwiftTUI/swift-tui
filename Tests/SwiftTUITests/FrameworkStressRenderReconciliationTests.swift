@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -5,7 +6,7 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressRenderReconciliationTests {}
 
 private func renderStressText(_ snapshot: RenderSnapshot) -> String {

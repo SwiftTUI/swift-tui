@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -6,7 +7,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI visual-effects stress behavior", .serialized)
+@Suite(
+  "SwiftTUI visual-effects stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressVisualEffectsTests {}
 
 @MainActor

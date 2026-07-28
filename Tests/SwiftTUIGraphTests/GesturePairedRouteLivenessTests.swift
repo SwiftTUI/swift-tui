@@ -130,12 +130,14 @@ struct GesturePairedRouteLivenessTests {
     let probeLatch = SoundnessProbeConfiguration.isSampledFrame
     let violationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isEnabled = probeEnabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.isSampledFrame = probeLatch
       SoundnessProbeConfiguration.registrationPublicationViolationCount = violationCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     SoundnessProbeConfiguration.isEnabled = true
     SoundnessProbeConfiguration.isTraceEnabled = false

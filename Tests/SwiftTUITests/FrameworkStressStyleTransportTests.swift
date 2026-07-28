@@ -1,8 +1,13 @@
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Runners) @testable import SwiftTUIRuntime
 
-@Suite("SwiftTUI style-transport stress behavior", .serialized)
+@Suite(
+  "SwiftTUI style-transport stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressStyleTransportTests {
   @Test("stress style transport 001 empty Base64 round trip stays empty")
   func styleTransport001EmptyBase64RoundTripStaysEmpty() {

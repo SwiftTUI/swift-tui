@@ -1,9 +1,14 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
-@Suite("SwiftTUI Unicode text-editing stress behavior", .serialized)
+@Suite(
+  "SwiftTUI Unicode text-editing stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressUnicodeTextEditingTests {}
 
 // MARK: - Grapheme-safe editing

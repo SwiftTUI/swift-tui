@@ -1,9 +1,14 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite("SwiftTUI terminal protocol boundary stress behavior", .serialized)
+@Suite(
+  "SwiftTUI terminal protocol boundary stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressTerminalProtocolBoundaryTests {
   @Test("stress terminal protocol 001 kitty associated text stays inside its envelope")
   func terminalProtocol001KittyAssociatedTextStaysInsideEnvelope() {

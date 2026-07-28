@@ -24,11 +24,13 @@ struct LifecycleCoordinatorSkipTests {
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let skipCount = SoundnessProbeConfiguration.lifecycleHandlerSkipCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     SoundnessProbeConfiguration.isTraceEnabled = false
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.lifecycleHandlerSkipCount = skipCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     return try body()
   }

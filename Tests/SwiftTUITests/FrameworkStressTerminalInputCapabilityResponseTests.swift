@@ -1,8 +1,9 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressTerminalInputCapabilityResponseTests {
   @Test("stress terminal input capability 001 kitty flags survive leading device attributes")
   func inputCapability001KittyFlagsSurviveLeadingDeviceAttributes() {

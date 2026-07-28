@@ -44,10 +44,12 @@ struct StateSlotTests {
     let dropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = dropCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     SoundnessProbeConfiguration.isTraceEnabled = false
 
@@ -126,9 +128,11 @@ struct StateSlotTests {
 
     let dropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = dropCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     _ = graph.restoreCheckpoint(checkpoint)
     graph.applyStateMutationOverlay(overlay)

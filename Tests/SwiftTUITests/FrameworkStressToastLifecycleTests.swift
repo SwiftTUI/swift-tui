@@ -7,7 +7,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI toast lifecycle stress behavior", .serialized)
+@Suite(
+  "SwiftTUI toast lifecycle stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressToastLifecycleTests {}
 
 @MainActor

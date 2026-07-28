@@ -1,4 +1,5 @@
 import Observation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -6,7 +7,7 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressObservationEffectsTests {}
 
 // MARK: - Attempt 001: conditional observable-property dependency switching

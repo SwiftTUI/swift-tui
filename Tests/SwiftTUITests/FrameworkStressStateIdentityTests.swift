@@ -7,7 +7,7 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressStateIdentityTests {}
 
 // MARK: - Attempt 001: Graph-scoped state seed isolation

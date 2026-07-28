@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -6,7 +7,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI frame-pipeline stress behavior", .serialized)
+@Suite(
+  "SwiftTUI frame-pipeline stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressFramePipelineTests {}
 
 // MARK: - Attempt 001: alternating narrow dirty sets

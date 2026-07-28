@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -18,7 +19,7 @@ import Testing
 /// retained frames, at depth, and that a subtree can transition retained ->
 /// recompute (and back) without losing state.
 @MainActor
-@Suite
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct RetainedSubtreeReuseTests {
   private struct Siblings: View {
     let aValue: String

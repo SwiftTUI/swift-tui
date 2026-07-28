@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -5,7 +6,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI tab and command stress behavior", .serialized)
+@Suite(
+  "SwiftTUI tab and command stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressTabCommandTests {}
 
 @MainActor

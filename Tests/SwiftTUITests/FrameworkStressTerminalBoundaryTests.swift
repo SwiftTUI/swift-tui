@@ -1,9 +1,14 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUIRuntime
 
-@Suite("SwiftTUI terminal boundary stress behavior", .serialized)
+@Suite(
+  "SwiftTUI terminal boundary stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressTerminalBoundaryTests {
   @Test("stress terminal boundary 001 split resize framing preserves the command boundary")
   func terminalBoundary001SplitResizeFramingPreservesCommandBoundary() {

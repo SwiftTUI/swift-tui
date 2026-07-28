@@ -22,12 +22,14 @@ struct DuplicateRegistrationProbeTests {
     let latch = SoundnessProbeConfiguration.isSampledFrame
     let count = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.isSampledFrame = latch
       SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = count
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     SoundnessProbeConfiguration.isEnabled = true
     SoundnessProbeConfiguration.isTraceEnabled = false

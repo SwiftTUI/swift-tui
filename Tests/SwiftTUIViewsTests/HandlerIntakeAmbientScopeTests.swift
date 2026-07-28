@@ -33,10 +33,12 @@ struct AmbientEnvironmentFallbackProbeTests {
     let baseline = SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount = baseline
       SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     SoundnessProbeConfiguration.isTraceEnabled = false
     let roots = withImperativeAuthoringContext(snapshot) {

@@ -1,9 +1,10 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressSixelEncodingTests {
   @Test("stress sixel encoding 001 reported cell metrics scale both output axes")
   func sixelEncoding001ReportedCellMetricsScaleBothOutputAxes() {

@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -23,7 +24,11 @@ private func stressCacheEntry(_ bytes: Int) -> StressCacheCost {
   .init(entries: 1, bytes: bytes)
 }
 
-@Suite("SwiftTUI cache state-machine stress behavior", .serialized)
+@Suite(
+  "SwiftTUI cache state-machine stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressCacheStateMachineTests {
   @Test("stress cache state machine 001 replacing LRU promotes it before eviction")
   func cacheState001ReplacingLRUPromotesItBeforeEviction() {

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -7,7 +8,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI animation and temporal stress behavior", .serialized)
+@Suite(
+  "SwiftTUI animation and temporal stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressAnimationTemporalTests {}
 
 // MARK: - Attempt 001: unchanged value-animation inheritance

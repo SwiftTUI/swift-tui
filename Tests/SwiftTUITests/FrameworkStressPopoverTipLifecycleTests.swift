@@ -1,3 +1,4 @@
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -5,7 +6,7 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressPopoverTipLifecycleTests {}
 
 // MARK: - Attempt 001: stable tip title payload freshness

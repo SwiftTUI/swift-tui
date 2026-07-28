@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -16,7 +17,11 @@ import Testing
 /// view node, so the interiors are committed children and the ordinary
 /// teardown cascade reclaims them.
 @MainActor
-@Suite("Toolbar button chrome teardown coherence", .serialized)
+@Suite(
+  "Toolbar button chrome teardown coherence",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressToolbarChromeLeakTests {
   @Test("toolbar strip churn and host teardown leave no teardown-coherence orphans")
   func toolbarStripChurnLeavesNoOrphans() throws {

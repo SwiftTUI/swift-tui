@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -6,7 +7,11 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
-@Suite("SwiftTUI table and outline stress behavior", .serialized)
+@Suite(
+  "SwiftTUI table and outline stress behavior",
+  .serialized,
+  FailOnSoundnessViolationGrowth()
+)
 struct FrameworkStressTableOutlineTests {}
 
 private func tableOutlineText(_ snapshot: RenderSnapshot) -> String {

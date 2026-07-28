@@ -161,10 +161,12 @@ struct NodeCheckpointImageStoreTests {
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let countBefore = SoundnessProbeConfiguration.checkpointStoreViolationCount
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.checkpointStoreViolationCount = countBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
     }
 
     SoundnessProbeConfiguration.isTraceEnabled = false

@@ -450,10 +450,12 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
 
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount = escalationsBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
     }
     SoundnessProbeConfiguration.isTraceEnabled = false
     let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(

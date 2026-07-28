@@ -1,9 +1,10 @@
+import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
 
-@Suite(.serialized)
+@Suite(.serialized, FailOnSoundnessViolationGrowth())
 struct FrameworkStressKittyPlacementGeometryTests {
   @Test("stress kitty placement geometry 001 unclipped placement preserves logical bounds")
   func kittyPlacement001UnclippedPlacementPreservesLogicalBounds() throws {

@@ -91,10 +91,12 @@ struct TeardownBarrierFixedPointTests {
     let alarmBefore = SoundnessProbeConfiguration.barrierNonConvergenceCount
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.barrierNonConvergenceCount = alarmBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
     }
     SoundnessProbeConfiguration.isTraceEnabled = false
 
