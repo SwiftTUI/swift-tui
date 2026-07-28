@@ -22,13 +22,10 @@ public protocol Gesture<Value> {
 
   /// Whether attaching this gesture should request pointer capture on
   /// press. Primitives that receive drag events after the initial .down
-  /// return `true`; tap-only primitives return `false`. Combinators
-  /// propagate by OR-ing their children. The default is `false`.
+  /// return `true`; tap-only primitives return `false`. Composed gestures
+  /// inherit their body's requirement, while body-less primitives default
+  /// to `false`. Combinators propagate by OR-ing their children.
   static var _needsPointerCapture: Bool { get }
-}
-
-extension Gesture {
-  public static var _needsPointerCapture: Bool { false }
 }
 
 extension Gesture where Body: Gesture, Body.Value == Value {
@@ -37,6 +34,12 @@ extension Gesture where Body: Gesture, Body.Value == Value {
   ) -> AnyGestureRecognizer {
     body._makeRecognizer(context: context)
   }
+}
+
+extension Gesture where Body: Gesture {
+  /// Composed gestures inherit their body's capture requirement, mirroring
+  /// the `_makeRecognizer` forwarding default above.
+  public static var _needsPointerCapture: Bool { Body._needsPointerCapture }
 }
 
 /// Escape hatch for primitives that have no body.
@@ -66,6 +69,8 @@ extension Never: Gesture {
   // `Body = Never` is provided by the `Never: View` extension in
   // ViewFoundation.swift and satisfies this protocol's requirement too.
   // An explicit redeclaration here would be a compile error (duplicate typealias).
+
+  public static var _needsPointerCapture: Bool { false }
 
   public func _makeRecognizer(
     context: GestureRecognizerBuildContext

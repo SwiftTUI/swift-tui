@@ -35,4 +35,52 @@ struct GesturePointerCapturePolicyTests {
     #expect(MappedDrag._needsPointerCapture)
     #expect(UpdatingDrag._needsPointerCapture)
   }
+
+  @Test("composed gestures inherit their body's capture requirement")
+  func composedCaptureRequirements() {
+    #expect(WrappedPan._needsPointerCapture)
+    #expect(!WrappedTap._needsPointerCapture)
+    #expect(TwoLevelWrappedPan._needsPointerCapture)
+    #expect(!BodylessGesturePrimitive._needsPointerCapture)
+  }
+}
+
+private struct WrappedPan: Gesture {
+  typealias Value = DragGesture.Value
+  typealias Body = _ChangedGesture<DragGesture>
+
+  var body: Body {
+    DragGesture().onChanged { _ in }
+  }
+}
+
+private struct WrappedTap: Gesture {
+  typealias Value = Void
+  typealias Body = _EndedGesture<TapGesture>
+
+  var body: Body {
+    TapGesture().onEnded {}
+  }
+}
+
+private struct TwoLevelWrappedPan: Gesture {
+  typealias Value = DragGesture.Value
+  typealias Body = WrappedPan
+
+  var body: Body {
+    WrappedPan()
+  }
+}
+
+private struct BodylessGesturePrimitive: Gesture {
+  typealias Value = Void
+  typealias Body = Never
+
+  var body: Never { neverBody() }
+
+  func _makeRecognizer(
+    context: GestureRecognizerBuildContext
+  ) -> AnyGestureRecognizer {
+    TapGesture()._makeRecognizer(context: context)
+  }
 }

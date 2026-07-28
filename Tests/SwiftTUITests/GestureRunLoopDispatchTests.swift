@@ -345,6 +345,68 @@ struct GestureRunLoopDispatchTests {
     #expect(box.location == Point(x: 1.5, y: 0.5))
   }
 
+  @Test("a named drag wrapper captures and receives the full pointer path")
+  func namedDragWrapperCapturesFullPointerPath() async throws {
+    @MainActor final class Box {
+      var changedValues: [DragGesture.Value] = []
+      var endedValue: DragGesture.Value?
+    }
+
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("NamedDragWrapper")])
+    let view = Text("Drag")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(
+        NamedDragWrapper(
+          onChanged: { box.changedValues.append($0) },
+          onEnded: { box.endedValue = $0 }
+        )
+      )
+
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: rootIdentity, environmentValues: environment)
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: context,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let region = try #require(initial.semanticSnapshot.interactionRegions.first)
+    let start = centerPoint(of: region.rect)
+    let firstDrag = Point(x: start.x + 2, y: start.y)
+    let lastDrag = Point(x: start.x + 4, y: start.y)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: start))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: firstDrag))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: lastDrag))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: lastDrag))),
+      ],
+      viewBuilder: { view }
+    )
+
+    let ended = try #require(box.endedValue)
+    #expect(result.exitReason == .inputEnded)
+    #expect(
+      box.changedValues.map { $0.location.x - $0.startLocation.x }
+        == [2, 4, 4]
+    )
+    #expect(ended.location.x - ended.startLocation.x == 4)
+    #expect(ended.path.first?.location == ended.startLocation)
+    #expect(ended.path.last?.location == ended.location)
+  }
+
   @Test("LongPressGesture fires through the full RunLoop deadline path")
   func longPressGestureFiresThroughRunLoop() async throws {
     @MainActor final class Box {
@@ -484,6 +546,20 @@ struct GestureRunLoopDispatchTests {
     #expect(result.exitReason == .inputEnded)
     #expect(counts.double == 1)
     #expect(counts.single == 0)
+  }
+}
+
+private struct NamedDragWrapper: Gesture {
+  typealias Value = DragGesture.Value
+  typealias Body = _EndedGesture<_ChangedGesture<DragGesture>>
+
+  let onChanged: @MainActor (DragGesture.Value) -> Void
+  let onEnded: @MainActor (DragGesture.Value) -> Void
+
+  var body: Body {
+    DragGesture(minimumDistance: 1)
+      .onChanged(onChanged)
+      .onEnded(onEnded)
   }
 }
 
