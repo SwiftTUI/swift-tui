@@ -33,6 +33,12 @@ package struct PointerInteractionState: Equatable, Sendable {
   /// the press origin. Set on `.down`, cleared on `.up`.
   package private(set) var dragStartLocation: PointerLocation?
 
+  /// Role-aware recognition produced by a scheduler deadline while this
+  /// pointer stream is still down. A deadline-driven recognizer can be
+  /// terminal (and re-authored) before `.up`, so the release cannot recover
+  /// this currency from the current recognizer alone.
+  package private(set) var deadlineDispatchOutcome: PointerDispatchOutcome?
+
   package init() {}
 
   /// True while any route owns the press (armed or captured) — gates whether a
@@ -41,10 +47,16 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteID != nil || capturedRouteID != nil
   }
 
+  /// The route currently owning the stream, preferring an irrevocable capture.
+  package var activeRouteID: RouteID? {
+    capturedRouteID ?? armedRouteID
+  }
+
   /// Record where a fresh press began. The routing decision (``arm(_:usesPointerHandler:)``
   /// or ``capture(_:)``) follows once the hit target is classified.
   package mutating func beginPress(at location: PointerLocation) {
     dragStartLocation = location
+    deadlineDispatchOutcome = nil
   }
 
   /// Arm a non-capturing route to activate on release. Clears any capture so the
@@ -87,6 +99,33 @@ package struct PointerInteractionState: Equatable, Sendable {
     capturedRouteID = routeID
   }
 
+  /// Latches deadline recognition until release. Claiming wins over observing
+  /// when multiple recognizers at the same route settle on one deadline.
+  package mutating func noteDeadlineDispatchOutcome(
+    _ outcome: PointerDispatchOutcome
+  ) {
+    guard outcome.wantsPointerStream else {
+      return
+    }
+    if outcome == .claimed || deadlineDispatchOutcome == nil {
+      deadlineDispatchOutcome = outcome
+    }
+  }
+
+  /// Combines the current release event with any recognition that happened on
+  /// a scheduler deadline earlier in the same pointer stream.
+  package func releaseOutcome(
+    combining outcome: PointerDispatchOutcome
+  ) -> PointerDispatchOutcome {
+    if outcome == .claimed || deadlineDispatchOutcome == .claimed {
+      return .claimed
+    }
+    if outcome == .observed || deadlineDispatchOutcome == .observed {
+      return .observed
+    }
+    return outcome
+  }
+
   /// Drop all routing — armed and captured — but keep the press origin. Used
   /// when a press resolves to nothing actionable, or when a captured region
   /// disappears from the rendered tree mid-interaction.
@@ -94,6 +133,7 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteID = nil
     armedRouteUsesPointerHandler = false
     capturedRouteID = nil
+    deadlineDispatchOutcome = nil
   }
 
   /// Full teardown to the idle state, including the press origin. Used on `.up`
@@ -103,5 +143,6 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteUsesPointerHandler = false
     capturedRouteID = nil
     dragStartLocation = nil
+    deadlineDispatchOutcome = nil
   }
 }

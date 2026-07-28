@@ -988,6 +988,8 @@ build_entry_point_launch_fixtures() {
     EntryPointFixtureBare \
     EntryPointFixtureCLIBare \
     EntryPointFixtureWebHostCLIBare \
+    EntryPointFixtureCLIAsyncVerbDispatch \
+    EntryPointFixtureWebHostCLIAsyncVerbDispatch \
     EntryPointFixtureVerbDispatch \
     EntryPointFixtureVerbDispatchNoOptions; do
     run_swift build --target "$fixture"
@@ -996,7 +998,7 @@ build_entry_point_launch_fixtures() {
 
 run_function_step \
   "Build entry-point launch fixtures" \
-  "$(swift_command_text build --target 'EntryPointFixture{AtMain,Bare,CLIBare,WebHostCLIBare,VerbDispatch,VerbDispatchNoOptions}')" \
+  "$(swift_command_text build --target 'EntryPointFixture{AtMain,Bare,CLIBare,WebHostCLIBare,CLIAsyncVerbDispatch,WebHostCLIAsyncVerbDispatch,VerbDispatch,VerbDispatchNoOptions}')" \
   build_entry_point_launch_fixtures
 
 run_function_step \

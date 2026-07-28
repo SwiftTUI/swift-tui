@@ -178,6 +178,85 @@ struct GestureRunLoopDispatchTests {
     #expect(counts.button == 0)
   }
 
+  @Test(
+    "a deadline-recognized long press preserves its attachment role through release",
+    arguments: DeadlineLongPressAttachmentRole.allCases
+  )
+  func deadlineRecognizedLongPressPreservesAttachmentRole(
+    role: DeadlineLongPressAttachmentRole
+  ) async throws {
+    @MainActor final class Counts {
+      let updates = MainActorConditionSignal()
+      var button = 0
+      var longPress = 0 {
+        didSet { updates.notify() }
+      }
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(
+      components: [IdentityComponent(rawValue: "DeadlineLongPressControl.\(role.rawValue)")]
+    )
+    let button = Button("Control") {
+      counts.button += 1
+    }
+    let longPress = LongPressGesture(minimumDuration: .milliseconds(20))
+      .onEnded { _ in counts.longPress += 1 }
+    let view: AnyView =
+      switch role {
+      case .ordinary:
+        AnyView(button.gesture(longPress))
+      case .highPriority:
+        AnyView(button.highPriorityGesture(longPress))
+      case .simultaneous:
+        AnyView(button.simultaneousGesture(longPress))
+      }
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let host = RecordingGestureTerminalHost(size: terminalSize)
+    let inputReader = InjectedTerminalInputReader()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: host,
+      terminalInputReader: inputReader,
+      signalReader: EmptyGestureSignals(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environment,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      exitKeyBindings: .none,
+      viewBuilder: { _, _ in view }
+    )
+
+    let task = Task {
+      try await runLoop.run()
+    }
+
+    await host.firstPresent.wait()
+    inputReader.send(.mouse(.init(kind: .down(.primary), location: point)))
+    await counts.updates.wait { counts.longPress == 1 }
+    inputReader.send(.mouse(.init(kind: .up(.primary), location: point)))
+    inputReader.finish()
+
+    let result = try await task.value
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.longPress == 1)
+    #expect(counts.button == role.expectedButtonActivations)
+  }
+
   @Test("a stationary click activates a button with a simultaneous drag gesture")
   func stationaryClickActivatesButtonWithSimultaneousDragGesture() async throws {
     @MainActor final class Counts {
@@ -718,6 +797,23 @@ private struct NamedDragWrapper: Gesture {
     DragGesture(minimumDistance: 1)
       .onChanged(onChanged)
       .onEnded(onEnded)
+  }
+}
+
+enum DeadlineLongPressAttachmentRole: String, CaseIterable, CustomStringConvertible,
+  Sendable
+{
+  case ordinary
+  case highPriority
+  case simultaneous
+
+  var description: String { rawValue }
+
+  var expectedButtonActivations: Int {
+    switch self {
+    case .ordinary, .highPriority: 0
+    case .simultaneous: 1
+    }
   }
 }
 

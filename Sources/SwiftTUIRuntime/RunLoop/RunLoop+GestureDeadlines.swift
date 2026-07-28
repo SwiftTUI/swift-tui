@@ -11,9 +11,16 @@ extension RunLoop {
   /// state via `.onEnded` callbacks.
   package func drainGestureDeadlines(at instant: MonotonicInstant) {
     var invalidatedIdentities: Set<Identity> = []
+    let routedIdentity = pointerInteraction.activeRouteID.flatMap {
+      pairedInteractionRegion(for: $0)?.identity
+    }
     for (identity, recognizer) in localGestureRegistry.activeRecognizers() {
-      if recognizer.handleDeadline(at: instant) {
+      let outcome = recognizer.handleDeadlineClassified(at: instant)
+      if outcome != .ignored {
         invalidatedIdentities.insert(identity)
+      }
+      if identity == routedIdentity {
+        pointerInteraction.noteDeadlineDispatchOutcome(outcome)
       }
     }
     if !invalidatedIdentities.isEmpty {

@@ -328,6 +328,32 @@ struct EntryPointLaunchTests {
     #expect(code == 0)
   }
 
+  @Test(
+    "an async claimed verb runs through each runner-owned launch tail",
+    arguments: AsyncVerbLaunchLayer.allCases
+  )
+  func asyncClaimedVerbRunsThroughRunnerLaunchTail(
+    layer: AsyncVerbLaunchLayer
+  ) async throws {
+    let result = try await runFixture(
+      layer.fixture,
+      arguments: ["probe-async"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains(layer.outputMarker),
+      "expected \(layer)'s async verb output; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("USAGE:"))
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
   @Test("the diagnostic message is accurate and framework-specific")
   func diagnosticMessageIsAccurate() {
     let message = synchronousLaunchDiagnosticMessage(commandTypeName: "MyApp")
@@ -432,6 +458,27 @@ struct EntryPointLaunchTests {
       return nil
     }
     return unsafe String(cString: name)
+  }
+}
+
+enum AsyncVerbLaunchLayer: String, CaseIterable, CustomStringConvertible, Sendable {
+  case terminal
+  case webHost
+
+  var description: String { rawValue }
+
+  var fixture: String {
+    switch self {
+    case .terminal: "EntryPointFixtureCLIAsyncVerbDispatch"
+    case .webHost: "EntryPointFixtureWebHostCLIAsyncVerbDispatch"
+    }
+  }
+
+  var outputMarker: String {
+    switch self {
+    case .terminal: "CLIASYNCPROBEOK"
+    case .webHost: "WEBHOSTCLIASYNCPROBEOK"
+    }
   }
 }
 

@@ -109,7 +109,8 @@ package final class LocalGestureRegistry: Equatable {
   /// the entry immediately instead of being discarded.
   private func applyPassRegistrations(for identity: Identity) {
     let authored = passAuthoredRecognizers[identity]?.registrations ?? []
-    let previousElements = recognizers[identity].map(stackElements(of:)) ?? []
+    let previousEntry = recognizers[identity]
+    let previousElements = previousEntry.map(stackElements(of:)) ?? []
 
     var result: [GestureRegistration] = []
     result.reserveCapacity(authored.count)
@@ -148,10 +149,22 @@ package final class LocalGestureRegistry: Equatable {
       }
     }
 
-    let entry =
-      result.count == 1 && result[0].role == .ordinary
-      ? result[0].recognizer
-      : AnyGestureRecognizer(StackedGestureRecognizer(registrations: result))
+    let entry: AnyGestureRecognizer
+    if let previousEntry,
+      let previousStack = previousEntry.base as? StackedGestureRecognizer,
+      previousStack.isActive
+    {
+      // Keep the wrapper as well as its active leaves. Re-wrapping preserved
+      // leaves makes the committed snapshot and fresh registry entry hold
+      // distinct stack owners around the same recognizers; restoring that
+      // snapshot tears down one owner and cancels the shared active leaf.
+      previousStack.replaceRegistrations(with: result)
+      entry = previousEntry
+    } else if result.count == 1 && result[0].role == .ordinary {
+      entry = result[0].recognizer
+    } else {
+      entry = AnyGestureRecognizer(StackedGestureRecognizer(registrations: result))
+    }
     recognizers[identity] = entry
     ownersByIdentity[identity] = .current(identity: identity)
     // Record on the pass's FIRST registering node: stacked levels can run
@@ -351,13 +364,22 @@ package final class LocalGestureRegistry: Equatable {
 private final class StackedGestureRecognizer: GestureRecognizer, RoleAwarePointerDispatching {
   typealias Value = Never
 
-  fileprivate let registrations: [GestureRegistration]
+  fileprivate private(set) var registrations: [GestureRegistration]
   private var highPriorityOwnsStream = false
 
   init(registrations: [GestureRegistration]) {
     self.registrations = registrations
     highPriorityOwnsStream = registrations.contains {
       $0.role == .highPriority && $0.recognizer.isActive
+    }
+  }
+
+  func replaceRegistrations(with registrations: [GestureRegistration]) {
+    self.registrations = registrations
+    if registrations.contains(where: {
+      $0.role == .highPriority && $0.recognizer.isActive
+    }) {
+      highPriorityOwnsStream = true
     }
   }
 
@@ -476,13 +498,38 @@ private final class StackedGestureRecognizer: GestureRecognizer, RoleAwarePointe
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
-    var didTerminate = false
+    handleDeadlineClassified(at: instant) != .ignored
+  }
+
+  func handleDeadlineClassified(
+    at instant: MonotonicInstant
+  ) -> PointerDispatchOutcome {
+    var sawClaimed = false
+    var sawObserved = false
+    var sawFailed = false
+
     for registration in registrations {
-      if registration.recognizer.handleDeadline(at: instant) {
-        didTerminate = true
+      switch registration.recognizer.handleDeadlineClassified(at: instant) {
+      case .claimed, .observed:
+        if registration.role == .simultaneous {
+          sawObserved = true
+        } else {
+          sawClaimed = true
+        }
+      case .failed:
+        sawFailed = true
+      case .ignored:
+        break
       }
     }
-    return didTerminate
+
+    if sawClaimed {
+      return .claimed
+    }
+    if sawObserved {
+      return .observed
+    }
+    return sawFailed ? .failed : .ignored
   }
 
   func currentValue() -> Never? {

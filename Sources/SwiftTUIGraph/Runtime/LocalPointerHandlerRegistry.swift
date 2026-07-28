@@ -93,6 +93,7 @@ package enum PointerDispatchOutcome: Equatable, Sendable {
 @MainActor
 package protocol RoleAwarePointerDispatching: AnyObject {
   func handleClassified(event: LocalPointerEvent) -> PointerDispatchOutcome
+  func handleDeadlineClassified(at instant: MonotonicInstant) -> PointerDispatchOutcome
 }
 
 @MainActor

@@ -20,6 +20,8 @@ struct PointerInteractionStateTests {
     #expect(state.armedRouteUsesPointerHandler == false)
     #expect(state.capturedRouteID == nil)
     #expect(state.dragStartLocation == nil)
+    #expect(state.deadlineDispatchOutcome == nil)
+    #expect(state.activeRouteID == nil)
     #expect(state.isRouting == false)
   }
 
@@ -104,5 +106,28 @@ struct PointerInteractionStateTests {
     #expect(state == PointerInteractionState())
     #expect(state.dragStartLocation == nil)
     #expect(state.isRouting == false)
+  }
+
+  @Test("deadline recognition stays role-aware until release and reset")
+  func deadlineRecognitionStaysRoleAwareUntilReset() {
+    var state = PointerInteractionState()
+    state.beginPress(at: location(7, 8))
+    state.arm(route("Button"), usesPointerHandler: true)
+    #expect(state.activeRouteID == route("Button"))
+
+    state.noteDeadlineDispatchOutcome(.observed)
+    #expect(state.deadlineDispatchOutcome == .observed)
+    #expect(state.releaseOutcome(combining: .ignored) == .observed)
+
+    state.noteDeadlineDispatchOutcome(.failed)
+    #expect(state.deadlineDispatchOutcome == .observed)
+
+    state.noteDeadlineDispatchOutcome(.claimed)
+    #expect(state.deadlineDispatchOutcome == .claimed)
+    #expect(state.releaseOutcome(combining: .observed) == .claimed)
+
+    state.reset()
+    #expect(state.deadlineDispatchOutcome == nil)
+    #expect(state.releaseOutcome(combining: .failed) == .failed)
   }
 }

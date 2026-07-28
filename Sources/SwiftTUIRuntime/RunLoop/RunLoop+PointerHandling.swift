@@ -142,16 +142,18 @@ extension RunLoop {
     if let capturedRouteID = pointerInteraction.capturedRouteID,
       let region = pairedInteractionRegion(for: capturedRouteID)
     {
-      let dispatchOutcome = dispatchPointerEvent(
-        preferredRouteID: region.routeID,
-        identity: region.identity,
-        event: .init(
-          kind: .up(.primary),
-          location: location,
-          targetRect: region.rect,
-          scrollContext: scrollContext(for: region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
-          timestamp: timestamp
+      let dispatchOutcome = pointerInteraction.releaseOutcome(
+        combining: dispatchPointerEvent(
+          preferredRouteID: region.routeID,
+          identity: region.identity,
+          event: .init(
+            kind: .up(.primary),
+            location: location,
+            targetRect: region.rect,
+            scrollContext: scrollContext(for: region.identity),
+            namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+            timestamp: timestamp
+          )
         )
       )
       // A drag recognizer captures on press so it can follow motion outside
@@ -201,16 +203,18 @@ extension RunLoop {
       return
     }
 
-    let dispatchOutcome = dispatchPointerEvent(
-      preferredRouteID: armedRouteID,
-      identity: region.identity,
-      event: .init(
-        kind: .up(.primary),
-        location: location,
-        targetRect: region.rect,
-        scrollContext: scrollContext(for: region.identity),
-        namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
-        timestamp: timestamp
+    let dispatchOutcome = pointerInteraction.releaseOutcome(
+      combining: dispatchPointerEvent(
+        preferredRouteID: armedRouteID,
+        identity: region.identity,
+        event: .init(
+          kind: .up(.primary),
+          location: location,
+          targetRect: region.rect,
+          scrollContext: scrollContext(for: region.identity),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+          timestamp: timestamp
+        )
       )
     )
     if dispatchOutcome == .claimed {

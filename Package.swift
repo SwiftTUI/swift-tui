@@ -438,6 +438,18 @@ let package = Package(
       path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureWebHostCLIBare",
       swiftSettings: swiftSettings()
     ),
+    .executableTarget(
+      name: "EntryPointFixtureCLIAsyncVerbDispatch",
+      dependencies: ["SwiftTUICLI", "SwiftTUIArguments"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureCLIAsyncVerbDispatch",
+      swiftSettings: swiftSettings()
+    ),
+    .executableTarget(
+      name: "EntryPointFixtureWebHostCLIAsyncVerbDispatch",
+      dependencies: ["SwiftTUIWebHostCLI", "SwiftTUIArguments"],
+      path: "Tests/EntryPointLaunchFixtures/EntryPointFixtureWebHostCLIAsyncVerbDispatch",
+      swiftSettings: swiftSettings()
+    ),
     // Verb dispatch: a root command with both a positional argument and its own
     // subcommands. Which command runs, and which command's usage a failure is
     // attributed to, are decisions made inside `App.main()`, so only a real

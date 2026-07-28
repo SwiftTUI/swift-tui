@@ -223,6 +223,20 @@ public final class AnyGestureRecognizer {
     _handleDeadline(instant)
   }
 
+  /// Drains a scheduled gesture deadline while retaining attachment-role
+  /// currency for the eventual pointer release.
+  package func handleDeadlineClassified(
+    at instant: MonotonicInstant
+  ) -> PointerDispatchOutcome {
+    if let roleAware = base as? any RoleAwarePointerDispatching {
+      return roleAware.handleDeadlineClassified(at: instant)
+    }
+    guard _handleDeadline(instant) else {
+      return .ignored
+    }
+    return _phase() == .ended ? .claimed : .failed
+  }
+
   package func tearDown() {
     _tearDown()
   }
