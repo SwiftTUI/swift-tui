@@ -170,15 +170,16 @@ extension Slider {
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
         else {
-          return false
+          return .ignored
         }
 
-        return updateBoundControlValue(
+        let handled = updateBoundControlValue(
           binding,
           delta: wheelDelta,
           step: step,
           bounds: bounds
         )
+        return handled ? .claimed : .ignored
       }
       intake.registerPointerHandler(routeID: trackRouteID) { event in
         switch event.kind {
@@ -189,20 +190,21 @@ extension Slider {
             bounds: bounds,
             step: step
           )
-          return true
+          return .claimed
         case .scrolled(let deltaX, let deltaY):
           guard let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY) else {
-            return false
+            return .ignored
           }
 
-          return updateBoundControlValue(
+          let handled = updateBoundControlValue(
             binding,
             delta: wheelDelta,
             step: step,
             bounds: bounds
           )
+          return handled ? .claimed : .ignored
         default:
-          return false
+          return .ignored
         }
       }
     }

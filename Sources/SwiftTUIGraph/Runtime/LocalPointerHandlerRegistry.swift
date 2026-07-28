@@ -71,9 +71,33 @@ package struct LocalPointerEvent: Equatable, Sendable {
   }
 }
 
+/// What a pointer dispatch did with an event, preserving the recognizer-role
+/// information the RunLoop needs for control-activation decisions.
+package enum PointerDispatchOutcome: Equatable, Sendable {
+  /// An ordinary or high-priority lane recognized and claimed the interaction.
+  case claimed
+  /// Only simultaneous lanes recognized; control activation remains eligible.
+  case observed
+  /// A recognizer resolved to failed; nothing handled the event.
+  case failed
+  /// Nothing consumed the event.
+  case ignored
+
+  /// Whether routing should continue through the pointer interaction stream.
+  package var wantsPointerStream: Bool {
+    self == .claimed || self == .observed
+  }
+}
+
+/// A recognizer aggregate that can preserve attachment roles through dispatch.
+@MainActor
+package protocol RoleAwarePointerDispatching: AnyObject {
+  func handleClassified(event: LocalPointerEvent) -> PointerDispatchOutcome
+}
+
 @MainActor
 package final class LocalPointerHandlerRegistry: Equatable {
-  package typealias Handler = @MainActor (LocalPointerEvent) -> Bool
+  package typealias Handler = @MainActor (LocalPointerEvent) -> PointerDispatchOutcome
   package typealias HoverHandler = @MainActor @Sendable (HoverPhase) -> Void
 
   private var handlers: [RouteID: Handler] = [:]
@@ -303,11 +327,11 @@ package final class LocalPointerHandlerRegistry: Equatable {
   package func dispatch(
     routeID: RouteID,
     event: LocalPointerEvent
-  ) -> Bool {
+  ) -> PointerDispatchOutcome {
     guard let resolved = handlerRouteID(pairingWith: routeID) else {
-      return false
+      return .ignored
     }
-    return handlers[resolved]?(event) ?? false
+    return handlers[resolved]?(event) ?? .ignored
   }
 
   package func dispatchHover(

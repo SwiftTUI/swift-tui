@@ -172,10 +172,11 @@ extension List {
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
-          return false
+          return .ignored
         }
 
         return policy.step(orderedTags: rows.compactMap(\.tag), delta: delta)
+          ? .claimed : .ignored
       }
 
       let interactionIndices: any Sequence<Int> =

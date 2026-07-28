@@ -31,7 +31,7 @@ struct GesturePairedRouteLivenessTests {
       node.recordPointerHandlerRegistration(
         routeID: RouteID(identity: row),
         structuralKey: row
-      ) { _ in false }
+      ) { _ in .ignored }
     }
 
     let set = RuntimeRegistrationSet.scratch()
@@ -123,7 +123,7 @@ struct GesturePairedRouteLivenessTests {
     )
     liveRegistrations.pointerHandlerRegistry?.register(
       routeID: RouteID(identity: pressedRow)
-    ) { _ in false }
+    ) { _ in .ignored }
 
     let probeEnabled = SoundnessProbeConfiguration.isEnabled
     let probeLatch = SoundnessProbeConfiguration.isSampledFrame

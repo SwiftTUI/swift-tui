@@ -19,6 +19,9 @@ package struct PointerInteractionState: Equatable, Sendable {
 
   /// Whether the armed route is driven by a custom pointer handler (a gesture
   /// that wants the full pressed stream) rather than a plain activation action.
+  ///
+  /// This flag controls moved-event streaming only. Release suppression is
+  /// decided by the pointer dispatch outcome.
   package private(set) var armedRouteUsesPointerHandler = false
 
   /// Route that has *captured* the pointer stream for the gesture's whole

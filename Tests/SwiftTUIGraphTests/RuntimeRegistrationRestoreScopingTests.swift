@@ -1818,7 +1818,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         marker.hasSuffix("1") ? .cancel : .allow
       }
       node.recordPointerHandlerRegistration(routeID: routeID) { _ in
-        marker.hasSuffix("1")
+        marker.hasSuffix("1") ? .claimed : .ignored
       }
       node.recordPointerHoverHandlerRegistration(routeID: routeID) { phase in
         probe.record("hover:\(marker):\(phase)")

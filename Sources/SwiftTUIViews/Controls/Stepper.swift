@@ -190,45 +190,53 @@ extension Stepper {
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
         else {
-          return false
+          return .ignored
         }
 
-        return updateBoundControlValue(
+        let handled = updateBoundControlValue(
           binding,
           delta: wheelDelta,
           step: step,
           bounds: bounds
         )
+        return handled ? .claimed : .ignored
       }
       intake.registerPointerHandler(routeID: decrementRouteID) { event in
-        guard case .down(.primary) = event.kind else {
-          return false
+        switch event.kind {
+        case .down(.primary):
+          // Claim the press whether or not the value can move. A click on the
+          // decrement affordance is an interaction owned by this route even
+          // at a bound.
+          _ = updateBoundControlValue(
+            binding,
+            delta: -1,
+            step: step,
+            bounds: bounds
+          )
+          return .claimed
+        case .up(.primary):
+          // The action is press-driven, but the same route owns the release.
+          // Claim it so the Stepper's root activation action cannot increment.
+          return .claimed
+        default:
+          return .ignored
         }
-
-        // Claim the press whether or not the value can move. A click on the
-        // decrement affordance is a gesture owned by this route even at a
-        // bound; returning false would let the press bubble to the Stepper's
-        // root keyboard-activation action, which increments.
-        _ = updateBoundControlValue(
-          binding,
-          delta: -1,
-          step: step,
-          bounds: bounds
-        )
-        return true
       }
       intake.registerPointerHandler(routeID: incrementRouteID) { event in
-        guard case .down(.primary) = event.kind else {
-          return false
+        switch event.kind {
+        case .down(.primary):
+          _ = updateBoundControlValue(
+            binding,
+            delta: 1,
+            step: step,
+            bounds: bounds
+          )
+          return .claimed
+        case .up(.primary):
+          return .claimed
+        default:
+          return .ignored
         }
-
-        _ = updateBoundControlValue(
-          binding,
-          delta: 1,
-          step: step,
-          bounds: bounds
-        )
-        return true
       }
     }
 

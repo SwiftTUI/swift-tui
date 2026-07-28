@@ -431,22 +431,26 @@ extension TabView {
         )
       )
       intake.registerPointerHandler(routeID: routeID) { event in
-        guard case .down(.primary) = event.kind else {
-          return false
+        switch event.kind {
+        case .down(.primary):
+          setStoredTabOverflowMenuExpanded(
+            false,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          setStoredFocusedTabIndex(
+            index,
+            tags: orderedTags,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          _ = setBoundSelection(binding, to: options[index].tag)
+          return .claimed
+        case .up(.primary):
+          return .claimed
+        default:
+          return .ignored
         }
-
-        setStoredTabOverflowMenuExpanded(
-          false,
-          in: ownerNode,
-          invalidationIdentity: context.identity
-        )
-        setStoredFocusedTabIndex(
-          index,
-          tags: orderedTags,
-          in: ownerNode,
-          invalidationIdentity: context.identity
-        )
-        return setBoundSelection(binding, to: options[index].tag)
       }
     }
 
@@ -458,25 +462,28 @@ extension TabView {
       for: tabOverflowTriggerIdentity(for: context.identity)
     )
     intake.registerPointerHandler(routeID: triggerRouteID) { event in
-      guard case .down(.primary) = event.kind else {
-        return false
-      }
-
-      let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
-      setStoredTabOverflowMenuExpanded(
-        nextExpanded,
-        in: ownerNode,
-        invalidationIdentity: context.identity
-      )
-      if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
-        setStoredFocusedTabIndex(
-          focusIndex,
-          tags: orderedTags,
+      switch event.kind {
+      case .down(.primary):
+        let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
+        setStoredTabOverflowMenuExpanded(
+          nextExpanded,
           in: ownerNode,
           invalidationIdentity: context.identity
         )
+        if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
+          setStoredFocusedTabIndex(
+            focusIndex,
+            tags: orderedTags,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+        }
+        return .claimed
+      case .up(.primary):
+        return .claimed
+      default:
+        return .ignored
       }
-      return true
     }
 
     for index in options.indices {
@@ -487,22 +494,26 @@ extension TabView {
         )
       )
       intake.registerPointerHandler(routeID: routeID) { event in
-        guard case .down(.primary) = event.kind else {
-          return false
+        switch event.kind {
+        case .down(.primary):
+          setStoredFocusedTabIndex(
+            index,
+            tags: orderedTags,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          setStoredTabOverflowMenuExpanded(
+            false,
+            in: ownerNode,
+            invalidationIdentity: context.identity
+          )
+          _ = setBoundSelection(binding, to: options[index].tag)
+          return .claimed
+        case .up(.primary):
+          return .claimed
+        default:
+          return .ignored
         }
-
-        setStoredFocusedTabIndex(
-          index,
-          tags: orderedTags,
-          in: ownerNode,
-          invalidationIdentity: context.identity
-        )
-        setStoredTabOverflowMenuExpanded(
-          false,
-          in: ownerNode,
-          invalidationIdentity: context.identity
-        )
-        return setBoundSelection(binding, to: options[index].tag)
       }
     }
   }

@@ -163,7 +163,7 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     let handlerIdentity = routeIdentity
     pointerRegistry.register(routeID: routeID, structuralKey: node.identity) { event in
       guard let current = gestureRegistryRef.recognizer(for: handlerIdentity) else {
-        return false
+        return .ignored
       }
       // One-shot recognizers park in absorbing terminal phases; when the
       // fired action mutates no state, no re-resolve re-authors a fresh
@@ -174,8 +174,7 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
       if case .down = event.kind {
         current.reArm()
       }
-      let disposition = current.handle(event: event)
-      return disposition == .handled
+      return current.handleClassified(event: event)
     }
 
     // Stamp semantic metadata: must hit-test; captureOnPress when the

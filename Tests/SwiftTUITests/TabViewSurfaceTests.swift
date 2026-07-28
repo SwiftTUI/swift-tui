@@ -716,7 +716,7 @@ struct TabViewSurfaceTests {
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
         event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
-      )
+      ).wantsPointerStream
     )
 
     let expandedSurface = renderer.render(
@@ -736,7 +736,7 @@ struct TabViewSurfaceTests {
       pointerRegistry.dispatch(
         routeID: hiddenRouteID,
         event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
-      )
+      ).wantsPointerStream
     )
     #expect(selectionBox.value == "four")
 
@@ -842,7 +842,7 @@ struct TabViewSurfaceTests {
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
         event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
-      )
+      ).wantsPointerStream
     )
 
     let surface = renderer.render(
@@ -893,7 +893,7 @@ struct TabViewSurfaceTests {
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
         event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
-      )
+      ).wantsPointerStream
     )
 
     let surface = renderer.render(
@@ -954,7 +954,7 @@ struct TabViewSurfaceTests {
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
         event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
-      )
+      ).wantsPointerStream
     )
 
     let surface = renderer.render(

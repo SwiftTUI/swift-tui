@@ -219,7 +219,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     scrollAxes: Axis.Set,
     binding: Binding<ScrollPosition>,
     panBinding: Binding<ScrollPanAnchor?>
-  ) -> @MainActor (LocalPointerEvent) -> Bool {
+  ) -> @MainActor (LocalPointerEvent) -> PointerDispatchOutcome {
     return { event in
       switch event.kind {
       case .scrolled(let deltaX, let deltaY):
@@ -236,7 +236,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         }
 
         guard changed else {
-          return false
+          return .ignored
         }
 
         if let ctx = event.scrollContext {
@@ -244,11 +244,11 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         }
 
         guard next != current else {
-          return false
+          return .ignored
         }
 
         binding.wrappedValue = next
-        return true
+        return .claimed
 
       // Direct-manipulation panning: a touch/pointer drag that starts on the
       // scroll view's own content (not on an inner control) pans the content
@@ -259,7 +259,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       // still bubble to a parent scroll view or gesture.
       case .down(.primary):
         guard let ctx = event.scrollContext else {
-          return false
+          return .ignored
         }
         // Only claim a press that landed directly on the scroll body, not
         // one that bubbled up from an inner control. A direct body hit
@@ -272,22 +272,22 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         // the run loop's drag-threshold takeover, which re-dispatches a
         // synthetic body `.down` whose `targetRect` is the viewport.
         guard event.targetRect == ctx.viewportRect else {
-          return false
+          return .ignored
         }
         let canPanX = scrollAxes.contains(.horizontal) && ctx.maxScrollX > 0
         let canPanY = scrollAxes.contains(.vertical) && ctx.maxScrollY > 0
         guard canPanX || canPanY else {
-          return false
+          return .ignored
         }
         panBinding.wrappedValue = ScrollPanAnchor(
           startLocation: event.location.location,
           startOffset: binding.wrappedValue
         )
-        return true
+        return .claimed
 
       case .dragged(.primary):
         guard let anchor = panBinding.wrappedValue else {
-          return false
+          return .ignored
         }
         let current = binding.wrappedValue
         let location = event.location.location
@@ -315,17 +315,17 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         if next != current {
           binding.wrappedValue = next
         }
-        return true
+        return .claimed
 
       case .up(.primary):
         guard panBinding.wrappedValue != nil else {
-          return false
+          return .ignored
         }
         panBinding.wrappedValue = nil
-        return true
+        return .claimed
 
       default:
-        return false
+        return .ignored
       }
     }
   }
@@ -337,7 +337,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   private func makeIndicatorPointerHandler(
     axis: ScrollIndicatorAxis,
     binding: Binding<ScrollPosition>
-  ) -> @MainActor (LocalPointerEvent) -> Bool {
+  ) -> @MainActor (LocalPointerEvent) -> PointerDispatchOutcome {
     return { event in
       switch event.kind {
       case .down(.primary), .dragged(.primary), .up(.primary):
@@ -350,7 +350,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             axis: axis
           )
         else {
-          return false
+          return .ignored
         }
         let current = binding.wrappedValue
         var next = current
@@ -373,16 +373,16 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
 
         if next != current {
           binding.wrappedValue = next
-          return true
+          return .claimed
         }
 
         if case .down(.primary) = event.kind {
-          return true
+          return .claimed
         }
 
-        return false
+        return .ignored
       default:
-        return false
+        return .ignored
       }
     }
   }

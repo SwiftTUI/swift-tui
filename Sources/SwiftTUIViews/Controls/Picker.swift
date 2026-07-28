@@ -86,14 +86,15 @@ extension Picker {
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
-          return false
+          return .ignored
         }
 
-        return stepBoundSelection(
+        let handled = stepBoundSelection(
           binding,
           orderedTags: options.map(\.tag),
           delta: delta
         )
+        return handled ? .claimed : .ignored
       }
 
       for (index, option) in options.enumerated() {
@@ -104,11 +105,15 @@ extension Picker {
           )
         )
         intake.registerPointerHandler(routeID: routeID) { event in
-          guard case .down(.primary) = event.kind else {
-            return false
+          switch event.kind {
+          case .down(.primary):
+            _ = setBoundSelection(binding, to: option.tag)
+            return .claimed
+          case .up(.primary):
+            return .claimed
+          default:
+            return .ignored
           }
-
-          return setBoundSelection(binding, to: option.tag)
         }
       }
 
@@ -117,7 +122,7 @@ extension Picker {
           for: pickerTriggerIdentity(for: context.identity)
         )
         intake.registerPointerHandler(routeID: triggerRouteID) { _ in
-          false
+          .ignored
         }
       }
     }

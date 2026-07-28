@@ -184,10 +184,11 @@ extension Table {
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
         else {
-          return false
+          return .ignored
         }
 
         return policy.step(orderedTags: selectableTags, delta: delta)
+          ? .claimed : .ignored
       }
 
       let interactionIndices: any Sequence<Int> =
@@ -208,11 +209,15 @@ extension Table {
           )
         )
         intake.registerPointerHandler(routeID: routeID) { event in
-          guard case .down(.primary) = event.kind else {
-            return false
+          switch event.kind {
+          case .down(.primary):
+            _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+            return .claimed
+          case .up(.primary):
+            return .claimed
+          default:
+            return .ignored
           }
-
-          return policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
         }
       }
     }

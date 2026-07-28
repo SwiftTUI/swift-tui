@@ -84,13 +84,13 @@ extension RunLoop {
       timestamp: timestamp
     )
 
-    let customHandled = dispatchPointerEvent(
+    let dispatchOutcome = dispatchPointerEvent(
       preferredRouteID: hitTarget.region.routeID,
       identity: hitTarget.region.identity,
       event: pointerEvent
     )
 
-    if customHandled {
+    if dispatchOutcome.wantsPointerStream {
       if let focusIdentity = hitTarget.focusIdentity,
         shouldClickFocus(focusIdentity, at: location)
       {
@@ -142,7 +142,7 @@ extension RunLoop {
     if let capturedRouteID = pointerInteraction.capturedRouteID,
       let region = pairedInteractionRegion(for: capturedRouteID)
     {
-      let pointerHandled = dispatchPointerEvent(
+      let dispatchOutcome = dispatchPointerEvent(
         preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
@@ -157,26 +157,20 @@ extension RunLoop {
       // A drag recognizer captures on press so it can follow motion outside
       // the original cell. If it never crosses its minimum distance, its
       // release fails instead of claiming the click. Let a control at that
-      // same route activate normally; a recognized drag still returns
-      // `handled` above and suppresses activation.
-      if !pointerHandled,
+      // same route activate normally. An ordinary or high-priority recognized
+      // drag claims the release and suppresses activation; a simultaneous drag
+      // only observes it and leaves the control eligible for activation.
+      if dispatchOutcome != .claimed,
         region.contains(location),
         let actionIdentity = containingActivationIdentity(
           for: region.identity,
           underPointerAt: location
         )
       {
-        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-        let handled = dispatchActivationAction(
+        dispatchReleaseActivation(
           identity: actionIdentity,
           hitOwnerNodeID: region.routeID.ownerNodeID
         )
-        if handled {
-          recordFollowUpInvalidation(
-            for: actionIdentity,
-            schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
-          )
-        }
       }
       // A captured *scroll* pan that releases with velocity flings; the `defer`
       // above then tears down the capture state but the fling lives on in the
@@ -207,7 +201,7 @@ extension RunLoop {
       return
     }
 
-    let pointerHandled = dispatchPointerEvent(
+    let dispatchOutcome = dispatchPointerEvent(
       preferredRouteID: armedRouteID,
       identity: region.identity,
       event: .init(
@@ -219,10 +213,7 @@ extension RunLoop {
         timestamp: timestamp
       )
     )
-    if pointerHandled {
-      return
-    }
-    if pointerInteraction.armedRouteUsesPointerHandler {
+    if dispatchOutcome == .claimed {
       return
     }
 
@@ -250,17 +241,27 @@ extension RunLoop {
       ?? focusedIdentity.flatMap { activationIdentity(for: $0, underPointerAt: location) }
 
     if let actionIdentity {
-      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-      let handled = dispatchActivationAction(
+      dispatchReleaseActivation(
         identity: actionIdentity,
         hitOwnerNodeID: hitTarget?.region.routeID.ownerNodeID
       )
-      if handled {
-        recordFollowUpInvalidation(
-          for: actionIdentity,
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
-        )
-      }
+    }
+  }
+
+  private func dispatchReleaseActivation(
+    identity: Identity,
+    hitOwnerNodeID: ViewNodeID?
+  ) {
+    let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+    let handled = dispatchActivationAction(
+      identity: identity,
+      hitOwnerNodeID: hitOwnerNodeID
+    )
+    if handled {
+      recordFollowUpInvalidation(
+        for: identity,
+        schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+      )
     }
   }
 
@@ -305,7 +306,7 @@ extension RunLoop {
       if region.routeID != armedRouteID {
         pointerInteraction.rekeyArmedRoute(to: region.routeID)
       }
-      let handled = dispatchPointerEvent(
+      let dispatchOutcome = dispatchPointerEvent(
         preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
@@ -317,7 +318,7 @@ extension RunLoop {
           timestamp: timestamp
         )
       )
-      if handled {
+      if dispatchOutcome.wantsPointerStream {
         return
       }
     }
@@ -389,7 +390,7 @@ extension RunLoop {
           for: scrollRoute.identity,
           ownerNodeID: scrollRoute.viewNodeID
         )
-        let handled = dispatchPointerEvent(
+        let dispatchOutcome = dispatchPointerEvent(
           preferredRouteID: routeID,
           identity: scrollRoute.identity,
           event: .init(
@@ -404,7 +405,7 @@ extension RunLoop {
             timestamp: timestamp
           )
         )
-        if handled {
+        if dispatchOutcome.wantsPointerStream {
           scheduler.requestInvalidation(
             of: scrollPointerInvalidationIdentities(for: scrollRoute.identity)
           )
@@ -427,7 +428,7 @@ extension RunLoop {
         scrollRoute = enclosingRoute
       }
     } else if let hitTarget = hitTarget(at: location) {
-      let handled = dispatchPointerEvent(
+      let dispatchOutcome = dispatchPointerEvent(
         preferredRouteID: hitTarget.region.routeID,
         identity: hitTarget.region.identity,
         event: .init(
@@ -439,7 +440,7 @@ extension RunLoop {
           timestamp: timestamp
         )
       )
-      if handled {
+      if dispatchOutcome.wantsPointerStream {
         scheduler.requestInvalidation(
           of: scrollPointerInvalidationIdentities(for: hitTarget.region.identity)
         )

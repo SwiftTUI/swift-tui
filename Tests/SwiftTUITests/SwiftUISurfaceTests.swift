@@ -2269,7 +2269,7 @@ struct SwiftUISurfaceTests {
           ),
           targetRect: targetRect
         )
-      )
+      ).wantsPointerStream
     )
     #expect(box.value == 0.25)
 
@@ -2281,7 +2281,7 @@ struct SwiftUISurfaceTests {
           location: .cellFallback(.init(x: 2, y: 0)),
           targetRect: targetRect
         )
-      )
+      ).wantsPointerStream
     )
     #expect(box.value == 1.0)
   }

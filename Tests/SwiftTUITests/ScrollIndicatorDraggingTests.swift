@@ -77,7 +77,7 @@ struct ScrollIndicatorDraggingTests {
             contentBounds: scrollRoute.contentBounds
           )
         )
-      )
+      ).wantsPointerStream
     )
     #expect(box.position.y == 8)
   }

@@ -245,7 +245,165 @@ struct GestureRunLoopDispatchTests {
     )
 
     #expect(dragResult.exitReason == .inputEnded)
+    // A simultaneous lane observes recognition without claiming the control.
+    #expect(counts.button == 2)
+    #expect(counts.drag == 1)
+  }
+
+  @Test("a default simultaneous drag and its button both recognize a stationary click")
+  func simultaneousDefaultDragAndButtonBothRecognizeStationaryClick() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var drag = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("SimultaneousDefaultDragControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .simultaneousGesture(
+      DragGesture()
+        .onEnded { _ in counts.drag += 1 }
+    )
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
     #expect(counts.button == 1)
+    #expect(counts.drag == 1)
+  }
+
+  @Test("a simultaneous tap and its button both recognize an on-target click")
+  func simultaneousTapAndButtonBothRecognizeOnTargetClick() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var tap = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("SimultaneousTapControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .simultaneousGesture(
+      TapGesture()
+        .onEnded { counts.tap += 1 }
+    )
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.button == 1)
+    #expect(counts.tap == 1)
+  }
+
+  @Test("an off-target release activates neither a simultaneous tap nor its button")
+  func simultaneousTapOffTargetReleaseActivatesNeither() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var tap = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("SimultaneousTapOffTargetControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .simultaneousGesture(
+      TapGesture()
+        .onEnded { counts.tap += 1 }
+    )
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let offTarget = Point(x: 19, y: 4)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: offTarget))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.button == 0)
+    #expect(counts.tap == 0)
+  }
+
+  @Test("a high-priority default drag claims and suppresses a stationary button click")
+  func highPriorityDefaultDragSuppressesStationaryButtonClick() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var drag = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("HighPriorityDefaultDragControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .highPriorityGesture(
+      DragGesture()
+        .onEnded { _ in counts.drag += 1 }
+    )
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.button == 0)
     #expect(counts.drag == 1)
   }
 
@@ -561,6 +719,33 @@ private struct NamedDragWrapper: Gesture {
       .onChanged(onChanged)
       .onEnded(onEnded)
   }
+}
+
+@MainActor
+private func interactionPoint<V: View>(
+  for view: V,
+  terminalSize: CellSize,
+  rootIdentity: Identity
+) throws -> Point {
+  var environment = EnvironmentValues()
+  environment.terminalSize = terminalSize
+  let pointerRegistry = LocalPointerHandlerRegistry()
+  let gestureRegistry = LocalGestureRegistry()
+  let gestureStateRegistry = LocalGestureStateRegistry()
+  var context = ResolveContext(identity: rootIdentity, environmentValues: environment)
+  context.localPointerHandlerRegistry = pointerRegistry
+  context.localGestureRegistry = gestureRegistry
+  context.localGestureStateRegistry = gestureStateRegistry
+  let initial = DefaultRenderer().render(
+    view,
+    context: context,
+    proposal: .init(width: terminalSize.width, height: terminalSize.height)
+  )
+  let region = try #require(
+    initial.semanticSnapshot.interactionRegions
+      .max { $0.hitTestOrder < $1.hitTestOrder }
+  )
+  return centerPoint(of: region.rect)
 }
 
 @MainActor

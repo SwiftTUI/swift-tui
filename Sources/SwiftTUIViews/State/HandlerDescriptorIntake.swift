@@ -215,7 +215,7 @@ package struct HandlerDescriptorIntake {
 
   package func registerPointerHandler(
     routeID: RouteID,
-    handler: @escaping @MainActor (LocalPointerEvent) -> Bool
+    handler: @escaping @MainActor (LocalPointerEvent) -> PointerDispatchOutcome
   ) {
     let scope = dispatchScope
     context.localPointerHandlerRegistry?.register(

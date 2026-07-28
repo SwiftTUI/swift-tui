@@ -348,7 +348,7 @@ package final class LocalGestureRegistry: Equatable {
 }
 
 @MainActor
-private final class StackedGestureRecognizer: GestureRecognizer {
+private final class StackedGestureRecognizer: GestureRecognizer, RoleAwarePointerDispatching {
   typealias Value = Never
 
   fileprivate let registrations: [GestureRegistration]
@@ -407,7 +407,19 @@ private final class StackedGestureRecognizer: GestureRecognizer {
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
-    var sawHandled = false
+    switch handleClassified(event: event) {
+    case .claimed, .observed:
+      return .handled
+    case .failed:
+      return .failed
+    case .ignored:
+      return .ignored
+    }
+  }
+
+  func handleClassified(event: LocalPointerEvent) -> PointerDispatchOutcome {
+    var sawClaimed = false
+    var sawObserved = false
     var sawFailed = false
 
     // High-priority recognizers receive the stream first. A claiming high
@@ -418,7 +430,7 @@ private final class StackedGestureRecognizer: GestureRecognizer {
     for registration in registrations where registration.role == .highPriority {
       switch registration.recognizer.handle(event: event) {
       case .handled:
-        sawHandled = true
+        sawClaimed = true
         highPriorityHandled = true
       case .failed:
         sawFailed = true
@@ -433,7 +445,7 @@ private final class StackedGestureRecognizer: GestureRecognizer {
     for registration in registrations where registration.role == .simultaneous {
       switch registration.recognizer.handle(event: event) {
       case .handled:
-        sawHandled = true
+        sawObserved = true
       case .failed:
         sawFailed = true
       case .ignored:
@@ -445,7 +457,7 @@ private final class StackedGestureRecognizer: GestureRecognizer {
       for registration in registrations where registration.role == .ordinary {
         switch registration.recognizer.handle(event: event) {
         case .handled:
-          sawHandled = true
+          sawClaimed = true
         case .failed:
           sawFailed = true
         case .ignored:
@@ -454,8 +466,11 @@ private final class StackedGestureRecognizer: GestureRecognizer {
       }
     }
 
-    if sawHandled {
-      return .handled
+    if sawClaimed {
+      return .claimed
+    }
+    if sawObserved {
+      return .observed
     }
     return sawFailed ? .failed : .ignored
   }

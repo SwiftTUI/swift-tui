@@ -161,21 +161,31 @@ extension RunLoop {
     preferredRouteID: RouteID,
     identity: Identity,
     event: LocalPointerEvent
-  ) -> Bool {
-    if localPointerHandlerRegistry.dispatch(routeID: preferredRouteID, event: event) {
-      return true
+  ) -> PointerDispatchOutcome {
+    let preferredOutcome = localPointerHandlerRegistry.dispatch(
+      routeID: preferredRouteID,
+      event: event
+    )
+    if preferredOutcome.wantsPointerStream {
+      return preferredOutcome
     }
+    var sawFailure = preferredOutcome == .failed
 
     for fallbackRouteID in fallbackPrimaryRouteIDs(
       startingAt: identity,
       excluding: preferredRouteID
     ) {
-      if localPointerHandlerRegistry.dispatch(routeID: fallbackRouteID, event: event) {
-        return true
+      let outcome = localPointerHandlerRegistry.dispatch(
+        routeID: fallbackRouteID,
+        event: event
+      )
+      if outcome.wantsPointerStream {
+        return outcome
       }
+      sawFailure = sawFailure || outcome == .failed
     }
 
-    return false
+    return sawFailure ? .failed : .ignored
   }
 
   package func fallbackPrimaryRouteIDs(

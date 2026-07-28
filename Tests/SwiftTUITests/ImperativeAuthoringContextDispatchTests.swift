@@ -585,7 +585,7 @@ struct ImperativeAuthoringContextDispatchTests {
           location: .zero,
           targetRect: .init(origin: .zero, size: .init(width: 10, height: 4))
         )
-      )
+      ).wantsPointerStream
     )
     try renderPending(primary.runLoop)
     try renderPending(secondary.runLoop)

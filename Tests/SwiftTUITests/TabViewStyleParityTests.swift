@@ -50,7 +50,7 @@ struct TabViewStyleParityTests {
       pointerRegistry.dispatch(
         routeID: routeID,
         event: primaryPointerDownEvent()
-      )
+      ).wantsPointerStream
     )
     #expect(selectionBox.value == "settings")
   }
@@ -86,7 +86,7 @@ struct TabViewStyleParityTests {
       pointerRegistry.dispatch(
         routeID: triggerRouteID,
         event: primaryPointerDownEvent()
-      )
+      ).wantsPointerStream
     )
 
     let expanded = renderer.render(
@@ -117,7 +117,7 @@ struct TabViewStyleParityTests {
       pointerRegistry.dispatch(
         routeID: overflowItemRouteID,
         event: primaryPointerDownEvent()
-      )
+      ).wantsPointerStream
     )
     #expect(selectionBox.value == "three")
   }

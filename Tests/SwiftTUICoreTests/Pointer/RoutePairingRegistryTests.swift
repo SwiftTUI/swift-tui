@@ -37,11 +37,11 @@ struct RoutePairingRegistryTests {
     var received: [String] = []
     registry.register(routeID: staleRoute) { _ in
       received.append("stale")
-      return true
+      return .claimed
     }
     registry.register(routeID: freshRoute) { _ in
       received.append("fresh")
-      return true
+      return .claimed
     }
 
     let event = LocalPointerEvent(
@@ -51,20 +51,23 @@ struct RoutePairingRegistryTests {
     )
 
     // An exact key still dispatches exactly.
-    #expect(registry.dispatch(routeID: staleRoute, event: event))
+    #expect(registry.dispatch(routeID: staleRoute, event: event) == .claimed)
     #expect(received == ["stale"])
     received = []
 
     // An owner-less probe (the run loop's ancestor-walk fallback) pairs with
     // both entries; the freshest owner must win — the old wildcard `==` left
     // this to hash-seeded dictionary probe order.
-    #expect(registry.dispatch(routeID: RouteID(identity: identity), event: event))
+    #expect(
+      registry.dispatch(routeID: RouteID(identity: identity), event: event)
+        == .claimed
+    )
     #expect(received == ["fresh"])
     received = []
 
     // A probe carrying a re-minted (unknown) owner pairs the same way.
     let reMinted = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 12))
-    #expect(registry.dispatch(routeID: reMinted, event: event))
+    #expect(registry.dispatch(routeID: reMinted, event: event) == .claimed)
     #expect(received == ["fresh"])
     #expect(registry.handlerRouteID(pairingWith: reMinted) == freshRoute)
     #expect(registry.hasHandler(pairingWith: reMinted))

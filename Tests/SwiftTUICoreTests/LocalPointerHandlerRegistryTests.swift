@@ -26,7 +26,7 @@ struct LocalPointerHandlerRegistryTests {
     let hoverRoute = RouteID(identity: Identity(components: [IdentityComponent(rawValue: "h")]))
     // No ViewNodeContext in a unit test: `.current` owners carry no
     // viewNodeID — the exact shape gesture prune would drop.
-    registry.register(routeID: pressRoute) { _ in false }
+    registry.register(routeID: pressRoute) { _ in .ignored }
     registry.registerHover(routeID: hoverRoute) { _ in }
     #expect(registry.hasHandler(routeID: pressRoute))
     #expect(registry.hasHoverHandler(routeID: hoverRoute))
@@ -43,12 +43,20 @@ struct LocalPointerHandlerRegistryTests {
     let parent = Identity(components: [IdentityComponent(rawValue: "p")])
     let childRoute = RouteID(identity: parent.child(IdentityComponent(rawValue: "c")))
     let siblingRoute = RouteID(identity: Identity(components: [IdentityComponent(rawValue: "s")]))
-    registry.register(routeID: childRoute) { _ in false }
-    registry.register(routeID: siblingRoute) { _ in false }
+    registry.register(routeID: childRoute) { _ in .ignored }
+    registry.register(routeID: siblingRoute) { _ in .ignored }
 
     registry.removeSubtrees(rootedAt: [parent])
 
     #expect(!registry.hasHandler(routeID: childRoute))
     #expect(registry.hasHandler(routeID: siblingRoute))
+  }
+
+  @Test("dispatch outcomes distinguish stream routing from release ownership")
+  func dispatchOutcomesDistinguishStreamRoutingFromReleaseOwnership() {
+    #expect(PointerDispatchOutcome.claimed.wantsPointerStream)
+    #expect(PointerDispatchOutcome.observed.wantsPointerStream)
+    #expect(!PointerDispatchOutcome.failed.wantsPointerStream)
+    #expect(!PointerDispatchOutcome.ignored.wantsPointerStream)
   }
 }

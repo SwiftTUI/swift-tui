@@ -54,7 +54,7 @@ enum RegistrationKindDriver {
       node.recordTerminationHandlerRegistration(identity: identity) { _ in .allow }
     case .pointerHandler:
       let routeID = RouteID(identity: identity)
-      node.recordPointerHandlerRegistration(routeID: routeID) { _ in false }
+      node.recordPointerHandlerRegistration(routeID: routeID) { _ in .ignored }
       node.recordPointerHoverHandlerRegistration(routeID: routeID) { _ in }
     case .gesture:
       node.recordGestureRegistration(
@@ -108,13 +108,16 @@ enum RegistrationKindDriver {
       )
     case .lifecycle:
       node.recordLifecycleAppearRegistration(
-        RegistrationKindDriver.lifecycleRegistration(identity: identity, node: node, suffix: .appear(ordinal: 0))
+        RegistrationKindDriver.lifecycleRegistration(
+          identity: identity, node: node, suffix: .appear(ordinal: 0))
       )
       node.recordLifecycleDisappearRegistration(
-        RegistrationKindDriver.lifecycleRegistration(identity: identity, node: node, suffix: .disappear(ordinal: 0))
+        RegistrationKindDriver.lifecycleRegistration(
+          identity: identity, node: node, suffix: .disappear(ordinal: 0))
       )
       node.recordLifecycleChangeRegistration(
-        RegistrationKindDriver.lifecycleRegistration(identity: identity, node: node, suffix: .change(ordinal: 0))
+        RegistrationKindDriver.lifecycleRegistration(
+          identity: identity, node: node, suffix: .change(ordinal: 0))
       )
     case .task:
       node.recordTaskRegistration(

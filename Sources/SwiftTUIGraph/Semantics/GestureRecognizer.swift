@@ -200,6 +200,20 @@ public final class AnyGestureRecognizer {
     _handleEvent(event)
   }
 
+  package func handleClassified(event: LocalPointerEvent) -> PointerDispatchOutcome {
+    if let roleAware = base as? any RoleAwarePointerDispatching {
+      return roleAware.handleClassified(event: event)
+    }
+    switch handle(event: event) {
+    case .handled:
+      return .claimed
+    case .failed:
+      return .failed
+    case .ignored:
+      return .ignored
+    }
+  }
+
   /// See ``GestureRecognizer/reArm()``.
   package func reArm() {
     _reArm()
