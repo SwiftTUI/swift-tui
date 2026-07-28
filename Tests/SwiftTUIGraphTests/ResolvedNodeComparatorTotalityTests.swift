@@ -56,12 +56,15 @@ struct ResolvedNodeComparatorTotalityTests {
       "structuralPath": "oracle-ignored: re-stamped on reuse",
       "entityIdentity": "per-resolve entity bookkeeping — histogram-only, never the alarm",
       "entityStructuralPath": "per-resolve entity bookkeeping — histogram-only, never the alarm",
+      "handlerInventory":
+        "committed registration bookkeeping — histogram-only, never memo-unsound content",
     ],
     "placementEquivalence": [
       "viewNodeID": "runtime node stamp — PlacedNode does not mirror it",
       "transactionSnapshot": "not mirrored into PlacedNode (see the metadata contract comment)",
       "preferenceValues": "not mirrored into PlacedNode; reconciled by the preference phase",
       "supportsRetainedReuse": "reuse-machinery flag, not placed output",
+      "handlerInventory": "registration bookkeeping, not placed output or geometry",
     ],
     "isEquivalentForMeasurement": [
       "viewNodeID": "measurement cache key: node stamps cannot change measured size",
@@ -76,6 +79,7 @@ struct ResolvedNodeComparatorTotalityTests {
       "surfaceComposition": "measurement cache key: compositing cannot change measured size",
       "semanticMetadata": "measurement cache key: semantics cannot change measured size",
       "lifecycleMetadata": "measurement cache key: lifecycle cannot change measured size",
+      "handlerInventory": "measurement cache key: registrations cannot change measured size",
       "preferenceValues": "measurement cache key: preferences cannot change measured size",
       "supportsRetainedReuse": "measurement cache key: reuse flag cannot change measured size",
       "matchedGeometry": "measurement cache key: matched-geometry pairing is placement-phase",
@@ -94,6 +98,7 @@ struct ResolvedNodeComparatorTotalityTests {
       "surfaceComposition": "placement cache key: compositing does not affect geometry",
       "semanticMetadata": "placement cache key: semantics do not affect geometry",
       "lifecycleMetadata": "placement cache key: lifecycle does not affect geometry",
+      "handlerInventory": "placement cache key: registrations do not affect geometry",
       "preferenceValues": "placement cache key: preferences do not affect geometry",
       "supportsRetainedReuse": "placement cache key: reuse flag does not affect geometry",
       "matchedGeometry": "placement cache key: pairing resolved by the matched-geometry pass",

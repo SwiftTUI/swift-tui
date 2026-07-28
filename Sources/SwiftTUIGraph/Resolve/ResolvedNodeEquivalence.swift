@@ -192,6 +192,7 @@ extension ResolvedNode {
       surfaceComposition == other.surfaceComposition,
       semanticMetadata == other.semanticMetadata,
       lifecycleMetadata == other.lifecycleMetadata,
+      handlerInventory == other.handlerInventory,
       drawPayload == other.drawPayload,
       intrinsicSize == other.intrinsicSize,
       indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
@@ -213,7 +214,8 @@ extension ResolvedNode {
 
   /// Stage-1 memo alarm classifier: returns the first **content** field on
   /// which the two nodes diverge, or nil when every divergence is per-resolve
-  /// identity bookkeeping (`entityIdentity`/`entityStructuralPath`; plus
+  /// identity bookkeeping (`entityIdentity`/`entityStructuralPath`) or
+  /// committed registration bookkeeping (`handlerInventory`; plus
   /// `structuralPath`, which ``memoReuseEquivalent(to:)`` already ignores, and
   /// `transactionSnapshot` compared by reuse-equivalence).
   ///
@@ -285,6 +287,7 @@ extension ResolvedNode {
     }
     if entityIdentity != other.entityIdentity { return "entityIdentity" }
     if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
+    if handlerInventory != other.handlerInventory { return "handlerInventory" }
     for (l, r) in zip(children, other.children) {
       if let childField = l.memoFirstDifferingField(from: r) {
         return "child.\(childField)"
@@ -314,6 +317,7 @@ extension ResolvedNode {
       && lhs.surfaceComposition == rhs.surfaceComposition
       && lhs.semanticMetadata == rhs.semanticMetadata
       && lhs.lifecycleMetadata == rhs.lifecycleMetadata
+      && lhs.handlerInventory == rhs.handlerInventory
       && lhs.drawPayload == rhs.drawPayload
       && lhs.intrinsicSize == rhs.intrinsicSize
       && lhs.indexedChildSource?.measurementSignature

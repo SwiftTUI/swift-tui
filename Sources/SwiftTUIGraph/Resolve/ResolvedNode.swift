@@ -110,6 +110,7 @@ package struct ResolvedNode: Equatable, Sendable {
   package var surfaceComposition: SurfaceCompositionMetadata
   package var semanticMetadata: SemanticMetadata
   package var lifecycleMetadata: LifecycleMetadata
+  package var handlerInventory: CommittedHandlerInventory
   package var drawPayload: DrawPayload
   package var intrinsicSize: CellSize?
   package var indexedChildSource: (any IndexedChildSource)? {
@@ -183,6 +184,7 @@ package struct ResolvedNode: Equatable, Sendable {
     surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
+    handlerInventory: CommittedHandlerInventory = .init(),
     drawPayload: DrawPayload = .none,
     intrinsicSize: CellSize? = nil,
     layoutRealizedContent: LayoutRealizedContentBoundary? = nil
@@ -210,6 +212,7 @@ package struct ResolvedNode: Equatable, Sendable {
     self.surfaceComposition = surfaceComposition
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
+    self.handlerInventory = handlerInventory
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = nil
@@ -242,6 +245,7 @@ package struct ResolvedNode: Equatable, Sendable {
     surfaceComposition: SurfaceCompositionMetadata = .normal,
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
+    handlerInventory: CommittedHandlerInventory = .init(),
     drawPayload: DrawPayload = .none,
     intrinsicSize: CellSize? = nil,
     indexedChildSource: (any IndexedChildSource)? = nil,
@@ -267,6 +271,7 @@ package struct ResolvedNode: Equatable, Sendable {
     self.surfaceComposition = surfaceComposition
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
+    self.handlerInventory = handlerInventory
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = indexedChildSource

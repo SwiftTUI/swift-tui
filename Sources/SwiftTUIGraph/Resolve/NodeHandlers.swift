@@ -7,6 +7,9 @@
 // family participates in emptiness checks and absorb adoption by
 // construction once its field joins that list —
 // `RuntimeRegistrationKindTotalityTests` pins the coverage.
+// `ResolvedNode.handlerInventory` is a derived identity-only projection, not
+// another registration record family: it is deliberately excluded from
+// `allRecordFields` and rebuilt from the selected records at commit seams.
 
 /// The single merge direction every family's `absorbAdopted` uses (F121):
 /// on a key collision the ADOPTING record keeps its own entry — the

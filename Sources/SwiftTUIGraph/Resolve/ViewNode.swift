@@ -821,10 +821,15 @@ package final class ViewNode {
       from: resolved.children,
       children: children
     )
-    let resolved = resolvedWithRuntimeNodeIDs(
+    var resolved = resolvedWithRuntimeNodeIDs(
       resolved,
       children: children
     )
+    // `NodeHandlers` remains the closure-bearing source of truth. Finalize its
+    // identity-only projection after this evaluation's registration-producing
+    // resolve work; retained-snapshot adoption deliberately bypasses this
+    // overwrite so a reused artifact keeps the inventory it was authored with.
+    resolved.handlerInventory = registeredHandlers.committedHandlerInventory
     // Reuse fast path: an unchanged reused subtree hands back exactly the nodes
     // already attached, in the same order (recordReusedSubtree resolves each child
     // via nodeForIdentity). The detach and re-parent loops below are then no-ops
@@ -1308,6 +1313,7 @@ package final class ViewNode {
       handler: handler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordActionRegistration(
@@ -1328,6 +1334,7 @@ package final class ViewNode {
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordKeyHandlerRegistration(
@@ -1344,6 +1351,7 @@ package final class ViewNode {
       identity: identity,
       handler: handler
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordKeyPressHandlerRegistration(
@@ -1357,6 +1365,7 @@ package final class ViewNode {
       ordinal: ordinal,
       handler: handler
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordPasteHandlerRegistration(
@@ -1370,6 +1379,7 @@ package final class ViewNode {
       ordinal: ordinal,
       handler: handler
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordTerminationHandlerRegistration(
@@ -1394,6 +1404,7 @@ package final class ViewNode {
       structuralKey: structuralKey,
       handler: handler
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordPointerHoverHandlerRegistration(
@@ -1407,6 +1418,7 @@ package final class ViewNode {
       structuralKey: structuralKey,
       handler: handler
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordGestureRegistration(
@@ -1420,6 +1432,7 @@ package final class ViewNode {
       structuralKey: structuralKey,
       recognizer: recognizer
     )
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func gestureRegistration(
@@ -1545,6 +1558,7 @@ package final class ViewNode {
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordCommand(registration)
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   package func recordDropDestinationRegistration(
@@ -1559,11 +1573,32 @@ package final class ViewNode {
     }
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordDropDestination(registration)
+    refreshCommittedHandlerInventoryOutsideCapture()
   }
 
   private func recordRuntimeRegistrationMutation() {
     // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     runtimeRegistrationMutationGeneration &+= 1
+  }
+
+  /// Resolve capture finalizes the inventory in `apply`. The toolbar action
+  /// refresh and cross-node gesture aggregation can write records outside that
+  /// capture window, so keep an already-committed artifact exact at those
+  /// unconditional registration seams too.
+  private func refreshCommittedHandlerInventoryOutsideCapture() {
+    guard registrationCaptureDepth == 0 else {
+      return
+    }
+    refreshCommittedHandlerInventory()
+  }
+
+  private func refreshCommittedHandlerInventory() {
+    let inventory = registeredHandlers.committedHandlerInventory
+    guard committed.handlerInventory != inventory else {
+      return
+    }
+    committed.handlerInventory = inventory
+    invalidateAncestorCachedSnapshots()
   }
 
   /// Enrolls this node in the graph's effect-owner index (F148) so the
@@ -1623,6 +1658,7 @@ package final class ViewNode {
     }
     recordRuntimeRegistrationMutation()
     registeredHandlers.absorbAdopted(departing.registeredHandlers)
+    refreshCommittedHandlerInventory()
     if registeredHandlers.hasEffectRegistrations {
       noteEffectRegistrationOwnership()
     }
