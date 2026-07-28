@@ -81,6 +81,18 @@ struct DragGestureTests {
     #expect(rec.phase == .changed || rec.phase == .began)
   }
 
+  @Test("minimumDistance fails when release stays below threshold")
+  func minDistanceFailsOnStationaryRelease() {
+    let rec = DragGesture(minimumDistance: 3)._makeRecognizer(context: ctx())
+    _ = rec.handle(event: event(.down(.primary), at: Point(x: 2, y: 1)))
+
+    let disposition = rec.handle(event: event(.up(.primary), at: Point(x: 2, y: 1)))
+
+    #expect(disposition == .failed)
+    #expect(rec.phase == .failed)
+    #expect(rec.currentValue() == nil)
+  }
+
   @Test("DragGesture currentValue exposes velocity after multiple samples")
   func velocityComputed() throws {
     let rec = DragGesture()._makeRecognizer(context: ctx())

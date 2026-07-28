@@ -142,7 +142,7 @@ extension RunLoop {
     if let capturedRouteID = pointerInteraction.capturedRouteID,
       let region = pairedInteractionRegion(for: capturedRouteID)
     {
-      _ = dispatchPointerEvent(
+      let pointerHandled = dispatchPointerEvent(
         preferredRouteID: region.routeID,
         identity: region.identity,
         event: .init(
@@ -154,6 +154,30 @@ extension RunLoop {
           timestamp: timestamp
         )
       )
+      // A drag recognizer captures on press so it can follow motion outside
+      // the original cell. If it never crosses its minimum distance, its
+      // release fails instead of claiming the click. Let a control at that
+      // same route activate normally; a recognized drag still returns
+      // `handled` above and suppresses activation.
+      if !pointerHandled,
+        region.contains(location),
+        let actionIdentity = containingActivationIdentity(
+          for: region.identity,
+          underPointerAt: location
+        )
+      {
+        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+        let handled = dispatchActivationAction(
+          identity: actionIdentity,
+          hitOwnerNodeID: region.routeID.ownerNodeID
+        )
+        if handled {
+          recordFollowUpInvalidation(
+            for: actionIdentity,
+            schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          )
+        }
+      }
       // A captured *scroll* pan that releases with velocity flings; the `defer`
       // above then tears down the capture state but the fling lives on in the
       // run-loop-owned momentum controller, keyed by the route identity.

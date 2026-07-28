@@ -123,6 +123,77 @@ struct GestureRunLoopDispatchTests {
     #expect(counts.button == 0)
   }
 
+  @Test("a stationary click activates a button with a simultaneous drag gesture")
+  func stationaryClickActivatesButtonWithSimultaneousDragGesture() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var drag = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("SimultaneousDragControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 1)
+        .onEnded { _ in counts.drag += 1 }
+    )
+
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: rootIdentity, environmentValues: environment)
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: context,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let region = try #require(
+      initial.semanticSnapshot.interactionRegions
+        .max { $0.hitTestOrder < $1.hitTestOrder }
+    )
+    let point = centerPoint(of: region.rect)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.button == 1)
+    #expect(counts.drag == 0)
+
+    let dragPoint = Point(x: point.x + 2, y: point.y)
+    let dragResult = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: dragPoint))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: dragPoint))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(dragResult.exitReason == .inputEnded)
+    #expect(counts.button == 1)
+    #expect(counts.drag == 1)
+  }
+
   @Test("SpatialTapGesture delivers local coordinates through the full RunLoop mouse path")
   func spatialTapGestureCarriesLocalCoordinatesThroughRunLoop() async throws {
     @MainActor final class Box {

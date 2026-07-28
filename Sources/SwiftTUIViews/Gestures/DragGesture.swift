@@ -192,6 +192,14 @@ final class DragGestureRecognizer: GestureRecognizer {
         )
       )
       namedCoordinateSpaces = event.namedCoordinateSpaces
+      let dx = location.x - start.x
+      let dy = location.y - start.y
+      let distance = max(abs(dx), abs(dy))
+      if phase == .possible, distance < minimumDistance {
+        phase = .failed
+        lastValue = nil
+        return .failed
+      }
       phase = .ended
       lastValue = makeValue(
         now: event.timestamp,
