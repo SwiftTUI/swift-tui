@@ -191,6 +191,10 @@ package final class LocalGestureRegistry: Equatable {
     recognizers[identity]
   }
 
+  package func hasRecognizer(for identity: Identity) -> Bool {
+    recognizers[identity] != nil
+  }
+
   package func hasCurrentPassRecognizer(for identity: Identity) -> Bool {
     guard let authored = passAuthoredRecognizers[identity] else {
       return false

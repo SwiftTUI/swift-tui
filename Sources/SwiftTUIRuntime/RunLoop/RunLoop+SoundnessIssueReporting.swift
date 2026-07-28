@@ -10,6 +10,12 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
   package var teardownCoherence = 0
   package var registrationPublication = 0
   package var memoUnsoundSkip = 0
+  package var handlerResolutionAction = 0
+  package var handlerResolutionKey = 0
+  package var handlerResolutionCommand = 0
+  package var handlerResolutionDrop = 0
+  package var handlerResolutionGesture = 0
+  package var actionDispatchMiss = 0
   package var strandedListing = 0
 
   package init() {}
@@ -29,6 +35,12 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
     counts.teardownCoherence = snapshot.teardownCoherenceViolationCount
     counts.registrationPublication = snapshot.registrationPublicationViolationCount
     counts.memoUnsoundSkip = snapshot.memoUnsoundSkipCount
+    counts.handlerResolutionAction = snapshot.actionResolutionViolationCount
+    counts.handlerResolutionKey = snapshot.keyHandlerResolutionViolationCount
+    counts.handlerResolutionCommand = snapshot.commandScopeResolutionViolationCount
+    counts.handlerResolutionDrop = snapshot.dropScopeResolutionViolationCount
+    counts.handlerResolutionGesture = snapshot.gestureRouteResolutionViolationCount
+    counts.actionDispatchMiss = snapshot.actionDispatchMissCount
     counts.strandedListing = snapshot.strandedListingViolationCount
     return counts
   }
@@ -86,6 +98,42 @@ extension RunLoop {
       total: snapshot.memoUnsoundSkipCount,
       detail: snapshot.lastViolationDetailByKind["memo-unsound-skip"],
       lastSeen: &counts.memoUnsoundSkip
+    )
+    reportSoundnessViolationGrowth(
+      kind: "handlerResolutionAction",
+      total: snapshot.actionResolutionViolationCount,
+      detail: snapshot.lastViolationDetailByKind["handler-resolution-action"],
+      lastSeen: &counts.handlerResolutionAction
+    )
+    reportSoundnessViolationGrowth(
+      kind: "handlerResolutionKey",
+      total: snapshot.keyHandlerResolutionViolationCount,
+      detail: snapshot.lastViolationDetailByKind["handler-resolution-key"],
+      lastSeen: &counts.handlerResolutionKey
+    )
+    reportSoundnessViolationGrowth(
+      kind: "handlerResolutionCommand",
+      total: snapshot.commandScopeResolutionViolationCount,
+      detail: snapshot.lastViolationDetailByKind["handler-resolution-command"],
+      lastSeen: &counts.handlerResolutionCommand
+    )
+    reportSoundnessViolationGrowth(
+      kind: "handlerResolutionDrop",
+      total: snapshot.dropScopeResolutionViolationCount,
+      detail: snapshot.lastViolationDetailByKind["handler-resolution-drop"],
+      lastSeen: &counts.handlerResolutionDrop
+    )
+    reportSoundnessViolationGrowth(
+      kind: "handlerResolutionGesture",
+      total: snapshot.gestureRouteResolutionViolationCount,
+      detail: snapshot.lastViolationDetailByKind["handler-resolution-gesture"],
+      lastSeen: &counts.handlerResolutionGesture
+    )
+    reportSoundnessViolationGrowth(
+      kind: "actionDispatchMiss",
+      total: snapshot.actionDispatchMissCount,
+      detail: snapshot.lastViolationDetailByKind["action-dispatch-miss"],
+      lastSeen: &counts.actionDispatchMiss
     )
     reportSoundnessViolationGrowth(
       kind: "strandedListing",

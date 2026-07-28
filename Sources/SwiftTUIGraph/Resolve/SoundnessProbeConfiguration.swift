@@ -26,6 +26,12 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var lifecycleHandlerSkipCount: Int
   package var ambientEnvironmentFallbackReadCount: Int
   package var committedHandlerResolutionViolationCount: Int
+  package var actionResolutionViolationCount: Int
+  package var keyHandlerResolutionViolationCount: Int
+  package var commandScopeResolutionViolationCount: Int
+  package var dropScopeResolutionViolationCount: Int
+  package var gestureRouteResolutionViolationCount: Int
+  package var actionDispatchMissCount: Int
   package var strandedListingViolationCount: Int
   package var lastViolationDetailByKind: [String: String]
 
@@ -58,6 +64,17 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
         SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount,
       committedHandlerResolutionViolationCount:
         SoundnessProbeConfiguration.committedHandlerResolutionViolationCount,
+      actionResolutionViolationCount:
+        SoundnessProbeConfiguration.actionResolutionViolationCount,
+      keyHandlerResolutionViolationCount:
+        SoundnessProbeConfiguration.keyHandlerResolutionViolationCount,
+      commandScopeResolutionViolationCount:
+        SoundnessProbeConfiguration.commandScopeResolutionViolationCount,
+      dropScopeResolutionViolationCount:
+        SoundnessProbeConfiguration.dropScopeResolutionViolationCount,
+      gestureRouteResolutionViolationCount:
+        SoundnessProbeConfiguration.gestureRouteResolutionViolationCount,
+      actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
       lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
@@ -155,6 +172,42 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       kind: "committed-handler-resolution",
       previous: previous.committedHandlerResolutionViolationCount,
       current: committedHandlerResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: InteractiveHandlerResolutionFamily.action.traceKind,
+      previous: previous.actionResolutionViolationCount,
+      current: actionResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: InteractiveHandlerResolutionFamily.key.traceKind,
+      previous: previous.keyHandlerResolutionViolationCount,
+      current: keyHandlerResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: InteractiveHandlerResolutionFamily.command.traceKind,
+      previous: previous.commandScopeResolutionViolationCount,
+      current: commandScopeResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: InteractiveHandlerResolutionFamily.drop.traceKind,
+      previous: previous.dropScopeResolutionViolationCount,
+      current: dropScopeResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: InteractiveHandlerResolutionFamily.gesture.traceKind,
+      previous: previous.gestureRouteResolutionViolationCount,
+      current: gestureRouteResolutionViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "action-dispatch-miss",
+      previous: previous.actionDispatchMissCount,
+      current: actionDispatchMissCount,
       to: &growth
     )
     appendGrowth(
@@ -270,6 +323,12 @@ package enum SoundnessProbeConfiguration {
   package static var lifecycleHandlerSkipCount = 0
   package static var ambientEnvironmentFallbackReadCount = 0
   package static var committedHandlerResolutionViolationCount = 0
+  package static var actionResolutionViolationCount = 0
+  package static var keyHandlerResolutionViolationCount = 0
+  package static var commandScopeResolutionViolationCount = 0
+  package static var dropScopeResolutionViolationCount = 0
+  package static var gestureRouteResolutionViolationCount = 0
+  package static var actionDispatchMissCount = 0
   package static var strandedListingViolationCount = 0
   package static var lastViolationDetailByKind: [String: String] = [:]
   private static var lastViolationDetailStorage: String?
@@ -497,6 +556,43 @@ package enum SoundnessProbeConfiguration {
     recordViolationDetail(detail, for: "committed-handler-resolution")
     emitTrace("committed-handler-resolution")
     assertZeroCensusViolation(detail)
+  }
+
+  /// Records one interactive registration family named by the committed
+  /// artifact but absent from the just-published live registry. These sampled
+  /// findings intentionally remain non-asserting while the five family
+  /// censuses establish their baseline.
+  package static func recordInteractiveHandlerResolutionViolation(
+    family: InteractiveHandlerResolutionFamily,
+    detail: @autoclosure () -> String
+  ) {
+    switch family {
+    case .action:
+      actionResolutionViolationCount += 1
+    case .key:
+      keyHandlerResolutionViolationCount += 1
+    case .command:
+      commandScopeResolutionViolationCount += 1
+    case .drop:
+      dropScopeResolutionViolationCount += 1
+    case .gesture:
+      gestureRouteResolutionViolationCount += 1
+    }
+    let detail = detail()
+    recordViolationDetail(detail, for: family.traceKind)
+    emitTrace(family.traceKind)
+  }
+
+  /// Records an action dispatch whose registry lookup failed. A registered
+  /// handler returning `false` is a successful lookup and does not use this
+  /// channel.
+  package static func recordActionDispatchMiss(
+    _ detail: @autoclosure () -> String
+  ) {
+    actionDispatchMissCount += 1
+    let detail = detail()
+    recordViolationDetail(detail, for: "action-dispatch-miss")
+    emitTrace("action-dispatch-miss")
   }
 
   /// Records one stranded listing (residual 2 of the reuse/freshness quirk

@@ -127,6 +127,11 @@ package final class CommandRegistry: Equatable {
     store[scope]?[binding]
   }
 
+  /// Whether `scope` publishes at least one dispatchable key command.
+  package func hasCommands(at scope: Identity) -> Bool {
+    store[scope]?.isEmpty == false
+  }
+
   /// Walks the focus chain shallowest-first and fires the first
   /// matching enabled keyCommand. A disabled match still consumes the
   /// event. Returns true if the event was consumed (fired or blocked)

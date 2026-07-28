@@ -33,6 +33,12 @@ struct SoundnessFailureChannelTests {
     "ambient-environment-fallback",
     "state-slot-restoration-drop",
     "committed-handler-resolution",
+    "handler-resolution-action",
+    "handler-resolution-key",
+    "handler-resolution-command",
+    "handler-resolution-drop",
+    "handler-resolution-gesture",
+    "action-dispatch-miss",
     "stranded-listing",
   ]
 
@@ -150,6 +156,27 @@ struct SoundnessFailureChannelTests {
     SoundnessProbeConfiguration.recordAmbientEnvironmentFallbackRead("test")
     SoundnessProbeConfiguration.recordStateSlotRestorationDrop("test")
     SoundnessProbeConfiguration.recordCommittedHandlerResolutionViolation("test")
+    SoundnessProbeConfiguration.recordInteractiveHandlerResolutionViolation(
+      family: .action,
+      detail: "test"
+    )
+    SoundnessProbeConfiguration.recordInteractiveHandlerResolutionViolation(
+      family: .key,
+      detail: "test"
+    )
+    SoundnessProbeConfiguration.recordInteractiveHandlerResolutionViolation(
+      family: .command,
+      detail: "test"
+    )
+    SoundnessProbeConfiguration.recordInteractiveHandlerResolutionViolation(
+      family: .drop,
+      detail: "test"
+    )
+    SoundnessProbeConfiguration.recordInteractiveHandlerResolutionViolation(
+      family: .gesture,
+      detail: "test"
+    )
+    SoundnessProbeConfiguration.recordActionDispatchMiss("test")
     SoundnessProbeConfiguration.recordStrandedListingViolation("test")
   }
 
@@ -261,6 +288,8 @@ private struct ScannerResult {
 @MainActor
 private struct ProbeState {
   let isEnabled: Bool
+  let sampleEveryNFrames: Int
+  let isSampledFrame: Bool
   let isTraceEnabled: Bool
   let stampCoherenceViolationCount: Int
   let deltaCheckpointViolationCount: Int
@@ -280,6 +309,12 @@ private struct ProbeState {
   let lifecycleHandlerSkipCount: Int
   let ambientEnvironmentFallbackReadCount: Int
   let committedHandlerResolutionViolationCount: Int
+  let actionResolutionViolationCount: Int
+  let keyHandlerResolutionViolationCount: Int
+  let commandScopeResolutionViolationCount: Int
+  let dropScopeResolutionViolationCount: Int
+  let gestureRouteResolutionViolationCount: Int
+  let actionDispatchMissCount: Int
   let strandedListingViolationCount: Int
   let lastViolationDetail: String?
   let lastViolationDetailByKind: [String: String]
@@ -287,6 +322,8 @@ private struct ProbeState {
   static func capture() -> Self {
     Self(
       isEnabled: SoundnessProbeConfiguration.isEnabled,
+      sampleEveryNFrames: SoundnessProbeConfiguration.sampleEveryNFrames,
+      isSampledFrame: SoundnessProbeConfiguration.isSampledFrame,
       isTraceEnabled: SoundnessProbeConfiguration.isTraceEnabled,
       stampCoherenceViolationCount: SoundnessProbeConfiguration.stampCoherenceViolationCount,
       deltaCheckpointViolationCount: SoundnessProbeConfiguration.deltaCheckpointViolationCount,
@@ -314,6 +351,17 @@ private struct ProbeState {
         SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount,
       committedHandlerResolutionViolationCount:
         SoundnessProbeConfiguration.committedHandlerResolutionViolationCount,
+      actionResolutionViolationCount:
+        SoundnessProbeConfiguration.actionResolutionViolationCount,
+      keyHandlerResolutionViolationCount:
+        SoundnessProbeConfiguration.keyHandlerResolutionViolationCount,
+      commandScopeResolutionViolationCount:
+        SoundnessProbeConfiguration.commandScopeResolutionViolationCount,
+      dropScopeResolutionViolationCount:
+        SoundnessProbeConfiguration.dropScopeResolutionViolationCount,
+      gestureRouteResolutionViolationCount:
+        SoundnessProbeConfiguration.gestureRouteResolutionViolationCount,
+      actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
       lastViolationDetail: SoundnessProbeConfiguration.lastViolationDetail,
@@ -323,6 +371,8 @@ private struct ProbeState {
 
   func restore() {
     SoundnessProbeConfiguration.isEnabled = isEnabled
+    SoundnessProbeConfiguration.sampleEveryNFrames = sampleEveryNFrames
+    SoundnessProbeConfiguration.isSampledFrame = isSampledFrame
     SoundnessProbeConfiguration.isTraceEnabled = isTraceEnabled
     SoundnessProbeConfiguration.stampCoherenceViolationCount = stampCoherenceViolationCount
     SoundnessProbeConfiguration.deltaCheckpointViolationCount = deltaCheckpointViolationCount
@@ -350,6 +400,17 @@ private struct ProbeState {
       ambientEnvironmentFallbackReadCount
     SoundnessProbeConfiguration.committedHandlerResolutionViolationCount =
       committedHandlerResolutionViolationCount
+    SoundnessProbeConfiguration.actionResolutionViolationCount =
+      actionResolutionViolationCount
+    SoundnessProbeConfiguration.keyHandlerResolutionViolationCount =
+      keyHandlerResolutionViolationCount
+    SoundnessProbeConfiguration.commandScopeResolutionViolationCount =
+      commandScopeResolutionViolationCount
+    SoundnessProbeConfiguration.dropScopeResolutionViolationCount =
+      dropScopeResolutionViolationCount
+    SoundnessProbeConfiguration.gestureRouteResolutionViolationCount =
+      gestureRouteResolutionViolationCount
+    SoundnessProbeConfiguration.actionDispatchMissCount = actionDispatchMissCount
     SoundnessProbeConfiguration.strandedListingViolationCount =
       strandedListingViolationCount
     SoundnessProbeConfiguration.lastViolationDetail = lastViolationDetail

@@ -41,7 +41,13 @@ package final class LocalActionRegistry: Equatable {
 
   @discardableResult
   package func dispatch(identity: Identity) -> Bool {
-    store[identity]?.handler() ?? false
+    guard let registration = store[identity] else {
+      SoundnessProbeConfiguration.recordActionDispatchMiss(
+        "action dispatch: no published handler for \(identity.path)"
+      )
+      return false
+    }
+    return registration.handler()
   }
 
   package func followUpInvalidationIdentity(

@@ -305,31 +305,14 @@ package final class ViewGraphFrameDraft {
     // dispatch queues rather than committed metadata, so the appear and
     // disappear legs carry the class here.
     if SoundnessProbeConfiguration.isSampledFrame,
-      let lifecycleRegistry = liveRegistrations.lifecycleRegistry,
       let committedRoot = viewGraph.committedRootSnapshotIfAvailable()
     {
-      var missing: [String] = []
-      var stack = [committedRoot]
-      while let node = stack.popLast(), missing.count < 4 {
-        for handlerID in node.lifecycleMetadata.appearHandlerIDs
-        where lifecycleRegistry.appearHandler(for: handlerID) == nil {
-          missing.append("appear:\(handlerID)")
-        }
-        for handlerID in node.lifecycleMetadata.disappearHandlerIDs
-        where lifecycleRegistry.disappearHandler(for: handlerID) == nil {
-          missing.append("disappear:\(handlerID)")
-        }
-        stack.append(contentsOf: node.children)
-      }
-      if !missing.isEmpty {
-        SoundnessProbeConfiguration.recordCommittedHandlerResolutionViolation(
-          """
-          committed handler resolution: committed tree names handlers absent \
-          from the published lifecycle registry: \(missing.joined(separator: ", ")) \
-          [mode=\(publicationModeName) roots=\(publicationSubtreeRootCount)]
-          """
-        )
-      }
+      CommittedHandlerResolutionOracle.inspect(
+        committedRoot: committedRoot,
+        registrations: liveRegistrations,
+        publicationModeName: publicationModeName,
+        publicationSubtreeRootCount: publicationSubtreeRootCount
+      )
     }
     if publicationIsUnchanged {
       viewGraph.recordCommittedRuntimeRegistrationFingerprintForUnchangedFrame()

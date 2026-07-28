@@ -91,6 +91,10 @@ package final class DropDestinationRegistry: Equatable {
     store[scope]
   }
 
+  package func hasHandler(at scope: Identity) -> Bool {
+    store[scope] != nil
+  }
+
   /// Walks `scopePath` from leaf to root, invoking the first registered
   /// handler. If the handler returns `true`, dispatch stops. If it
   /// returns `false`, dispatch continues outward looking for another
