@@ -52,6 +52,7 @@ package struct Rasterizer: Sendable {
   }
 
   private var incrementalVerificationPolicy: IncrementalRasterVerificationPolicy
+  internal let preparedMeshGradientCache: PreparedMeshGradientCache
 
   /// Proof token for the incremental repaint adapter.
   ///
@@ -96,6 +97,18 @@ package struct Rasterizer: Sendable {
     incrementalVerificationPolicy: IncrementalRasterVerificationPolicy
   ) {
     self.incrementalVerificationPolicy = incrementalVerificationPolicy
+    self.preparedMeshGradientCache = .shared
+  }
+
+  /// Test-isolation seam for cache behavior that must not depend on the
+  /// process-wide cache's occupancy or admission history.
+  internal init(
+    preparedMeshGradientCache: PreparedMeshGradientCache,
+    incrementalVerificationPolicy: IncrementalRasterVerificationPolicy =
+      Self.defaultIncrementalVerificationPolicy()
+  ) {
+    self.incrementalVerificationPolicy = incrementalVerificationPolicy
+    self.preparedMeshGradientCache = preparedMeshGradientCache
   }
 
   /// Rasterizes a draw tree into a ``RasterSurface``.

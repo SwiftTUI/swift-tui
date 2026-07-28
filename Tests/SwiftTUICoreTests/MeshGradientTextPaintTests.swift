@@ -298,9 +298,10 @@ func allTextArmsPreserveEveryColorMode() {
 }
 
 @MainActor
-@Test("one 20-line mesh text command reuses one shared preparation across paints")
-func meshGradientTextReusesSharedPreparation() throws {
-  let cache = PreparedMeshGradientCache.shared
+@Test("one 20-line mesh text command reuses one preparation across paints")
+func meshGradientTextReusesPreparation() throws {
+  let cache = PreparedMeshGradientCache()
+  let rasterizer = Rasterizer(preparedMeshGradientCache: cache)
   let mesh = meshTextGradient()
   let input = MeshGradientRasterInput(
     width: mesh.width,
@@ -325,23 +326,27 @@ func meshGradientTextReusesSharedPreparation() throws {
     commands: [command]
   )
 
-  let first = Rasterizer().rasterize(draw)
-  let second = Rasterizer().rasterize(draw)
+  let first = rasterizer.rasterize(draw)
+  let second = rasterizer.rasterize(draw)
 
   #expect(first == second)
   #expect(
-    cache.entryMetrics(for: input, bounds: meshTextScenarioBounds)
-      == .init(lookups: 2, hits: 1, misses: 1)
+    cache.metrics
+      == .init(entries: 1, lookups: 2, hits: 1, misses: 1, stores: 1)
   )
 
+  _ = PreparedMeshGradientCache.shared
   let snapshot = try #require(
     MemoryMetricRegistry.shared.snapshotAll().first {
       $0.name == "PreparedMeshGradientCache.entries"
     })
-  #expect(snapshot.count >= 1)
+  #expect(snapshot.detail?["triangles"] != nil)
+
+  let isolatedSnapshot = cache.memoryMetricSnapshot
+  #expect(isolatedSnapshot.count == 1)
   #expect(
-    snapshot.detail?["triangles"] ?? 0
-      >= PreparedMeshGradient(input: input, bounds: meshTextScenarioBounds).diagnostics
+    isolatedSnapshot.detail?["triangles"]
+      == PreparedMeshGradient(input: input, bounds: meshTextScenarioBounds).diagnostics
       .triangleCount
   )
 }

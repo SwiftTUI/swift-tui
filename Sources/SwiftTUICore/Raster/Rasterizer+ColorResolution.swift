@@ -373,7 +373,7 @@ extension Rasterizer {
         colorSpace: gradient.colorSpace == .device ? .device : .perceptual
       )
       return .sampledMesh(
-        PreparedMeshGradientCache.shared.prepared(
+        preparedMeshGradientCache.prepared(
           for: input,
           bounds: bounds
         ))
