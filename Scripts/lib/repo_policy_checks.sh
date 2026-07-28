@@ -96,6 +96,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check soundness oracle map" \
+    "./Scripts/check_soundness_oracle_map.sh" \
+    ./Scripts/check_soundness_oracle_map.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check DocC coverage" \
     "./Scripts/check_docc_coverage.sh" \
     ./Scripts/check_docc_coverage.sh

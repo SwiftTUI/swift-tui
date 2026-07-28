@@ -276,6 +276,9 @@ package struct SoundnessCounterGrowth: Sendable, Equatable {
 /// process would interleave counters and misattribute trace lines. Note-only
 /// until multi-scene hosting is real; the fix shape is scoping to the
 /// `ViewGraph` instance (or task-locals, the animation-sink storages' shape).
+///
+/// The canonical invariant, enforcement, sampling, and test-owner map is
+/// maintained in `docs/SOUNDNESS-ORACLES.md`.
 @MainActor
 package enum SoundnessProbeConfiguration {
   package static let environmentVariableName = FeatureGate.soundnessProbe.environmentVariableName

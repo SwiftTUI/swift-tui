@@ -246,6 +246,10 @@ run-loop suites run serialized in a `continue-on-error` step (an intermittent
 red there is flake-#1 signal, not a merge blocker), and a second variant
 rebuilds the stress/reconciliation subset with
 `-enable-actor-data-race-checks`.
+The canonical [soundness oracle map](SOUNDNESS-ORACLES.md) records each
+invariant's enforcement, sampling, failure channel, owning tests, and residual
+status; the normal repository policy phase fails if that map drifts from the
+probe source.
 
 CI jobs also carry workflow-level caps: the Linux repo gate is capped at 45
 minutes, the macOS repo gate at 30 minutes, the iOS build at 15 minutes, the

@@ -110,6 +110,11 @@ re-exported (`@_exported`) through `SwiftTUICore` and then `SwiftTUIRuntime`.
 - **`SwiftTUIRuntime`** — the run loop, the renderer, scenes (`App`, `Scene`,
   `WindowGroup`), terminal hosting, and the host-frame contracts.
 
+The graph and render layers also carry sampled reconciliation soundness probes.
+Their canonical invariant, enforcement, sampling, and test-owner inventory is
+the [soundness oracle map](SOUNDNESS-ORACLES.md); the repository policy phase
+checks that every source recorder, trace kind, and counter remains represented.
+
 ### Published library products
 
 - **`SwiftTUI`** — the batteries-included convenience product. It re-exports
