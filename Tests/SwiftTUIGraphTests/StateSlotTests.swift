@@ -41,16 +41,19 @@ struct StateSlotTests {
     let identity = testIdentity("Root", "Owner")
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
 
+    let probeEnabled = SoundnessProbeConfiguration.isEnabled
     let dropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
+      SoundnessProbeConfiguration.isEnabled = probeEnabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = dropCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
+    SoundnessProbeConfiguration.isEnabled = false
     SoundnessProbeConfiguration.isTraceEnabled = false
 
     let liveKey = StateMutationSlotKey(key: StateSlotKey(owner: node.viewNodeID, ordinal: 0))

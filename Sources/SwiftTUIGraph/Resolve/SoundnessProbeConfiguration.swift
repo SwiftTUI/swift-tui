@@ -296,8 +296,10 @@ package enum SoundnessProbeConfiguration {
 
   package static func recordDeltaCheckpointViolation(_ detail: @autoclosure () -> String) {
     deltaCheckpointViolationCount += 1
-    recordViolationDetail(detail(), for: "delta-checkpoint")
+    let detail = detail()
+    recordViolationDetail(detail, for: "delta-checkpoint")
     emitTrace("delta-checkpoint")
+    assertZeroCensusViolation(detail)
   }
 
   /// Records one caught checkpoint-store incoherence (F29): restoring a
@@ -305,8 +307,10 @@ package enum SoundnessProbeConfiguration {
   /// went stale without its owner's generation moving, or membership drifted.
   package static func recordCheckpointStoreViolation(_ detail: @autoclosure () -> String) {
     checkpointStoreViolationCount += 1
-    recordViolationDetail(detail(), for: "checkpoint-store")
+    let detail = detail()
+    recordViolationDetail(detail, for: "checkpoint-store")
     emitTrace("checkpoint-store")
+    assertZeroCensusViolation(detail)
   }
 
   /// Records one caught incremental-raster mismatch (the F13 oracle repaired a
@@ -392,8 +396,10 @@ package enum SoundnessProbeConfiguration {
   /// raise this alarm.
   package static func recordMemoUnsoundSkip(_ detail: @autoclosure () -> String) {
     memoUnsoundSkipCount += 1
-    recordViolationDetail(detail(), for: "memo-unsound-skip")
+    let detail = detail()
+    recordViolationDetail(detail, for: "memo-unsound-skip")
     emitTrace("memo-unsound-skip")
+    assertZeroCensusViolation(detail)
   }
 
   /// Records one caught same-identity duplicate registration (F104): a
@@ -469,8 +475,10 @@ package enum SoundnessProbeConfiguration {
   /// potential user-visible lost write.
   package static func recordStateSlotRestorationDrop(_ detail: @autoclosure () -> String) {
     stateSlotRestorationDropCount += 1
-    recordViolationDetail(detail(), for: "state-slot-restoration-drop")
+    let detail = detail()
+    recordViolationDetail(detail, for: "state-slot-restoration-drop")
     emitTrace("state-slot-restoration-drop")
+    assertZeroCensusViolation(detail)
   }
 
   /// Records one committed-tree handler ID that failed to resolve in the
@@ -485,8 +493,10 @@ package enum SoundnessProbeConfiguration {
     _ detail: @autoclosure () -> String
   ) {
     committedHandlerResolutionViolationCount += 1
-    recordViolationDetail(detail(), for: "committed-handler-resolution")
+    let detail = detail()
+    recordViolationDetail(detail, for: "committed-handler-resolution")
     emitTrace("committed-handler-resolution")
+    assertZeroCensusViolation(detail)
   }
 
   /// Records one stranded listing (residual 2 of the reuse/freshness quirk
@@ -528,6 +538,19 @@ package enum SoundnessProbeConfiguration {
   private static func recordViolationDetail(_ detail: String, for kind: String) {
     lastViolationDetailByKind[kind] = detail
     lastViolationDetailStorage = detail
+  }
+
+  /// S2 promotion tier: the 2026-07-28 full-gate census observed no
+  /// unexpected hits for these recorders. Keep the counter and trace visible
+  /// before trapping so release builds and crash logs retain the forensic
+  /// channel. Intentional oracle reductions disable `isEnabled` while proving
+  /// the counter path.
+  private static func assertZeroCensusViolation(_ detail: String) {
+    #if DEBUG
+      if isEnabled {
+        assertionFailure(detail)
+      }
+    #endif
   }
 
   private static func environmentDefault() -> Bool {

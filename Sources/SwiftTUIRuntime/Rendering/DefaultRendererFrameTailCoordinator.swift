@@ -72,7 +72,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       verifyIncrementalRasterDamage: SoundnessProbeConfiguration.isSampledFrame,
       clock: draft.clock
     )
-    recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
+    Self.recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
     return tail
   }
 
@@ -82,17 +82,24 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   /// point after the (possibly off-main) raster tail returns — record every
   /// caught mismatch on the probe's counters here.
   @MainActor
-  private func recordIncrementalRasterMismatchIfCaught(
+  package static func recordIncrementalRasterMismatchIfCaught(
     _ mismatch: Rasterizer.IncrementalRasterMismatch?
   ) {
     guard let mismatch else {
       return
     }
-    SoundnessProbeConfiguration.recordRasterDamageMismatch(
+    let detail =
       mismatch.mismatchedRows.isEmpty
-        ? "incremental raster mismatch: non-cell surface state diverged from fresh raster"
-        : "incremental raster mismatch: rows \(mismatch.mismatchedRows) diverged from fresh raster"
-    )
+      ? "incremental raster mismatch: non-cell surface state diverged from fresh raster"
+      : "incremental raster mismatch: rows \(mismatch.mismatchedRows) diverged from fresh raster"
+    SoundnessProbeConfiguration.recordRasterDamageMismatch(detail)
+    // The 2026-07-28 full-gate census observed zero unexpected mismatches.
+    // Record first so the release trace and crash diagnostics retain context.
+    #if DEBUG
+      if SoundnessProbeConfiguration.isEnabled {
+        assertionFailure(detail)
+      }
+    #endif
   }
 
   @MainActor
@@ -249,7 +256,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       clock: draft.clock
     )
     suspensionHooks?.onEnd?()
-    recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
+    Self.recordIncrementalRasterMismatchIfCaught(tail.incrementalMismatch)
     let rasterSuspensionDuration =
       if let rasterSuspensionStart, let clock = draft.clock {
         rasterSuspensionStart.duration(to: clock.now)

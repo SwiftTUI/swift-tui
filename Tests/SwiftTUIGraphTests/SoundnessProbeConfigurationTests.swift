@@ -68,6 +68,7 @@ struct SoundnessProbeConfigurationTests {
   @Test("memo unsound skips are counted with detail")
   func memoUnsoundSkipRecordsCountAndDetail() {
     withRestoredProbeState {
+      SoundnessProbeConfiguration.isEnabled = false
       let before = SoundnessProbeConfiguration.memoUnsoundSkipCount
       SoundnessProbeConfiguration.recordMemoUnsoundSkip("drawPayload diverged")
       #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == before + 1)

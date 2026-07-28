@@ -158,17 +158,20 @@ struct NodeCheckpointImageStoreTests {
 
   @Test("checkpoint-store violations are counted with detail")
   func violationCounterPlumbing() {
+    let probeEnabled = SoundnessProbeConfiguration.isEnabled
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let countBefore = SoundnessProbeConfiguration.checkpointStoreViolationCount
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
     let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
+      SoundnessProbeConfiguration.isEnabled = probeEnabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.checkpointStoreViolationCount = countBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
     }
 
+    SoundnessProbeConfiguration.isEnabled = false
     SoundnessProbeConfiguration.isTraceEnabled = false
     SoundnessProbeConfiguration.recordCheckpointStoreViolation("store test detail")
 

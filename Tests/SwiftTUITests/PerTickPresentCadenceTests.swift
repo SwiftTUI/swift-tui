@@ -154,12 +154,15 @@ struct PerTickPresentCadenceTests {
     // This red-proof deliberately abandons a completed frame after the memo
     // shadow has recomputed it. The resulting would-skip draw divergence is
     // part of the synthetic disposal witness, not a gate finding.
+    let probeEnabled = SoundnessProbeConfiguration.isEnabled
     let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let memoAlarmBefore = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
     let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
+    SoundnessProbeConfiguration.isEnabled = false
     SoundnessProbeConfiguration.isTraceEnabled = false
     defer {
+      SoundnessProbeConfiguration.isEnabled = probeEnabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoAlarmBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore

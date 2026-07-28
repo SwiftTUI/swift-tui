@@ -48,6 +48,7 @@ struct SoundnessFailureChannelTests {
       SoundnessProbeConfiguration.traceFileEnvironmentVariableName,
       value: traceFile.path
     ) {
+      SoundnessProbeConfiguration.isEnabled = false
       SoundnessProbeConfiguration.isTraceEnabled = true
       recordEveryViolationKind()
     }
@@ -259,6 +260,7 @@ private struct ScannerResult {
 
 @MainActor
 private struct ProbeState {
+  let isEnabled: Bool
   let isTraceEnabled: Bool
   let stampCoherenceViolationCount: Int
   let deltaCheckpointViolationCount: Int
@@ -284,6 +286,7 @@ private struct ProbeState {
 
   static func capture() -> Self {
     Self(
+      isEnabled: SoundnessProbeConfiguration.isEnabled,
       isTraceEnabled: SoundnessProbeConfiguration.isTraceEnabled,
       stampCoherenceViolationCount: SoundnessProbeConfiguration.stampCoherenceViolationCount,
       deltaCheckpointViolationCount: SoundnessProbeConfiguration.deltaCheckpointViolationCount,
@@ -319,6 +322,7 @@ private struct ProbeState {
   }
 
   func restore() {
+    SoundnessProbeConfiguration.isEnabled = isEnabled
     SoundnessProbeConfiguration.isTraceEnabled = isTraceEnabled
     SoundnessProbeConfiguration.stampCoherenceViolationCount = stampCoherenceViolationCount
     SoundnessProbeConfiguration.deltaCheckpointViolationCount = deltaCheckpointViolationCount
