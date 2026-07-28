@@ -139,13 +139,17 @@ private func uncachedTextLayout(
   sourceLines: [[TextCluster]],
   options: TextLayoutOptions
 ) -> TextLayoutResult {
-  let wrappedLines = sourceLines.flatMap { line in
+  // Wrapped rows stay grouped by the source line that produced them: truncation
+  // needs to reach past the last visible row into the rest of *its own* logical
+  // line, and only the grouping records which logical line that is.
+  let wrappedGroups = sourceLines.map { line in
     wrapTextLine(
       line,
       width: options.width,
       wrappingStrategy: options.wrappingStrategy
     )
   }
+  let wrappedLines = Array(wrappedGroups.joined())
 
   guard let rawLineLimit = options.lineLimit else {
     return TextLayoutResult(lines: wrappedLines)
@@ -159,7 +163,12 @@ private func uncachedTextLayout(
   var visibleLines = Array(wrappedLines.prefix(lineLimit))
   if let lastIndex = visibleLines.indices.last {
     visibleLines[lastIndex] = truncating(
-      visibleLines[lastIndex],
+      truncationInput(
+        forWrappedRow: lastIndex,
+        in: wrappedGroups,
+        sourceLines: sourceLines,
+        options: options
+      ),
       to: options.width,
       mode: options.truncationMode,
       forceIndicator: options.width != nil

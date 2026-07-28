@@ -68,8 +68,10 @@ struct TextLayoutCacheTests {
     #expect(wrapped.lines.map(\.text) == ["alpha", "beta"])
     #expect(unwrapped.lines.map(\.text) == ["alpha beta"])
     #expect(tailTruncated.lines.map(\.text) == ["alph…"])
-    #expect(headTruncated.lines.map(\.text) == ["…lpha"])
-    #expect(middleTruncated.lines.map(\.text) == ["al…ha"])
+    // `.head` and `.middle` slice the tail of the *logical* line ("gamma"), not
+    // the tail of the first wrapped row ("alpha") — see TextLayoutTests.
+    #expect(headTruncated.lines.map(\.text) == ["…amma"])
+    #expect(middleTruncated.lines.map(\.text) == ["al…ma"])
     #expect(tailTruncatedAgain == tailTruncated)
 
     let metrics = cache.metrics

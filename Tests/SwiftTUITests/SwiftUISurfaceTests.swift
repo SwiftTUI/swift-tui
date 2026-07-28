@@ -5210,8 +5210,8 @@ struct SwiftUISurfaceTests {
 
     #expect(tailArtifacts.measuredTree.measuredSize == .init(width: 4, height: 1))
     #expect(tailArtifacts.rasterSurface.lines == ["ABC…"])
-    #expect(headArtifacts.rasterSurface.lines == ["…BC–"])
-    #expect(middleArtifacts.rasterSurface.lines == ["A…C–"])
+    #expect(headArtifacts.rasterSurface.lines == ["…EFG"])
+    #expect(middleArtifacts.rasterSurface.lines == ["A…FG"])
     #expect(multilineArtifacts.measuredTree.measuredSize == .init(width: 3, height: 2))
     #expect(multilineArtifacts.rasterSurface.lines == ["AB–", "–C…"])
   }
