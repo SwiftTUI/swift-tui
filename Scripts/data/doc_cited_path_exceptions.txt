@@ -1,0 +1,29 @@
+# Exact stable-documentation burn-down ledger.
+#
+# Format:
+#   missing-path|<stable-doc>|<repository-relative cited path>
+#   forbidden|<rule-id>|<stable-doc>
+#
+# This file must match the checker's current violations exactly. New rows and
+# stale rows both fail the policy phase; repair stages may only shrink it.
+forbidden|accessibility-consumer-count|docs/README.md
+forbidden|execution-mode-count|Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Architecture.md
+forbidden|execution-mode-count|docs/ARCHITECTURE.md
+forbidden|execution-mode-count|docs/README.md
+forbidden|execution-mode-count|docs/VISION.md
+forbidden|graph-under-core|docs/CODEBASE-GUIDE.md
+forbidden|separate-android-codable|docs/CODEBASE-GUIDE.md
+missing-path|docs/CODEBASE-GUIDE.md|Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceFrameEncoder.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Animation/
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Geometry/
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Geometry/GeometryTypes.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Pipeline/Scheduler.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Resolve/
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Resolve/ViewGraph.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Resolve/ViewGraphFieldGroups.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Resolve/ViewNode.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Runtime/
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftTUICore/Runtime/DroppedPath.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftUIHost/NativeRasterSurfaceRenderer.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/SwiftUIHost/SwiftUIHostSceneHost.swift
+missing-path|docs/CODEBASE-GUIDE.md|Sources/UnixSignals/CrashSignalHandler.swift

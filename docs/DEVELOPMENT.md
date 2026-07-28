@@ -101,7 +101,9 @@ phase (`Scripts/lib/repo_policy_checks.sh`) runs, in order:
    absence of retired AnyView and registry seams, and the style-protocol
    policy; also checks that the policy is documented in
    [PUBLIC-API.md](PUBLIC-API.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
-2. **Stable doc source paths** (`check_stable_doc_source_paths.sh`).
+2. **Documentation-cited paths and claims** (`check_doc_cited_paths.sh`) —
+   requires cited repository paths to exist and ratchets retired architecture
+   claims against an exact burn-down ledger.
 3. **DocC coverage** (`check_docc_coverage.sh`) — every `.library` product in
    `Package.swift` ships a DocC catalog. Derived by convention (a directory
    named `<target>.docc`); no manifest.

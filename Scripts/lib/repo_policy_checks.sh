@@ -89,9 +89,9 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
-    "Check stable doc source paths" \
-    "./Scripts/check_stable_doc_source_paths.sh" \
-    ./Scripts/check_stable_doc_source_paths.sh
+    "Check documentation-cited paths and claims" \
+    "./Scripts/check_doc_cited_paths.sh" \
+    ./Scripts/check_doc_cited_paths.sh
 
   run_repo_policy_check \
     "$mode" \
