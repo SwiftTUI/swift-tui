@@ -21,6 +21,7 @@ struct PointerInteractionStateTests {
     #expect(state.capturedRouteID == nil)
     #expect(state.dragStartLocation == nil)
     #expect(state.deadlineDispatchOutcome == nil)
+    #expect(state.pointerHandlerIdentity == nil)
     #expect(state.activeRouteID == nil)
     #expect(state.isRouting == false)
   }
@@ -44,6 +45,7 @@ struct PointerInteractionStateTests {
     #expect(state.armedRouteUsesPointerHandler == true)
     #expect(state.capturedRouteID == nil)
     #expect(state.dragStartLocation == location(3, 4))
+    #expect(state.pointerHandlerIdentity == route("Button").identity)
     #expect(state.isRouting == true)
   }
 
@@ -59,6 +61,7 @@ struct PointerInteractionStateTests {
     // it set is the classic drift that mis-routes the next gesture.
     #expect(state.armedRouteUsesPointerHandler == false)
     #expect(state.dragStartLocation == location(3, 4))
+    #expect(state.pointerHandlerIdentity == route("Scroll").identity)
     #expect(state.isRouting == true)
   }
 
@@ -70,6 +73,7 @@ struct PointerInteractionStateTests {
     #expect(state.armedRouteID == route("Button"))
     #expect(state.capturedRouteID == nil)
     #expect(state.armedRouteUsesPointerHandler == false)
+    #expect(state.pointerHandlerIdentity == nil)
   }
 
   @Test("clearRouting drops both routes and the flag but keeps the origin")
@@ -82,7 +86,22 @@ struct PointerInteractionStateTests {
     #expect(state.armedRouteUsesPointerHandler == false)
     #expect(state.capturedRouteID == nil)
     #expect(state.dragStartLocation == location(7, 8))
+    #expect(state.pointerHandlerIdentity == nil)
     #expect(state.isRouting == false)
+  }
+
+  @Test("fallback pointer-handler identity is independent of the armed hit route")
+  func fallbackHandlerIdentityIsIndependentOfArmedRoute() {
+    var state = PointerInteractionState()
+    state.beginPress(at: location(7, 8))
+    state.arm(
+      route("Button"),
+      usesPointerHandler: true,
+      pointerHandlerIdentity: route("AncestorGesture").identity
+    )
+
+    #expect(state.armedRouteID == route("Button"))
+    #expect(state.pointerHandlerIdentity == route("AncestorGesture").identity)
   }
 
   @Test("clearRouting releases a captured route too")

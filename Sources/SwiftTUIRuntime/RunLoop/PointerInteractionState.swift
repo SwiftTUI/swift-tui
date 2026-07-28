@@ -3,7 +3,7 @@ import SwiftTUICore
 /// The run loop's pointer-routing state: which interaction route, if any, owns
 /// the active press, and where that press began.
 ///
-/// These four fields move together through a small set of intent-named
+/// These routing fields move together through a small set of intent-named
 /// transitions so no handler can leave a partial tuple behind. A stale
 /// `armedRouteID` or `capturedRouteID` — or an `armedRouteUsesPointerHandler`
 /// flag that outlives the route it described — is the exact shape of the
@@ -39,6 +39,11 @@ package struct PointerInteractionState: Equatable, Sendable {
   /// this currency from the current recognizer alone.
   package private(set) var deadlineDispatchOutcome: PointerDispatchOutcome?
 
+  /// Stable identity of the pointer handler that accepted `.down`. This can be
+  /// an ancestor of the armed spatial hit route when fallback dispatch reaches
+  /// an ordinary gesture wrapped around a descendant control.
+  package private(set) var pointerHandlerIdentity: Identity?
+
   package init() {}
 
   /// True while any route owns the press (armed or captured) — gates whether a
@@ -57,24 +62,37 @@ package struct PointerInteractionState: Equatable, Sendable {
   package mutating func beginPress(at location: PointerLocation) {
     dragStartLocation = location
     deadlineDispatchOutcome = nil
+    pointerHandlerIdentity = nil
   }
 
   /// Arm a non-capturing route to activate on release. Clears any capture so the
   /// armed and captured routes are never both live.
-  package mutating func arm(_ routeID: RouteID, usesPointerHandler: Bool) {
+  package mutating func arm(
+    _ routeID: RouteID,
+    usesPointerHandler: Bool,
+    pointerHandlerIdentity: Identity? = nil
+  ) {
     armedRouteID = routeID
     armedRouteUsesPointerHandler = usesPointerHandler
     capturedRouteID = nil
+    deadlineDispatchOutcome = nil
+    self.pointerHandlerIdentity =
+      usesPointerHandler ? pointerHandlerIdentity ?? routeID.identity : nil
   }
 
   /// Capture the pointer stream on a route for the gesture's whole lifetime,
   /// clearing any armed route — e.g. a drag handed off from an inner control to
   /// an ancestor scroll view. The press origin is retained so the captured pan
   /// can keep measuring from where the press began.
-  package mutating func capture(_ routeID: RouteID) {
+  package mutating func capture(
+    _ routeID: RouteID,
+    pointerHandlerIdentity: Identity? = nil
+  ) {
     capturedRouteID = routeID
     armedRouteID = nil
     armedRouteUsesPointerHandler = false
+    deadlineDispatchOutcome = nil
+    self.pointerHandlerIdentity = pointerHandlerIdentity ?? routeID.identity
   }
 
   /// Re-key the armed route after a mid-press re-mint: the control's region
@@ -134,6 +152,7 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteUsesPointerHandler = false
     capturedRouteID = nil
     deadlineDispatchOutcome = nil
+    pointerHandlerIdentity = nil
   }
 
   /// Full teardown to the idle state, including the press origin. Used on `.up`
@@ -144,5 +163,6 @@ package struct PointerInteractionState: Equatable, Sendable {
     capturedRouteID = nil
     dragStartLocation = nil
     deadlineDispatchOutcome = nil
+    pointerHandlerIdentity = nil
   }
 }

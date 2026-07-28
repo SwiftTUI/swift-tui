@@ -84,25 +84,32 @@ extension RunLoop {
       timestamp: timestamp
     )
 
-    let dispatchOutcome = dispatchPointerEvent(
+    let dispatch = dispatchPointerEventResolvingHandler(
       preferredRouteID: hitTarget.region.routeID,
       identity: hitTarget.region.identity,
       event: pointerEvent
     )
 
-    if dispatchOutcome.wantsPointerStream {
+    if dispatch.outcome.wantsPointerStream {
       if let focusIdentity = hitTarget.focusIdentity,
         shouldClickFocus(focusIdentity, at: location)
       {
         _ = focusTracker.setFocus(to: focusIdentity)
       }
       if shouldCapturePointer(routeID: hitTarget.region.routeID) {
-        pointerInteraction.capture(hitTarget.region.routeID)
+        pointerInteraction.capture(
+          hitTarget.region.routeID,
+          pointerHandlerIdentity: dispatch.handlerRouteID?.identity
+        )
       } else {
         // Non-capturing gestures like TapGesture still need the rest of the
         // pressed interaction stream so they can observe drag cancellation and
         // the eventual release.
-        pointerInteraction.arm(hitTarget.region.routeID, usesPointerHandler: true)
+        pointerInteraction.arm(
+          hitTarget.region.routeID,
+          usesPointerHandler: true,
+          pointerHandlerIdentity: dispatch.handlerRouteID?.identity
+        )
       }
       setPressedIdentity(hitTarget.focusIdentity, transient: false)
       return

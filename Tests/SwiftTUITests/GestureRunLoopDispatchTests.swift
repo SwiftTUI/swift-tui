@@ -257,6 +257,130 @@ struct GestureRunLoopDispatchTests {
     #expect(counts.button == role.expectedButtonActivations)
   }
 
+  @Test(
+    "a deadline-recognized ancestor long press preserves its role over a descendant button",
+    arguments: DeadlineLongPressAttachmentRole.allCases
+  )
+  func deadlineRecognizedAncestorLongPressPreservesRoleOverDescendantButton(
+    role: DeadlineLongPressAttachmentRole
+  ) async throws {
+    @MainActor final class Counts {
+      let updates = MainActorConditionSignal()
+      var button = 0
+      var longPress = 0 {
+        didSet { updates.notify() }
+      }
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(
+      components: [IdentityComponent(rawValue: "DeadlineAncestorLongPressControl.\(role.rawValue)")]
+    )
+    let content = VStack {
+      Button("Control") {
+        counts.button += 1
+      }
+    }
+    .frame(minWidth: 10, maxWidth: 10, minHeight: 3, maxHeight: 3)
+    let longPress = LongPressGesture(minimumDuration: .milliseconds(20))
+      .onEnded { _ in counts.longPress += 1 }
+    let view: AnyView =
+      switch role {
+      case .ordinary:
+        AnyView(content.gesture(longPress))
+      case .highPriority:
+        AnyView(content.highPriorityGesture(longPress))
+      case .simultaneous:
+        AnyView(content.simultaneousGesture(longPress))
+      }
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let host = RecordingGestureTerminalHost(size: terminalSize)
+    let inputReader = InjectedTerminalInputReader()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: host,
+      terminalInputReader: inputReader,
+      signalReader: EmptyGestureSignals(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environment,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      exitKeyBindings: .none,
+      viewBuilder: { _, _ in view }
+    )
+
+    let task = Task {
+      try await runLoop.run()
+    }
+
+    await host.firstPresent.wait()
+    inputReader.send(.mouse(.init(kind: .down(.primary), location: point)))
+    await counts.updates.wait { counts.longPress == 1 }
+    inputReader.send(.mouse(.init(kind: .up(.primary), location: point)))
+    inputReader.finish()
+
+    let result = try await task.value
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.longPress == 1)
+    #expect(counts.button == role.expectedButtonActivations)
+  }
+
+  @Test("a failed ordinary ancestor long press leaves its descendant button eligible")
+  func failedAncestorLongPressLeavesDescendantButtonEligible() async throws {
+    @MainActor final class Counts {
+      var button = 0
+      var longPress = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("FailedAncestorLongPressControl")])
+    let view = VStack {
+      Button("Control") {
+        counts.button += 1
+      }
+    }
+    .frame(minWidth: 10, maxWidth: 10, minHeight: 3, maxHeight: 3)
+    .gesture(
+      LongPressGesture(minimumDuration: .seconds(60))
+        .onEnded { _ in counts.longPress += 1 }
+    )
+
+    let point = try interactionPoint(
+      for: view,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.longPress == 0)
+    #expect(counts.button == 1)
+  }
+
   @Test("a stationary click activates a button with a simultaneous drag gesture")
   func stationaryClickActivatesButtonWithSimultaneousDragGesture() async throws {
     @MainActor final class Counts {

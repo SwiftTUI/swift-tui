@@ -6,6 +6,11 @@ extension RunLoop {
     var focusIdentity: Identity?
   }
 
+  package struct RoutedPointerDispatch {
+    package var outcome: PointerDispatchOutcome
+    package var handlerRouteID: RouteID?
+  }
+
   /// Returns whether a click at `location` should move focus to `focusIdentity`.
   /// Focus is set unless a more-specific descendant focus region contains the
   /// point and is smaller than the candidate (indicating a child control, not
@@ -162,12 +167,34 @@ extension RunLoop {
     identity: Identity,
     event: LocalPointerEvent
   ) -> PointerDispatchOutcome {
-    let preferredOutcome = localPointerHandlerRegistry.dispatch(
-      routeID: preferredRouteID,
+    dispatchPointerEventResolvingHandler(
+      preferredRouteID: preferredRouteID,
+      identity: identity,
       event: event
+    ).outcome
+  }
+
+  /// Dispatches a pointer event while retaining the exact handler route that
+  /// accepted the stream. The spatial hit route and the accepting route can
+  /// differ when an ordinary ancestor gesture is reached through identity
+  /// fallback over a descendant control.
+  package func dispatchPointerEventResolvingHandler(
+    preferredRouteID: RouteID,
+    identity: Identity,
+    event: LocalPointerEvent
+  ) -> RoutedPointerDispatch {
+    let resolvedPreferredRouteID = localPointerHandlerRegistry.handlerRouteID(
+      pairingWith: preferredRouteID
     )
+    let preferredOutcome =
+      resolvedPreferredRouteID.map {
+        localPointerHandlerRegistry.dispatch(routeID: $0, event: event)
+      } ?? .ignored
     if preferredOutcome.wantsPointerStream {
-      return preferredOutcome
+      return RoutedPointerDispatch(
+        outcome: preferredOutcome,
+        handlerRouteID: resolvedPreferredRouteID
+      )
     }
     var sawFailure = preferredOutcome == .failed
 
@@ -175,17 +202,26 @@ extension RunLoop {
       startingAt: identity,
       excluding: preferredRouteID
     ) {
-      let outcome = localPointerHandlerRegistry.dispatch(
-        routeID: fallbackRouteID,
-        event: event
+      let resolvedFallbackRouteID = localPointerHandlerRegistry.handlerRouteID(
+        pairingWith: fallbackRouteID
       )
+      let outcome =
+        resolvedFallbackRouteID.map {
+          localPointerHandlerRegistry.dispatch(routeID: $0, event: event)
+        } ?? .ignored
       if outcome.wantsPointerStream {
-        return outcome
+        return RoutedPointerDispatch(
+          outcome: outcome,
+          handlerRouteID: resolvedFallbackRouteID
+        )
       }
       sawFailure = sawFailure || outcome == .failed
     }
 
-    return sawFailure ? .failed : .ignored
+    return RoutedPointerDispatch(
+      outcome: sawFailure ? .failed : .ignored,
+      handlerRouteID: nil
+    )
   }
 
   package func fallbackPrimaryRouteIDs(
