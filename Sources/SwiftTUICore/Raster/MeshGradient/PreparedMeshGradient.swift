@@ -1,9 +1,9 @@
-package enum MeshGradientRasterColorSpace: Sendable {
+package enum MeshGradientRasterColorSpace: Hashable, Sendable {
   case device
   case perceptual
 }
 
-package struct MeshGradientRasterInput: Sendable {
+package struct MeshGradientRasterInput: Hashable, Sendable {
   package var width: Int
   package var height: Int
   package var points: [SIMD2<Float>]
@@ -37,6 +37,9 @@ package struct MeshGradientRasterInput: Sendable {
 /// adaptive triangles, row bins, and working-space color vectors are all
 /// produced once, while the rasterizer's inner loop performs only bounded
 /// row-bin lookup and interpolation.
+///
+/// Preparation is a pure function of `(input, bounds)`. Any new preparation
+/// input must also become part of ``PreparedMeshGradientCache/Key``.
 package struct PreparedMeshGradient: Sendable {
   package struct Diagnostics: Sendable, Equatable {
     package var triangleCount: Int

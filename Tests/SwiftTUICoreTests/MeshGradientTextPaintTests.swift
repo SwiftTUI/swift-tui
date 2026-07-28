@@ -273,6 +273,69 @@ func nonMeshStyledTextPaint() {
   }
 }
 
+@MainActor
+@Test("mesh text reuses one shared preparation across paints")
+func meshGradientTextReusesSharedPreparation() throws {
+  let cache = PreparedMeshGradientCache.shared
+  cache.reset()
+  defer { cache.reset() }
+  let mesh = MeshGradient(
+    width: 2,
+    height: 2,
+    points: [.init(0, 0), .init(1, 0), .init(0, 1), .init(1, 1)],
+    colors: [
+      Color(red: 0.123, green: 0.234, blue: 0.345),
+      Color(red: 0.456, green: 0.567, blue: 0.678),
+      Color(red: 0.789, green: 0.321, blue: 0.654),
+      Color(red: 0.246, green: 0.813, blue: 0.579),
+    ],
+    background: .clear,
+    smoothsColors: false,
+    colorSpace: .device
+  )
+  let input = MeshGradientRasterInput(
+    width: mesh.width,
+    height: mesh.height,
+    points: mesh.points,
+    colors: mesh.colors,
+    background: mesh.background,
+    smoothsColors: mesh.smoothsColors,
+    colorSpace: .device
+  )
+  let command = DrawCommand.text(
+    bounds: meshTextBounds,
+    content: "ABCD",
+    style: .init(foregroundStyle: .meshGradient(mesh)),
+    lineLimit: nil,
+    truncationMode: .tail,
+    wrappingStrategy: .wordBoundary
+  )
+  let draw = DrawNode(
+    identity: testIdentity("mesh-shared-cache"),
+    bounds: meshTextBounds,
+    commands: [command]
+  )
+
+  let first = Rasterizer().rasterize(draw)
+  let second = Rasterizer().rasterize(draw)
+
+  #expect(first == second)
+  #expect(
+    cache.entryMetrics(for: input, bounds: meshTextBounds)
+      == .init(lookups: 2, hits: 1, misses: 1)
+  )
+
+  let snapshot = try #require(
+    MemoryMetricRegistry.shared.snapshotAll().first {
+      $0.name == "PreparedMeshGradientCache.entries"
+    })
+  #expect(snapshot.count >= 1)
+  #expect(
+    snapshot.detail?["triangles"] ?? 0
+      >= PreparedMeshGradient(input: input, bounds: meshTextBounds).diagnostics.triangleCount
+  )
+}
+
 private let meshTextBounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
 
 private func meshTextGradient() -> MeshGradient {

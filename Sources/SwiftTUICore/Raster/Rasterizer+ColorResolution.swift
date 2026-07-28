@@ -363,17 +363,18 @@ extension Rasterizer {
         aspectRatio: environment.cellPixelMetrics.aspectRatio
       )
     case .meshGradient(let gradient):
+      let input = MeshGradientRasterInput(
+        width: gradient.width,
+        height: gradient.height,
+        points: gradient.points,
+        colors: gradient.colors,
+        background: gradient.background,
+        smoothsColors: gradient.smoothsColors,
+        colorSpace: gradient.colorSpace == .device ? .device : .perceptual
+      )
       return .sampledMesh(
-        PreparedMeshGradient(
-          input: MeshGradientRasterInput(
-            width: gradient.width,
-            height: gradient.height,
-            points: gradient.points,
-            colors: gradient.colors,
-            background: gradient.background,
-            smoothsColors: gradient.smoothsColors,
-            colorSpace: gradient.colorSpace == .device ? .device : .perceptual
-          ),
+        PreparedMeshGradientCache.shared.prepared(
+          for: input,
           bounds: bounds
         ))
     case .tileStyle(let tile):
