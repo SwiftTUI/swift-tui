@@ -96,6 +96,8 @@ package struct LifetimeKeepDecision: Equatable, Sendable {
 package enum LifetimeAnchorInverseDirection: Equatable, Hashable, Sendable {
   case forwardMissingFromInverse
   case inverseMissingFromForward
+  case sourceMissingFromCanonical
+  case canonicalMissingFromSource
 }
 
 package struct LifetimeAnchorInverseViolation: Equatable, Hashable, Sendable {
@@ -110,13 +112,14 @@ package struct LifetimeUnreachableNodeForensics: Equatable, Sendable {
   package var outgoingNodeIDs: [ViewNodeID]
 }
 
-/// Bidirectional runtime-node lifetime relation.
+/// Runtime-node lifetime relation with incoming, target, and source projections.
 ///
-/// Every mutation goes through this value so the target-to-source and
-/// source-to-target projections move atomically.
+/// Every mutation goes through this value so all three projections move
+/// atomically.
 package struct LifetimeAnchorIndex: Equatable, Sendable {
   package var anchorsByNodeID: [ViewNodeID: Set<LifetimeAnchor>]
   package var nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>]
+  package var anchorsBySourceNodeID: [ViewNodeID: Set<LifetimeAnchor>]
 
   package var edgeCount: Int {
     anchorsByNodeID.values.reduce(into: 0) { count, anchors in
@@ -126,10 +129,13 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
 
   package init(
     anchorsByNodeID: [ViewNodeID: Set<LifetimeAnchor>] = [:],
-    nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>] = [:]
+    nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>] = [:],
+    anchorsBySourceNodeID: [ViewNodeID: Set<LifetimeAnchor>]? = nil
   ) {
     self.anchorsByNodeID = anchorsByNodeID
     self.nodeIDsByAnchor = nodeIDsByAnchor
+    self.anchorsBySourceNodeID =
+      anchorsBySourceNodeID ?? Self.sourceProjection(from: nodeIDsByAnchor)
   }
 
   package mutating func insert(
@@ -138,6 +144,9 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
   ) {
     anchorsByNodeID[nodeID, default: []].insert(anchor)
     nodeIDsByAnchor[anchor, default: []].insert(nodeID)
+    if let sourceNodeID = anchor.sourceNodeID {
+      anchorsBySourceNodeID[sourceNodeID, default: []].insert(anchor)
+    }
   }
 
   package mutating func remove(
@@ -151,6 +160,12 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     nodeIDsByAnchor[anchor]?.remove(nodeID)
     if nodeIDsByAnchor[anchor]?.isEmpty == true {
       nodeIDsByAnchor.removeValue(forKey: anchor)
+      if let sourceNodeID = anchor.sourceNodeID {
+        anchorsBySourceNodeID[sourceNodeID]?.remove(anchor)
+        if anchorsBySourceNodeID[sourceNodeID]?.isEmpty == true {
+          anchorsBySourceNodeID.removeValue(forKey: sourceNodeID)
+        }
+      }
     }
   }
 
@@ -264,8 +279,8 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     of nodeID: ViewNodeID
   ) -> Set<ViewNodeID> {
     var result: Set<ViewNodeID> = []
-    for (anchor, nodeIDs) in nodeIDsByAnchor where anchor.sourceNodeID == nodeID {
-      result.formUnion(nodeIDs)
+    for anchor in anchorsBySourceNodeID[nodeID, default: []] {
+      result.formUnion(nodeIDsByAnchor[anchor, default: []])
     }
     return result
   }
@@ -306,14 +321,15 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
 
   /// Removes every incoming and outgoing edge that names `nodeID`.
   package mutating func removeNode(_ nodeID: ViewNodeID) {
-    for anchor in anchorsByNodeID[nodeID, default: []] {
+    let incomingAnchors = Array(anchorsByNodeID[nodeID, default: []])
+    for anchor in incomingAnchors {
       remove(anchor: anchor, for: nodeID)
     }
-    let outgoingAnchors = nodeIDsByAnchor.keys.filter { anchor in
-      anchor.sourceNodeID == nodeID
-    }
+    // Snapshot the bucket before `remove` mutates the source projection.
+    let outgoingAnchors = Array(anchorsBySourceNodeID[nodeID, default: []])
     for anchor in outgoingAnchors {
-      for targetNodeID in nodeIDsByAnchor[anchor, default: []] {
+      let targetNodeIDs = Array(nodeIDsByAnchor[anchor, default: []])
+      for targetNodeID in targetNodeIDs {
         remove(anchor: anchor, for: targetNodeID)
       }
     }
@@ -419,13 +435,7 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       enqueue(nodeID, chain: [.root(nodeID)])
     }
 
-    let entityAnchors = nodeIDsByAnchor.keys.compactMap { anchor -> EntityIdentity? in
-      guard case .entityHome(let entity) = anchor else {
-        return nil
-      }
-      return entity
-    }.sorted(by: entityIdentityLessThan)
-    for entity in entityAnchors {
+    for entity in context.liveEntityHomeByIdentity.keys.sorted(by: entityIdentityLessThan) {
       guard let nodeID = context.liveEntityHomeByIdentity[entity],
         entityHomeIsQualified(entity, nodeID: nodeID, context: context),
         nodeIDsByAnchor[.entityHome(entity), default: []].contains(nodeID)
@@ -500,6 +510,34 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
         )
       }
     }
+    for (sourceNodeID, anchors) in anchorsBySourceNodeID {
+      for anchor in anchors
+      where anchor.sourceNodeID != sourceNodeID
+        || nodeIDsByAnchor[anchor, default: []].isEmpty
+      {
+        violations.insert(
+          LifetimeAnchorInverseViolation(
+            direction: .sourceMissingFromCanonical,
+            nodeID: sourceNodeID,
+            anchor: anchor
+          )
+        )
+      }
+    }
+    for (anchor, nodeIDs) in nodeIDsByAnchor where !nodeIDs.isEmpty {
+      guard let sourceNodeID = anchor.sourceNodeID,
+        !anchorsBySourceNodeID[sourceNodeID, default: []].contains(anchor)
+      else {
+        continue
+      }
+      violations.insert(
+        LifetimeAnchorInverseViolation(
+          direction: .canonicalMissingFromSource,
+          nodeID: sourceNodeID,
+          anchor: anchor
+        )
+      )
+    }
     return violations.sorted(by: inverseViolationLessThan)
   }
 
@@ -520,8 +558,8 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     from source: ViewNodeID
   ) -> [(LifetimeAnchor, ViewNodeID)] {
     var result: [(LifetimeAnchor, ViewNodeID)] = []
-    for (anchor, nodeIDs) in nodeIDsByAnchor where anchor.sourceNodeID == source {
-      for nodeID in nodeIDs {
+    for anchor in anchorsBySourceNodeID[source, default: []] {
+      for nodeID in nodeIDsByAnchor[anchor, default: []] {
         result.append((anchor, nodeID))
       }
     }
@@ -534,6 +572,18 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       }
       return lhs.1 < rhs.1
     }
+  }
+
+  private static func sourceProjection(
+    from nodeIDsByAnchor: [LifetimeAnchor: Set<ViewNodeID>]
+  ) -> [ViewNodeID: Set<LifetimeAnchor>] {
+    var result: [ViewNodeID: Set<LifetimeAnchor>] = [:]
+    for (anchor, nodeIDs) in nodeIDsByAnchor where !nodeIDs.isEmpty {
+      if let sourceNodeID = anchor.sourceNodeID {
+        result[sourceNodeID, default: []].insert(anchor)
+      }
+    }
+    return result
   }
 }
 
@@ -592,10 +642,13 @@ private func inverseViolationLessThan(
   if lifetimeAnchorLessThan(rhs.anchor, lhs.anchor) {
     return false
   }
-  switch (lhs.direction, rhs.direction) {
-  case (.forwardMissingFromInverse, .inverseMissingFromForward):
-    return true
-  default:
-    return false
+  func rank(_ direction: LifetimeAnchorInverseDirection) -> Int {
+    switch direction {
+    case .forwardMissingFromInverse: 0
+    case .inverseMissingFromForward: 1
+    case .sourceMissingFromCanonical: 2
+    case .canonicalMissingFromSource: 3
+    }
   }
+  return rank(lhs.direction) < rank(rhs.direction)
 }

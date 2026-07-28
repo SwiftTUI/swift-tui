@@ -83,6 +83,25 @@ struct LifetimeAnchorIndexTests {
     #expect(index.isInverseConsistent)
   }
 
+  @Test("node removal preserves shared pre-removal buckets under copy-on-write")
+  func nodeRemovalPreservesSharedBuckets() {
+    var index = LifetimeAnchorIndex()
+    index.insert(anchor: .parent(nodeID(1)), for: nodeID(2))
+    index.insert(anchor: .hostedDetached(nodeID(2)), for: nodeID(3))
+    index.insert(anchor: .hostedDetached(nodeID(2)), for: nodeID(4))
+    index.insert(anchor: .navigationSurface(nodeID(2)), for: nodeID(5))
+    let before = index
+
+    index.removeNode(nodeID(2))
+
+    #expect(before.targets(of: nodeID(2)) == [nodeID(3), nodeID(4), nodeID(5)])
+    #expect(before.anchors(for: nodeID(2)) == [.parent(nodeID(1))])
+    #expect(before.isInverseConsistent)
+    #expect(index.targets(of: nodeID(2)).isEmpty)
+    #expect(index.anchors(for: nodeID(2)).isEmpty)
+    #expect(index.isInverseConsistent)
+  }
+
   @Test("cycles terminate and shortest anchor chains are deterministic")
   func cycleClosureIsDeterministic() {
     var index = LifetimeAnchorIndex()
@@ -195,6 +214,42 @@ struct LifetimeAnchorIndexTests {
     )
   }
 
+  @Test("source projection validation reports either one-sided corruption")
+  func sourceProjectionValidationFindsCorruption() {
+    let source = nodeID(1)
+    let target = nodeID(2)
+    let anchor = LifetimeAnchor.parent(source)
+    let sourceOnly = LifetimeAnchorIndex(
+      anchorsBySourceNodeID: [source: [anchor]]
+    )
+    #expect(
+      sourceOnly.inverseConsistencyViolations()
+        == [
+          LifetimeAnchorInverseViolation(
+            direction: .sourceMissingFromCanonical,
+            nodeID: source,
+            anchor: anchor
+          )
+        ]
+    )
+
+    let canonicalOnly = LifetimeAnchorIndex(
+      anchorsByNodeID: [target: [anchor]],
+      nodeIDsByAnchor: [anchor: [target]],
+      anchorsBySourceNodeID: [:]
+    )
+    #expect(
+      canonicalOnly.inverseConsistencyViolations()
+        == [
+          LifetimeAnchorInverseViolation(
+            direction: .canonicalMissingFromSource,
+            nodeID: source,
+            anchor: anchor
+          )
+        ]
+    )
+  }
+
   @Test("bounded randomized mutations never split the inverse")
   func randomizedMutationsPreserveInverse() {
     var random = DeterministicLifetimeRandom(seed: 0xC0FFEE)
@@ -229,6 +284,11 @@ struct LifetimeAnchorIndexTests {
         )
       }
       #expect(index.isInverseConsistent)
+      let rebuilt = LifetimeAnchorIndex(
+        anchorsByNodeID: index.anchorsByNodeID,
+        nodeIDsByAnchor: index.nodeIDsByAnchor
+      )
+      #expect(index.anchorsBySourceNodeID == rebuilt.anchorsBySourceNodeID)
     }
   }
 
@@ -312,6 +372,11 @@ struct LifetimeRelationCheckpointTests {
     graph.restoreCheckpoint(checkpoint)
     #expect(graph.debugTotalStateSnapshot() == before)
     #expect(graph.lifetimeAnchors.isInverseConsistent)
+    let rebuilt = LifetimeAnchorIndex(
+      anchorsByNodeID: graph.lifetimeAnchors.anchorsByNodeID,
+      nodeIDsByAnchor: graph.lifetimeAnchors.nodeIDsByAnchor
+    )
+    #expect(graph.lifetimeAnchors.anchorsBySourceNodeID == rebuilt.anchorsBySourceNodeID)
   }
 }
 
