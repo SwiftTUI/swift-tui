@@ -497,6 +497,11 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        let colorModes = resolvedTextColorModes(
+          for: style,
+          environment: environment,
+          bounds: bounds
+        )
 
         let layout = layoutText(
           for: content,
@@ -515,6 +520,8 @@ extension Rasterizer {
 
             let resolvedStyle = resolveTextStyle(
               style,
+              foregroundMode: colorModes.foreground,
+              backgroundMode: colorModes.background,
               environment: environment,
               bounds: bounds,
               sampleX: x,
@@ -554,6 +561,11 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        let colorModes = resolvedTextColorModes(
+          for: style,
+          environment: environment,
+          bounds: bounds
+        )
 
         for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
           let clusters = clusterize(line)
@@ -565,6 +577,8 @@ extension Rasterizer {
 
             let resolvedStyle = resolveTextStyle(
               style,
+              foregroundMode: colorModes.foreground,
+              backgroundMode: colorModes.background,
               environment: environment,
               bounds: bounds,
               sampleX: x,
@@ -607,6 +621,11 @@ extension Rasterizer {
 
           for run in line.runs {
             let runStyle = style.merging(run.style)
+            let colorModes = resolvedTextColorModes(
+              for: runStyle,
+              environment: environment,
+              bounds: bounds
+            )
             let clusters = clusterize(run.content)
 
             for cluster in clusters {
@@ -616,6 +635,8 @@ extension Rasterizer {
 
               let resolvedStyle = resolveTextStyle(
                 runStyle,
+                foregroundMode: colorModes.foreground,
+                backgroundMode: colorModes.background,
                 environment: environment,
                 bounds: bounds,
                 sampleX: x,
@@ -669,6 +690,18 @@ extension Rasterizer {
             wrappingStrategy: wrappingStrategy
           )
         )
+        let runColorModes = payload.runs.map { run in
+          resolvedTextColorModes(
+            for: run.style,
+            environment: environment,
+            bounds: bounds
+          )
+        }
+        let defaultColorModes = resolvedTextColorModes(
+          for: .init(),
+          environment: environment,
+          bounds: bounds
+        )
 
         for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
           var x = bounds.origin.x
@@ -680,8 +713,14 @@ extension Rasterizer {
             let run = cluster.runIndex.flatMap { runIndex in
               payload.runs.indices.contains(runIndex) ? payload.runs[runIndex] : nil
             }
+            let colorModes =
+              cluster.runIndex.flatMap { runIndex in
+                runColorModes.indices.contains(runIndex) ? runColorModes[runIndex] : nil
+              } ?? defaultColorModes
             let resolvedStyle = resolveTextStyle(
               run?.style ?? .init(),
+              foregroundMode: colorModes.foreground,
+              backgroundMode: colorModes.background,
               environment: environment,
               bounds: bounds,
               sampleX: x,

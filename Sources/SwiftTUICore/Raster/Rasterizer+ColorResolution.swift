@@ -215,17 +215,67 @@ extension Rasterizer {
     width: Int,
     currentCellBackground: Color? = nil
   ) -> ResolvedTextStyle {
-    var foregroundColor = resolveColor(
+    let modes = resolvedTextColorModes(
+      for: style,
+      environment: environment,
+      bounds: bounds
+    )
+    return resolveTextStyle(
+      style,
+      foregroundMode: modes.foreground,
+      backgroundMode: modes.background,
+      environment: environment,
+      bounds: bounds,
+      sampleX: sampleX,
+      sampleY: sampleY,
+      width: width,
+      currentCellBackground: currentCellBackground
+    )
+  }
+
+  internal func resolvedTextColorModes(
+    for style: TextStyle,
+    environment: StyleEnvironmentSnapshot,
+    bounds: CellRect
+  ) -> (
+    foreground: ResolvedShapeColorMode,
+    background: ResolvedShapeColorMode?
+  ) {
+    let foreground = resolvedColorMode(
       from: style.foregroundStyle ?? environment.foregroundStyle ?? .semantic(.foreground),
       environment: environment,
+      bounds: bounds
+    )
+    let background = style.backgroundStyle.map {
+      resolvedColorMode(
+        from: $0,
+        environment: environment,
+        bounds: bounds
+      )
+    }
+    return (foreground, background)
+  }
+
+  internal func resolveTextStyle(
+    _ style: TextStyle,
+    foregroundMode: ResolvedShapeColorMode,
+    backgroundMode: ResolvedShapeColorMode?,
+    environment: StyleEnvironmentSnapshot,
+    bounds: CellRect,
+    sampleX: Int,
+    sampleY: Int,
+    width: Int,
+    currentCellBackground: Color? = nil
+  ) -> ResolvedTextStyle {
+    var foregroundColor = resolveColor(
+      from: foregroundMode,
       bounds: bounds,
       sampleX: sampleX + max(0, width - 1) / 2,
       sampleY: sampleY
     )
-    let backgroundColor = style.backgroundStyle.flatMap {
+    let backgroundColor = backgroundMode.flatMap {
       resolveColor(
         from: $0,
-        environment: environment,
         bounds: bounds,
         sampleX: sampleX + max(0, width - 1) / 2,
         sampleY: sampleY
