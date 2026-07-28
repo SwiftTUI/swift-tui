@@ -414,7 +414,7 @@ private struct LiteralTabsStripBaseRule: PrimitiveView, ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var drawMetadata = DrawMetadata()
     drawMetadata.foregroundStyle = .semantic(.foreground)
-    drawMetadata.ruleStackAxis = context.environmentValues.stackAxis
+    drawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
         kindName: "LiteralTabsStripBaseRule",

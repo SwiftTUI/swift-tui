@@ -118,7 +118,7 @@ package struct DrawMetadata: Equatable, Sendable {
   package var clipIdentifier: String?
   package var compositingHint: String?
   package var imagePreference: String?
-  package var ruleStackAxis: Axis?
+  package var leafStackAxis: Axis?
 
   package init(
     foregroundStyle: AnyShapeStyle? = nil,
@@ -183,7 +183,7 @@ package struct DrawMetadata: Equatable, Sendable {
     self.clipIdentifier = clipIdentifier
     self.compositingHint = compositingHint
     self.imagePreference = imagePreference
-    ruleStackAxis = nil
+    leafStackAxis = nil
   }
 
   package var baseStyle: BaseStyle {
@@ -287,7 +287,7 @@ package struct DrawMetadata: Equatable, Sendable {
     merged.clipIdentifier = other.clipIdentifier ?? clipIdentifier
     merged.compositingHint = other.compositingHint ?? compositingHint
     merged.imagePreference = other.imagePreference ?? imagePreference
-    merged.ruleStackAxis = other.ruleStackAxis ?? ruleStackAxis
+    merged.leafStackAxis = other.leafStackAxis ?? leafStackAxis
     return merged
   }
 

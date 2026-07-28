@@ -59,12 +59,12 @@ extension LayoutEngine {
         switch current.drawPayload {
         case .rule:
           // A Divider/Rule fills the cross axis of its enclosing stack
-          // (stored in `drawMetadata.ruleStackAxis`). A rule inside a
+          // (stored in `drawMetadata.leafStackAxis`). A rule inside a
           // VStack expands horizontally; a rule inside an HStack
           // expands vertically. It counts as flexible on any axis that
           // isn't its own stack axis.
-          if let ruleStackAxis = current.drawMetadata.ruleStackAxis {
-            if ruleStackAxis != axis {
+          if let leafStackAxis = current.drawMetadata.leafStackAxis {
+            if leafStackAxis != axis {
               return true
             }
             continue

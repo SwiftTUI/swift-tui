@@ -60,7 +60,7 @@ extension LayoutEngine {
       case .rule:
         return measuredRuleSize(
           for: proposal,
-          stackAxis: resolved.drawMetadata.ruleStackAxis
+          stackAxis: resolved.drawMetadata.leafStackAxis
         )
       case .none:
         break

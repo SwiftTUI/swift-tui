@@ -95,6 +95,15 @@ extension LayoutEngine {
       return DirectMaximum(value: nil)
     }
     if isSpacer(node) {
+      // A Spacer absorbs unbounded space only along its own stack's axis —
+      // the same rule the `.rule` (Divider) branch below applies. Reporting
+      // unbounded on the cross axis too made every Spacer-bearing bar
+      // vertically greedy inside a VStack (and horizontally greedy inside an
+      // HStack), so a one-line status strip competed with the intended
+      // flexible child and the stack never filled its proposal.
+      if let spacerStackAxis = node.drawMetadata.leafStackAxis, spacerStackAxis != axis {
+        return DirectMaximum(value: idealMain)
+      }
       return DirectMaximum(value: nil)
     }
     if isFixedSize(node.layoutMetadata, on: axis) {
@@ -107,7 +116,7 @@ extension LayoutEngine {
       case .shape, .canvas, .foreignSurface:
         return DirectMaximum(value: nil)
       case .rule:
-        if let ruleStackAxis = node.drawMetadata.ruleStackAxis, ruleStackAxis != axis {
+        if let leafStackAxis = node.drawMetadata.leafStackAxis, leafStackAxis != axis {
           return DirectMaximum(value: nil)
         }
         return DirectMaximum(value: idealMain)

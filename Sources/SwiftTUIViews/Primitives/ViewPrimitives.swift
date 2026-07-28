@@ -243,10 +243,18 @@ public struct Spacer: PrimitiveView, ResolvableView {
       case nil:
         CellSize(width: minLength, height: minLength)
       }
+    // Record the enclosing stack's axis for the same reason `Divider` does: a
+    // Spacer absorbs unbounded space only along its *own* stack's axis. Without
+    // this the maximum-size traversal reports the subtree as unbounded on both
+    // axes, so an `HStack { Text; Spacer() }` status bar competes with its
+    // siblings for the VStack's height.
+    var resolvedDrawMetadata = DrawMetadata()
+    resolvedDrawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
         kindName: "Spacer",
         intrinsicSize: intrinsicSize,
+        drawMetadata: resolvedDrawMetadata,
         in: context
       )
     ]
@@ -263,7 +271,7 @@ public struct Divider: PrimitiveView, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolvedDrawMetadata = DrawMetadata()
-    resolvedDrawMetadata.ruleStackAxis = context.environmentValues.stackAxis
+    resolvedDrawMetadata.leafStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
         kindName: "Divider",

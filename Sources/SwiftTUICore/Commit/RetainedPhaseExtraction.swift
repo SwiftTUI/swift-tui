@@ -47,7 +47,7 @@ package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
     var clipIdentifier: String?
     var compositingHint: String?
     var imagePreference: String?
-    var ruleStackAxis: Axis?
+    var leafStackAxis: Axis?
 
     init(_ metadata: DrawMetadata) {
       heavyFields = metadata.heavyFields.value
@@ -55,7 +55,7 @@ package struct RetainedPhaseExtractionSignature: Equatable, Sendable {
       clipIdentifier = metadata.clipIdentifier
       compositingHint = metadata.compositingHint
       imagePreference = metadata.imagePreference
-      ruleStackAxis = metadata.ruleStackAxis
+      leafStackAxis = metadata.leafStackAxis
     }
   }
 

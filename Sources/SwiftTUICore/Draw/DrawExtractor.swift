@@ -307,7 +307,7 @@ extension DrawExtractor {
             ?? drawMetadata.foregroundStyle
             ?? .semantic(.separator),
           strokeStyle: strokeStyle ?? drawMetadata.borderStrokeStyle ?? .init(),
-          stackAxis: drawMetadata.ruleStackAxis
+          stackAxis: drawMetadata.leafStackAxis
         )
       )
     case .canvas(let payload):
