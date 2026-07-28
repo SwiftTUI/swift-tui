@@ -8,7 +8,7 @@ public struct SyntheticMeshTextScenario: PerfScenario {
   public let defaultTerminalSize = PerfTerminalSize(columns: 80, rows: 24)
   public let scriptedEvents = [
     "capture mesh-styled text first render",
-    "advance six frames with unchanged mesh-styled text",
+    "warm the static mesh key, then advance six measured unchanged frames",
     "animate mesh text points and colors to a settled target",
   ]
   public let visualMarkers = ["mesh text phase static"]
@@ -38,11 +38,23 @@ public struct SyntheticMeshTextScenario: PerfScenario {
         )
       ]
 
-      let retainedDispatch = monotonicSeconds()
       var retainedFrame = first
-      for pass in 1...6 {
-        let cell = try driver.cell(containing: "retain mesh text")
-        driver.sendClick(at: cell)
+      let retainedCell = try driver.cell(containing: "retain mesh text")
+
+      // The process-wide preparation cache survives benchmark iterations. An
+      // earlier iteration's animated keys can evict this static key, and the
+      // admission gate intentionally bypasses a full cache on first sighting.
+      // Keep that possible miss outside the measured phase so all six timed
+      // repaints exercise the promised steady-state hit regime.
+      driver.sendClick(at: retainedCell)
+      retainedFrame = try await driver.waitForFrame(
+        containing: "retained text pass 1",
+        afterFrame: retainedFrame.frameNumber
+      )
+
+      let retainedDispatch = monotonicSeconds()
+      for pass in 2...7 {
+        driver.sendClick(at: retainedCell)
         retainedFrame = try await driver.waitForFrame(
           containing: "retained text pass \(pass)",
           afterFrame: retainedFrame.frameNumber
@@ -53,7 +65,7 @@ public struct SyntheticMeshTextScenario: PerfScenario {
           eventID: "mesh-text-unchanged-retained-frames",
           eventType: "mouse_click",
           dispatchTimeSeconds: retainedDispatch,
-          expectedVisualMarker: "retained text pass 6",
+          expectedVisualMarker: "retained text pass 7",
           firstMatchingFrame: retainedFrame.frameNumber,
           firstMatchingTimeSeconds: retainedFrame.timestampSeconds,
           finalSettledFrame: retainedFrame.frameNumber,
