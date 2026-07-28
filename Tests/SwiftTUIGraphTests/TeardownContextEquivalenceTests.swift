@@ -114,6 +114,74 @@ struct TeardownContextEquivalenceTests {
     #expect(graph.lifetimeAnchors.isInverseConsistent)
   }
 
+  @Test("one removal cascade builds at most one reachability context")
+  func oneContextPerCascade() {
+    let graph = ViewGraph()
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: testIdentity("TeardownContextEquivalence", "Root"),
+        kind: .root
+      )
+    )
+    graph.beginFrame()
+    let nodes = (0..<50).map { index in
+      evaluateStoredNode(graph, named: "Relation-\(index)")
+    }
+    for index in 0..<(nodes.count - 1) {
+      graph.lifetimeAnchors.insert(
+        anchor: .committedValue(nodes[index].viewNodeID),
+        for: nodes[index + 1].viewNodeID
+      )
+    }
+
+    graph.beginFrame()
+    let countBefore = graph.debugReachabilityContextBuildCount
+    graph.removeSubtree(rootedAt: nodes[0])
+
+    #expect(graph.debugReachabilityContextBuildCount == countBefore + 1)
+    #expect(nodes.allSatisfy { graph.nodeIfExists(for: $0.viewNodeID) == nil })
+  }
+
+  @Test("a fully parented cascade without relation targets builds no context")
+  func parentedCascadeBuildsNoContext() {
+    let graph = ViewGraph()
+    let identities = (0..<50).map { index in
+      testIdentity("TeardownContextEquivalence", "Parented-\(index)")
+    }
+    var subtree = ResolvedNode(identity: identities.last!, kind: .view("Leaf"))
+    for identity in identities.dropLast().reversed() {
+      subtree = ResolvedNode(
+        identity: identity,
+        kind: .view("Branch"),
+        children: [subtree]
+      )
+    }
+    let rootIdentity = testIdentity("TeardownContextEquivalence", "ParentedRoot")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [subtree]
+      )
+    )
+    let subtreeRoot = graph.nodeForIdentity(for: identities[0])
+    for index in 0..<(identities.count - 1) {
+      let source = graph.nodeForIdentity(for: identities[index])
+      let target = graph.nodeForIdentity(for: identities[index + 1])
+      graph.lifetimeAnchors.remove(
+        anchor: .parent(source.viewNodeID),
+        for: target.viewNodeID
+      )
+    }
+
+    graph.beginFrame()
+    let countBefore = graph.debugReachabilityContextBuildCount
+    graph.removeSubtree(rootedAt: subtreeRoot)
+
+    #expect(graph.debugReachabilityContextBuildCount == countBefore)
+    #expect(identities.allSatisfy { graph.nodeIfExists(for: $0) == nil })
+  }
+
   private func makeAnchorFixture() -> (
     index: LifetimeAnchorIndex,
     context: LifetimeReachabilityContext,

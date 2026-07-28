@@ -93,6 +93,21 @@ extension ViewGraph {
   final class SubtreeRemovalWalk {
     var enteredNodeIDs: Set<ViewNodeID> = []
     var relationCascadeNodeIDs: Set<ViewNodeID> = []
+    /// Memoized no-argument reachability context for this cascade. This is
+    /// sound while that context depends only on `root`, which is never
+    /// reassigned during a removal cascade.
+    private var memoizedContext: LifetimeReachabilityContext??
+
+    func reachabilityContext(
+      _ build: () -> LifetimeReachabilityContext?
+    ) -> LifetimeReachabilityContext? {
+      if let memoizedContext {
+        return memoizedContext
+      }
+      let built = build()
+      memoizedContext = .some(built)
+      return built
+    }
   }
 
   func removeSubtree(
@@ -221,27 +236,29 @@ extension ViewGraph {
     // ever reached it, so index ownership is not evidence of adoption there.
     // Every other caller keeps the guard: the proxies protect live re-rooted
     // controls and flattened state owners mid-frame.
-    let hasDurableAnchorOutsideCascade =
-      policy.consultsLifetimeAnchors
-      && (lifetimeReachabilityContext().map { context in
-        lifetimeAnchors.hasAnchorOutside(
-          node.viewNodeID,
-          excluding: walk.relationCascadeNodeIDs,
-          context: context
-        )
-      } ?? false)
     if policy.appliesParentDetachedKeepGuard,
       node.parent == nil,
       node.viewNodeID != root?.viewNodeID,
-      node.visitedThisFrame(currentFrameID),
-      hasDurableAnchorOutsideCascade
+      node.visitedThisFrame(currentFrameID)
+    {
+      let hasDurableAnchorOutsideCascade =
+        policy.consultsLifetimeAnchors
+        && (walk.reachabilityContext { lifetimeReachabilityContext() }.map { context in
+          lifetimeAnchors.hasAnchorOutside(
+            node.viewNodeID,
+            excluding: walk.relationCascadeNodeIDs,
+            context: context
+          )
+        } ?? false)
+      if hasDurableAnchorOutsideCascade
         || nodeIDByIdentity[node.identity] == node.viewNodeID
         || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
         || entityRoutingTable.entityByNodeID[node.viewNodeID].map({ entity in
           entityRoutingTable.route(entity) == node.viewNodeID
         }) ?? false
-    {
-      return
+      {
+        return
+      }
     }
 
     // An entity-routed node reached by DESCENT is not necessarily departing
@@ -327,7 +344,7 @@ extension ViewGraph {
         continue
       }
       let anchorSurvivesRemoval =
-        lifetimeReachabilityContext().map { context in
+        walk.reachabilityContext { lifetimeReachabilityContext() }.map { context in
           lifetimeAnchors.hasAnchorOutside(
             targetNodeID,
             excluding: walk.relationCascadeNodeIDs,
@@ -359,7 +376,7 @@ extension ViewGraph {
       let targetIsAbsorbed =
         teardownBarrierWork.reasons(for: targetNodeID).contains(.absorbedShadow)
       if !targetIsAbsorbed,
-        let context = lifetimeReachabilityContext(),
+        let context = walk.reachabilityContext({ lifetimeReachabilityContext() }),
         lifetimeAnchors.keepDecision(
           for: targetNodeID,
           removalCascade: walk.relationCascadeNodeIDs,

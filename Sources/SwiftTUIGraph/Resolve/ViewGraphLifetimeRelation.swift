@@ -5,6 +5,9 @@ extension ViewGraph {
     candidateRootID: ViewNodeID? = nil,
     activeEntities: Set<EntityIdentity> = []
   ) -> LifetimeReachabilityContext? {
+    #if DEBUG
+      noteReachabilityContextBuild()
+    #endif
     guard let candidateRootID = candidateRootID ?? root?.viewNodeID else {
       return nil
     }

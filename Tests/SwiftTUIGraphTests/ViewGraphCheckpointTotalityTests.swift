@@ -72,7 +72,9 @@ struct ViewGraphCheckpointTotalityTests {
     // chunked-resolve worklist, transient within one synchronous resolve
     // pass: its queue is empty and its depth zero at every frame boundary
     // (asserted in `beginFrame`), so no checkpoint can ever observe
-    // non-default state.
+    // non-default state — and `debugReachabilityContextBuildCount`, DEBUG-only
+    // diagnostic instrumentation whose monotonic observation count is
+    // deliberately not graph state and is not rewound by restore.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -88,7 +90,7 @@ struct ViewGraphCheckpointTotalityTests {
       Set(viewGraphGroupFields)
         == groupPropertyNames.union([
           "root", "nodeCheckpointImageStore", "detachedHostedRootsRecordedThisFrame",
-          "deferredResolveDriver",
+          "deferredResolveDriver", "debugReachabilityContextBuildCount",
         ])
     )
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.

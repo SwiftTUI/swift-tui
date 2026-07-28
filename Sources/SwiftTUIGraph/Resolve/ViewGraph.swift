@@ -156,6 +156,18 @@ package final class ViewGraph {
   /// so no checkpoint can ever observe non-default state.
   package let deferredResolveDriver = DeferredResolveDriver()
 
+  #if DEBUG
+    /// Test-only observability for reachability-context construction cost.
+    ///
+    /// This is diagnostic instrumentation rather than graph state: checkpoint
+    /// restore deliberately does not rewind it.
+    package private(set) var debugReachabilityContextBuildCount = 0
+
+    package func noteReachabilityContextBuild() {
+      debugReachabilityContextBuildCount += 1
+    }
+  #endif
+
   // Cohesive field groups (see ViewGraphFieldGroups.swift). Every original field
   // is forwarded by a private computed accessor below, so reconciliation logic
   // is unchanged while makeCheckpoint/restoreCheckpoint move whole groups.
