@@ -93,6 +93,7 @@ extension ViewGraph {
   final class SubtreeRemovalWalk {
     var enteredNodeIDs: Set<ViewNodeID> = []
     var relationCascadeNodeIDs: Set<ViewNodeID> = []
+    var reuseCacheEvictionRoots: [Identity] = []
     /// Memoized no-argument reachability context for this cascade. This is
     /// sound while that context depends only on `root`, which is never
     /// reassigned during a removal cascade.
@@ -122,6 +123,13 @@ extension ViewGraph {
     else {
       return
     }
+    let ownsWalk = walk == nil
+    let walk = walk ?? SubtreeRemovalWalk()
+    defer {
+      if ownsWalk {
+        flushReuseCacheEvictions(walk)
+      }
+    }
     // The descent below walks committed snapshots whose identity and
     // structural-path lookups can alias a node already being removed higher in
     // this same cascade (an absolute-`.id` re-root shares structural paths with
@@ -130,7 +138,6 @@ extension ViewGraph {
     // once. A re-entry still descends its own snapshot's children: an aliased
     // snapshot can cover departed descendants the first entry's snapshot does
     // not, and the descent strictly shrinks into the finite resolved tree.
-    let walk = walk ?? SubtreeRemovalWalk()
     if walk.relationCascadeNodeIDs.isEmpty {
       walk.relationCascadeNodeIDs = lifetimeAnchors.removalCascade(
         from: node.viewNodeID
@@ -280,14 +287,14 @@ extension ViewGraph {
 
     node.prepareForFrame(currentFrameID)
     let snapshot = committedSnapshot ?? node.committed
-    removeResolvedNodeReuseCaches(rootedAt: node.identity)
+    walk.reuseCacheEvictionRoots.append(node.identity)
     if node.resolvedIdentity != node.identity {
-      removeResolvedNodeReuseCaches(rootedAt: node.resolvedIdentity)
+      walk.reuseCacheEvictionRoots.append(node.resolvedIdentity)
     }
     if snapshot.identity != node.identity,
       snapshot.identity != node.resolvedIdentity
     {
-      removeResolvedNodeReuseCaches(rootedAt: snapshot.identity)
+      walk.reuseCacheEvictionRoots.append(snapshot.identity)
     }
     if snapshot.children.isEmpty {
       for child in node.children {
@@ -476,15 +483,42 @@ extension ViewGraph {
     effectRegistrationOwnerNodeIDs.remove(node.viewNodeID)
   }
 
-  private func removeResolvedNodeReuseCaches(
-    rootedAt identity: Identity
-  ) {
-    resolvedNodeReuseCache = resolvedNodeReuseCache.filter { key, entry in
-      let ownerMatches = key.owner == identity || key.owner.isDescendant(of: identity)
-      let nodeMatches =
-        entry.node.identity == identity || entry.node.identity.isDescendant(of: identity)
-      return !ownerMatches && !nodeMatches
+  private func flushReuseCacheEvictions(_ walk: SubtreeRemovalWalk) {
+    guard !resolvedNodeReuseCache.isEmpty,
+      !walk.reuseCacheEvictionRoots.isEmpty
+    else {
+      return
     }
+
+    // Component-wise preorder keeps every descendant contiguous behind its
+    // ancestor, so the previous retained root is the only possible ancestor.
+    let sortedRoots = Set(walk.reuseCacheEvictionRoots).sorted(by: identityPathLessThan)
+    var minimalRoots: [Identity] = []
+    minimalRoots.reserveCapacity(sortedRoots.count)
+    for root in sortedRoots {
+      if let previous = minimalRoots.last,
+        root.isDescendant(of: previous)
+      {
+        continue
+      }
+      minimalRoots.append(root)
+    }
+
+    resolvedNodeReuseCache = resolvedNodeReuseCache.filter { key, entry in
+      !minimalRoots.contains { root in
+        root.isAncestor(of: key.owner)
+          || root.isAncestor(of: entry.node.identity)
+      }
+    }
+  }
+
+  private func identityPathLessThan(_ lhs: Identity, _ rhs: Identity) -> Bool {
+    for (lhsComponent, rhsComponent) in zip(lhs.components, rhs.components) {
+      if lhsComponent != rhsComponent {
+        return lhsComponent < rhsComponent
+      }
+    }
+    return lhs.components.count < rhs.components.count
   }
 
   private func removeResolvedSubtree(
@@ -492,7 +526,13 @@ extension ViewGraph {
     policy: SubtreeRemovalPolicy = .ordinary,
     walk: SubtreeRemovalWalk? = nil
   ) {
+    let ownsWalk = walk == nil
     let walk = walk ?? SubtreeRemovalWalk()
+    defer {
+      if ownsWalk {
+        flushReuseCacheEvictions(walk)
+      }
+    }
     let nodes = nodeIDsForResolvedNode(resolved)
       .compactMap { nodeIfExists(for: $0) }
       .sorted { lhs, rhs in
