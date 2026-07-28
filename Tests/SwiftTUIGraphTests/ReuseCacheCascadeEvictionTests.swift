@@ -68,6 +68,21 @@ struct ReuseCacheCascadeEvictionTests {
     #expect(graph.nodeIfExists(for: detached.viewNodeID) == nil)
     #expect(!contains(graph, namespace: "detached-island"))
     #expect(contains(graph, namespace: "unrelated"))
+    #expect(
+      graph.debugReuseCacheEvictionFlushCount == 1,
+      "the multi-node relation cascade must filter the reuse cache exactly once"
+    )
+  }
+
+  @Test("an empty cache skips the cascade-end filter")
+  func emptyCacheSkipsFlush() {
+    let graph = ViewGraph()
+    let source = evaluateStoredNode(graph, named: "NoCache")
+
+    graph.beginFrame()
+    graph.removeSubtree(rootedAt: source)
+
+    #expect(graph.debugReuseCacheEvictionFlushCount == 0)
   }
 
   private func store(

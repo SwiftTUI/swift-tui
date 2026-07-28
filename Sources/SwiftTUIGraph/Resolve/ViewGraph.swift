@@ -163,8 +163,19 @@ package final class ViewGraph {
     /// restore deliberately does not rewind it.
     package private(set) var debugReachabilityContextBuildCount = 0
 
+    /// Test-only observability for resolved-node reuse-cache filtering.
+    ///
+    /// A removal cascade must filter the cache at most once, after all related
+    /// nodes have contributed their eviction roots. Like the reachability
+    /// counter, this is diagnostic instrumentation rather than graph state.
+    package private(set) var debugReuseCacheEvictionFlushCount = 0
+
     package func noteReachabilityContextBuild() {
       debugReachabilityContextBuildCount += 1
+    }
+
+    package func noteReuseCacheEvictionFlush() {
+      debugReuseCacheEvictionFlushCount += 1
     }
   #endif
 

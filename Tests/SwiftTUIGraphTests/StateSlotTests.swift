@@ -231,4 +231,56 @@ struct TaskDescriptorIdentitySlotTests {
     #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 0, value: 7) == zero)
     #expect(graph.taskDescriptorIdentityLabel(for: node.viewNodeID, ordinal: 1, value: 7) == one)
   }
+
+  @Test("checkpoint restore preserves nested owner and ordinal buckets")
+  func checkpointRestorePreservesNestedBuckets() {
+    let graph = ViewGraph()
+    let firstOwner = ViewNodeID(rawValue: 101)
+    let secondOwner = ViewNodeID(rawValue: 202)
+    let firstZero = graph.taskDescriptorIdentityLabel(
+      for: firstOwner, ordinal: 0, value: "first-zero"
+    )
+    let firstOne = graph.taskDescriptorIdentityLabel(
+      for: firstOwner, ordinal: 1, value: "first-one"
+    )
+    let secondZero = graph.taskDescriptorIdentityLabel(
+      for: secondOwner, ordinal: 0, value: "second-zero"
+    )
+    let checkpoint = graph.makeCheckpoint()
+
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: firstOwner, ordinal: 0, value: "mutated-first-zero"
+      ) != firstZero
+    )
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: firstOwner, ordinal: 1, value: "mutated-first-one"
+      ) != firstOne
+    )
+    graph.removeTaskDescriptorSlots(ownedBy: secondOwner)
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: secondOwner, ordinal: 0, value: "replacement-second-zero"
+      ) != secondZero
+    )
+
+    graph.restoreCheckpoint(checkpoint)
+
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: firstOwner, ordinal: 0, value: "first-zero"
+      ) == firstZero
+    )
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: firstOwner, ordinal: 1, value: "first-one"
+      ) == firstOne
+    )
+    #expect(
+      graph.taskDescriptorIdentityLabel(
+        for: secondOwner, ordinal: 0, value: "second-zero"
+      ) == secondZero
+    )
+  }
 }

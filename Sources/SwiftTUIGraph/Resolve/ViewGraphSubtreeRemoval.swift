@@ -504,6 +504,9 @@ extension ViewGraph {
       minimalRoots.append(root)
     }
 
+    #if DEBUG
+      noteReuseCacheEvictionFlush()
+    #endif
     resolvedNodeReuseCache = resolvedNodeReuseCache.filter { key, entry in
       !minimalRoots.contains { root in
         root.isAncestor(of: key.owner)
