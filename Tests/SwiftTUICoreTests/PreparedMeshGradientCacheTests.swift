@@ -35,6 +35,38 @@ struct PreparedMeshGradientCacheTests {
     )
   }
 
+  @Test("racing same-key lookups keep hit and miss metrics partitioned")
+  func racingSameKeyLookupsKeepMetricsPartitioned() async {
+    let taskCount = 32
+    let cache = PreparedMeshGradientCache()
+    let input = cacheTestInput()
+    let bounds = CellRect(origin: .zero, size: .init(width: 80, height: 24))
+
+    await withTaskGroup(of: Void.self) { group in
+      for _ in 0..<taskCount {
+        group.addTask {
+          _ = cache.prepared(for: input, bounds: bounds)
+        }
+      }
+      await group.waitForAll()
+    }
+
+    let metrics = cache.metrics
+    #expect(metrics.entries == 1)
+    #expect(metrics.lookups == taskCount)
+    #expect(metrics.lookups == metrics.hits + metrics.misses)
+    #expect(metrics.stores == 1)
+    #expect(metrics.misses == metrics.stores + metrics.duplicatePreparations)
+    #expect(
+      cache.entryMetrics(for: input, bounds: bounds)
+        == .init(
+          lookups: taskCount,
+          hits: metrics.hits,
+          misses: metrics.misses
+        )
+    )
+  }
+
   @Test("every preparation input and bounds axis participates in the key")
   func everyKeyAxisMisses() {
     let cache = PreparedMeshGradientCache(capacity: 16)
@@ -79,7 +111,8 @@ struct PreparedMeshGradientCacheTests {
   func meshGradientMutationKeepsCachedEntryIsolated() {
     let cache = PreparedMeshGradientCache()
     var gradient = cacheTestGradient()
-    let oldInput = cacheInput(for: gradient)
+    let retainedAlias = gradient
+    let oldInput = cacheInput(for: retainedAlias)
     let bounds = cacheTestBounds()
     let oldPrepared = cache.prepared(for: oldInput, bounds: bounds)
     let oldSample = oldPrepared.color(atCellX: 3, y: 2)
@@ -93,6 +126,7 @@ struct PreparedMeshGradientCacheTests {
       colors: targetColors,
       background: .white
     )
+    #expect(cacheInput(for: retainedAlias) == oldInput)
     let newInput = cacheInput(for: gradient)
     let retainedOld = cache.prepared(for: oldInput, bounds: bounds)
     let newPrepared = cache.prepared(for: newInput, bounds: bounds)

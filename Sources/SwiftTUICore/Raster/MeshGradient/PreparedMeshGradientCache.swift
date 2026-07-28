@@ -33,6 +33,7 @@ package final class PreparedMeshGradientCache: Sendable {
     package var stores: Int
     package var evictions: Int
     package var bypassedStores: Int
+    package var duplicatePreparations: Int
 
     package init(
       entries: Int = 0,
@@ -41,7 +42,8 @@ package final class PreparedMeshGradientCache: Sendable {
       misses: Int = 0,
       stores: Int = 0,
       evictions: Int = 0,
-      bypassedStores: Int = 0
+      bypassedStores: Int = 0,
+      duplicatePreparations: Int = 0
     ) {
       self.entries = entries
       self.lookups = lookups
@@ -50,6 +52,7 @@ package final class PreparedMeshGradientCache: Sendable {
       self.stores = stores
       self.evictions = evictions
       self.bypassedStores = bypassedStores
+      self.duplicatePreparations = duplicatePreparations
     }
   }
 
@@ -78,6 +81,7 @@ package final class PreparedMeshGradientCache: Sendable {
     var stores = 0
     var evictions = 0
     var bypassedStores = 0
+    var duplicatePreparations = 0
     var nextGeneration: UInt64 = 0
     var admissionCandidates: [Key: UInt64] = [:]
     var admissionOrder: Deque<AccessRecord> = []
@@ -110,7 +114,8 @@ package final class PreparedMeshGradientCache: Sendable {
         misses: storage.misses,
         stores: storage.stores,
         evictions: storage.evictions,
-        bypassedStores: storage.bypassedStores
+        bypassedStores: storage.bypassedStores,
+        duplicatePreparations: storage.duplicatePreparations
       )
     }
   }
@@ -130,6 +135,7 @@ package final class PreparedMeshGradientCache: Sendable {
           "misses": storage.misses,
           "evictions": storage.evictions,
           "bypassedStores": storage.bypassedStores,
+          "duplicatePreparations": storage.duplicatePreparations,
         ]
       )
     }
@@ -169,6 +175,7 @@ package final class PreparedMeshGradientCache: Sendable {
       storage.stores = 0
       storage.evictions = 0
       storage.bypassedStores = 0
+      storage.duplicatePreparations = 0
       storage.nextGeneration = 0
       storage.admissionCandidates.removeAll(keepingCapacity: true)
       storage.admissionOrder.removeAll(keepingCapacity: true)
@@ -203,11 +210,16 @@ package final class PreparedMeshGradientCache: Sendable {
 
     return storage.withLock { storage in
       if var cached = storage.entries[key] {
-        storage.hits += 1
+        // The caller's initial probe already recorded a miss and performed
+        // preparation outside the lock. Another caller won the race to store,
+        // so return that canonical value without counting the same lookup as
+        // both a hit and a miss. This keeps `lookups == hits + misses`;
+        // `duplicatePreparations` exposes the accepted redundant work.
+        storage.duplicatePreparations += 1
         let generation = nextGeneration(in: &storage)
         cached.generation = generation
         cached.lookups += 1
-        cached.hits += 1
+        cached.misses += 1
         storage.entries[key] = cached
         recordAccess(key, generation: generation, in: &storage)
         return cached.prepared

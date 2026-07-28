@@ -273,26 +273,35 @@ func nonMeshStyledTextPaint() {
   }
 }
 
+@Test("all four text arms preserve mesh linear radial tile semantic and opacity styles")
+func allTextArmsPreserveEveryColorMode() {
+  for fixture in TextPaintStyleFixture.allCases {
+    let reference = rasterizedTextSurface(
+      command: textPaintCommand(arm: .text, fixture: fixture),
+      identity: "text-mode-\(fixture.rawValue)-reference",
+      environment: fixture.environment
+    )
+    expectFixtureForeground(reference, fixture: fixture)
+
+    for arm in TextPaintArm.allCases {
+      let candidate = rasterizedTextSurface(
+        command: textPaintCommand(arm: arm, fixture: fixture),
+        identity: "text-mode-\(fixture.rawValue)-\(arm.rawValue)",
+        environment: fixture.environment
+      )
+      #expect(
+        candidate == reference,
+        "text arm \(arm.rawValue) diverged for \(fixture.rawValue)"
+      )
+    }
+  }
+}
+
 @MainActor
-@Test("mesh text reuses one shared preparation across paints")
+@Test("one 20-line mesh text command reuses one shared preparation across paints")
 func meshGradientTextReusesSharedPreparation() throws {
   let cache = PreparedMeshGradientCache.shared
-  cache.reset()
-  defer { cache.reset() }
-  let mesh = MeshGradient(
-    width: 2,
-    height: 2,
-    points: [.init(0, 0), .init(1, 0), .init(0, 1), .init(1, 1)],
-    colors: [
-      Color(red: 0.123, green: 0.234, blue: 0.345),
-      Color(red: 0.456, green: 0.567, blue: 0.678),
-      Color(red: 0.789, green: 0.321, blue: 0.654),
-      Color(red: 0.246, green: 0.813, blue: 0.579),
-    ],
-    background: .clear,
-    smoothsColors: false,
-    colorSpace: .device
-  )
+  let mesh = meshTextGradient()
   let input = MeshGradientRasterInput(
     width: mesh.width,
     height: mesh.height,
@@ -300,11 +309,11 @@ func meshGradientTextReusesSharedPreparation() throws {
     colors: mesh.colors,
     background: mesh.background,
     smoothsColors: mesh.smoothsColors,
-    colorSpace: .device
+    colorSpace: .perceptual
   )
   let command = DrawCommand.text(
-    bounds: meshTextBounds,
-    content: "ABCD",
+    bounds: meshTextScenarioBounds,
+    content: meshTextScenarioBlock,
     style: .init(foregroundStyle: .meshGradient(mesh)),
     lineLimit: nil,
     truncationMode: .tail,
@@ -312,7 +321,7 @@ func meshGradientTextReusesSharedPreparation() throws {
   )
   let draw = DrawNode(
     identity: testIdentity("mesh-shared-cache"),
-    bounds: meshTextBounds,
+    bounds: meshTextScenarioBounds,
     commands: [command]
   )
 
@@ -321,7 +330,7 @@ func meshGradientTextReusesSharedPreparation() throws {
 
   #expect(first == second)
   #expect(
-    cache.entryMetrics(for: input, bounds: meshTextBounds)
+    cache.entryMetrics(for: input, bounds: meshTextScenarioBounds)
       == .init(lookups: 2, hits: 1, misses: 1)
   )
 
@@ -332,11 +341,172 @@ func meshGradientTextReusesSharedPreparation() throws {
   #expect(snapshot.count >= 1)
   #expect(
     snapshot.detail?["triangles"] ?? 0
-      >= PreparedMeshGradient(input: input, bounds: meshTextBounds).diagnostics.triangleCount
+      >= PreparedMeshGradient(input: input, bounds: meshTextScenarioBounds).diagnostics
+      .triangleCount
   )
 }
 
 private let meshTextBounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
+private let meshTextScenarioBounds = CellRect(
+  origin: .zero,
+  size: .init(width: 70, height: 20)
+)
+private let meshTextScenarioLine = String(repeating: "mesh-text ", count: 7)
+private let meshTextScenarioBlock = Array(repeating: meshTextScenarioLine, count: 20)
+  .joined(separator: "\n")
+
+private enum TextPaintArm: String, CaseIterable {
+  case text
+  case preformatted
+  case styledPreformatted
+  case rich
+}
+
+private enum TextPaintStyleFixture: String, CaseIterable {
+  case mesh
+  case linear
+  case radial
+  case tile
+  case semantic
+  case opacityWrapped
+
+  var style: TextStyle {
+    switch self {
+    case .mesh:
+      return .init(foregroundStyle: .meshGradient(meshTextGradient()))
+    case .linear:
+      return .init(foregroundStyle: .linearGradient(textPaintLinearGradient))
+    case .radial:
+      return .init(foregroundStyle: .radialGradient(textPaintRadialGradient))
+    case .tile:
+      return .init(foregroundStyle: .tileStyle(textPaintTileStyle))
+    case .semantic:
+      return .init(foregroundStyle: .semantic(.foreground))
+    case .opacityWrapped:
+      return .init(
+        foregroundStyle: .opacity(.meshGradient(meshTextGradient()), textPaintOpacity)
+      )
+    }
+  }
+
+  var environment: EnvironmentSnapshot {
+    switch self {
+    case .semantic:
+      return .init(style: .init(theme: Theme(foreground: .green)))
+    default:
+      return .init()
+    }
+  }
+}
+
+private let textPaintLinearGradient = LinearGradient(
+  colors: [.red, .blue],
+  startPoint: .leading,
+  endPoint: .trailing
+)
+private let textPaintRadialGradient = RadialGradient(
+  colors: [.yellow, .blue],
+  center: .center,
+  startRadius: 0,
+  endRadius: 2
+)
+private let textPaintTileStyle = TileStyle(.dots, foreground: .red, background: .blue)
+private let textPaintOpacity = 0.4
+
+private func textPaintCommand(
+  arm: TextPaintArm,
+  fixture: TextPaintStyleFixture
+) -> DrawCommand {
+  let style = fixture.style
+  switch arm {
+  case .text:
+    return .text(
+      bounds: meshTextBounds,
+      content: "ABCD",
+      style: style,
+      lineLimit: nil,
+      truncationMode: .tail,
+      wrappingStrategy: .wordBoundary
+    )
+  case .preformatted:
+    return .preformattedText(
+      bounds: meshTextBounds,
+      lines: ["ABCD"],
+      style: style
+    )
+  case .styledPreformatted:
+    return .styledPreformattedText(
+      bounds: meshTextBounds,
+      lines: [
+        PreformattedTextLine(
+          runs: [
+            PreformattedTextRun(content: "ABCD")
+          ])
+      ],
+      style: style
+    )
+  case .rich:
+    return .richText(
+      bounds: meshTextBounds,
+      payload: RichTextPayload(runs: [RichTextRun(text: "ABCD", style: style)]),
+      lineLimit: nil,
+      truncationMode: .tail,
+      wrappingStrategy: .wordBoundary
+    )
+  }
+}
+
+private func expectFixtureForeground(
+  _ surface: RasterSurface,
+  fixture: TextPaintStyleFixture
+) {
+  let rasterizer = Rasterizer()
+  let expectedMesh: PreparedMeshGradient?
+  switch fixture {
+  case .mesh:
+    expectedMesh = preparedTextMesh(meshTextGradient())
+  case .opacityWrapped:
+    let mesh = meshTextGradient()
+    expectedMesh = preparedTextMesh(
+      MeshGradient(
+        width: mesh.width,
+        height: mesh.height,
+        points: mesh.points,
+        colors: mesh.colors.map { $0.opacity(textPaintOpacity) },
+        background: mesh.background.opacity(textPaintOpacity),
+        smoothsColors: mesh.smoothsColors,
+        colorSpace: mesh.colorSpace
+      ))
+  default:
+    expectedMesh = nil
+  }
+
+  for x in 0..<meshTextBounds.size.width {
+    let expected: Color?
+    switch fixture {
+    case .mesh, .opacityWrapped:
+      expected = expectedMesh?.color(atCellX: x, y: 0)
+    case .linear:
+      expected = rasterizer.sample(textPaintLinearGradient, in: meshTextBounds, x: x, y: 0)
+    case .radial:
+      expected = rasterizer.sample(
+        textPaintRadialGradient,
+        in: meshTextBounds,
+        aspectRatio: CellPixelMetrics.estimated.aspectRatio,
+        x: x,
+        y: 0
+      )
+    case .tile:
+      expected = .red
+    case .semantic:
+      expected = .green
+    }
+    #expect(
+      surface.cells[0][x].style?.foregroundColor == expected,
+      "unexpected \(fixture.rawValue) sample at x=\(x)"
+    )
+  }
+}
 
 private func meshTextGradient() -> MeshGradient {
   MeshGradient(
