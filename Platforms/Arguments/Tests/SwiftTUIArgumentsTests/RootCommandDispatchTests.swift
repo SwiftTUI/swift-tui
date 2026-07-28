@@ -140,6 +140,15 @@ struct RootCommandDispatchTests {
     #expect(claimed == nil)
   }
 
+  @Test("T-09c registeredSubcommand preserves an async verb's concrete conformance")
+  func registeredSubcommandPreservesAsyncVerbConformance() throws {
+    let claimed = try DispatchingRootFixture.registeredSubcommand(forRawArguments: [
+      "probe-async"
+    ])
+    #expect(claimed is AsyncFixtureCommand)
+    #expect(claimed is any AsyncParsableCommand)
+  }
+
   @Test("T-10 --help with a hook installed still resolves the root's help")
   func helpWithHookResolvesRootHelp() throws {
     var command = try DispatchingRootFixture.parseSwiftTUIRootCommand(arguments: ["--help"])
@@ -383,7 +392,7 @@ struct PositionalRootFixture: App, SwiftTUICommand {
 struct DispatchingRootFixture: App, SwiftTUICommand {
   nonisolated static let configuration = CommandConfiguration(
     commandName: "dispatchroot",
-    subcommands: [CompletionsCommand.self, FixtureInfoCommand.self]
+    subcommands: [CompletionsCommand.self, FixtureInfoCommand.self, AsyncFixtureCommand.self]
   )
 
   @OptionGroup(title: "SwiftTUI Options") var swiftTUIOptions: SwiftTUIOptions
@@ -401,6 +410,13 @@ struct DispatchingRootFixture: App, SwiftTUICommand {
   ) throws -> (any ParsableCommand)? {
     try registeredSubcommand(forRawArguments: arguments)
   }
+}
+
+/// An async-only verb used to prove dispatch preserves its concrete conformance.
+struct AsyncFixtureCommand: AsyncParsableCommand {
+  static let configuration = CommandConfiguration(commandName: "probe-async")
+
+  mutating func run() async throws {}
 }
 
 /// A conformer whose hook claims every verb it is asked about, `completions`

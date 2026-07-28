@@ -123,6 +123,61 @@ struct GestureRunLoopDispatchTests {
     #expect(counts.button == 0)
   }
 
+  @Test("an ordinary tap gesture claims a button click through the RunLoop")
+  func ordinaryTapGestureClaimsButtonClick() async throws {
+    @MainActor final class Counts {
+      var gesture = 0
+      var button = 0
+    }
+
+    let counts = Counts()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("OrdinaryTapControl")])
+    let view = Button("Control") {
+      counts.button += 1
+    }
+    .gesture(
+      TapGesture().onEnded {
+        counts.gesture += 1
+      }
+    )
+
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: rootIdentity, environmentValues: environment)
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: context,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let region = try #require(
+      initial.semanticSnapshot.interactionRegions
+        .max { $0.hitTestOrder < $1.hitTestOrder }
+    )
+    let point = centerPoint(of: region.rect)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(counts.gesture == 1)
+    #expect(counts.button == 0)
+  }
+
   @Test("a stationary click activates a button with a simultaneous drag gesture")
   func stationaryClickActivatesButtonWithSimultaneousDragGesture() async throws {
     @MainActor final class Counts {
