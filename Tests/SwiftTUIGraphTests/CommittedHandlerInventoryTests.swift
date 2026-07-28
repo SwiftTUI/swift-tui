@@ -261,6 +261,37 @@ struct CommittedHandlerInventoryTests {
     #expect(visited == depth)
   }
 
+  @Test("canonical reconciliation leaves an exact committed tree unchanged")
+  func canonicalReconciliationLeavesExactCommittedTreeUnchanged() {
+    let action = testIdentity("Exact", "Action")
+    let inventory = CommittedHandlerInventory(actionIdentities: [action])
+    let leafID = ViewNodeID(rawValue: 1)
+    let rootID = ViewNodeID(rawValue: 2)
+    var exact = ResolvedNode(
+      viewNodeID: rootID,
+      identity: testIdentity("Exact"),
+      kind: .root,
+      children: [
+        ResolvedNode(
+          viewNodeID: leafID,
+          identity: testIdentity("Exact", "Leaf"),
+          kind: .view("Leaf"),
+          handlerInventory: inventory
+        )
+      ]
+    )
+    let original = exact
+    var lookupCount = 0
+
+    exact.reconcileCommittedHandlerInventory { viewNodeID in
+      lookupCount += 1
+      return viewNodeID == leafID ? inventory : .init()
+    }
+
+    #expect(lookupCount == 2)
+    #expect(exact == original)
+  }
+
   @Test("equality observes inventory while geometry and content alarms exclude it")
   func equalityAndComparatorClassification() {
     let identity = testIdentity("Root")

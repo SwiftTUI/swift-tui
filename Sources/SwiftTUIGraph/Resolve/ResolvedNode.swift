@@ -359,12 +359,32 @@ package struct ResolvedNode: Equatable, Sendable {
   /// children until that ancestor next applies. Its structural/render payload
   /// remains valid for that lazy-rewire contract, but its handler inventory
   /// must not continue to describe a runtime owner that no longer exists.
-  /// Surviving stamped values take the current projection from their runtime
-  /// owner; departed stamped values clear only this derived metadata. Unstamped
-  /// values retain their authored inventory.
+  /// Surviving stamped values take their runtime owner's current committed
+  /// projection; departed stamped values clear only this derived metadata.
+  /// Unstamped values retain their authored inventory.
   package mutating func reconcileCommittedHandlerInventory(
     inventoryForRuntimeNodeID: (ViewNodeID) -> CommittedHandlerInventory?
   ) {
+    // The common case is already canonical. Prove that with a read-only walk
+    // before opening the value tree for mutation: reconstructing every
+    // committed node on every sampled frame made the oracle materially more
+    // expensive even when no handler currency changed.
+    var inspectionStack = [self]
+    var needsRepair = false
+    while let node = inspectionStack.popLast() {
+      if let viewNodeID = node.viewNodeID,
+        node.handlerInventory
+          != (inventoryForRuntimeNodeID(viewNodeID) ?? .init())
+      {
+        needsRepair = true
+        break
+      }
+      inspectionStack.append(contentsOf: node._storedChildren)
+    }
+    guard needsRepair else {
+      return
+    }
+
     var stack = [
       HandlerInventoryReconciliationFrame(node: self)
     ]

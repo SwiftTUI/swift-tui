@@ -3096,26 +3096,32 @@ package final class ViewGraph {
       // Teardown can intentionally leave inert child value copies in an
       // ancestor's committed tree until that ancestor next applies. Refresh
       // the derived handler currency after the accepted frame's live set has
-      // settled: an exact stored/live owner contributes its current
-      // NodeHandlers projection, while a departed stamp clears only the stale
-      // bookkeeping. The strict committed-vs-live oracle then reads a
+      // settled: an exact stored/live owner contributes its current committed
+      // projection, while a departed stamp clears only the stale bookkeeping.
+      // The strict committed-vs-live oracle then reads a
       // canonical committed artifact without treating lazy structural
       // rewiring as a handler-loss defect.
-      let liveInventoriesByNodeID: [ViewNodeID: CommittedHandlerInventory] = Dictionary(
-        uniqueKeysWithValues: liveNodeIDs.compactMap {
-          viewNodeID
-            -> (ViewNodeID, CommittedHandlerInventory)? in
-          guard
-            let node = nodesByNodeID[viewNodeID],
-            node.committed.viewNodeID == viewNodeID
-          else {
-            return nil
-          }
-          return (viewNodeID, node.registeredHandlers.committedHandlerInventory)
-        }
-      )
+      let canonicalRootNodeID = root?.viewNodeID
+      let canonicalRootInventory = root?.committed.handlerInventory
+      let committedLiveNodeIDs = liveNodeIDs
+      let committedNodesByNodeID = nodesByNodeID
       root?.reconcileCommittedHandlerInventory { viewNodeID in
-        liveInventoriesByNodeID[viewNodeID]
+        guard committedLiveNodeIDs.contains(viewNodeID) else {
+          return nil
+        }
+        if viewNodeID == canonicalRootNodeID {
+          return canonicalRootInventory
+        }
+        guard
+          let node = committedNodesByNodeID[viewNodeID],
+          node.committed.viewNodeID == viewNodeID
+        else {
+          return nil
+        }
+        // The committed projection is the artifact under test. Rebuilding
+        // from closure-bearing source records here would silently repair the
+        // same stamping/publication defect the strict oracle must expose.
+        return node.committed.handlerInventory
       }
     }
     releaseInactiveEntityRoutes(

@@ -5,6 +5,78 @@ import Testing
 @MainActor
 @Suite("Committed handler resolution oracle", .serialized)
 struct CommittedHandlerResolutionOracleTests {
+  @Test(
+    "sampled publication checks hollow records against committed root and child currency"
+  )
+  func sampledPublicationUsesCommittedCurrencyForRootAndChild() throws {
+    try withRestoredProbeState {
+      let graph = ViewGraph()
+      let rootIdentity = testIdentity("Root")
+      let childIdentity = testIdentity("Root", "Child")
+      let rootAction = testIdentity("Root", "Action")
+      let childAction = testIdentity("Root", "Child", "Action")
+      _ = graph.applySnapshot(
+        ResolvedNode(
+          identity: rootIdentity,
+          kind: .root,
+          children: [
+            ResolvedNode(identity: childIdentity, kind: .view("Child"))
+          ]
+        )
+      )
+      let rootNode = try #require(graph.nodeIfExists(for: rootIdentity))
+      let childNode = try #require(graph.nodeIfExists(for: childIdentity))
+
+      // Retained artifacts can carry authored handler currency independently
+      // of the closure-bearing records on the current runtime nodes. Keep the
+      // records deliberately hollow so rebuilding from registeredHandlers
+      // would launder the exact defect this oracle must report.
+      var childCommitted = childNode.snapshot()
+      childCommitted.handlerInventory = CommittedHandlerInventory(
+        actionIdentities: [childAction]
+      )
+      childNode.applyRetainedSnapshot(childCommitted)
+
+      var rootCommitted = graph.snapshot(rootIdentity: rootIdentity)
+      rootCommitted.handlerInventory = CommittedHandlerInventory(
+        actionIdentities: [rootAction]
+      )
+      rootNode.applyRetainedSnapshot(rootCommitted)
+      #expect(rootNode.registeredHandlers.action.registrations.isEmpty)
+      #expect(childNode.registeredHandlers.action.registrations.isEmpty)
+
+      let resolved = graph.snapshot(rootIdentity: rootIdentity)
+      _ = graph.finalizeFrame(
+        rootIdentity: rootIdentity,
+        resolved: resolved,
+        placed: nil
+      )
+
+      let finalized = try #require(graph.committedRootSnapshotIfAvailable())
+      #expect(finalized.handlerInventory.actionIdentities == [rootAction])
+      #expect(finalized.children[0].handlerInventory.actionIdentities == [childAction])
+
+      let liveRegistrations = RuntimeRegistrationSet.scratch()
+      let draft = ViewGraphFrameDraft(
+        liveRegistrations: liveRegistrations,
+        checkpoint: nil
+      )
+      draft.recordDirtyEvaluationPlan(nil)
+      let before = SoundnessCounterSnapshot.current()
+
+      _ = draft.commitRuntimeRegistrations(from: graph)
+
+      let after = SoundnessCounterSnapshot.current()
+      #expect(
+        after.actionResolutionViolationCount
+          == before.actionResolutionViolationCount + 1
+      )
+      let detail = after.lastViolationDetailByKind["handler-resolution-action"]
+      #expect(detail?.contains(rootAction.path) == true)
+      #expect(detail?.contains(childAction.path) == true)
+    }
+  }
+
   @Test("action inventory resolves live, then reports one bounded family finding after reset")
   func actionResolutionAfterReset() {
     withRestoredProbeState {
@@ -531,12 +603,12 @@ struct CommittedHandlerResolutionOracleTests {
     )
   }
 
-  private func withRestoredProbeState(_ body: () -> Void) {
+  private func withRestoredProbeState(_ body: () throws -> Void) rethrows {
     let state = OracleProbeState.capture()
     defer { state.restore() }
     SoundnessProbeConfiguration.isSampledFrame = true
     SoundnessProbeConfiguration.isTraceEnabled = false
-    body()
+    try body()
   }
 }
 
