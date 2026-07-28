@@ -57,6 +57,9 @@ extension RunLoop {
                 continuation.yield()
               }
             }
+            if buffer.enqueue(.inputEnded) {
+              continuation.yield()
+            }
             completion.streamFinished(continuation)
           }
         }
@@ -68,6 +71,9 @@ extension RunLoop {
             if buffer.enqueue(.input(event)) {
               continuation.yield()
             }
+          }
+          if buffer.enqueue(.inputEnded) {
+            continuation.yield()
           }
           completion.streamFinished(continuation)
         }

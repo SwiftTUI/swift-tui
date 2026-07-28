@@ -7,5 +7,6 @@
 /// direct-handler closures in `makeEventPump` (see `RunLoop+EventPump.swift`).
 package enum RuntimeEvent: Sendable {
   case input(InputEvent)
+  case inputEnded
   case signal(String)
 }

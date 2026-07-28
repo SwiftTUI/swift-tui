@@ -5351,37 +5351,47 @@ private final class TimedInputReader: InputReading {
   private let scriptedEvents: [TimedRuntimeEvent<KeyPress>]
   private let frameSignal: MainActorConditionSignal
   private let frameCount: @MainActor () -> Int
+  private let finishAfterEvents: Bool
 
   init(
     events: [TimedRuntimeEvent<KeyPress>],
     frameSignal: MainActorConditionSignal,
-    frameCount: @escaping @MainActor () -> Int
+    frameCount: @escaping @MainActor () -> Int,
+    finishAfterEvents: Bool = true
   ) {
     scriptedEvents = events
     self.frameSignal = frameSignal
     self.frameCount = frameCount
+    self.finishAfterEvents = finishAfterEvents
   }
 
   convenience init(
     events: [TimedRuntimeEvent<KeyEvent>],
     frameSignal: MainActorConditionSignal,
-    frameCount: @escaping @MainActor () -> Int
+    frameCount: @escaping @MainActor () -> Int,
+    finishAfterEvents: Bool = true
   ) {
     self.init(
       events: events.map { .init(value: KeyPress($0.value)) },
       frameSignal: frameSignal,
-      frameCount: frameCount
+      frameCount: frameCount,
+      finishAfterEvents: finishAfterEvents
     )
   }
 
   func events() -> AsyncStream<KeyPress> {
-    AsyncStream { continuation in
+    let finishAfterEvents = finishAfterEvents
+    return AsyncStream { continuation in
       let task = runFrameGatedScript(
         scriptedEvents,
         frameSignal: frameSignal,
         frameCount: frameCount,
         yield: { continuation.yield($0) },
-        finish: { continuation.finish() }
+        finish: {
+          if finishAfterEvents {
+            continuation.finish()
+          }
+        }
       )
       continuation.onTermination = { _ in
         task.cancel()
@@ -5731,7 +5741,8 @@ private func makeLifecycleRuntimeHarness(
     inputReader: TimedInputReader(
       events: events,
       frameSignal: terminal.frameSignal,
-      frameCount: { terminal.frames.count }
+      frameCount: { terminal.frames.count },
+      finishAfterEvents: signals.isEmpty
     ),
     signalReader: TimedSignalReader(
       signals: signals,

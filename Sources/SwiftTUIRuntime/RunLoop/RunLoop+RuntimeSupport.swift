@@ -40,10 +40,14 @@ extension RunLoop {
   package func terminationDisposition(
     for exitReason: RunLoopExitReason
   ) -> TerminationDisposition {
-    localTerminationRegistry.dispatch(
+    let disposition = localTerminationRegistry.dispatch(
       TerminationRequest(exitReason),
       preferredPath: currentFocusScopePath()
     )
+    if exitReason == .inputEnded {
+      return .allow
+    }
+    return disposition
   }
 
   package func updateFocusPresentation(

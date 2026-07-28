@@ -27,7 +27,7 @@ import Testing
 /// gallery under instrumentation. This test still earns its place: it fails if
 /// live tab activation or autonomous-task execution regresses outright.
 @MainActor
-@Suite
+@Suite(.timeLimit(.minutes(5)))
 struct TabTaskActivationRuntimeTests {
   @Test("selection-driven tab activation runs the activated tab's task")
   func activatingLazyTabStartsItsTask() async throws {
@@ -59,16 +59,20 @@ struct TabTaskActivationRuntimeTests {
     // activating frame publishes runtime registrations with a frontier-scoped
     // (`.subtrees`) plan rather than a full `.all` rebuild. The scoped restore
     // is the path that dropped the behind-the-seam tab body's `.task`. The
-    // scripted input ends after the click; `run()` then drains to scheduler
-    // quiescence — which, with the fix, includes the task running and the
-    // re-render it triggers — before exiting on `inputEnded`.
+    // The scripted input ends after the autonomous task's frame is observed.
+    // This keeps EOF as the deterministic exit while synchronizing directly
+    // with the behavior the test exists to prove.
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
-      terminalInputReader: TabTaskFixedMouseReader(events: [
-        .mouse(.init(kind: .down(.primary), location: clickPoint)),
-        .mouse(.init(kind: .up(.primary), location: clickPoint)),
-      ]),
+      terminalInputReader: TabTaskFixedMouseReader(
+        events: [
+          .mouse(.init(kind: .down(.primary), location: clickPoint)),
+          .mouse(.init(kind: .up(.primary), location: clickPoint)),
+        ], frameSignal: terminal.frameSignal
+      ) {
+        terminal.frames.contains { $0.contains("WORK tick:1") }
+      },
       signalReader: TabTaskEmptySignalReader(),
       stateContainer: StateContainer(
         initialState: 0,
@@ -92,12 +96,11 @@ struct TabTaskActivationRuntimeTests {
       "expected the Work tab body to render after activation"
     )
     // The task only advances the tick if its start event reached the live task
-    // registry. `run()` drains to scheduler quiescence before exiting on
-    // `inputEnded`, so if the task ran the tick:1 re-render is already present;
-    // if autonomous-task execution regressed outright, the tick stays 0 and this
-    // fails (RED) rather than hanging. (See the suite SCOPE NOTE: this minimal
-    // structure keeps the body children-reachable, so it does not isolate the
-    // capture-host-seam fix specifically.)
+    // registry. The input reader waits directly for that frame before ending,
+    // so a task-start regression fails at the suite time limit instead of
+    // racing EOF. (See the suite SCOPE NOTE: this minimal structure keeps the
+    // body children-reachable, so it does not isolate the capture-host-seam fix
+    // specifically.)
     let frameTail = terminal.frames.suffix(3).joined(separator: "\n----\n")
     #expect(
       terminal.frames.contains { $0.contains("WORK tick:1") },
@@ -178,9 +181,17 @@ private struct TabTaskWorkContent: View {
 
 private final class TabTaskFixedMouseReader: TerminalInputReading {
   private let scriptedEvents: [InputEvent]
+  private let frameSignal: MainActorConditionSignal
+  private let isComplete: @MainActor () -> Bool
 
-  init(events: [InputEvent]) {
+  init(
+    events: [InputEvent],
+    frameSignal: MainActorConditionSignal,
+    isComplete: @escaping @MainActor () -> Bool
+  ) {
     scriptedEvents = events
+    self.frameSignal = frameSignal
+    self.isComplete = isComplete
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
@@ -188,7 +199,15 @@ private final class TabTaskFixedMouseReader: TerminalInputReading {
       for event in scriptedEvents {
         continuation.yield(event)
       }
-      continuation.finish()
+      let frameSignal = self.frameSignal
+      let isComplete = self.isComplete
+      let task = Task { @MainActor in
+        await frameSignal.wait(until: isComplete)
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
     }
   }
 }

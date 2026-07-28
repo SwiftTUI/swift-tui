@@ -55,14 +55,15 @@ package final class EventPumpBuffer: Sendable {
     _ current: RuntimeEvent,
     with next: RuntimeEvent
   ) -> RuntimeEvent? {
-    guard case .input(.mouse(let currentMouseEvent)) = current,
-      case .input(.mouse(let nextMouseEvent)) = next,
-      let mergedMouseEvent = currentMouseEvent.merged(with: nextMouseEvent)
-    else {
+    switch (current, next) {
+    case (.input(.mouse(let currentMouseEvent)), .input(.mouse(let nextMouseEvent))):
+      guard let mergedMouseEvent = currentMouseEvent.merged(with: nextMouseEvent) else {
+        return nil
+      }
+      return .input(.mouse(mergedMouseEvent))
+    case (.input, _), (.inputEnded, _), (.signal, _):
       return nil
     }
-
-    return .input(.mouse(mergedMouseEvent))
   }
 
   private func canAppendToBatch(
@@ -77,9 +78,11 @@ package final class EventPumpBuffer: Sendable {
   private func isCoalesciblePointerEvent(
     _ event: RuntimeEvent
   ) -> Bool {
-    guard case .input(.mouse(let mouseEvent)) = event else {
+    switch event {
+    case .input(.mouse(let mouseEvent)):
+      return mouseEvent.isCoalescible
+    case .input, .inputEnded, .signal:
       return false
     }
-    return mouseEvent.isCoalescible
   }
 }

@@ -53,7 +53,10 @@ struct TerminationRequestTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: TerminationTestTerminalHost(),
-      terminalInputReader: TerminationTestInputReader(events: []),
+      terminalInputReader: TerminationTestInputReader(
+        events: [],
+        finishAfterEvents: false
+      ),
       signalReader: signalReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -108,7 +111,10 @@ private func runTerminationHarness(
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
     presentationSurface: TerminationTestTerminalHost(),
-    terminalInputReader: TerminationTestInputReader(events: events),
+    terminalInputReader: TerminationTestInputReader(
+      events: events,
+      finishAfterEvents: signals.isEmpty
+    ),
     signalReader: TerminationTestSignalReader(signals: signals),
     scheduler: FrameScheduler(),
     stateContainer: StateContainer(
@@ -172,9 +178,11 @@ private final class TerminationTestTerminalHost: PresentationSurface {
 
 private final class TerminationTestInputReader: TerminalInputReading {
   let events: [InputEvent]
+  let finishAfterEvents: Bool
 
-  init(events: [InputEvent]) {
+  init(events: [InputEvent], finishAfterEvents: Bool = true) {
     self.events = events
+    self.finishAfterEvents = finishAfterEvents
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
@@ -182,7 +190,9 @@ private final class TerminationTestInputReader: TerminalInputReading {
       for event in events {
         continuation.yield(event)
       }
-      continuation.finish()
+      if finishAfterEvents {
+        continuation.finish()
+      }
     }
   }
 }

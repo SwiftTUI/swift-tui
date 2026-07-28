@@ -9,6 +9,8 @@ extension RunLoop {
 
   package func handle(_ event: RuntimeEvent) -> RunLoopExitReason? {
     switch event {
+    case .inputEnded:
+      return .inputEnded
     case .signal(let name):
       scheduler.requestSignal(named: name)
       switch signalDisposition(for: name) {
