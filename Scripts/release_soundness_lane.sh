@@ -38,18 +38,41 @@ SWIFTTUI_SOUNDNESS_PROBE=1 && export SWIFTTUI_SOUNDNESS_PROBE
 SWIFTTUI_SOUNDNESS_PROBE_SAMPLE=1 && export SWIFTTUI_SOUNDNESS_PROBE_SAMPLE
 SWIFTTUI_SOUNDNESS_PROBE_TRACE=1 && export SWIFTTUI_SOUNDNESS_PROBE_TRACE
 
+mode="${1:-}"
+case "$mode" in
+"") mode_slug=default ;;
+--flaky-only) mode_slug=flaky-only ;;
+--race-checks) mode_slug=race-checks ;;
+*)
+  echo "unknown mode: $mode (expected --flaky-only, --race-checks, or none)" >&2
+  exit 2
+  ;;
+esac
+
+soundness_trace_root=${SWIFTTUI_SOUNDNESS_TRACE_ROOT:-".build/soundness-trace/release-$mode_slug"}
+if [ -d "$soundness_trace_root" ]; then
+  find "$soundness_trace_root" -type f -name '*.log' -delete
+fi
+mkdir -p "$soundness_trace_root"
+release_test_index=0
+
 # The load-flaky run-loop suites (flake #1's usual homes) plus the
 # high-contention async suites the debug gate also isolates.
 FLAKY_SUITES="InteractiveRuntimeTests PortalPrimitiveTests ActorIsolationSurfaceTests"
 ISOLATED_ASYNC_SUITES="AsyncLifecycleGenerationTests AsyncFrameTailRenderingTests TaskReadsUnbodiedStateTests"
+# This suite deliberately suppresses trace emission across awaits while it
+# proves the completed-frame disposal arm. Keep that process-global window out
+# of the broad release process so unrelated violations cannot be hidden.
+TRACE_SUPPRESSION_SUITES="PerTickPresentCadenceTests"
 
 release_test() {
+  release_test_index=$((release_test_index + 1))
+  SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE=$soundness_trace_root/invocation-$release_test_index.log
+  export SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE
   echo "==> $SWIFT test -c release $*"
   # shellcheck disable=SC2086
   $SWIFT test -c release "$@"
 }
-
-mode="${1:-}"
 
 case "$mode" in
   --flaky-only)
@@ -78,16 +101,23 @@ case "$mode" in
   "")
     release_test --filter SwiftTUICoreTests
     skip_args=""
-    for suite in $FLAKY_SUITES $ISOLATED_ASYNC_SUITES; do
+    for suite in $FLAKY_SUITES $ISOLATED_ASYNC_SUITES $TRACE_SUPPRESSION_SUITES; do
       skip_args="$skip_args --skip SwiftTUITests.$suite"
     done
     # shellcheck disable=SC2086
     release_test --filter SwiftTUITests $skip_args
+    for suite in $TRACE_SUPPRESSION_SUITES; do
+      release_test --filter "SwiftTUITests.$suite" --parallel --num-workers 1
+    done
     ;;
   *)
     echo "unknown mode: $mode (expected --flaky-only, --race-checks, or none)" >&2
     exit 2
     ;;
 esac
+
+Scripts/scan_soundness_traces.sh \
+  "$soundness_trace_root" \
+  Scripts/soundness_quarantine.txt
 
 echo "release soundness lane (${mode:-default}) passed"

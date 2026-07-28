@@ -2,7 +2,7 @@ import Testing
 
 @testable import SwiftTUIGraph
 
-@Suite
+@Suite(.serialized)
 struct StateSlotTests {
   @Test("equatable state slot preserves type and reports real changes")
   func equatableStateSlotTracksChanges() {
@@ -42,11 +42,14 @@ struct StateSlotTests {
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
 
     let dropCount = SoundnessProbeConfiguration.stateSlotRestorationDropCount
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.stateSlotRestorationDropCount = dropCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
+    SoundnessProbeConfiguration.isTraceEnabled = false
 
     let liveKey = StateMutationSlotKey(key: StateSlotKey(owner: node.viewNodeID, ordinal: 0))
     let vanishedKey = StateMutationSlotKey(

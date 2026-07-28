@@ -16,7 +16,7 @@ import Testing
 /// capture-preference orders of the four `HandlerDescriptorIntake`
 /// initializers that exist to prevent the class.
 @MainActor
-@Suite("Ambient environment fallback probe")
+@Suite("Ambient environment fallback probe", .serialized)
 struct AmbientEnvironmentFallbackProbeTests {
   private func makeAuthoringContext(_ name: String) -> AuthoringContext {
     AuthoringContext(
@@ -31,6 +31,14 @@ struct AmbientEnvironmentFallbackProbeTests {
     #expect(snapshot?.environmentValues == nil)
 
     let baseline = SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let detail = SoundnessProbeConfiguration.lastViolationDetail
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.ambientEnvironmentFallbackReadCount = baseline
+      SoundnessProbeConfiguration.lastViolationDetail = detail
+    }
+    SoundnessProbeConfiguration.isTraceEnabled = false
     let roots = withImperativeAuthoringContext(snapshot) {
       Environment(\.imageResourceRoots).wrappedValue
     }

@@ -8,6 +8,9 @@ cd "$repo_root"
 runner_name=${SWIFTTUI_TEST_RUNNER_NAME:-test-all}
 step_timeout_seconds=${SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS:-1200}
 step_timeout_kill_grace_seconds=${SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
+soundness_trace_root=$repo_root/.build/soundness-trace
+soundness_quarantine_file=$repo_root/Scripts/soundness_quarantine.txt
+soundness_trace_invocation_index=0
 
 write_full_log_report() {
   body_log=$1
@@ -457,6 +460,12 @@ swift_command_text() {
   done
 }
 
+soundness_trace_slug() {
+  printf '%s' "$1" |
+    LC_ALL=C tr '[:upper:]' '[:lower:]' |
+    sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-//; s/-$//'
+}
+
 derive_failure_count() {
   log_file=$1
 
@@ -540,6 +549,15 @@ run_swift() {
   #     timing-dependent interleaving is reproducible/bisectable rather than
   #     racing across parallel workers.
   if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
+    soundness_trace_invocation_index=$((soundness_trace_invocation_index + 1))
+    trace_slug=${soundness_trace_step_slug:-swift-test}
+    trace_file=$soundness_trace_root/$trace_slug-$soundness_trace_invocation_index.log
+    mkdir -p "$soundness_trace_root"
+    : >"$trace_file"
+    SWIFTTUI_SOUNDNESS_PROBE_TRACE=1 && export SWIFTTUI_SOUNDNESS_PROBE_TRACE
+    SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE=$trace_file
+    export SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE
+
     if [ -n "${SWIFTTUI_SWIFT_TEST_SKIP_REGEX:-}" ]; then
       set -- "$@" --skip "$SWIFTTUI_SWIFT_TEST_SKIP_REGEX"
     fi
@@ -648,6 +666,7 @@ run_function_step() {
   log_file=$log_root/step-$step_index.log
   status_file=$log_root/step-$step_index.status
   timeout_file=$log_root/step-$step_index.timeout
+  soundness_trace_step_slug=$step_index-$(soundness_trace_slug "$title")
 
   echo ""
   echo "==> $title"
@@ -807,6 +826,10 @@ print_summary() {
 require_command swiftly
 require_command bun
 validate_timeout_configuration
+if [ -d "$soundness_trace_root" ]; then
+  find "$soundness_trace_root" -type f -name '*.log' -delete
+fi
+mkdir -p "$soundness_trace_root"
 
 if [ "$is_linux" -eq 1 ]; then
   echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 for repo package resolution."
@@ -1043,6 +1066,11 @@ else
     "$(swift_command_text test --package-path Tools/TermUIPerf)" \
     run_swift test --package-path Tools/TermUIPerf
 fi
+
+run_function_step \
+  "Scan soundness traces" \
+  "Scripts/scan_soundness_traces.sh .build/soundness-trace Scripts/soundness_quarantine.txt" \
+  Scripts/scan_soundness_traces.sh "$soundness_trace_root" "$soundness_quarantine_file"
 
 if [ "$any_failed" -eq 0 ]; then
   print_summary

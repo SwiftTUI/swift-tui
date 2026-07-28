@@ -14,7 +14,7 @@ import Testing
 /// one-interaction preservation window is full-rebuild-contract behavior,
 /// not a divergence — an awareness that must die with the interaction.
 @MainActor
-@Suite("Gesture-paired pointer route liveness")
+@Suite("Gesture-paired pointer route liveness", .serialized)
 struct GesturePairedRouteLivenessTests {
   @Test("prune releases the paired route of a departed preserved recognizer")
   func pruneReleasesPairedRouteOfDepartedRecognizer() {
@@ -126,16 +126,19 @@ struct GesturePairedRouteLivenessTests {
     ) { _ in .ignored }
 
     let probeEnabled = SoundnessProbeConfiguration.isEnabled
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let probeLatch = SoundnessProbeConfiguration.isSampledFrame
     let violationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = probeEnabled
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.isSampledFrame = probeLatch
       SoundnessProbeConfiguration.registrationPublicationViolationCount = violationCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     SoundnessProbeConfiguration.isEnabled = true
+    SoundnessProbeConfiguration.isTraceEnabled = false
     SoundnessProbeConfiguration.isSampledFrame = true
 
     func commitScoped() {

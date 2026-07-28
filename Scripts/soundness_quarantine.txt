@@ -1,0 +1,10 @@
+# Exact-count soundness quarantine ledger.
+#
+# Format:
+# <kind> <YYYY-MM-DD> <tracking-ref> <reason containing count=N>
+#
+# A quarantined kind is a ratchet, not an unlimited allowance: the scanner
+# fails above count=N, warns at the exact baseline, and warns below it so this
+# ledger is reduced with the next fix.
+registration-publication 2026-07-28 Program-5-S0 count=1194 post-suppression scoped-restore residual
+teardown-coherence-leak 2026-07-28 Program-5-S0 count=478 existing unreachable-node residual

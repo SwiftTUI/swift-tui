@@ -10,7 +10,7 @@ import Testing
 /// `SoundnessProbeConfiguration`, which the run loop routes to the host as a
 /// `RuntimeIssue` alongside the other F34 soundness counters.
 @MainActor
-@Suite("Memo soundness alarm")
+@Suite("Memo soundness alarm", .serialized)
 struct MemoSoundnessAlarmTests {
   /// Save and restore every process-global static this suite touches so an
   /// enabled trace or a synthetic alarm never leaks into unrelated suites.
@@ -18,6 +18,7 @@ struct MemoSoundnessAlarmTests {
     let enabled = MemoSkipTrace.isEnabled
     let sample = MemoSkipTrace.sampleEveryNFrames
     let latch = MemoSkipTrace.isSampledFrame
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let alarmCount = SoundnessProbeConfiguration.memoUnsoundSkipCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
@@ -25,9 +26,13 @@ struct MemoSoundnessAlarmTests {
       MemoSkipTrace.sampleEveryNFrames = sample
       MemoSkipTrace.isSampledFrame = latch
       MemoSkipTrace.reset()
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.memoUnsoundSkipCount = alarmCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
+    // This suite asserts the alarm channel itself, so its synthetic records
+    // must not become gate findings.
+    SoundnessProbeConfiguration.isTraceEnabled = false
     try body()
   }
 

@@ -182,7 +182,9 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     )
 
     #expect(
-      planning.plan?.targetNodes.map(\.identity) == [shallowA.identity, shallowZ.identity, deep.identity]
+      planning.plan?.targetNodes.map(\.identity) == [
+        shallowA.identity, shallowZ.identity, deep.identity,
+      ]
     )
   }
 
@@ -446,6 +448,14 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let escalationsBefore =
       SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount
 
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.plannerTargetlessFrontierEscalationCount = escalationsBefore
+      SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+    }
+    SoundnessProbeConfiguration.isTraceEnabled = false
     let planning = ViewGraphDirtyEvaluationPlanner.targetPlan(
       input: planningInput(hasRoot: true, dirty: [live, orphan], nodes: [live, orphan])
     )

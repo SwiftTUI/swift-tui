@@ -151,6 +151,19 @@ struct PerTickPresentCadenceTests {
     )
   )
   func asyncDisposalSuppressesHeldFrame() async throws {
+    // This red-proof deliberately abandons a completed frame after the memo
+    // shadow has recomputed it. The resulting would-skip draw divergence is
+    // part of the synthetic disposal witness, not a gate finding.
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let memoAlarmBefore = SoundnessProbeConfiguration.memoUnsoundSkipCount
+    let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    SoundnessProbeConfiguration.isTraceEnabled = false
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.memoUnsoundSkipCount = memoAlarmBefore
+      SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+    }
+
     let harness = PerTickCadenceHarness(rootName: "PerTickCadenceAsyncRoot")
     defer { harness.removeDiagnostics() }
     harness.runLoop.renderMode = .async
@@ -208,6 +221,7 @@ struct PerTickPresentCadenceTests {
           && row["drop_decision"] == "drop_visual_only"
       }
     )
+    #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == memoAlarmBefore + 1)
   }
 
   @MainActor

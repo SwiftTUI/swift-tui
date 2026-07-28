@@ -14,8 +14,25 @@ import Testing
 /// suspicious skips are counted and surfaced as runtime issues; departed-node
 /// cancels stay benign and unreported.
 @MainActor
-@Suite("Lifecycle commit skip observability")
+@Suite("Lifecycle commit skip observability", .serialized)
 struct LifecycleCoordinatorSkipTests {
+  /// Keep synthetic skip-oracle coverage out of gate traces without changing
+  /// the counters or runtime issues the tests assert.
+  private func withoutSoundnessTrace<Result>(
+    _ body: () throws -> Result
+  ) rethrows -> Result {
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let skipCount = SoundnessProbeConfiguration.lifecycleHandlerSkipCount
+    let detail = SoundnessProbeConfiguration.lastViolationDetail
+    SoundnessProbeConfiguration.isTraceEnabled = false
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.lifecycleHandlerSkipCount = skipCount
+      SoundnessProbeConfiguration.lastViolationDetail = detail
+    }
+    return try body()
+  }
+
   @Test("a .taskStart with no matching registration is counted and reported")
   func taskStartWithoutRegistrationIsCountedAndReported() {
     let coordinator = LifecycleCoordinator(assertsOnTaskStartSkip: false)
@@ -294,11 +311,13 @@ struct LifecycleCoordinatorSkipTests {
       ]
     )
 
-    let issues = coordinator.applyCommittedFrame(
-      plan: plan,
-      currentLifecycleRegistry: LocalLifecycleRegistry(),
-      currentTaskRegistry: LocalTaskRegistry()
-    )
+    let issues = withoutSoundnessTrace {
+      coordinator.applyCommittedFrame(
+        plan: plan,
+        currentLifecycleRegistry: LocalLifecycleRegistry(),
+        currentTaskRegistry: LocalTaskRegistry()
+      )
+    }
 
     #expect(coordinator.appearHandlerSkipCount == 1)
     #expect(issues.count == 1)
@@ -320,11 +339,13 @@ struct LifecycleCoordinatorSkipTests {
       ]
     )
 
-    let issues = coordinator.applyCommittedFrame(
-      plan: plan,
-      currentLifecycleRegistry: LocalLifecycleRegistry(),
-      currentTaskRegistry: LocalTaskRegistry()
-    )
+    let issues = withoutSoundnessTrace {
+      coordinator.applyCommittedFrame(
+        plan: plan,
+        currentLifecycleRegistry: LocalLifecycleRegistry(),
+        currentTaskRegistry: LocalTaskRegistry()
+      )
+    }
 
     #expect(coordinator.disappearHandlerSkipCount == 1)
     #expect(issues.count == 1)
@@ -344,11 +365,13 @@ struct LifecycleCoordinatorSkipTests {
       ]
     )
 
-    let issues = coordinator.applyCommittedFrame(
-      plan: plan,
-      currentLifecycleRegistry: LocalLifecycleRegistry(),
-      currentTaskRegistry: LocalTaskRegistry()
-    )
+    let issues = withoutSoundnessTrace {
+      coordinator.applyCommittedFrame(
+        plan: plan,
+        currentLifecycleRegistry: LocalLifecycleRegistry(),
+        currentTaskRegistry: LocalTaskRegistry()
+      )
+    }
 
     #expect(coordinator.changeHandlerSkipCount == 1)
     #expect(issues.count == 1)
@@ -467,19 +490,21 @@ struct LifecycleCoordinatorSkipTests {
       currentTaskRegistry: LocalTaskRegistry()
     )
 
-    let issues = coordinator.applyCommittedFrame(
-      plan: CommitPlan(
-        lifecycle: [
-          .init(
-            viewNodeID: ViewNodeID(rawValue: 2),
-            identity: identity,
-            operation: .change(handlerIDs: [changeID])
-          )
-        ]
-      ),
-      currentLifecycleRegistry: LocalLifecycleRegistry(),
-      currentTaskRegistry: LocalTaskRegistry()
-    )
+    let issues = withoutSoundnessTrace {
+      coordinator.applyCommittedFrame(
+        plan: CommitPlan(
+          lifecycle: [
+            .init(
+              viewNodeID: ViewNodeID(rawValue: 2),
+              identity: identity,
+              operation: .change(handlerIDs: [changeID])
+            )
+          ]
+        ),
+        currentLifecycleRegistry: LocalLifecycleRegistry(),
+        currentTaskRegistry: LocalTaskRegistry()
+      )
+    }
 
     #expect(changeFired == 0, "a pruned handler must not fire after its subtree departed")
     #expect(coordinator.changeHandlerSkipCount == 1)

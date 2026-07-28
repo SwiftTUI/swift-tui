@@ -12,22 +12,25 @@ import Testing
 /// sessions, distinct identities, same-scope different-binding commands) do
 /// NOT raise it.
 @MainActor
-@Suite("Duplicate registration probe")
+@Suite("Duplicate registration probe", .serialized)
 struct DuplicateRegistrationProbeTests {
   /// Arms the probe latch and restores every probe global it touches, so the
   /// alarm state never leaks into unrelated suites.
   private func withArmedProbe(_ body: () throws -> Void) rethrows {
     let enabled = SoundnessProbeConfiguration.isEnabled
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let latch = SoundnessProbeConfiguration.isSampledFrame
     let count = SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.isSampledFrame = latch
       SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount = count
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     SoundnessProbeConfiguration.isEnabled = true
+    SoundnessProbeConfiguration.isTraceEnabled = false
     SoundnessProbeConfiguration.isSampledFrame = true
     try body()
   }

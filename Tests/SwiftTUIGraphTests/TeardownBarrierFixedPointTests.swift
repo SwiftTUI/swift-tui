@@ -4,7 +4,7 @@ import Testing
 @testable import SwiftTUIGraph
 
 @MainActor
-@Suite("Teardown barrier fixed point")
+@Suite("Teardown barrier fixed point", .serialized)
 struct TeardownBarrierFixedPointTests {
   @Test("preview and finalize delegate teardown only to the shared barrier")
   func previewAndFinalizeUseOnlySharedBarrier() throws {
@@ -89,6 +89,14 @@ struct TeardownBarrierFixedPointTests {
     graph.recordReusedSubtree(root, invalidator: nil)
     let impossibleNodeID = ViewNodeID(rawValue: UInt64.max)
     let alarmBefore = SoundnessProbeConfiguration.barrierNonConvergenceCount
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.barrierNonConvergenceCount = alarmBefore
+      SoundnessProbeConfiguration.lastViolationDetail = detailBefore
+    }
+    SoundnessProbeConfiguration.isTraceEnabled = false
 
     let result = graph.debugSettleTeardownBarrier(resolved: root) { stage, _ in
       if stage == .departedNavigationSurface {

@@ -8,7 +8,7 @@ import Testing
 // each capture in these tests is itself an end-to-end soundness check; the
 // suite asserts the violation counter never moves.
 @MainActor
-@Suite("NodeCheckpointImageStore")
+@Suite("NodeCheckpointImageStore", .serialized)
 struct NodeCheckpointImageStoreTests {
   private func makeGraph() -> (
     graph: ViewGraph, rootIdentity: Identity, childIdentity: Identity
@@ -158,13 +158,16 @@ struct NodeCheckpointImageStoreTests {
 
   @Test("checkpoint-store violations are counted with detail")
   func violationCounterPlumbing() {
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let countBefore = SoundnessProbeConfiguration.checkpointStoreViolationCount
     let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
     defer {
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.checkpointStoreViolationCount = countBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
     }
 
+    SoundnessProbeConfiguration.isTraceEnabled = false
     SoundnessProbeConfiguration.recordCheckpointStoreViolation("store test detail")
 
     #expect(SoundnessProbeConfiguration.checkpointStoreViolationCount == countBefore + 1)

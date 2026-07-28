@@ -10,7 +10,7 @@ import Testing
 /// without order normalization the scoped restore would re-append the changed
 /// subtree's focus entries last and diverge from a full rebuild.
 @MainActor
-@Suite
+@Suite(.serialized)
 struct RuntimeRegistrationRestoreScopingTests {
   @Test("scoped .subtrees restore is byte-identical to a full rebuild (focus order)")
   func scopedSubtreeRestoreMatchesFullRebuild() {
@@ -489,16 +489,19 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
 
     let probeEnabled = SoundnessProbeConfiguration.isEnabled
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let probeLatch = SoundnessProbeConfiguration.isSampledFrame
     let violationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = probeEnabled
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.isSampledFrame = probeLatch
       SoundnessProbeConfiguration.registrationPublicationViolationCount = violationCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
     SoundnessProbeConfiguration.isEnabled = true
+    SoundnessProbeConfiguration.isTraceEnabled = false
     SoundnessProbeConfiguration.isSampledFrame = true
 
     let scopedDraft = ViewGraphFrameDraft(

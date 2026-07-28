@@ -13,13 +13,14 @@ import Testing
 /// `#else` call sites themselves are only compiled under `-c release`; the
 /// org-gate CI exercises that configuration.
 @MainActor
-@Suite("Soundness probe")
+@Suite("Soundness probe", .serialized)
 struct SoundnessProbeConfigurationTests {
   /// Save and restore every process-global static the probe owns so a test
   /// never leaks the probe being enabled into unrelated suites (which would
   /// make them pay the oracle cost and could flake under load).
   private func withRestoredProbeState(_ body: () throws -> Void) rethrows {
     let enabled = SoundnessProbeConfiguration.isEnabled
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
     let sample = SoundnessProbeConfiguration.sampleEveryNFrames
     let latch = SoundnessProbeConfiguration.isSampledFrame
     let stampCount = SoundnessProbeConfiguration.stampCoherenceViolationCount
@@ -38,6 +39,7 @@ struct SoundnessProbeConfigurationTests {
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     defer {
       SoundnessProbeConfiguration.isEnabled = enabled
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.sampleEveryNFrames = sample
       SoundnessProbeConfiguration.isSampledFrame = latch
       SoundnessProbeConfiguration.stampCoherenceViolationCount = stampCount
@@ -55,6 +57,9 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
       SoundnessProbeConfiguration.lastViolationDetail = detail
     }
+    // These tests deliberately exercise recorder plumbing. Keep the counters
+    // live while excluding their synthetic records from gate-owned traces.
+    SoundnessProbeConfiguration.isTraceEnabled = false
     try body()
   }
 
