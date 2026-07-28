@@ -30,6 +30,14 @@ private func parsedFieldGroupMemberNames() throws -> [String] {
   }
 }
 
+private func debugProjectionMemberNames() throws -> [String] {
+  try parsedFieldGroupMemberNames().map { fieldName in
+    // Task descriptors are owner-bucketed in graph state, while the total
+    // debug snapshot deliberately preserves its established flat projection.
+    fieldName == "slotsByNode" ? "taskDescriptorNodeSlots" : fieldName
+  }
+}
+
 @MainActor
 @Suite("ViewGraph checkpoint totality")
 struct ViewGraphCheckpointTotalityTests {
@@ -55,6 +63,7 @@ struct ViewGraphCheckpointTotalityTests {
       relativePath: "Sources/SwiftTUIGraph/Resolve/ViewGraphDebugSnapshots.swift"
     )
     let groupMemberFields = try parsedFieldGroupMemberNames()
+    let debugProjectionFields = try debugProjectionMemberNames()
 
     #expect(Set(viewGraphGroupFields).count == viewGraphGroupFields.count)
     #expect(Set(viewGraphCheckpointGroupFields).count == viewGraphCheckpointGroupFields.count)
@@ -101,7 +110,7 @@ struct ViewGraphCheckpointTotalityTests {
     // Every per-field name across all groups, plus the standalone `root`, is
     // mirrored by the flat debug snapshot — the checkpoint-totality contract
     // for the debug-state guard.
-    #expect(Set(viewGraphDebugFields) == Set(groupMemberFields + ["root"]))
+    #expect(Set(viewGraphDebugFields) == Set(debugProjectionFields + ["root"]))
 
     let viewNodeFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "class",
@@ -164,7 +173,7 @@ struct ViewGraphCheckpointTotalityTests {
   func totalityGuardCatchesMissingField() throws {
     // The canonical covered set is the flattened field-group members plus the
     // standalone `root`; the flat debug snapshot must mirror it exactly.
-    let canonicalFields = try parsedFieldGroupMemberNames() + ["root"]
+    let canonicalFields = try debugProjectionMemberNames() + ["root"]
     let debugFields = try SourceParsingTestSupport.parsedStoredVarNames(
       typeKind: "struct",
       typeName: "DebugTotalStateSnapshot",

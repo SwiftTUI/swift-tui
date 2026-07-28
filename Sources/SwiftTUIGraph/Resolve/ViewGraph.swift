@@ -305,9 +305,24 @@ package final class ViewGraph {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner = newValue }
   }
-  var taskDescriptorNodeSlots: [TaskDescriptorSlotKey: TaskDescriptorIdentitySlot] {
-    get { taskDescriptors.taskDescriptorNodeSlots }
-    set { taskDescriptors.taskDescriptorNodeSlots = newValue }
+  func taskDescriptorSlot(
+    for key: TaskDescriptorSlotKey
+  ) -> TaskDescriptorIdentitySlot? {
+    taskDescriptors.slotsByNode[key.node]?[key.ordinal]
+  }
+  func setTaskDescriptorSlot(
+    _ slot: TaskDescriptorIdentitySlot,
+    for key: TaskDescriptorSlotKey
+  ) {
+    taskDescriptors.slotsByNode[key.node, default: [:]][key.ordinal] = slot
+  }
+  func removeTaskDescriptorSlots(ownedBy nodeID: ViewNodeID) {
+    taskDescriptors.slotsByNode.removeValue(forKey: nodeID)
+  }
+  func taskDescriptorSlots(
+    ownedBy nodeID: ViewNodeID
+  ) -> [Int: TaskDescriptorIdentitySlot] {
+    taskDescriptors.slotsByNode[nodeID] ?? [:]
   }
   private var nextTaskDescriptorIdentityToken: UInt64 {
     get { taskDescriptors.nextTaskDescriptorIdentityToken }
@@ -669,8 +684,10 @@ package final class ViewGraph {
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
       taskDescriptorNodeSlots: Dictionary(
-        uniqueKeysWithValues: taskDescriptorNodeSlots.map { key, slot in
-          ("\(key.node.rawValue)#\(key.ordinal)", slot.label)
+        uniqueKeysWithValues: taskDescriptors.slotsByNode.flatMap { nodeID, slots in
+          slots.map { ordinal, slot in
+            ("\(nodeID.rawValue)#\(ordinal)", slot.label)
+          }
         }
       ),
       nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
@@ -1522,7 +1539,7 @@ package final class ViewGraph {
     value: ID
   ) -> String {
     let key = TaskDescriptorSlotKey(node: viewNodeID, ordinal: ordinal)
-    if let slot = taskDescriptorNodeSlots[key],
+    if let slot = taskDescriptorSlot(for: key),
       slot.matches(value)
     {
       return slot.label
@@ -1531,9 +1548,12 @@ package final class ViewGraph {
     // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
     nextTaskDescriptorIdentityToken &+= 1
     let label = "id:\(nextTaskDescriptorIdentityToken)"
-    taskDescriptorNodeSlots[key] = TaskDescriptorIdentitySlot(
-      label: label,
-      value: value
+    setTaskDescriptorSlot(
+      TaskDescriptorIdentitySlot(
+        label: label,
+        value: value
+      ),
+      for: key
     )
     return label
   }

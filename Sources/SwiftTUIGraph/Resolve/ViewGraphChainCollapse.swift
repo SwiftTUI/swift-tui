@@ -106,10 +106,10 @@ extension ViewGraph {
     // resolve, and a slot left keyed to the reclaimed node would miss,
     // mint a fresh identity token, and plan a spurious cancel + restart
     // of a task whose `.task(id:)` value never changed.
-    for (key, slot) in taskDescriptorNodeSlots where key.node == node.viewNodeID {
-      let adoptedKey = TaskDescriptorSlotKey(node: absorberID, ordinal: key.ordinal)
-      if taskDescriptorNodeSlots[adoptedKey] == nil {
-        taskDescriptorNodeSlots[adoptedKey] = slot
+    for (ordinal, slot) in taskDescriptorSlots(ownedBy: node.viewNodeID) {
+      let adoptedKey = TaskDescriptorSlotKey(node: absorberID, ordinal: ordinal)
+      if taskDescriptorSlot(for: adoptedKey) == nil {
+        setTaskDescriptorSlot(slot, for: adoptedKey)
       }
     }
   }

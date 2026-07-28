@@ -454,7 +454,7 @@ extension ViewGraph {
     if nodeIDsByStructuralPath[node.committed.structuralPath]?.isEmpty == true {
       nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
     }
-    taskDescriptorNodeSlots = taskDescriptorNodeSlots.filter { $0.key.node != node.viewNodeID }
+    removeTaskDescriptorSlots(ownedBy: node.viewNodeID)
     if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
       flattenedStateOwnerNodeIDByIdentity.removeValue(forKey: node.identity)
     }
