@@ -11,10 +11,9 @@
 SwiftTUI is a **SwiftUI-shaped UI framework**. You author the same value types you
 know from SwiftUI — `App`, `Scene`, `View`, `@State`, `@FocusState`, `VStack`,
 the `Layout` protocol — and that *one* authored view tree is rendered, unchanged,
-to **five hosts**: a terminal (cells/ANSI bytes), a static `wasm32-wasi` browser
-bundle, a localhost WebHost over a WebSocket, a native SwiftUI surface, and an
-Android Compose surface. There is no host-specific resolve, layout, or state; only
-host-specific *consumption of one finished frame*.
+to **five hosts**. The canonical enumeration and packaging boundaries live in
+[docs/HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). There is no host-specific
+resolve, layout, or state; only host-specific *consumption of one finished frame*.
 
 The core mental model is three sentences long. **One authored tree, five hosts.** A
 **frame pipeline** turns that tree into a single committed frame by running it
@@ -61,10 +60,12 @@ so the engine never knows about terminals and the authoring surface never knows
 about run loops:
 
 ```text
-SwiftTUICore   (engine: geometry + pipeline + typed products; no terminal IO, Foundation-free)
-   -> SwiftTUIViews   (authoring surface: View, controls, layout, @State, @FocusState, gestures; Foundation-free)
-       -> SwiftTUIRuntime   (run loop, renderer orchestration, scenes, host integration, terminal)
-           -> SwiftTUI   (batteries-included convenience re-export)
+SwiftTUIPrimitives  (leaf value vocabulary: geometry, styles, draw/layout metadata; no engine)
+  -> SwiftTUIGraph  (reconciliation engine: retained graph, state, invalidation, reuse, scheduler)
+    -> SwiftTUICore  (render engine: layout, extraction, raster, commit)
+      -> SwiftTUIViews  (authoring surface: View, controls, layouts, property wrappers, gestures)
+        -> SwiftTUIRuntime  (run loop, renderer orchestration, scenes, host integration, terminal)
+          -> SwiftTUI  (batteries-included convenience re-export)
 ```
 
 Peer products (`SwiftTUIAnimatedImage`, `SwiftTUIProfiling`) and
@@ -77,7 +78,9 @@ Read the arrows as the *legal direction of dependency*; crossing one backwards i
 layering violation:
 
 ```text
-SwiftTUICore
+SwiftTUIPrimitives
+  -> SwiftTUIGraph            (Graph depends on Primitives)
+  -> SwiftTUICore             (Core depends on Graph + Primitives)
   -> SwiftTUIViews            (Views depends on Core)
   -> SwiftTUIRuntime          (Runtime depends on Core + Views)
      -> SwiftTUI              (convenience product re-exports Runtime + WebHostCLI + AnimatedImage)
@@ -102,7 +105,9 @@ consumes it ships from `swift-tui-android`.
 
 | Module | Home | Owns | Hard boundary |
 | --- | --- | --- | --- |
-| **SwiftTUICore** | `Sources/SwiftTUICore/` | Geometry, `LayoutEngine`, the seven phase products + their types, semantic/draw extractors, rasterizer, commit planner, scheduler, the runtime data model (graph, state, registries), diagnostics contract. | **Foundation-free** and **terminal-IO-free**. Internal target — reaches consumers only re-exported through Views or Runtime. Not a published product. |
+| **SwiftTUIPrimitives** | `Sources/SwiftTUIPrimitives/` | Inert value vocabulary: geometry, identity, style and color-science values, draw/layout metadata, pointer and semantic values, and animatable math. | Leaf internal target: no engine or render-pipeline algorithms; depends only on the standard library plus the vendored figlet-font payload. **Foundation-free** and builds standalone. |
+| **SwiftTUIGraph** | `Sources/SwiftTUIGraph/` | Reconciliation: the retained graph and immutable resolve product, state slots, dependency/invalidation planning, reuse and checkpoints, lifecycle/entity routing, runtime registries, the frame scheduler, and animation intent. | AttributeGraph analog. Does **no layout, draw, raster, or commit work**; depends on Primitives only and is **Foundation-free**. |
+| **SwiftTUICore** | `Sources/SwiftTUICore/` | The render engine: `LayoutEngine`, measure/place products, semantic and draw extractors, rasterizer, commit planner, content engines, style resolution, focus tracking, and frame-drop/elision policy. | Depends on Graph + Primitives and re-exports both. **Foundation-free** and **terminal-IO-free**; internal, not a published product. |
 | **SwiftTUIViews** | `Sources/SwiftTUIViews/` | The authoring surface: `View`/`ViewModifier`/`ViewBuilder`, controls, stacks, the `Layout` protocol, `@State`/`@Binding`/`@FocusState`/`@Environment`, gestures, presentation, scrolling, shapes. | **Foundation-free.** `View` is body-only, `@MainActor`-isolated; lowering to primitives is package-internal. `@_exported`-imports Core (which re-exports Graph + Primitives) so the published `SwiftTUIViews` product is a self-sufficient authoring surface for external view libraries. |
 | **SwiftTUIRuntime** | `Sources/SwiftTUIRuntime/` | `RunLoop`, `DefaultRenderer`, the runtime stage pipeline, scenes (`App`/`Scene`/`WindowGroup`), terminal hosting, host-frame contracts, input, animation controller, lifecycle, diagnostics emission. | The first layer allowed to touch terminal IO and Foundation. |
 | **SwiftTUI** | `Sources/SwiftTUI/` | Convenience re-export: `App.main()`, standard flags, `--web` launch, animated-image support. | Also kept **Foundation-free** (writes UTF-8 to stdout without Foundation). |
@@ -111,12 +116,13 @@ consumes it ships from `swift-tui-android`.
 | **Platforms/** runners | `Platforms/{CLI,WASI,WebHost,Android,Embedding,Arguments}/Sources/` | One host runner or transport each. **No nested Swift packages** — every target is declared in the root `Package.swift`. | Hosts sit *below* the committed-frame boundary; they consume committed contracts, not renderer-private state. |
 
 > The Foundation-free boundary is enforced, not aspirational: the
-> `no-foundation-in-library-products` prek hook plus
-> `Scripts/check_foundation_free_layers.sh` block `import Foundation` (including
-> transitive reach) in `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI`. Where Core needs
+> `no-foundation-in-library-products` prek hook blocks source-level imports in
+> Primitives, Graph, Core, Views, and `SwiftTUI`;
+> `Scripts/check_foundation_free_layers.sh` additionally proves that Primitives,
+> Graph, Core, and Views do not load Foundation transitively. Where Graph needs
 > something Foundation would normally provide, it keeps a raw representation instead
-> — e.g. a dropped file path is kept as a raw string precisely so Core need not
-> import Foundation (`Sources/SwiftTUICore/Runtime/DroppedPath.swift`).
+> — e.g. a dropped file path remains a raw string in
+> `Sources/SwiftTUIGraph/Runtime/DroppedPath.swift`.
 
 ### Two pipeline views are the same work
 
@@ -124,7 +130,8 @@ This is the single most important idea to hold straight, because three of the fo
 flows cross it. There are **two views of the same work**, not two pipelines:
 
 ```text
-Phase products (the typed values the engine computes — owned by SwiftTUICore):
+Phase products (the typed values the engine computes — owned by Graph and Core,
+using Primitives' leaf vocabulary):
   resolve -> measure -> place -> semantics -> draw -> raster -> commit
    Resolved-  Measured-  Placed-  Semantic-   Draw-   Raster-   Commit-
    Node       Node       Node     Snapshot    Node    Surface   Plan
@@ -148,24 +155,24 @@ and the key types you will land on. The flows below cite back to these homes.
 
 | Subsystem | Directory | Key types (file) |
 | --- | --- | --- |
-| **Resolve / reconciliation graph** | `Sources/SwiftTUICore/Resolve/` | `ViewGraph` (`ViewGraph.swift:87`, the live retained graph), `ViewNode` (`ViewNode.swift:2`, mutable per-identity node), `ResolvedNode` (`ResolvedNode.swift:12`, the immutable resolve product), `AnyStateSlot` (`StateSlot.swift:1`), `StructuralDiff`. The `Resolver` entry point lives in **Views** (`Sources/SwiftTUIViews/Foundation/ViewFoundation.swift:7`, `Resolver.resolve` at `:12`). |
-| **Layout (measure + place)** | `Sources/SwiftTUICore/Measure/` and `Sources/SwiftTUICore/Place/` | `LayoutEngine` (`Measure/LayoutEngine.swift:1`), `MeasuredNode`, `PlacedNode`; the authored `Layout` protocol (`Sources/SwiftTUIViews/Layout/CustomLayout.swift:117`) and `StackLayouts`. Proposal/response uses `ProposedSize` (`Sources/SwiftTUICore/Geometry/GeometryTypes.swift`). |
-| **Geometry** | `Sources/SwiftTUICore/Geometry/` | Cell space: `CellPoint`/`CellSize`/`CellRect` (`CellGeometry.swift`). Continuous space: `Point`/`Size`/`Rect` (`Point.swift`). Pixel space: `PixelPoint`/`PixelSize` (`PixelGeometry.swift`). `Anchor`, `Axis`, `Path`. |
-| **State & observation** | `Sources/SwiftTUIViews/State/` (authoring) + `Sources/SwiftTUICore/Resolve/` & `Runtime/` (engine) | `State` (`State/State.swift:211`), `Binding` (`Foundation/ViewBaseTypes.swift:16`), `AuthoringContext` (`State/AuthoringContext.swift:18`), `AnyStateSlot` (`Resolve/StateSlot.swift:1`), `StateContainer` (`Runtime/StateContainer.swift`). Observation/invalidation: `Environment/Observation.swift`, `Resolve/DependencyTracker.swift`, `Resolve/InvalidationSourceTrace.swift`. |
-| **Focus** | `Sources/SwiftTUICore/Semantics/` (tracking) + `Sources/SwiftTUIViews/State/` & `Focus/` (authoring) | `FocusTracker` (`Semantics/FocusTracker.swift:9`), `FocusedValues` (`Semantics/FocusedValues.swift:48`), `FocusPolicy`/`FocusPresentation`; `FocusState` (`State/FocusState.swift:100`), `FocusedValue` (`State/FocusedValue.swift`), `DefaultFocus` (`Focus/DefaultFocus.swift`). |
-| **Gestures & pointer** | `Sources/SwiftTUIViews/Gestures/` (authoring) + `Sources/SwiftTUICore/Semantics/` & `Pointer/` (engine) | `Gesture` (`Gestures/Gesture.swift:10`), `DragGesture`/`TapGesture`/`LongPressGesture`, `GestureState`; `GestureRecognizer` (`Semantics/GestureRecognizer.swift:45`), `HoverPhase`/`PointerLocation` (`Core/Pointer/`). RunLoop-side hit-testing: `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PointerHitTesting.swift`. |
-| **Environment** | `Sources/SwiftTUIViews/Environment/` | `Environment` wrapper (`Environment.swift:201`), `EnvironmentValues` (`Environment.swift:79`), `ResolveContext`, `StyleEnvironment`, `PointerInputEnvironment`. |
-| **Animation** | `Sources/SwiftTUIRuntime/Lifecycle/` (driver) + `Sources/SwiftTUIViews/Animation/` (authoring) + `Sources/SwiftTUICore/Animation/` (model) | `AnimationController` (`Lifecycle/AnimationController.swift:10`; its per-frame checkpoint/restore/reset state is grouped into four value sub-structs in `Lifecycle/AnimationControllerSubstructs.swift`), `ScrollMomentumController`, `PointerVelocitySampler`; `Animation`/`withAnimation`/`PhaseAnimator`/`TimelineView`/`AnyTransition` (`Views/Animation/`); `AnimatableArray`/`AnimationProtocols` (`Core/Animation/`). |
+| **Resolve / reconciliation graph** | `Sources/SwiftTUIGraph/Resolve/` | The retained `ViewGraph` and `ViewNode`, immutable `ResolvedNode`, `AnyStateSlot`, and `StructuralDiff`. Start at `ViewGraph.evaluateDirtyNodes`; the authored-body driver remains `Resolver.resolve` in `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift`. |
+| **Layout (measure + place)** | `Sources/SwiftTUICore/Measure/` and `Sources/SwiftTUICore/Place/` | `LayoutEngine`, `MeasuredNode`, and `PlacedNode`; the authored `Layout` protocol lives in `Sources/SwiftTUIViews/Layout/CustomLayout.swift`. Proposal/response uses `ProposedSize` from `Sources/SwiftTUIPrimitives/Geometry/GeometryTypes.swift`. |
+| **Geometry** | `Sources/SwiftTUIPrimitives/Geometry/` | Cell space (`CellPoint`/`CellSize`/`CellRect`), continuous space (`Point`/`Size`/`Rect`), pixel space (`PixelPoint`/`PixelSize`), `Axis`, and `Path`. Graph-aware `Anchor` types live in `Sources/SwiftTUIGraph/Geometry/`. |
+| **State & observation** | `Sources/SwiftTUIViews/State/` (authoring) + `Sources/SwiftTUIGraph/Resolve/` and `Sources/SwiftTUIGraph/Runtime/` (engine) | `State`, `Binding`, and `AuthoringContext` on the authored side; `AnyStateSlot` and `StateContainer` on the graph side. Follow invalidation through `DependencyTracker` and `InvalidationSourceTrace`, then `ViewGraph.queueDirtyForStateChange`. |
+| **Focus** | `Sources/SwiftTUICore/Semantics/` (render-time tracking) + `Sources/SwiftTUIGraph/Semantics/` (graph values) + `Sources/SwiftTUIViews/State/` and `Sources/SwiftTUIViews/Focus/` (authoring) | `FocusTracker` remains in Core; `FocusedValues`, `FocusParticipation`, `AutomaticFocusPolicy`, and graph-facing focus metadata live in Graph. `FocusState`, `FocusedValue`, and `DefaultFocus` are authored in Views. |
+| **Gestures & pointer** | `Sources/SwiftTUIViews/Gestures/` (authoring) + `Sources/SwiftTUIGraph/Semantics/` (recognition) + `Sources/SwiftTUIPrimitives/Pointer/` (values) | `Gesture`, `DragGesture`, `TapGesture`, `LongPressGesture`, and `GestureState`; Graph's `GestureRecognizer`; Primitives' `HoverPhase` and `PointerLocation`. Run-loop hit testing starts at `Sources/SwiftTUIRuntime/RunLoop/RunLoop+PointerHitTesting.swift`. |
+| **Environment** | `Sources/SwiftTUIViews/Environment/` | `Environment`, `EnvironmentValues`, `ResolveContext`, `StyleEnvironment`, and `PointerInputEnvironment`. |
+| **Animation** | `Sources/SwiftTUIRuntime/Lifecycle/` (driver) + `Sources/SwiftTUIViews/Animation/` (authoring) + `Sources/SwiftTUIGraph/Animation/` (intent) + `Sources/SwiftTUIPrimitives/Animation/` (math) | `AnimationController`, `ScrollMomentumController`, and `PointerVelocitySampler`; authored `Animation`/`withAnimation`/`PhaseAnimator`/`TimelineView`/`AnyTransition`; Graph's `AnimationProtocols`; Primitives' `AnimatableArray`. |
 | **Presentation** | `Sources/SwiftTUIViews/Presentation/` | Boolean and optional-item modifiers emit through `PresentationTriggerLeaf`; `PresentationCoordinatorRegistry` owns family ordering and Escape dispatch; `OverlayStackEntryHost` registers presenter `onDismiss` observers on committed entry teardown. `fullScreenCover` reuses the sheet family with an internal full-screen surface mode. |
-| **Semantics / accessibility** | `Sources/SwiftTUICore/Semantics/` + `Sources/SwiftTUIRuntime/Accessibility/` | `SemanticExtractor` (`Core/Semantics/Semantics.swift:3`), `SemanticSnapshot` (`Core/Semantics/SemanticSnapshot.swift:274`); `LinearAccessibilityRenderer`, `LiveRegionAnnouncer` (`Runtime/Accessibility/`). |
-| **Draw / raster** | `Sources/SwiftTUICore/Draw/` and `Sources/SwiftTUICore/Raster/` | `DrawExtractor` (`Draw/DrawExtractor.swift:2`) → `DrawNode`; `Rasterizer` (`Raster/Rasterizer.swift:14`) → `RasterSurface` (`Raster/RasterTypes.swift:107`). Braille/canvas drawing and image compositing also under `Draw/`. |
-| **Commit** | `Sources/SwiftTUICore/Commit/` | `CommitPlanner` (`CommitPlanner.swift:2`) → `CommitPlan`; `FrameArtifacts` gathers all seven products; `PresentationDamage`. |
-| **Styling** | `Sources/SwiftTUICore/Styling/` | `Color` (`Color.swift:15`), `Theme` (`Theme.swift:3`), `BorderSet`, `GradientStyles`, `ShapeStyles`, `Appearance`, `ResolvedTextStyle`. |
-| **Runtime registries** | `Sources/SwiftTUICore/Runtime/` | Per-node "what did this view register" tables: `ActionScope`, `CommandRegistry`, `LocalGestureRegistry`, `LocalTaskRegistry`, `LocalKeyHandlerRegistry`, `PreferenceValues`, `RuntimeRegistrationSet`. |
-| **Run loop & rendering** | `Sources/SwiftTUIRuntime/RunLoop/` and `Sources/SwiftTUIRuntime/Rendering/` | `RunLoop` (`RunLoop/RunLoop.swift:6`), `DefaultRenderer`, `RuntimeRenderPipeline`, frame-head/frame-tail coordinators. |
-| **Scenes & hosting** | `Sources/SwiftTUIRuntime/Scenes/` | `App` (`App.swift:178`), `Scene` (`App.swift:19`), `WindowGroup` (`App.swift:60`), `SceneSession`, `HostedSceneSession`, `WindowSceneSelection`. |
-| **Terminal & host contracts** | `Sources/SwiftTUIRuntime/Terminal/` | `TerminalHost`, `PresentationSurface`, `SemanticHostFrame` (`PresentationSurface.swift:235`) — the committed-frame contract non-terminal hosts consume. |
-| **Host runners** | `Platforms/` | `TerminalRunner` (`Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift`), `WASIRunner` (`Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift:80`), `WebHostRunner` (`Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift`), `WebHostCLIRunner` (`Platforms/WebHost/Sources/SwiftTUIWebHostCLI/WebHostCLIRunner.swift:17`), `SwiftTUIAndroidHost` ABI, `SwiftTUIArguments`. |
+| **Semantics / accessibility** | `Sources/SwiftTUICore/Semantics/` + `Sources/SwiftTUIRuntime/Accessibility/` | Core's `SemanticExtractor` and `SemanticSnapshot`; Runtime's `LinearAccessibilityRenderer` and `LiveRegionAnnouncer`. |
+| **Draw / raster** | `Sources/SwiftTUICore/Draw/` and `Sources/SwiftTUICore/Raster/` | `DrawExtractor` → `DrawNode`; `Rasterizer` → `RasterSurface`. Braille/canvas drawing and image compositing also live under Draw. |
+| **Commit** | `Sources/SwiftTUICore/Commit/` | `CommitPlanner` → `CommitPlan`; `FrameArtifacts` gathers all seven products; `PresentationDamage` describes host-facing raster damage. |
+| **Styling** | `Sources/SwiftTUIPrimitives/Styling/` + `Sources/SwiftTUICore/Styling/` | Primitives owns `Color`, `Theme`, `BorderSet`, gradients, shapes, appearance, and structural text-style values; Core owns render-time collection-style layout and text-style resolution. |
+| **Runtime registries** | `Sources/SwiftTUIGraph/Runtime/` | Per-node “what did this view register” tables: `ActionScope`, `CommandRegistry`, `LocalGestureRegistry`, `LocalTaskRegistry`, `LocalKeyHandlerRegistry`, `PreferenceValues`, and `RuntimeRegistrationSet`. |
+| **Run loop & rendering** | `Sources/SwiftTUIRuntime/RunLoop/` and `Sources/SwiftTUIRuntime/Rendering/` | `RunLoop`, `DefaultRenderer`, `RuntimeRenderPipeline`, and the frame-head/frame-tail coordinators. |
+| **Scenes & hosting** | `Sources/SwiftTUIRuntime/Scenes/` | `App`, `Scene`, `WindowGroup`, `SceneSession`, `HostedSceneSession`, and `WindowSceneSelection`. |
+| **Terminal & host contracts** | `Sources/SwiftTUIRuntime/Terminal/` | `TerminalHost`, `PresentationSurface`, and `SemanticHostFrame` — the committed-frame contract non-terminal hosts consume. |
+| **Host runners** | `Platforms/` | `TerminalRunner`, `WASIRunner`, `WebHostRunner`, `WebHostCLIRunner`, the `SwiftTUIAndroidHost` ABI, and `SwiftTUIArguments`. |
 
 ### Three subsystems worth a closer look on day one
 
@@ -173,47 +180,53 @@ These are the ones whose *shape* is non-obvious and most often misread — and e
 underlies a flow below.
 
 **Resolve is two graphs, not one.** `ViewGraph`
-(`Sources/SwiftTUICore/Resolve/ViewGraph.swift:87`) is the *live, retained, mutable*
-graph of `ViewNode`s (`ViewNode.swift:2`) that persists across frames and owns
+(`Sources/SwiftTUIGraph/Resolve/ViewGraph.swift`) is the *live, retained, mutable*
+graph of `ViewNode`s that persists across frames and owns
 identity, state ownership, and runtime registrations. `ResolvedNode`
-(`ResolvedNode.swift:12`) is the *immutable, per-frame* product of resolve. A new
+is the *immutable, per-frame* product of resolve. A new
 engineer's most common mistake is treating `ResolvedNode` as if it carried
 persistent state — it does not; persistence lives in `ViewGraph`/`ViewNode`. Inside
 `ViewGraph`, the ~36 retained fields are grouped into nine `package` value sub-structs
-(`Sources/SwiftTUICore/Resolve/ViewGraphFieldGroups.swift`: `GraphIndex`, `DirtyState`,
+(`Sources/SwiftTUIGraph/Resolve/ViewGraphFieldGroups.swift`: `GraphIndex`, `DirtyState`,
 `FrameCommitState`, `LifecycleEventBuffers`, …) so an abortable frame's *checkpoint*
 copies them wholesale and `restore` cannot silently drop one —
-`ViewGraphCheckpointTotalityTests` enforces the coverage. Reuse
+`ViewGraphCheckpointTotalityTests` enforces the coverage. Start at
+`ViewGraph.evaluateDirtyNodes` to follow dirty-frontier evaluation. Reuse
 (retained reuse + memoized-body reuse) is decided here against the frame's
 invalidation set. The [interaction flow](#3b-the-interaction--update-loop) lives and
 dies on this distinction.
 
 **Layout is recursive size negotiation, not a constraint solver.** A parent proposes
 a `ProposedSize` to each child; the child reports a wanted size; the parent places
-the child. `LayoutEngine` (`Sources/SwiftTUICore/Measure/LayoutEngine.swift:1`)
+the child. `LayoutEngine` (`Sources/SwiftTUICore/Measure/LayoutEngine.swift`)
 drives both measure and place — note the directory split (`Measure/` for sizing,
 `Place/` for positioning) is *one* `LayoutEngine` struct with `+`-suffixed extension
 files, **not** two types. The authored `Layout` protocol
-(`Sources/SwiftTUIViews/Layout/CustomLayout.swift:117`) is the public hook; `Layout`
+(`Sources/SwiftTUIViews/Layout/CustomLayout.swift`) is the public hook; `Layout`
 requires `Sendable` (value and cache), so the renderer can run any custom layout on
 the frame-tail worker.
 
 **The host boundary is a committed contract, never renderer internals.** Below
 `commit`, every host consumes a *committed* frame: a `RasterSurface` plus a
-`SemanticHostFrame` (`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift:235`).
-The pipeline above the host is identical for all five; only the presentation
-transport differs. The [five-hosts flow](#3d-one-app-five-hosts) is entirely about
-what happens below this line.
+`SemanticHostFrame` (`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift`).
+The pipeline contracts above the host are shared by all five; the selected engine
+profile may change reuse strategy without changing those contracts, and the
+presentation transport differs below them. The
+[five-hosts flow](#3d-one-app-five-hosts) is entirely about what happens below this
+line.
 
 ### Map-level invariants
 
-- **Dependency direction is one-way.** `Core → Views → Runtime → SwiftTUI`. Peer
+- **Dependency direction is one-way.** `Primitives → Graph → Core → Views → Runtime
+  → SwiftTUI`. Peer
   products and `Platforms/` runners depend *into* the spine, never the reverse. Core
   is never allowed to know a Runtime or host type.
-- **Core and the authoring/convenience layers are Foundation-free and
-  terminal-IO-free**, enforced by prek hooks +
-  `Scripts/check_foundation_free_layers.sh` (including transitive reach).
-  Terminal/POSIX/Foundation code starts no earlier than `SwiftTUIRuntime`.
+- **Primitives, Graph, Core, and the authoring/convenience layers are source-level
+  Foundation-free and terminal-IO-free**, enforced by prek hooks. The separate
+  `Scripts/check_foundation_free_layers.sh` proves the transitive boundary through
+  Views; the `SwiftTUI` convenience target legitimately re-exports Runtime/WebHost
+  dependencies that load Foundation. Terminal/POSIX/Foundation implementation code
+  starts no earlier than `SwiftTUIRuntime`.
 - **One package, many products.** All `Platforms/` sources are targets in the root
   `Package.swift`; there are no nested SwiftPM packages under `Platforms/`.
 - **`SwiftTUIProfiling` is strictly opt-in.** Nothing in the default graph depends on
@@ -223,11 +236,12 @@ what happens below this line.
 
 ### Map-level gotchas
 
-- **`Resolver` lives in Views, not Core.** Despite "resolve" being a Core phase and
-  `ResolvedNode`/`ViewGraph` living in `Sources/SwiftTUICore/Resolve/`, the
+- **`Resolver` lives in Views, not Graph.** Despite `ResolvedNode`/`ViewGraph`
+  living in `Sources/SwiftTUIGraph/Resolve/`, the
   `Resolver` entry point that evaluates authored bodies is
-  `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift:7` — because it must call
-  `View.body`, a Views concept. Resolve straddles the Core/Views seam.
+  `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift` — because it must call
+  `View.body`, a Views concept. Resolve straddles the Graph/Views seam through
+  erased evaluator thunks rather than a reverse module dependency.
 - **The two non-terminal native hosts are in other repos.** The SwiftUI surface
   (`SwiftUIHost`) is in `swift-tui-swiftui`; the Compose UI is in
   `swift-tui-android`. The `SwiftTUIAndroidHost` target *here* is only the
@@ -237,7 +251,7 @@ what happens below this line.
   separate "measurer" and "placer" types.
 - **State directories are split by role.** Authoring property wrappers live in
   `Sources/SwiftTUIViews/State/`; the *storage and ownership* live in
-  `Sources/SwiftTUICore/`. A state bug usually means visiting both.
+  `Sources/SwiftTUIGraph/`. A state bug usually means visiting both.
 - **WASI breaks ship green.** The Linux Repo Gate does **not** compile `wasm32-wasi`,
   so a WASI-only break passes CI and only surfaces in the examples/site gates after a
   tag is cut. New files touching C stdio/POSIX must be WASI-safe; cross-build before
@@ -294,9 +308,10 @@ in the tail may touch live `ViewGraph`/`@State` mutable state.
   reaches up into renderer-private tail state.
 
 **Key types.** Package IR flows `ResolvedNode` → `MeasuredNode` → `PlacedNode` →
-`SemanticSnapshot` → `DrawNode` → `RasterSurface` → `CommitPlan`, all under
-`Sources/SwiftTUICore/` (`Resolve/`, `Measure/`, `Place/`, `Semantics/`, `Draw/`,
-`Raster/`, `Commit/`); the orchestration lives in
+`SemanticSnapshot` → `DrawNode` → `RasterSurface` → `CommitPlan`. Graph owns
+`ResolvedNode` in `Sources/SwiftTUIGraph/Resolve/`; Core owns the remaining render
+products under `Sources/SwiftTUICore/` (`Measure/`, `Place/`, `Semantics/`, `Draw/`,
+`Raster/`, `Commit/`). Runtime orchestration lives in
 `Sources/SwiftTUIRuntime/Rendering/`. `FrameArtifacts` gathers all seven products as
 the package-only committed bundle; public one-shot callers see `RenderSnapshot`, and
 hosts consume `RasterSurface`/`SemanticHostFrame`.
@@ -369,9 +384,9 @@ terminal/transport bytes
 | Where do raw bytes become events? | `Sources/SwiftTUIRuntime/Input/InputReader.swift`, `Input/TerminalInputStreamReading.swift`, `Input/TerminalInputParser.swift` |
 | What is the run loop's event-intake shape? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop.swift` (`run()` / `runWithInstalledAnimationSinks()`), `RunLoop/RunLoop+EventPump.swift`, `RunLoop/EventPumpBuffer.swift` |
 | Where is a key/pointer event routed to handlers? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+EventDispatch.swift`, `RunLoop/RunLoop+PointerHandling.swift` |
-| How does a `@State` write turn into an invalidation? | `Sources/SwiftTUIViews/State/State.swift`, `Sources/SwiftTUICore/Resolve/ViewNode.swift` (`setStateSlot`), `Sources/SwiftTUICore/Pipeline/Scheduler.swift` |
-| How are wakes coalesced into one frame? | `Sources/SwiftTUICore/Pipeline/Scheduler.swift` (`FrameScheduler`), `RunLoop/RunLoop+Rendering.swift` |
-| How does a write re-resolve exactly the right subtree? | `Sources/SwiftTUICore/Resolve/ViewGraph.swift` (`queueDirtyForStateChange`, `evaluateDirtyNodes`), `Resolve/ViewGraphDirtyEvaluationPlanning.swift`, `Resolve/ViewGraphInvalidationPlanning.swift` |
+| How does a `@State` write turn into an invalidation? | `Sources/SwiftTUIViews/State/State.swift`, `Sources/SwiftTUIGraph/Resolve/ViewNode.swift` (`ViewNode.setStateSlot`), `Sources/SwiftTUIGraph/Pipeline/Scheduler.swift` (`FrameScheduler`) |
+| How are wakes coalesced into one frame? | `Sources/SwiftTUIGraph/Pipeline/Scheduler.swift` (`FrameScheduler`), `RunLoop/RunLoop+Rendering.swift` |
+| How does a write re-resolve exactly the right subtree? | `Sources/SwiftTUIGraph/Resolve/ViewGraph.swift` (`ViewGraph.queueDirtyForStateChange`, `ViewGraph.evaluateDirtyNodes`), `Resolve/ViewGraphDirtyEvaluationPlanning.swift`, `Resolve/ViewGraphInvalidationPlanning.swift` |
 | Why might a frame re-render after focus moves? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FocusSync.swift`, `Sources/SwiftTUICore/Semantics/FocusTracker.swift` |
 | Where does intake hand off to the render pipeline? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+ResolveContext.swift`, `RunLoop/RunLoop+FrameAcquisition.swift` |
 
@@ -421,20 +436,19 @@ exits the loop; otherwise the frame half runs. Pointer events route through
 **Step 4 — A handler writes `@State`; the write records dirt and requests
 invalidation.** `State.wrappedValue`'s setter (`State/State.swift:247`) resolves the
 live `DynamicStateLocation` for the current graph-scoped owner and calls `setValue`.
-For a graph-backed owner that reaches `ViewNode.setStateSlot(...)`
-(`Resolve/ViewNode.swift:268`). Two things happen — **but only if the value actually
-changed** (`slot.set` reports `didChange`):
+For a graph-backed owner, `setValue` reaches `ViewNode.setStateSlot(...)`. Two things
+happen — **but only if the value actually changed** (`slot.set` reports `didChange`):
 
-1. `ownerGraph.queueDirtyForStateChange(key)` (`ViewGraph.swift:734`) inserts the
+1. `ownerGraph.queueDirtyForStateChange(key)` inserts the
    owning node-id (and recorded *reader* node-ids) into `graphLocalDirtyNodeIDs` and
    marks them `isDirty`. The reader set comes from dependency tracking recorded during
-   resolve (`ViewNode.stateSlot`, `ViewNode.swift:233`): under reader attribution a
+   resolve (`ViewNode.stateSlot`): under reader attribution a
    read records on the node that genuinely read the value, so projecting a binding
    into a disjoint subtree (a sheet background) records nothing and that subtree is
    spared.
 2. `invalidator.requestInvalidation(of:)` — and the invalidator *is the
    `FrameScheduler`* — with identities from `stateChangeInvalidationIdentities`
-   (`ViewNode.swift:316`). A `withAnimation` on the stack routes through
+   on `ViewNode`. A `withAnimation` on the stack routes through
    `AnimationAwareInvalidating` so the frame carries the animation request.
 
 The correctness point: the dirty *graph* mutation (1) and the scheduler *intent* (2)
@@ -442,14 +456,15 @@ are separate. (1) tells the next resolve which nodes to re-evaluate; (2) tells t
 loop a frame is owed.
 
 **Step 5 — The scheduler coalesces every wake into one `ScheduledFrame`.**
-`FrameScheduler` (`Pipeline/Scheduler.swift:105`) accumulates a set of `WakeCause`
+`FrameScheduler` in `Sources/SwiftTUIGraph/Pipeline/Scheduler.swift` accumulates a
+set of `WakeCause`
 (`.input`, `.invalidation`, `.signal`, `.external`, `.deadline`), a union of
 `invalidatedIdentities`, signal names, and the nearest animation deadline. Ten
 keypresses and a focus move between two frames produce **one** `ScheduledFrame` whose
 identities are the union and whose `intentRequestCount` records how many merged
-(`Scheduler.swift:28`). `consumeReadyFrame(at:)` (`:194`) atomically drains and clears
-that state; `hasPendingFrame`/`nextWakeInstant` let the loop decide whether to render
-now, sleep to a deadline, or block.
+intents. `FrameScheduler.consumeReadyFrame(at:)` atomically drains and clears that
+state; `hasPendingFrame`/`nextWakeInstant` let the loop decide whether to render now,
+sleep to a deadline, or block.
 
 **Step 6 — The loop re-resolves the dirty frontier.** In
 `RunLoop.renderPendingFramesAsync(...)` (`RunLoop+Rendering.swift:293`) the driver
@@ -460,7 +475,7 @@ frame-scoped consumer downstream reads instead of the clock. It then
 builds a `ResolveContext` carrying `scheduledFrame.invalidatedIdentities`
 (`RunLoop+ResolveContext.swift:64`), then acquires artifacts via
 `acquireFrameArtifactsAsync → DefaultRenderer.render*`. Inside resolve,
-`ViewGraph.evaluateDirtyNodes(using:)` (`ViewGraph.swift:1048`) is where reuse pays
+`ViewGraph.evaluateDirtyNodes(using:)` is where reuse pays
 off. With selective evaluation enabled (after the first frame, `RunLoop.swift:322`),
 `ViewGraphDirtyEvaluationPlanner` computes `dirtyFrontierNodes`
 (`ViewGraphDirtyEvaluationPlanning.swift:63`) — the **topmost** dirty nodes (a dirty
@@ -511,8 +526,8 @@ work, and clears any transient press identity.
   identities diverge, `ViewGraphDirtyEvaluationPlanner.targetPlan` bails to a full
   root re-resolve (`ViewGraphDirtyEvaluationPlanning.swift:31`). Selective evaluation
   depends on both channels naming the same nodes.
-- **`didChange` gating.** `setStateSlot` only invalidates when the value actually
-  changed (`ViewNode.swift:277`). Writing an equal value is intentionally inert.
+- **`didChange` gating.** `ViewNode.setStateSlot` only invalidates when the value
+  actually changed. Writing an equal value is intentionally inert.
 - **Coalescing is correctness, not just speed.** Pointer bursts merge twice (delayed
   flush in `InputReader`, in-place in `EventPumpBuffer.enqueue`) and key/state intents
   collapse in the scheduler. Breaking single-flush-per-cluster reintroduces the
@@ -589,7 +604,7 @@ loud, accurate error.
 | Where is raw mode entered / restored? | `RunLoop.swift:253-262`; `Terminal/TerminalHost.swift:162` / `:225` |
 | Where is the alternate screen entered? | `Terminal/TerminalHost.swift:209` (`enterAlternateScreen`, `ESC[?1049h`) |
 | What is the steady-state run-loop tick? | `RunLoop.swift:340-452` (`while await iterator.next()`) |
-| How does the loop wait on input *vs* the frame deadline? | `RunLoop+EventPump.swift:31`; `RunLoop.swift:444-451` + `Pipeline/Scheduler.swift:181` (`nextWakeInstant`) |
+| How does the loop wait on input *vs* the frame deadline? | `RunLoop+EventPump.swift:31`; `RunLoop.swift:444-451` + `FrameScheduler.nextWakeInstant` |
 | What drives the ~33 ms deadline? | `Lifecycle/AnimationController.swift:158`, `RunLoop+ScrollMomentum.swift:6`; armed via `RunLoop+PostCommitSupport.swift:118,131,173` |
 | How are SIGINT/SIGTERM/SIGWINCH handled? | `RunLoop+EventDispatch.swift:10` (`handle`) + `:232` (`signalDisposition`); reader `Platforms/CLI/Sources/SwiftTUICLI/SignalReader.swift:10` |
 | What restores the terminal on crash / abnormal exit? | `SceneRuntime.swift:165` (`installCrashGuard`); `Terminal/TerminalProcessExitCleanup.swift:47` (`atexit`) |
@@ -639,7 +654,7 @@ Secondary scenes get a pty-backed `TerminalHost` so they can be `attach`ed later
 **Step 5 — Crash guard, then `RunLoop` construction.** For the primary scene,
 `SceneRuntime.run` calls `installCrashGuard()` (`:113,165`) **before** raw mode: it
 snapshots `termios` via `tcgetattr` and registers a `CrashSignalHandler.ResetAction`
-(vendored `Vendor/UnixSignals/Sources/UnixSignals/CrashSignalHandler.swift:127`) for fatal signals, so
+(vendored `CrashSignalHandler.install`) for fatal signals, so
 a SIGSEGV/SIGABRT resets mouse reporting, shows the cursor, resets style, and exits the
 alternate screen *from inside the signal handler* before the process dies;
 `defer { CrashSignalHandler.uninstall() }` removes it on normal exit. `selection.run →
@@ -692,7 +707,7 @@ schedule a timed self-wake via `scheduleDeadlineWake(_:)`. The steady loop is
 3. After events, `renderPendingFramesAsync(...)` drains the scheduler one full frame
    per ready entry.
 4. The loop computes the next self-wake via `scheduler.nextWakeInstant(after:)`
-   (`:444`, `Scheduler.swift:181`) and, if a deadline is pending in the future,
+   and, if a deadline is pending in the future,
    `eventPump.scheduleDeadlineWake(...)`. With no pending cause and no deadline,
    `nextWakeInstant` returns `nil` and the loop simply blocks — **fully idle, zero
    CPU** — until input/signal/invalidation arrives.
@@ -702,9 +717,9 @@ The ~33 ms deadline is *demand-driven*, not a fixed timer. After a frame commits
 `scheduler.requestDeadline(...)` only while the `AnimationController` has pending work
 (`frameInterval = .milliseconds(33)`, `AnimationController.swift:158`); scroll
 momentum/fling arms its own 33 ms cadence (`RunLoop+ScrollMomentum.swift`). A static
-screen arms no deadline. `consumeReadyFrame` (`Scheduler.swift:194`) tags the produced
-`ScheduledFrame` with a `.deadline` cause when `nextDeadline <= now`, distinguishing an
-animation frame from an input/invalidation frame.
+screen arms no deadline. `FrameScheduler.consumeReadyFrame` tags the produced
+`ScheduledFrame` with a `.deadline` cause when `nextDeadline <= now`,
+distinguishing an animation frame from an input/invalidation frame.
 
 **Step 8 — Teardown and restore.** The loop returns a `RunLoopResult` with one of
 three `RunLoopExitReason`s: `.inputEnded` (stream finished — stdin EOF, both pump
@@ -780,54 +795,59 @@ intentionally redundant.
 > step 8 calls `presentCommittedFrame`.
 
 **Mental model.** A SwiftTUI program authors **one** view tree, and that tree is
-rendered the same way for every host. Resolve, layout, semantics, draw, and raster all
-run in `SwiftTUICore` + `SwiftTUIRuntime` with zero host knowledge. The host enters
+rendered the same way for every host. Graph owns resolve, Core owns the render
+products, and Runtime orchestrates them with zero host knowledge. The host enters
 only **below the committed-frame boundary**: each owns a thin surface adapter that
 turns a finished frame into terminal bytes, a JSON wire frame, or native pixels.
 
 The single contract every non-terminal host consumes is the value type
-`SemanticHostFrame` (`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift:235`):
+`SemanticHostFrame` (`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift`):
 a committed `RasterSurface` plus the `SemanticSnapshot`, focused identity, host-facing
 raster damage, monotonic producer `sequence`, and preferred layout size. Everything
 above the boundary is shared; everything below is a per-host adapter.
 
 ```text
-App.body  ->  RunLoop (one per host, identical engine)
+App.body  ->  RunLoop (shared engine, host-selected profile)
            ->  phase products (3a): resolve -> measure -> place -> semantics -> draw -> raster -> commit
            ->  FrameArtifacts (package committed)    === COMMITTED-FRAME BOUNDARY ===
            ->  RenderSnapshot / host contracts       === PUBLIC-HOST BOUNDARY ===
            ->  RunLoop.presentCommittedFrame(artifacts, damage:)
-                 -> SemanticHostFrame  ───────────┬──> WebSurfaceTransport      (WASI: stdout FD)
-                                                  ├──> WebSocketSurfaceTransport (WebHost: WebSocket)
-                                                  ├──> HostedRasterSurface       (SwiftUI host: NSView/UIView)
-                                                  └──> HostedRasterSurface       (Android: Compose surface)
-                 -> RasterSurface (+ ANSI plan) ─────> TerminalHost              (terminal: cell/ANSI bytes)
+                 -> SemanticHostFrame  ───────────┬──> HostWireFrameModel ─┬──> WASI stdout
+                                                  │                        ├──> WebHost WebSocket
+                                                  │                        └──> Android ABI
+                                                  └──> HostedRasterSurface ────> SwiftUI host
+                 -> RasterSurface (+ ANSI plan) ─────> TerminalHost ────────────> terminal bytes
 ```
 
 **Code Map.** Per host, the entry file and how it consumes the committed frame.
 
 | Host | Entry file | How it consumes the frame |
 | --- | --- | --- |
-| Shared boundary | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift:15` | `presentCommittedFrame(_:damage:)` branches on `RuntimeConfiguration.output` and the roles the surface implements; builds the `SemanticHostFrame`. |
-| Terminal (CLI / Embedding) | `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift:27`, `Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift` | `TerminalHost` is a full `PresentationSurface` + `DamageAwarePresentationSurface`; `present(_:damage:)` plans incremental vs full repaint and writes ANSI/cell bytes + image protocols. |
-| WASI static bundle | `Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift:80`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift:147` | `WebSurfaceTransport.present(_:)` JSON-encodes the frame via `WebSurfaceFrameEncoder` and writes it to a stdout file descriptor. |
-| localhost WebHost | `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift:97`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift:142` | Same `WebSurfaceFrameEncoder` wire frame as WASI, but bytes go over a WebSocket pump instead of a file descriptor. |
-| Native SwiftUI host | `swift-tui-swiftui/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift:159`, `swift-tui-swiftui/Sources/SwiftUIHost/NativeRasterSurfaceRenderer.swift:30` | `HostedRasterSurface.onFrame` stores the frame on an `@Observable`; SwiftUI repaints by drawing the `RasterSurface` cell-by-cell into a `CGContext` (NSView/UIView). |
+| Shared boundary | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift` | `RunLoop.presentCommittedFrame(_:damage:)` branches on `RuntimeConfiguration.output` and the roles the surface implements; builds the `SemanticHostFrame`. |
+| Terminal (CLI / Embedding) | `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`, `Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift` | `TerminalHost.present(_:damage:)` plans incremental vs full repaint and writes ANSI/cell bytes + image protocols. |
+| WASI static bundle | `Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift` | `WebSurfaceTransport.present(_:)` JSON-encodes the frame via `WebSurfaceFrameEncoder` and writes it to a stdout file descriptor. |
+| localhost WebHost | `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift` | Same `WebSurfaceFrameEncoder` wire frame as WASI, but bytes go over a WebSocket pump instead of a file descriptor. |
+| Native SwiftUI host | `SwiftUIHostSceneHost`, `NativeRasterSurfaceRenderer` (in the sibling `swift-tui-swiftui` package) | `HostedRasterSurface.onFrame` stores the frame on an `@Observable`; SwiftUI repaints by drawing the `RasterSurface` cell-by-cell into a `CGContext` (NSView/UIView). |
 | Android Compose host | `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidHostSceneHost.swift`, `Platforms/Android/Sources/SwiftTUIAndroidHost/AndroidMainExecutorPump.swift` | `HostedRasterSurface.onFrame` stores the frame; the ABI copy path encodes it as a converged web-surface record (encode-at-copy); Kotlin pulls bytes across the ABI each tick and *drives the Swift main executor* manually. |
 
 **Step 0 — Everything above the boundary is shared.** Each host builds a
 `SceneSessionResources(presentationSurface:…)` and runs the **same** `SceneSession →
 RunLoop → DefaultRenderer`. The host injects only a *surface object* and an *input
 reader*; the run loop, invalidation coalescing, animation controller, `@State`
-ownership, layout, raster, and commit policy are identical across all five.
-`TerminalRunner`, `WebHostRunner.swift:103`, `WASIRunner.swift:175`, and
-`HostedSceneSession.start()` (`Scenes/HostedSceneSession.swift:160`) all construct
+ownership, layout, raster, and commit policy are identical **modulo the per-host
+engine profile**.
+`TerminalRunner`, `WebHostRunner`, `WASIRunner`, and
+`HostedSceneSession.start()` all construct
 `SceneSessionResources` the same way and differ only in the `presentationSurface`.
+WASI defaults to the stack-lean profile while the other hosts default to full
+reuse. See
+[docs/HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md), the owner of per-host
+engine-profile truth.
 
-**Step 1 — The committed-frame boundary.** `presentCommittedFrame(artifacts, damage:)`
-(`RunLoop+Presentation.swift:15`) derives host-facing damage against the surface *this*
-run loop last presented (`previousPresentedRasterSurface`, diffed in
-`RunLoop+PostCommitSupport.swift:9`), then dispatches by capability, in order:
+**Step 1 — The committed-frame boundary.**
+`RunLoop.presentCommittedFrame(artifacts:damage:)` derives host-facing damage against
+the surface *this* run loop last presented (`previousPresentedRasterSurface`, diffed
+by `presentationDamage(for:)`), then dispatches by capability, in order:
 
 1. `output == .json` → `presentJSONFrame`.
 2. `output == .accessible` → `presentLinearAccessibilityFrame`.
@@ -838,71 +858,82 @@ run loop last presented (`previousPresentedRasterSurface`, diffed in
    takes this path.**
 5. plain `RasterPresentationSurface` → full repaint fallback.
 
-Roles are defined in `PresentationSurface.swift:147-188`. A terminal conforms to the
-aggregate `PresentationSurface`; non-terminal hosts conform to the narrow
-`SemanticHostFramePresentationSurface` (`PresentationSurface.swift:260`) plus
-`PresentationSurfaceMetricsProvider`.
+Roles are defined in
+`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift`. A terminal conforms to
+the aggregate `PresentationSurface`; non-terminal hosts conform to the narrow
+`SemanticHostFramePresentationSurface` plus `PresentationSurfaceMetricsProvider`.
 
-**Step 2 — Terminal: ANSI/cell bytes + image protocols.** `TerminalHost`
-(`TerminalHost.swift:27`) is the only host that owns raw mode and writes terminal
-control bytes. Its `present(_:damage:)` (`:357`) plans a strategy
+**Step 2 — Terminal: ANSI/cell bytes + image protocols.** `TerminalHost` is the only
+host that owns raw mode and writes terminal control bytes. Its
+`TerminalHost.present(_:damage:)` plans a strategy
 (`TerminalPresentationPlanner` → full repaint vs incremental row batches) and lowers it
-via `TerminalHostPresentationEmissionBuilder` (`Terminal/TerminalHost+PresentationEmission.swift:4`):
+via `TerminalHostPresentationEmissionBuilder` in
+`Sources/SwiftTUIRuntime/Terminal/TerminalHost+PresentationEmission.swift`:
 cursor moves, `eraseToEndOfLine`, styled cell runs, and Kitty/Sixel/iTerm image
 write-steps. The CLI runner wires a real terminal device; the embedding products
 (`Platforms/Embedding/`) wire a PTY-backed emulator view. The whole emission builder is
 compiled out under `#if !canImport(WASILibc)` — terminal byte I/O is not WASI-safe.
 
-**Step 3 — WASI bundle and WebHost: one wire protocol, two transports.** Both web paths
-serialize the **exact same JSON wire frame** through
-`WebSurfaceFrameEncoder.encode(_:…)` (`Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceFrameEncoder.swift:126`). The
+**Step 3 — One wire, three consumers.** WASI, WebHost, and Android serialize the
+**same JSON wire frame** through `WebSurfaceFrameEncoder.encode(_:…)` in
+`Sources/SwiftTUIRuntime/Terminal/WebSurfaceFrameEncoder.swift`. The encoder lives
+in Runtime, not the WASI bridge, because the wire is host-neutral. The
 frame becomes a `\u{1E}surface:{…}` record carrying `width`/`height`, a deduplicated
 `styles` table, per-row cell runs, image attachments, raster `damage`, accessibility
 tree, announcements, and scroll regions (versioned, with optional delta encoding). The
-two transports differ **only in where the bytes go**:
+three consumers differ in where the bytes go:
 
-- **WASI** (`WebSurfaceTransport`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift:147`) writes to a
+- **WASI** (`WebSurfaceTransport` in
+  `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`) writes to a
   stdout file descriptor — the statically-linked `wasm32-wasi` bundle. `WASIRunner`
-  (`WASIRunner.swift:80`) also has a *manifest mode* (`SWIFTTUI_MODE=manifest`) that
+  also has a *manifest mode* (`SWIFTTUI_MODE=manifest`) that
   prints the `SceneManifest` JSON without running, so a static site can enumerate an
   app's scenes ahead of time.
-- **WebHost** (`WebSocketSurfaceTransport`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift:142`)
+- **WebHost** (`WebSocketSurfaceTransport` in
+  `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift`)
   hands the *same* encoder output to a `ByteSinkPump` draining over a WebSocket, the
   static browser bundle served from `WebHostBrowserBundle`.
+- **Android** encodes the same host-wire model when Kotlin calls
+  `AndroidHostSceneHost.copyLatestFrameBytes`, then copies the record across the
+  ABI to Compose.
 
-Both advertise an identical `TerminalCapabilityProfile` (unicode, true color,
+The two browser transports advertise an identical `TerminalCapabilityProfile`
+(unicode, true color,
 `emitsStyleEscapeSequences: false` — styles travel in JSON, not ANSI). The encoded
-frames are consumed by the **TypeScript runtime in the sibling `swift-tui-web` repo**,
-which owns DOM/canvas painting; the Swift side never paints pixels for the web.
+WASI/WebHost frames are consumed by the **TypeScript runtime in the sibling
+`swift-tui-web` repo**, while Android's copy is consumed by its Kotlin parser.
+Terminal and the external SwiftUI host consume the committed frame directly and do
+not use this wire.
 
 **Step 4 — Native SwiftUI host: `SemanticHostFrame` → `CGContext`.** The SwiftUI host
 lives in `swift-tui-swiftui` and uses no transport — it consumes the frame in-process.
-`SwiftUIHostSceneHost` (`swift-tui-swiftui/Sources/SwiftUIHost/SwiftUIHostSceneHost.swift:43`)
+`SwiftUIHostSceneHost` (in the sibling `swift-tui-swiftui` package)
 constructs a `HostedRasterSurface` (the shared runtime surface,
-`Sources/SwiftTUIRuntime/Scenes/HostedRasterSurface.swift:11`) whose `onFrame`
-(`:159`) stores `frame.raster`/`frame.semantics`/`frame.focusedIdentity`/`frame.rasterDamage`
+`Sources/SwiftTUIRuntime/Scenes/HostedRasterSurface.swift`) whose `onFrame` stores
+`frame.raster`/`frame.semantics`/`frame.focusedIdentity`/`frame.rasterDamage`
 on an `@Observable`, dropping any frame whose `sequence` is stale. SwiftUI observation
-triggers a repaint, and `NativeRasterSurfaceRenderer.draw(...)`
-(`swift-tui-swiftui/Sources/SwiftUIHost/NativeRasterSurfaceRenderer.swift:30`) walks the `RasterSurface` cell grid into a
+triggers a repaint, and `NativeRasterSurfaceRenderer.draw(...)` walks the
+`RasterSurface` cell grid into a
 `CGContext` inside an NSView/UIView: background fills, box-drawing glyphs (procedural
 via `BoxDrawingRenderer`, else font text), underline/strikethrough, image attachments.
-`frame.rasterDamage` becomes `CGRect` dirty rects (`dirtyRects(for:…)`, `:86`) so
+`frame.rasterDamage` becomes `CGRect` dirty rects via `dirtyRects(for:…)`, so
 SwiftUI repaints only changed rows. The accessibility tree and focused identity drive a
 native accessibility overlay.
 
-**Step 5 — Android Compose host: `Codable` snapshot, host-driven main executor.** The
+**Step 5 — Android Compose host: converged host wire, host-driven main executor.** The
 Android host (`Platforms/Android/`) also wraps a `HostedRasterSurface` via
-`AndroidHostSceneHost` (`AndroidHostSceneHost.swift:159`), with
+`AndroidHostSceneHost`, with
 `frameDelivery: .assumedMainActor`. Consumed frames are encoded at copy time as
 converged web-surface records (style-table cells, image attachments —
 precomposed PNG when blended — accessibility, scroll regions, damage,
-terminalStyle), which Kotlin pulls across the ABI (`copyLatestFrameBytes`, `AndroidHostSceneHost.swift:340`)
+terminalStyle), which Kotlin pulls across the ABI with
+`AndroidHostSceneHost.copyLatestFrameBytes`
 and renders into a Compose surface. The Android-only twist is *scheduling*, not
 rendering (cross-reference [3c](#3c-app-bootstrap--run-loop-lifecycle)'s WASI/Android
 gotcha): there is **no CFRunLoop on a bare JNI embedding**, so the Swift main-actor job
-queue would never drain. `AndroidMainExecutorPump` (`AndroidMainExecutorPump.swift:38`)
+queue would never drain. `AndroidMainExecutorPump`
 installs a custom `HostMainExecutor` via `_createExecutors(factory:)` at JNI bring-up,
-and the Kotlin render loop calls `AndroidHostSceneHost.tick()` (`:291`) ~30 Hz, which
+and the Kotlin render loop calls `AndroidHostSceneHost.tick()` ~30 Hz, which
 calls `drainReadyJobs()` and returns. The default off-main executor stays libdispatch's
 self-driving global pool, so `Task.sleep` timers still fire on worker threads; only the
 hop *back* to `@MainActor` is host-driven. This is the only host that drives the
@@ -915,18 +946,21 @@ engine.
   a host sees are `SemanticHostFrame` / `RasterSurface` / `SemanticSnapshot`. Renderer
   reuse hints must not leak past `commit` — the same invariant [3a](#3a-the-render-pipeline-condensed)
   states.
-- **Damage is per-host.** `presentationDamage(for:…)` (`RunLoop+PostCommitSupport.swift:9`)
+- **Damage is per-host.** `presentationDamage(for:…)`
   diffs against `previousPresentedRasterSurface` — the surface *this* run loop last
   presented to *this* host. Each host has its own run loop instance, so damage is never
   shared and async-dropped/elided frames never corrupt another host's baseline. `nil`
   damage = full repaint; non-`nil` empty = nothing visible changed.
-- **One frame, one boundary, two byte formats.** WASI and WebHost share
-  `WebSurfaceFrameEncoder` exactly; they differ only in transport. Change the web wire
-  frame and you change both at once. The Android snapshot is a *separate* `Codable`
-  shape — keep it in sync with the Kotlin parser, not the web encoder.
-- **Style transport differs by host, by design.** Terminal emits ANSI
-  (`emitsStyleEscapeSequences: true`); web/native hosts set it `false` and carry
-  `ResolvedTextStyle` structurally. Never assume a host paints ANSI.
+- **One frame, one boundary, one host wire.** `HostWireSchema` records the rule that
+  every serialized host speaks one wire. WASI, WebHost, and
+  `AndroidHostSceneHost` all consume the same encoder contract, so changing it changes
+  all three consumers at once. Android gates decoding with Kotlin's
+  `SUPPORTED_WEB_SURFACE_VERSION`; the Swift encoder and Kotlin parser must evolve
+  together.
+- **Style transport differs by host, by design.** Terminal may lower styles to
+  ANSI, the two browser transports disable style escape emission, and retained
+  native hosts consume `ResolvedTextStyle` structurally from the committed raster.
+  Never assume a non-terminal host paints ANSI.
 - **Only `TerminalHost` writes control bytes / owns raw mode.** Everything in
   `Terminal/*PresentationEmission*` is compiled out under `#if !canImport(WASILibc)`. A
   WASI-only break ships green on the Linux gate and only surfaces in the
@@ -949,28 +983,29 @@ engine.
 A suggested first-week reading order, each tied to a section above:
 
 1. **Read [the map's "Where does X live?" table](#where-does-x-live)** and skim the
-   three deep-dive subsystems. Then open `Sources/SwiftTUICore/Resolve/ViewGraph.swift`
+   three deep-dive subsystems. Then open `Sources/SwiftTUIGraph/Resolve/ViewGraph.swift`
    and `ViewNode.swift` and confirm for yourself that `ResolvedNode` carries no
    persistent state — this is the single most clarifying half-hour you can spend.
 2. **Read <doc:Runtime-Render-Pipeline> in full**, then re-read
    [§3a](#3a-the-render-pipeline-condensed). You now have the data model.
 3. **Trace one keypress** with [§3b](#3b-the-interaction--update-loop) open beside
    `RunLoop+EventDispatch.swift` and `RunLoop+Rendering.swift`. Set a breakpoint in
-   `ViewGraph.evaluateDirtyNodes` (`ViewGraph.swift:1048`) and watch the dirty frontier
+   `ViewGraph.evaluateDirtyNodes` and watch the dirty frontier
    shrink to one node on a `@State` toggle.
 4. **Launch an app** under the CLI host and follow [§3c](#3c-app-bootstrap--run-loop-lifecycle)
    from `SwiftTUI.App.main() async` through `RunLoop.run()`. Try a bare
    `MyApp.main()` once to see the `-> Never` trap fire.
 5. **Run the same app under `--web`** and read [§3d](#3d-one-app-five-hosts) — confirm
-   the wire frame is identical to the WASI bundle's. The build/test commands for all
-   hosts are in [docs/DEVELOPMENT.md](DEVELOPMENT.md).
+   WebHost, WASI, and Android share one encoder contract. The build/test commands for
+   all hosts are in [docs/DEVELOPMENT.md](DEVELOPMENT.md).
 
 Good first changes live at the edges where the contract is narrow: a new
-chart view in the external `swift-tui-charts` package (no engine risk), a new key binding in the
-`handleKeyPress` ladder, or a new field on the web wire frame (touches exactly
-`WebSurfaceFrameEncoder` and the `swift-tui-web` parser). Avoid the resolve planner,
-the actor split in the fused tail, and reuse suppression until you have traced a frame
-end to end — those are the areas where the map's invariants bite hardest.
+chart view in the external `swift-tui-charts` package (no engine risk), or a new key
+binding in the `handleKeyPress` ladder. A host-wire field is deliberately broader:
+it touches `HostWireFrameModel`/`HostWireSchema`, `WebSurfaceFrameEncoder`, and the
+TypeScript and Kotlin decoders. Avoid the resolve planner, the actor split in the
+fused tail, and reuse suppression until you have traced a frame end to end — those
+are the areas where the map's invariants bite hardest.
 
 Before any commit, remember the recurring trap from three of the flows: **the Linux
 Repo Gate does not compile `wasm32-wasi`.** Cross-build for the WASI SDK before tagging
