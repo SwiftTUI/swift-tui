@@ -40,6 +40,81 @@ private struct RuntimeRegistrationPublicationDiagnosticsStorage: Equatable, Send
   }
 }
 
+/// Identity of one concrete runtime-registration publication target.
+///
+/// A `RuntimeRegistrationSet` is a value aggregate over reference-typed member
+/// registries. Lifetime-safe member tokens, in the aggregate's canonical
+/// fan-out order, distinguish the persistent target a committed fingerprint
+/// describes from a fresh ResolveContext set that starts empty. Tokens remain
+/// unique after their weakly held registry referents are released.
+package struct RuntimeRegistrationTargetIdentity: Equatable, Sendable {
+  private let memberTokens: [RuntimeRegistryIdentityToken]
+
+  @MainActor
+  fileprivate init(registries: [any RuntimeRegistry]) {
+    memberTokens = RuntimeRegistryIdentityTokenTable.shared.tokens(for: registries)
+  }
+}
+
+struct RuntimeRegistryIdentityToken: Equatable, Sendable {
+  let rawValue: UInt64
+}
+
+@MainActor
+final class RuntimeRegistryIdentityTokenTable {
+  fileprivate static let shared = RuntimeRegistryIdentityTokenTable()
+
+  private final class WeakEntry {
+    weak var registry: (any RuntimeRegistry)?
+    let token: RuntimeRegistryIdentityToken
+
+    init(
+      registry: any RuntimeRegistry,
+      token: RuntimeRegistryIdentityToken
+    ) {
+      self.registry = registry
+      self.token = token
+    }
+  }
+
+  private var entriesByLookupKey: [ObjectIdentifier: WeakEntry] = [:]
+  private var nextTokenRawValue: UInt64 = 0
+
+  init() {}
+
+  fileprivate func tokens(
+    for registries: [any RuntimeRegistry]
+  ) -> [RuntimeRegistryIdentityToken] {
+    entriesByLookupKey = entriesByLookupKey.filter { $0.value.registry != nil }
+    return registries.map { token(for: $0) }
+  }
+
+  private func token(for registry: any RuntimeRegistry) -> RuntimeRegistryIdentityToken {
+    token(for: registry, lookupKey: ObjectIdentifier(registry))
+  }
+
+  func token(
+    for registry: any RuntimeRegistry,
+    lookupKey: ObjectIdentifier
+  ) -> RuntimeRegistryIdentityToken {
+    if let entry = entriesByLookupKey[lookupKey],
+      let priorRegistry = entry.registry,
+      priorRegistry === registry
+    {
+      return entry.token
+    }
+
+    precondition(
+      nextTokenRawValue != UInt64.max,
+      "runtime registry identity token space exhausted"
+    )
+    nextTokenRawValue += 1
+    let token = RuntimeRegistryIdentityToken(rawValue: nextTokenRawValue)
+    entriesByLookupKey[lookupKey] = WeakEntry(registry: registry, token: token)
+    return token
+  }
+}
+
 @MainActor
 package struct RuntimeRegistrationSet {
   package let actionRegistry: LocalActionRegistry?
@@ -143,5 +218,9 @@ package struct RuntimeRegistrationSet {
       commandRegistry: CommandRegistry(),
       dropDestinationRegistry: DropDestinationRegistry()
     )
+  }
+
+  package var targetIdentity: RuntimeRegistrationTargetIdentity {
+    RuntimeRegistrationTargetIdentity(registries: allRegistries)
   }
 }

@@ -141,6 +141,15 @@ package final class ViewGraphFrameDraft {
     var committedFingerprint: RuntimeRegistrationGraphFingerprint?
     var usedScopedRestore = false
     var publicationIsUnchanged = false
+    let targetIdentity = liveRegistrations.targetIdentity
+    let registrationTargetChanged =
+      !viewGraph.runtimeRegistrationTargetMatches(targetIdentity)
+    if registrationTargetChanged {
+      // A committed graph fingerprint only describes the registry instances
+      // it was published into. A fresh ResolveContext target starts empty even
+      // when the graph is byte-unchanged, so no delta can populate it.
+      runtimeRegistrationPublication = .all
+    }
     // In-place registration refreshes (a reused toolbar strip re-capturing its
     // item actions in the late-preference stage) mutate node records outside
     // any dirty plan; their refreshed records reach the live registry only
@@ -155,12 +164,12 @@ package final class ViewGraphFrameDraft {
     switch runtimeRegistrationPublication {
     case .unchanged:
       // Nothing was re-evaluated, so no node's registrations changed. The live
-      // registry usually already holds the last committed (canonical) state.
-      // Still refresh the low-volume effect registries from all live nodes:
-      // one-shot/fresh caller registries may be empty even when the graph is
-      // unchanged, and preference/lifecycle/task effects need matching live
-      // handlers. Keep high-volume and order-sensitive registries untouched so
-      // unchanged commits do not duplicate focus candidates or handlers.
+      // registry is the recorded publication target and already holds the last
+      // committed (canonical) state. Still refresh the low-volume effect
+      // registries from all live nodes because their captures can be replaced
+      // in place without dirty graph work. Keep high-volume and order-sensitive
+      // registries untouched so unchanged commits do not duplicate focus
+      // candidates or handlers.
       restoredNodeCount = 0
       publicationIsUnchanged = true
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
@@ -169,7 +178,8 @@ package final class ViewGraphFrameDraft {
         from: viewGraph,
         restoredNodeCount: &restoredNodeCount,
         committedFingerprint: &committedFingerprint,
-        usedScopedRestore: &usedScopedRestore
+        usedScopedRestore: &usedScopedRestore,
+        forceFullPublication: registrationTargetChanged
       )
     case .subtrees(let roots):
       // Two escalations route onto the fingerprint-delta body (the `.all`-frame
@@ -206,7 +216,8 @@ package final class ViewGraphFrameDraft {
           from: viewGraph,
           restoredNodeCount: &restoredNodeCount,
           committedFingerprint: &committedFingerprint,
-          usedScopedRestore: &usedScopedRestore
+          usedScopedRestore: &usedScopedRestore,
+          forceFullPublication: registrationTargetChanged
         )
         break
       }
@@ -319,6 +330,7 @@ package final class ViewGraphFrameDraft {
     } else {
       viewGraph.recordCommittedRuntimeRegistrationFingerprint(committedFingerprint)
     }
+    viewGraph.recordCommittedRuntimeRegistrationTarget(targetIdentity)
     didCommit = true
     var diagnostics = liveRegistrations.diagnostics()
     publicationDiagnostics.publicationMode = publicationModeName
@@ -373,11 +385,13 @@ package final class ViewGraphFrameDraft {
     from viewGraph: ViewGraph,
     restoredNodeCount: inout Int?,
     committedFingerprint: inout RuntimeRegistrationGraphFingerprint?,
-    usedScopedRestore: inout Bool
+    usedScopedRestore: inout Bool,
+    forceFullPublication: Bool
   ) {
     let publication = viewGraph.runtimeRegistrationPublicationDeltaForCurrentFrame()
     committedFingerprint = publication?.current
-    if let delta = publication?.delta,
+    if !forceFullPublication,
+      let delta = publication?.delta,
       !viewGraph.runtimeRegistrationDeltaRequiresFullPublication(delta)
     {
       if publicationDiagnosticsEnabled {

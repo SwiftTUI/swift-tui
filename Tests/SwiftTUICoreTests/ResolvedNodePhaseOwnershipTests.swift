@@ -18,6 +18,7 @@ struct ResolvedNodePhaseOwnershipTests {
 
 private enum ResolvedNodePhaseOwnership: String {
   case runtime
+  case resolve
   case identity
   case structure
   case measurement
@@ -54,6 +55,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("surfaceComposition", .damage),
     ("semanticMetadata", .semantics),
     ("lifecycleMetadata", .lifecycle),
+    ("handlerInventory", .resolve),
     ("drawPayload", .draw),
     ("intrinsicSize", .measurement),
     ("indexedChildSource", .measurement),

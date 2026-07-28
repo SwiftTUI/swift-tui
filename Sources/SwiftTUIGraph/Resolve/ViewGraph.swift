@@ -372,6 +372,10 @@ package final class ViewGraph {
     get { frameCommit.committedRuntimeRegistrationFingerprint }
     set { frameCommit.committedRuntimeRegistrationFingerprint = newValue }
   }
+  private var committedRuntimeRegistrationTargetIdentity: RuntimeRegistrationTargetIdentity? {
+    get { frameCommit.committedRuntimeRegistrationTargetIdentity }
+    set { frameCommit.committedRuntimeRegistrationTargetIdentity = newValue }
+  }
   private var pendingRuntimeRegistrationRefreshRoots: Set<Identity> {
     get { frameCommit.pendingRuntimeRegistrationRefreshRoots }
     set { frameCommit.pendingRuntimeRegistrationRefreshRoots = newValue }
@@ -712,6 +716,8 @@ package final class ViewGraph {
         $0.current.storedTypeDescription
       },
       committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
+      committedRuntimeRegistrationTargetIdentity:
+        committedRuntimeRegistrationTargetIdentity,
       pendingRuntimeRegistrationRefreshRoots: pendingRuntimeRegistrationRefreshRoots
     )
   }
@@ -3366,6 +3372,18 @@ package final class ViewGraph {
       return nil
     }
     return (committedRuntimeRegistrationFingerprint.publicationDelta(to: current), current)
+  }
+
+  package func runtimeRegistrationTargetMatches(
+    _ targetIdentity: RuntimeRegistrationTargetIdentity
+  ) -> Bool {
+    committedRuntimeRegistrationTargetIdentity == targetIdentity
+  }
+
+  package func recordCommittedRuntimeRegistrationTarget(
+    _ targetIdentity: RuntimeRegistrationTargetIdentity
+  ) {
+    committedRuntimeRegistrationTargetIdentity = targetIdentity
   }
 
   /// Records the committed fingerprint. The `.all` commit branch already builds

@@ -18,8 +18,9 @@ package enum InteractiveHandlerResolutionFamily: String, CaseIterable, Sendable 
 /// The walk is deliberately iterative and shared by lifecycle plus all five
 /// interactive families. Each family retains an independent four-finding
 /// budget, so a noisy missing registry cannot hide another family's first
-/// evidence. Registry absence is equivalent to every referenced entry being
-/// absent.
+/// evidence. An absent optional registry means that family is outside the
+/// caller's publication target; present registries are checked without any
+/// liveness or activity excuse.
 @MainActor
 package enum CommittedHandlerResolutionOracle {
   private static let maximumFindingsPerFamily = 4
@@ -81,11 +82,14 @@ package enum CommittedHandlerResolutionOracle {
     registry: LocalLifecycleRegistry?,
     into findings: inout [String]
   ) {
+    guard let registry else {
+      return
+    }
     for handlerID in node.lifecycleMetadata.appearHandlerIDs {
       guard findings.count < maximumFindingsPerFamily else {
         return
       }
-      if registry?.appearHandler(for: handlerID) == nil {
+      if registry.appearHandler(for: handlerID) == nil {
         findings.append("appear:\(handlerID)")
       }
     }
@@ -93,7 +97,7 @@ package enum CommittedHandlerResolutionOracle {
       guard findings.count < maximumFindingsPerFamily else {
         return
       }
-      if registry?.disappearHandler(for: handlerID) == nil {
+      if registry.disappearHandler(for: handlerID) == nil {
         findings.append("disappear:\(handlerID)")
       }
     }
@@ -104,30 +108,38 @@ package enum CommittedHandlerResolutionOracle {
     registrations: RuntimeRegistrationSet,
     into findings: inout Findings
   ) {
-    collectMissingIdentities(
-      inventory.actionIdentities,
-      into: &findings.action
-    ) { identity in
-      registrations.actionRegistry?.hasHandler(identity: identity) == true
+    if let actionRegistry = registrations.actionRegistry {
+      collectMissingIdentities(
+        inventory.actionIdentities,
+        into: &findings.action
+      ) { identity in
+        actionRegistry.hasHandler(identity: identity)
+      }
     }
-    collectMissingIdentities(
-      inventory.keyHandlerIdentities,
-      into: &findings.key
-    ) { identity in
-      registrations.keyHandlerRegistry?.hasHandler(identity: identity) == true
-        || registrations.keyHandlerRegistry?.hasPasteHandler(identity: identity) == true
+    if let keyHandlerRegistry = registrations.keyHandlerRegistry {
+      collectMissingIdentities(
+        inventory.keyHandlerIdentities,
+        into: &findings.key
+      ) { identity in
+        keyHandlerRegistry.hasHandler(identity: identity)
+          || keyHandlerRegistry.hasPasteHandler(identity: identity)
+      }
     }
-    collectMissingIdentities(
-      inventory.commandScopes,
-      into: &findings.command
-    ) { identity in
-      registrations.commandRegistry?.hasCommands(at: identity) == true
+    if let commandRegistry = registrations.commandRegistry {
+      collectMissingIdentities(
+        inventory.commandScopes,
+        into: &findings.command
+      ) { identity in
+        commandRegistry.hasCommands(at: identity)
+      }
     }
-    collectMissingIdentities(
-      inventory.dropScopes,
-      into: &findings.drop
-    ) { identity in
-      registrations.dropDestinationRegistry?.hasHandler(at: identity) == true
+    if let dropDestinationRegistry = registrations.dropDestinationRegistry {
+      collectMissingIdentities(
+        inventory.dropScopes,
+        into: &findings.drop
+      ) { identity in
+        dropDestinationRegistry.hasHandler(at: identity)
+      }
     }
 
     for identity in inventory.gestureRouteIdentities {
@@ -135,12 +147,14 @@ package enum CommittedHandlerResolutionOracle {
         break
       }
       var missingParts: [String] = []
-      if registrations.gestureRegistry?.hasRecognizer(for: identity) != true {
+      if let gestureRegistry = registrations.gestureRegistry,
+        !gestureRegistry.hasRecognizer(for: identity)
+      {
         missingParts.append("recognizer")
       }
-      if registrations.pointerHandlerRegistry?.hasHandler(
-        pairingWith: RouteID(identity: identity)
-      ) != true {
+      if let pointerHandlerRegistry = registrations.pointerHandlerRegistry,
+        !pointerHandlerRegistry.hasHandler(pairingWith: RouteID(identity: identity))
+      {
         missingParts.append("pointer")
       }
       if !missingParts.isEmpty {

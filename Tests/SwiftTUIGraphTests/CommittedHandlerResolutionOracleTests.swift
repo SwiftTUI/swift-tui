@@ -299,8 +299,8 @@ struct CommittedHandlerResolutionOracleTests {
     }
   }
 
-  @Test("missing optional registries report each family once and cap detail at four identities")
-  func missingOptionalRegistriesAreMissingEntries() {
+  @Test("absent optional registries leave their families outside oracle scope")
+  func absentOptionalRegistriesAreSkipped() {
     withRestoredProbeState {
       let actions = (0..<6).map { testIdentity("Root", "Branch", "Action\($0)") }
       let keys = (0..<2).map { testIdentity("Root", "Branch", "Key\($0)") }
@@ -321,23 +321,42 @@ struct CommittedHandlerResolutionOracleTests {
       inspectSampled(root, registrations: RuntimeRegistrationSet())
 
       let after = SoundnessCounterSnapshot.current()
-      #expect(after.actionResolutionViolationCount == before.actionResolutionViolationCount + 1)
+      #expect(after.actionResolutionViolationCount == before.actionResolutionViolationCount)
       #expect(
         after.keyHandlerResolutionViolationCount
-          == before.keyHandlerResolutionViolationCount + 1
+          == before.keyHandlerResolutionViolationCount
       )
       #expect(
         after.commandScopeResolutionViolationCount
-          == before.commandScopeResolutionViolationCount + 1
+          == before.commandScopeResolutionViolationCount
       )
       #expect(
         after.dropScopeResolutionViolationCount
-          == before.dropScopeResolutionViolationCount + 1
+          == before.dropScopeResolutionViolationCount
       )
       #expect(
         after.gestureRouteResolutionViolationCount
-          == before.gestureRouteResolutionViolationCount + 1
+          == before.gestureRouteResolutionViolationCount
       )
+    }
+  }
+
+  @Test("a present empty family registry reports once and caps detail at four identities")
+  func presentEmptyRegistryCapsFindings() {
+    withRestoredProbeState {
+      let actions = (0..<6).map { testIdentity("Root", "Branch", "Action\($0)") }
+      let root = nestedRoot(
+        inventory: CommittedHandlerInventory(actionIdentities: actions)
+      )
+      let before = SoundnessCounterSnapshot.current()
+
+      inspectSampled(
+        root,
+        registrations: RuntimeRegistrationSet(actionRegistry: LocalActionRegistry())
+      )
+
+      let after = SoundnessCounterSnapshot.current()
+      #expect(after.actionResolutionViolationCount == before.actionResolutionViolationCount + 1)
       #expect(
         after.lastViolationDetailByKind["handler-resolution-action"]
           == resolutionDetail(family: .action, findings: actions.prefix(4).map(\.path))
@@ -357,7 +376,10 @@ struct CommittedHandlerResolutionOracleTests {
       )
       let before = SoundnessCounterSnapshot.current()
 
-      inspectSampled(root, registrations: RuntimeRegistrationSet())
+      inspectSampled(
+        root,
+        registrations: RuntimeRegistrationSet(lifecycleRegistry: LocalLifecycleRegistry())
+      )
 
       let after = SoundnessCounterSnapshot.current()
       #expect(

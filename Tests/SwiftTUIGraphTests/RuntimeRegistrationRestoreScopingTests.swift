@@ -436,6 +436,82 @@ struct RuntimeRegistrationRestoreScopingTests {
     )
   }
 
+  @Test("a fresh registration target forces full publication before same-target unchanged reuse")
+  func freshRegistrationTargetForcesFullPublication() {
+    let rootIdentity = testIdentity("Root")
+    let controlIdentity = testIdentity("Root", "Control")
+    let graph = ViewGraph()
+
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let controlNode = graph.beginEvaluation(identity: controlIdentity, invalidator: nil)
+    ViewNodeContext.withValue(controlNode) {
+      for kind in [
+        RuntimeRegistrationKind.action,
+        .keyHandler,
+        .pointerHandler,
+        .gesture,
+        .command,
+        .dropDestination,
+      ] {
+        RegistrationKindDriver.record(kind, on: controlNode, identity: controlIdentity)
+      }
+    }
+    let control = ResolvedNode(identity: controlIdentity, kind: .view("Control"))
+    graph.finishEvaluation(controlNode, resolved: control, accessedStateSlots: 0)
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: [control]),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let firstTarget = RuntimeRegistrationSet.scratch()
+    let firstDraft = ViewGraphFrameDraft(
+      liveRegistrations: firstTarget,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    firstDraft.recordDirtyEvaluationPlan(nil)
+    let firstDiagnostics = firstDraft.commitRuntimeRegistrations(from: graph)
+    #expect(firstDiagnostics.publication.publicationMode == "all")
+    expectInteractiveRegistrations(in: firstTarget, at: controlIdentity)
+
+    // The graph and its registration fingerprint are unchanged, but the
+    // publication target is a newly-created ResolveContext registry set. It
+    // starts empty and therefore needs a full publication rather than the
+    // same-target fingerprint-delta fast path.
+    let freshTarget = RuntimeRegistrationSet.scratch()
+    let freshDraft = ViewGraphFrameDraft(
+      liveRegistrations: freshTarget,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let freshDiagnostics = freshDraft.commitRuntimeRegistrations(from: graph)
+    #expect(freshDiagnostics.publication.publicationMode == "all")
+    expectInteractiveRegistrations(in: freshTarget, at: controlIdentity)
+    #expect(
+      graph.debugTotalStateSnapshot().committedRuntimeRegistrationTargetIdentity
+        == freshTarget.targetIdentity
+    )
+    #expect(
+      graph.makeCheckpoint().frameCommit.committedRuntimeRegistrationTargetIdentity
+        == freshTarget.targetIdentity
+    )
+
+    // Once that target has been recorded, the ordinary no-dirty-work path
+    // remains unchanged and leaves its already-published registries intact.
+    let sameTargetDraft = ViewGraphFrameDraft(
+      liveRegistrations: freshTarget,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let sameTargetDiagnostics = sameTargetDraft.commitRuntimeRegistrations(from: graph)
+    #expect(sameTargetDiagnostics.publication.publicationMode == "unchanged")
+    expectInteractiveRegistrations(in: freshTarget, at: controlIdentity)
+  }
+
   @Test("a publication violation carries plan and checkpoint context without the diagnostics flag")
   func publicationViolationCarriesContextWithoutDiagnosticsFlag() {
     // F92: the F04 scoped-restore oracle used to emit a context-free detail
@@ -2107,6 +2183,23 @@ struct RuntimeRegistrationRestoreScopingTests {
           paths: droppedPaths,
           along: [changedIdentity]
         )
+    )
+  }
+
+  private func expectInteractiveRegistrations(
+    in registrations: RuntimeRegistrationSet,
+    at identity: Identity
+  ) {
+    #expect(registrations.actionRegistry?.hasHandler(identity: identity) == true)
+    #expect(registrations.keyHandlerRegistry?.hasHandler(identity: identity) == true)
+    #expect(registrations.keyHandlerRegistry?.hasPasteHandler(identity: identity) == true)
+    #expect(registrations.commandRegistry?.hasCommands(at: identity) == true)
+    #expect(registrations.dropDestinationRegistry?.hasHandler(at: identity) == true)
+    #expect(registrations.gestureRegistry?.hasRecognizer(for: identity) == true)
+    #expect(
+      registrations.pointerHandlerRegistry?.hasHandler(
+        pairingWith: RouteID(identity: identity)
+      ) == true
     )
   }
 

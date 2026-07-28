@@ -152,6 +152,10 @@ extension ViewGraph {
     // (gallery fuzzer, 2026-07-17 §9.5: palette-sheet `onChange` skip).
     package var changeObservationValues: [ChangeObservationValueKey: ChangeObservationSlot] = [:]
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
+    // The concrete member-registry instances the committed fingerprint was
+    // published into. A fresh ResolveContext can carry an empty set with the
+    // same graph fingerprint; target mismatch forces a full publication.
+    package var committedRuntimeRegistrationTargetIdentity: RuntimeRegistrationTargetIdentity?
     // Identities whose registrations were refreshed in place since the last
     // commit (`ViewGraph.refreshActionRegistration`), owed to the next
     // commit's publication. Checkpointed with the group: a discarded frame's
