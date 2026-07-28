@@ -25,12 +25,23 @@ struct BareProbeCommand: ParsableCommand {
   }
 }
 
+struct BareAsyncProbeCommand: AsyncParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "probe-async",
+    abstract: "Prove the no-options dispatch path ran the async witness."
+  )
+
+  mutating func run() async throws {
+    print("BAREASYNCPROBEOK")
+  }
+}
+
 @main
 struct EntryPointFixtureVerbDispatchNoOptions: App {
   nonisolated static let configuration = CommandConfiguration(
     commandName: "bareverbdispatch",
     abstract: "Verb-dispatch launch fixture with no stored SwiftTUI options.",
-    subcommands: [CompletionsCommand.self, BareProbeCommand.self]
+    subcommands: [CompletionsCommand.self, BareProbeCommand.self, BareAsyncProbeCommand.self]
   )
 
   var body: some Scene {

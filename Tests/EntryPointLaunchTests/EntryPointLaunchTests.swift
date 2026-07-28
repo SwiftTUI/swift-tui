@@ -286,6 +286,48 @@ struct EntryPointLaunchTests {
     #expect(code == 0)
   }
 
+  @Test("T-29 an async claimed verb runs through the parsed-command path")
+  func asyncClaimedVerbRunsThroughParsedCommandPath() async throws {
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatch",
+      arguments: ["probe-async"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("ASYNCPROBEOK"),
+      "expected the async verb's output; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("USAGE:"))
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
+  @Test("T-30 an async claimed verb runs through the no-options path")
+  func asyncClaimedVerbRunsThroughNoOptionsPath() async throws {
+    let result = try await runFixture(
+      "EntryPointFixtureVerbDispatchNoOptions",
+      arguments: ["probe-async"],
+      stoppingAt: nil,
+      watchdog: .seconds(20)
+    )
+    #expect(
+      result.output.contains("BAREASYNCPROBEOK"),
+      "expected the async verb's output; got:\n\(result.output)"
+    )
+    #expect(!result.output.contains("USAGE:"))
+    #expect(!result.output.contains(Self.frameMarker))
+    guard case .exited(let code) = result.exit else {
+      Issue.record("expected a normal exit, got \(result.exit)")
+      return
+    }
+    #expect(code == 0)
+  }
+
   @Test("the diagnostic message is accurate and framework-specific")
   func diagnosticMessageIsAccurate() {
     let message = synchronousLaunchDiagnosticMessage(commandTypeName: "MyApp")

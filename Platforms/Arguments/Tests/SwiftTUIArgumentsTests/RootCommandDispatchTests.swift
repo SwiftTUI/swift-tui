@@ -1,5 +1,6 @@
 import ArgumentParser
 import SwiftTUIRuntime
+import Synchronization
 import Testing
 
 @testable import SwiftTUIArguments
@@ -147,6 +148,28 @@ struct RootCommandDispatchTests {
     ])
     #expect(claimed is AsyncFixtureCommand)
     #expect(claimed is any AsyncParsableCommand)
+  }
+
+  @Test("a dispatched async command runs its async witness")
+  nonisolated func dispatchedAsyncCommandRunsAsyncWitness() async throws {
+    AsyncFixtureCommand.runCount.withLock { $0 = 0 }
+    let command = try #require(
+      try DispatchingRootFixture.registeredSubcommand(forRawArguments: ["probe-async"])
+    )
+
+    try await runDispatchedRootSubcommand(command)
+
+    #expect(AsyncFixtureCommand.runCount.withLock { $0 } == 1)
+  }
+
+  @Test("a dispatched sync command keeps running its sync witness")
+  nonisolated func dispatchedSyncCommandRunsSyncWitness() async throws {
+    SyncFixtureCommand.runCount.withLock { $0 = 0 }
+    let command = try SyncFixtureCommand.parseAsRoot([])
+
+    try await runDispatchedRootSubcommand(command)
+
+    #expect(SyncFixtureCommand.runCount.withLock { $0 } == 1)
   }
 
   @Test("T-10 --help with a hook installed still resolves the root's help")
@@ -415,8 +438,19 @@ struct DispatchingRootFixture: App, SwiftTUICommand {
 /// An async-only verb used to prove dispatch preserves its concrete conformance.
 struct AsyncFixtureCommand: AsyncParsableCommand {
   static let configuration = CommandConfiguration(commandName: "probe-async")
+  static let runCount = Mutex(0)
 
-  mutating func run() async throws {}
+  mutating func run() async throws {
+    Self.runCount.withLock { $0 += 1 }
+  }
+}
+
+struct SyncFixtureCommand: ParsableCommand {
+  static let runCount = Mutex(0)
+
+  mutating func run() throws {
+    Self.runCount.withLock { $0 += 1 }
+  }
 }
 
 /// A conformer whose hook claims every verb it is asked about, `completions`

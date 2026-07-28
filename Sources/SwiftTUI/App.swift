@@ -27,27 +27,31 @@ extension App {
 
   /// Default entry point for batteries-included apps.
   public static func main() async {
-    var dispatched: (any ParsableCommand)?
+    var dispatchedCommandType: (any ParsableCommand.Type)?
     do {
       if usesStoredSwiftTUIOptions {
-        try await runParsedCommand(dispatched: &dispatched)
+        try await runParsedCommand(dispatchedCommandType: &dispatchedCommandType)
       } else {
         // An app with no stored `swiftTUIOptions` skips
         // `parseSwiftTUIRootCommand` entirely, so its verb-dispatch hook would
         // otherwise be silently ignored on this path. Consult it here too. The
         // default hook returns nil, so this is a no-op for every app that
         // declares none.
-        if var subcommand = try swiftTUIRootSubcommand(
+        if let subcommand = try swiftTUIRootSubcommand(
           forRawArguments: Array(CommandLine.arguments.dropFirst())
         ) {
-          dispatched = subcommand
-          try subcommand.run()
+          dispatchedCommandType = type(of: subcommand)
+          try await runDispatchedRootSubcommand(subcommand)
           return
         }
         try await WebHostCLIRunner.run(Self.self)
       }
     } catch {
-      exitAttributingDispatchedSubcommand(error, dispatchedCommand: dispatched, root: Self.self)
+      exitAttributingDispatchedSubcommand(
+        error,
+        dispatchedCommandType: dispatchedCommandType,
+        root: Self.self
+      )
     }
   }
 
@@ -86,9 +90,9 @@ extension App {
   /// thrown by `run()` to the command that threw it.
   @MainActor
   private static func runParsedCommand(
-    dispatched: inout (any ParsableCommand)?
+    dispatchedCommandType: inout (any ParsableCommand.Type)?
   ) async throws {
-    var command = try parseSwiftTUIRootCommand()
+    let command = try parseSwiftTUIRootCommand()
     if let script = completionScript(forParsedCommand: command) {
       writeToStandardOutput(script)
       return
@@ -107,8 +111,8 @@ extension App {
     // Anything reaching here is not the root app: a verb the hook claimed, or
     // swift-argument-parser's own help command. Record it so a failure from
     // `run()` is rendered with that command's usage rather than the app's.
-    dispatched = command
-    try command.run()
+    dispatchedCommandType = type(of: command)
+    try await runDispatchedRootSubcommand(command)
   }
 }
 

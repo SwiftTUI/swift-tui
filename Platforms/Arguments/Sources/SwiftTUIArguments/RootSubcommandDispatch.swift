@@ -92,6 +92,21 @@ extension SwiftTUICommand {
   }
 }
 
+/// Runs a dispatched (non-root) command, honoring an async conformance the
+/// same way swift-argument-parser's `AsyncParsableCommand.main()` does.
+///
+/// Shared by every launch layer so the execution tail cannot drift apart.
+package func runDispatchedRootSubcommand(
+  _ command: sending any ParsableCommand
+) async throws {
+  if var asyncCommand = command as? any AsyncParsableCommand {
+    try await asyncCommand.run()
+  } else {
+    var command = command
+    try command.run()
+  }
+}
+
 /// A failure while parsing a verb claimed by
 /// ``SwiftTUICommand/swiftTUIRootSubcommand(forRawArguments:)``, carrying the
 /// verb's type so a launch site can render usage for the verb rather than for
@@ -112,7 +127,7 @@ extension SwiftTUICommand {
 /// one — the claim carries its own attribution back out.
 ///
 /// Deliberately not public: launch sites resolve it through
-/// ``exitAttributingDispatchedSubcommand(_:dispatchedCommand:root:)``, and
+/// ``exitAttributingDispatchedSubcommand(_:dispatchedCommandType:root:)``, and
 /// consumers neither construct nor catch it. `description` renders the fully
 /// attributed message so that a consumer who hand-rolls a launch sequence and
 /// passes this straight to `exit(withError:)` still gets readable, correctly
@@ -147,14 +162,14 @@ package struct DispatchedSubcommandError: Error, CustomStringConvertible {
 /// untouched: it maps to an exact status with no usage text at all.
 package func exitAttributingDispatchedSubcommand(
   _ error: any Error,
-  dispatchedCommand: (any ParsableCommand)?,
+  dispatchedCommandType: (any ParsableCommand.Type)?,
   root rootType: any ParsableArguments.Type
 ) -> Never {
   if let dispatchError = error as? DispatchedSubcommandError {
     dispatchError.subcommandType.exit(withError: dispatchError.underlying)
   }
-  if let dispatchedCommand {
-    type(of: dispatchedCommand).exit(withError: error)
+  if let dispatchedCommandType {
+    dispatchedCommandType.exit(withError: error)
   }
   rootType.exit(withError: error)
 }

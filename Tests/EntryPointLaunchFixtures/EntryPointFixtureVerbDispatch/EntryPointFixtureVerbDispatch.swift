@@ -29,12 +29,23 @@ struct ProbeCommand: ParsableCommand {
   }
 }
 
+struct AsyncProbeCommand: AsyncParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "probe-async",
+    abstract: "Prove the dispatched async witness ran."
+  )
+
+  mutating func run() async throws {
+    print("ASYNCPROBEOK")
+  }
+}
+
 @main
 struct EntryPointFixtureVerbDispatch: App {
   nonisolated static let configuration = CommandConfiguration(
     commandName: "verbdispatch",
     abstract: "Verb-dispatch launch fixture.",
-    subcommands: [CompletionsCommand.self, ProbeCommand.self]
+    subcommands: [CompletionsCommand.self, ProbeCommand.self, AsyncProbeCommand.self]
   )
 
   @OptionGroup(title: "SwiftTUI Options") var swiftTUIOptions: SwiftTUIOptions
