@@ -110,12 +110,8 @@ private struct PerfMeshTextProbeView: View {
       }
       Text("retained text pass \(retainedPass)")
       Text("mesh text phase \(phaseLabel)")
-      VStack(alignment: .leading, spacing: 0) {
-        ForEach(0..<20, id: \.self) { _ in
-          Text(Self.textLine)
-        }
-      }
-      .foregroundStyle(fillStyle)
+      Text(Self.textBlock)
+        .foregroundStyle(fillStyle)
     }
   }
 
@@ -150,6 +146,8 @@ private struct PerfMeshTextProbeView: View {
   }
 
   private static let textLine = String(repeating: "mesh-text ", count: 7)
+  private static let textBlock = Array(repeating: textLine, count: 20)
+    .joined(separator: "\n")
 
   private static let sourcePoints: [SIMD2<Float>] = [
     .init(0, 0), .init(0.5, 0), .init(1, 0),
