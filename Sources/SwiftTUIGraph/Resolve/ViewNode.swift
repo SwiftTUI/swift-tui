@@ -1272,7 +1272,18 @@ package final class ViewNode {
   }
 
   package func endRegistrationCapture() {
-    registrationCaptureDepth = max(0, registrationCaptureDepth - 1)
+    guard registrationCaptureDepth > 0 else {
+      return
+    }
+    registrationCaptureDepth -= 1
+    if registrationCaptureDepth == 0 {
+      // A capture that records no replacement handlers still changed the
+      // closure-bearing source of truth when `beginRegistrationCapture`
+      // reset it. Some transparent/group/capture-host evaluations splice
+      // their resolved value into another node and never call `apply` on this
+      // recording node, so close the zero-registration path here as well.
+      refreshCommittedHandlerInventory()
+    }
   }
 
   /// Raises the duplicate-registration soundness alarm (F104) when a
@@ -1581,10 +1592,10 @@ package final class ViewNode {
     runtimeRegistrationMutationGeneration &+= 1
   }
 
-  /// Resolve capture finalizes the inventory in `apply`. The toolbar action
-  /// refresh and cross-node gesture aggregation can write records outside that
-  /// capture window, so keep an already-committed artifact exact at those
-  /// unconditional registration seams too.
+  /// Resolve capture finalizes the inventory in `apply`/`endRegistrationCapture`.
+  /// Toolbar action refresh and cross-node gesture aggregation can also write
+  /// records outside that capture window, so keep an already-committed artifact
+  /// exact at those unconditional registration seams.
   private func refreshCommittedHandlerInventoryOutsideCapture() {
     guard registrationCaptureDepth == 0 else {
       return
@@ -1599,6 +1610,17 @@ package final class ViewNode {
     }
     committed.handlerInventory = inventory
     invalidateAncestorCachedSnapshots()
+  }
+
+  /// Repairs only the derived handler-bookkeeping projection in this node's
+  /// committed value tree. Structural child values deliberately remain lazily
+  /// rewired after teardown.
+  package func reconcileCommittedHandlerInventory(
+    inventoryForRuntimeNodeID: (ViewNodeID) -> CommittedHandlerInventory?
+  ) {
+    committed.reconcileCommittedHandlerInventory(
+      inventoryForRuntimeNodeID: inventoryForRuntimeNodeID
+    )
   }
 
   /// Enrolls this node in the graph's effect-owner index (F148) so the

@@ -607,6 +607,7 @@ struct ViewGraphTests {
 
     let liveRegistrations = RuntimeRegistrationSet.scratch()
     graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    graph.recordCommittedRuntimeRegistrationTarget(liveRegistrations.targetIdentity)
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: liveRegistrations,
       checkpoint: graph.makeCheckpoint(),
@@ -1381,6 +1382,7 @@ struct ViewGraphTests {
 
     let liveRegistrations = RuntimeRegistrationSet.scratch()
     graph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
+    graph.recordCommittedRuntimeRegistrationTarget(liveRegistrations.targetIdentity)
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: liveRegistrations,
       checkpoint: graph.makeCheckpoint(),

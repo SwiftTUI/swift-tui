@@ -351,6 +351,56 @@ package struct ResolvedNode: Equatable, Sendable {
     }
   }
 
+  /// Reconciles the derived handler-bookkeeping currency against the runtime
+  /// node store after teardown has settled.
+  ///
+  /// Committed child values intentionally rewire lazily: a removed runtime
+  /// node can remain as an inert value copy in an ancestor's committed
+  /// children until that ancestor next applies. Its structural/render payload
+  /// remains valid for that lazy-rewire contract, but its handler inventory
+  /// must not continue to describe a runtime owner that no longer exists.
+  /// Surviving stamped values take the current projection from their runtime
+  /// owner; departed stamped values clear only this derived metadata. Unstamped
+  /// values retain their authored inventory.
+  package mutating func reconcileCommittedHandlerInventory(
+    inventoryForRuntimeNodeID: (ViewNodeID) -> CommittedHandlerInventory?
+  ) {
+    var stack = [
+      HandlerInventoryReconciliationFrame(node: self)
+    ]
+
+    while !stack.isEmpty {
+      let frameIndex = stack.index(before: stack.endIndex)
+      if stack[frameIndex].nextChildIndex
+        < stack[frameIndex].node._storedChildren.count
+      {
+        let childIndex = stack[frameIndex].nextChildIndex
+        let child = stack[frameIndex].node._storedChildren[childIndex]
+        stack[frameIndex].nextChildIndex += 1
+        stack.append(HandlerInventoryReconciliationFrame(node: child))
+        continue
+      }
+
+      var completed = stack.removeLast()
+      if let viewNodeID = completed.node.viewNodeID {
+        completed.node.handlerInventory =
+          inventoryForRuntimeNodeID(viewNodeID) ?? .init()
+      }
+      if !completed.node._storedChildren.isEmpty {
+        completed.node.setChildrenPreservingDerivedState(
+          completed.reconciledChildren
+        )
+      }
+
+      guard !stack.isEmpty else {
+        self = completed.node
+        return
+      }
+      stack[stack.index(before: stack.endIndex)]
+        .reconciledChildren.append(completed.node)
+    }
+  }
+
   private static func combinedPreferenceValues(
     for children: [ResolvedNode]
   ) -> PreferenceValues {
@@ -422,6 +472,17 @@ package struct ResolvedNode: Equatable, Sendable {
     }
   }
 
+}
+
+private struct HandlerInventoryReconciliationFrame {
+  var node: ResolvedNode
+  var nextChildIndex = 0
+  var reconciledChildren: [ResolvedNode] = []
+
+  init(node: ResolvedNode) {
+    self.node = node
+    reconciledChildren.reserveCapacity(node._storedChildren.count)
+  }
 }
 
 extension ResolvedNode {

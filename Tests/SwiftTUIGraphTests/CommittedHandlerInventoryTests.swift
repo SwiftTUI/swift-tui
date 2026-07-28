@@ -145,6 +145,122 @@ struct CommittedHandlerInventoryTests {
     #expect(inventory.keyHandlerIdentities == [adoptedPaste])
   }
 
+  @Test("an empty replacement capture clears committed inventory without an apply")
+  func emptyReplacementCaptureClearsInventoryWithoutApply() {
+    let root = testIdentity("Root")
+    let action = testIdentity("Root", "Action")
+    let node = RegistrationKindDriver.makeRecordingNode(identity: root)
+
+    ViewNodeContext.withValue(node) {
+      node.recordActionRegistration(
+        identity: action,
+        handler: { false },
+        followUpInvalidationIdentity: nil
+      )
+    }
+    node.apply(
+      resolved: ResolvedNode(identity: root, kind: .root),
+      children: []
+    )
+    #expect(node.snapshot().handlerInventory.actionIdentities == [action])
+
+    // Group/AnyView normalization and capture-host splicing can re-evaluate a
+    // recording node without applying a resolved value back onto that same
+    // node. Ending the empty capture must still publish the reset projection.
+    ViewNodeContext.withValue(node) {}
+
+    #expect(node.registeredHandlers.action.registrations.isEmpty)
+    #expect(node.snapshot().handlerInventory.actionIdentities.isEmpty)
+  }
+
+  @Test("finalize clears inventory from a lazily rewired departed child value")
+  func finalizeClearsInventoryFromDepartedChildValue() throws {
+    let graph = ViewGraph()
+    let root = testIdentity("Root")
+    let child = testIdentity("Root", "Child")
+    let action = testIdentity("Root", "Child", "Action")
+    _ = graph.applySnapshot(
+      ResolvedNode(
+        identity: root,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: child, kind: .view("Child"))
+        ]
+      )
+    )
+
+    let childNode = try #require(graph.nodeIfExists(for: child))
+    childNode.recordActionRegistration(
+      identity: action,
+      handler: { false },
+      followUpInvalidationIdentity: nil
+    )
+    let inventoried = graph.snapshot(rootIdentity: root)
+    #expect(inventoried.children[0].handlerInventory.actionIdentities == [action])
+
+    // The accepted frame's order joins the committed live set during finalize.
+    // Canonicalization must run after that union or it would erase a newly
+    // accepted handler before the oracle can inspect it.
+    graph.liveNodeIDs = []
+    _ = graph.finalizeFrame(
+      rootIdentity: root,
+      resolved: inventoried,
+      placed: nil
+    )
+    let live = try #require(graph.committedRootSnapshotIfAvailable())
+    #expect(live.children[0].handlerInventory.actionIdentities == [action])
+
+    // Teardown removes the runtime owner immediately but intentionally leaves
+    // the ancestor's committed child value to rewire on its next apply.
+    graph.removeSubtree(rootedAt: childNode)
+    let stale = try #require(graph.committedRootSnapshotIfAvailable())
+    #expect(stale.children[0].handlerInventory.actionIdentities == [action])
+    #expect(graph.nodeIfExists(for: child) == nil)
+
+    _ = graph.finalizeFrame(
+      rootIdentity: root,
+      resolved: ResolvedNode(identity: root, kind: .root),
+      placed: nil
+    )
+
+    let reconciled = try #require(graph.committedRootSnapshotIfAvailable())
+    #expect(reconciled.children.count == 1)
+    #expect(reconciled.children[0].handlerInventory.actionIdentities.isEmpty)
+  }
+
+  @Test("reconciliation is stack safe across a deep lazy committed chain")
+  func reconciliationIsStackSafeAcrossDeepLazyCommittedChain() {
+    let depth = 8_192
+    let action = testIdentity("Deep", "Action")
+    let inventory = CommittedHandlerInventory(actionIdentities: [action])
+    var chain = ResolvedNode(
+      viewNodeID: ViewNodeID(rawValue: 1),
+      identity: testIdentity("Deep", "0"),
+      kind: .view("Depth"),
+      handlerInventory: inventory
+    )
+    for index in 1..<depth {
+      chain = ResolvedNode(
+        viewNodeID: ViewNodeID(rawValue: UInt64(index + 1)),
+        identity: testIdentity("Deep", "\(index)"),
+        kind: .view("Depth"),
+        children: [chain],
+        handlerInventory: inventory
+      )
+    }
+
+    chain.reconcileCommittedHandlerInventory { _ in nil }
+
+    var visited = 0
+    var stack = [chain]
+    while let node = stack.popLast() {
+      visited += 1
+      #expect(node.handlerInventory == .init())
+      stack.append(contentsOf: node.children)
+    }
+    #expect(visited == depth)
+  }
+
   @Test("equality observes inventory while geometry and content alarms exclude it")
   func equalityAndComparatorClassification() {
     let identity = testIdentity("Root")

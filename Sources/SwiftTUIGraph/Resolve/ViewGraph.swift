@@ -3042,7 +3042,6 @@ package final class ViewGraph {
       barrierResult.didConverge,
       "frame finalization teardown barrier did not converge"
     )
-
     for viewNodeID in frameOrder {
       guard let node = nodesByNodeID[viewNodeID] else {
         continue
@@ -3093,6 +3092,32 @@ package final class ViewGraph {
     // shadowed mint) — carrying its ID into `liveNodeIDs` would strand a dead
     // entry there forever.
     liveNodeIDs.formUnion(frameOrder.filter { nodesByNodeID[$0] != nil })
+    if SoundnessProbeConfiguration.isSampledFrame {
+      // Teardown can intentionally leave inert child value copies in an
+      // ancestor's committed tree until that ancestor next applies. Refresh
+      // the derived handler currency after the accepted frame's live set has
+      // settled: an exact stored/live owner contributes its current
+      // NodeHandlers projection, while a departed stamp clears only the stale
+      // bookkeeping. The strict committed-vs-live oracle then reads a
+      // canonical committed artifact without treating lazy structural
+      // rewiring as a handler-loss defect.
+      let liveInventoriesByNodeID: [ViewNodeID: CommittedHandlerInventory] = Dictionary(
+        uniqueKeysWithValues: liveNodeIDs.compactMap {
+          viewNodeID
+            -> (ViewNodeID, CommittedHandlerInventory)? in
+          guard
+            let node = nodesByNodeID[viewNodeID],
+            node.committed.viewNodeID == viewNodeID
+          else {
+            return nil
+          }
+          return (viewNodeID, node.registeredHandlers.committedHandlerInventory)
+        }
+      )
+      root?.reconcileCommittedHandlerInventory { viewNodeID in
+        liveInventoriesByNodeID[viewNodeID]
+      }
+    }
     releaseInactiveEntityRoutes(
       activeEntities: activeEntities
     )
