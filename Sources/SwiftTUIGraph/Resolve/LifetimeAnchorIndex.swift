@@ -50,18 +50,15 @@ package struct LifetimeReachabilityContext: Equatable, Sendable {
   package var candidateRootID: ViewNodeID
   package var activeEntityIdentities: Set<EntityIdentity>
   package var liveEntityHomeByIdentity: [EntityIdentity: ViewNodeID]
-  package var parentedNodeIDs: Set<ViewNodeID>
 
   package init(
     candidateRootID: ViewNodeID,
     activeEntityIdentities: Set<EntityIdentity> = [],
-    liveEntityHomeByIdentity: [EntityIdentity: ViewNodeID] = [:],
-    parentedNodeIDs: Set<ViewNodeID> = []
+    liveEntityHomeByIdentity: [EntityIdentity: ViewNodeID] = [:]
   ) {
     self.candidateRootID = candidateRootID
     self.activeEntityIdentities = activeEntityIdentities
     self.liveEntityHomeByIdentity = liveEntityHomeByIdentity
-    self.parentedNodeIDs = parentedNodeIDs
   }
 }
 
@@ -517,16 +514,6 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
   ) -> Bool {
     context.activeEntityIdentities.contains(entity)
       && context.liveEntityHomeByIdentity[entity] == nodeID
-  }
-
-  private func hasCurrentParent(
-    _ nodeID: ViewNodeID,
-    context: LifetimeReachabilityContext
-  ) -> Bool {
-    context.parentedNodeIDs.contains(nodeID)
-      || anchorsByNodeID[nodeID, default: []].contains { anchor in
-        anchor.kind == .parent
-      }
   }
 
   private func sortedOutgoingEdges(

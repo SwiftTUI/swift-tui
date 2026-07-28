@@ -29,11 +29,7 @@ extension ViewGraph {
     return LifetimeReachabilityContext(
       candidateRootID: candidateRootID,
       activeEntityIdentities: activeEntities,
-      liveEntityHomeByIdentity: qualifiedHomes,
-      parentedNodeIDs: Set(
-        nodesByNodeID.values.compactMap { node in
-          node.parent == nil ? nil : node.viewNodeID
-        })
+      liveEntityHomeByIdentity: qualifiedHomes
     )
   }
 
