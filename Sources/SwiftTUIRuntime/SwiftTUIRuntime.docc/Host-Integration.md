@@ -8,6 +8,8 @@ The same authored ``App``, ``Scene``, and ``WindowGroup`` values run unchanged
 across the supported execution modes. Pick the mode that matches your shipping
 target. In repo terminology, a runner owns process startup and launch routing,
 while a host owns an external presentation environment or embedding lifecycle.
+The canonical mode, packaging, and engine-profile matrix is
+[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
 
 - **Batteries-included convenience** — import `SwiftTUI` to get the default
   terminal `App.main()`, pty-backed scene management, `--web` localhost launch,
@@ -17,10 +19,11 @@ while a host owns an external presentation environment or embedding lifecycle.
 - **WASI runner** — import `SwiftTUIWASI` for WebAssembly execution and manifest generation. Use when you ship the app as a wasm module to a browser or sandbox host.
 - **Host product** — retain ``HostedSceneSession`` values with explicit
   presentation surfaces such as ``HostedRasterSurface`` inside another app's
-  lifecycle. `@swifttui/web` does this for browser hosting on top of a WASI
-  build. The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view
-  on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-  https://github.com/SwiftTUI/swift-tui-swiftui
+  lifecycle. The in-package `SwiftTUIAndroidHost` product uses this contract
+  for Android embedding. `@swifttui/web` consumes a WASI build in the browser,
+  while the external
+  [`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses
+  the contract for native SwiftUI embedding on macOS and iOS.
 - **WebHost runner and browser host** — import `SwiftTUIWebHost` for web-only
   localhost-browser launch, or use `SwiftTUIWebHostCLI` directly when one
   executable should support both terminal-native and `--web` launch without the
@@ -29,7 +32,9 @@ while a host owns an external presentation environment or embedding lifecycle.
 
 All modes flow through the same runtime invalidation path. Resize, terminal
 style, and lifecycle events are normalized into the same control-message
-contract regardless of where the host fetches them.
+contract regardless of where the host fetches them. Resolve reuse, selective
+evaluation, ambient binding, and stack-depth policy can still vary by the
+[per-host engine profile](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
 
 Host-managed presentation surfaces that consume semantics receive
 ``SemanticHostFrame`` values. A semantic host frame is the atomic handoff for one

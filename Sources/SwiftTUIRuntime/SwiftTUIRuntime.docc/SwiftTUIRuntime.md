@@ -1,6 +1,7 @@
 # ``SwiftTUIRuntime``
 
-Render views, drive interactive terminal sessions, and connect the pure frame pipeline to a real terminal host.
+Render views, drive interactive sessions, and connect the pure frame pipeline
+to terminal or host-managed presentation surfaces.
 
 ## Overview
 
@@ -12,7 +13,8 @@ Use it when you want to:
 - resolve or render a `View` into inspectable frame artifacts
 - run an interactive terminal session with `RunLoop`
 - parse terminal input and signals
-- present rasterized output with capability-aware ANSI rendering and
+- present committed raster and semantic output through terminal or hosted
+  surfaces, including capability-aware ANSI rendering and
   presentation-boundary terminal sanitization
 
 `SwiftTUIRuntime` re-exports `SwiftTUIViews` and `SwiftTUICore`. Import it for
@@ -32,13 +34,11 @@ build on.
 Scene declarations such as ``App`` and ``WindowGroup`` also live here. The
 release-facing `SwiftTUI` product re-exports this module through
 `SwiftTUIWebHostCLI` and includes animated GIF/image support for one-import
-apps. Other platform integrations compose with this module directly:
-`SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and `SwiftTUIWebHostCLI`.
-Browser deployment uses the `@swifttui/web` package in the sibling
-`SwiftTUI/swift-tui-web` repository to consume a `SwiftTUIWASI` build. The
-native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
-macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-https://github.com/SwiftTUI/swift-tui-swiftui
+apps. Other in-package runner and host products, including
+`SwiftTUIAndroidHost`, compose with this module directly. Externally packaged
+integrations such as `SwiftUIHost` use the same runtime-facing layer. The
+canonical product, distribution, and engine-profile boundaries are documented
+in [Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
 
 Pointer input policy types such as `TerminalMouseInputResolution`,
 `TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`

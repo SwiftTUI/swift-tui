@@ -77,8 +77,8 @@ makes a small number of intentional departures:
   focus, gestures, animation, navigation, and presentation surfaces.
 - A typed seven-phase render pipeline with off-main execution of the heavy
   stages.
-- Four execution modes: terminal-native, WASI/browser, host-managed embedding,
-  and a localhost-browser WebHost.
+- The shipped host presentations and packaging boundaries recorded in the
+  canonical [host matrix](HOSTS-AND-PLATFORMS.md#canonical-host-matrix).
 - A semantic accessibility substrate feeding each consumer.
 - Animated-image playback in the default `SwiftTUI` convenience product, with
   charts and terminal-program embedding as peer products.

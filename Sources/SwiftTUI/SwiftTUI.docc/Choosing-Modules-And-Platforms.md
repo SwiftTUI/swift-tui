@@ -26,8 +26,10 @@ terminal/WebHost runner that provides the default `App.main()` behavior, and
 animated GIF/image support. Its `App` protocol is the command-enabled
 convenience overlay over `SwiftTUIRuntime.App`.
 
-When your app needs a narrower launch or hosting story, choose one of the
-sibling root-package products directly.
+When your app needs a narrower launch or hosting story, choose an in-package
+integration product or an externally distributed host. The canonical
+packaging boundaries live in
+[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
 
 ## Import Matrix
 
@@ -40,18 +42,20 @@ sibling root-package products directly.
 | Browser deployment from a WASI build | `SwiftTUIWASI` app plus `@swifttui/web` tooling | `import SwiftTUIWASI` in the app |
 | Localhost browser app from a native binary | `SwiftTUIWebHost` | `import SwiftTUIWebHost` |
 | One binary that supports terminal launch and `--web` | `SwiftTUIWebHostCLI` | `import SwiftTUIWebHostCLI` |
+| Host-managed Android app | `SwiftTUIAndroidHost` | `import SwiftTUIAndroidHost` |
+| Native SwiftUI embedding on macOS or iOS | `SwiftUIHost` from the separate [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package | `import SwiftUIHost` |
 | Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
 | Tabbed/split terminal workspaces | `SwiftTUITerminalWorkspace` | `import SwiftTUITerminalWorkspace` |
 | Charts and compact metrics | `SwiftTUICharts` (from the separate [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package) | `import SwiftTUICharts` |
 | Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
-`SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and
-`SwiftTUIWebHostCLI` all re-export the authoring surface, so an executable
-usually imports one launch product. `SwiftTUI` additionally includes
-`SwiftTUIAnimatedImage` by default. Add peer products such as
-`SwiftTUITerminal` and `SwiftTUITerminalWorkspace` alongside your launch
-product only when you use those views; charts come from the separate
-[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package.
+`SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`,
+`SwiftTUIWebHostCLI`, and `SwiftTUIAndroidHost` all re-export the authoring
+surface, so an executable or host usually imports one integration product.
+`SwiftTUI` additionally includes `SwiftTUIAnimatedImage` by default. Add peer
+products such as `SwiftTUITerminal` and `SwiftTUITerminalWorkspace` alongside
+your launch product only when you use those views; charts and the SwiftUI host
+come from their separately distributed packages.
 
 ## Common Compositions
 
@@ -138,11 +142,14 @@ struct HostedApp: App {
 }
 ```
 
-The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
-macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-https://github.com/SwiftTUI/swift-tui-swiftui — it uses this shape for native
-SwiftUI embedding. `@swifttui/web` uses the same authored scene model with a
-`SwiftTUIWASI` build and the browser-side `web-surface` runtime.
+The in-package `SwiftTUIAndroidHost` product uses this shape for Android
+embedding. The external
+[`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses it
+for native SwiftUI embedding, and `@swifttui/web` consumes the same authored
+scene model from a `SwiftTUIWASI` build. See
+[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md)
+for the canonical
+distribution and engine-profile matrix.
 
 ### Terminal Program Embedding
 

@@ -123,6 +123,76 @@ record_forbidden_pattern() {
   done <"$rfp_files_file"
 }
 
+record_host_ownership_violations() {
+  rhov_scan_root=$1
+  rhov_files_file=$2
+  rhov_output_file=$3
+
+  while IFS= read -r rhov_source_file; do
+    [ -n "$rhov_source_file" ] || continue
+    [ "$rhov_source_file" = "docs/HOSTS-AND-PLATFORMS.md" ] && continue
+    rhov_source_path="$rhov_scan_root/$rhov_source_file"
+
+    # Stable docs may summarize host choices, but any text presenting itself
+    # as an execution-mode/host matrix must point readers to the single owner.
+    rhov_has_host_overview=0
+    if rg -qiU \
+      'execution[[:space:]-]+modes?|canonical[[:space:]-]+host[[:space:]-]+matrix|host[[:space:]-]+matrix|import[[:space:]-]+matrix|platform[[:space:]-]+integrations?' \
+      "$rhov_source_path"
+    then
+      rhov_has_host_overview=1
+    else
+      rhov_status=$?
+      if [ "$rhov_status" -ne 1 ]; then
+        >&2 printf 'Host-overview scan failed for %s\n' "$rhov_source_file"
+        return "$rhov_status"
+      fi
+    fi
+
+    if [ "$rhov_has_host_overview" -eq 1 ]; then
+      if rg -q 'HOSTS-AND-PLATFORMS\.md' "$rhov_source_path"; then
+        :
+      else
+        rhov_status=$?
+        if [ "$rhov_status" -ne 1 ]; then
+          >&2 printf 'Host-owner-link scan failed for %s\n' "$rhov_source_file"
+          return "$rhov_status"
+        fi
+        printf 'forbidden|host-matrix-owner-link|%s\n' \
+          "$rhov_source_file" >>"$rhov_output_file"
+      fi
+
+      # A high-level overview that names multiple launch/host products must not
+      # silently omit either the in-package Android host or external SwiftUI host.
+      rhov_named_product_count=0
+      rhov_has_android_host=0
+      rhov_has_swiftui_host=0
+      for rhov_product in \
+        SwiftTUICLI SwiftTUIWASI SwiftTUIWebHost SwiftTUIWebHostCLI \
+        SwiftTUIAndroidHost SwiftUIHost
+      do
+        if rg -qw -- "$rhov_product" "$rhov_source_path"; then
+          rhov_named_product_count=$((rhov_named_product_count + 1))
+          [ "$rhov_product" = "SwiftTUIAndroidHost" ] && rhov_has_android_host=1
+          [ "$rhov_product" = "SwiftUIHost" ] && rhov_has_swiftui_host=1
+        else
+          rhov_status=$?
+          if [ "$rhov_status" -ne 1 ]; then
+            >&2 printf 'Host-product scan failed for %s\n' "$rhov_source_file"
+            return "$rhov_status"
+          fi
+        fi
+      done
+      if [ "$rhov_named_product_count" -ge 2 ] &&
+        { [ "$rhov_has_android_host" -ne 1 ] || [ "$rhov_has_swiftui_host" -ne 1 ]; }
+      then
+        printf 'forbidden|host-overview-incomplete|%s\n' \
+          "$rhov_source_file" >>"$rhov_output_file"
+      fi
+    fi
+  done <"$rhov_files_file"
+}
+
 record_forbidden_violations() {
   rfv_scan_root=$1
   rfv_files_file=$2
@@ -153,6 +223,18 @@ record_forbidden_violations() {
     accessibility-consumer-count docs/ACCESSIBILITY.md \
     '(four|five) accessibility consumers' \
     0 1
+  record_forbidden_pattern \
+    "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file" \
+    all-hosts-one-package "" \
+    '(?m)(^|[.!?:][[:space:]]+|^[[:space:]]*[-*+][[:space:]]+)(\*\*)?((all|the|these)[[:space:]]+(five[[:space:]]+)?(hosts?|host[[:space:]]+presentations?)|five[[:space:]]+(hosts?|host[[:space:]]+presentations?)|one[[:space:]]+source[^.!?]{0,40}five[[:space:]]+hosts?)[^.!?]{0,350}(are|remain|ship([[:space:]]+as)?|form)[[:space:]]+((all|sibling)[[:space:]]+){0,2}products?[[:space:]]+(of|in|from)[[:space:]]+(one|the[[:space:]]+same|a[[:space:]]+single|single|same)[[:space:]]+package' \
+    1 1
+  record_forbidden_pattern \
+    "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file" \
+    all-hosts-one-package "" \
+    '(?m)(^|[.!?:][[:space:]]+|^[[:space:]]*[-*+][[:space:]]+)(\*\*)?one[[:space:]]+source[^.!?]{0,40}five[[:space:]]+hosts?[.!][[:space:]*]{0,20}(terminal|the[[:space:]]+terminal)[^.!?]{0,350}(are|remain|ship([[:space:]]+as)?|form)[[:space:]]+((all|sibling)[[:space:]]+){0,2}products?[[:space:]]+(of|in|from)[[:space:]]+(one|the[[:space:]]+same|a[[:space:]]+single|single|same)[[:space:]]+package' \
+    1 1
+  record_host_ownership_violations \
+    "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file"
 }
 
 collect_violations() {
@@ -193,12 +275,56 @@ run_self_test() {
 # Clean fixture
 
 The implementation is at `Sources/Present.swift:12`.
+The execution-mode matrix lives in
+[Hosts and Platforms](HOSTS-AND-PLATFORMS.md).
+Not all five hosts are products of one package; SwiftUIHost is external.
+All five hosts are not products of one package; SwiftUIHost is external.
+All five hosts share a committed-frame contract. The two web adapters are
+products of one package.
+- **One source, five hosts.** Terminal, WASI, WebHost, SwiftUI, and Android
+  follow the packaging boundaries in the owner document.
 EOF
   cat >"$scratch_root/docs/bad.md" <<'EOF'
 # Bad fixture
 
 This cites `Sources/Missing.swift` and the retired
 `Sources/SwiftTUICore/Resolve/` ownership.
+
+The execution-mode matrix uses SwiftTUICLI and SwiftTUIWASI.
+All five hosts are sibling products of one
+package.
+EOF
+  cat >"$scratch_root/docs/bad-wrapped.md" <<'EOF'
+# Wrapped bad fixture
+
+Supported execution
+modes use SwiftTUICLI and SwiftTUIWASI.
+EOF
+  cat >"$scratch_root/docs/HOSTS-AND-PLATFORMS.md" <<'EOF'
+# Bad owner fixture
+
+The five hosts are products of one package.
+EOF
+  cat >"$scratch_root/docs/bad-colon.md" <<'EOF'
+# Colon bad fixture
+
+False claim: All hosts are products of one package.
+EOF
+  cat >"$scratch_root/docs/bad-indented.md" <<'EOF'
+# Indented bad fixture
+
+  - All host presentations ship as sibling products in a single package.
+EOF
+  cat >"$scratch_root/docs/bad-all-products.md" <<'EOF'
+# All-products bad fixture
+
+The five hosts are all products of the same package.
+EOF
+  cat >"$scratch_root/docs/bad-headline.md" <<'EOF'
+# Headline bad fixture
+
+- **One source, five hosts.** Terminal, WASI, WebHost, SwiftUI, and Android
+  are sibling products of one package.
 EOF
 
   clean_files="$scratch_root/clean-files"
@@ -207,7 +333,14 @@ EOF
   bad_actual="$scratch_root/bad-actual"
   scratch_unsorted="$scratch_root/unsorted"
   printf '%s\n' docs/clean.md >"$clean_files"
-  printf '%s\n' docs/bad.md >"$bad_files"
+  printf '%s\n' \
+    docs/HOSTS-AND-PLATFORMS.md \
+    docs/bad-all-products.md \
+    docs/bad-colon.md \
+    docs/bad-headline.md \
+    docs/bad-indented.md \
+    docs/bad-wrapped.md \
+    docs/bad.md >"$bad_files"
 
   collect_violations "$scratch_root" "$clean_files" "$clean_actual" "$scratch_unsorted"
   if [ -s "$clean_actual" ]; then
@@ -219,7 +352,17 @@ EOF
   collect_violations "$scratch_root" "$bad_files" "$bad_actual" "$scratch_unsorted"
   expected_bad="$scratch_root/expected-bad"
   cat >"$expected_bad" <<'EOF'
+forbidden|all-hosts-one-package|docs/HOSTS-AND-PLATFORMS.md
+forbidden|all-hosts-one-package|docs/bad-all-products.md
+forbidden|all-hosts-one-package|docs/bad-colon.md
+forbidden|all-hosts-one-package|docs/bad-headline.md
+forbidden|all-hosts-one-package|docs/bad-indented.md
+forbidden|all-hosts-one-package|docs/bad.md
 forbidden|graph-under-core|docs/bad.md
+forbidden|host-matrix-owner-link|docs/bad-wrapped.md
+forbidden|host-matrix-owner-link|docs/bad.md
+forbidden|host-overview-incomplete|docs/bad-wrapped.md
+forbidden|host-overview-incomplete|docs/bad.md
 missing-path|docs/bad.md|Sources/Missing.swift
 missing-path|docs/bad.md|Sources/SwiftTUICore/Resolve/
 EOF

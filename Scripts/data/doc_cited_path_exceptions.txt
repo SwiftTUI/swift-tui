@@ -6,8 +6,3 @@
 #
 # This file must match the checker's current violations exactly. New rows and
 # stale rows both fail the policy phase; repair stages may only shrink it.
-forbidden|accessibility-consumer-count|docs/README.md
-forbidden|execution-mode-count|Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Architecture.md
-forbidden|execution-mode-count|docs/ARCHITECTURE.md
-forbidden|execution-mode-count|docs/README.md
-forbidden|execution-mode-count|docs/VISION.md

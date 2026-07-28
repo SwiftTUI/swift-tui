@@ -58,9 +58,9 @@ boundaries, the runtime pipeline, and the phase products that connect them.
 - executable runner products `SwiftTUICLI` and `SwiftTUIWASI` build top-level
   execution layers on top of `SwiftTUIRuntime`
 - host products and packages retain authored `SwiftTUIRuntime` apps inside
-  platform-managed shells: `SwiftTUIWebHost` for localhost-browser launch and
-  `@swifttui/web` for browser deployment. The native SwiftUI host (for embedding
-  a SwiftTUI app in a SwiftUI view on macOS/iOS) now lives in the separate
+  platform-managed shells: `SwiftTUIWebHost` for localhost-browser launch,
+  `SwiftTUIAndroidHost` for Android embedding, and `@swifttui/web` for browser
+  deployment. The Apple-SDK-gated `SwiftUIHost` product lives in the separate
   `swift-tui-swiftui` package: https://github.com/SwiftTUI/swift-tui-swiftui
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
@@ -132,17 +132,12 @@ The core runtime is intentionally narrow today:
 Platform integration and multi-scene orchestration live in sibling products in
 the root package rather than in the `SwiftTUIRuntime` product itself.
 
-Those integration layers serve four execution modes:
-
-- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or
-  the default `App.main()` provided by the `SwiftTUI` convenience product
-- WASI executable execution and manifest generation via `WASIRunner` in
-  `SwiftTUIWASI`
-- host-managed embedding via `SceneManifest(for:)` and
-  `HostedRasterSurface` plus `HostedSceneSession(for:sceneID:surface:)`, as used by
-  `@swifttui/web`
-- localhost-browser WebHost execution via `WebHostRunner` and the WebHost
-  browser bridge in `SwiftTUIWebHost`
+The canonical execution-mode matrix, cross-package ownership, and resolve
+engine profiles live in
+[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+For the public
+runtime seams used by executable and retained-session integrations, see
+<doc:Host-Integration>.
 
 CLI scene management is executable-runner policy rather than an authored-scene
 rule. One-window and multi-window apps share the same runner story; composed

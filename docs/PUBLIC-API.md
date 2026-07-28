@@ -203,15 +203,18 @@ also used by `SwiftTUIWASISurfaceBridge` and the runners), so the runtime never 
 on the product. The sink and record-envelope types are package-internal for now;
 the environment grammar builds them.
 
-### Root-package platform integration products
+### Platform integration products
 
-Platform-specific execution and embedding are root-package products:
+The canonical packaging and engine-profile boundaries live in
+[HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). At this package boundary:
 
 - **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
-  `SwiftTUIWebHost` (`WebHostRunner`), `SwiftTUIWebHostCLI` (`WebHostCLIRunner`).
-- **Hosts** — The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI
-  view on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-  https://github.com/SwiftTUI/swift-tui-swiftui
+  `SwiftTUIWebHost` (`WebHostRunner`), and `SwiftTUIWebHostCLI`
+  (`WebHostCLIRunner`).
+- **In-package host** — `SwiftTUIAndroidHost` retains runtime sessions for the
+  separately distributed Android Compose/AAR integration.
+- **External host** — `SwiftUIHost` lives in the separate
+  [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package.
 - **Embedding** — `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`, and
   `SwiftTUIPTYPrimitives`.
 

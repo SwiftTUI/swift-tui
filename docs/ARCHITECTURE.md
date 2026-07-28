@@ -15,7 +15,7 @@ flowchart LR
     views["SwiftTUIViews<br/>authoring surface"]
     core["SwiftTUICore<br/>pipeline + data model"]
     runtime["SwiftTUIRuntime<br/>run loop + hosting"]
-    host["Host<br/>terminal · browser · SwiftUI"]
+    host["Host presentation"]
 
     author --> views
     views --> core
@@ -142,15 +142,18 @@ checks that every source recorder, trace kind, and counter remains represented.
 
 ### Platform, host, and embedding products
 
-All of these live in the **root package** (`Package.swift`); the `Platforms/`
-directory holds their sources but contains no nested Swift packages.
+Except for the explicitly external SwiftUI host, these live in the **root
+package** (`Package.swift`); the `Platforms/` directory holds their sources but
+contains no nested Swift packages.
 
-- **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
-  `SwiftTUIWebHost` (`WebHostRunner`), `SwiftTUIWebHostCLI` (`WebHostCLIRunner`),
-  and `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).
-- **Hosts** — The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI
-  view on macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-  https://github.com/SwiftTUI/swift-tui-swiftui
+- **In-package integrations** — `SwiftTUICLI` (`TerminalRunner`),
+  `SwiftTUIWASI` (`WASIRunner`), `SwiftTUIWebHost` (`WebHostRunner`),
+  `SwiftTUIWebHostCLI` (`WebHostCLIRunner`), `SwiftTUIAndroidHost`, and
+  `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).
+- **External host** — the `SwiftUIHost` product for embedding SwiftTUI inside
+  SwiftUI on macOS/iOS lives in the separate
+  [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)
+  package, not under this package's `Platforms/` tree.
 - **Terminal-program embedding** — `SwiftTUITerminal` (`TerminalView`,
   `TerminalSession`, `TerminalProcessSession`), `SwiftTUITerminalWorkspace`
   (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
@@ -185,7 +188,7 @@ Sources/
   SwiftTUIProfiling/   Activation, Sinks, CPU, Memory, Progress  + .docc
                        (optional opt-in profiling product)
 Platforms/             Arguments, CLI, WASI, WebHost,
-                       Embedding, SwiftUI  (sources for the product targets)
+                       Android, Embedding  (sources for the product targets)
 Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
                        UnixSignals  (third-party code, own licenses)
 Tools/TermUIPerf/      Performance scenario harness
@@ -278,12 +281,12 @@ requires both — so the renderer can evaluate any custom layout on the
 frame-tail worker. Layouts may additionally publish stable
 measurement/placement reuse signatures to opt into cross-frame reuse.
 
-## The four execution modes
+## Host modes and engine profiles
 
-The same resolved frame can be presented four ways: a **terminal**, a
-**WASI/browser** canvas, a **host-managed** raster surface inside a SwiftUI app,
-and a **localhost-browser WebHost**. Each is a different *host*; the pipeline
-above them is identical. See [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
+[HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) owns the canonical host
+matrix, packaging boundaries, and per-host engine profiles. The hosts consume
+the same phase products and committed-frame contracts, but their resolve reuse,
+selective-evaluation, and stack-depth policies are not identical.
 
 ## Concurrency model
 
@@ -320,7 +323,7 @@ uses honest isolation or `Synchronization` primitives.
   host/graphics interop.
 - **Semantic snapshot** — the per-frame `SemanticSnapshot`, including the flat
   `accessibilityNodes` array, consumed by accessibility and focus.
-- **Host** — the component that presents a committed frame: a terminal, a
-  browser canvas, or a SwiftUI raster surface.
+- **Host** — the component that presents a committed frame; the canonical host
+  matrix is in [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 - **Action scope** — a node in the focus chain that can own key commands,
   palette commands, and toolbar items (`ActionScope`).

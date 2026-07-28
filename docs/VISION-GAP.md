@@ -94,26 +94,26 @@ explicit work-stack paths for parts of measurement and placement.
 
 ## WASI / browser execution
 
-**Shipped.** The `SwiftTUIWASI` runner and `web-surface` wire (v1/v2 full
-frames, v3 delta frames); the stack-lean resolve profile (default-on for WASI:
-lean ambient slots, retained/memoized reuse and selective evaluation off); the
-depth-capped chunked resolve driver (`DeferredResolveDriver`, K=6 under the
-lean profile) that fits the resolve descent inside JavaScriptCore's worker
-thread-stack budget.
+**Shipped.** The `SwiftTUIWASI` runner, `web-surface` wire, and current
+WASI resolve behavior are described by the canonical
+[per-host engine profile](HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
+This section records only what remains divergent from the project's intent.
 
 **Not yet built.**
 
-- **Per-tick frame emission under reuse.** With the lean profile off (reuse
-  active), reuse gates coalesce surface publications: task-driven ticks that
-  change the raster surface do not each produce a presented frame (observed
-  live on 0.1.9 Chromium as Life emitting ~1 wire frame per ~4 generations).
-  The lean profile masks this today only because it disables reuse entirely.
-  This is the exit condition for the browser runtime's lean-everywhere hold,
-  and the blocker for non-lean WASI defaults and a JSPI main-thread default.
+- **Per-tick frame emission under retained reuse.** When retained reuse is
+  active — through the full profile or the lean profile's partial re-enable —
+  reuse gates coalesce surface publications: task-driven ticks that change the
+  raster surface do not each produce a presented frame (observed live on 0.1.9
+  Chromium as Life emitting ~1 wire frame per ~4 generations). The default
+  lean profile without retained reuse masks this today. This is the exit
+  condition for making the full profile the WASI default and for a JSPI
+  main-thread default.
 - **Bounded-stack resolve as architecture.** The chunked driver is a
-  WASI-profile workaround; resolve (and built-in layout, registered under
-  "Layout and pipeline internals") still recurse on the Swift call stack, so
-  stack budgets remain a per-engine constraint rather than a non-issue.
+  stack-lean profile mechanism, not a fully iterative engine; resolve (and
+  built-in layout, registered under "Layout and pipeline internals") still
+  recurse on the Swift call stack, so stack budgets remain a per-engine
+  constraint rather than a non-issue.
 
 ## Animation, transitions, and gestures
 

@@ -53,19 +53,17 @@ geometry resolution miss counters, and `input_events_during_render_suspension`.
 
 ## Scene-Based Apps
 
-The public scene declarations live in `SwiftTUIRuntime`, while platform
-integration lives in sibling root package products. The `SwiftTUI` convenience
-product re-exports this module plus the combined terminal/WebHost launch
-surface and animated GIF/image support for ordinary app binaries.
+The public scene declarations live in `SwiftTUIRuntime`, while integration
+lives in in-package runner/host products and externally distributed hosts. The
+`SwiftTUI` convenience product re-exports this module plus the combined
+terminal/WebHost launch surface and animated GIF/image support for ordinary app
+binaries.
 
-The same authored `App` and `Scene` declarations can feed these execution
-modes:
-
-- terminal-native execution through the `SwiftTUI` convenience product or the
-  explicit `SwiftTUICLI` runner product
-- WASI execution through the `SwiftTUIWASI` runner product
-- localhost-browser execution through the compound `SwiftTUIWebHost` product
-- host-managed embedding through a host product
+The same authored `App` and `Scene` declarations feed every integration in the
+canonical [host matrix](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+That owner
+records the execution modes, packaging boundaries, and per-host engine
+profiles; this article focuses on the shared runtime entry points.
 
 `SwiftTUIRuntime` owns scene declarations, manifests, and hosted-session APIs.
 It does not pull in runner products on its own.
@@ -103,11 +101,11 @@ let a host product build `SceneManifest` values, retain one or more
 values so host shells receive producer sequence, raster output, semantics,
 focus, and raster damage as one committed frame.
 
-The native SwiftUI host (for embedding a SwiftTUI app in a SwiftUI view on
-macOS/iOS) now lives in the separate `swift-tui-swiftui` package:
-https://github.com/SwiftTUI/swift-tui-swiftui — it uses that path to embed
-SwiftTUI scenes inside a SwiftUI app. `@swifttui/web` uses the same authored
-scene model for browser hosting on top of a `SwiftTUIWASI` build.
+The in-package `SwiftTUIAndroidHost` product uses this path for Android
+embedding. The external
+[`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses it
+to embed SwiftTUI scenes inside a SwiftUI app, while `@swifttui/web` consumes
+the same authored scene model on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`

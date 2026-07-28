@@ -262,11 +262,12 @@ For hosts:
   the same host.
 
 `RasterSurface` also carries package-level ordered presentation layers. Current
-terminal, WebHost/WASI, and SwiftUI host paths continue to consume the collapsed
-cell grid plus image attachments. The damage derivation still returns row/range
-damage for those hosts, but it also treats presentation-layer topology changes
-as dirty row signals so future ordered-layer consumers can detect authoring-order
-changes even when the final collapsed cells are stable.
+terminal, WebHost/WASI, Android, and external SwiftUI host paths continue to
+consume the collapsed cell grid plus image attachments. The damage derivation
+still returns row/range damage for those hosts, but it also treats
+presentation-layer topology changes as dirty row signals so future
+ordered-layer consumers can detect authoring-order changes even when the final
+collapsed cells are stable.
 
 ## Host Handoff
 
@@ -285,9 +286,13 @@ current frame. Raster hosts consume either a raster presentation surface or a
 - host-facing damage;
 - preferred layout size when available.
 
-Terminal-native, WASI/browser, localhost WebHost, and hosted SwiftUI surfaces all
-sit below this committed-frame boundary. For host selection and surface roles,
-see <doc:Host-Integration>.
+Terminal-native, WASI/browser, localhost WebHost, host-managed Android, and the
+external SwiftUI host all sit below this committed-frame boundary. They share
+the phase order and handoff contract, but resolve reuse, selective evaluation,
+ambient binding, and stack-depth policy vary by the per-host engine profile
+documented in
+[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
+For runtime host seams and surface roles, see <doc:Host-Integration>.
 
 Raster image attachments are still presented after cell rasterization. If an
 attachment carries blend metadata, the host path asks the shared image
@@ -295,8 +300,9 @@ compositor for a precomposed PNG variant keyed by the image reference, visible
 rect, blend mode, backdrop signature, cell pixel size, and host fallback
 background. The compositor expands captured backgrounds and explicit foreground
 glyphs into a pixel backdrop using deterministic block, braille, and centered
-text approximations; terminal graphics protocols, WASI/WebHost image records,
-and the SwiftUI host then draw that variant through their normal image routes.
+text approximations; terminal graphics protocols, WASI/WebHost/Android image
+records, and the SwiftUI host then draw that variant through their normal image
+routes.
 
 ## Diagnostics
 

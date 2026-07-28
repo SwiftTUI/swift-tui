@@ -331,7 +331,7 @@ Type-erased style storage
 ## Removed From The Public Surface
 ## Package-Only Transitional Seams
 ### `SwiftTUI`
-### Root-package platform integration products
+### Platform integration products
 Experimental or showcase targets follow the same rule
 EOF
 

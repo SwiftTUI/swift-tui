@@ -12,8 +12,10 @@ SwiftTUI is a **SwiftUI-shaped UI framework**. You author the same value types y
 know from SwiftUI — `App`, `Scene`, `View`, `@State`, `@FocusState`, `VStack`,
 the `Layout` protocol — and that *one* authored view tree is rendered, unchanged,
 to **five hosts**. The canonical enumeration and packaging boundaries live in
-[docs/HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). There is no host-specific
-resolve, layout, or state; only host-specific *consumption of one finished frame*.
+[docs/HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). Every host shares the
+same authored tree, phase order, and phase-product contracts. The selected
+engine profile can change resolve reuse, evaluation, ambient binding, and stack
+depth before host-specific presentation consumes the finished frame.
 
 The core mental model is three sentences long. **One authored tree, five hosts.** A
 **frame pipeline** turns that tree into a single committed frame by running it
@@ -795,16 +797,19 @@ intentionally redundant.
 > step 8 calls `presentCommittedFrame`.
 
 **Mental model.** A SwiftTUI program authors **one** view tree, and that tree is
-rendered the same way for every host. Graph owns resolve, Core owns the render
-products, and Runtime orchestrates them with zero host knowledge. The host enters
-only **below the committed-frame boundary**: each owns a thin surface adapter that
-turns a finished frame into terminal bytes, a JSON wire frame, or native pixels.
+rendered through the same phase sequence and contracts for every host. Graph
+owns resolve, Core owns the render products, and Runtime orchestrates them; the
+process's engine profile may change resolve mechanics above the boundary. The
+presentation host enters **below the committed-frame boundary** through a thin
+surface adapter that turns a finished frame into terminal bytes, a JSON wire
+frame, or native pixels.
 
 The single contract every non-terminal host consumes is the value type
 `SemanticHostFrame` (`Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift`):
 a committed `RasterSurface` plus the `SemanticSnapshot`, focused identity, host-facing
 raster damage, monotonic producer `sequence`, and preferred layout size. Everything
-above the boundary is shared; everything below is a per-host adapter.
+above the boundary shares one contract and phase order, modulo the engine
+profile; everything below is a per-host adapter.
 
 ```text
 App.body  ->  RunLoop (shared engine, host-selected profile)
@@ -823,7 +828,7 @@ App.body  ->  RunLoop (shared engine, host-selected profile)
 
 | Host | Entry file | How it consumes the frame |
 | --- | --- | --- |
-| Shared boundary | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift` | `RunLoop.presentCommittedFrame(_:damage:)` branches on `RuntimeConfiguration.output` and the roles the surface implements; builds the `SemanticHostFrame`. |
+| Shared boundary | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift` | `RunLoop.presentCommittedFrame(_:damage:)` branches on `RuntimeConfiguration.output` and the roles the surface implements; builds a `SemanticHostFrame` for semantic-frame surfaces or takes a raster role for terminal presentation. |
 | Terminal (CLI / Embedding) | `Sources/SwiftTUIRuntime/Terminal/TerminalHost.swift`, `Platforms/CLI/Sources/SwiftTUICLI/TerminalRunner.swift` | `TerminalHost.present(_:damage:)` plans incremental vs full repaint and writes ANSI/cell bytes + image protocols. |
 | WASI static bundle | `Platforms/WASI/Sources/SwiftTUIWASI/WASIRunner.swift`, `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift` | `WebSurfaceTransport.present(_:)` JSON-encodes the frame via `WebSurfaceFrameEncoder` and writes it to a stdout file descriptor. |
 | localhost WebHost | `Platforms/WebHost/Sources/SwiftTUIWebHost/WebHostRunner.swift`, `Platforms/WebHost/Sources/SwiftTUIWebHost/WebSocketSurfaceTransport.swift` | Same `WebSurfaceFrameEncoder` wire frame as WASI, but bytes go over a WebSocket pump instead of a file descriptor. |

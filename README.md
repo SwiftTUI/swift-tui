@@ -52,9 +52,10 @@ snapshot-testable.
   drives a linear accessible output path, `--no-color` / `--ascii` fallbacks, and
   reduce-motion behavior — so you get it without wiring it up. See
   [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
-- **One source, five hosts.** Terminal, static WASI bundle, localhost WebHost,
-  native SwiftUI surface, and native Android surface are sibling products of one
-  package — so the same authored app reaches every target.
+- **One source across host presentations.** The same authored app reaches the
+  [canonical host matrix](docs/HOSTS-AND-PLATFORMS.md#canonical-host-matrix);
+  that owner records which integrations ship in this package and which are
+  distributed separately.
 
 ## Quick start
 

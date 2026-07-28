@@ -45,14 +45,14 @@ flowchart TD
 
 | Document | What it covers |
 | --- | --- |
-| [CODEBASE-GUIDE.md](CODEBASE-GUIDE.md) | **Start here for new engineers.** A horizontal map (the module graph and a "where does X live?" subsystem table) plus vertical end-to-end traces (the interaction→update loop, app bootstrap & run-loop lifecycle, and one app → five hosts). Complements the per-frame render-pipeline article rather than duplicating it. |
+| [CODEBASE-GUIDE.md](CODEBASE-GUIDE.md) | **Start here for new engineers.** A horizontal map (the module graph and a "where does X live?" subsystem table) plus vertical end-to-end traces (the interaction→update loop, app bootstrap & run-loop lifecycle, and host handoff). Complements the per-frame render-pipeline article rather than duplicating it. |
 | [VISION.md](VISION.md) | What SwiftTUI is for, its design principles, and what is deliberately in and out of scope. |
 | [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The single gap register for the documentation. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
 | [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
 | [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Internal compatibility pointer to the DocC render pipeline guides. |
-| [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The four execution modes, the platform support matrix, and terminal-program embedding. |
-| [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds four accessibility consumers. |
+| [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The canonical host matrix, per-host engine profiles, platform support, and terminal-program embedding. |
+| [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds all five host-side consumer paths. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Toolchains, the build/test gate, fixture policy, and the release process. |
 | [KNOWN-TEST-FLAKES.md](KNOWN-TEST-FLAKES.md) | The register of known, pre-existing flaky tests and how to tell a flake from a real regression. |
