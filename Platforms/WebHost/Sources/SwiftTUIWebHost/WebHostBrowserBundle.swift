@@ -71,23 +71,20 @@ package enum WebHostBrowserBundle {
 
   package static func assetPaths() throws -> [String] {
     let baseURL = try browserResourceDirectory()
-    guard
-      let enumerator = FileManager.default.enumerator(
-        at: baseURL,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
-      )
-    else {
+    guard let enumerator = FileManager.default.enumerator(atPath: baseURL.path) else {
       return []
     }
 
     var paths: [String] = []
-    for case let fileURL as URL in enumerator {
+    for case let relativePath as String in enumerator {
+      guard !relativePath.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else {
+        continue
+      }
+      let fileURL = baseURL.appendingPathComponent(relativePath, isDirectory: false)
       let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
       guard values.isRegularFile == true else {
         continue
       }
-      let relativePath = String(fileURL.path.dropFirst(baseURL.path.count + 1))
       paths.append(relativePath)
     }
     return paths.sorted()
@@ -140,10 +137,21 @@ package enum WebHostBrowserBundle {
   }
 
   private static func browserResourceDirectory() throws -> URL {
-    if let url = Bundle.module.url(forResource: "browser", withExtension: nil) {
-      return url
+    // `.copy("Resources/browser")` preserves the directory in SwiftPM's module
+    // bundle, so request paths remain rooted at its contents rather than at the
+    // module bundle itself.
+    let browserURL = Bundle.module.resourceURL?
+      .appendingPathComponent("browser", isDirectory: true)
+    guard let browserURL else {
+      throw WebHostBrowserBundleError.missingBundle
     }
-    throw WebHostBrowserBundleError.missingBundle
+    guard
+      let values = try? browserURL.resourceValues(forKeys: [.isDirectoryKey]),
+      values.isDirectory == true
+    else {
+      throw WebHostBrowserBundleError.missingBundle
+    }
+    return browserURL
   }
 }
 
