@@ -24,7 +24,15 @@ reference exists because parts of the graph's vocabulary surface in public
 authoring APIs: preference keys, focused values, key events, and the
 matched-geometry namespace.
 
+For the normative reconciliation model — dirty frontiers, cones, freshness
+stamps, the two-layer reuse door, and its soundness oracles — see
+<doc:Reuse-and-Invalidation>.
+
 ## Topics
+
+### Reconciliation
+
+- <doc:Reuse-and-Invalidation>
 
 ### Preferences And Anchors
 

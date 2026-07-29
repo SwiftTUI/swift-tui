@@ -257,6 +257,9 @@ view value is `Equatable`-equal to last frame's, it read no
 `@State`/`@Observable`/focus state, and it passes the retained-reuse guards —
 the `EquatableView` / `View.equatable()` opt-in. It is `Equatable`-only, so it is
 inert on views that do not opt in; set `SWIFTTUI_MEMO_REUSE=0` to disable it.
+The complete ordering, input contracts, freshness-stamp algebra, suppression
+rules, and oracle boundaries are documented in
+[Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).
 
 ## The layout model
 
@@ -327,3 +330,15 @@ uses honest isolation or `Synchronization` primitives.
   matrix is in [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 - **Action scope** — a node in the focus chain that can own key commands,
   palette commands, and toolbar items (`ActionScope`).
+- **Publication** — committing graph-recorded runtime registrations into the live dispatch registries after resolve; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Fingerprint** — an equality-friendly registration projection used to compute publication deltas or compare a scoped restore with a scratch rebuild; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Frontier** — the highest stitchable evaluator targets that collectively cover all queued graph-local dirty work; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Cone** — the self/ancestor/descendant region whose resolved output may be affected by an invalidation or structural churn; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Rail** — one of the parallel invalidated-node and graph-local-dirty work ledgers reconciled before frontier planning; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Strand** — stored, listed, or published graph state whose ownership path no longer makes it reachable or retires it; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Island** — resolved content connected to its host through `evaluationHost` rather than an ordinary live `parent` edge; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Servable** — having enough gate-specific evidence for a committed subtree to be returned without evaluating its body; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Freshness stamp** — one of `CommittedFreshness`'s fresh, island-stale, and foreign-parented verdicts governing snapshot service and rebuild; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Reuse door** — the single `ViewGraph.reuseResolvedSubtree` seam that owns retained-before-memo ordering and common acceptance effects; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Suppression scope** — a finite focus/press identity set that names forced recomputation not fully represented by ordinary invalidation; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Oracle** — an independently evaluated invariant that exposes false reuse, lost work, incoherent stamps, or stranded ownership; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
