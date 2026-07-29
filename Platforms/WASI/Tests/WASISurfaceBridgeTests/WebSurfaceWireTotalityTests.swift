@@ -29,6 +29,9 @@ struct WebSurfaceWireTotalityTests {
     #expect(
       HostWireSchema.scalingModeTokens
         == ["stretch", "fit", "fill"])
+    #expect(
+      HostWireSchema.DeliveryUplink.resyncScopeTokens
+        == ["keyframe", "images"])
 
     #expect(
       Set(FocusPresentation.Semantics.allCases.map(HostWireSchema.focusSemanticsToken))
@@ -49,7 +52,7 @@ struct WebSurfaceWireTotalityTests {
 
   @Test("a fully-populated full frame emits exactly the manifest key sets")
   func fullFrameEmitsExactlyTheManifestSurface() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let record = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         HostWireFrameModel(
@@ -57,7 +60,7 @@ struct WebSurfaceWireTotalityTests {
           terminalStyle: Self.totalityTerminalStyle
         ),
         fallbackBackground: TerminalAppearance.fallback.backgroundColor,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
 
@@ -208,19 +211,19 @@ struct WebSurfaceWireTotalityTests {
     #expect(record["linkTargets"] != nil)
     #expect(
       Set(record.keys)
-        == HostWireSchema.WebWire.fullFrameKeys.union(["links", "linkTargets"])
+        == HostWireSchema.WebWire.fullFrameKeys.union(["epoch", "gen", "links", "linkTargets"])
     )
   }
 
-  @Test("default frames omit every optional field")
-  func defaultFramesOmitOptionalFields() throws {
+  @Test("default frames emit only delivery stamps among optional fields")
+  func defaultFramesEmitOnlyDeliveryStampsAmongOptionalFields() throws {
     let record = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         RasterSurface(size: CellSize(width: 2, height: 1), lines: ["ok"])
       )
     )
 
-    #expect(Set(record.keys) == HostWireSchema.WebWire.fullFrameKeys)
+    #expect(Set(record.keys) == HostWireSchema.WebWire.fullFrameKeys.union(["epoch", "gen"]))
     #expect(record["version"] as? Int == 1)
   }
 
@@ -267,14 +270,14 @@ struct WebSurfaceWireTotalityTests {
     // propagate loudly to the sibling repo instead of silently drifting.
     // Regenerate with SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
     // sync flow described in docs/DEVELOPMENT.md.
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let encoded = WebSurfaceFrameEncoder.encode(
       HostWireFrameModel(
         Self.fullyPopulatedFrame().hostProjection,
         terminalStyle: Self.totalityTerminalStyle
       ),
       fallbackBackground: TerminalAppearance.fallback.backgroundColor,
-      knownImageIDs: &knownImageIDs
+      state: &state
     )
     let url = Self.fixtureURL("web-surface-totality.txt")
 
@@ -298,7 +301,11 @@ struct WebSurfaceWireTotalityTests {
     // swift-tui-web parses a byte-identical copy and the coordination root's
     // transport_fixture_sync gate keeps the copies in lockstep. Regenerate
     // with SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1.
-    let encoded = WebSurfaceFrameEncoder.encode(Self.compositedImageFrame())
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+    let encoded = WebSurfaceFrameEncoder.encode(
+      Self.compositedImageFrame(),
+      state: &state
+    )
 
     // Red-proof that the pre-blend path engaged: a compositing-tagged
     // attachment must emit the blended payload, not its raw source bytes.

@@ -52,44 +52,16 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ surface: RasterSurface
   ) -> String {
-    var knownImageIDs: Set<String> = []
-    return encode(
-      surface,
-      damage: nil,
-      knownImageIDs: &knownImageIDs
-    )
+    var state = HostWireCapabilities().negotiatedEncodingState()
+    return encode(surface, damage: nil, state: &state)
   }
 
   package static func encode(
     _ surface: RasterSurface,
     damage: PresentationDamage?
   ) -> String {
-    var knownImageIDs: Set<String> = []
-    return encode(
-      surface,
-      damage: damage,
-      knownImageIDs: &knownImageIDs
-    )
-  }
-
-  package static func encode(
-    _ surface: RasterSurface,
-    damage: PresentationDamage? = nil,
-    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    knownImageIDs: inout Set<String>
-  ) -> String {
-    encode(
-      HostWireFrameModel(
-        surface: surface,
-        sequence: nil,
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: damage,
-        preferredLayoutSize: nil
-      ),
-      fallbackBackground: fallbackBackground,
-      knownImageIDs: &knownImageIDs
-    )
+    var state = HostWireCapabilities().negotiatedEncodingState()
+    return encode(surface, damage: damage, state: &state)
   }
 
   package static func encode(
@@ -128,25 +100,8 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ frame: SemanticHostFrame
   ) -> String {
-    var knownImageIDs: Set<String> = []
-    return encode(
-      frame,
-      knownImageIDs: &knownImageIDs
-    )
-  }
-
-  package static func encode(
-    _ frame: SemanticHostFrame,
-    fallbackBackground: Color = TerminalAppearance.fallback.backgroundColor,
-    knownImageIDs: inout Set<String>
-  ) -> String {
-    // Decompose the frame through the shared host-content projection so the
-    // host-serialized field set lives in one place (see `HostFrameProjection`).
-    encode(
-      HostWireFrameModel(frame.hostProjection),
-      fallbackBackground: fallbackBackground,
-      knownImageIDs: &knownImageIDs
-    )
+    var state = HostWireCapabilities().negotiatedEncodingState()
+    return encode(frame, state: &state)
   }
 
   package static func encode(
@@ -191,18 +146,24 @@ package enum WebSurfaceFrameEncoder {
     state: inout HostWireEncodingState
   ) -> String {
     guard state.deltaEnabled else {
-      return encode(
+      let generation = state.nextGen()
+      return encodeFull(
         model,
         fallbackBackground: fallbackBackground,
+        epochID: state.epochID,
+        generation: generation,
         knownImageIDs: &state.knownImageIDs
-      )
+      ).output
     }
 
     switch model.deltaDecision(for: state) {
     case .full:
+      let generation = state.nextGen()
       let full = encodeFull(
         model,
         fallbackBackground: fallbackBackground,
+        epochID: state.epochID,
+        generation: generation,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -217,9 +178,12 @@ package enum WebSurfaceFrameEncoder {
         state.recordDeltaBaseline(gridSize: model.gridSize)
         return output
       }
+      let generation = state.nextGen()
       let full = encodeFull(
         model,
         fallbackBackground: fallbackBackground,
+        epochID: state.epochID,
+        generation: generation,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -227,21 +191,11 @@ package enum WebSurfaceFrameEncoder {
     }
   }
 
-  package static func encode(
-    _ model: HostWireFrameModel,
-    fallbackBackground: Color,
-    knownImageIDs: inout Set<String>
-  ) -> String {
-    encodeFull(
-      model,
-      fallbackBackground: fallbackBackground,
-      knownImageIDs: &knownImageIDs
-    ).output
-  }
-
   private static func encodeFull(
     _ model: HostWireFrameModel,
     fallbackBackground: Color,
+    epochID: UInt32,
+    generation: UInt64,
     knownImageIDs: inout Set<String>
   ) -> (output: String, styles: HostWireStyleTable) {
     var styles = HostWireStyleTable(gridSize: model.gridSize)
@@ -266,6 +220,8 @@ package enum WebSurfaceFrameEncoder {
 
     var json = "\u{001E}surface:{"
     json += "\"version\":\(version)"
+    json += ",\"epoch\":\(epochID)"
+    json += ",\"gen\":\(generation)"
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }
@@ -333,10 +289,15 @@ package enum WebSurfaceFrameEncoder {
       model.accessibilityAnnouncements
     )
     let scrollRegions = encodeScrollRegions(model.scrollRegions)
+    let baselineGeneration = candidate.recordsEncoded
+    let generation = candidate.nextGen()
 
     var json = "\u{001E}surface:{"
     json += "\"version\":3"
     json += ",\"encoding\":\"delta\""
+    json += ",\"epoch\":\(candidate.epochID)"
+    json += ",\"gen\":\(generation)"
+    json += ",\"baselineGen\":\(baselineGeneration)"
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }

@@ -80,6 +80,9 @@ package struct WebSurfaceInputParser {
     if let capabilities = parseCapsCommand(text) {
       return ([], [capabilities])
     }
+    if let resync = parseResyncCommand(text) {
+      return ([], [resync])
+    }
     if let event = parseKeyCommand(text) ?? parseMouseCommand(text) ?? parsePasteCommand(text) {
       return ([event], [])
     }
@@ -151,6 +154,20 @@ package struct WebSurfaceInputParser {
       return nil
     }
     return .capabilities(capabilities)
+  }
+
+  private func parseResyncCommand(
+    _ text: String
+  ) -> WebSurfaceInputControlMessage? {
+    let prefix = "resync:"
+    guard text.hasPrefix(prefix),
+      let request = HostWireResyncRequest.fromRequestJSON(
+        String(text.dropFirst(prefix.count))
+      )
+    else {
+      return nil
+    }
+    return .resync(request)
   }
 
   private func parseKeyCommand(

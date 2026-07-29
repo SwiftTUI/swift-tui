@@ -116,6 +116,18 @@ private final class AndroidHostSceneHostStateBox: Sendable {
     }
   }
 
+  func requestResync(
+    _ request: HostWireResyncRequest
+  ) {
+    state.withLock { state in
+      state.webEncodingState.requestResync(request)
+      // The latest frame may already have encode-at-copy scratch. Clearing
+      // its sequence forces the next size/copy handshake to re-encode that
+      // same frame with the repaired delivery state.
+      state.encodedFrameSequence = nil
+    }
+  }
+
   private static func unionDamage(
     _ accumulated: PresentationDamage?,
     _ next: PresentationDamage?
@@ -337,9 +349,9 @@ public final class AndroidHostSceneHost {
     state.latestFrameBytes
   }
 
-  /// How many distinct frames have been encoded for consumption — the
+  /// How many frame records have been encoded for consumption — the
   /// encode-at-copy test seam: committed-but-never-copied frames must not
-  /// advance it.
+  /// advance it, while a requested same-sequence resync re-encode must.
   package var consumedFrameEncodeCount: Int {
     state.encodedFrameCount
   }
@@ -382,6 +394,21 @@ public final class AndroidHostSceneHost {
     }
     wireCapabilities = capabilities
     state.declareWireCapabilities(capabilities)
+    return true
+  }
+
+  /// Requests delivery-state repair from a `resync`-shaped JSON object.
+  ///
+  /// Unlike capability declaration, resync is valid throughout the session:
+  /// it changes neither record shape nor connection epoch.
+  @discardableResult
+  public func requestResync(
+    json: String
+  ) -> Bool {
+    guard let request = HostWireResyncRequest.fromRequestJSON(json) else {
+      return false
+    }
+    state.requestResync(request)
     return true
   }
 

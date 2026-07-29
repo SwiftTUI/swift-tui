@@ -14,49 +14,49 @@ import Testing
 struct HostWireSchemaContractTests {
   private static func fixtures() -> [(typeName: String, instance: Any)] {
     [
-    (
-      "HostFrameProjection",
-      HostFrameProjection(
-        SemanticHostFrame(
-          sequence: 1,
-          raster: RasterSurface(size: CellSize(width: 1, height: 1), lines: [" "]),
-          semantics: SemanticSnapshot(),
-          focusedIdentity: nil
+      (
+        "HostFrameProjection",
+        HostFrameProjection(
+          SemanticHostFrame(
+            sequence: 1,
+            raster: RasterSurface(size: CellSize(width: 1, height: 1), lines: [" "]),
+            semantics: SemanticSnapshot(),
+            focusedIdentity: nil
+          )
         )
-      )
-    ),
-    ("RasterSurface", RasterSurface()),
-    ("RasterCell", RasterCell.empty),
-    ("ResolvedTextStyle", ResolvedTextStyle()),
-    ("TextLineStyle", TextLineStyle()),
-    (
-      "RasterImageAttachment",
-      RasterImageAttachment(
-        identity: Identity(components: ["image"]),
-        bounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
-        source: .data([1])
-      )
-    ),
-    (
-      "AccessibilityNode",
-      AccessibilityNode(
-        identity: Identity(components: ["node"]),
-        rect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
-        role: .group
-      )
-    ),
-    ("AccessibilityAnnouncement", AccessibilityAnnouncement(message: "m")),
-    (
-      "ScrollRoute",
-      ScrollRoute(
-        identity: Identity(components: ["list"]),
-        viewportRect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
-        contentBounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 2))
-      )
-    ),
-    ("FocusPresentation", FocusPresentation.none),
-    ("PresentationDamage", PresentationDamage()),
-    ("PresentationDamage.TextRow", PresentationDamage.TextRow(row: 0)),
+      ),
+      ("RasterSurface", RasterSurface()),
+      ("RasterCell", RasterCell.empty),
+      ("ResolvedTextStyle", ResolvedTextStyle()),
+      ("TextLineStyle", TextLineStyle()),
+      (
+        "RasterImageAttachment",
+        RasterImageAttachment(
+          identity: Identity(components: ["image"]),
+          bounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
+          source: .data([1])
+        )
+      ),
+      (
+        "AccessibilityNode",
+        AccessibilityNode(
+          identity: Identity(components: ["node"]),
+          rect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
+          role: .group
+        )
+      ),
+      ("AccessibilityAnnouncement", AccessibilityAnnouncement(message: "m")),
+      (
+        "ScrollRoute",
+        ScrollRoute(
+          identity: Identity(components: ["list"]),
+          viewportRect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
+          contentBounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 2))
+        )
+      ),
+      ("FocusPresentation", FocusPresentation.none),
+      ("PresentationDamage", PresentationDamage()),
+      ("PresentationDamage.TextRow", PresentationDamage.TextRow(row: 0)),
     ]
   }
 
@@ -120,6 +120,21 @@ struct HostWireSchemaContractTests {
       #expect(!mapping.webSocketIngress.isEmpty, "\(mapping.field): empty WebSocket ingress")
       #expect(!mapping.androidIngress.isEmpty, "\(mapping.field): empty Android ingress")
     }
+  }
+
+  @Test("delivery uplink manifest names capability and resync records")
+  func deliveryUplinkManifestNamesRecordsAndKeys() {
+    #expect(HostWireSchema.DeliveryUplink.recordTypes == ["caps", "resync"])
+    #expect(
+      HostWireSchema.DeliveryUplink.capabilityKeys
+        == Set(HostWireSchema.capabilityMappings.map(\.field))
+    )
+    #expect(HostWireSchema.DeliveryUplink.resyncRequiredKeys == ["scope"])
+    #expect(HostWireSchema.DeliveryUplink.resyncOptionalKeys == ["ids"])
+    #expect(
+      HostWireSchema.DeliveryUplink.resyncScopeTokens
+        == ["keyframe", "images"]
+    )
   }
 
   @Test("every not-serialized treatment carries a rationale")

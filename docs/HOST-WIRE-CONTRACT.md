@@ -31,9 +31,9 @@ The Swift encoder currently emits four record types:
 | `frameDiagnostic` | A JSON object containing the format plus its header and fields. |
 
 The input parser accepts terminal bytes mixed with RS-prefixed `resize`,
-`style`, `caps`, `key`, `mouse`, and `paste` control records. It buffers a
-partial control record until newline. Malformed or unknown controls are
-dropped; they are not terminal input.
+`style`, `caps`, `resync`, `key`, `mouse`, and `paste` control records. It
+buffers a partial control record until newline. Malformed or unknown controls
+are dropped; they are not terminal input.
 
 `surface` has three record shapes:
 
@@ -43,10 +43,11 @@ dropped; they are not terminal input.
   regions.
 - Version 3 has `encoding: "delta"` and replaces `rows` with `deltaRows`.
 
-The v1/v2 choice is not a capability revision. Additive fields such as links,
-focus presentation, preferred grid size, and Android's terminal style can
-appear without changing that choice. A v3 record is emitted only after
-`acceptsDeltaFrames` has been declared and a compatible baseline exists.
+The v1/v2 choice is not a capability revision. Additive fields such as
+`epoch`, `gen`, links, focus presentation, preferred grid size, and Android's
+terminal style can appear without changing that choice. A v3 record is
+emitted only after `acceptsDeltaFrames` has been declared and a compatible
+baseline exists; it additionally carries `baselineGen`.
 
 ## Evolution rules
 
@@ -94,19 +95,41 @@ only when the field is otherwise a string.
 
 ## Cross-frame encoder state
 
-`HostWireEncodingState` has three stateful axes. None currently carries an
-epoch identifier, record generation, baseline generation, or delivery
-acknowledgement.
+`HostWireEncodingState` has four stateful axes. It carries record identity and
+repairable baseline/image state, but still has no delivery acknowledgement.
+
+### Encoding epoch and record generation
+
+Each newly negotiated encoding state receives a process-local `UInt32`
+`epochID`. Records emitted from that state carry the additive-optional keys
+`epoch` and `gen`; `gen` begins at 1 and increases once for every successfully
+encoded full or delta record. A delta also carries `baselineGen`, the
+generation immediately preceding it in that epoch.
+
+The tuple `(epoch, gen)` is encoder-owned. It is not the runtime frame
+`sequence`: a keyframe repair can re-encode the same Android frame sequence
+at a new generation, and several runtime frames can be skipped before one
+Android record is consumed. Reconstructing the complete encoding state, such
+as an accepted WebSocket capability declaration, allocates a new epoch.
+Repairing an existing state does not.
+
+These fields are optional in the schema for legacy compatibility but are
+always emitted by the current Swift encoder. Their addition does not change
+the full-frame version literals, the delta version literal, or the capability
+set.
 
 ### Transmit-once images
 
-`knownImageIDs` is an insert-only set within one encoding state. The first
-appearance of an image ID includes `dataBase64`; later appearances retain the
-image's geometry and metadata but omit the payload. Reconstructing the
-encoding state empties the set and causes payloads to be sent again.
+`knownImageIDs` records which payloads were transmitted within one encoding
+state. The first appearance of an image ID includes `dataBase64`; later
+appearances retain the image's geometry and metadata but omit the payload.
+Reconstructing the encoding state empties the set and causes payloads to be
+sent again.
 
-The encoder has no current downlink acknowledging image retention and no
-uplink through which a consumer can request a missing payload.
+A `resync:{"scope":"images","ids":[...]}` uplink removes those IDs from the
+set so their next appearance includes payload bytes again. Omitting `ids`, or
+sending an empty list, clears the whole set. The encoder still has no
+downlink acknowledging which images a consumer retained.
 
 ### Delta baseline
 
@@ -118,10 +141,11 @@ frame establishes a baseline. A later frame may be a delta when:
 - the baseline grid size equals the current grid size; and
 - damage does not request a full text repaint or graphics replay.
 
-The state does not retain baseline rows. A delta record does not identify the
-full or delta record to which it applies. The emitted record therefore lets a
-consumer check only that it has a retained baseline with the same dimensions;
-it cannot prove which record established that baseline.
+The state does not retain baseline rows. A delta identifies its immediately
+preceding record through `baselineGen`; together with `epoch`, a consumer can
+reject a stale, reordered, or non-contiguous delta. A
+`resync:{"scope":"keyframe"}` request clears `hasBaseline`, so the next record
+is full in the same epoch and consumes the next generation.
 
 ### Persistent style epoch
 
@@ -141,9 +165,9 @@ retained the bytes.
 
 | Transport | Current ratchet |
 | --- | --- |
-| WASI browser | Capabilities and state are created with the transport. `present` encodes and mutates state, then synchronously writes the complete record to stdout. A write error can occur after the mutation; there is no acknowledgement. Reloading constructs a fresh transport. |
-| Localhost WebHost | `present` encodes and mutates state before enqueuing bytes on the asynchronous FIFO sink pump. Send completion and failure are observed later through `drain` or a subsequent enqueue. Every accepted `caps` declaration replaces all encoding state and begins a new connection epoch. |
-| Host-managed Android | Encoding is deferred to `copyLatestFrameBytes`. The first size query for a new sequence encodes into committed state, increments the encoded-frame count, and clears accumulated damage before checking whether a destination buffer can receive the bytes. The following copy call reuses those scratch bytes if the sequence is unchanged. |
+| WASI browser | Capabilities and state are created with the transport. `present` encodes and mutates state, then synchronously writes the complete record to stdout. A write error can occur after the mutation; there is no acknowledgement. Reloading constructs a fresh transport. A parsed `resync` record mutates the existing state under its mutex. |
+| Localhost WebHost | `present` encodes and mutates state before enqueuing bytes on the asynchronous FIFO sink pump. Send completion and failure are observed later through `drain` or a subsequent enqueue. Every accepted `caps` declaration replaces all encoding state and begins a new connection epoch; `resync` instead repairs the current epoch under the same state mutex. |
+| Host-managed Android | Encoding is deferred to `copyLatestFrameBytes`. The first size query for a new sequence encodes into committed state, increments the encoded-frame count, and clears accumulated damage before checking whether a destination buffer can receive the bytes. The following copy call reuses those scratch bytes if the sequence is unchanged. An accepted resync clears the scratch sequence so even the same latest frame is re-encoded with the repaired state. |
 
 These are encode-time epochs, not delivery-coupled epochs. A failed write,
 failed asynchronous send, abandoned Android size query, failed decode, or
@@ -179,25 +203,49 @@ The ingress lifecycle differs by transport:
 `SWIFTTUI_SURFACE_MAX_VERSION` is retired and inert. Versions are decoder
 shape guards, not negotiated ceilings.
 
+## Delivery repair uplink
+
+`HostWireSchema.DeliveryUplink` manifests the two records that change or
+repair cross-frame wire state: `caps` and `resync`. Resync is always safe and
+therefore is not a capability bit. The Foundation-free request parser accepts:
+
+- `{"scope":"keyframe"}` to force the next surface record full; and
+- `{"scope":"images","ids":[...]}` to request selected image payloads, with
+  omitted or empty `ids` meaning all images.
+
+Malformed requests and unknown scope tokens are rejected without mutation.
+Unknown object keys are skipped for additive compatibility.
+
+Ingress follows each host's existing control channel:
+
+- **WASI browser:** the shared input parser produces the request and
+  `WASIRunner` routes it to `WebSurfaceTransport`. Runtime `caps` remains
+  deliberately ignored because WASI capability negotiation is
+  environment-owned.
+- **Localhost WebHost:** `WebSocketInputReader` routes it to
+  `WebSocketSurfaceTransport`.
+- **Host-managed Android:** `AndroidHostSceneHost.requestResync(json:)` and
+  the `swift_tui_android_request_resync` C ABI route it to mutex-guarded host
+  state.
+
 ## Current consumer contract
 
-Until the known gaps below close, a delta-capable consumer is implicitly
-required to provide:
+Until the remaining delivery gaps below close, a delta-capable consumer is
+implicitly required to provide:
 
 1. lossless, in-order application of every accepted surface record;
-2. a baseline that survives for the entire encoding epoch;
+2. a baseline whose retained `(epoch, gen)` matches each delta's
+   `(epoch, baselineGen)`;
 3. perfect memory for every image ID whose payload appeared in that epoch;
 4. a style table that accepts the complete accumulated table on every delta.
 
 No deployed consumer has explicitly acknowledged that contract, and current
 implementations violate parts of it:
 
-- The browser decoder applies a delta to the last same-sized frame; it has no
-  generation with which to detect a skipped or reordered record. A delta
-  received without a retained baseline is dropped and leaves the current
-  surface unchanged.
-- The Android decoder also accepts a same-sized retained baseline without an
-  epoch or baseline generation.
+- The current sibling browser and Android decoders have not yet adopted the
+  producer's additive generation fields. They still apply a delta to the last
+  same-sized frame and cannot yet reject a skipped or reordered record by
+  generation.
 - The canvas painter removes a failed decode from its cache. A later
   payload-less repeat cannot retry the decode.
 - The Android renderer stores decoded images in an 8 MiB `LruCache`. Eviction
@@ -235,7 +283,7 @@ package's `HEAD`.
 
 | Coordination stage | Gap at `HEAD` |
 | --- | --- |
-| S1 | Surface records have no epoch, generation, or baseline generation. Consumers cannot distinguish a contiguous delta from a stale or reordered one, and no transport accepts a keyframe or image resync request. |
+| S1 | Swift production is complete: every surface record carries an epoch and generation, deltas name their baseline generation, and all three Swift host ingresses accept keyframe/image resync. The sibling browser and Android consumers still need to validate the fields and emit repairs. |
 | S2 | Image payloads are transmit-once, but a canvas decode failure or Android cache eviction can still lose one. There is no resend-on-miss path or retained-image acknowledgement. |
 | S3a | Android's size query commits cross-frame encoder state before the bytes are copied and decoded. An abandoned handshake, a grown second query, or decode failure can strand that state. |
 | S3b | `WebHostSceneChannel` retains an unbounded detached output backlog and flushes it when a client attaches, before processing that client's capability declaration. Detached surface records can therefore precede the epoch reset intended for the new client. |

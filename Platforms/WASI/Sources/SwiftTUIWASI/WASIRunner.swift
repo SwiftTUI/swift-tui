@@ -195,6 +195,8 @@ public enum WASIRunner {
           // mid-session declaration would serve. The shared parser produces
           // this message for the WebSocket transport, which does have one.
           break
+        case .resync(let request):
+          host.requestResync(request)
         }
       }
 

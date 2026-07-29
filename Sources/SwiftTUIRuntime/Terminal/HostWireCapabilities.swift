@@ -108,9 +108,96 @@ package struct HostWireCapabilities: Equatable, Sendable {
   }
 }
 
-/// Minimal JSON scanner for the flat `caps:` declaration object. Recognizes
-/// strings, integers, booleans, and null as values, and skips balanced
-/// nested containers so unknown future keys cannot wedge the parse.
+/// A host request to repair delivery state without creating a new negotiated
+/// connection epoch.
+package struct HostWireResyncRequest: Equatable, Sendable {
+  package enum Scope: Equatable, Sendable {
+    case keyframe
+    /// An empty list requests every image payload.
+    case images([String])
+  }
+
+  package let scope: Scope
+
+  package init(scope: Scope) {
+    self.scope = scope
+  }
+
+  /// Parses the JSON object payload of a `resync:` control record.
+  ///
+  /// Unknown keys are ignored for additive compatibility. Known keys and the
+  /// scope token are strict so malformed repair requests cannot accidentally
+  /// invalidate broader encoder state.
+  package static func fromRequestJSON(
+    _ text: String
+  ) -> HostWireResyncRequest? {
+    var scanner = CapsJSONScanner(text)
+    scanner.skipWhitespace()
+    guard scanner.consume("{") else {
+      return nil
+    }
+
+    var scope: String?
+    var imageIDs: [String]?
+    scanner.skipWhitespace()
+    if scanner.consume("}") {
+      return nil
+    }
+
+    while true {
+      scanner.skipWhitespace()
+      guard let key = scanner.consumeString() else {
+        return nil
+      }
+      scanner.skipWhitespace()
+      guard scanner.consume(":") else {
+        return nil
+      }
+      scanner.skipWhitespace()
+
+      switch key {
+      case "scope":
+        guard let value = scanner.consumeString() else {
+          return nil
+        }
+        scope = value
+      case "ids":
+        guard let value = scanner.consumeStringArray() else {
+          return nil
+        }
+        imageIDs = value
+      default:
+        guard scanner.skipValue() else {
+          return nil
+        }
+      }
+
+      scanner.skipWhitespace()
+      if scanner.consume(",") {
+        continue
+      }
+      guard scanner.consume("}") else {
+        return nil
+      }
+      scanner.skipWhitespace()
+      guard scanner.isAtEnd else {
+        return nil
+      }
+      switch scope {
+      case "keyframe":
+        return HostWireResyncRequest(scope: .keyframe)
+      case "images":
+        return HostWireResyncRequest(scope: .images(imageIDs ?? []))
+      default:
+        return nil
+      }
+    }
+  }
+}
+
+/// Minimal JSON scanner for the `caps:` and `resync:` objects. It validates
+/// the full grammar of skipped values, including nested containers, so
+/// unknown future keys remain additive without admitting malformed records.
 private struct CapsJSONScanner {
   private let scalars: [Unicode.Scalar]
   private var index = 0
@@ -164,40 +251,126 @@ private struct CapsJSONScanner {
         switch escaped {
         case "\"", "\\", "/":
           value.append(escaped)
+        case "b":
+          value.append("\u{0008}")
+        case "f":
+          value.append("\u{000C}")
         case "n":
           value.append("\n")
         case "t":
           value.append("\t")
         case "r":
           value.append("\r")
+        case "u":
+          guard let firstCodeUnit = consumeHexCodeUnit() else {
+            return nil
+          }
+          let scalarValue: UInt32
+          if (0xD800...0xDBFF).contains(firstCodeUnit) {
+            guard consume("\\"), consume("u"),
+              let secondCodeUnit = consumeHexCodeUnit(),
+              (0xDC00...0xDFFF).contains(secondCodeUnit)
+            else {
+              return nil
+            }
+            scalarValue =
+              0x1_0000
+              + (UInt32(firstCodeUnit - 0xD800) << 10)
+              + UInt32(secondCodeUnit - 0xDC00)
+          } else {
+            guard !(0xDC00...0xDFFF).contains(firstCodeUnit) else {
+              return nil
+            }
+            scalarValue = UInt32(firstCodeUnit)
+          }
+          guard let decoded = Unicode.Scalar(scalarValue) else {
+            return nil
+          }
+          value.append(decoded)
         default:
-          // Escapes the declaration never needs (\b, \f, \uXXXX): reject
-          // rather than mis-decode.
           return nil
         }
         continue
+      }
+      guard scalar.value >= 0x20 else {
+        return nil
       }
       value.append(scalar)
     }
     return nil
   }
 
-  mutating func consumeInteger() -> Int? {
-    var digits = ""
-    let start = index
-    if index < scalars.count, scalars[index] == "-" {
-      digits.unicodeScalars.append(scalars[index])
-      index += 1
-    }
-    while index < scalars.count, ("0"..."9").contains(scalars[index]) {
-      digits.unicodeScalars.append(scalars[index])
-      index += 1
-    }
-    guard let value = Int(digits) else {
-      index = start
+  private mutating func consumeHexCodeUnit() -> UInt16? {
+    guard index + 4 <= scalars.count else {
       return nil
     }
+    var value: UInt16 = 0
+    for _ in 0..<4 {
+      let scalar = scalars[index]
+      let digit: UInt16
+      switch scalar.value {
+      case 0x30...0x39:
+        digit = UInt16(scalar.value - 0x30)
+      case 0x41...0x46:
+        digit = UInt16(scalar.value - 0x41 + 10)
+      case 0x61...0x66:
+        digit = UInt16(scalar.value - 0x61 + 10)
+      default:
+        return nil
+      }
+      value = (value << 4) | digit
+      index += 1
+    }
     return value
+  }
+
+  private mutating func consumeNumber() -> Bool {
+    let start = index
+    _ = consume("-")
+    guard index < scalars.count else {
+      index = start
+      return false
+    }
+
+    if scalars[index] == "0" {
+      index += 1
+      if index < scalars.count, ("0"..."9").contains(scalars[index]) {
+        index = start
+        return false
+      }
+    } else if ("1"..."9").contains(scalars[index]) {
+      repeat {
+        index += 1
+      } while index < scalars.count && ("0"..."9").contains(scalars[index])
+    } else {
+      index = start
+      return false
+    }
+
+    if consume(".") {
+      guard index < scalars.count, ("0"..."9").contains(scalars[index]) else {
+        index = start
+        return false
+      }
+      repeat {
+        index += 1
+      } while index < scalars.count && ("0"..."9").contains(scalars[index])
+    }
+
+    if index < scalars.count, scalars[index] == "e" || scalars[index] == "E" {
+      index += 1
+      if index < scalars.count, scalars[index] == "+" || scalars[index] == "-" {
+        index += 1
+      }
+      guard index < scalars.count, ("0"..."9").contains(scalars[index]) else {
+        index = start
+        return false
+      }
+      repeat {
+        index += 1
+      } while index < scalars.count && ("0"..."9").contains(scalars[index])
+    }
+    return true
   }
 
   mutating func consumeBool() -> Bool? {
@@ -208,6 +381,33 @@ private struct CapsJSONScanner {
       return false
     }
     return nil
+  }
+
+  mutating func consumeStringArray() -> [String]? {
+    guard consume("[") else {
+      return nil
+    }
+    skipWhitespace()
+    if consume("]") {
+      return []
+    }
+
+    var values: [String] = []
+    while true {
+      skipWhitespace()
+      guard let value = consumeString() else {
+        return nil
+      }
+      values.append(value)
+      skipWhitespace()
+      if consume(",") {
+        continue
+      }
+      guard consume("]") else {
+        return nil
+      }
+      return values
+    }
   }
 
   private mutating func consumeLiteral(
@@ -225,9 +425,11 @@ private struct CapsJSONScanner {
     return true
   }
 
-  /// Skips one well-formed JSON value of any shape, including balanced
-  /// nested objects/arrays. Returns false when the value is malformed.
-  mutating func skipValue() -> Bool {
+  /// Skips one well-formed JSON value of any shape. Nesting is capped so an
+  /// untrusted control record cannot exhaust the native stack.
+  mutating func skipValue(
+    nestingDepth: Int = 0
+  ) -> Bool {
     skipWhitespace()
     guard index < scalars.count else {
       return false
@@ -235,30 +437,10 @@ private struct CapsJSONScanner {
     switch scalars[index] {
     case "\"":
       return consumeString() != nil
-    case "{", "[":
-      var depth = 0
-      while index < scalars.count {
-        let scalar = scalars[index]
-        switch scalar {
-        case "\"":
-          guard consumeString() != nil else {
-            return false
-          }
-          continue
-        case "{", "[":
-          depth += 1
-        case "}", "]":
-          depth -= 1
-          if depth == 0 {
-            index += 1
-            return true
-          }
-        default:
-          break
-        }
-        index += 1
-      }
-      return false
+    case "{":
+      return skipObject(nestingDepth: nestingDepth)
+    case "[":
+      return skipArray(nestingDepth: nestingDepth)
     default:
       if consumeBool() != nil {
         return true
@@ -266,18 +448,59 @@ private struct CapsJSONScanner {
       if consumeLiteral("null") {
         return true
       }
-      if consumeInteger() != nil {
-        // Tolerate a fractional/exponent tail on numbers we skip.
-        while index < scalars.count,
-          scalars[index] == "." || scalars[index] == "e" || scalars[index] == "E"
-            || scalars[index] == "+" || scalars[index] == "-"
-            || ("0"..."9").contains(scalars[index])
-        {
-          index += 1
-        }
-        return true
-      }
+      return consumeNumber()
+    }
+  }
+
+  private mutating func skipObject(
+    nestingDepth: Int
+  ) -> Bool {
+    guard nestingDepth < 128, consume("{") else {
       return false
+    }
+    skipWhitespace()
+    if consume("}") {
+      return true
+    }
+    while true {
+      skipWhitespace()
+      guard consumeString() != nil else {
+        return false
+      }
+      skipWhitespace()
+      guard consume(":") else {
+        return false
+      }
+      guard skipValue(nestingDepth: nestingDepth + 1) else {
+        return false
+      }
+      skipWhitespace()
+      if consume(",") {
+        continue
+      }
+      return consume("}")
+    }
+  }
+
+  private mutating func skipArray(
+    nestingDepth: Int
+  ) -> Bool {
+    guard nestingDepth < 128, consume("[") else {
+      return false
+    }
+    skipWhitespace()
+    if consume("]") {
+      return true
+    }
+    while true {
+      guard skipValue(nestingDepth: nestingDepth + 1) else {
+        return false
+      }
+      skipWhitespace()
+      if consume(",") {
+        continue
+      }
+      return consume("]")
     }
   }
 }

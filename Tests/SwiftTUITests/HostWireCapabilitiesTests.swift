@@ -71,9 +71,14 @@ struct HostWireCapabilitiesTests {
     // negotiated state never inherits a baseline or a transmitted-image set.
     let negotiated = HostWireCapabilities(acceptsDeltaFrames: true)
       .negotiatedEncodingState()
+    let next = HostWireCapabilities(acceptsDeltaFrames: true)
+      .negotiatedEncodingState()
     #expect(!negotiated.hasBaseline)
     #expect(negotiated.baselineSize == nil)
     #expect(negotiated.knownImageIDs.isEmpty)
+    #expect(negotiated.recordsEncoded == 0)
+    #expect(next.recordsEncoded == 0)
+    #expect(negotiated.epochID != next.epochID)
   }
 
   @Test("an empty declaration keeps the defaults")

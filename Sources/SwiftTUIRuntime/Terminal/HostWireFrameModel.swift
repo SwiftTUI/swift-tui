@@ -1,4 +1,11 @@
 import SwiftTUICore
+import Synchronization
+
+private let hostWireEpochCounter = Atomic<UInt32>(0)
+
+private func nextHostWireEpochID() -> UInt32 {
+  hostWireEpochCounter.wrappingAdd(1, ordering: .relaxed).newValue
+}
 
 /// The shared cross-host wire model: every semantic value the host encoders
 /// emit, derived **once** per presented frame from the
@@ -260,6 +267,8 @@ package struct HostWireFrameModel {
 /// instantiate the same machinery instead of re-implementing it;
 /// `WebSurfaceFrameEncodingState` is the web instantiation.
 package struct HostWireEncodingState: Sendable {
+  package let epochID: UInt32
+  package var recordsEncoded: UInt64
   package var deltaEnabled: Bool
   package var knownImageIDs: Set<String>
   package var persistentStyles: HostWireStyleTable
@@ -270,8 +279,11 @@ package struct HostWireEncodingState: Sendable {
     deltaEnabled: Bool,
     knownImageIDs: Set<String> = [],
     hasBaseline: Bool = false,
-    baselineSize: CellSize? = nil
+    baselineSize: CellSize? = nil,
+    epochID: UInt32? = nil
   ) {
+    self.epochID = epochID ?? nextHostWireEpochID()
+    recordsEncoded = 0
     self.deltaEnabled = deltaEnabled
     self.knownImageIDs = knownImageIDs
     persistentStyles = HostWireStyleTable(gridSize: baselineSize)
@@ -308,6 +320,28 @@ extension HostWireFrameModel {
 }
 
 extension HostWireEncodingState {
+  /// Advances and returns the generation for the next emitted record in this
+  /// encoding epoch.
+  package mutating func nextGen() -> UInt64 {
+    recordsEncoded &+= 1
+    return recordsEncoded
+  }
+
+  package mutating func requestResync(
+    _ request: HostWireResyncRequest
+  ) {
+    switch request.scope {
+    case .keyframe:
+      hasBaseline = false
+    case .images(let imageIDs):
+      if imageIDs.isEmpty {
+        knownImageIDs.removeAll(keepingCapacity: true)
+      } else {
+        knownImageIDs.subtract(imageIDs)
+      }
+    }
+  }
+
   /// Re-anchors the delta baseline after a full-frame emission: the
   /// persistent style table restarts from the emitted frame's table.
   package mutating func rebaseline(

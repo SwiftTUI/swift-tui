@@ -185,6 +185,24 @@ public func swift_tui_android_declare_capabilities(
   }
 }
 
+/// Applies a UTF-8 `resync` JSON request to the host's current wire epoch.
+@_cdecl("swift_tui_android_request_resync")
+public func swift_tui_android_request_resync(
+  _ handle: Int64,
+  _ bytes: UnsafePointer<UInt8>?,
+  _ count: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle),
+    let bytes = unsafe bytes,
+    count > 0
+  else {
+    return 0
+  }
+
+  let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
+  return host.requestResync(json: String(decoding: payload, as: UTF8.self)) ? 1 : 0
+}
+
 @_cdecl("swift_tui_android_copy_latest_frame")
 public func swift_tui_android_copy_latest_frame(
   _ handle: Int64,

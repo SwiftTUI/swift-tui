@@ -9,13 +9,15 @@ struct WebSurfaceTransportTests {
   @Test("encoder emits the shared basic web-surface fixture")
   func encoderEmitsBasicFixture() throws {
     let fixture = try Self.fixture("web-surface-basic")
-    #expect(WebSurfaceFrameEncoder.encode(Self.basicSurface()) == fixture)
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+    #expect(WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state) == fixture)
   }
 
   @Test("encoder preserves styles, spans, escaping, and skips continuation cells")
   func encoderEmitsStyledFixture() throws {
     let fixture = try Self.fixture("web-surface-styled")
-    #expect(WebSurfaceFrameEncoder.encode(Self.styledSurface()) == fixture)
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+    #expect(WebSurfaceFrameEncoder.encode(Self.styledSurface(), state: &state) == fixture)
   }
 
   @Test("host writes one complete surface record and reports full repaint metrics")
@@ -33,7 +35,13 @@ struct WebSurfaceTransportTests {
     pipe.fileHandleForReading.closeFile()
 
     let fixture = try Self.fixture("web-surface-basic")
-    #expect(output == fixture)
+    let frame = try Self.decodedSurfaceFrame(output)
+    let epoch = try #require(frame["epoch"] as? Int)
+    let normalized = output.replacingOccurrences(
+      of: "\"epoch\":\(epoch)",
+      with: "\"epoch\":1"
+    )
+    #expect(normalized == fixture)
     #expect(metrics.bytesWritten == output.utf8.count)
     #expect(metrics.linesTouched == 2)
     #expect(metrics.cellsChanged == 4)
@@ -173,9 +181,16 @@ struct WebSurfaceTransportTests {
 
   @Test("delta-disabled encoder does not populate baseline state")
   func deltaDisabledEncoderDoesNotPopulateBaselineState() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: false)
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: false, epochID: 17)
 
-    let frame = try Self.decodedSurfaceFrame(
+    let first = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.imageSurface(),
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+    )
+    let second = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.imageSurface(),
         damage: PresentationDamage(textRows: [.init(row: 0)]),
@@ -183,12 +198,17 @@ struct WebSurfaceTransportTests {
       )
     )
 
-    #expect(frame["encoding"] == nil)
-    #expect(frame["rows"] != nil)
-    #expect(frame["deltaRows"] == nil)
+    #expect(first["encoding"] == nil)
+    #expect(first["rows"] != nil)
+    #expect(first["deltaRows"] == nil)
+    #expect(first["epoch"] as? Int == 17)
+    #expect(first["gen"] as? Int == 1)
+    #expect(second["epoch"] as? Int == 17)
+    #expect(second["gen"] as? Int == 2)
     #expect(state.knownImageIDs.isEmpty == false)
     #expect(state.hasBaseline == false)
     #expect(state.baselineSize == nil)
+    #expect(state.recordsEncoded == 2)
   }
 
   @Test("delta-enabled encoder emits dirty rows after a baseline")
@@ -219,6 +239,73 @@ struct WebSurfaceTransportTests {
     let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
     #expect(textRows.first?.first as? Int == 1)
     #expect(textRows.first?.dropFirst().first as? [[Int]] == [[1, 2]])
+  }
+
+  @Test("WASI transport keyframe resync forces a full record in the same epoch")
+  func wasiTransportKeyframeResyncForcesFullRecord() throws {
+    let pipe = Pipe()
+    let transport = WebSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 2),
+      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+      renderStyle: .init(appearance: .fallback),
+      wireCapabilities: .init(acceptsDeltaFrames: true)
+    )
+
+    _ = try transport.present(Self.basicSurface())
+    _ = try transport.present(
+      SemanticHostFrame(
+        sequence: 2,
+        raster: Self.changedSurface(),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
+      )
+    )
+    transport.requestResync(.init(scope: .keyframe))
+    _ = try transport.present(
+      SemanticHostFrame(
+        sequence: 3,
+        raster: Self.changedSurface(),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
+      )
+    )
+    pipe.fileHandleForWriting.closeFile()
+
+    let records = try Self.decodedSurfaceFrames(
+      String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    )
+    pipe.fileHandleForReading.closeFile()
+    #expect(records.count == 3)
+    #expect(records[1]["encoding"] as? String == "delta")
+    #expect(records[2]["encoding"] == nil)
+    #expect(records[2]["epoch"] as? Int == records[0]["epoch"] as? Int)
+    #expect(records[2]["gen"] as? Int == 3)
+  }
+
+  @Test("encoder stamps one epoch and monotonic generations across full and delta records")
+  func encoderStampsEpochAndMonotonicGenerations() throws {
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 41)
+
+    let full = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+    )
+    let delta = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.changedSurface(),
+        damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])]),
+        state: &state
+      )
+    )
+
+    #expect(full["epoch"] as? Int == 41)
+    #expect(full["gen"] as? Int == 1)
+    #expect(full["baselineGen"] == nil)
+    #expect(delta["epoch"] as? Int == 41)
+    #expect(delta["gen"] as? Int == 2)
+    #expect(delta["baselineGen"] as? Int == 1)
+    #expect(state.recordsEncoded == 2)
   }
 
   @Test("delta-enabled encoder emits duplicate damaged rows once")
@@ -299,7 +386,7 @@ struct WebSurfaceTransportTests {
 
   @Test("a below-budget delta keeps the established byte shape")
   func belowBudgetDeltaKeepsEstablishedByteShape() {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 1)
     _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
     let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
 
@@ -311,8 +398,9 @@ struct WebSurfaceTransportTests {
 
     #expect(
       output
-        == "\u{001E}surface:{\"version\":3,\"encoding\":\"delta\",\"width\":2,"
-        + "\"height\":2,\"styles\":[null],\"deltaRows\":[[1,[[0,\" \",1,0],"
+        == "\u{001E}surface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":1,"
+        + "\"gen\":2,\"baselineGen\":1,\"width\":2,\"height\":2,\"styles\":[null],"
+        + "\"deltaRows\":[[1,[[0,\" \",1,0],"
         + "[1,\"!\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[1,2]]]],"
         + "\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"
     )
@@ -374,7 +462,8 @@ struct WebSurfaceTransportTests {
     var state = HostWireEncodingState(
       deltaEnabled: true,
       hasBaseline: true,
-      baselineSize: size
+      baselineSize: size,
+      epochID: 23
     )
     for identifier in 0..<1_023 {
       #expect(
@@ -400,6 +489,10 @@ struct WebSurfaceTransportTests {
     #expect(full["version"] as? Int == 2)
     #expect(full["encoding"] == nil)
     #expect(full["rows"] != nil)
+    #expect(full["epoch"] as? Int == 23)
+    #expect(full["gen"] as? Int == 1)
+    #expect(full["baselineGen"] == nil)
+    #expect(state.recordsEncoded == 1)
     #expect(state.persistentStyles.count == 2)
 
     let next = try Self.decodedSurfaceFrame(
@@ -417,6 +510,10 @@ struct WebSurfaceTransportTests {
     )
     #expect(next["version"] as? Int == 3)
     #expect(next["encoding"] as? String == "delta")
+    #expect(next["epoch"] as? Int == 23)
+    #expect(next["gen"] as? Int == 2)
+    #expect(next["baselineGen"] as? Int == 1)
+    #expect(state.recordsEncoded == 2)
     #expect(state.persistentStyles.count == 3)
   }
 
@@ -821,17 +918,17 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder emits image data once and then reuses the cached image id")
   func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let firstFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.imageSurface(),
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let secondFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.imageSurface(),
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
 
@@ -851,26 +948,26 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder emits blended image payloads as cached png variants")
   func encoderEmitsBlendedImagePayloadsAsCachedPNGVariants() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let firstFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.blendedImageSurface(background: .blue, signature: 1),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let secondFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.blendedImageSurface(background: .blue, signature: 1),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let changedBackdropFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.blendedImageSurface(background: .red, signature: 2),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
 
@@ -898,7 +995,7 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder emits a new blended png variant when backdrop glyph changes")
   func encoderEmitsNewBlendedPNGVariantWhenBackdropGlyphChanges() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let firstFrame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.blendedImageSurface(
@@ -908,7 +1005,7 @@ struct WebSurfaceTransportTests {
           signature: 1
         ),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let stableFrame = try Self.decodedSurfaceFrame(
@@ -920,7 +1017,7 @@ struct WebSurfaceTransportTests {
           signature: 1
         ),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let changedGlyphFrame = try Self.decodedSurfaceFrame(
@@ -932,7 +1029,7 @@ struct WebSurfaceTransportTests {
           signature: 2
         ),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
 
@@ -954,7 +1051,7 @@ struct WebSurfaceTransportTests {
   @Test("encoder process compositor evicts blended payloads under the default policy")
   func encoderProcessCompositorEvictsBlendedPayloadsUnderDefaultPolicy() throws {
     let before = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
 
     for index in 0..<300 {
       _ = WebSurfaceFrameEncoder.encode(
@@ -963,14 +1060,14 @@ struct WebSurfaceTransportTests {
           signature: UInt64(10_000 + index)
         ),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     }
 
     let after = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
     #expect(after.entryCount <= 256)
     #expect(after.evictionCount > before.evictionCount)
-    #expect(knownImageIDs.count == 300)
+    #expect(state.knownImageIDs.count == 300)
   }
 
   @Test("encoder emits presentation damage for browser partial redraws")
@@ -997,11 +1094,11 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
   func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.gifSurface(compositing: nil),
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let image = try #require((frame["images"] as? [[String: Any]])?.first)
@@ -1014,7 +1111,7 @@ struct WebSurfaceTransportTests {
 
   @Test("encoder leaves blended raw GIF bytes as GIF pass-through when no frame decoder exists")
   func encoderLeavesBlendedRawGIFBytesAsGIFPassThroughWhenNoFrameDecoderExists() throws {
-    var knownImageIDs: Set<String> = []
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let frame = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         Self.gifSurface(
@@ -1029,7 +1126,7 @@ struct WebSurfaceTransportTests {
           )
         ),
         fallbackBackground: .black,
-        knownImageIDs: &knownImageIDs
+        state: &state
       )
     )
     let image = try #require((frame["images"] as? [[String: Any]])?.first)
@@ -1039,7 +1136,7 @@ struct WebSurfaceTransportTests {
     #expect(id.hasPrefix("gif:"))
     #expect(!id.hasPrefix("blend:png:"))
     #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
-    #expect(knownImageIDs == Set([id]))
+    #expect(state.knownImageIDs == Set([id]))
   }
 
   @Test("parser handles resize and style commands split across chunks")
@@ -1464,6 +1561,14 @@ struct WebSurfaceTransportTests {
     let json = String(line.dropFirst(prefix.count))
     let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
     return try #require(decoded as? [String: Any])
+  }
+
+  private static func decodedSurfaceFrames(
+    _ output: String
+  ) throws -> [[String: Any]] {
+    try output.split(separator: "\n").map {
+      try decodedSurfaceFrame(String($0) + "\n")
+    }
   }
 
   private static func decodedTypedRecord(

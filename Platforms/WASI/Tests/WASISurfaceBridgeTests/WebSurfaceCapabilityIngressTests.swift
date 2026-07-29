@@ -12,6 +12,114 @@ import Testing
 /// against an old server must drop silently, never fail the session.
 @Suite
 struct WebSurfaceCapabilityIngressTests {
+  @Test("resync request parser accepts keyframe and image scopes")
+  func resyncRequestParserAcceptsKnownScopes() {
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(#"{"scope":"keyframe"}"#)
+        == HostWireResyncRequest(scope: .keyframe)
+    )
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":["first","second"]}"#)
+        == HostWireResyncRequest(scope: .images(["first", "second"]))
+    )
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(#"{"scope":"images"}"#)
+        == HostWireResyncRequest(scope: .images([]))
+    )
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":[]}"#)
+        == HostWireResyncRequest(scope: .images([]))
+    )
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(
+        #"{"scope":"images","ids":["\u0061","\uD83D\uDE00"]}"#
+      ) == HostWireResyncRequest(scope: .images(["a", "😀"]))
+    )
+  }
+
+  @Test("resync request parser rejects malformed and unknown scopes")
+  func resyncRequestParserRejectsMalformedRequests() {
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"future"}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":[1]}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"keyframe""#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","x":[}}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","x":{]}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","x":[garbage]}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","x":[1,,2]}"#) == nil)
+    #expect(HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","x":{"a" 1}}"#) == nil)
+    #expect(
+      HostWireResyncRequest.fromRequestJSON(
+        "{\"scope\":\"images\",\"ids\":[\"raw\ncontrol\"]}"
+      ) == nil
+    )
+  }
+
+  @Test("resync request parser rejects excessive unknown-value nesting")
+  func resyncRequestParserRejectsExcessiveNesting() {
+    let nestedValue =
+      String(repeating: "[", count: 129)
+      + "null"
+      + String(repeating: "]", count: 129)
+    let request = #"{"scope":"images","future":"# + nestedValue + "}"
+
+    #expect(HostWireResyncRequest.fromRequestJSON(request) == nil)
+  }
+
+  @Test("shared input parser emits resync control messages")
+  func sharedInputParserEmitsResyncControlMessages() {
+    var parser = WebSurfaceInputParser()
+    let parsed = parser.feed(
+      Array(
+        ("\u{001E}resync:{\"scope\":\"keyframe\"}\n"
+          + "\u{001E}resync:{\"scope\":\"images\",\"ids\":[\"image-a\"]}\n").utf8
+      )
+    )
+
+    #expect(parsed.events.isEmpty)
+    #expect(
+      parsed.controlMessages == [
+        .resync(.init(scope: .keyframe)),
+        .resync(.init(scope: .images(["image-a"]))),
+      ]
+    )
+  }
+
+  @Test("resync requests invalidate only their requested encoder state")
+  func resyncRequestsMutateEncodingState() {
+    var state = HostWireEncodingState(
+      deltaEnabled: true,
+      knownImageIDs: ["first", "second"],
+      hasBaseline: true,
+      baselineSize: .init(width: 2, height: 1),
+      epochID: 7
+    )
+
+    state.requestResync(.init(scope: .images(["first"])))
+    #expect(state.hasBaseline)
+    #expect(state.knownImageIDs == ["second"])
+    #expect(state.epochID == 7)
+
+    let beforeMalformedImageIDs = state.knownImageIDs
+    let beforeMalformedBaseline = state.hasBaseline
+    let beforeMalformedGeneration = state.recordsEncoded
+    if let malformed = HostWireResyncRequest.fromRequestJSON(
+      #"{"scope":"images","x":[}}"#
+    ) {
+      state.requestResync(malformed)
+    }
+    #expect(state.knownImageIDs == beforeMalformedImageIDs)
+    #expect(state.hasBaseline == beforeMalformedBaseline)
+    #expect(state.recordsEncoded == beforeMalformedGeneration)
+
+    state.requestResync(.init(scope: .images([])))
+    #expect(state.knownImageIDs.isEmpty)
+
+    state.requestResync(.init(scope: .keyframe))
+    #expect(!state.hasBaseline)
+    #expect(state.baselineSize == .init(width: 2, height: 1))
+    #expect(state.epochID == 7)
+  }
+
   @Test("the canonical caps record fixture parses to a capabilities message")
   func canonicalCapsFixtureParses() throws {
     // `Fixtures/Transport/web-caps-record.txt` is the cross-repo canonical

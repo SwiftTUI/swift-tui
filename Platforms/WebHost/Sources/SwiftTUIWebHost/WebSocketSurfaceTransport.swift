@@ -93,6 +93,14 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     }
   }
 
+  package func requestResync(
+    _ request: HostWireResyncRequest
+  ) {
+    state.withLock { state in
+      state.encodingState.requestResync(request)
+    }
+  }
+
   package var surfaceSize: CellSize {
     state.withLock(\.surfaceSize)
   }

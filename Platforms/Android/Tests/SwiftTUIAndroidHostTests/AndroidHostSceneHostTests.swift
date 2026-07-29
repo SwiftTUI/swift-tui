@@ -73,6 +73,64 @@ func android_host_abi_declare_capabilities_round_trips() throws {
 
 @MainActor
 @Test
+func android_host_abi_resync_invalidates_same_frame_encoding_scratch() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+  #expect(host.declareCapabilities(json: "{\"acceptsDeltaFrames\":true}"))
+
+  _ = try host.surface.present(
+    SemanticHostFrame(
+      sequence: 7,
+      raster: RasterSurface(size: .init(width: 2, height: 1), lines: ["OK"]),
+      semantics: .init(),
+      focusedIdentity: nil
+    )
+  )
+  await Task.yield()
+
+  func copyRecord() throws -> [String: Any] {
+    let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
+    #expect(required > 0)
+    var bytes = [UInt8](repeating: 0, count: Int(required))
+    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+      unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
+    }
+    #expect(copied == required)
+    return try decodedWebSurfaceRecord(bytes)
+  }
+
+  let first = try copyRecord()
+  #expect(first["gen"] as? Int == 1)
+  #expect(host.consumedFrameEncodeCount == 1)
+
+  let malformed = Array(#"{"scope":"future"}"#.utf8)
+  let rejected = unsafe malformed.withUnsafeBufferPointer { buffer in
+    unsafe swift_tui_android_request_resync(
+      handle, buffer.baseAddress, Int32(buffer.count))
+  }
+  #expect(rejected == 0)
+  #expect(host.consumedFrameEncodeCount == 1)
+
+  let request = Array(#"{"scope":"keyframe"}"#.utf8)
+  let accepted = unsafe request.withUnsafeBufferPointer { buffer in
+    unsafe swift_tui_android_request_resync(
+      handle, buffer.baseAddress, Int32(buffer.count))
+  }
+  #expect(accepted == 1)
+  #expect(swift_tui_android_request_resync(0, nil, 0) == 0)
+
+  let repaired = try copyRecord()
+  #expect(repaired["encoding"] == nil)
+  #expect(repaired["epoch"] as? Int == first["epoch"] as? Int)
+  #expect(repaired["gen"] as? Int == 2)
+  #expect(host.consumedFrameEncodeCount == 2)
+}
+
+@MainActor
+@Test
 func android_host_encodes_frames_only_at_consumption() async throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
   let handle = AndroidHostHandleRegistry.register(host)

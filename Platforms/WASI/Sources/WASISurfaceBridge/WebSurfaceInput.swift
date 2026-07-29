@@ -63,6 +63,8 @@ package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   /// WebSocket client after open. Absence means ``HostWireCapabilities``
   /// defaults — today's bytes. See `HostWireSchema.capabilityMappings`.
   case capabilities(HostWireCapabilities)
+  /// A host delivery-repair request (`resync:{json}`).
+  case resync(HostWireResyncRequest)
 }
 
 // `WebSurfaceInputParser` — the incremental byte/command parser — lives in

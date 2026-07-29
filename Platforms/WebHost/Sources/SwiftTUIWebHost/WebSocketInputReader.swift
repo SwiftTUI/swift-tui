@@ -29,6 +29,8 @@ package final class WebSocketInputReader: TerminalInputReading, Sendable {
         transport.updateStyle(style)
       case .capabilities(let capabilities):
         transport.declareCapabilities(capabilities)
+      case .resync(let request):
+        transport.requestResync(request)
       }
     }
   }

@@ -144,15 +144,16 @@ fixture tests pass unconditionally.
 
 `Fixtures/Transport/` holds the wire fixtures shared with the sibling host
 repos: `swift-tui-web` mirrors the web-surface and terminal-style files in its
-own `Fixtures/Transport/`, and `swift-tui-android` mirrors
-`android-frame-totality.json` in its test resources. The coordination root's
-`//:transport_fixture_sync` gate byte-compares every mirrored copy, so a
-wire-contract change here goes red in org CI until the sibling copies are
-re-synced. The two `*-totality.*` fixtures are generated — re-run their pin
-tests with `SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1` after an intentional wire
-change, copy the results to the sibling repos, and commit all sides. The
-hand-authored fixtures (`web-surface-basic/styled`, terminal style) are edited
-in place and copied the same way.
+own `Fixtures/Transport/`, and `swift-tui-android` mirrors the generated
+`web-surface-totality` and `web-surface-composited-image` records in its test
+resources. The coordination root's `//:transport_fixture_sync` gate
+byte-compares every mirrored copy, so a wire-contract change here goes red in
+org CI until the sibling copies are re-synced. The totality and
+composited-image fixtures are generated — re-run their pin tests with
+`SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1` after an intentional wire change,
+copy the results to the sibling repos, and commit all sides. The hand-authored
+fixtures (`web-surface-basic/styled`, terminal style) are edited in place and
+copied the same way.
 
 ## Public API baseline
 

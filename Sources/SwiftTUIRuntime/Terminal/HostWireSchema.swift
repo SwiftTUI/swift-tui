@@ -235,7 +235,8 @@ package enum HostWireSchema {
       "version", "width", "height", "styles", "rows", "images",
     ]
     package static let fullFrameOptionalKeys: Set<String> = [
-      "sequence", "damage", "accessibilityTree", "accessibilityAnnouncements",
+      "epoch", "gen", "sequence", "damage", "accessibilityTree",
+      "accessibilityAnnouncements",
       "scrollRegions", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
@@ -244,8 +245,8 @@ package enum HostWireSchema {
       "damage",
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
-      "sequence", "accessibilityTree", "accessibilityAnnouncements",
-      "scrollRegions", "links", "linkTargets", "focusPresentation",
+      "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
+      "accessibilityAnnouncements", "scrollRegions", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
     package static let styleKeys: Set<String> = [
@@ -286,7 +287,18 @@ package enum HostWireSchema {
     package static let linkRunTupleArity = 3
   }
 
-  // MARK: - Capability declarations
+  // MARK: - Delivery uplink and capability declarations
+
+  /// The typed delivery-control records a host may send upstream. This is
+  /// intentionally separate from input controls such as key, mouse, resize,
+  /// and style: these records change or repair cross-frame wire state.
+  package enum DeliveryUplink {
+    package static let recordTypes: Set<String> = ["caps", "resync"]
+    package static let capabilityKeys: Set<String> = ["acceptsDeltaFrames"]
+    package static let resyncRequiredKeys: Set<String> = ["scope"]
+    package static let resyncOptionalKeys: Set<String> = ["ids"]
+    package static let resyncScopeTokens: Set<String> = ["keyframe", "images"]
+  }
 
   /// One ``HostWireCapabilities`` field and its declaration ingress on each
   /// transport. `field` must match the `Mirror` child label exactly —
@@ -350,9 +362,9 @@ package enum HostWireSchema {
   /// retired `maxWebSurfaceVersion` was an integer only ever compared
   /// against one threshold, duplicating — more weakly — the decoder-side
   /// skew guard that hard-rejects a `surface` record newer than the decoder
-  /// understands. `supportsResync` retired with it, never sent by any
-  /// client and never read; it returns with the resync stage, when it has
-  /// semantics to encode.
+  /// understands. Resync is an always-safe repair request rather than a
+  /// record-shape capability, so it is manifest-owned by ``DeliveryUplink``
+  /// and does not add a capability bit.
   package static let capabilityMappings: [CapabilityMapping] = [
     .init(
       "acceptsDeltaFrames",

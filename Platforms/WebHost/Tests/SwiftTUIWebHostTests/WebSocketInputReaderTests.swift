@@ -59,6 +59,60 @@ struct WebSocketInputReaderTests {
     )
   }
 
+  @Test("a resync record routes to the WebSocket transport")
+  func resyncRecordRoutesToTransport() async throws {
+    let source = InMemoryByteSource()
+    let sink = RecordingInputTestSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+    let reader = WebSocketInputReader(source: source, transport: transport)
+    let events = reader.inputEvents()
+    var iterator = events.makeAsyncIterator()
+
+    await source.yield("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n")
+    await source.finish()
+    #expect(await iterator.next() == nil)
+
+    _ = try transport.present(RasterSurface(size: .init(width: 2, height: 1), lines: ["A "]))
+    _ = try transport.present(
+      SemanticHostFrame(
+        sequence: 2,
+        raster: RasterSurface(size: .init(width: 2, height: 1), lines: ["B "]),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: .init(textRows: [.init(row: 0)])
+      )
+    )
+    try await transport.drain()
+
+    let resyncSource = InMemoryByteSource()
+    let resyncReader = WebSocketInputReader(source: resyncSource, transport: transport)
+    let resyncEvents = resyncReader.inputEvents()
+    var resyncIterator = resyncEvents.makeAsyncIterator()
+    await resyncSource.yield("\u{001E}resync:{\"scope\":\"keyframe\"}\n")
+    await resyncSource.finish()
+    #expect(await resyncIterator.next() == nil)
+
+    _ = try transport.present(
+      SemanticHostFrame(
+        sequence: 3,
+        raster: RasterSurface(size: .init(width: 2, height: 1), lines: ["C "]),
+        semantics: .init(),
+        focusedIdentity: nil,
+        rasterDamage: .init(textRows: [.init(row: 0)])
+      )
+    )
+    try await transport.drain()
+
+    let records = await sink.records()
+    #expect(records.count == 3)
+    #expect(records[1].contains("\"encoding\":\"delta\""))
+    #expect(!records[2].contains("\"encoding\":\"delta\""))
+    #expect(records[2].contains("\"gen\":3"))
+  }
+
   @Test("key and paste input yield expected input events")
   func keyAndPasteInputYieldExpectedEvents() async throws {
     let source = InMemoryByteSource()
@@ -102,5 +156,13 @@ private actor InMemoryByteSource: WebHostByteSource {
 }
 
 private actor RecordingInputTestSink: WebHostByteSink {
-  func send(_: [UInt8]) async throws {}
+  private var batches: [String] = []
+
+  func send(_ bytes: [UInt8]) async throws {
+    batches.append(String(decoding: bytes, as: UTF8.self))
+  }
+
+  func records() -> [String] {
+    batches
+  }
 }

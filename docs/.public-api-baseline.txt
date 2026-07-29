@@ -19,6 +19,7 @@ SwiftTUIAndroidHost.AndroidHostSceneHost.latestEncodingErrorDescription
 SwiftTUIAndroidHost.AndroidHostSceneHost.latestFrame
 SwiftTUIAndroidHost.AndroidHostSceneHost.latestFrameBytes
 SwiftTUIAndroidHost.AndroidHostSceneHost.manifest
+SwiftTUIAndroidHost.AndroidHostSceneHost.requestResync(json:)
 SwiftTUIAndroidHost.AndroidHostSceneHost.resize(columns:rows:cellPixelWidth:cellPixelHeight:)
 SwiftTUIAndroidHost.AndroidHostSceneHost.sendInput(_:)
 SwiftTUIAndroidHost.AndroidHostSceneHost.session
@@ -38,6 +39,7 @@ SwiftTUIAndroidHost.swift_tui_android_declare_capabilities(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_destroy(_:)
 SwiftTUIAndroidHost.swift_tui_android_diag()
 SwiftTUIAndroidHost.swift_tui_android_install_executor()
+SwiftTUIAndroidHost.swift_tui_android_request_resync(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_resize(_:_:_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_send_input(_:_:_:)
 SwiftTUIAndroidHost.swift_tui_android_start(_:)

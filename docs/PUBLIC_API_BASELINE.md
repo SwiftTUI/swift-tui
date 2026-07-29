@@ -30,7 +30,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
-| `SwiftTUIAndroidHost` | 14 | 41 |
+| `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 39 | 267 |
 | `SwiftTUIPrimitives` | 167 | 1444 |
 | `SwiftTUIGraph` | 55 | 337 |
@@ -506,10 +506,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIAndroidHost
 
-### Canonical surface (14)
+### Canonical surface (15)
 
 - `AndroidHostHandleRegistry` — enum — 3 members
-- `AndroidHostSceneHost` — class — 20 members
+- `AndroidHostSceneHost` — class — 21 members
 - `AndroidHostStyle` — struct — 4 members
 - `swift_tui_android_copy_clipboard_text(_:_:_:)` — func
 - `swift_tui_android_copy_latest_frame(_:_:_:)` — func
@@ -517,6 +517,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `swift_tui_android_destroy(_:)` — func
 - `swift_tui_android_diag()` — func
 - `swift_tui_android_install_executor()` — func
+- `swift_tui_android_request_resync(_:_:_:)` — func
 - `swift_tui_android_resize(_:_:_:_:_:)` — func
 - `swift_tui_android_send_input(_:_:_:)` — func
 - `swift_tui_android_start(_:)` — func

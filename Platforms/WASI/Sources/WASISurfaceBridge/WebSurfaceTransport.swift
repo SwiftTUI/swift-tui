@@ -119,6 +119,14 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     }
   }
 
+  package func requestResync(
+    _ request: HostWireResyncRequest
+  ) {
+    state.withLock { state in
+      state.encodingState.requestResync(request)
+    }
+  }
+
   @discardableResult
   @MainActor
   package func writeClipboard(_ text: String) throws -> Bool {
