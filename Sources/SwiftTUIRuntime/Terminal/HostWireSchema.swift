@@ -18,6 +18,8 @@ import SwiftTUICore
 ///   and asserts every stored property has a mapping here — the ratchet for
 ///   the "add a field and forget its wire treatment" bug class.
 ///
+/// Normative state, delivery, and consumer obligations: `docs/HOST-WIRE-CONTRACT.md`.
+///
 /// ## Wire-evolution policy (load-bearing)
 ///
 /// Deployed decoders (browser `WebHostSurfaceTransport.ts`, Android

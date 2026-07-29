@@ -151,19 +151,18 @@ raster damage diff exists, steady-state frames ship as v3 `deltaRows` patches
 against the previously presented surface instead. Each transport conforms to
 the host-frame surface protocols rather than reaching into the renderer.
 
-Hosts declare wire capabilities before frames flow, carried by one Swift-side
-currency (`HostWireCapabilities`) with one ingress per transport: WASI resolves
-the `SWIFTTUI_SURFACE_DELTA` / `SWIFTTUI_SURFACE_MAX_VERSION` environment keys at
-transport construction, the browser WebSocket client sends a one-shot
-`caps:{json}` control record after open, and the Android host calls
-`declareCapabilities` before scene start. Absence of a declaration keeps the
-defaults — today's wire bytes. On the WebSocket path the declaration also
-marks a fresh client connection: its arrival re-anchors the transport's
-cross-connection encoding state (a reloaded client receives a full keyframe
-with image payloads re-transmitted), and a client that declares v3 + delta
-acceptance receives v3 `deltaRows` records for steady frames. The WASI and
-Android ingresses remain declaration-only. The canonical field/ingress
-manifest is `HostWireSchema.capabilityMappings`.
+Hosts declare wire capabilities through one Swift-side currency
+(`HostWireCapabilities`) with one ingress per transport. Its only field at
+`HEAD` is the named `acceptsDeltaFrames` bit; absence keeps the default
+full-frame bytes. WASI resolves `SWIFTTUI_SURFACE_DELTA` at transport
+construction and ignores runtime `caps` input. The browser WebSocket client
+sends a `caps:{json}` control record after open, while the server accepts every
+declaration as a new connection epoch and re-anchors all cross-frame encoding
+state. Android accepts `declareCapabilities` only before scene start. The
+retired `SWIFTTUI_SURFACE_MAX_VERSION` key is inert: record versions describe
+shapes and are not negotiated ceilings. The canonical field/ingress manifest
+is `HostWireSchema.capabilityMappings`; the normative state and delivery rules
+are in [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md).
 
 ### Shared Raster Damage Contract
 

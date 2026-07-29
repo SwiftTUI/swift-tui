@@ -21,6 +21,7 @@ flowchart TD
     SPLIT["REPOSITORY-SPLIT.md<br/>repository ownership"]
     PIPE["RENDER-PIPELINE.md<br/>internal DocC pointer"]
     HOSTS["HOSTS-AND-PLATFORMS.md<br/>execution modes, platforms"]
+    WIRE["HOST-WIRE-CONTRACT.md<br/>wire state, epochs, obligations"]
     A11Y["ACCESSIBILITY.md<br/>semantic substrate"]
     API["PUBLIC-API.md<br/>public surface policy"]
     DEV["DEVELOPMENT.md<br/>build, test, release"]
@@ -36,6 +37,7 @@ flowchart TD
     VISION --> GAP
     ARCH --> PIPE
     ARCH --> HOSTS
+    HOSTS --> WIRE
     ARCH --> A11Y
     ARCH --> API
     DEV --> FLAKES
@@ -52,6 +54,7 @@ flowchart TD
 | [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
 | [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Internal compatibility pointer to the DocC render pipeline guides. |
 | [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md) | The canonical host matrix, per-host engine profiles, platform support, and terminal-program embedding. |
+| [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md) | The normative converged host-wire record, state, capability, delivery, and consumer contract at `HEAD`, including known gaps. |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | The semantic substrate and how one snapshot feeds all five host-side consumer paths. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Toolchains, the build/test gate, fixture policy, and the release process. |
