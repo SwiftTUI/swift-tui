@@ -18,7 +18,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 61 | 533 |
+| `SwiftTUIRuntime` | 59 | 517 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 276 | 1510 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
@@ -45,7 +45,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIRuntime
 
-### Canonical surface (61)
+### Canonical surface (59)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -55,7 +55,6 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DefaultRenderer` — struct — 3 members
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 5 members
-- `FileOpenError` — enum — 2 members
 - `FrameDiagnosticRecord` — struct — 85 members
 - `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
@@ -92,7 +91,6 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `SemanticHostFrame` — struct — 7 members
 - `SemanticHostFrameCapabilities` — struct — 8 members
 - `SignalReading` — protocol — 1 member
-- `Standard` — enum — 12 members
 - `StateKeyHandler` — typealias
 - `TerminalCapabilityProfile` — struct — 24 members
 - `TerminalCommandPresentationSurface` — protocol — 7 members

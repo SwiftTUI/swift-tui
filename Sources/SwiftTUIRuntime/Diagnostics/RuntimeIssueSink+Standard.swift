@@ -1,4 +1,5 @@
 import SwiftTUICore
+import SwiftTUIViews
 
 extension RuntimeIssueSink {
   /// Reports runtime issues to standard error.

@@ -710,6 +710,8 @@ classifications:
     # Compatibility-shim types that were retired. If any of these reappears
     # in the source, the --check run fails.
     - SwiftTUI.FrameDiagnosticsLogger
+    - SwiftTUIRuntime.FileOpenError
+    - SwiftTUIRuntime.Standard
     - SwiftTUIViews.Resolver
     - SwiftTUICore.ChildAllocation
     - SwiftTUICore.CommitPlan

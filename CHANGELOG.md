@@ -8,6 +8,15 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- **`Standard` and `FileOpenError` now each have one public identity.**
+  The duplicate `SwiftTUIRuntime.Standard` and
+  `SwiftTUIRuntime.FileOpenError` identities have been removed during the
+  pre-0.9 API-hardening window. Unqualified uses under `import SwiftTUIRuntime`
+  or `import SwiftTUI` are unchanged; module-qualified references should use
+  `SwiftTUIViews.Standard` and `SwiftTUIViews.FileOpenError`.
+
 ## [0.3.8] - 2026-07-27
 
 ### Added
