@@ -74,14 +74,6 @@ extension RunLoop {
       }
     }
 
-    // Configured exit bindings are the single source of truth for
-    // framework-level exits. The runtime never hardcodes an exit key
-    // outside this check; consumers that pass ``ExitKeyBindings.none``
-    // opt out of framework-provided exits entirely.
-    if exitKeyBindings.contains(keyPress) {
-      return .userExit(keyPress)
-    }
-
     let focusedIdentity = focusTracker.currentFocusIdentity
     let focusedActivationIdentity = focusedIdentity.flatMap {
       activationIdentity(for: $0)
@@ -90,6 +82,15 @@ extension RunLoop {
       focusedIdentity.flatMap { identity in
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
       }?.focusInteractions ?? .automatic
+
+    // Preserve the established editor contract: scene exit bindings win before
+    // a TextField/TextEditor can interpret the modified character as authored
+    // input. Non-edit focus continues through consumer handlers below, which
+    // lets an app-owned modal editor such as a search overlay conditionally
+    // claim a bare character binding.
+    if focusedInteractions == .edit, exitKeyBindings.contains(keyPress) {
+      return .userExit(keyPress)
+    }
 
     if let focusedIdentity {
       // Bubble from the focused identity up its hosting chain (SwiftUI
@@ -124,6 +125,19 @@ extension RunLoop {
         )
         return nil
       }
+    }
+
+    // Configured exit bindings are the fallback after focused view handlers.
+    // A non-edit focused handler can therefore claim a normally terminating
+    // character while an app-owned mode is active, then return `.ignored` for
+    // the same key outside that mode and let the scene binding terminate the
+    // session. Keep this before the low-level StateKeyHandler so the existing
+    // run-loop contract remains intact: configured exits cannot be swallowed
+    // by a handler returning `.handled`. The runtime never hardcodes an exit
+    // key outside these checks; consumers that pass ``ExitKeyBindings.none``
+    // opt out of framework-provided exits entirely.
+    if exitKeyBindings.contains(keyPress) {
+      return .userExit(keyPress)
     }
 
     if let keyHandler {

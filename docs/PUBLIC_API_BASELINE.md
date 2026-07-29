@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 517 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 276 | 1510 |
+| `SwiftTUIViews` | 276 | 1511 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 49 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -353,7 +353,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalHandoffAction` — struct — 5 members
 - `TerminalHandoffError` — enum — 4 members
 - `TerminationRequestModifier` — struct
-- `Text` — struct — 33 members
+- `Text` — struct — 34 members
 - `TextEditor` — struct — 2 members
 - `TextField` — struct — 4 members
 - `TextFieldStyle` — protocol — 4 members

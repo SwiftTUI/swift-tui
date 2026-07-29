@@ -4182,6 +4182,7 @@ SwiftTUIViews.Text.StringInterpolation.appendLiteral(_:)
 SwiftTUIViews.Text.StringInterpolation.init(literalCapacity:interpolationCount:)
 SwiftTUIViews.Text.TruncationMode
 SwiftTUIViews.Text.WrappingStrategy
+SwiftTUIViews.Text.backgroundStyle(_:)
 SwiftTUIViews.Text.blink()
 SwiftTUIViews.Text.blink(_:)
 SwiftTUIViews.Text.bold()

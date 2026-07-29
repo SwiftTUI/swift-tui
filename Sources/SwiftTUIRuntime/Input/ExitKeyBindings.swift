@@ -12,10 +12,11 @@ public import SwiftTUICore
 /// only exit on OS signals, `stdin` EOF, or an explicit exit returned by
 /// a consumer `keyHandler` / `keyCommand`.
 ///
-/// Consumer `keyCommand`s registered at any in-focus scope win over the
-/// exit bindings — scope dispatch runs first. This lets a focused view
-/// claim `Ctrl+D` (or any other exit key) for domain-specific behavior
-/// without removing the binding globally.
+/// Consumer `keyCommand`s and non-edit focused `onKeyPress` handlers win over
+/// the exit bindings. This lets an app-owned mode claim a normally terminating
+/// character while returning `.ignored` outside that mode so the same scene
+/// binding still exits. Native text-edit focus preserves the established
+/// behavior in which an exit binding wins before text insertion.
 public struct ExitKeyBindings: Sendable, Equatable {
   public var keys: [KeyPress]
 

@@ -10,6 +10,14 @@ extension Text {
     }
   }
 
+  /// Applies a background shape style to this text and to the cells occupied
+  /// by this fragment when it is interpolated into ``Text/RichContent``.
+  public func backgroundStyle<S: ShapeStyle>(_ style: S) -> Text {
+    mutatingDrawMetadata { metadata in
+      metadata.backgroundStyle = AnyShapeStyle(style)
+    }
+  }
+
   public func bold() -> Text {
     bold(true)
   }

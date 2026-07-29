@@ -66,6 +66,68 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("focused key handlers can conditionally claim a scene exit key")
+  func focusedHandlerPrecedesSceneExitBinding() async throws {
+    let terminal = RecordingTerminalHost()
+    let recorder = ActionRecorder()
+    let claimedKey = KeyPress(.character("q"))
+    let fallbackExitKey = KeyPress(.character("x"), modifiers: .ctrl)
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Conditional Exit Window") {
+        Text("editor")
+          .focusable(true)
+          .onKeyPress(.any) { keyPress in
+            guard keyPress == claimedKey else {
+              return .ignored
+            }
+            recorder.count += 1
+            return .handled
+          }
+      }
+      .exitOnKeys([claimedKey, fallbackExitKey]),
+      sessionName: "AppRuntimeTests.ConditionalExit",
+      presentationSurface: terminal,
+      inputReader: ScriptedInputReader(events: [claimedKey, fallbackExitKey]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(recorder.count == 1)
+    #expect(result.exitReason == .userExit(fallbackExitKey))
+  }
+
+  @MainActor
+  @Test("scene exit bindings retain precedence over low-level state key handlers")
+  func sceneExitBindingPrecedesStateKeyHandler() async throws {
+    let exitKey = KeyPress(.character("q"))
+    let rootIdentity = testIdentity("StateKeyHandlerExitPrecedence")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: RecordingTerminalHost(),
+      inputReader: ScriptedInputReader(events: [exitKey]),
+      signalReader: EmptySignalReader(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { _, _, stateContainer in
+        stateContainer.mutate { $0 += 1 }
+        return .handled
+      },
+      exitKeyBindings: ExitKeyBindings([exitKey]),
+      viewBuilder: { state, _ in
+        Text("handled \(state)")
+      }
+    )
+
+    let result = try await runLoop.run()
+
+    #expect(result.exitReason == .userExit(exitKey))
+    #expect(result.finalState == 0)
+  }
+
+  @MainActor
   @Test("WindowGroup scenes present at the terminal canvas size even for small roots")
   func windowGroupScenesPresentAtTerminalCanvasSize() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 20, height: 4))

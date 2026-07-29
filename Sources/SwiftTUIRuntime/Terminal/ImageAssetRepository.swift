@@ -46,9 +46,19 @@ private struct ImageAssetCacheCost: BoundedLRUCost {
   }
 }
 
-private struct ImageAssetCachePolicy: Sendable {
+struct ImageAssetCachePolicy: Sendable {
   var maxEntries: Int
   var maxBytes: Int
+
+  static let resolutionDefault = Self(
+    maxEntries: 512,
+    maxBytes: 128 * 1_024 * 1_024
+  )
+
+  static let decodedDefault = Self(
+    maxEntries: 64,
+    maxBytes: 128 * 1_024 * 1_024
+  )
 }
 
 extension ImageLookupKey: Hashable {
@@ -68,7 +78,7 @@ extension ImageLookupKey: Hashable {
       // stays byte-exact, so same-shaped payloads can only cost a bucket
       // collision, never a wrong hit. (Equal sources sample identically, so
       // the equal-implies-equal-hash contract holds.)
-      hasher.combine(0x64617461)  // 'data' — keeps the case discriminated
+      hasher.combine(0x6461_7461)  // 'data' — keeps the case discriminated
       hasher.combine(bytes.count)
       let sampleCount = 64
       if bytes.count <= sampleCount * 2 {
@@ -152,19 +162,28 @@ private func isPNGBytes(_ bytes: [UInt8]) -> Bool {
 final class ImageAssetRepository: Sendable {
   // Both caches live for the process (`sharedImageAssetRepository`), so without a
   // bound a long session that views many distinct images grows them without
-  // limit (and leaks across tests sharing the singleton). Cap each by entry
-  // count; F52 moved them onto the shared generational-LRU ``BoundedLRUCache``
-  // (recency-ordered, O(1) eviction) — the working set of on-screen images is
-  // small, so a generous cap bounds memory without measurably hurting hit rate.
-  private static let resolutionPolicy = ImageAssetCachePolicy(maxEntries: 512, maxBytes: .max)
-  private static let decodedPolicy = ImageAssetCachePolicy(maxEntries: 256, maxBytes: .max)
+  // limit (and leaks across tests sharing the singleton). F52 moved them onto
+  // the shared generational-LRU ``BoundedLRUCache`` (recency-ordered, O(1)
+  // eviction). Both caches are entry- and byte-bounded: resolution entries can
+  // retain encoded payloads in both their lookup key and normalized reference,
+  // while decoded entries retain encoded bytes plus RGBA pixels.
 
   private struct Storage {
     var resolutions = BoundedLRUCache<ImageLookupKey, ResolvedImageAsset, ImageAssetCacheCost>()
     var decodedImages = BoundedLRUCache<ImageAssetReference, DecodedImage, ImageAssetCacheCost>()
   }
 
+  private let resolutionPolicy: ImageAssetCachePolicy
+  private let decodedPolicy: ImageAssetCachePolicy
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+
+  init(
+    resolutionCachePolicy: ImageAssetCachePolicy = .resolutionDefault,
+    decodedCachePolicy: ImageAssetCachePolicy = .decodedDefault
+  ) {
+    resolutionPolicy = resolutionCachePolicy
+    decodedPolicy = decodedCachePolicy
+  }
 
   func resolver() -> ImageAssetResolver {
     { [weak self] source, resourceRoots, cellPixelSize in
@@ -207,13 +226,18 @@ final class ImageAssetRepository: Sendable {
       cellPixelSize: cellPixelSize
     )
 
-    storage.withLockUnchecked { storage in
-      storage.resolutions.upsert(
-        lookupKey,
-        value: resolved,
-        cost: ImageAssetCacheCost(entryCount: 1, byteCount: 0),
-        policy: Self.resolutionPolicy
-      )
+    if let byteCount = resolutionCacheByteCount(lookupKey, resolved) {
+      let cost = ImageAssetCacheCost(entryCount: 1, byteCount: byteCount)
+      if !cost.violates(resolutionPolicy) {
+        storage.withLockUnchecked { storage in
+          storage.resolutions.upsert(
+            lookupKey,
+            value: resolved,
+            cost: cost,
+            policy: resolutionPolicy
+          )
+        }
+      }
     }
     return resolved
   }
@@ -229,18 +253,37 @@ final class ImageAssetRepository: Sendable {
       return nil
     }
 
-    let byteCount =
-      decoded.encodedBytes.count
-      + decoded.pixels.count * MemoryLayout<RGBAImagePixel>.stride
+    storeDecodedImage(decoded, for: reference)
+    return decoded
+  }
+
+  /// Stores a decoded image when its dimensions and retained byte cost are
+  /// valid and fit the configured cache policy. Oversized images may still be
+  /// rendered by the caller, but never make this process-lived cache exceed
+  /// its hard bound.
+  @discardableResult
+  func storeDecodedImage(
+    _ decoded: DecodedImage,
+    for reference: ImageAssetReference
+  ) -> Bool {
+    guard let byteCount = decodedImageCacheByteCount(decoded) else {
+      return false
+    }
+
+    let cost = ImageAssetCacheCost(entryCount: 1, byteCount: byteCount)
+    guard !cost.violates(decodedPolicy) else {
+      return false
+    }
+
     storage.withLockUnchecked { storage in
       storage.decodedImages.upsert(
         reference,
         value: decoded,
-        cost: ImageAssetCacheCost(entryCount: 1, byteCount: byteCount),
-        policy: Self.decodedPolicy
+        cost: cost,
+        policy: decodedPolicy
       )
     }
-    return decoded
+    return true
   }
 
   private func resolvedReference(
@@ -327,12 +370,23 @@ final class ImageAssetRepository: Sendable {
     return nil
   }
 
-  func occupancy() -> (resolutionCount: Int, decodedCount: Int, approxBytes: Int) {
+  func occupancy() -> (
+    resolutionCount: Int,
+    decodedCount: Int,
+    resolutionApproxBytes: Int,
+    decodedApproxBytes: Int,
+    approxBytes: Int
+  ) {
     storage.withLockUnchecked { storage in
-      (
+      let resolutionBytes = storage.resolutions.totalCost.byteCount
+      let decodedBytes = storage.decodedImages.totalCost.byteCount
+      let (totalBytes, overflow) = resolutionBytes.addingReportingOverflow(decodedBytes)
+      return (
         storage.resolutions.count,
         storage.decodedImages.count,
-        storage.decodedImages.totalCost.byteCount
+        resolutionBytes,
+        decodedBytes,
+        overflow ? .max : totalBytes
       )
     }
   }
@@ -355,6 +409,82 @@ final class ImageAssetRepository: Sendable {
   }
 }
 
+private func resolutionCacheByteCount(
+  _ lookupKey: ImageLookupKey,
+  _ resolved: ResolvedImageAsset
+) -> Int? {
+  var retainedBytes = 0
+
+  func add(_ byteCount: Int) -> Bool {
+    let (result, overflow) = retainedBytes.addingReportingOverflow(byteCount)
+    guard !overflow else {
+      return false
+    }
+    retainedBytes = result
+    return true
+  }
+
+  switch lookupKey.source {
+  case .path(let value), .fileURL(let value):
+    guard add(value.utf8.count) else {
+      return nil
+    }
+  case .data(let bytes):
+    guard add(bytes.count) else {
+      return nil
+    }
+  }
+
+  for root in lookupKey.resourceRoots {
+    guard add(root.utf8.count) else {
+      return nil
+    }
+  }
+
+  switch resolved.reference {
+  case .namedResource(let value), .filePath(let value):
+    guard add(value.utf8.count) else {
+      return nil
+    }
+  case .embeddedImage(let bytes):
+    guard add(bytes.count) else {
+      return nil
+    }
+  }
+
+  return retainedBytes
+}
+
+private func decodedImageCacheByteCount(
+  _ decoded: DecodedImage
+) -> Int? {
+  let width = decoded.pixelSize.width
+  let height = decoded.pixelSize.height
+  guard width > 0, height > 0 else {
+    return nil
+  }
+
+  let (pixelCount, pixelCountOverflow) = width.multipliedReportingOverflow(by: height)
+  guard !pixelCountOverflow, pixelCount == decoded.pixels.count else {
+    return nil
+  }
+
+  let (pixelBytes, pixelBytesOverflow) = pixelCount.multipliedReportingOverflow(
+    by: MemoryLayout<RGBAImagePixel>.stride
+  )
+  guard !pixelBytesOverflow else {
+    return nil
+  }
+
+  let (retainedBytes, retainedBytesOverflow) = decoded.encodedBytes.count.addingReportingOverflow(
+    pixelBytes
+  )
+  guard !retainedBytesOverflow else {
+    return nil
+  }
+  return retainedBytes
+}
+
 let sharedImageAssetRepository: ImageAssetRepository = {
   let repo = ImageAssetRepository()
   // Only the shared repository is counted; per-test instances never register,
@@ -368,8 +498,13 @@ let sharedImageAssetRepository: ImageAssetRepository = {
       return MemoryMetricSnapshot(
         name: "ImageAssetRepository.decodedImages",
         count: occupancy.decodedCount,
-        approxBytes: occupancy.approxBytes,
-        detail: ["resolutions": occupancy.resolutionCount]
+        approxBytes: occupancy.decodedApproxBytes,
+        detail: [
+          "decodedImages": occupancy.decodedCount,
+          "decodedApproxBytes": occupancy.decodedApproxBytes,
+          "resolutions": occupancy.resolutionCount,
+          "resolutionApproxBytes": occupancy.resolutionApproxBytes,
+        ]
       )
     }
   )

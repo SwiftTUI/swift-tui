@@ -116,7 +116,9 @@ public struct WindowGroup<Content: View>: Scene {
   /// Pass ``ExitKeyBindings/none`` (or `[]`) to disable framework-level
   /// exits entirely; the window will then only exit in response to OS
   /// signals, `stdin` EOF, or an explicit exit returned by a consumer
-  /// `keyHandler` or `keyCommand`.
+  /// `keyHandler` or `keyCommand`. Non-edit focused `onKeyPress` handlers run
+  /// before these bindings and can consume a key conditionally; native
+  /// text-edit focus retains exit-key precedence.
   public func exitOnKeys(_ keys: [KeyPress]) -> WindowGroup<Content> {
     WindowGroup(
       title: title,

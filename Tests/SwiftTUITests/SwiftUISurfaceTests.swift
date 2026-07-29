@@ -4682,6 +4682,27 @@ struct SwiftUISurfaceTests {
     )
   }
 
+  @Test("inline text background styles survive rich-content rasterization")
+  func inlineTextBackgroundStyleSurvivesRichContentRasterization() throws {
+    let artifacts = DefaultRenderer().render(
+      Text("before \(Text("code").foregroundStyle(.yellow).backgroundStyle(.blue)) after"),
+      context: .init(identity: testIdentity("InlineCode"))
+    )
+
+    guard case .richText(let payload) = artifacts.resolvedTree.drawPayload else {
+      Issue.record("Expected interpolated Text to resolve to a rich text payload")
+      return
+    }
+
+    #expect(payload.runs.map(\.text) == ["before ", "code", " after"])
+    #expect(payload.runs[1].style.foregroundStyle == .color(.yellow))
+    #expect(payload.runs[1].style.backgroundStyle == .color(.blue))
+    #expect(artifacts.rasterSurface.cells[0][6].style?.backgroundColor == nil)
+    #expect(artifacts.rasterSurface.cells[0][7].style?.backgroundColor == .blue)
+    #expect(artifacts.rasterSurface.cells[0][10].style?.backgroundColor == .blue)
+    #expect(artifacts.rasterSurface.cells[0][11].style?.backgroundColor == nil)
+  }
+
   @Test("focused standalone and inline links use highlighted link chrome")
   func focusedLinksUseHighlightedChrome() throws {
     let appearance = TerminalAppearance(
