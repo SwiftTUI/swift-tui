@@ -18,14 +18,14 @@ import SwiftTUICore
 /// side. Mirrors the JSON `format` field on each transmitted image
 /// record, and disambiguates the MIME type that the consumer will
 /// pass to `Blob`/`<img>` when decoding.
-enum WebSurfaceImageFormat: Sendable, Equatable {
+package enum WebSurfaceImageFormat: CaseIterable, Sendable, Equatable {
   case png
   case jpeg
   case gif
 
   /// String that appears in the surface JSON's `format` field — and
   /// becomes the suffix of `image/<value>` in the consumer's MIME.
-  var jsonValue: String {
+  package var jsonValue: String {
     switch self {
     case .png: return "png"
     case .jpeg: return "jpeg"

@@ -1,6 +1,6 @@
 /// Host-facing snapshot of the settled focus presentation for a committed frame.
 public struct FocusPresentation: Equatable, Sendable {
-  public enum Semantics: Equatable, Sendable {
+  public enum Semantics: CaseIterable, Equatable, Sendable {
     case none
     case automatic
     case activate

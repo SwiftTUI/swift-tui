@@ -64,10 +64,33 @@ The following rules are load-bearing:
 4. An incompatible new record shape requires a named capability in
    `HostWireCapabilities`, with an ingress and an absence-means-current-bytes
    default for every transport.
+5. String token vocabularies are manifest-frozen for emission but open-world
+   at decoding. Extending an emitted vocabulary requires both a
+   `HostWireSchema` manifest edit and review of every decoder's degradation
+   default. An unknown string must not reject an otherwise-structural frame.
 
 Browser and Android decoders reject a `surface` version newer than the newest
 shape they understand. This skew guard is separate from capability
 negotiation; there is no encoder-side version ceiling.
+
+## String token vocabularies
+
+`HostWireSchema` owns the frozen emitted sets for focus semantics,
+announcement politeness, accessibility live regions, image formats, and image
+scaling modes. Consumers normalize unknown strings at the point where a token
+affects behavior:
+
+| Unknown token | Browser degradation |
+| --- | --- |
+| Focus semantics | `automatic` |
+| Announcement politeness | `polite` |
+| Accessibility-node live region | Ignored |
+| Image scaling mode | `fit` |
+| Image format | Skip that image only |
+
+Unknown image formats do not reject the frame or suppress sibling images.
+Structural type errors remain frame-invalidating; open-world treatment applies
+only when the field is otherwise a string.
 
 ## Cross-frame encoder state
 
@@ -164,31 +187,27 @@ required to provide:
 1. lossless, in-order application of every accepted surface record;
 2. a baseline that survives for the entire encoding epoch;
 3. perfect memory for every image ID whose payload appeared in that epoch;
-4. a style table that accepts the complete accumulated table on every delta;
-   and
-5. closed-world agreement with the encoder's string token vocabulary.
+4. a style table that accepts the complete accumulated table on every delta.
 
 No deployed consumer has explicitly acknowledged that contract, and current
 implementations violate parts of it:
 
 - The browser decoder applies a delta to the last same-sized frame; it has no
-  generation with which to detect a skipped or reordered record. A delta it
-  cannot materialize degrades to ordinary text output.
+  generation with which to detect a skipped or reordered record. A delta
+  received without a retained baseline is dropped and leaves the current
+  surface unchanged.
 - The Android decoder also accepts a same-sized retained baseline without an
   epoch or baseline generation.
-- The DOM painter tests for a payload before consulting its retained image,
-  so a payload-less repeat drops the existing element.
 - The canvas painter removes a failed decode from its cache. A later
   payload-less repeat cannot retry the decode.
 - The Android renderer stores decoded images in an 8 MiB `LruCache`. Eviction
-  can recycle a bitmap that the insert-only encoder will not resend, and the
-  current oversized-entry ordering can return a bitmap already recycled by
-  the cache.
-- The browser validators reject the whole surface record when focus,
-  accessibility, or image fields contain an unknown enum-like token. Android
-  does not reject the frame: it retains focus, accessibility, and scaling
-  strings, omits image format from its model, and applies consumer-side
-  defaults. The two consumers do not yet share an open-world token policy.
+  can discard a bitmap that the insert-only encoder will not resend.
+  Oversized images bypass the cache and recycled entries are defensively
+  skipped, but there is no recovery request after an ordinary eviction.
+- Browser and Android accept unknown string tokens structurally. Browser
+  consumption applies the defaults above; Android retains focus,
+  accessibility, and scaling strings, omits image format from its model, and
+  applies host-side defaults.
 
 ## Android single-looper convention
 
@@ -217,12 +236,11 @@ package's `HEAD`.
 | Coordination stage | Gap at `HEAD` |
 | --- | --- |
 | S1 | Surface records have no epoch, generation, or baseline generation. Consumers cannot distinguish a contiguous delta from a stale or reordered one, and no transport accepts a keyframe or image resync request. |
-| H1 / S2 | Image payloads are transmit-once, but browser and Android retention can drop, fail, evict, or recycle them. There is no resend-on-miss path or retained-image acknowledgement. |
+| S2 | Image payloads are transmit-once, but a canvas decode failure or Android cache eviction can still lose one. There is no resend-on-miss path or retained-image acknowledgement. |
 | S3a | Android's size query commits cross-frame encoder state before the bytes are copied and decoded. An abandoned handshake, a grown second query, or decode failure can strand that state. |
 | S3b | `WebHostSceneChannel` retains an unbounded detached output backlog and flushes it when a client attaches, before processing that client's capability declaration. Detached surface records can therefore precede the epoch reset intended for the new client. |
 | S3d | Every delta retransmits the complete accumulated style table. Measured style churn makes late-record cost grow with the epoch rather than with current damage. |
 | S3e | The browser/WASI shared input queue rejects a control record larger than its remaining 64 KiB capacity as one chunk. The paste route catches and reports the error but drops the whole logical paste. |
-| S4 | Browser token validators are closed-world at the frame boundary. One unknown enum-like token rejects the entire surface instead of degrading only the affected field or record. |
 
 The Stage SV investigation also tested the claimed unbounded Android damage
 union. That claim is **refuted**, not a current gap:

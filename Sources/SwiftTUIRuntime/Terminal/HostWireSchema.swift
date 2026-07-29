@@ -33,6 +33,10 @@ import SwiftTUICore
 ///   describe the record *shape*, not the contract revision. Never bump them
 ///   for an additive field; anything newer is negotiated via
 ///   ``HostWireCapabilities``.
+/// - String token vocabularies are manifest-frozen below. Extending one
+///   requires both a manifest edit and decoder-default review. Decoders accept
+///   unknown tokens structurally and degrade only the affected field or
+///   record according to the normative contract.
 package enum HostWireSchema {
   // MARK: - Source-of-truth field mappings
 
@@ -360,6 +364,31 @@ package enum HostWireSchema {
   ]
 
   // MARK: - Shared wire tokens
+
+  /// Frozen tokens emitted for ``FocusPresentation/Semantics``.
+  package static let focusSemanticsTokens: Set<String> = [
+    "none", "automatic", "activate", "edit",
+  ]
+
+  /// Frozen tokens emitted for accessibility announcements.
+  package static let politenessTokens: Set<String> = [
+    "off", "polite", "assertive",
+  ]
+
+  /// Frozen tokens emitted for accessibility-node live regions.
+  package static let liveRegionTokens: Set<String> = [
+    "off", "polite", "assertive",
+  ]
+
+  /// Frozen image-container tokens emitted on surface image records.
+  package static let imageFormatTokens: Set<String> = [
+    "png", "jpeg", "gif",
+  ]
+
+  /// Frozen image-scaling tokens emitted on surface image records.
+  package static let scalingModeTokens: Set<String> = [
+    "stretch", "fit", "fill",
+  ]
 
   /// The focus-semantics wire token for the converged wire; the encoder
   /// consumes it directly and `WebSurfaceWireTotalityTests` pins the emitted

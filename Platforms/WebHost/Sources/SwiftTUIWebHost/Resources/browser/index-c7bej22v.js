@@ -448,6 +448,9 @@ class WebHostOutputDecoder {
         return { type: "surface", frame };
       }
       if (isWebHostSurfaceDeltaFrame(frame)) {
+        if (!this.lastSurfaceFrame || this.lastSurfaceFrame.width !== frame.width || this.lastSurfaceFrame.height !== frame.height) {
+          return { type: "surfaceDropped", reason: "noBaseline" };
+        }
         const materialized = this.materializeDeltaFrame(frame);
         if (materialized) {
           this.lastSurfaceFrame = materialized;
@@ -460,7 +463,7 @@ class WebHostOutputDecoder {
   }
   materializeDeltaFrame(frame) {
     const baseline = this.lastSurfaceFrame;
-    if (!baseline || baseline.width !== frame.width || baseline.height !== frame.height) {
+    if (!baseline) {
       return;
     }
     const rows = baseline.rows.slice();
@@ -600,7 +603,7 @@ function isWebHostFocusPresentation(value) {
     return false;
   }
   const presentation = value;
-  return (presentation.focusedIdentity === undefined || typeof presentation.focusedIdentity === "string") && (presentation.semantics === "none" || presentation.semantics === "automatic" || presentation.semantics === "activate" || presentation.semantics === "edit") && typeof presentation.prefersTextInput === "boolean" && typeof presentation.hasFocusedRegion === "boolean";
+  return (presentation.focusedIdentity === undefined || typeof presentation.focusedIdentity === "string") && typeof presentation.semantics === "string" && typeof presentation.prefersTextInput === "boolean" && typeof presentation.hasFocusedRegion === "boolean";
 }
 function isWebHostSurfaceDeltaRow(value) {
   return Array.isArray(value) && value.length === 2 && Number.isSafeInteger(value[0]) && value[0] >= 0 && isWebHostSurfaceRow(value[1]);
@@ -619,7 +622,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || node.liveRegion === "off" || node.liveRegion === "polite" || node.liveRegion === "assertive") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean");
+  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean");
 }
 function isWebHostAccessibilityPoint(value) {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => typeof entry === "number");
@@ -632,7 +635,7 @@ function isWebHostAccessibilityAnnouncement(value) {
     return false;
   }
   const announcement = value;
-  return typeof announcement.message === "string" && (announcement.politeness === "off" || announcement.politeness === "polite" || announcement.politeness === "assertive");
+  return typeof announcement.message === "string" && typeof announcement.politeness === "string";
 }
 function isWebHostSurfaceImages(value) {
   return Array.isArray(value) && value.every(isWebHostSurfaceImage);
@@ -658,7 +661,7 @@ function isWebHostSurfaceDamageRange(value) {
   return Array.isArray(value) && value.length === 2 && typeof value[0] === "number" && typeof value[1] === "number";
 }
 function isWebHostSurfaceImageFormat(value) {
-  return value === "png" || value === "jpeg" || value === "gif";
+  return typeof value === "string";
 }
 function isWebHostScrollRegions(value) {
   return Array.isArray(value) && value.every(isWebHostScrollRegion);
@@ -677,7 +680,7 @@ function isWebHostSurfaceSize(value) {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => typeof entry === "number");
 }
 function isWebHostSurfaceScalingMode(value) {
-  return value === "stretch" || value === "fit" || value === "fill";
+  return typeof value === "string";
 }
 
 // src/wasi/BrowserWASIBridge.ts
@@ -728,6 +731,8 @@ class BrowserWASIBridge {
             break;
           case "frameDiagnostic":
             sink.recordFrameDiagnostic?.(record.diagnostic);
+            break;
+          case "surfaceDropped":
             break;
           case "text":
             sink.writeOutput?.(record.text);
@@ -879,6 +884,8 @@ class WebSocketSceneBridge {
         break;
       case "frameDiagnostic":
         sink.recordFrameDiagnostic?.(record.diagnostic);
+        break;
+      case "surfaceDropped":
         break;
       case "text":
         sink.writeOutput?.(record.text);
@@ -1565,6 +1572,52 @@ function resolvedSurfaceBackground(style, terminalStyle) {
   return style?.bg;
 }
 
+// src/normalizeWireTokens.ts
+function normalizeSemantics(value) {
+  switch (value) {
+    case "none":
+    case "automatic":
+    case "activate":
+    case "edit":
+      return value;
+    default:
+      return "automatic";
+  }
+}
+function normalizePoliteness(value) {
+  switch (value) {
+    case "off":
+    case "polite":
+    case "assertive":
+      return value;
+    default:
+      return "polite";
+  }
+}
+function normalizeLiveRegion(value) {
+  switch (value) {
+    case "off":
+    case "polite":
+    case "assertive":
+      return value;
+    default:
+      return;
+  }
+}
+function normalizeScalingMode(value) {
+  switch (value) {
+    case "stretch":
+    case "fit":
+    case "fill":
+      return value;
+    default:
+      return "fit";
+  }
+}
+function isSupportedImageFormat(value) {
+  return value === "png" || value === "jpeg" || value === "gif";
+}
+
 // src/CanvasSurfacePainter.ts
 class CanvasSurfacePainter {
   imageCache = new Map;
@@ -1628,7 +1681,13 @@ class CanvasSurfacePainter {
   }
   drawImages(context, images, metrics, dirtyRegion) {
     for (const image of images) {
-      this.drawImage(context, image, metrics, dirtyRegion);
+      if (!isSupportedImageFormat(image.format)) {
+        continue;
+      }
+      this.drawImage(context, {
+        ...image,
+        scalingMode: normalizeScalingMode(image.scalingMode)
+      }, metrics, dirtyRegion);
     }
   }
   drawImage(context, image, metrics, dirtyRegion) {
@@ -1973,7 +2032,14 @@ class DomSurfacePainter {
       return;
     }
     const next = new Map;
-    for (const image of images) {
+    for (const rawImage of images) {
+      if (!isSupportedImageFormat(rawImage.format)) {
+        continue;
+      }
+      const image = {
+        ...rawImage,
+        scalingMode: normalizeScalingMode(rawImage.scalingMode)
+      };
       const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
       const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
       const existing = this.renderedImages.get(image.id);
@@ -2338,7 +2404,14 @@ class AccessibilityTreeMounter {
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
-    const visibleNodes = nodes.filter((node) => !node.hidden);
+    const visibleNodes = nodes.filter((node) => !node.hidden).map((node) => ({
+      ...node,
+      liveRegion: normalizeLiveRegion(node.liveRegion)
+    }));
+    const normalizedAnnouncements = announcements.map((announcement) => ({
+      ...announcement,
+      politeness: normalizePoliteness(announcement.politeness)
+    }));
     const previousById = this.nodesById;
     const nextById = new Map;
     for (const node of visibleNodes) {
@@ -2361,7 +2434,7 @@ class AccessibilityTreeMounter {
       const parent = node.parentId ? nextById.get(node.parentId) : undefined;
       (parent ?? this.element).appendChild(element);
     }
-    this.announceLiveRegionChanges(visibleNodes, announcements);
+    this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
     const focused = visibleNodes.find((node) => node.isFocused);
     if ((options.synchronizeFocus ?? true) && focused) {
       this.nodesById.get(focused.id)?.focus?.({ preventScroll: true });
@@ -2711,7 +2784,14 @@ class WebHostSceneRuntime {
     return { width: frame.preferredGridWidth, height: frame.preferredGridHeight };
   }
   get focusPresentation() {
-    return this.currentFrame?.focusPresentation;
+    const presentation = this.currentFrame?.focusPresentation;
+    if (!presentation) {
+      return;
+    }
+    return {
+      ...presentation,
+      semantics: normalizeSemantics(presentation.semantics)
+    };
   }
   linkTarget(location) {
     return linkTargetAt(this.currentFrame?.links, this.currentFrame?.linkTargets, location);

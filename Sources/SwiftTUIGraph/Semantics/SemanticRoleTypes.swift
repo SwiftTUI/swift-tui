@@ -157,7 +157,12 @@ public enum AccessibilityRole: Hashable, Sendable, CustomStringConvertible {
   }
 }
 
-public enum AccessibilityPoliteness: Hashable, Sendable, CustomStringConvertible {
+public enum AccessibilityPoliteness:
+  CaseIterable,
+  Hashable,
+  Sendable,
+  CustomStringConvertible
+{
   case off
   case polite
   case assertive

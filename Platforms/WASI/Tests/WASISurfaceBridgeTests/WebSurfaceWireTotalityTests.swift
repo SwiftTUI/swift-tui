@@ -12,6 +12,41 @@ import Testing
 /// missing on web) and a manifest entry the encoder never learned both fail.
 @Suite
 struct WebSurfaceWireTotalityTests {
+  @Test("emitted wire vocabularies equal the frozen manifest sets")
+  func emittedWireVocabulariesEqualTheFrozenManifestSets() {
+    #expect(
+      HostWireSchema.focusSemanticsTokens
+        == ["none", "automatic", "activate", "edit"])
+    #expect(
+      HostWireSchema.politenessTokens
+        == ["off", "polite", "assertive"])
+    #expect(
+      HostWireSchema.liveRegionTokens
+        == ["off", "polite", "assertive"])
+    #expect(
+      HostWireSchema.imageFormatTokens
+        == ["png", "jpeg", "gif"])
+    #expect(
+      HostWireSchema.scalingModeTokens
+        == ["stretch", "fit", "fill"])
+
+    #expect(
+      Set(FocusPresentation.Semantics.allCases.map(HostWireSchema.focusSemanticsToken))
+        == HostWireSchema.focusSemanticsTokens)
+    #expect(
+      Set(AccessibilityPoliteness.allCases.map(\.description))
+        == HostWireSchema.politenessTokens)
+    #expect(
+      Set(AccessibilityPoliteness.allCases.map(\.description))
+        == HostWireSchema.liveRegionTokens)
+    #expect(
+      Set(WebSurfaceImageFormat.allCases.map(\.jsonValue))
+        == HostWireSchema.imageFormatTokens)
+    #expect(
+      Set(ImageScalingMode.allCases.map(\.rawValue))
+        == HostWireSchema.scalingModeTokens)
+  }
+
   @Test("a fully-populated full frame emits exactly the manifest key sets")
   func fullFrameEmitsExactlyTheManifestSurface() throws {
     var knownImageIDs: Set<String> = []

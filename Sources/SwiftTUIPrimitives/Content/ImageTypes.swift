@@ -13,7 +13,7 @@ public enum ImageAssetReference: Equatable, Hashable, Sendable {
 }
 
 /// Layout behavior used when an image participates in resizable measurement.
-public enum ImageScalingMode: String, Equatable, Sendable {
+public enum ImageScalingMode: String, CaseIterable, Equatable, Sendable {
   case stretch
   case fit
   case fill
