@@ -222,16 +222,6 @@ interface OverrideFile {
    * They are still validated on every platform where they appear.
    */
   platform_exceptions?: string[];
-  /**
-   * Exact temporary bridge for the pre-existing malformed/dead ledger keys
-   * which Stage S7 migrates. Every row must currently fail normal validation;
-   * a resolved or unused row is itself an error.
-   */
-  migration_exceptions?: {
-    classifications?: string[];
-    module_defaults?: string[];
-    notes?: string[];
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,11 +292,6 @@ async function loadOverrides(path: string): Promise<{
   defaultClassification: Classification;
   notes: Map<string, string>;
   platformExceptions: Set<string>;
-  migrationExceptions: {
-    classifications: string[];
-    moduleDefaults: string[];
-    notes: string[];
-  };
 }> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -316,11 +301,6 @@ async function loadOverrides(path: string): Promise<{
       defaultClassification: "pending-review",
       notes: new Map(),
       platformExceptions: new Set(),
-      migrationExceptions: {
-        classifications: [],
-        moduleDefaults: [],
-        notes: [],
-      },
     };
   }
   const raw = await file.text();
@@ -342,11 +322,6 @@ async function loadOverrides(path: string): Promise<{
     defaultClassification: parsed.default ?? "pending-review",
     notes,
     platformExceptions: new Set(parsed.platform_exceptions ?? []),
-    migrationExceptions: {
-      classifications: parsed.migration_exceptions?.classifications ?? [],
-      moduleDefaults: parsed.migration_exceptions?.module_defaults ?? [],
-      notes: parsed.migration_exceptions?.notes ?? [],
-    },
   };
 }
 
@@ -388,12 +363,6 @@ function validateOverrides(
 ): void {
   const failures: string[] = [];
   const knownModules = new Set<string>(ALL_MODULES);
-  const migrationExceptionSets = {
-    classifications: new Set(overrides.migrationExceptions.classifications),
-    moduleDefaults: new Set(overrides.migrationExceptions.moduleDefaults),
-    notes: new Set(overrides.migrationExceptions.notes),
-  };
-  const consumedMigrationExceptions = new Set<string>();
   const emittedTopLevel = new Set<string>();
   for (const report of reports) {
     for (const entry of report.topLevel) {
@@ -401,48 +370,9 @@ function validateOverrides(
     }
   }
 
-  const migrationExceptionID = (
-    category: keyof typeof migrationExceptionSets,
-    key: string,
-  ): string => `${category}\u0000${key}`;
-  const recordFailure = (
-    category: keyof typeof migrationExceptionSets,
-    key: string,
-    message: string,
-  ): void => {
-    if (migrationExceptionSets[category].has(key)) {
-      consumedMigrationExceptions.add(migrationExceptionID(category, key));
-      return;
-    }
-    failures.push(message);
-  };
-
-  for (const [category, keys] of Object.entries(
-    overrides.migrationExceptions,
-  ) as [keyof typeof migrationExceptionSets, string[]][]) {
-    const seen = new Set<string>();
-    for (const key of keys) {
-      if (seen.has(key)) {
-        failures.push(`migration_exceptions.${category} duplicates '${key}'`);
-      }
-      seen.add(key);
-      if (
-        category === "moduleDefaults"
-          ? !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)
-          : qualifiedModule(key) === undefined
-      ) {
-        failures.push(
-          `migration_exceptions.${category} key '${key}' is malformed`,
-        );
-      }
-    }
-  }
-
   for (const module of overrides.moduleDefaults.keys()) {
     if (!knownModules.has(module)) {
-      recordFailure(
-        "moduleDefaults",
-        module,
+      failures.push(
         `module_defaults key '${module}' is not a configured module`,
       );
     }
@@ -463,14 +393,11 @@ function validateOverrides(
   const validatePresentKey = (
     key: string,
     source: string,
-    category: "classifications" | "notes",
   ): void => {
     const localFailures: string[] = [];
     const module = validateQualifiedKey(key, source, knownModules, localFailures);
     if (!module) {
-      for (const failure of localFailures) {
-        recordFailure(category, key, failure);
-      }
+      failures.push(...localFailures);
       return;
     }
     if (emittedTopLevel.has(key)) return;
@@ -481,9 +408,7 @@ function validateOverrides(
     ) {
       return;
     }
-    recordFailure(
-      category,
-      key,
+    failures.push(
       `${source} key '${key}' does not match a top-level dump symbol`,
     );
   };
@@ -495,27 +420,11 @@ function validateOverrides(
       validatePresentKey(
         key,
         `classifications.${classification}`,
-        "classifications",
       );
     }
   }
   for (const key of overrides.notes.keys()) {
-    validatePresentKey(key, "notes", "notes");
-  }
-
-  for (const [category, keys] of Object.entries(
-    overrides.migrationExceptions,
-  ) as [keyof typeof migrationExceptionSets, string[]][]) {
-    for (const key of keys) {
-      if (
-        !consumedMigrationExceptions.has(migrationExceptionID(category, key))
-      ) {
-        failures.push(
-          `migration_exceptions.${category} key '${key}' is stale or unused; ` +
-            "normal validation no longer fails",
-        );
-      }
-    }
+    validatePresentKey(key, "notes");
   }
 
   if (failures.length > 0) {
@@ -1111,7 +1020,8 @@ async function main(): Promise<void> {
     }
     if (drift.pendingReview.length > 0) {
       failures.push(
-        `${drift.pendingReview.length} top-level symbol(s) are unclassified:`,
+        `${drift.pendingReview.length} top-level symbol(s) are classified ` +
+          `"pending-review" ⚠:`,
       );
       for (const p of drift.pendingReview.slice(0, 10)) {
         failures.push(`  - ${p.qualifiedName}`);

@@ -1,8 +1,0 @@
-classifications:
-  canonical:
-    - SwiftTUI.Known
-    - SwiftTUI.LegacyKey
-default: pending-review
-migration_exceptions:
-  classifications:
-    - SwiftTUI.LegacyKey

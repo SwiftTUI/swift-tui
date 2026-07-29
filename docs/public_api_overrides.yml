@@ -1,17 +1,21 @@
 # Public API classification overrides.
 #
-# Maps "Module.TypeName" → classification.
+# Maps each live top-level public symbol's "Module.Name" to a classification.
 #
-# This file is the single source of truth for how each top-level public
-# symbol is classified. Symbols not listed here fall into the
-# `pending-review` bucket and surface in the generated baseline as ⚠.
+# Shipped-product symbols are classified explicitly. Module defaults are
+# restricted to package-only and test-support modules whose entire charter has
+# one classification. Every other unlisted symbol falls into `pending-review`
+# and makes the inventory's --check mode fail.
 #
-# Adding a new classification: drop the qualified name into the right
-# bucket. Removing a symbol from the source: move it under `removed:`.
+# Add a symbol by placing its qualified dump name in the appropriate bucket.
+# Retire a symbol by moving its last qualified declaration name to `removed:`;
+# a removed name reappearing in a dump is a hard failure. Platform-conditional
+# live symbols may also be named under `platform_exceptions:`, but still need
+# an ordinary classification or note and are validated wherever they appear.
 #
 # Classifications:
 #   canonical          — part of the supported authoring/runtime story.
-#                        Documented in DocC and PUBLIC_API_INVENTORY.md.
+#                        Documented in DocC and PUBLIC-API.md.
 #   package-only-seam  — exists for transitional reasons; not part of the
 #                        intended product surface but tolerated.
 #   test-support       — exposed only to support test access; not for
@@ -21,39 +25,13 @@
 #   removed            — explicitly retired. If a build emits a symbol with a
 #                        name in this list the --check run fails.
 #
-# Default for unclassified symbols: pending-review.
-#
-# Seeded from docs/PUBLIC_API_INVENTORY.md as of the foundation PR.
-# Kept intentionally conservative — when in doubt, leave a symbol in
-# pending-review and let the next reviewer place it.
+# Global default for unclassified symbols: pending-review.
 
 classifications:
 
   canonical:
-    # ─── SwiftTUI (runtime + scene + host) ────────────────────────────────
-    - SwiftTUI.AnyScene
+    # ─── SwiftTUI umbrella ─────────────────────────────────────────────────
     - SwiftTUI.App
-    - SwiftTUI.AppLaunchError
-    - SwiftTUI.ClipboardWritingPresentationSurface
-    - SwiftTUI.DefaultRenderer
-    - SwiftTUI.HostedSceneSession
-    - SwiftTUI.RunLoop
-    - SwiftTUI.RunLoopExitReason
-    - SwiftTUI.RunLoopResult
-    - SwiftTUI.RuntimeConfiguration
-    - SwiftTUI.RuntimeRenderMode
-    - SwiftTUI.Scene
-    - SwiftTUI.SceneBuilder
-    - SwiftTUI.SignalReader
-    - SwiftTUI.TerminalCapabilityProfile
-    - SwiftTUI.TerminalSurfaceRenderer
-    - SwiftTUI.SceneDescriptor
-    - SwiftTUI.SceneManifest
-    - SwiftTUI.TerminalMouseInputCompatibilityMatrix
-    - SwiftTUI.TerminalMouseInputResolution
-    - SwiftTUI.TerminalMouseInputTrustPolicy
-    - SwiftTUI.WindowGroup
-    - SwiftTUI.WindowIdentifier
 
     # ─── Profiling (optional diagnostics product) ──────────────────────────
     - SwiftTUIProfiling.CPUSample
@@ -74,8 +52,6 @@ classifications:
     - SwiftTUIViews.Button
     - SwiftTUIViews.Canvas
     - SwiftTUIViews.CanvasClosureDrawing
-    - SwiftTUIViews.CanvasContext
-    - SwiftTUIViews.CanvasDrawing
     - SwiftTUIViews.CanvasInputDrawing
     - SwiftTUIViews.Capsule
     - SwiftTUIViews.Circle
@@ -94,9 +70,6 @@ classifications:
     - SwiftTUIViews.EquatableView
     - SwiftTUIViews.FocusedBinding
     - SwiftTUIViews.FocusedValue
-    - SwiftTUIViews.FocusedValueKey
-    - SwiftTUIViews.FocusedValues
-    - SwiftTUIViews.FocusInteractions
     - SwiftTUIViews.FocusState
     - SwiftTUIViews.ForeignSurface
     - SwiftTUIViews.GeometryReader
@@ -104,7 +77,6 @@ classifications:
     - SwiftTUIViews.GroupBox
     - SwiftTUIViews.HStack
     - SwiftTUIViews.HStackLayout
-    - SwiftTUIViews.HoverPhase
     - SwiftTUIViews.Image
     - SwiftTUIViews.Label
     - SwiftTUIViews.LabeledContent
@@ -113,7 +85,6 @@ classifications:
     - SwiftTUIViews.LazyHStack
     - SwiftTUIViews.LazyVStack
     - SwiftTUIViews.Link
-    - SwiftTUIViews.LinkDestination
     - SwiftTUIViews.List
     - SwiftTUIViews.Menu
     - SwiftTUIViews.ModifiedContent
@@ -125,7 +96,6 @@ classifications:
     - SwiftTUIViews.PopoverAttachmentAnchor
     - SwiftTUIViews.PopoverTip
     - SwiftTUIViews.PopoverTipAction
-    - SwiftTUIViews.PreferenceKey
     - SwiftTUIViews.ProgressView
     - SwiftTUIViews.Rectangle
     - SwiftTUIViews.ResetFocusAction
@@ -169,43 +139,134 @@ classifications:
     - SwiftTUIAnimatedImage.AnimatedImagePixel
     - SwiftTUIAnimatedImage.AnimatedImageSequence
 
-    # ─── SwiftTUI runtime types (public, deeper than the daily surface) ──
-    - SwiftTUI.ConditionalScene
-    - SwiftTUI.EmptyScene
-    - SwiftTUI.ExitKeyBindings
-    - SwiftTUI.FileOpenError
-    - SwiftTUI.FrameDiagnosticRecord
-    - SwiftTUI.HostedRasterSurface
-    - SwiftTUI.HostedSceneSessionError
-    - SwiftTUI.InProcessSignalReader
-    - SwiftTUI.InputEvent
-    - SwiftTUI.InputReader
-    - SwiftTUI.InputReading
-    - SwiftTUI.KeyHandlingResult
-    - SwiftTUI.KeyParser
-    - SwiftTUI.MouseButton
-    - SwiftTUI.MouseEvent
-    - SwiftTUI.PasteEvent
-    - SwiftTUI.PresentationSurface
-    - SwiftTUI.PresentationSurfaceMetricsProvider
-    - SwiftTUI.PresentationMetrics
-    - SwiftTUI.RasterPresentationSurface
+    # ─── SwiftTUIRuntime ───────────────────────────────────────────────────
+    - SwiftTUIRuntime.AnyScene
+    - SwiftTUIRuntime.App
+    - SwiftTUIRuntime.AppLaunchError
+    - SwiftTUIRuntime.ClipboardWritingPresentationSurface
+    - SwiftTUIRuntime.ConditionalScene
+    - SwiftTUIRuntime.DefaultRenderer
+    - SwiftTUIRuntime.EmptyScene
+    - SwiftTUIRuntime.ExitKeyBindings
+    - SwiftTUIRuntime.FrameDiagnosticRecord
+    - SwiftTUIRuntime.HostedRasterSurface
+    - SwiftTUIRuntime.HostedSceneSession
+    - SwiftTUIRuntime.HostedSceneSessionError
+    - SwiftTUIRuntime.HostedSurfaceConfirmedSlack
+    - SwiftTUIRuntime.HostedSurfaceSizeNegotiation
+    - SwiftTUIRuntime.HostedSurfaceSizeNegotiator
+    - SwiftTUIRuntime.HostLengthSize
+    - SwiftTUIRuntime.InProcessSignalReader
+    - SwiftTUIRuntime.InputEvent
+    - SwiftTUIRuntime.InputReader
+    - SwiftTUIRuntime.InputReading
+    - SwiftTUIRuntime.KeyHandlingResult
+    - SwiftTUIRuntime.KeyParser
+    - SwiftTUIRuntime.MouseButton
+    - SwiftTUIRuntime.MouseEvent
+    - SwiftTUIRuntime.Never
+    - SwiftTUIRuntime.PasteEvent
+    - SwiftTUIRuntime.PresentationMetrics
+    - SwiftTUIRuntime.PresentationSurface
+    - SwiftTUIRuntime.PresentationSurfaceMetricsProvider
+    - SwiftTUIRuntime.RasterPresentationSurface
     - SwiftTUIRuntime.RenderSnapshot
-    - SwiftTUI.SemanticHostFrame
-    - SwiftTUI.SemanticHostFrameCapabilities
-    - SwiftTUI.SignalReading
-    - SwiftTUI.Standard
-    - SwiftTUI.StateKeyHandler
-    - SwiftTUI.TerminalControlMessage
-    - SwiftTUI.TerminalGraphicsCapabilities
-    - SwiftTUI.TerminalHost
-    - SwiftTUI.TerminalHostError
-    - SwiftTUI.TerminalCommandPresentationSurface
-    - SwiftTUI.TerminalInputParser
-    - SwiftTUI.TerminalInputReading
-    - SwiftTUI.TerminalPresentationMetrics
-    - SwiftTUI.TupleScene
-    - SwiftTUI.VariadicScene
+    - SwiftTUIRuntime.RunLoop
+    - SwiftTUIRuntime.RunLoopExitReason
+    - SwiftTUIRuntime.RunLoopResult
+    - SwiftTUIRuntime.RuntimeConfiguration
+    - SwiftTUIRuntime.RuntimeIssueSink
+    - SwiftTUIRuntime.RuntimeRenderMode
+    - SwiftTUIRuntime.Scene
+    - SwiftTUIRuntime.SceneBuilder
+    - SwiftTUIRuntime.SceneDescriptor
+    - SwiftTUIRuntime.SceneManifest
+    - SwiftTUIRuntime.SemanticHostFrame
+    - SwiftTUIRuntime.SemanticHostFrameCapabilities
+    - SwiftTUIRuntime.SignalReading
+    - SwiftTUIRuntime.StateKeyHandler
+    - SwiftTUIRuntime.TerminalCapabilityProfile
+    - SwiftTUIRuntime.TerminalCommandPresentationSurface
+    - SwiftTUIRuntime.TerminalControlMessage
+    - SwiftTUIRuntime.TerminalGraphicsCapabilities
+    - SwiftTUIRuntime.TerminalHost
+    - SwiftTUIRuntime.TerminalHostError
+    - SwiftTUIRuntime.TerminalInputParser
+    - SwiftTUIRuntime.TerminalInputReading
+    - SwiftTUIRuntime.TerminalPresentationMetrics
+    - SwiftTUIRuntime.TerminalSurfaceRenderer
+    - SwiftTUIRuntime.TupleScene
+    - SwiftTUIRuntime.VariadicScene
+    - SwiftTUIRuntime.WindowGroup
+    - SwiftTUIRuntime.WindowIdentifier
+
+    # ─── Explicit shipped-product surfaces ─────────────────────────────────
+    - SwiftTUIArguments.CompletionsCommand
+    - SwiftTUIArguments.SwiftTUIApp
+    - SwiftTUIArguments.SwiftTUICommand
+    - SwiftTUIArguments.SwiftTUIOptions
+    - "SwiftTUIPTYPrimitives.closeFD(_:)"
+    - "SwiftTUIPTYPrimitives.openPTY()"
+    - SwiftTUIPTYPrimitives.PTYError
+    - SwiftTUIPTYPrimitives.PTYHandles
+    - SwiftTUIPTYPrimitives.PTYPair
+    - "SwiftTUIPTYPrimitives.ptyResize(masterFD:cols:rows:)"
+    - SwiftTUITerminal.ChildProcessPty
+    - SwiftTUITerminal.TerminalBufferKind
+    - SwiftTUITerminal.TerminalEmulator
+    - SwiftTUITerminal.TerminalEmulatorEvent
+    - SwiftTUITerminal.TerminalEmulatorKey
+    - SwiftTUITerminal.TerminalEmulatorMouse
+    - SwiftTUITerminal.TerminalExitReason
+    - SwiftTUITerminal.TerminalLifecycle
+    - SwiftTUITerminal.TerminalMouseMode
+    - SwiftTUITerminal.TerminalProcessSession
+    - SwiftTUITerminal.TerminalSession
+    - SwiftTUITerminal.TerminalView
+    - SwiftTUITerminal.TerminalViewKeyDisposition
+    - SwiftTUITerminal.View
+    - SwiftTUITerminalWorkspace.TerminalPaneID
+    - SwiftTUITerminalWorkspace.TerminalPaneSpec
+    - SwiftTUITerminalWorkspace.TerminalSplit
+    - SwiftTUITerminalWorkspace.TerminalSplitAxis
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceAction
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceDirection
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceLayout
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceNode
+    - SwiftTUITerminalWorkspace.TerminalWorkspacePaneFrame
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceSessionStore
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceState
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceTab
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceTabID
+    - SwiftTUITerminalWorkspace.TerminalWorkspaceView
+    - SwiftTUICLI.App
+    - SwiftTUICLI.RenderOnce
+    - SwiftTUICLI.ScenePty
+    - SwiftTUICLI.SignalReader
+    - SwiftTUICLI.TerminalRunner
+    - SwiftTUICLI.TerminalRunnerError
+    - SwiftTUIWASI.App
+    - SwiftTUIWASI.WASIRunner
+    - SwiftTUIWASI.WASIRunnerError
+    - SwiftTUIWebHost.WebHostConfig
+    - SwiftTUIWebHost.WebHostRunner
+    - SwiftTUIWebHost.WebHostRunnerError
+    - SwiftTUIWebHostCLI.App
+    - SwiftTUIWebHostCLI.WebHostCLIRunner
+    - SwiftTUIAndroidHost.AndroidHostHandleRegistry
+    - SwiftTUIAndroidHost.AndroidHostSceneHost
+    - SwiftTUIAndroidHost.AndroidHostStyle
+    - "SwiftTUIAndroidHost.swift_tui_android_copy_clipboard_text(_:_:_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_copy_latest_frame(_:_:_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_declare_capabilities(_:_:_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_destroy(_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_diag()"
+    - "SwiftTUIAndroidHost.swift_tui_android_install_executor()"
+    - "SwiftTUIAndroidHost.swift_tui_android_resize(_:_:_:_:_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_send_input(_:_:_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_start(_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_stop(_:)"
+    - "SwiftTUIAndroidHost.swift_tui_android_tick(_:)"
 
     # ─── View animation primitives ─────────────────────────────────────────
     - SwiftTUIViews.Animation
@@ -244,16 +305,12 @@ classifications:
     - SwiftTUIViews.ButtonStyleConfiguration
     - SwiftTUIViews.DefaultBottomToolbarStyle
     - SwiftTUIViews.DefaultTopToolbarStyle
-    - SwiftTUIViews.ErrorToastStyle
     - SwiftTUIViews.InfoToastStyle
-    - SwiftTUIViews.InsetListStyle
     - SwiftTUIViews.InsetGroupedListStyle
-    - SwiftTUIViews.GroupedListStyle
     - SwiftTUIViews.PlainButtonStyle
     - SwiftTUIViews.PlainListStyle
     - SwiftTUIViews.PlainOutlineStyle
     - SwiftTUIViews.PlainTextFieldStyle
-    - SwiftTUIViews.PlainPickerStyle
     - SwiftTUIViews.RoundedOutlineStyle
     - SwiftTUIViews.SegmentedPickerStyle
     - SwiftTUIViews.SuccessToastStyle
@@ -564,7 +621,6 @@ classifications:
     - SwiftTUIPrimitives.OklabColor
     - SwiftTUIPrimitives.OklchColor
     - SwiftTUIPrimitives.OutlineStylePresentation
-    - "SwiftTUICore.parseDroppedPaths(_:)"
     - SwiftTUIPrimitives.Path
     - SwiftTUIPrimitives.Phase
     - SwiftTUIPrimitives.PixelPoint
@@ -684,9 +740,7 @@ classifications:
     # ─── External-type extensions ─────────────────────────────────────────
     # Public API a module adds to a type it does not define (a sibling module's
     # type or the stdlib). Surfaced from the `Module@Other.symbols.json`
-    # extension graphs. Only modules without a canonical `module_defaults`
-    # entry need to be listed here; App/View/Never/RuntimeIssueSink extensions
-    # in SwiftTUICLI/WASI/WebHostCLI/Terminal/Runtime inherit canonical.
+    # extension graphs and classified explicitly for shipped products.
     - SwiftTUIProfiling.Scene
     - SwiftTUIViews.ActionScope
     - SwiftTUIViews.Duration
@@ -700,8 +754,8 @@ classifications:
 
   package-only-seam:
     # Transitional / lowering-layer types kept package-internal but reachable
-    # for narrow compatibility paths (see PUBLIC_SURFACE_POLICY.md).
-    - SwiftTUIViews.ResolvableView
+    # for narrow compatibility paths (see PUBLIC-API.md).
+    - "SwiftTUIGraph.parseDroppedPaths(_:)"
     # COW wrapper carried by ShapeGeometry.path; public only because it rides a
     # public enum case. Its members are package — authors use Shape.path(in:).
     - SwiftTUIPrimitives.BoxedPath
@@ -712,6 +766,10 @@ classifications:
     - SwiftTUI.FrameDiagnosticsLogger
     - SwiftTUIRuntime.FileOpenError
     - SwiftTUIRuntime.Standard
+    - SwiftTUIViews.ErrorToastStyle
+    - SwiftTUIViews.GroupedListStyle
+    - SwiftTUIViews.InsetListStyle
+    - SwiftTUIViews.PlainPickerStyle
     - SwiftTUIViews.Resolver
     - SwiftTUICore.ChildAllocation
     - SwiftTUICore.CommitPlan
@@ -764,26 +822,13 @@ classifications:
     - SwiftTUIViews.PresentationCoordinatorConfiguration
     - SwiftTUIViews.PresentationPlacementContext
 
-# Module-level defaults applied to any symbol in that module not listed
-# under `classifications:` above. Useful for whole-module classifications
-# (e.g. Core is a package-only target — every public symbol there is
-# package-only-seam unless an explicit canonical override applies).
+# Module defaults are limited to modules whose entire charter has one
+# classification. Shipped products classify every top-level symbol explicitly
+# so a new API cannot silently inherit `canonical`.
 module_defaults:
-  Core: package-only-seam
   SwiftTUIPrimitives: package-only-seam
   SwiftTUIGraph: package-only-seam
-  SwiftTUI: canonical
-  SwiftTUIRuntime: canonical
-  SwiftTUIArguments: canonical
-  SwiftTUIPTYPrimitives: canonical
-  SwiftTUITerminal: canonical
-  SwiftTUITerminalWorkspace: canonical
-  SwiftTUICLI: canonical
-  SwiftTUIWASISurfaceBridge: package-only-seam
-  SwiftTUIWASI: canonical
-  SwiftTUIWebHost: canonical
-  SwiftTUIWebHostCLI: canonical
-  SwiftTUIAndroidHost: canonical
+  SwiftTUICore: package-only-seam
   SwiftTUIPTYCPrimitives: package-only-seam
   SwiftTUITestSupport: test-support
 
@@ -795,93 +840,6 @@ default: pending-review
 # present. Keep this list exact; never use it for renamed or retired symbols.
 platform_exceptions: []
 
-# Temporary exact bridge for pre-existing ledger keys whose module/name
-# migration is owned by Stage S7. The S5 validator requires every entry below
-# to fail ordinary validation today and rejects duplicates, resolved entries,
-# and unused entries. Live re-verification found 74 rows (71 classifications,
-# two module defaults, and one note), rather than the plan-time estimate.
-# Stage S7 removes this section in full.
-migration_exceptions:
-  module_defaults:
-    - Core
-    - SwiftTUIWASISurfaceBridge
-  classifications:
-    - SwiftTUI.AnyScene
-    - SwiftTUI.AppLaunchError
-    - SwiftTUI.ClipboardWritingPresentationSurface
-    - SwiftTUI.DefaultRenderer
-    - SwiftTUI.HostedSceneSession
-    - SwiftTUI.RunLoop
-    - SwiftTUI.RunLoopExitReason
-    - SwiftTUI.RunLoopResult
-    - SwiftTUI.RuntimeConfiguration
-    - SwiftTUI.RuntimeRenderMode
-    - SwiftTUI.Scene
-    - SwiftTUI.SceneBuilder
-    - SwiftTUI.SignalReader
-    - SwiftTUI.TerminalCapabilityProfile
-    - SwiftTUI.TerminalSurfaceRenderer
-    - SwiftTUI.SceneDescriptor
-    - SwiftTUI.SceneManifest
-    - SwiftTUI.TerminalMouseInputCompatibilityMatrix
-    - SwiftTUI.TerminalMouseInputResolution
-    - SwiftTUI.TerminalMouseInputTrustPolicy
-    - SwiftTUI.WindowGroup
-    - SwiftTUI.WindowIdentifier
-    - SwiftTUIViews.CanvasContext
-    - SwiftTUIViews.CanvasDrawing
-    - SwiftTUIViews.FocusedValueKey
-    - SwiftTUIViews.FocusedValues
-    - SwiftTUIViews.FocusInteractions
-    - SwiftTUIViews.HoverPhase
-    - SwiftTUIViews.LinkDestination
-    - SwiftTUIViews.PreferenceKey
-    - SwiftTUI.ConditionalScene
-    - SwiftTUI.EmptyScene
-    - SwiftTUI.ExitKeyBindings
-    - SwiftTUI.FileOpenError
-    - SwiftTUI.FrameDiagnosticRecord
-    - SwiftTUI.HostedRasterSurface
-    - SwiftTUI.HostedSceneSessionError
-    - SwiftTUI.InProcessSignalReader
-    - SwiftTUI.InputEvent
-    - SwiftTUI.InputReader
-    - SwiftTUI.InputReading
-    - SwiftTUI.KeyHandlingResult
-    - SwiftTUI.KeyParser
-    - SwiftTUI.MouseButton
-    - SwiftTUI.MouseEvent
-    - SwiftTUI.PasteEvent
-    - SwiftTUI.PresentationSurface
-    - SwiftTUI.PresentationSurfaceMetricsProvider
-    - SwiftTUI.PresentationMetrics
-    - SwiftTUI.RasterPresentationSurface
-    - SwiftTUI.SemanticHostFrame
-    - SwiftTUI.SemanticHostFrameCapabilities
-    - SwiftTUI.SignalReading
-    - SwiftTUI.Standard
-    - SwiftTUI.StateKeyHandler
-    - SwiftTUI.TerminalControlMessage
-    - SwiftTUI.TerminalGraphicsCapabilities
-    - SwiftTUI.TerminalHost
-    - SwiftTUI.TerminalHostError
-    - SwiftTUI.TerminalCommandPresentationSurface
-    - SwiftTUI.TerminalInputParser
-    - SwiftTUI.TerminalInputReading
-    - SwiftTUI.TerminalPresentationMetrics
-    - SwiftTUI.TupleScene
-    - SwiftTUI.VariadicScene
-    - SwiftTUIViews.ErrorToastStyle
-    - SwiftTUIViews.InsetListStyle
-    - SwiftTUIViews.GroupedListStyle
-    - SwiftTUIViews.PlainPickerStyle
-    - SwiftTUICore.parseDroppedPaths(_:)
-    - SwiftTUIViews.ResolvableView
-  notes:
-    - View.ResolvableView
-
 # Optional human-readable notes appended in the generated baseline next to a
-# qualified name. Keep these short — the prose in PUBLIC_API_INVENTORY.md is
-# the right place for longer commentary.
-notes:
-  View.ResolvableView: "kept package-only; do not promote without ADR review"
+# live qualified name. Keep these short — PUBLIC-API.md owns longer rationale.
+notes: {}

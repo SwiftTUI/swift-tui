@@ -1,7 +1,0 @@
-classifications:
-  canonical:
-    - SwiftTUI.*
-default: pending-review
-migration_exceptions:
-  classifications:
-    - SwiftTUI.*

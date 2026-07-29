@@ -1,7 +1,5 @@
 classifications:
   canonical:
     - SwiftTUI.Known
+    - SwiftTUI.NewSurface
 default: pending-review
-migration_exceptions:
-  classifications:
-    - SwiftTUI.Known

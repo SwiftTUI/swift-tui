@@ -170,10 +170,26 @@ from `swift package dump-symbol-graph`, classified through
 
 Run the script with no arguments to regenerate them; run it with `--check` (as
 the gate does) to fail when they are stale. Any change that adds or removes a
-public symbol must regenerate these files. New public symbols also need a
-classification entry in `docs/public_api_overrides.yml` (the SPI baseline is
-classification-free). The prose rationale for the surface lives in
-[PUBLIC-API.md](PUBLIC-API.md).
+public symbol must regenerate these files. Every new shipped-product symbol
+also needs an explicit classification in `docs/public_api_overrides.yml`;
+otherwise it enters `pending-review` and `--check` fails. Module defaults are
+reserved for the uniformly package-only and test-support modules, while the SPI
+baseline remains classification-free.
+
+When retiring a module default or moving declarations, preserve the committed
+baseline's effective classifications by materializing the missing explicit
+entries for review:
+
+```bash
+bun run Scripts/lib/materialize_override_entries.ts \
+  --baseline docs/PUBLIC_API_BASELINE.md \
+  --overrides docs/public_api_overrides.yml \
+  --module SwiftTUIRuntime
+```
+
+Add `--check` to verify that every selected baseline entry is already explicit.
+The helper only reports YAML entries; it never edits the ledger. The prose
+rationale for the surface lives in [PUBLIC-API.md](PUBLIC-API.md).
 
 ## Releases
 

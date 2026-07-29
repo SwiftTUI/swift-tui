@@ -7,6 +7,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fixture_root="${repo_root}/Scripts/data/public-api-fixtures"
 generator="${repo_root}/Scripts/lib/generate_public_api_inventory.ts"
+materializer="${repo_root}/Scripts/lib/materialize_override_entries.ts"
 scratch="$(mktemp -d -t swift-tui-public-api-fixtures.XXXXXX)"
 trap 'rm -rf "${scratch}"' EXIT
 
@@ -106,38 +107,83 @@ expect_failure \
   removed-present.yml \
   Package.swift
 
-# The exact bridge must suppress only the listed unresolved key. With all other
-# configured modules explicitly allowed missing, this synthetic partial check
-# should succeed.
-bridge_dir="${scratch}/exact-migration-bridge"
-mkdir -p "${bridge_dir}/symbolgraph"
-cp "${fixture_root}/symbolgraph/SwiftTUI.symbols.json" "${bridge_dir}/symbolgraph/"
-if ! bun run "${generator}" \
-  --symbolgraph-dir "${bridge_dir}/symbolgraph" \
-  --overrides "${fixture_root}/migration-bridge.yml" \
-  --package-manifest "${fixture_root}/Package.swift" \
-  --baseline-md "${bridge_dir}/PUBLIC_API_BASELINE.md" \
-  --baseline-flat "${bridge_dir}/public-api-baseline.txt" \
-  --check \
-  "${allow_missing_args[@]}" \
-  >"${bridge_dir}/output.log" 2>&1
+materializer_dir="${scratch}/materializer"
+mkdir -p "${materializer_dir}"
+if ! bun run "${materializer}" \
+  --baseline "${fixture_root}/PUBLIC_API_BASELINE.md" \
+  --overrides "${fixture_root}/overrides.yml" \
+  --module SwiftTUI \
+  >"${materializer_dir}/missing.yml" \
+  2>"${materializer_dir}/missing.log"
 then
-  echo "[check_public_api_generator_fixtures] exact-migration-bridge: expected success" >&2
-  sed -n '1,120p' "${bridge_dir}/output.log" >&2
+  echo "[check_public_api_generator_fixtures] materializer-output: expected success" >&2
+  sed -n '1,120p' "${materializer_dir}/missing.log" >&2
   exit 1
 fi
-echo "[check_public_api_generator_fixtures] exact-migration-bridge: ok"
+if ! rg --fixed-strings --quiet \
+  -- "- SwiftTUI.NewSurface" \
+  "${materializer_dir}/missing.yml"
+then
+  echo "[check_public_api_generator_fixtures] materializer-output: missing entry" >&2
+  sed -n '1,120p' "${materializer_dir}/missing.yml" >&2
+  exit 1
+fi
+echo "[check_public_api_generator_fixtures] materializer-output: ok"
 
-expect_failure \
-  stale-migration-bridge \
-  "migration_exceptions.classifications key 'SwiftTUI.Known' is stale or unused" \
-  resolved-migration-bridge.yml \
-  Package.swift
+if bun run "${materializer}" \
+  --baseline "${fixture_root}/malformed-PUBLIC_API_BASELINE.md" \
+  --overrides "${fixture_root}/materialized-overrides.yml" \
+  --module SwiftTUI \
+  --check \
+  >"${materializer_dir}/malformed-baseline.log" \
+  2>&1
+then
+  echo "[check_public_api_generator_fixtures] materializer-malformed-baseline: expected failure" >&2
+  exit 1
+fi
+if ! rg --fixed-strings --quiet \
+  -- "Baseline entry-count mismatch for 'SwiftTUI': summary declares 2, parsed 0" \
+  "${materializer_dir}/malformed-baseline.log"
+then
+  echo "[check_public_api_generator_fixtures] materializer-malformed-baseline: missing diagnostic" >&2
+  sed -n '1,120p' "${materializer_dir}/malformed-baseline.log" >&2
+  exit 1
+fi
+echo "[check_public_api_generator_fixtures] materializer-malformed-baseline: ok"
 
-expect_failure \
-  wildcard-migration-bridge \
-  "migration_exceptions.classifications key 'SwiftTUI.*' is malformed" \
-  wildcard-migration-bridge.yml \
-  Package.swift
+if bun run "${materializer}" \
+  --baseline "${fixture_root}/PUBLIC_API_BASELINE.md" \
+  --overrides "${fixture_root}/overrides.yml" \
+  --module SwiftTUI \
+  --check \
+  >"${materializer_dir}/check-failure.log" \
+  2>&1
+then
+  echo "[check_public_api_generator_fixtures] materializer-check-failure: expected failure" >&2
+  exit 1
+fi
+if ! rg --fixed-strings --quiet \
+  -- "canonical: SwiftTUI.NewSurface" \
+  "${materializer_dir}/check-failure.log"
+then
+  echo "[check_public_api_generator_fixtures] materializer-check-failure: missing diagnostic" >&2
+  sed -n '1,120p' "${materializer_dir}/check-failure.log" >&2
+  exit 1
+fi
+echo "[check_public_api_generator_fixtures] materializer-check-failure: ok"
+
+if ! bun run "${materializer}" \
+  --baseline "${fixture_root}/PUBLIC_API_BASELINE.md" \
+  --overrides "${fixture_root}/materialized-overrides.yml" \
+  --module SwiftTUI \
+  --check \
+  >"${materializer_dir}/check-success.log" \
+  2>&1
+then
+  echo "[check_public_api_generator_fixtures] materializer-check-success: expected success" >&2
+  sed -n '1,120p' "${materializer_dir}/check-success.log" >&2
+  exit 1
+fi
+echo "[check_public_api_generator_fixtures] materializer-check-success: ok"
 
 echo "[check_public_api_generator_fixtures] ok"
