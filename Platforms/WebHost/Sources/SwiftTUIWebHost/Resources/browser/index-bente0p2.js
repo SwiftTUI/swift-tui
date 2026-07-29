@@ -6,18 +6,22 @@ class StdIOPipe {
   closed = false;
   write(chunk) {
     if (this.closed) {
-      return;
+      return false;
     }
     const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : new Uint8Array(chunk);
     const waiter = this.waiters.shift();
     if (waiter) {
       waiter({ done: false, value: bytes });
-      return;
+      return true;
     }
     this.chunks.push(bytes);
+    let accepted = true;
     for (const listener of this.listeners) {
-      listener(bytes);
+      if (listener(bytes) === false) {
+        accepted = false;
+      }
     }
+    return accepted;
   }
   close() {
     if (this.closed) {
@@ -368,6 +372,10 @@ class WebHostOutputDecoder {
   textDecoder = new TextDecoder;
   bufferedText = "";
   lastSurfaceFrame;
+  lastEpoch;
+  lastGen;
+  pendingResyncRequest;
+  keyframeResyncOutstanding = false;
   feed(chunk) {
     this.bufferedText += this.textDecoder.decode(chunk, { stream: true });
     const records = [];
@@ -394,6 +402,16 @@ class WebHostOutputDecoder {
     const text = this.bufferedText;
     this.bufferedText = "";
     return [this.decodeLine(text)];
+  }
+  takeResyncRequest() {
+    const request = this.pendingResyncRequest;
+    this.pendingResyncRequest = undefined;
+    return request;
+  }
+  resyncRequestDeliveryFailed(request) {
+    if (request.scope === "keyframe" && this.keyframeResyncOutstanding && this.pendingResyncRequest === undefined) {
+      this.pendingResyncRequest = request;
+    }
   }
   decodeLine(line) {
     if (line.startsWith(`${recordPrefix}clipboard:`)) {
@@ -445,21 +463,42 @@ class WebHostOutputDecoder {
       }
       if (isWebHostSurfaceFrame(frame)) {
         this.lastSurfaceFrame = frame;
+        this.lastEpoch = frame.epoch;
+        this.lastGen = frame.gen;
+        this.pendingResyncRequest = undefined;
+        this.keyframeResyncOutstanding = false;
         return { type: "surface", frame };
       }
       if (isWebHostSurfaceDeltaFrame(frame)) {
+        const carriesDeliveryStamps = frame.epoch !== undefined || frame.gen !== undefined || frame.baselineGen !== undefined;
         if (!this.lastSurfaceFrame || this.lastSurfaceFrame.width !== frame.width || this.lastSurfaceFrame.height !== frame.height) {
+          if (carriesDeliveryStamps) {
+            this.requestKeyframeResync();
+          }
           return { type: "surfaceDropped", reason: "noBaseline" };
+        }
+        if (carriesDeliveryStamps && (frame.epoch === undefined || frame.gen === undefined || frame.baselineGen === undefined || frame.epoch !== this.lastEpoch || frame.baselineGen !== this.lastGen)) {
+          this.requestKeyframeResync();
+          return { type: "surfaceDropped", reason: "staleBaseline" };
         }
         const materialized = this.materializeDeltaFrame(frame);
         if (materialized) {
           this.lastSurfaceFrame = materialized;
+          this.lastEpoch = frame.epoch;
+          this.lastGen = frame.gen;
           return { type: "surface", frame: materialized };
         }
       }
     } catch {}
     return { type: "text", text: `${line}
 ` };
+  }
+  requestKeyframeResync() {
+    if (this.keyframeResyncOutstanding) {
+      return;
+    }
+    this.keyframeResyncOutstanding = true;
+    this.pendingResyncRequest = { scope: "keyframe" };
   }
   materializeDeltaFrame(frame) {
     const baseline = this.lastSurfaceFrame;
@@ -475,6 +514,8 @@ class WebHostOutputDecoder {
     }
     return {
       version: baseline.version,
+      epoch: frame.epoch,
+      gen: frame.gen,
       sequence: frame.sequence,
       width: frame.width,
       height: frame.height,
@@ -536,6 +577,14 @@ function encodeCapabilitiesControlMessage() {
   return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true}
 `);
 }
+function encodeResyncControlMessage(request) {
+  const payload = request.scope === "keyframe" ? { scope: "keyframe" } : {
+    scope: "images",
+    ...request.ids === undefined ? {} : { ids: request.ids }
+  };
+  return textEncoder.encode(`${recordPrefix}resync:${JSON.stringify(payload)}
+`);
+}
 function encodeKeyInputMessage(input) {
   const modifiers = Math.max(0, Math.round(input.modifiers ?? 0));
   if (input.key === "character") {
@@ -577,10 +626,13 @@ function isWebHostSurfaceDeltaFrame(value) {
     return false;
   }
   const frame = value;
-  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
 }
 function hasValidAdditiveFrameFields(frame) {
-  return (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+  return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+}
+function isOptionalSafeInteger(value) {
+  return value === undefined || Number.isSafeInteger(value);
 }
 function isWebHostSurfaceLinks(value) {
   return Array.isArray(value) && value.every(isWebHostSurfaceLinkRow);
@@ -739,6 +791,13 @@ class BrowserWASIBridge {
             break;
         }
       }
+      const request = decoder.takeResyncRequest();
+      if (request) {
+        const accepted = this.stdin.write(encodeResyncControlMessage(request));
+        if (!accepted) {
+          decoder.resyncRequestDeliveryFailed(request);
+        }
+      }
     });
     this.detachStderr = this.stderr.subscribe((chunk) => {
       sink.writeError?.(new TextDecoder().decode(chunk));
@@ -865,6 +924,7 @@ class WebSocketSceneBridge {
     for (const record of this.decoder.feed(bytes)) {
       this.deliver(record);
     }
+    this.sendPendingResyncRequest();
   }
   deliver(record) {
     const sink = this.sink;
@@ -898,6 +958,16 @@ class WebSocketSceneBridge {
     }
     while (this.queuedInput.length > 0) {
       this.socket.send(this.queuedInput.shift());
+    }
+  }
+  sendPendingResyncRequest() {
+    const request = this.decoder.takeResyncRequest();
+    if (request) {
+      try {
+        this.sendInput(encodeResyncControlMessage(request));
+      } catch {
+        this.decoder.resyncRequestDeliveryFailed(request);
+      }
     }
   }
 }
