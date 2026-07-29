@@ -1,7 +1,12 @@
 # Contributing
 
-SwiftTUI is currently an alpha, single-maintainer, AI-assisted project. Small,
-well-scoped issues and pull requests are easiest to review.
+> [!Important]
+> SwiftTUI is currently a single-maintainer pre-release project. I would be excited to get more people involved.  
+> Expect some friction as the project's tooling currently lags its ambitions.
+>
+> Please join the discord if trying to land something non-trivial. https://discord.gg/8j35kYDFxn
+
+
 
 ## Development Setup
 
