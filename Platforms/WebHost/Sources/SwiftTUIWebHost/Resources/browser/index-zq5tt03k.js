@@ -1857,6 +1857,16 @@ function isSupportedImageFormat(value) {
   return value === "png" || value === "jpeg" || value === "gif";
 }
 
+// src/SurfacePainterConformanceControl.ts
+var canvasControls = new WeakMap;
+var domControls = new WeakMap;
+function registerCanvasSurfacePainterConformanceControl(painter, control) {
+  canvasControls.set(painter, control);
+}
+function registerDomSurfacePainterConformanceControl(painter, control) {
+  domControls.set(painter, control);
+}
+
 // src/CanvasSurfacePainter.ts
 var MAX_IMAGE_DECODE_ATTEMPTS = 3;
 var MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES = 256;
@@ -1876,6 +1886,16 @@ class CanvasSurfacePainter {
   constructor(options = {}) {
     this.imageDecoder = options.decodeImage ?? decodeImage;
     this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
+    registerCanvasSurfacePainterConformanceControl(this, {
+      evictImages: (ids) => {
+        for (const id of ids) {
+          this.removeUnresolvedImage(id);
+          this.imageCache.delete(id);
+          this.pendingImagePayloadMissIds.delete(id);
+        }
+      },
+      visibleImageIDs: (images) => [...new Set(images.filter(isPaintableSurfaceImage).filter((image) => this.imageCache.get(image.id)?.image !== undefined).map((image) => image.id))].sort()
+    });
   }
   attach(canvas, requestRedraw) {
     this.canvas = canvas;
@@ -1947,7 +1967,7 @@ class CanvasSurfacePainter {
   drawImages(context, images, metrics, dirtyRegion, recoveredPayloadIds) {
     const missingPayloadIds = new Set;
     for (const image of images) {
-      if (!isSupportedImageFormat(image.format)) {
+      if (!isPaintableSurfaceImage(image)) {
         continue;
       }
       this.drawImage(context, image, metrics, dirtyRegion, missingPayloadIds, recoveredPayloadIds);
@@ -1957,12 +1977,7 @@ class CanvasSurfacePainter {
   prepareImages(images, recoveredPayloadIds) {
     const missingPayloadIds = new Set;
     for (const image of images) {
-      if (!isSupportedImageFormat(image.format)) {
-        continue;
-      }
-      const [, , boundsWidth, boundsHeight] = image.bounds;
-      const [, , clipWidth, clipHeight] = image.visibleBounds;
-      if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      if (!isPaintableSurfaceImage(image)) {
         continue;
       }
       this.cachedImage(image, missingPayloadIds, recoveredPayloadIds);
@@ -2033,7 +2048,7 @@ class CanvasSurfacePainter {
     }
     if (!cached.promise) {
       const nextAttempts = attempts + 1;
-      const promise = this.imageDecoder(cached.payload, image.format);
+      const promise = this.imageDecoder(cached.payload, image.format, image.id);
       cached.promise = promise;
       cached.retries = nextAttempts;
       promise.then((decodedImage) => {
@@ -2090,9 +2105,7 @@ class CanvasSurfacePainter {
       if (!this.unresolvedImageIds.has(image.id)) {
         continue;
       }
-      const [, , boundsWidth, boundsHeight] = image.bounds;
-      const [, , clipWidth, clipHeight] = image.visibleBounds;
-      if (isSupportedImageFormat(image.format) && boundsWidth > 0 && boundsHeight > 0 && clipWidth > 0 && clipHeight > 0) {
+      if (isPaintableSurfaceImage(image)) {
         presentedIds.add(image.id);
       }
     }
@@ -2217,6 +2230,11 @@ class CanvasSurfacePainter {
     context.setLineDash([]);
   }
 }
+function isPaintableSurfaceImage(image) {
+  const [, , boundsWidth, boundsHeight] = image.bounds;
+  const [, , clipWidth, clipHeight] = image.visibleBounds;
+  return isSupportedImageFormat(image.format) && boundsWidth > 0 && boundsHeight > 0 && clipWidth > 0 && clipHeight > 0;
+}
 function fontForStyle(terminalStyle, style) {
   const emphasis = style?.em ?? 0;
   const italic = (emphasis & 2) !== 0 ? "italic " : "";
@@ -2319,6 +2337,16 @@ class DomSurfacePainter {
   lastEpoch;
   constructor(options = {}) {
     this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
+    registerDomSurfacePainterConformanceControl(this, {
+      evictImages: (ids) => {
+        for (const id of ids) {
+          this.renderedImages.get(id)?.container.remove();
+          this.renderedImages.delete(id);
+          this.reportedMissingImageIds.delete(id);
+        }
+      },
+      visibleImageIDs: () => [...this.renderedImages.keys()].sort()
+    });
   }
   attach(root) {
     this.root = root;
