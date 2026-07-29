@@ -39,6 +39,8 @@ interface Args {
   spiSymbolgraphDir?: string;
   /** Output path for the flat SPI-only baseline; paired with the above. */
   baselineSpi?: string;
+  /** Package manifest used to reconcile configured modules with products. */
+  packageManifest: string;
   check: boolean;
   allowMissingModules: string[];
 }
@@ -69,6 +71,7 @@ function parseArgs(argv: readonly string[]): Args {
     baselineFlat: required("--baseline-flat"),
     spiSymbolgraphDir,
     baselineSpi,
+    packageManifest: get("--package-manifest") ?? "Package.swift",
     check: argv.includes("--check"),
     allowMissingModules: values(argv, "--allow-missing-module"),
   };
@@ -109,10 +112,10 @@ interface SymbolGraph {
 // ---------------------------------------------------------------------------
 // Module configuration
 //
-// Library products live in PRIMARY_MODULES. PACKAGE_ONLY_MODULES are emitted
-// as a separate section because they aren't shipped as library products even
-// though their symbols carry `public` access (they're re-exported by other
-// targets).
+// Library products live in PRIMARY_MODULES. PACKAGE_ONLY_MODULES and
+// TEST_SUPPORT_MODULES are emitted as separate sections because they have
+// intentionally different audiences even though their symbols carry `public`
+// access.
 
 const PRIMARY_MODULES = [
   "SwiftTUI",
@@ -136,7 +139,36 @@ const PACKAGE_ONLY_MODULES = [
   "SwiftTUIGraph",
   "SwiftTUIPTYCPrimitives",
 ] as const;
-const ALL_MODULES = [...PRIMARY_MODULES, ...PACKAGE_ONLY_MODULES] as const;
+const TEST_SUPPORT_MODULES = ["SwiftTUITestSupport"] as const;
+const ALL_MODULES = [
+  ...PRIMARY_MODULES,
+  ...PACKAGE_ONLY_MODULES,
+  ...TEST_SUPPORT_MODULES,
+] as const;
+
+// Library products which intentionally do not participate in the inventory.
+// Keep this empty unless a product has a reviewed reason to be absent.
+const EXCLUDED_PRODUCTS: readonly string[] = [];
+
+// SwiftPM emits graphs for non-product implementation and vendored targets as
+// well as the configured public/test-support modules. Every blind spot is
+// named, rather than hidden behind a prefix rule.
+const KNOWN_UNSCANNED_MODULES = [
+  // Executable entry-point support; it is not a library product or API surface.
+  "CEntryPointImageLocator",
+  // Vendored FIGlet implementation; consumers use SwiftTUI's Image surface.
+  "SwiftTUIVendorFiglet",
+  // Generated FIGlet font payload support; it is not a standalone product.
+  "SwiftTUIVendorFigletEmbeddedFonts",
+  // Vendored image decoders are implementation details of SwiftTUIAnimatedImage.
+  "SwiftTUIVendorGIF",
+  "SwiftTUIVendorJPEG",
+  "SwiftTUIVendorPNG",
+  // Vendored signal handling is an implementation detail of terminal hosts.
+  "SwiftTUIVendorUnixSignals",
+  // WASI host bridge implementation; consumers use the SwiftTUIWASI product.
+  "SwiftTUIWASISurfaceBridge",
+] as const;
 
 type ModuleName = (typeof ALL_MODULES)[number];
 
@@ -185,6 +217,21 @@ interface OverrideFile {
   /** Global fallback for any symbol not otherwise classified. */
   default?: Classification;
   notes?: Record<string, string>;
+  /**
+   * Qualified symbols that are known to be compiled out on some platforms.
+   * They are still validated on every platform where they appear.
+   */
+  platform_exceptions?: string[];
+  /**
+   * Exact temporary bridge for the pre-existing malformed/dead ledger keys
+   * which Stage S7 migrates. Every row must currently fail normal validation;
+   * a resolved or unused row is itself an error.
+   */
+  migration_exceptions?: {
+    classifications?: string[];
+    module_defaults?: string[];
+    notes?: string[];
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +301,12 @@ async function loadOverrides(path: string): Promise<{
   moduleDefaults: Map<string, Classification>;
   defaultClassification: Classification;
   notes: Map<string, string>;
+  platformExceptions: Set<string>;
+  migrationExceptions: {
+    classifications: string[];
+    moduleDefaults: string[];
+    notes: string[];
+  };
 }> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -262,6 +315,12 @@ async function loadOverrides(path: string): Promise<{
       moduleDefaults: new Map(),
       defaultClassification: "pending-review",
       notes: new Map(),
+      platformExceptions: new Set(),
+      migrationExceptions: {
+        classifications: [],
+        moduleDefaults: [],
+        notes: [],
+      },
     };
   }
   const raw = await file.text();
@@ -282,7 +341,249 @@ async function loadOverrides(path: string): Promise<{
     moduleDefaults,
     defaultClassification: parsed.default ?? "pending-review",
     notes,
+    platformExceptions: new Set(parsed.platform_exceptions ?? []),
+    migrationExceptions: {
+      classifications: parsed.migration_exceptions?.classifications ?? [],
+      moduleDefaults: parsed.migration_exceptions?.module_defaults ?? [],
+      notes: parsed.migration_exceptions?.notes ?? [],
+    },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Configuration validation
+
+function qualifiedModule(name: string): string | undefined {
+  const match = name.match(
+    /^([A-Za-z_][A-Za-z0-9_]*)\.[A-Za-z_][A-Za-z0-9_]*(?:\([^.\s*]*\))?$/,
+  );
+  return match?.[1];
+}
+
+function validateQualifiedKey(
+  key: string,
+  source: string,
+  knownModules: ReadonlySet<string>,
+  failures: string[],
+): string | undefined {
+  const module = qualifiedModule(key);
+  if (!module) {
+    failures.push(`${source} key '${key}' must have Module.Name shape`);
+    return undefined;
+  }
+  if (!knownModules.has(module)) {
+    failures.push(`${source} key '${key}' names unknown module '${module}'`);
+    return undefined;
+  }
+  return module;
+}
+
+function validateOverrides(
+  overrides: Awaited<ReturnType<typeof loadOverrides>>,
+  reports: ReadonlyArray<ModuleReport>,
+  options: {
+    missingModules: ReadonlySet<string>;
+    allowedMissingModules: ReadonlySet<string>;
+  },
+): void {
+  const failures: string[] = [];
+  const knownModules = new Set<string>(ALL_MODULES);
+  const migrationExceptionSets = {
+    classifications: new Set(overrides.migrationExceptions.classifications),
+    moduleDefaults: new Set(overrides.migrationExceptions.moduleDefaults),
+    notes: new Set(overrides.migrationExceptions.notes),
+  };
+  const consumedMigrationExceptions = new Set<string>();
+  const emittedTopLevel = new Set<string>();
+  for (const report of reports) {
+    for (const entry of report.topLevel) {
+      emittedTopLevel.add(entry.qualifiedName);
+    }
+  }
+
+  const migrationExceptionID = (
+    category: keyof typeof migrationExceptionSets,
+    key: string,
+  ): string => `${category}\u0000${key}`;
+  const recordFailure = (
+    category: keyof typeof migrationExceptionSets,
+    key: string,
+    message: string,
+  ): void => {
+    if (migrationExceptionSets[category].has(key)) {
+      consumedMigrationExceptions.add(migrationExceptionID(category, key));
+      return;
+    }
+    failures.push(message);
+  };
+
+  for (const [category, keys] of Object.entries(
+    overrides.migrationExceptions,
+  ) as [keyof typeof migrationExceptionSets, string[]][]) {
+    const seen = new Set<string>();
+    for (const key of keys) {
+      if (seen.has(key)) {
+        failures.push(`migration_exceptions.${category} duplicates '${key}'`);
+      }
+      seen.add(key);
+      if (
+        category === "moduleDefaults"
+          ? !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)
+          : qualifiedModule(key) === undefined
+      ) {
+        failures.push(
+          `migration_exceptions.${category} key '${key}' is malformed`,
+        );
+      }
+    }
+  }
+
+  for (const module of overrides.moduleDefaults.keys()) {
+    if (!knownModules.has(module)) {
+      recordFailure(
+        "moduleDefaults",
+        module,
+        `module_defaults key '${module}' is not a configured module`,
+      );
+    }
+  }
+
+  for (const key of overrides.platformExceptions) {
+    validateQualifiedKey(key, "platform_exceptions", knownModules, failures);
+    if (
+      !overrides.classification.has(key) &&
+      !overrides.notes.has(key)
+    ) {
+      failures.push(
+        `platform_exceptions key '${key}' is unused; add it to classifications or notes`,
+      );
+    }
+  }
+
+  const validatePresentKey = (
+    key: string,
+    source: string,
+    category: "classifications" | "notes",
+  ): void => {
+    const localFailures: string[] = [];
+    const module = validateQualifiedKey(key, source, knownModules, localFailures);
+    if (!module) {
+      for (const failure of localFailures) {
+        recordFailure(category, key, failure);
+      }
+      return;
+    }
+    if (emittedTopLevel.has(key)) return;
+    if (overrides.platformExceptions.has(key)) return;
+    if (
+      options.missingModules.has(module) &&
+      options.allowedMissingModules.has(module)
+    ) {
+      return;
+    }
+    recordFailure(
+      category,
+      key,
+      `${source} key '${key}' does not match a top-level dump symbol`,
+    );
+  };
+
+  for (const [key, classification] of overrides.classification) {
+    if (classification === "removed") {
+      validateQualifiedKey(key, "removed", knownModules, failures);
+    } else {
+      validatePresentKey(
+        key,
+        `classifications.${classification}`,
+        "classifications",
+      );
+    }
+  }
+  for (const key of overrides.notes.keys()) {
+    validatePresentKey(key, "notes", "notes");
+  }
+
+  for (const [category, keys] of Object.entries(
+    overrides.migrationExceptions,
+  ) as [keyof typeof migrationExceptionSets, string[]][]) {
+    for (const key of keys) {
+      if (
+        !consumedMigrationExceptions.has(migrationExceptionID(category, key))
+      ) {
+        failures.push(
+          `migration_exceptions.${category} key '${key}' is stale or unused; ` +
+            "normal validation no longer fails",
+        );
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      "Invalid docs/public_api_overrides.yml:\n" +
+        failures.map((failure) => `  - ${failure}`).join("\n"),
+    );
+  }
+}
+
+async function configuredLibraryProducts(packageManifest: string): Promise<string[]> {
+  const manifest = Bun.file(packageManifest);
+  if (!(await manifest.exists())) {
+    throw new Error(`Package manifest does not exist: ${packageManifest}`);
+  }
+  const products = new Set<string>();
+  for (const line of (await manifest.text()).split("\n")) {
+    // Keep this grammar in lockstep with Scripts/check_docc_coverage.sh:
+    // sed -n 's/.*\.library(name: "\([^"]*\)".*/\1/p'
+    const match = line.match(/.*\.library\(name: "([^"]*)".*/);
+    if (match?.[1]) products.add(match[1]);
+  }
+  if (products.size === 0) {
+    throw new Error(
+      `Could not find any one-line .library products in ${packageManifest}`,
+    );
+  }
+  return [...products].sort();
+}
+
+async function emittedGraphModules(symbolgraphDir: string): Promise<string[]> {
+  const modules = new Set<string>();
+  const glob = new Glob("*.symbols.json");
+  for await (const name of glob.scan({ cwd: symbolgraphDir, onlyFiles: true })) {
+    const graph = (await Bun.file(join(symbolgraphDir, name)).json()) as SymbolGraph;
+    modules.add(graph.module.name);
+  }
+  return [...modules].sort();
+}
+
+async function validateModuleReconciliation(args: Args): Promise<void> {
+  const configuredModules = new Set<string>(ALL_MODULES);
+  const excludedProducts = new Set(EXCLUDED_PRODUCTS);
+  const knownUnscanned = new Set<string>(KNOWN_UNSCANNED_MODULES);
+  const failures: string[] = [];
+
+  for (const product of await configuredLibraryProducts(args.packageManifest)) {
+    if (!configuredModules.has(product) && !excludedProducts.has(product)) {
+      failures.push(
+        `library product '${product}' is missing from ALL_MODULES`,
+      );
+    }
+  }
+
+  for (const module of await emittedGraphModules(args.symbolgraphDir)) {
+    if (!configuredModules.has(module) && !knownUnscanned.has(module)) {
+      failures.push(
+        `symbol-graph module '${module}' is neither configured nor explicitly unscanned`,
+      );
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      "Public API module reconciliation failed:\n" +
+        failures.map((failure) => `  - ${failure}`).join("\n"),
+    );
+  }
 }
 
 /**
@@ -454,7 +755,7 @@ function renderBaselineMarkdown(
     "is the machine-grep target; this file is grouped for human review.",
   );
   lines.push("");
-  lines.push("For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).");
+  lines.push("For prose context, see [PUBLIC-API.md](PUBLIC-API.md).");
   lines.push("");
 
   // Summary table
@@ -476,6 +777,9 @@ function renderBaselineMarkdown(
     const isPackageOnly = (PACKAGE_ONLY_MODULES as readonly string[]).includes(
       report.module,
     );
+    const isTestSupport = (TEST_SUPPORT_MODULES as readonly string[]).includes(
+      report.module,
+    );
     lines.push(`## ${report.module}`);
     lines.push("");
     if (isPackageOnly) {
@@ -486,6 +790,16 @@ function renderBaselineMarkdown(
         `> are package-internal but carry \`public\` access for re-export through`,
       );
       lines.push(`> other targets.`);
+      lines.push("");
+    }
+    if (isTestSupport) {
+      lines.push(
+        `> \`${report.module}\` is a test-support library product. Symbols here`,
+      );
+      lines.push(
+        `> are public only for package and downstream integration tests, not`,
+      );
+      lines.push(`> ordinary application use.`);
       lines.push("");
     }
 
@@ -679,6 +993,7 @@ async function writeFileEnsuringDir(path: string, contents: string): Promise<voi
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const overrides = await loadOverrides(args.overrides);
+  await validateModuleReconciliation(args);
   const existingBaselineMd = await readFileIfExists(args.baselineMd);
   const generatedAt = args.check
     ? extractGeneratedAt(existingBaselineMd) ??
@@ -708,10 +1023,15 @@ async function main(): Promise<void> {
     );
   }
 
+  const allowedMissingModules = new Set(args.allowMissingModules);
+  validateOverrides(overrides, reports, {
+    missingModules: new Set(missingModules),
+    allowedMissingModules,
+  });
+
   if (missingModules.length > 0) {
-    const allowedMissing = new Set(args.allowMissingModules);
     const unexpectedMissing = missingModules.filter(
-      (module) => !allowedMissing.has(module),
+      (module) => !allowedMissingModules.has(module),
     );
     if (!args.check) {
       console.error(

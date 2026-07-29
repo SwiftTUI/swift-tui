@@ -1,0 +1,7 @@
+classifications:
+  canonical:
+    - SwiftTUI.Known
+default: pending-review
+migration_exceptions:
+  classifications:
+    - SwiftTUI.Known

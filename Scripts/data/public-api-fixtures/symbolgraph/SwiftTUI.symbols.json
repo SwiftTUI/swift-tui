@@ -1,0 +1,23 @@
+{
+  "module": {
+    "name": "SwiftTUI"
+  },
+  "symbols": [
+    {
+      "identifier": {
+        "precise": "s:PublicAPIFixture5KnownV"
+      },
+      "pathComponents": [
+        "Known"
+      ],
+      "kind": {
+        "identifier": "swift.struct",
+        "displayName": "Structure"
+      },
+      "accessLevel": "public",
+      "names": {
+        "title": "Known"
+      }
+    }
+  ]
+}

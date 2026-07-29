@@ -783,9 +783,100 @@ module_defaults:
   SwiftTUIWebHostCLI: canonical
   SwiftTUIAndroidHost: canonical
   SwiftTUIPTYCPrimitives: package-only-seam
+  SwiftTUITestSupport: test-support
 
 # Global fallback for any symbol not otherwise classified.
 default: pending-review
+
+# Symbols which are known to be compiled out on some dump platforms. Entries
+# remain subject to ordinary key validation on every platform where they are
+# present. Keep this list exact; never use it for renamed or retired symbols.
+platform_exceptions: []
+
+# Temporary exact bridge for pre-existing ledger keys whose module/name
+# migration is owned by Stage S7. The S5 validator requires every entry below
+# to fail ordinary validation today and rejects duplicates, resolved entries,
+# and unused entries. Live re-verification found 74 rows (71 classifications,
+# two module defaults, and one note), rather than the plan-time estimate.
+# Stage S7 removes this section in full.
+migration_exceptions:
+  module_defaults:
+    - Core
+    - SwiftTUIWASISurfaceBridge
+  classifications:
+    - SwiftTUI.AnyScene
+    - SwiftTUI.AppLaunchError
+    - SwiftTUI.ClipboardWritingPresentationSurface
+    - SwiftTUI.DefaultRenderer
+    - SwiftTUI.HostedSceneSession
+    - SwiftTUI.RunLoop
+    - SwiftTUI.RunLoopExitReason
+    - SwiftTUI.RunLoopResult
+    - SwiftTUI.RuntimeConfiguration
+    - SwiftTUI.RuntimeRenderMode
+    - SwiftTUI.Scene
+    - SwiftTUI.SceneBuilder
+    - SwiftTUI.SignalReader
+    - SwiftTUI.TerminalCapabilityProfile
+    - SwiftTUI.TerminalSurfaceRenderer
+    - SwiftTUI.SceneDescriptor
+    - SwiftTUI.SceneManifest
+    - SwiftTUI.TerminalMouseInputCompatibilityMatrix
+    - SwiftTUI.TerminalMouseInputResolution
+    - SwiftTUI.TerminalMouseInputTrustPolicy
+    - SwiftTUI.WindowGroup
+    - SwiftTUI.WindowIdentifier
+    - SwiftTUIViews.CanvasContext
+    - SwiftTUIViews.CanvasDrawing
+    - SwiftTUIViews.FocusedValueKey
+    - SwiftTUIViews.FocusedValues
+    - SwiftTUIViews.FocusInteractions
+    - SwiftTUIViews.HoverPhase
+    - SwiftTUIViews.LinkDestination
+    - SwiftTUIViews.PreferenceKey
+    - SwiftTUI.ConditionalScene
+    - SwiftTUI.EmptyScene
+    - SwiftTUI.ExitKeyBindings
+    - SwiftTUI.FileOpenError
+    - SwiftTUI.FrameDiagnosticRecord
+    - SwiftTUI.HostedRasterSurface
+    - SwiftTUI.HostedSceneSessionError
+    - SwiftTUI.InProcessSignalReader
+    - SwiftTUI.InputEvent
+    - SwiftTUI.InputReader
+    - SwiftTUI.InputReading
+    - SwiftTUI.KeyHandlingResult
+    - SwiftTUI.KeyParser
+    - SwiftTUI.MouseButton
+    - SwiftTUI.MouseEvent
+    - SwiftTUI.PasteEvent
+    - SwiftTUI.PresentationSurface
+    - SwiftTUI.PresentationSurfaceMetricsProvider
+    - SwiftTUI.PresentationMetrics
+    - SwiftTUI.RasterPresentationSurface
+    - SwiftTUI.SemanticHostFrame
+    - SwiftTUI.SemanticHostFrameCapabilities
+    - SwiftTUI.SignalReading
+    - SwiftTUI.Standard
+    - SwiftTUI.StateKeyHandler
+    - SwiftTUI.TerminalControlMessage
+    - SwiftTUI.TerminalGraphicsCapabilities
+    - SwiftTUI.TerminalHost
+    - SwiftTUI.TerminalHostError
+    - SwiftTUI.TerminalCommandPresentationSurface
+    - SwiftTUI.TerminalInputParser
+    - SwiftTUI.TerminalInputReading
+    - SwiftTUI.TerminalPresentationMetrics
+    - SwiftTUI.TupleScene
+    - SwiftTUI.VariadicScene
+    - SwiftTUIViews.ErrorToastStyle
+    - SwiftTUIViews.InsetListStyle
+    - SwiftTUIViews.GroupedListStyle
+    - SwiftTUIViews.PlainPickerStyle
+    - SwiftTUICore.parseDroppedPaths(_:)
+    - SwiftTUIViews.ResolvableView
+  notes:
+    - View.ResolvableView
 
 # Optional human-readable notes appended in the generated baseline next to a
 # qualified name. Keep these short — the prose in PUBLIC_API_INVENTORY.md is
