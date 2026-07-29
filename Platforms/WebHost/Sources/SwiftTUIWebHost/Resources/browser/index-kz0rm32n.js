@@ -1976,10 +1976,10 @@ class DomSurfacePainter {
     for (const image of images) {
       const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
       const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
-      if (!image.dataBase64 || boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      const existing = this.renderedImages.get(image.id);
+      if (!existing && !image.dataBase64 || boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
         continue;
       }
-      const existing = this.renderedImages.get(image.id);
       const entry = existing ?? makeImageEntry();
       entry.container.style.left = `${clipX * metrics.cellWidth}px`;
       entry.container.style.top = `${clipY * metrics.cellHeight}px`;
@@ -1989,10 +1989,12 @@ class DomSurfacePainter {
       entry.image.style.top = `${(boundsY - clipY) * metrics.cellHeight}px`;
       entry.image.style.width = `${boundsWidth * metrics.cellWidth}px`;
       entry.image.style.height = `${boundsHeight * metrics.cellHeight}px`;
-      const source = `data:image/${image.format};base64,${image.dataBase64}`;
-      if (entry.source !== source) {
-        entry.image.setAttribute("src", source);
-        entry.source = source;
+      if (image.dataBase64) {
+        const source = `data:image/${image.format};base64,${image.dataBase64}`;
+        if (entry.source !== source) {
+          entry.image.setAttribute("src", source);
+          entry.source = source;
+        }
       }
       if (!existing) {
         layer.appendChild(entry.container);
