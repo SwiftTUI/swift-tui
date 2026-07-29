@@ -1,3 +1,4 @@
+import Foundation
 @_spi(Runners) import SwiftTUI
 import Testing
 
@@ -113,6 +114,58 @@ struct WebSocketInputReaderTests {
     #expect(records[2].contains("\"gen\":3"))
   }
 
+  @Test("an image resync request retransmits only the named payload")
+  func imageResyncRetransmitsOnlyNamedPayload() async throws {
+    let sink = RecordingInputTestSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    _ = try transport.present(Self.twoImageFrame(sequence: 1))
+    _ = try transport.present(Self.twoImageFrame(sequence: 2))
+    try await transport.drain()
+
+    let steadyRecords = await sink.records()
+    #expect(steadyRecords.count == 2)
+    let initialImages = try Self.decodedImages(in: steadyRecords[0])
+    let steadyImages = try Self.decodedImages(in: steadyRecords[1])
+    #expect(initialImages.count == 2)
+    #expect(steadyImages.count == 2)
+
+    let requestedID = try #require(initialImages[0]["id"] as? String)
+    let retainedID = try #require(initialImages[1]["id"] as? String)
+    let requestedPayload = try #require(initialImages[0]["dataBase64"] as? String)
+    _ = try #require(initialImages[1]["dataBase64"] as? String)
+    #expect(requestedID != retainedID)
+    #expect(steadyImages[0]["id"] as? String == requestedID)
+    #expect(steadyImages[1]["id"] as? String == retainedID)
+    #expect(steadyImages[0]["dataBase64"] == nil)
+    #expect(steadyImages[1]["dataBase64"] == nil)
+
+    let source = InMemoryByteSource()
+    let reader = WebSocketInputReader(source: source, transport: transport)
+    let events = reader.inputEvents()
+    var iterator = events.makeAsyncIterator()
+    await source.yield(
+      "\u{001E}resync:{\"scope\":\"images\",\"ids\":[\"\(requestedID)\"]}\n"
+    )
+    await source.finish()
+    #expect(await iterator.next() == nil)
+
+    _ = try transport.present(Self.twoImageFrame(sequence: 3))
+    try await transport.drain()
+
+    let repairedRecords = await sink.records()
+    #expect(repairedRecords.count == 3)
+    let repairedImages = try Self.decodedImages(in: repairedRecords[2])
+    #expect(repairedImages.count == 2)
+    #expect(repairedImages[0]["id"] as? String == requestedID)
+    #expect(repairedImages[0]["dataBase64"] as? String == requestedPayload)
+    #expect(repairedImages[1]["id"] as? String == retainedID)
+    #expect(repairedImages[1]["dataBase64"] == nil)
+  }
+
   @Test("key and paste input yield expected input events")
   func keyAndPasteInputYieldExpectedEvents() async throws {
     let source = InMemoryByteSource()
@@ -127,6 +180,51 @@ struct WebSocketInputReaderTests {
 
     await source.finish()
     #expect(await iterator.next() == nil)
+  }
+
+  private static func twoImageFrame(
+    sequence: UInt64
+  ) -> SemanticHostFrame {
+    let firstBytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x01]
+    let secondBytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x02]
+    let imageSize = CellSize(width: 1, height: 1)
+    return SemanticHostFrame(
+      sequence: sequence,
+      raster: RasterSurface(
+        size: .init(width: 2, height: 1),
+        cells: [[RasterCell(character: " "), RasterCell(character: " ")]],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: Identity(components: ["root", "first-image"]),
+            bounds: CellRect(origin: .zero, size: imageSize),
+            source: .data(firstBytes),
+            resolvedReference: .embeddedImage(firstBytes),
+            pixelSize: .init(width: 1, height: 1)
+          ),
+          RasterImageAttachment(
+            identity: Identity(components: ["root", "second-image"]),
+            bounds: CellRect(origin: .init(x: 1, y: 0), size: imageSize),
+            source: .data(secondBytes),
+            resolvedReference: .embeddedImage(secondBytes),
+            pixelSize: .init(width: 1, height: 1)
+          ),
+        ]
+      ),
+      semantics: .init(),
+      focusedIdentity: nil
+    )
+  }
+
+  private static func decodedImages(
+    in output: String
+  ) throws -> [[String: Any]] {
+    let prefix = "\u{001E}surface:"
+    let line = output.trimmingCharacters(in: .newlines)
+    #expect(line.hasPrefix(prefix))
+    let json = String(line.dropFirst(prefix.count))
+    let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
+    let frame = try #require(decoded as? [String: Any])
+    return try #require(frame["images"] as? [[String: Any]])
   }
 }
 

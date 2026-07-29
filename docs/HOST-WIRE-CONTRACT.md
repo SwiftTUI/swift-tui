@@ -131,6 +131,40 @@ set so their next appearance includes payload bytes again. Omitting `ids`, or
 sending an empty list, clears the whole set. The encoder still has no
 downlink acknowledging which images a consumer retained.
 
+Consumers may keep decoded images in bounded caches. A payload-less record
+whose ID is no longer cached is a recoverable miss: the consumer admits
+eligible missing IDs to an `images` resync request, subject to its documented
+resource bounds. The accepted surface frame still advances; an unresolved
+image is absent, or an existing cached image remains visible, until a
+payload-carrying appearance repairs that ID. Requests are deduplicated per ID
+while outstanding. A consumer retries a delivery failure only when its
+transport defines that failure as retryable.
+
+Android resolves the resync JNI entry point lazily for version-skew
+compatibility. A return value of zero means the old native host does not expose
+the entry point. Android treats that request as unavailable and keeps the ID
+outstanding and deduplicated until its payload arrives or the encoding epoch is
+reset or restarted. It does not retry-poll the unavailable symbol, and an
+incidental keyframe does not count as image repair.
+
+The browser canvas painter retains a first-seen payload through at most three
+decode attempts, drops the retained base64 after decode succeeds, and requests
+that ID after the retry budget is exhausted or a payload-less record misses
+its cache. It tracks at most 256 unresolved entries and 64 MiB of retained
+payload; overflow is deferred and may be retried on a later presented frame
+rather than being admitted immediately. The DOM painter likewise offers an
+unknown payload-less ID for resync instead of silently omitting it. Browser
+resync admission is capped at 1,024 outstanding IDs. A successfully delivered
+request stays deduplicated while its ID remains present and unresolved, but is
+cleared when payload arrives, the ID disappears from a presented frame, or the
+encoding epoch resets. Disappearance therefore lets a later reappearance
+request the ID again.
+
+Android keeps its decoded bitmap cache bounded at 8 MiB; an ordinary eviction
+is repaired through the same per-ID request and payload re-application path
+rather than by pinning every transmitted image in memory. Oversized Android
+images continue to bypass the cache.
+
 ### Delta baseline
 
 `hasBaseline` and `baselineSize` are the entire baseline currency. A full
@@ -216,6 +250,13 @@ therefore is not a capability bit. The Foundation-free request parser accepts:
 Malformed requests and unknown scope tokens are rejected without mutation.
 Unknown object keys are skipped for additive compatibility.
 
+The scopes are independent and may be requested together. Keyframe resync
+clears only the delta baseline; it does not clear `knownImageIDs` or force all
+image payloads to repeat. Image resync removes only the selected IDs; it does
+not clear the delta baseline. If both repairs are outstanding, the next record
+is a full keyframe whose image list re-carries only the requested payloads
+(or every payload when the image request omitted `ids`).
+
 Ingress follows each host's existing control channel:
 
 - **WASI browser:** the shared input parser produces the request and
@@ -230,32 +271,45 @@ Ingress follows each host's existing control channel:
 
 ## Current consumer contract
 
-Until the remaining delivery gaps below close, a delta-capable consumer is
-implicitly required to provide:
+Every delta-capable consumer is required to:
 
-1. lossless, in-order application of every accepted surface record;
-2. a baseline whose retained `(epoch, gen)` matches each delta's
-   `(epoch, baselineGen)`;
-3. perfect memory for every image ID whose payload appeared in that epoch;
-4. a style table that accepts the complete accumulated table on every delta.
+1. apply accepted surface records in order;
+2. reject a delta unless its retained `(epoch, gen)` matches the delta's
+   `(epoch, baselineGen)`, preserving the last internally consistent frame;
+3. request one keyframe repair for a rejected stamped delta, deduplicate that
+   request until a full frame is applied, and retry only delivery failures its
+   transport defines as retryable;
+4. request selected image payloads after bounded decode retries or cache
+   misses while bounding admission and retained unresolved data; browser may
+   defer overflow and deduplicates an admitted ID until payload, disappearance,
+   or epoch reset, while Android deduplicates until payload or epoch reset; an
+   unavailable Android JNI request remains outstanding instead of being
+   retried or cleared by an incidental keyframe; and
+5. accept the complete accumulated style table on every delta.
 
-No deployed consumer has explicitly acknowledged that contract, and current
-implementations violate parts of it:
+The sibling browser and Android decoders both consume the producer's additive
+generation fields. They retain the last applied `(epoch, gen)`, refuse a
+stamped delta whose baseline does not match, and request a keyframe instead of
+corrupting the retained grid. Their delivery paths deduplicate an outstanding
+keyframe request until a full frame is applied. Browser transports requeue
+retryable send or queue failures. Android's lazy-JNI old-host return of zero
+means unavailable; it remains deduplicated instead of repeatedly invoking a
+missing entry point.
 
-- The current sibling browser and Android decoders have not yet adopted the
-  producer's additive generation fields. They still apply a delta to the last
-  same-sized frame and cannot yet reject a skipped or reordered record by
-  generation.
-- The canvas painter removes a failed decode from its cache. A later
-  payload-less repeat cannot retry the decode.
-- The Android renderer stores decoded images in an 8 MiB `LruCache`. Eviction
-  can discard a bitmap that the insert-only encoder will not resend.
-  Oversized images bypass the cache and recycled entries are defensively
-  skipped, but there is no recovery request after an ordinary eviction.
-- Browser and Android accept unknown string tokens structurally. Browser
-  consumption applies the defaults above; Android retains focus,
-  accessibility, and scaling strings, omits image format from its model, and
-  applies host-side defaults.
+Both consumers also implement resend-on-miss without making image retention
+unbounded. Browser decode failures use the bounded retry path above, with at
+most 256 unresolved canvas entries or 64 MiB of retained payload and at most
+1,024 admitted outstanding request IDs. Capacity overflow can be deferred for
+a later frame. A browser request is cleared by payload repair, disappearance
+from a presented frame, or epoch reset. Android keeps its 8 MiB `LruCache`,
+drains missing payload IDs into image-resync requests, and suppresses another
+successful request for an ID until a payload-carrying record clears it. When
+the Android resync entry point is unavailable, the ID remains outstanding
+until payload repair or an encoding epoch reset or restart; an incidental
+keyframe does not clear it. Browser and Android accept unknown string tokens
+structurally. Browser consumption applies the defaults above; Android retains
+focus, accessibility, and scaling strings, omits image format from its model,
+and applies host-side defaults.
 
 ## Android single-looper convention
 
@@ -274,17 +328,17 @@ calls must not use this handshake. The convention does not make the size query
 a delivery acknowledgement: abandoning the second call still leaves encoder
 state advanced.
 
-## Known contract gaps
+## Contract stage status
 
-The coordination root tracks these gaps in
+The coordination root tracks this program in
 `docs/plans/2026-07-28-006-delivery-coupled-wire-epochs-plan.md`. That plan is
-forward-looking; the rows below describe only what is missing at this
-package's `HEAD`.
+forward-looking; the rows below describe only the state at this package's
+`HEAD`.
 
-| Coordination stage | Gap at `HEAD` |
+| Coordination stage | State at `HEAD` |
 | --- | --- |
-| S1 | Swift production is complete: every surface record carries an epoch and generation, deltas name their baseline generation, and all three Swift host ingresses accept keyframe/image resync. The sibling browser and Android consumers still need to validate the fields and emit repairs. |
-| S2 | Image payloads are transmit-once, but a canvas decode failure or Android cache eviction can still lose one. There is no resend-on-miss path or retained-image acknowledgement. |
+| S1 | Complete: every surface record carries an epoch and generation, deltas name their baseline generation, all three Swift host ingresses accept keyframe/image resync, and the sibling browser and Android decoders validate stamped baselines and emit deduplicated keyframe repairs. |
+| S2 | Resend-on-miss is complete: browser decode/cache misses enter bounded unresolved/request tracking, with overflow deferred and admitted IDs deduplicated until payload repair, disappearance, or epoch reset; Android bitmap-cache eviction requests selected IDs deduplicated until payload repair or epoch reset. Android treats a lazy-JNI old-host return of zero as unavailable rather than retrying it or treating an incidental keyframe as image repair. The wire still has no retained-image acknowledgement. |
 | S3a | Android's size query commits cross-frame encoder state before the bytes are copied and decoded. An abandoned handshake, a grown second query, or decode failure can strand that state. |
 | S3b | `WebHostSceneChannel` retains an unbounded detached output backlog and flushes it when a client attaches, before processing that client's capability declaration. Detached surface records can therefore precede the epoch reset intended for the new client. |
 | S3d | Every delta retransmits the complete accumulated style table. Measured style churn makes late-record cost grow with the epoch rather than with current damage. |

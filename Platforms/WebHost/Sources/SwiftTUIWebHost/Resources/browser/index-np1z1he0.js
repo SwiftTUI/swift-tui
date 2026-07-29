@@ -366,6 +366,11 @@ function encodeBase64(value) {
 // src/WebHostSurfaceTransport.ts
 var recordPrefix = "\x1E";
 var textEncoder = new TextEncoder;
+var MAX_IMAGE_RECOVERY_ID_BYTES = 1024;
+var MAX_OUTSTANDING_IMAGE_RECOVERY_IDS = 1024;
+function isWebHostImageRecoveryId(id) {
+  return id.length > 0 && id.length <= MAX_IMAGE_RECOVERY_ID_BYTES && textEncoder.encode(id).byteLength <= MAX_IMAGE_RECOVERY_ID_BYTES;
+}
 var SUPPORTED_SURFACE_VERSION = 3;
 
 class WebHostOutputDecoder {
@@ -374,8 +379,11 @@ class WebHostOutputDecoder {
   lastSurfaceFrame;
   lastEpoch;
   lastGen;
-  pendingResyncRequest;
+  lastPresentedEpoch;
   keyframeResyncOutstanding = false;
+  keyframeResyncPending = false;
+  imageResyncOutstandingIds = new Set;
+  imageResyncPendingIds = new Set;
   feed(chunk) {
     this.bufferedText += this.textDecoder.decode(chunk, { stream: true });
     const records = [];
@@ -403,14 +411,68 @@ class WebHostOutputDecoder {
     this.bufferedText = "";
     return [this.decodeLine(text)];
   }
-  takeResyncRequest() {
-    const request = this.pendingResyncRequest;
-    this.pendingResyncRequest = undefined;
-    return request;
+  takeResyncRequest(maximumEncodedBytes) {
+    if (this.keyframeResyncPending) {
+      this.keyframeResyncPending = false;
+      return { scope: "keyframe" };
+    }
+    if (this.imageResyncPendingIds.size === 0) {
+      return;
+    }
+    const sortedIds = [...this.imageResyncPendingIds].sort();
+    const { ids, rejectedIds } = boundedImageResyncIds(sortedIds, maximumEncodedBytes);
+    for (const id of rejectedIds) {
+      this.imageResyncPendingIds.delete(id);
+      this.imageResyncOutstandingIds.delete(id);
+    }
+    for (const id of ids) {
+      this.imageResyncPendingIds.delete(id);
+    }
+    if (ids.length === 0) {
+      return;
+    }
+    return { scope: "images", ids };
+  }
+  requestImagePayloads(ids) {
+    const acceptedIds = new Set;
+    for (const id of ids) {
+      if (!isWebHostImageRecoveryId(id)) {
+        continue;
+      }
+      if (this.imageResyncOutstandingIds.has(id)) {
+        acceptedIds.add(id);
+        continue;
+      }
+      if (this.imageResyncOutstandingIds.size >= MAX_OUTSTANDING_IMAGE_RECOVERY_IDS) {
+        continue;
+      }
+      this.imageResyncOutstandingIds.add(id);
+      this.imageResyncPendingIds.add(id);
+      acceptedIds.add(id);
+    }
+    return [...acceptedIds];
+  }
+  prepareToPresentSurface(frame) {
+    const recoveredImagePayloadIds = this.recoveredImagePayloadIds(frame.images);
+    this.resetImageResyncForEpoch(frame.epoch);
+    this.sweepImageResyncForPresentedImages(frame.images);
+    this.clearArrivedImagePayloads(frame.images);
+    if (frame.epoch !== undefined) {
+      this.lastPresentedEpoch = frame.epoch;
+    }
+    return recoveredImagePayloadIds;
   }
   resyncRequestDeliveryFailed(request) {
-    if (request.scope === "keyframe" && this.keyframeResyncOutstanding && this.pendingResyncRequest === undefined) {
-      this.pendingResyncRequest = request;
+    if (request.scope === "keyframe") {
+      if (this.keyframeResyncOutstanding) {
+        this.keyframeResyncPending = true;
+      }
+      return;
+    }
+    for (const id of request.ids ?? []) {
+      if (this.imageResyncOutstandingIds.has(id)) {
+        this.imageResyncPendingIds.add(id);
+      }
     }
   }
   decodeLine(line) {
@@ -465,8 +527,8 @@ class WebHostOutputDecoder {
         this.lastSurfaceFrame = frame;
         this.lastEpoch = frame.epoch;
         this.lastGen = frame.gen;
-        this.pendingResyncRequest = undefined;
         this.keyframeResyncOutstanding = false;
+        this.keyframeResyncPending = false;
         return { type: "surface", frame };
       }
       if (isWebHostSurfaceDeltaFrame(frame)) {
@@ -498,7 +560,47 @@ class WebHostOutputDecoder {
       return;
     }
     this.keyframeResyncOutstanding = true;
-    this.pendingResyncRequest = { scope: "keyframe" };
+    this.keyframeResyncPending = true;
+  }
+  resetImageResyncForEpoch(epoch) {
+    if (epoch === undefined || epoch === this.lastPresentedEpoch) {
+      return;
+    }
+    this.imageResyncOutstandingIds.clear();
+    this.imageResyncPendingIds.clear();
+  }
+  clearArrivedImagePayloads(images) {
+    for (const image of images ?? []) {
+      if (image.dataBase64 === undefined) {
+        continue;
+      }
+      this.imageResyncOutstandingIds.delete(image.id);
+      this.imageResyncPendingIds.delete(image.id);
+    }
+  }
+  recoveredImagePayloadIds(images) {
+    const recoveredIds = new Set;
+    for (const image of images ?? []) {
+      if (image.dataBase64 !== undefined && this.imageResyncOutstandingIds.has(image.id)) {
+        recoveredIds.add(image.id);
+      }
+    }
+    return [...recoveredIds].sort();
+  }
+  sweepImageResyncForPresentedImages(images) {
+    const presentedIds = new Set;
+    for (const image of images ?? []) {
+      if (this.imageResyncOutstandingIds.has(image.id)) {
+        presentedIds.add(image.id);
+      }
+    }
+    for (const id of this.imageResyncOutstandingIds) {
+      if (presentedIds.has(id)) {
+        continue;
+      }
+      this.imageResyncOutstandingIds.delete(id);
+      this.imageResyncPendingIds.delete(id);
+    }
   }
   materializeDeltaFrame(frame) {
     const baseline = this.lastSurfaceFrame;
@@ -533,6 +635,36 @@ class WebHostOutputDecoder {
       preferredGridHeight: frame.preferredGridHeight
     };
   }
+}
+function boundedImageResyncIds(sortedIds, maximumEncodedBytes) {
+  if (maximumEncodedBytes === undefined || !Number.isFinite(maximumEncodedBytes)) {
+    return { ids: sortedIds, rejectedIds: [] };
+  }
+  const emptyRequestBytes = encodeResyncControlMessage({
+    scope: "images",
+    ids: []
+  }).byteLength;
+  const normalizedMaximum = Math.max(0, Math.floor(maximumEncodedBytes));
+  const ids = [];
+  const rejectedIds = [];
+  let encodedBytes = emptyRequestBytes;
+  for (const id of sortedIds) {
+    const separatorBytes = ids.length === 0 ? 0 : 1;
+    const idBytes = textEncoder.encode(JSON.stringify(id)).byteLength;
+    if (encodedBytes + separatorBytes + idBytes > normalizedMaximum) {
+      if (ids.length === 0) {
+        rejectedIds.push(id);
+        continue;
+      }
+      break;
+    }
+    ids.push(id);
+    encodedBytes += separatorBytes + idBytes;
+    if (encodedBytes >= normalizedMaximum) {
+      break;
+    }
+  }
+  return { ids, rejectedIds };
 }
 function declaresNewerSurfaceVersion(value) {
   if (!value || typeof value !== "object") {
@@ -735,7 +867,12 @@ function isWebHostSurfaceScalingMode(value) {
   return typeof value === "string";
 }
 
+// src/wasi/SharedInputQueue.ts
+var sharedInputQueueDefaultCapacity = 64 * 1024;
+
 // src/wasi/BrowserWASIBridge.ts
+var maximumWASIResyncControlBytes = sharedInputQueueDefaultCapacity - 1;
+
 class BrowserWASIBridge {
   stdin = new StdIOPipe;
   stdout = new StdIOPipe;
@@ -743,6 +880,7 @@ class BrowserWASIBridge {
   environment;
   detachStdout;
   detachStderr;
+  decoder = new WebHostOutputDecoder;
   resizeListeners = new Set;
   latestResize;
   constructor(options) {
@@ -768,12 +906,12 @@ class BrowserWASIBridge {
   bindOutput(sink) {
     this.detachStdout?.();
     this.detachStderr?.();
-    const decoder = new WebHostOutputDecoder;
+    this.decoder = new WebHostOutputDecoder;
     this.detachStdout = this.stdout.subscribe((chunk) => {
-      for (const record of decoder.feed(chunk)) {
+      for (const record of this.decoder.feed(chunk)) {
         switch (record.type) {
           case "surface":
-            sink.presentSurface(record.frame);
+            sink.presentSurface(record.frame, this.decoder.prepareToPresentSurface(record.frame));
             break;
           case "clipboard":
             sink.writeClipboard?.(record.text);
@@ -791,13 +929,7 @@ class BrowserWASIBridge {
             break;
         }
       }
-      const request = decoder.takeResyncRequest();
-      if (request) {
-        const accepted = this.stdin.write(encodeResyncControlMessage(request));
-        if (!accepted) {
-          decoder.resyncRequestDeliveryFailed(request);
-        }
-      }
+      this.sendPendingResyncRequests();
     });
     this.detachStderr = this.stderr.subscribe((chunk) => {
       sink.writeError?.(new TextDecoder().decode(chunk));
@@ -826,12 +958,33 @@ class BrowserWASIBridge {
   sendInput(chunk) {
     this.stdin.write(chunk);
   }
+  requestImagePayloads(ids) {
+    const acceptedIds = this.decoder.requestImagePayloads(ids);
+    this.sendPendingResyncRequests();
+    return acceptedIds;
+  }
+  notifyInputCapacityAvailable() {
+    this.sendPendingResyncRequests();
+  }
   subscribeResize(listener) {
     this.resizeListeners.add(listener);
     listener(this.latestResize.columns, this.latestResize.rows, this.latestResize.cellWidth, this.latestResize.cellHeight);
     return () => {
       this.resizeListeners.delete(listener);
     };
+  }
+  sendPendingResyncRequests() {
+    while (true) {
+      const request = this.decoder.takeResyncRequest(maximumWASIResyncControlBytes);
+      if (!request) {
+        return;
+      }
+      const accepted = this.stdin.write(encodeResyncControlMessage(request));
+      if (!accepted) {
+        this.decoder.resyncRequestDeliveryFailed(request);
+        return;
+      }
+    }
   }
   dispose() {
     this.detachStdout?.();
@@ -894,11 +1047,18 @@ class WebSocketSceneBridge {
       return;
     }
     const copy = new Uint8Array(chunk);
+    this.queuedInput.push(copy);
     if (this.socket.readyState === socketOpenState) {
-      this.socket.send(copy);
-    } else {
-      this.queuedInput.push(copy);
+      this.flushQueuedInput();
     }
+  }
+  requestImagePayloads(ids) {
+    if (this.disposed) {
+      return [];
+    }
+    const acceptedIds = this.decoder.requestImagePayloads(ids);
+    this.sendPendingResyncRequests();
+    return acceptedIds;
   }
   dispose() {
     if (this.disposed) {
@@ -924,7 +1084,7 @@ class WebSocketSceneBridge {
     for (const record of this.decoder.feed(bytes)) {
       this.deliver(record);
     }
-    this.sendPendingResyncRequest();
+    this.sendPendingResyncRequests();
   }
   deliver(record) {
     const sink = this.sink;
@@ -934,7 +1094,7 @@ class WebSocketSceneBridge {
     }
     switch (record.type) {
       case "surface":
-        sink.presentSurface(record.frame);
+        sink.presentSurface(record.frame, this.decoder.prepareToPresentSurface(record.frame));
         break;
       case "clipboard":
         sink.writeClipboard?.(record.text);
@@ -957,16 +1117,25 @@ class WebSocketSceneBridge {
       return;
     }
     while (this.queuedInput.length > 0) {
-      this.socket.send(this.queuedInput.shift());
+      try {
+        this.socket.send(this.queuedInput[0]);
+        this.queuedInput.shift();
+      } catch {
+        return;
+      }
     }
   }
-  sendPendingResyncRequest() {
-    const request = this.decoder.takeResyncRequest();
-    if (request) {
+  sendPendingResyncRequests() {
+    while (true) {
+      const request = this.decoder.takeResyncRequest();
+      if (!request) {
+        return;
+      }
       try {
         this.sendInput(encodeResyncControlMessage(request));
       } catch {
         this.decoder.resyncRequestDeliveryFailed(request);
+        return;
       }
     }
   }
@@ -1689,22 +1858,48 @@ function isSupportedImageFormat(value) {
 }
 
 // src/CanvasSurfacePainter.ts
+var MAX_IMAGE_DECODE_ATTEMPTS = 3;
+var MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES = 256;
+var MAX_UNRESOLVED_IMAGE_PAYLOAD_CHARACTERS = 64 * 1024 * 1024;
+
 class CanvasSurfacePainter {
   imageCache = new Map;
+  unresolvedImageIds = new Set;
+  unresolvedImagePayloadCharacters = 0;
+  imageDecoder;
+  onImagePayloadMiss;
   canvas;
   requestRedraw = () => {};
+  lastEpoch;
+  pendingImagePayloadMissIds = new Set;
+  imagePayloadMissScheduled = false;
+  constructor(options = {}) {
+    this.imageDecoder = options.decodeImage ?? decodeImage;
+    this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
+  }
   attach(canvas, requestRedraw) {
     this.canvas = canvas;
     this.requestRedraw = requestRedraw;
   }
-  paint(metrics, frame, damage) {
+  paint(metrics, frame, damage, recoveredImagePayloadIds = []) {
     const canvas = this.canvas;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) {
       return;
     }
+    if (frame?.epoch !== undefined && frame.epoch !== this.lastEpoch) {
+      this.lastEpoch = frame.epoch;
+      for (const cached of this.imageCache.values()) {
+        if (!cached.image) {
+          cached.missReported = false;
+        }
+      }
+    }
+    this.sweepUnresolvedImages(frame?.images);
     const dirtyRegion = frame ? this.dirtyRegionForDamage(damage, frame, metrics) : undefined;
+    const recoveredPayloadIds = new Set(recoveredImagePayloadIds);
     if (dirtyRegion?.rects.length === 0) {
+      this.prepareImages(frame?.images ?? [], recoveredPayloadIds);
       return;
     }
     const scale = globalThis.window?.devicePixelRatio || 1;
@@ -1724,7 +1919,7 @@ class CanvasSurfacePainter {
       return;
     }
     this.drawRows(context, frame, metrics, dirtyRegion);
-    this.drawImages(context, frame.images ?? [], metrics, dirtyRegion);
+    this.drawImages(context, frame.images ?? [], metrics, dirtyRegion, recoveredPayloadIds);
   }
   drawRows(context, frame, metrics, dirtyRegion) {
     if (dirtyRegion) {
@@ -1749,25 +1944,39 @@ class CanvasSurfacePainter {
       this.drawCell(context, metrics, x, y, text, span, style);
     }
   }
-  drawImages(context, images, metrics, dirtyRegion) {
+  drawImages(context, images, metrics, dirtyRegion, recoveredPayloadIds) {
+    const missingPayloadIds = new Set;
     for (const image of images) {
       if (!isSupportedImageFormat(image.format)) {
         continue;
       }
-      this.drawImage(context, {
-        ...image,
-        scalingMode: normalizeScalingMode(image.scalingMode)
-      }, metrics, dirtyRegion);
+      this.drawImage(context, image, metrics, dirtyRegion, missingPayloadIds, recoveredPayloadIds);
     }
+    this.reportImagePayloadMisses(missingPayloadIds);
   }
-  drawImage(context, image, metrics, dirtyRegion) {
-    const decodedImage = this.cachedImage(image);
-    if (!decodedImage) {
-      return;
+  prepareImages(images, recoveredPayloadIds) {
+    const missingPayloadIds = new Set;
+    for (const image of images) {
+      if (!isSupportedImageFormat(image.format)) {
+        continue;
+      }
+      const [, , boundsWidth, boundsHeight] = image.bounds;
+      const [, , clipWidth, clipHeight] = image.visibleBounds;
+      if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+        continue;
+      }
+      this.cachedImage(image, missingPayloadIds, recoveredPayloadIds);
     }
+    this.reportImagePayloadMisses(missingPayloadIds);
+  }
+  drawImage(context, image, metrics, dirtyRegion, missingPayloadIds, recoveredPayloadIds) {
     const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
     const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
     if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      return;
+    }
+    const decodedImage = this.cachedImage(image, missingPayloadIds, recoveredPayloadIds);
+    if (!decodedImage) {
       return;
     }
     if (dirtyRegion && !dirtyRegionIntersectsCellRect(dirtyRegion, clipX, clipY, clipWidth, clipHeight)) {
@@ -1780,26 +1989,151 @@ class CanvasSurfacePainter {
     context.drawImage(decodedImage, boundsX * metrics.cellWidth, boundsY * metrics.cellHeight, boundsWidth * metrics.cellWidth, boundsHeight * metrics.cellHeight);
     context.restore();
   }
-  cachedImage(image) {
-    const cached = this.imageCache.get(image.id);
+  cachedImage(image, missingPayloadIds, recoveredPayloadIds) {
+    let cached = this.imageCache.get(image.id);
     if (cached?.image) {
       return cached.image;
     }
-    if (!cached?.promise && image.dataBase64) {
-      const promise = decodeImage(image.dataBase64, image.format);
-      this.imageCache.set(image.id, { promise });
+    const beginsRecoveredGeneration = image.dataBase64 !== undefined && recoveredPayloadIds.delete(image.id);
+    if (image.dataBase64 !== undefined && (cached?.payload === undefined || beginsRecoveredGeneration)) {
+      if (!this.canTrackUnresolvedImage(image.id, image.dataBase64)) {
+        return;
+      }
+      cached = {
+        payload: image.dataBase64,
+        retries: 0
+      };
+      this.setUnresolvedImage(image.id, cached);
+    } else if (!cached) {
+      if (!isWebHostImageRecoveryId(image.id)) {
+        return;
+      }
+      if (!this.canTrackUnresolvedImage(image.id)) {
+        return;
+      }
+      cached = { missReported: false };
+      this.setUnresolvedImage(image.id, cached);
+      missingPayloadIds.add(image.id);
+      return;
+    }
+    const attempts = cached.retries ?? 0;
+    if (cached.payload === undefined) {
+      if (!cached.missReported) {
+        cached.missReported = true;
+        missingPayloadIds.add(image.id);
+      }
+      return;
+    }
+    if (attempts >= MAX_IMAGE_DECODE_ATTEMPTS) {
+      if (!cached.missReported) {
+        cached.missReported = true;
+        missingPayloadIds.add(image.id);
+      }
+      return;
+    }
+    if (!cached.promise) {
+      const nextAttempts = attempts + 1;
+      const promise = this.imageDecoder(cached.payload, image.format);
+      cached.promise = promise;
+      cached.retries = nextAttempts;
       promise.then((decodedImage) => {
         const latest = this.imageCache.get(image.id);
         if (latest?.promise !== promise) {
           return;
         }
+        this.removeUnresolvedImage(image.id);
         this.imageCache.set(image.id, { image: decodedImage });
         this.requestRedraw();
       }).catch(() => {
-        this.imageCache.delete(image.id);
+        const latest = this.imageCache.get(image.id);
+        if (latest?.promise !== promise) {
+          return;
+        }
+        latest.promise = undefined;
+        if ((latest.retries ?? 0) >= MAX_IMAGE_DECODE_ATTEMPTS && !latest.missReported) {
+          latest.missReported = true;
+          if (isWebHostImageRecoveryId(image.id)) {
+            this.scheduleImagePayloadMiss(image.id);
+          }
+        }
+        this.requestRedraw();
       });
     }
     return;
+  }
+  canTrackUnresolvedImage(id, payload) {
+    const existing = this.imageCache.get(id);
+    const existingPayloadCharacters = existing?.image ? 0 : existing?.payload?.length ?? 0;
+    const nextPayloadCharacters = this.unresolvedImagePayloadCharacters - existingPayloadCharacters + (payload?.length ?? 0);
+    return (this.unresolvedImageIds.has(id) || this.unresolvedImageIds.size < MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES) && nextPayloadCharacters <= MAX_UNRESOLVED_IMAGE_PAYLOAD_CHARACTERS;
+  }
+  setUnresolvedImage(id, cached) {
+    const existing = this.imageCache.get(id);
+    if (this.unresolvedImageIds.has(id)) {
+      this.unresolvedImagePayloadCharacters -= existing?.payload?.length ?? 0;
+    }
+    this.imageCache.set(id, cached);
+    this.unresolvedImageIds.add(id);
+    this.unresolvedImagePayloadCharacters += cached.payload?.length ?? 0;
+    this.pendingImagePayloadMissIds.delete(id);
+  }
+  removeUnresolvedImage(id) {
+    if (!this.unresolvedImageIds.delete(id)) {
+      return;
+    }
+    this.unresolvedImagePayloadCharacters -= this.imageCache.get(id)?.payload?.length ?? 0;
+    this.pendingImagePayloadMissIds.delete(id);
+  }
+  sweepUnresolvedImages(images) {
+    const presentedIds = new Set;
+    for (const image of images ?? []) {
+      if (!this.unresolvedImageIds.has(image.id)) {
+        continue;
+      }
+      const [, , boundsWidth, boundsHeight] = image.bounds;
+      const [, , clipWidth, clipHeight] = image.visibleBounds;
+      if (isSupportedImageFormat(image.format) && boundsWidth > 0 && boundsHeight > 0 && clipWidth > 0 && clipHeight > 0) {
+        presentedIds.add(image.id);
+      }
+    }
+    for (const id of this.unresolvedImageIds) {
+      if (presentedIds.has(id)) {
+        continue;
+      }
+      this.removeUnresolvedImage(id);
+      this.imageCache.delete(id);
+    }
+  }
+  reportImagePayloadMisses(ids) {
+    if (ids.size === 0) {
+      return;
+    }
+    const candidateIds = [...ids].sort();
+    this.applyImagePayloadMissAdmission(candidateIds, this.onImagePayloadMiss(candidateIds));
+  }
+  scheduleImagePayloadMiss(id) {
+    this.pendingImagePayloadMissIds.add(id);
+    if (this.imagePayloadMissScheduled) {
+      return;
+    }
+    this.imagePayloadMissScheduled = true;
+    queueMicrotask(() => {
+      this.imagePayloadMissScheduled = false;
+      const ids = [...this.pendingImagePayloadMissIds].sort();
+      this.pendingImagePayloadMissIds.clear();
+      if (ids.length > 0) {
+        this.applyImagePayloadMissAdmission(ids, this.onImagePayloadMiss(ids));
+      }
+    });
+  }
+  applyImagePayloadMissAdmission(candidateIds, admittedIds) {
+    const acceptedIds = new Set(Array.isArray(admittedIds) ? admittedIds : candidateIds);
+    for (const id of candidateIds) {
+      const cached = this.imageCache.get(id);
+      if (cached && !cached.image) {
+        cached.missReported = acceptedIds.has(id);
+      }
+    }
   }
   drawCell(context, metrics, x, y, text, span, style) {
     const rectX = x * metrics.cellWidth;
@@ -1970,6 +2304,7 @@ function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
 
 // src/DomSurfacePainter.ts
 class DomSurfacePainter {
+  onImagePayloadMiss;
   root;
   rowsLayer;
   imagesLayer;
@@ -1979,6 +2314,12 @@ class DomSurfacePainter {
   renderedGridKey;
   hasRenderedFrame = false;
   letterSpacing;
+  reportedMissingImageIds = new Set;
+  lastImageRecoveryFrame;
+  lastEpoch;
+  constructor(options = {}) {
+    this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
+  }
   attach(root) {
     this.root = root;
     const rowsLayer = createElement("div");
@@ -1996,12 +2337,19 @@ class DomSurfacePainter {
     this.appliedMetricsKey = undefined;
     this.renderedGridKey = undefined;
     this.hasRenderedFrame = false;
+    this.reportedMissingImageIds.clear();
+    this.lastImageRecoveryFrame = undefined;
+    this.lastEpoch = undefined;
   }
-  paint(metrics, frame, damage) {
+  paint(metrics, frame, damage, _recoveredImagePayloadIds) {
     const root = this.root;
     const rowsLayer = this.rowsLayer;
     if (!root || !rowsLayer) {
       return;
+    }
+    if (frame?.epoch !== undefined && frame.epoch !== this.lastEpoch) {
+      this.lastEpoch = frame.epoch;
+      this.reportedMissingImageIds.clear();
     }
     const metricsKey = metricsKeyFor(metrics);
     const metricsChanged = metricsKey !== this.appliedMetricsKey;
@@ -2012,7 +2360,8 @@ class DomSurfacePainter {
     if (!frame) {
       this.rowElements = [];
       rowsLayer.replaceChildren();
-      this.reconcileImages([], metrics);
+      this.lastImageRecoveryFrame = undefined;
+      this.reconcileImages([], metrics, false);
       this.renderedGridKey = undefined;
       this.hasRenderedFrame = false;
       return;
@@ -2036,7 +2385,9 @@ class DomSurfacePainter {
         this.rebuildRow(row, frame, metrics);
       }
     }
-    this.reconcileImages(frame.images ?? [], metrics);
+    const allowRecoveryRequests = frame !== this.lastImageRecoveryFrame;
+    this.lastImageRecoveryFrame = frame;
+    this.reconcileImages(frame.images ?? [], metrics, allowRecoveryRequests);
     this.hasRenderedFrame = true;
   }
   rebuildRow(y, frame, metrics) {
@@ -2096,12 +2447,14 @@ class DomSurfacePainter {
     this.letterSpacing = { key, value };
     return value;
   }
-  reconcileImages(images, metrics) {
+  reconcileImages(images, metrics, allowRecoveryRequests) {
     const layer = this.imagesLayer;
     if (!layer) {
       return;
     }
     const next = new Map;
+    const currentMissingImageIds = new Set;
+    const newlyMissingImageIds = new Set;
     for (const rawImage of images) {
       if (!isSupportedImageFormat(rawImage.format)) {
         continue;
@@ -2113,7 +2466,17 @@ class DomSurfacePainter {
       const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
       const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
       const existing = this.renderedImages.get(image.id);
-      if (!existing && !image.dataBase64 || boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+        continue;
+      }
+      if (!existing && image.dataBase64 === undefined) {
+        if (!isWebHostImageRecoveryId(image.id)) {
+          continue;
+        }
+        currentMissingImageIds.add(image.id);
+        if (!this.reportedMissingImageIds.has(image.id)) {
+          newlyMissingImageIds.add(image.id);
+        }
         continue;
       }
       const entry = existing ?? makeImageEntry();
@@ -2143,6 +2506,22 @@ class DomSurfacePainter {
       }
     }
     this.renderedImages = next;
+    for (const id of this.reportedMissingImageIds) {
+      if (!currentMissingImageIds.has(id)) {
+        this.reportedMissingImageIds.delete(id);
+      }
+    }
+    if (allowRecoveryRequests && newlyMissingImageIds.size > 0) {
+      const candidateIds = [...newlyMissingImageIds].sort();
+      const admittedIds = this.onImagePayloadMiss(candidateIds);
+      const acceptedIds = Array.isArray(admittedIds) ? admittedIds : candidateIds;
+      const candidates = new Set(candidateIds);
+      for (const id of acceptedIds) {
+        if (candidates.has(id)) {
+          this.reportedMissingImageIds.add(id);
+        }
+      }
+    }
   }
 }
 function metricsKeyFor(metrics) {
@@ -2713,7 +3092,10 @@ class WebHostSceneRuntime {
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
     this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
     this.rendererKind = options.renderer ?? "canvas";
-    this.painter = this.rendererKind === "dom" ? new DomSurfacePainter : new CanvasSurfacePainter;
+    const onImagePayloadMiss = (ids) => {
+      return this.bridge?.requestImagePayloads?.(ids);
+    };
+    this.painter = this.rendererKind === "dom" ? new DomSurfacePainter({ onImagePayloadMiss }) : new CanvasSurfacePainter({ onImagePayloadMiss });
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
@@ -2752,7 +3134,7 @@ class WebHostSceneRuntime {
     this.installInputHandlers();
     this.installResizeObserver();
     this.bridge?.bindOutput({
-      presentSurface: (frame) => this.presentSurface(frame),
+      presentSurface: (frame, recoveredImagePayloadIds) => this.presentSurface(frame, recoveredImagePayloadIds),
       writeClipboard: (text) => this.writeClipboard(text),
       notifyRuntimeIssue: (issue) => this.notifyRuntimeIssue(issue),
       recordFrameDiagnostic: (diagnostic) => this.recordFrameDiagnostic(diagnostic),
@@ -2837,13 +3219,13 @@ class WebHostSceneRuntime {
     this.resizeObserver?.disconnect();
     this.element.remove();
   }
-  presentSurface(frame) {
+  presentSurface(frame, recoveredImagePayloadIds) {
     const previousFrame = this.currentFrame;
     this.currentFrame = frame;
     this.columns = Math.max(1, Math.round(frame.width));
     this.rows = Math.max(1, Math.round(frame.height));
     const resized = this.resizeSurface();
-    this.draw(previousFrame && !resized ? frame.damage : undefined);
+    this.draw(previousFrame && !resized ? frame.damage : undefined, recoveredImagePayloadIds);
     this.syncAccessibilityTree();
   }
   get preferredGridSize() {
@@ -3081,8 +3463,8 @@ class WebHostSceneRuntime {
     this.cellWidth = Math.max(1, Math.ceil(context.measureText("W").width));
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
-  draw(damage) {
-    this.painter.paint(this.surfaceMetrics(), this.currentFrame, damage);
+  draw(damage, recoveredImagePayloadIds) {
+    this.painter.paint(this.surfaceMetrics(), this.currentFrame, damage, recoveredImagePayloadIds);
   }
   syncAccessibilityTree() {
     const tree = this.accessibilityTree;
