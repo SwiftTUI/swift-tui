@@ -608,6 +608,8 @@ let package = Package(
       dependencies: [
         "SwiftTUIAndroidHost",
         "SwiftTUIRuntime",
+        "SwiftTUIWASISurfaceBridge",
+        "SwiftTUIWebHost",
       ],
       path: "Platforms/Android/Tests/SwiftTUIAndroidHostTests",
       swiftSettings: swiftSettings()

@@ -136,12 +136,13 @@ step_index=0
 
 for name in \
   PARALLEL_RECORD_RENDERED_FIXTURES \
+  SWIFTTUI_REGENERATE_CONFORMANCE_FIXTURES \
   SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES \
   SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
   eval "is_set=\${$name+x}"
   if [ -n "$is_set" ]; then
     >&2 echo "$name must not be set when running the repo gate."
-    >&2 echo "Use Scripts/record_rendered_text_fixtures.sh to update rendered fixtures."
+    >&2 echo "Use the fixture recorder named in docs/DEVELOPMENT.md."
     exit 1
   fi
 done
@@ -737,12 +738,13 @@ check_bun_environment() {
 check_fixture_recording_environment_disabled() {
   for name in \
     PARALLEL_RECORD_RENDERED_FIXTURES \
+    SWIFTTUI_REGENERATE_CONFORMANCE_FIXTURES \
     SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES \
     SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT; do
     eval "is_set=\${$name+x}"
     if [ -n "$is_set" ]; then
       >&2 echo "$name must not be set when running the repo gate."
-      >&2 echo "Use Scripts/record_rendered_text_fixtures.sh to update rendered fixtures."
+      >&2 echo "Use the fixture recorder named in docs/DEVELOPMENT.md."
       return 1
     fi
   done
@@ -848,8 +850,8 @@ run_function_step \
   check_bun_environment
 
 run_function_step \
-  "Check rendered fixture recording is disabled" \
-  "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES|SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
+  "Check fixture recording is disabled" \
+  "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|SWIFTTUI_REGENERATE_CONFORMANCE_FIXTURES|SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES|SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
   check_fixture_recording_environment_disabled
 
 if [ "$clean_builds" -eq 1 ]; then

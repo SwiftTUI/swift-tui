@@ -1,0 +1,8 @@
+{"formatVersion":1,"manifestSHA256":"640752802ef20cfcd0683f7c206111ac3500a35339d2af08f764030d2478710a","bodySHA256":"f2dff5704b6f0719cab73fce8c3ef431f6c0dfec736fa45e3cafa67eed128286"}
+{"androidABI":{"action":"publish","damage":null,"height":1,"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}],"sequence":1,"width":1}}
+{"androidABI":{"action":"sizeQuery","label":"q1"}}
+{"androidABI":{"action":"publish","damage":{"rows":[{"ranges":[[0,1]],"row":0}]},"height":1,"rows":[{"cells":[{"column":0,"span":1,"text":"B"}],"row":0}],"sequence":2,"width":1}}
+{"androidABI":{"action":"copy","capacity":4096,"label":"q1"}}
+{"androidABI":{"action":"sizeQuery","label":"q2"}}
+{"androidABI":{"action":"copy","capacity":4096,"label":"q2"}}
+{"expect":{"androidDeliveries":[{"capacity":4096,"copied":true,"label":"q1","record":{"baselineGen":null,"epoch":301,"gen":1,"kind":"full","rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}]},"reported":128,"returned":128},{"capacity":4096,"copied":true,"label":"q2","record":{"baselineGen":1,"epoch":301,"gen":2,"kind":"delta","rows":[{"cells":[{"column":0,"span":1,"text":"B"}],"row":0}]},"reported":275,"returned":275}]}}

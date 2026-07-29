@@ -1,0 +1,117 @@
+{
+  "fixtures" : [
+    {
+      "bodySHA256" : "f2dff5704b6f0719cab73fce8c3ef431f6c0dfec736fa45e3cafa67eed128286",
+      "file" : "conformance-android-delivery-commit.jsonl",
+      "kind" : "android-abi",
+      "mutationClass" : "android-delivery-commit",
+      "requiresStage" : "s3a",
+      "runners" : [
+        "swift-android-abi"
+      ],
+      "scenario" : "android-delivery-commits-copied-candidate"
+    },
+    {
+      "bodySHA256" : "d6ead7f7073ea7de136b14b30b0e8e46ebc8c994b69e0dc1b8d27217ef87b440",
+      "file" : "conformance-baseline-loss.jsonl",
+      "kind" : "record",
+      "mutationClass" : "baseline-loss",
+      "requiresStage" : "s1",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "baseline-loss-refuses-stale-delta"
+    },
+    {
+      "bodySHA256" : "27a5c95eab79def001b1fa807890f21122efca56641f5d153ba0ddc3536e737e",
+      "file" : "conformance-control.jsonl",
+      "kind" : "record",
+      "mutationClass" : "control",
+      "requiresStage" : "s1",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "control-steady-delta"
+    },
+    {
+      "bodySHA256" : "582b034623538fd683fbc9fb1d35350a7a0c2c38a8466c659829827d2893d57f",
+      "file" : "conformance-epoch-reanchor.jsonl",
+      "kind" : "record",
+      "mutationClass" : "epoch-reanchor",
+      "requiresStage" : "s1",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "epoch-reanchor-and-style-budget-full"
+    },
+    {
+      "bodySHA256" : "acdce60c546c0a9af521bd0bf952a7cedddc1041c62b800d10d3d239bb09c370",
+      "file" : "conformance-image-decode-failure.jsonl",
+      "kind" : "web-painter",
+      "mutationClass" : "image-decode-failure",
+      "requiresStage" : "s2",
+      "runners" : [
+        "web-canvas"
+      ],
+      "scenario" : "canvas-decode-failure-retries-deterministically"
+    },
+    {
+      "bodySHA256" : "dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199",
+      "file" : "conformance-image-forget-record.jsonl",
+      "kind" : "record",
+      "mutationClass" : "image-forget",
+      "requiresStage" : "s2",
+      "runners" : [
+        "swift-reference",
+        "android"
+      ],
+      "scenario" : "image-forget-requests-and-reapplies"
+    },
+    {
+      "bodySHA256" : "dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199",
+      "file" : "conformance-image-forget-web-painter.jsonl",
+      "kind" : "web-painter",
+      "mutationClass" : "image-forget",
+      "requiresStage" : "s2",
+      "runners" : [
+        "web-canvas",
+        "web-dom"
+      ],
+      "scenario" : "web-painter-image-forget-requests-and-reapplies"
+    },
+    {
+      "bodySHA256" : "28851ab5526ef11bfbb0e6f78369d403853022257b35d2dac8dd6ed25f41c63f",
+      "file" : "conformance-unknown-token.jsonl",
+      "kind" : "record",
+      "mutationClass" : "unknown-token",
+      "requiresStage" : "s1",
+      "runners" : [
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "unknown-token-degrades-per-record"
+    },
+    {
+      "bodySHA256" : "3c48916e3a87f7426a4d28f3e37b4df1eb22a1938890eadc8bd7d1c4a85829cd",
+      "file" : "conformance-websocket-detached-backlog.jsonl",
+      "kind" : "websocket-channel",
+      "mutationClass" : "websocket-detached-backlog",
+      "requiresStage" : "s3b",
+      "runners" : [
+        "swift-websocket-channel"
+      ],
+      "scenario" : "websocket-detached-backlog-reconnects-by-token"
+    }
+  ],
+  "formatVersion" : 1
+}

@@ -143,10 +143,11 @@ fixture tests pass unconditionally.
 ## Transport wire fixtures
 
 `Fixtures/Transport/` holds the wire fixtures shared with the sibling host
-repos: `swift-tui-web` mirrors the web-surface and terminal-style files in its
-own `Fixtures/Transport/`, and `swift-tui-android` mirrors the generated
-`web-surface-totality` and `web-surface-composited-image` records in its test
-resources. The coordination root's `//:transport_fixture_sync` gate
+repos: `swift-tui-web` mirrors the web-surface, terminal-style, and full
+conformance corpus in its own `Fixtures/Transport/`; `swift-tui-android`
+mirrors the generated `web-surface-totality` and
+`web-surface-composited-image` records plus that same full conformance corpus
+in its test resources. The coordination root's `//:transport_fixture_sync` gate
 byte-compares every mirrored copy, so a wire-contract change here goes red in
 org CI until the sibling copies are re-synced. The totality and
 composited-image fixtures are generated — re-run their pin tests with
@@ -154,6 +155,31 @@ composited-image fixtures are generated — re-run their pin tests with
 copy the results to the sibling repos, and commit all sides. The hand-authored
 fixtures (`web-surface-basic/styled`, terminal style) are edited in place and
 copied the same way.
+
+The versioned host-wire conformance corpus is
+`Fixtures/Transport/conformance-manifest.json` plus every declared
+`conformance-*.jsonl` body. Record it only through the real Swift encoder:
+
+```bash
+Scripts/record_host_wire_conformance_fixtures.sh
+```
+
+The recorder recomputes the exact manifest and body SHA-256 values, then its
+test reloads the corpus through the strict schema/census validator. Do not edit
+recorded `emit` bytes; the sole exception is the named unknown-token scenario,
+whose recorder performs one explicit token substitution after production
+encoding. Structured row expectations are decoded back from those production
+records instead of being authored independently. Review the byte diff, run the
+recorder test again with recording
+disabled, and copy the manifest and **every** conformance body byte-for-byte to
+both consumer repos before the coordination root's fixture-sync gate. S5 has
+active `s1`/`s2` scenarios, parseable but inactive `s3a`/`s3b` host-adapter
+scenarios, and intentionally no `s3d` fixture until the real post-S3d encoder
+exists. The inactive Swift adapters still compile and their meta-tests interpret
+the real Android copy ABI and WebSocket channel/input seams; adding the binding
+stage to an adapter's implemented-stage set makes its full fixture mandatory.
+The repo gate rejects
+`SWIFTTUI_REGENERATE_CONFORMANCE_FIXTURES` so recording cannot mask drift.
 
 ## Public API baseline
 
