@@ -78,6 +78,57 @@ struct WebHostServerTests {
 
     #expect(await iterator.next() == .close(code: 1009, reason: "too large"))
   }
+
+  @Test(
+    "[characterization D11] detached channel retains every surface record before attached input"
+  )
+  func detachedChannelRetainsEverySurfaceRecordBeforeAttachedInput() async throws {
+    let channel = WebHostSceneChannel()
+    let detachedRecords = (0..<100).map { sequence in
+      Array("\u{001E}surface:{\"sequence\":\(sequence)}\n".utf8)
+    }
+    for record in detachedRecords {
+      try await channel.send(record)
+    }
+
+    let attachedInput = Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)
+    let inputProcessedClose = WebHostSocketMessage.close(
+      code: 4001,
+      reason: "after attached input"
+    )
+    let client = AsyncStream<WebHostSocketMessage> { continuation in
+      continuation.yield(.data(attachedInput))
+      continuation.yield(inputProcessedClose)
+      continuation.finish()
+    }
+    var inputIterator = channel.chunks().makeAsyncIterator()
+    let output = await channel.attach(client: client)
+    var outputIterator = output.makeAsyncIterator()
+    var flushedRecords: [[UInt8]] = []
+    for _ in detachedRecords.indices {
+      guard case .data(let bytes) = try #require(await outputIterator.next()) else {
+        Issue.record("expected detached data record")
+        return
+      }
+      flushedRecords.append(bytes)
+    }
+    let closeAfterInputProcessing = try #require(await outputIterator.next())
+    let forwardedInput = try #require(await inputIterator.next())
+
+    // Known defect D11: all 100 stale surface records remain queued while
+    // detached and are synchronously placed ahead of the newly attached
+    // client's input task. The client's close is an observable effect of that
+    // task, so finding it after every stale record pins the unsafe ordering.
+    // S3b bounds this queue and drops detached surfaces.
+    #expect(flushedRecords == detachedRecords)
+    #expect(closeAfterInputProcessing == inputProcessedClose)
+    #expect(forwardedInput == attachedInput)
+    print(
+      "[wire-epoch-sv][D11] detachedSurfaceRecords=\(flushedRecords.count) "
+        + "detachedSurfaceBytes=\(flushedRecords.reduce(0) { $0 + $1.count }) "
+        + "attachedInputBytes=\(forwardedInput.count)"
+    )
+  }
 }
 
 func withServer(

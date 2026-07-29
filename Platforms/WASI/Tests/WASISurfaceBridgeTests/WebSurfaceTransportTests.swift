@@ -488,6 +488,85 @@ struct WebSurfaceTransportTests {
     #expect(fullFrameCount > 1)
   }
 
+  @Test(
+    "[characterization D10] accumulated styles dominate late delta bytes during opacity churn"
+  )
+  func accumulatedStylesDominateLateDeltaBytesDuringOpacityChurn() throws {
+    let size = CellSize(width: 80, height: 24)
+    let frameCount = 300
+    let styledCellCount = 200
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 0, columnRanges: [0..<80]),
+        .init(row: 1, columnRanges: [0..<80]),
+        .init(row: 2, columnRanges: [0..<40]),
+      ]
+    )
+    var state = HostWireEncodingState(deltaEnabled: true)
+    var lateSamples: [(recordBytes: Int, stylesBytes: Int, styleCount: Int)] = []
+
+    for frameIndex in 0..<frameCount {
+      let output = WebSurfaceFrameEncoder.encode(
+        Self.opacityChurnSurface(
+          frameIndex: frameIndex,
+          frameCount: frameCount,
+          styledCellCount: styledCellCount,
+          size: size
+        ),
+        sequence: UInt64(frameIndex + 1),
+        semanticSnapshot: nil,
+        focusedIdentity: nil,
+        damage: damage,
+        state: &state
+      )
+      guard frameIndex > 0 else {
+        continue
+      }
+
+      let frame = try Self.decodedSurfaceFrame(output)
+      #expect(frame["encoding"] as? String == "delta")
+      if frameIndex >= frameCount - 50 {
+        lateSamples.append(
+          (
+            recordBytes: output.utf8.count,
+            stylesBytes: try Self.encodedStylesFieldByteCount(inDelta: output),
+            styleCount: state.persistentStyles.count
+          )
+        )
+      }
+    }
+
+    let firstLate = try #require(lateSamples.first)
+    let lastLate = try #require(lateSamples.last)
+    let totalLateRecordBytes = lateSamples.reduce(0) { $0 + $1.recordBytes }
+    let totalLateStylesBytes = lateSamples.reduce(0) { $0 + $1.stylesBytes }
+    let minimumLateSharePermille =
+      try #require(
+        lateSamples.map { sample in
+          sample.stylesBytes * 1_000 / sample.recordBytes
+        }.min()
+      )
+
+    // Known defect D10: the unchanged accumulated style epoch is the majority
+    // of every late delta record. S3d replaces that retransmission with the
+    // capability-negotiated styleAppend shape; until then this passing
+    // characterization makes the cost visible without weakening the gate.
+    #expect(lateSamples.count == 50)
+    #expect(lateSamples.allSatisfy { $0.stylesBytes > $0.recordBytes - $0.stylesBytes })
+    #expect(lastLate.styleCount == frameCount + 1)
+    print(
+      "[wire-epoch-sv][D10] frames=\(frameCount) styledCells=\(styledCellCount) "
+        + "lateFrames=\(lateSamples.count) "
+        + "firstLateRecordBytes=\(firstLate.recordBytes) "
+        + "firstLateStylesBytes=\(firstLate.stylesBytes) "
+        + "lastLateRecordBytes=\(lastLate.recordBytes) "
+        + "lastLateStylesBytes=\(lastLate.stylesBytes) "
+        + "lateStylesSharePermille=\(totalLateStylesBytes * 1_000 / totalLateRecordBytes) "
+        + "minimumLateStylesSharePermille=\(minimumLateSharePermille) "
+        + "finalStyleCount=\(lastLate.styleCount)"
+    )
+  }
+
   @Test("a resized full frame starts a grid-sized style epoch")
   func resizedFullFrameStartsGridSizedStyleEpoch() {
     var state = HostWireEncodingState(deltaEnabled: true)
@@ -1209,6 +1288,42 @@ struct WebSurfaceTransportTests {
         }
       }
     )
+  }
+
+  private static func opacityChurnSurface(
+    frameIndex: Int,
+    frameCount: Int,
+    styledCellCount: Int,
+    size: CellSize
+  ) -> RasterSurface {
+    let style = ResolvedTextStyle(
+      opacity: Double(frameIndex + 1) / Double(frameCount + 1)
+    )
+    return RasterSurface(
+      size: size,
+      cells: (0..<size.height).map { y in
+        (0..<size.width).map { x in
+          let cellIndex = y * size.width + x
+          return RasterCell(
+            character: " ",
+            style: cellIndex < styledCellCount ? style : nil
+          )
+        }
+      }
+    )
+  }
+
+  private static func encodedStylesFieldByteCount(
+    inDelta output: String
+  ) throws -> Int {
+    let stylesStart = try #require(output.range(of: "\"styles\":["))
+    let stylesEnd = try #require(
+      output.range(
+        of: "],\"deltaRows\":",
+        range: stylesStart.upperBound..<output.endIndex
+      )
+    )
+    return output[stylesStart.lowerBound...stylesEnd.lowerBound].utf8.count
   }
 
   private static func wireStyle(

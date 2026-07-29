@@ -1,6 +1,6 @@
 import Foundation
-@_spi(Testing) import SwiftTUICore
 import SwiftTUIAndroidHost
+@_spi(Testing) import SwiftTUICore
 @_spi(Runners) import SwiftTUIRuntime
 import Testing
 
@@ -230,6 +230,88 @@ func android_host_delta_accumulates_damage_across_skipped_polls() async throws {
   #expect(delta["encoding"] as? String == "delta")
   let deltaRows = try #require(delta["deltaRows"] as? [[Any]])
   #expect(deltaRows.compactMap { $0.first as? Int }.sorted() == [0, 1])
+}
+
+@MainActor
+@Test("[characterization D15] unpolled Android damage stays normalized across commits")
+func android_host_unpolled_damage_stays_normalized_across_commits() async throws {
+  let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
+  let handle = AndroidHostHandleRegistry.register(host)
+  defer {
+    swift_tui_android_destroy(handle)
+  }
+
+  #expect(
+    host.declareCapabilities(
+      json: "{\"acceptsDeltaFrames\":true}"
+    )
+  )
+
+  func present(
+    _ sequence: UInt64,
+    character: Character,
+    damage: PresentationDamage?
+  ) throws {
+    _ = try host.surface.present(
+      SemanticHostFrame(
+        sequence: sequence,
+        raster: RasterSurface(
+          size: CellSize(width: 1, height: 1),
+          cells: [[RasterCell(character: character)]]
+        ),
+        semantics: SemanticSnapshot(),
+        focusedIdentity: nil,
+        rasterDamage: damage
+      )
+    )
+  }
+
+  func copyRecordBytes() throws -> [UInt8] {
+    let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
+    #expect(required > 0)
+    var bytes = [UInt8](repeating: 0, count: Int(required))
+    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+      unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
+    }
+    #expect(copied == required)
+    return bytes
+  }
+
+  try present(1, character: "A", damage: nil)
+  await Task.yield()
+  _ = try copyRecordBytes()
+
+  let unpolledCommitCount = 10_000
+  let oneCellDamage = PresentationDamage(
+    textRows: [.init(row: 0, columnRanges: [0..<1])]
+  )
+  for offset in 0..<unpolledCommitCount {
+    try present(
+      UInt64(offset + 2),
+      character: offset.isMultiple(of: 2) ? "B" : "C",
+      damage: oneCellDamage
+    )
+  }
+  await Task.yield()
+
+  let bytes = try copyRecordBytes()
+  let record = try decodedWebSurfaceRecord(bytes)
+  let damage = try #require(record["damage"] as? [String: Any])
+  let textRows = try #require(damage["textRows"] as? [[Any]])
+
+  // D15 is refuted at implementation HEAD. Although the host's union spells
+  // the operation as array concatenation, PresentationDamage.init normalizes
+  // duplicate rows and merges overlapping column ranges on every commit.
+  // The public copy seam therefore observes one grid-bounded row after 10,000
+  // unpolled commits, not one retained entry per commit.
+  #expect(record["encoding"] as? String == "delta")
+  #expect(textRows.count == 1)
+  #expect(textRows.first?.first as? Int == 0)
+  #expect(textRows.first?.dropFirst().first as? [[Int]] == [[0, 1]])
+  print(
+    "[wire-epoch-sv][D15] unpolledCommits=\(unpolledCommitCount) "
+      + "damageTextRows=\(textRows.count) encodedRecordBytes=\(bytes.count)"
+  )
 }
 
 @MainActor
