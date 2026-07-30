@@ -161,6 +161,23 @@ extension LayoutEngine {
         columns: payload.columns,
         discovered: discovered
       )
+      // The second pass is load-bearing, not redundant (register item D21).
+      // Discovery above reads each cell's MEASURED width, and a cell that has
+      // had `.frame(width:)` applied reports exactly that width — a frame
+      // reports `width ?? contentSize.width`, so it fully masks the child's
+      // ideal. Discovery therefore needs an UNFRAMED measurement while the
+      // layout product needs a FRAMED one, and one pass cannot be both.
+      //
+      // Applying the retained widths before the loop instead — the obvious
+      // single-pass rewrite — caps every column at whatever it first
+      // discovered and never lets it grow again; with no retained widths on
+      // the first frame that cap is the column TITLE width, so a 16-character
+      // cell renders as narrow as a 2-character one, permanently.
+      // `TableColumnWidthPassTests` pins both halves of that.
+      //
+      // The cost is one extra measure of the WINDOW — not a re-realization:
+      // `applyHostedTableColumnWidths` re-maps the realization cache in place,
+      // so `child(at:)` below hits it (D21-a).
       if let tableColumnWidths {
         source.applyHostedTableColumnWidths(tableColumnWidths)
         children.removeAll(keepingCapacity: true)
