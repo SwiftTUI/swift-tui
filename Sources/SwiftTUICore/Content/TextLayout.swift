@@ -119,8 +119,15 @@ package func layoutRichText(
   for payload: RichTextPayload,
   options: TextLayoutOptions
 ) -> TextLayoutResult {
+  uncachedRichTextLayout(for: payload, options: options)
+}
+
+func uncachedRichTextLayout(
+  for payload: RichTextPayload,
+  options: TextLayoutOptions
+) -> TextLayoutResult {
   uncachedTextLayout(
-    sourceLines: explicitClusterLines(for: payload),
+    sourceLines: explicitClusterLines(for: payload, options: options),
     options: options
   )
 }
@@ -130,7 +137,7 @@ func uncachedTextLayout(
   options: TextLayoutOptions
 ) -> TextLayoutResult {
   uncachedTextLayout(
-    sourceLines: explicitClusterLines(for: content),
+    sourceLines: explicitClusterLines(for: content, options: options),
     options: options
   )
 }
@@ -139,23 +146,47 @@ private func uncachedTextLayout(
   sourceLines: [[TextCluster]],
   options: TextLayoutOptions
 ) -> TextLayoutResult {
-  // Wrapped rows stay grouped by the source line that produced them: truncation
-  // needs to reach past the last visible row into the rest of *its own* logical
-  // line, and only the grouping records which logical line that is.
-  let wrappedGroups = sourceLines.map { line in
-    wrapTextLine(
-      line,
-      width: options.width,
-      wrappingStrategy: options.wrappingStrategy
-    )
-  }
-  let wrappedLines = Array(wrappedGroups.joined())
-
   guard let rawLineLimit = options.lineLimit else {
+    // Unbounded: wrap every source line to full depth, exactly as before.
+    let wrappedLines = sourceLines.flatMap { line in
+      wrapTextLine(
+        line,
+        width: options.width,
+        wrappingStrategy: options.wrappingStrategy
+      )
+    }
     return TextLayoutResult(lines: wrappedLines)
   }
 
   let lineLimit = max(1, rawLineLimit)
+
+  // The product is at most `lineLimit` rows, so the wrap needs at most
+  // `lineLimit + 1` — one row past the limit is the entire evidence that
+  // truncation is required (D71). Wrapping the whole content first and
+  // discarding the tail made an O(lineLimit × width) product cost
+  // O(total content).
+  let rowBudget = lineLimit + 1
+
+  // Rows stay grouped by the source line that produced them: truncation needs
+  // to reach past the last visible row into the rest of *its own* logical line,
+  // and only the grouping records which logical line that is.
+  let indexedGroups = budgetedWrapGroups(
+    sourceLines.map { line in
+      line.enumerated().map { index, cluster in
+        SourceIndexedCluster(sourceIndex: index, cluster: cluster)
+      }
+    },
+    options: options,
+    rowBudget: rowBudget
+  )
+
+  let wrappedLines = indexedGroups.flatMap { rows in
+    rows.map { row in TextLayoutLine(clusters: row.map(\.cluster)) }
+  }
+
+  // Reaching `lineLimit + 1` emitted rows proves at least one row past the
+  // limit exists; producing fewer under an unhit budget proves the wrap
+  // completed. Identical to the old `allRows.count > lineLimit`.
   guard wrappedLines.count > lineLimit else {
     return TextLayoutResult(lines: wrappedLines)
   }
@@ -165,9 +196,8 @@ private func uncachedTextLayout(
     visibleLines[lastIndex] = truncating(
       truncationInput(
         forWrappedRow: lastIndex,
-        in: wrappedGroups,
-        sourceLines: sourceLines,
-        options: options
+        in: indexedGroups,
+        sourceLines: sourceLines
       ),
       to: options.width,
       mode: options.truncationMode,
@@ -177,30 +207,74 @@ private func uncachedTextLayout(
   return TextLayoutResult(lines: visibleLines, wasTruncated: true)
 }
 
+/// Wraps source lines left to right, spending a shared row budget, and stops
+/// consuming source lines once it is gone.
+///
+/// Every source line yields at least one row, so the budget bounds how many
+/// source lines are even looked at — which is what keeps a `lineLimit(1)` over
+/// a thousand-line document from wrapping a thousand lines to show one.
+private func budgetedWrapGroups(
+  _ sourceLines: [[SourceIndexedCluster]],
+  options: TextLayoutOptions,
+  rowBudget: Int
+) -> [[[SourceIndexedCluster]]] {
+  var groups: [[[SourceIndexedCluster]]] = []
+  var remaining = rowBudget
+
+  for line in sourceLines {
+    guard remaining > 0 else {
+      break
+    }
+    let rows = wrapTextLineClusters(
+      line,
+      width: options.width,
+      wrappingStrategy: options.wrappingStrategy,
+      rowBudget: remaining
+    )
+    groups.append(rows)
+    remaining -= rows.count
+  }
+
+  return groups
+}
+
 private func explicitClusterLines(
-  for content: String
+  for content: String,
+  options: TextLayoutOptions
 ) -> [[TextCluster]] {
   explicitClusterLines(
     from: [
       RichTextRun(text: content)
-    ]
+    ],
+    options: options
   )
 }
 
 private func explicitClusterLines(
-  for payload: RichTextPayload
+  for payload: RichTextPayload,
+  options: TextLayoutOptions
 ) -> [[TextCluster]] {
-  explicitClusterLines(from: payload.runs)
+  explicitClusterLines(from: payload.runs, options: options)
 }
 
 private func explicitClusterLines(
-  from runs: [RichTextRun]
+  from runs: [RichTextRun],
+  options: TextLayoutOptions
 ) -> [[TextCluster]] {
+  // Each source line yields at least one wrapped row, so a `lineLimit` of n can
+  // never read past the (n + 1)-th source line — and clusterizing lines nobody
+  // will wrap is the same O(total content) cost the row budget exists to
+  // delete. Stopping here is unobservable: reaching the cap means at least
+  // `lineLimit + 1` rows, which is already `wasTruncated`.
+  let maximumLines = options.lineLimit.map { max(1, $0) + 1 }
   var lines: [[TextCluster]] = [[]]
 
   for (runIndex, run) in runs.enumerated() {
     for character in run.text {
       if character == "\n" {
+        if let maximumLines, lines.count >= maximumLines {
+          return lines
+        }
         lines.append([])
         continue
       }

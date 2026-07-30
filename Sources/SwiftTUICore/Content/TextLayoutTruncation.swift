@@ -14,11 +14,16 @@
 /// of its logical line. Rows past the limit are folded back in this way; later
 /// logical lines are not, so a two-line `.middle` shows the tail of the line it
 /// is truncating rather than the tail of the whole document.
+/// The rows here are the *same* wrap that produced the visible output — the
+/// primary wrap runs over ``SourceIndexedCluster`` and the visible rows are
+/// derived from it by stripping indexes. That is what makes the source mapping
+/// structural rather than correlated: there is no second wrap to disagree with,
+/// so neither `rowIndex` bounds nor row boundaries can diverge, and the two
+/// silent fall-backs this function used to carry (D78) have no case to cover.
 func truncationInput(
   forWrappedRow globalRowIndex: Int,
-  in wrappedGroups: [[TextLayoutLine]],
-  sourceLines: [[TextCluster]],
-  options: TextLayoutOptions
+  in wrappedGroups: [[[SourceIndexedCluster]]],
+  sourceLines: [[TextCluster]]
 ) -> TextLayoutLine {
   var rowIndex = globalRowIndex
   for (sourceLineIndex, rows) in wrappedGroups.enumerated() {
@@ -26,8 +31,7 @@ func truncationInput(
       return truncationInput(
         forRow: rows[rowIndex],
         at: rowIndex,
-        of: sourceLines[sourceLineIndex],
-        options: options
+        of: sourceLines[sourceLineIndex]
       )
     }
     rowIndex -= rows.count
@@ -37,61 +41,30 @@ func truncationInput(
 }
 
 private func truncationInput(
-  forRow row: TextLayoutLine,
+  forRow row: [SourceIndexedCluster],
   at rowIndex: Int,
-  of sourceLine: [TextCluster],
-  options: TextLayoutOptions
+  of sourceLine: [TextCluster]
 ) -> TextLayoutLine {
   // The first row starts at the head of its logical line, so the whole line is
-  // the remainder and the source-index re-wrap can be skipped entirely. This is
-  // the `lineLimit(1)` path, which is the overwhelmingly common one.
+  // the remainder and no index lookup is needed. This is the `lineLimit(1)`
+  // path, which is the overwhelmingly common one.
   guard rowIndex > 0 else {
     return TextLayoutLine(clusters: sourceLine)
   }
 
-  let indexedRows = wrapTextLineClusters(
-    sourceLine.enumerated().map { index, cluster in
-      SourceIndexedCluster(sourceIndex: index, cluster: cluster)
-    },
-    width: options.width,
-    wrappingStrategy: options.wrappingStrategy
-  )
-  guard rowIndex < indexedRows.count else {
-    return row
-  }
-
   var leadingMarkers: [TextCluster] = []
-  for cluster in indexedRows[rowIndex] {
+  for cluster in row {
     guard let sourceIndex = cluster.sourceIndex else {
       leadingMarkers.append(cluster.cluster)
       continue
     }
     return TextLayoutLine(clusters: leadingMarkers + sourceLine[sourceIndex...])
   }
-  return row
-}
-
-/// A source cluster paired with its index in the logical, pre-wrap line, so a
-/// wrapped row can be mapped back to the point in that line where it starts.
-/// Continuation markers are synthesized by wrapping and carry no source
-/// position, exactly as ``TextWrappableCluster`` requires — which is what makes
-/// them distinguishable from real content here.
-private struct SourceIndexedCluster: TextWrappableCluster {
-  var sourceIndex: Int?
-  var cluster: TextCluster
-
-  var character: Character { cluster.character }
-  var cellWidth: Int { cluster.cellWidth }
-
-  static func continuationMarker(
-    character: Character,
-    cellWidth: Int
-  ) -> SourceIndexedCluster {
-    .init(
-      sourceIndex: nil,
-      cluster: TextCluster(character: character, cellWidth: cellWidth)
-    )
-  }
+  // A row of pure continuation markers owns no source position, so its markers
+  // *are* its whole content. This is the loop's own accumulation, not a
+  // fall-back to some other wrap's answer — the distinction that made the old
+  // `return row` a silent revert to the known-bad fragment.
+  return TextLayoutLine(clusters: leadingMarkers)
 }
 
 func truncating(

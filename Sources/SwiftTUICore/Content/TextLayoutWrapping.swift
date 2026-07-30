@@ -22,15 +22,48 @@ extension TextCluster: TextWrappableCluster {
   }
 }
 
+/// A source cluster paired with its index in the logical, pre-wrap line, so a
+/// wrapped row can be mapped back to the point in that line where it starts.
+///
+/// Truncation needs that mapping: the last visible row must be folded back into
+/// the remainder of *its own* logical line, and separator whitespace dropped at
+/// a wrap point means the row's clusters alone cannot recover where it began.
+/// Continuation markers are synthesized by wrapping and carry no source
+/// position, exactly as ``TextWrappableCluster`` requires — which is what makes
+/// them distinguishable from real content.
+///
+/// Wrapping this payload as the *primary* wrap (rather than re-wrapping a
+/// second instantiation afterwards) is what makes the mapping structural: there
+/// is one wrap, so there is nothing for a second one to disagree with.
+internal struct SourceIndexedCluster: TextWrappableCluster {
+  var sourceIndex: Int?
+  var cluster: TextCluster
+
+  var character: Character { cluster.character }
+  var cellWidth: Int { cluster.cellWidth }
+
+  static func continuationMarker(
+    character: Character,
+    cellWidth: Int
+  ) -> SourceIndexedCluster {
+    .init(
+      sourceIndex: nil,
+      cluster: TextCluster(character: character, cellWidth: cellWidth)
+    )
+  }
+}
+
 func wrapTextLine(
   _ line: [TextCluster],
   width: Int?,
-  wrappingStrategy: TextWrappingStrategy
+  wrappingStrategy: TextWrappingStrategy,
+  rowBudget: Int? = nil
 ) -> [TextLayoutLine] {
   wrapTextLineClusters(
     line,
     width: width,
-    wrappingStrategy: wrappingStrategy
+    wrappingStrategy: wrappingStrategy,
+    rowBudget: rowBudget
   ).map(TextLayoutLine.init(clusters:))
 }
 
@@ -38,10 +71,26 @@ func wrapTextLine(
 /// every consumer wraps identically. Returns the wrapped rows as cluster
 /// arrays; rows may contain synthesized continuation markers, and separator
 /// whitespace at a wrap point is dropped (not represented in any row).
+///
+/// **Payload independence (convention).** The algorithm reads only `character`
+/// and `cellWidth`, so every conformer wraps at identical row boundaries
+/// regardless of what else it carries. Keep it that way: a future field that
+/// influenced a wrap point would silently desynchronize consumers that wrap the
+/// same text through different instantiations — notably the caret movement map
+/// (`TextInputLayoutMapBuilder`, F140), which exists precisely so the map and
+/// the rendered rows cannot disagree.
+///
+/// - Parameter rowBudget: when non-`nil`, stop after emitting this many rows.
+///   The result is then exactly `prefix(rowBudget)` of the unbudgeted wrap:
+///   rows are flushed left to right and never revised once appended, so
+///   stopping early cannot change a row already produced. Values below 1 are
+///   clamped, keeping the "never returns an empty row list" postcondition that
+///   every caller relies on.
 package func wrapTextLineClusters<Cluster: TextWrappableCluster>(
   _ line: [Cluster],
   width: Int?,
-  wrappingStrategy: TextWrappingStrategy
+  wrappingStrategy: TextWrappingStrategy,
+  rowBudget: Int? = nil
 ) -> [[Cluster]] {
   guard let width else {
     return [line]
@@ -59,7 +108,8 @@ package func wrapTextLineClusters<Cluster: TextWrappableCluster>(
   case .wordBoundary:
     return wrapTextLineOnWordBoundaries(
       line,
-      width: width
+      width: width,
+      rowBudget: rowBudget.map { max(1, $0) }
     )
   }
 }
@@ -80,7 +130,8 @@ private struct TextWrapRun<Cluster: TextWrappableCluster> {
 
 private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
   _ clusters: [Cluster],
-  width: Int
+  width: Int,
+  rowBudget: Int?
 ) -> [[Cluster]] {
   let runs = textWrapRuns(in: clusters)
   var result: [[Cluster]] = []
@@ -88,6 +139,17 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
   var currentWidth = 0
   var pendingSeparator: [Cluster]?
   var isAtSourceLineStart = true
+
+  /// True once `result` holds every row the caller asked for. Rows only enter
+  /// `result` through a flush, and a flush leaves `currentClusters` empty, so
+  /// anything still unconsumed at that point could only land in row
+  /// `rowBudget` or later — rows the caller has said it will not read.
+  func isBudgetExhausted() -> Bool {
+    guard let rowBudget else {
+      return false
+    }
+    return result.count >= rowBudget
+  }
 
   func flushCurrentLine() {
     result.append(currentClusters)
@@ -97,6 +159,9 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
 
   func appendClusters(_ clusters: [Cluster]) {
     for cluster in clusters {
+      if isBudgetExhausted() {
+        return
+      }
       let clusterWidth = cluster.cellWidth
 
       if currentClusters.isEmpty {
@@ -133,7 +198,13 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
     }
 
     for line in lines.dropLast() {
+      if isBudgetExhausted() {
+        return
+      }
       result.append(line)
+    }
+    if isBudgetExhausted() {
+      return
     }
 
     let lastLine = lines.last!
@@ -168,8 +239,17 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
     }
 
     if isWordLike {
+      // Rows still wanted from this token: what the caller has left, minus the
+      // one `adoptWrappedLines` holds back in `currentClusters` — plus that
+      // held-back row itself, since it is `lines.last` rather than an appended
+      // one. Without this, a single unbroken multi-kilobyte token under
+      // `lineLimit(1)` would be split into thousands of marker-wrapped rows to
+      // show two.
+      let wordRowBudget = rowBudget.map { budget in
+        max(1, budget - result.count) + 1
+      }
       adoptWrappedLines(
-        wrapWordLikeClusters(clusters, width: width)
+        wrapWordLikeClusters(clusters, width: width, rowBudget: wordRowBudget)
       )
       return
     }
@@ -178,6 +258,9 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
   }
 
   for run in runs {
+    if isBudgetExhausted() {
+      break
+    }
     switch run.kind {
     case .whitespace:
       if isAtSourceLineStart {
@@ -204,11 +287,14 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
     }
   }
 
-  if let pendingSeparator {
+  if let pendingSeparator, !isBudgetExhausted() {
     appendClusters(pendingSeparator)
   }
 
-  if !currentClusters.isEmpty || result.isEmpty {
+  // The trailing partial row becomes row `result.count`. Under an exhausted
+  // budget that index is past what the caller asked for, so flushing it would
+  // overshoot rather than complete a prefix.
+  if !isBudgetExhausted(), !currentClusters.isEmpty || result.isEmpty {
     flushCurrentLine()
   }
 
@@ -259,10 +345,11 @@ private func textWrapRuns<Cluster: TextWrappableCluster>(
 
 private func wrapWordLikeClusters<Cluster: TextWrappableCluster>(
   _ clusters: [Cluster],
-  width: Int
+  width: Int,
+  rowBudget: Int? = nil
 ) -> [[Cluster]] {
   guard width >= 3 else {
-    return clusterWrappedLines(for: clusters, width: width)
+    return clusterWrappedLines(for: clusters, width: width, rowBudget: rowBudget)
   }
 
   let continuationMarker = Cluster.continuationMarker(character: "–", cellWidth: 1)
@@ -270,14 +357,28 @@ private func wrapWordLikeClusters<Cluster: TextWrappableCluster>(
   let middleLineContentWidth = width - (continuationMarker.cellWidth * 2)
 
   guard firstLineContentWidth > 0, middleLineContentWidth > 0 else {
-    return clusterWrappedLines(for: clusters, width: width)
+    return clusterWrappedLines(for: clusters, width: width, rowBudget: rowBudget)
   }
+
+  // The marker scan below is append-only EXCEPT for one path: a cluster too
+  // wide to start a middle line makes it abandon everything built so far and
+  // re-wrap the whole token through `clusterWrappedLines`. A budget that
+  // stopped before reaching such a cluster would therefore return rows the
+  // unbudgeted wrap never emits — a prefix violation, not merely less work.
+  // Ruling the case out up front (an integer scan, no rows materialized)
+  // restores the prefix property; when it cannot be ruled out the scan simply
+  // runs unbudgeted and stays correct.
+  let effectiveRowBudget =
+    clusters.allSatisfy { $0.cellWidth <= middleLineContentWidth } ? rowBudget : nil
 
   var remaining = clusters[...]
   var remainingCellWidth = sliceCellWidth(remaining)
   var lines: [[Cluster]] = []
 
   while !remaining.isEmpty {
+    if let effectiveRowBudget, lines.count >= effectiveRowBudget {
+      break
+    }
     if lines.isEmpty {
       let content = prefixByCellWidth(remaining, maxWidth: firstLineContentWidth)
       let contentCellWidth = sliceCellWidth(content[...])
@@ -348,11 +449,19 @@ private func sliceCellWidth<Cluster: TextWrappableCluster>(
 
 private func clusterWrappedLines<Cluster: TextWrappableCluster>(
   for clusters: [Cluster],
-  width: Int
+  width: Int,
+  rowBudget: Int? = nil
 ) -> [[Cluster]] {
   var result: [[Cluster]] = []
   var currentClusters: [Cluster] = []
   var currentWidth = 0
+
+  func isBudgetExhausted() -> Bool {
+    guard let rowBudget else {
+      return false
+    }
+    return result.count >= rowBudget
+  }
 
   func flushCurrentLine() {
     result.append(currentClusters)
@@ -361,6 +470,9 @@ private func clusterWrappedLines<Cluster: TextWrappableCluster>(
   }
 
   for cluster in clusters {
+    if isBudgetExhausted() {
+      break
+    }
     let clusterWidth = cluster.cellWidth
 
     if currentClusters.isEmpty {
@@ -386,7 +498,7 @@ private func clusterWrappedLines<Cluster: TextWrappableCluster>(
     currentWidth += clusterWidth
   }
 
-  if !currentClusters.isEmpty || result.isEmpty {
+  if !isBudgetExhausted(), !currentClusters.isEmpty || result.isEmpty {
     flushCurrentLine()
   }
 
