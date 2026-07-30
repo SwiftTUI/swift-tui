@@ -29,6 +29,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       authoringScope: dynamicPropertyScope
     )
     for iteration in iterations {
+      // Eager realization: counted on the same probe as the indexed-source
+      // path so one counter compares the windowed and eager forks directly.
+      IndexedChildRealizationProbe.recordRealization()
       resolved.append(
         contentsOf: iteration.resolveElements(
           content: content,

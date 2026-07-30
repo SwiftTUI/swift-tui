@@ -39,6 +39,31 @@ package enum IndexedChildSourceArtifactsProbe {
   }
 }
 
+/// Test instrumentation (the F118 probe pattern): counts how many distinct
+/// elements an indexed source actually *realizes* — resolves a child view
+/// for — during a pass. Realization dominates hosted-collection frame cost,
+/// so this is the counter that distinguishes a windowed collection (O(viewport)
+/// realizations) from one that collapsed to full-dataset realization. Cache
+/// hits are deliberately not counted: the per-source cache lives exactly one
+/// resolve, so a pass's miss count *is* its realized-row count. Increments
+/// compile out of release.
+@MainActor
+package enum IndexedChildRealizationProbe {
+  package private(set) static var realizedChildCount = 0
+
+  package static func recordRealization() {
+    #if DEBUG
+      realizedChildCount += 1
+    #endif
+  }
+
+  package static func reset() {
+    #if DEBUG
+      realizedChildCount = 0
+    #endif
+  }
+}
+
 /// The identity artifacts a `ForEachIndexedChildSource` retains across
 /// container resolves (F145): pure functions of (element ids, identity root,
 /// entity scope), adopted only when all three match, so a rebuilt source over
@@ -186,6 +211,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       }
 
       let realize = { [self] () -> ResolvedNode in
+        IndexedChildRealizationProbe.recordRealization()
         let dataIndex = data.index(data.startIndex, offsetBy: index)
         let element = data[dataIndex]
         let iteration = makeForEachIteration(
