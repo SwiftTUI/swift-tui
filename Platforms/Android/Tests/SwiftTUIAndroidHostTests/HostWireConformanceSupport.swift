@@ -549,7 +549,7 @@ struct HostWireConformanceRunnerDeclaration: Equatable {
   static let swiftAndroidABI = Self(id: .swiftAndroidABI, implementedStages: [.s3a])
   static let swiftWebSocketChannel = Self(
     id: .swiftWebSocketChannel,
-    implementedStages: []
+    implementedStages: [.s3b]
   )
 
   func requiredEntries(

@@ -203,7 +203,7 @@ retained the bytes.
 | Transport | Current ratchet |
 | --- | --- |
 | WASI browser | Capabilities and state are created with the transport. `present` encodes and mutates state, then synchronously writes the complete record to stdout. A write error can occur after the mutation; there is no acknowledgement. Reloading constructs a fresh transport. A parsed `resync` record mutates the existing state under its mutex. |
-| Localhost WebHost | `present` encodes and mutates state before enqueuing bytes on the asynchronous FIFO sink pump. Send completion and failure are observed later through `drain` or a subsequent enqueue. Every accepted `caps` declaration replaces all encoding state and begins a new connection epoch; `resync` instead repairs the current epoch under the same state mutex. |
+| Localhost WebHost | `present` encodes and mutates state before enqueuing bytes on the asynchronous FIFO sink pump. Send completion and failure are observed later through `drain` or a subsequent enqueue. An accepted `caps` declaration replaces all encoding state and begins a new connection epoch; `resync` instead repairs the current epoch under the same state mutex. Whether a record is *delivered* is a separate decision the channel makes from its connection phase — see [WebHost connection lifecycle](#webhost-connection-lifecycle). |
 | Host-managed Android | **Delivery-coupled.** Encoding is deferred to `copyLatestFrameBytes` and runs against a *candidate* copy of the encoding state. A size query for a newer sequence encodes and stores that candidate beside committed state; a copy serves the scratch its preceding size query measured — never a newer re-encode — and promotes candidate → committed only once bytes are written into the caller's buffer. An accepted resync drops the whole scratch, including any uncommitted candidate, so the next handshake re-encodes from repaired committed state. |
 
 The WASI and WebHost rows are encode-time epochs: a failed write, a failed
@@ -230,10 +230,13 @@ The ingress lifecycle differs by transport:
 - **WASI browser — construction only.** `SWIFTTUI_SURFACE_DELTA` is resolved
   once when the transport is built. Runtime `caps` input is deliberately
   ignored because reload creates a new in-process transport.
-- **Localhost WebHost — any time, every arrival is an epoch.** The browser
-  client intends to send one `caps:{"acceptsDeltaFrames":true}` record after
-  opening a socket, but the server accepts declarations at any time. Each
-  arrival clears the delta baseline and transmitted-image set.
+- **Localhost WebHost — once per connection, before any surface record.** The
+  browser client sends one `caps:{"acceptsDeltaFrames":true}` record after
+  opening a socket, and that is now the only accepted shape: the channel takes a
+  declaration from the current connection while it is still
+  pre-capabilities, and a second declaration on the same connection is not a new
+  epoch. An accepted declaration clears the delta baseline and transmitted-image
+  set, marks the session surface-active, and requests a refresh.
 - **Host-managed Android — before scene start only.** `declareCapabilities`
   rejects malformed declarations and declarations after start. The JNI bridge
   resolves the declaration symbol lazily, so a newer AAR against an older
@@ -316,6 +319,58 @@ structurally. Browser consumption applies the defaults above; Android retains
 focus, accessibility, and scaling strings, omits image format from its model,
 and applies host-side defaults.
 
+## WebHost connection lifecycle
+
+One scene input stream lives for the whole session; a client connection comes
+and goes beneath it. The channel is in one of four phases.
+
+| Phase | Surface records | Non-surface records | Scene input |
+| --- | --- | --- | --- |
+| `detached` | Dropped | Retained, bounded FIFO of 32 (oldest dropped at the cap) | Alive |
+| `pre-capabilities` | Dropped, observed as suppressed | Delivered, after the detached backlog is flushed in order | Alive |
+| `active` | Delivered | Delivered | Alive |
+| `terminal` | Dropped | Dropped | Finished |
+
+**Blank beats stale.** A surface record buffered while no client is attached is
+worthless to whoever attaches next: a delta names a baseline the fresh decoder
+does not have, and even a full frame belongs to the encoding epoch that ended
+with the previous client. Neither may become a fallback delivery. The
+reconnecting client's first surface record is the keyframe produced by its own
+declaration.
+
+**A client close is connection-local.** It transitions the channel to
+`detached` and must not finish the scene input continuation. Finishing it
+terminates `WebSocketInputReader` permanently, so a reattaching client's
+declaration could never be read and the session could never leave
+`pre-capabilities`. Only `shutdown()` finishes scene input, and
+`WebHostServerSession.stop()` calls it before the server stop handler on every
+path so no stop can omit it. `shutdown()` is idempotent: the second call is a
+no-op, and later attach, send, input, and close callbacks cannot reactivate or
+deliver.
+
+**Connection tokens.** Each `attach` takes the next monotonically increasing
+token. A `close` message, a capability declaration, or a parsed input record is
+accepted only while its token still names the current connection, so a callback
+arriving late from a replaced client cannot detach, activate, or inject input
+into its successor. Ordinary teardown of a connection the channel already
+retired is not counted as an ignored stale callback; an explicit stale `close`
+message is.
+
+**Inbound bytes are tagged, and refused in three places.** Scene input is a
+stream of `connectionOpened` / `bytes(token:)` / `connectionClosed` / `shutdown`
+events rather than raw chunks, and the reader owns parser state for exactly one
+connection:
+
+| Refusal point | Reason recorded | What it prevents |
+| --- | --- | --- |
+| Before parsing | `stale-at-ingress` (already superseded when it arrived) or `stale-at-consumption` (current on arrival, still queued when superseded) | A chunk in flight during a reconnect combining with the new client's bytes |
+| At `connectionOpened` | `connection-boundary` | The successor's first chunk completing a partial record the previous client left in the parser |
+| Before applying a parsed record | not recorded as a chunk; the record simply has no effect | A connection retiring while a parsed declaration or input event is in hand |
+
+A retired connection's receive loop deliberately outlives detachment so bytes
+already in flight are refused *with a reason* rather than vanishing.
+`shutdown()` cancels whatever is left.
+
 ## Android delivery-coupled commit
 
 The two-phase copy ABI is a size query (`outBuffer == nil`) followed by a copy.
@@ -364,7 +419,7 @@ forward-looking; the rows below describe only the state at this package's
 | S1 | Complete: every surface record carries an epoch and generation, deltas name their baseline generation, all three Swift host ingresses accept keyframe/image resync, and the sibling browser and Android decoders validate stamped baselines and emit deduplicated keyframe repairs. |
 | S2 | Resend-on-miss is complete: browser decode/cache misses enter bounded unresolved/request tracking, with overflow deferred and admitted IDs deduplicated until payload repair, disappearance, or epoch reset; Android bitmap-cache eviction requests selected IDs deduplicated until payload repair or epoch reset. Android treats a lazy-JNI old-host return of zero as unavailable rather than retrying it or treating an incidental keyframe as image repair. The wire still has no retained-image acknowledgement. |
 | S3a | Complete: the Android copy ABI encodes against a candidate and commits only when bytes are copied out. An abandoned size query, an undersized copy, or a commit landing mid-handshake leaves committed encoder state and accumulated damage intact. See [Android delivery-coupled commit](#android-delivery-coupled-commit). |
-| S3b | `WebHostSceneChannel` retains an unbounded detached output backlog and flushes it when a client attaches, before processing that client's capability declaration. Detached surface records can therefore precede the epoch reset intended for the new client. |
+| S3b | Complete: the detached backlog drops surface records and bounds the rest at 32; a client close is connection-local and leaves scene input alive; every connection carries a token that gates input, close, and capability callbacks; and session stop is the sole idempotent terminal transition. See [WebHost connection lifecycle](#webhost-connection-lifecycle). |
 | S3d | Every delta retransmits the complete accumulated style table. Measured style churn makes late-record cost grow with the epoch rather than with current damage. |
 | S3e | The browser/WASI shared input queue rejects a control record larger than its remaining 64 KiB capacity as one chunk. The paste route catches and reports the error but drops the whole logical paste. |
 

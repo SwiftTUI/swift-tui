@@ -35,6 +35,17 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     var pointerInputCapabilities: PointerInputCapabilities
     var encodingState: HostWireEncodingState
     var wireCapabilities: HostWireCapabilities
+    /// The most recent frame presented to this transport, retained so a
+    /// reconnecting client can be given a keyframe without waiting for the app
+    /// to produce one. An idle app produces none, and the pre-capabilities
+    /// session deliberately drops everything sent before the declaration, so
+    /// without this the reconnecting client would stay blank.
+    var lastPresentedFrame: RetainedFrame?
+  }
+
+  private enum RetainedFrame: Sendable {
+    case raster(RasterSurface)
+    case semantic(SemanticHostFrame)
   }
 
   private let state: Mutex<State>
@@ -63,7 +74,8 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
         graphicsCapabilities: .none,
         pointerInputCapabilities: .cellOnly,
         encodingState: HostWireCapabilities().negotiatedEncodingState(),
-        wireCapabilities: HostWireCapabilities()
+        wireCapabilities: HostWireCapabilities(),
+        lastPresentedFrame: nil
       )
     )
   }
@@ -83,7 +95,12 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
   /// for steady frames; undeclared clients keep today's full frames, byte
   /// for byte).
   ///
-  /// Ingress lifecycle: accepted at any time, and every arrival is an epoch.
+  /// Ingress lifecycle: once per connection, before any surface record is
+  /// deliverable. `WebHostSceneChannel.applyCapabilities` owns the gate — it
+  /// accepts a declaration only from the current connection while that
+  /// connection is still pre-capabilities, then re-anchors here, marks the
+  /// session surface-active, and requests a refresh. A second declaration on
+  /// the same connection is not a new epoch.
   package func declareCapabilities(
     _ capabilities: HostWireCapabilities
   ) {
@@ -99,6 +116,42 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     state.withLock { state in
       state.encodingState.requestResync(request)
     }
+  }
+
+  /// Re-encodes and sends the most recently presented frame, if there is one.
+  ///
+  /// Called by the channel immediately after a capability declaration
+  /// re-anchors the encoding state, so the record produced here is a full
+  /// keyframe in the new epoch — the first surface record the reconnecting
+  /// client is allowed to receive. A no-op before the first present.
+  package func requestSurfaceRefresh() {
+    let bytes = state.withLock { state -> [UInt8] in
+      guard let retained = state.lastPresentedFrame else {
+        return []
+      }
+      let background = state.renderStyle.appearance.backgroundColor
+      switch retained {
+      case .raster(let surface):
+        return Array(
+          WebSurfaceFrameEncoder.encode(
+            surface,
+            damage: nil,
+            fallbackBackground: background,
+            state: &state.encodingState
+          ).utf8)
+      case .semantic(let frame):
+        return Array(
+          WebSurfaceFrameEncoder.encode(
+            frame,
+            fallbackBackground: background,
+            state: &state.encodingState
+          ).utf8)
+      }
+    }
+    // A refresh is best-effort by construction: a transport already carrying a
+    // send failure has nothing useful to add by throwing from a capability
+    // declaration.
+    try? sendBytes(bytes)
   }
 
   package var surfaceSize: CellSize {
@@ -156,7 +209,8 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     _ surface: RasterSurface
   ) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
-      Array(
+      state.lastPresentedFrame = .raster(surface)
+      return Array(
         WebSurfaceFrameEncoder.encode(
           surface,
           damage: nil,
@@ -176,7 +230,8 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
   @discardableResult
   package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     let bytes = state.withLock { state in
-      Array(
+      state.lastPresentedFrame = .semantic(frame)
+      return Array(
         WebSurfaceFrameEncoder.encode(
           frame,
           fallbackBackground: state.renderStyle.appearance.backgroundColor,

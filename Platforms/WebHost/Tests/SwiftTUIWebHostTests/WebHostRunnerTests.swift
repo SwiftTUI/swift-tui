@@ -160,7 +160,9 @@ struct WebHostRunnerTests {
     }
 
     let session = await server.startedSession()
-    let output = await session.channel.attach(client: AsyncStream { _ in })
+    var clientContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
+    let client = AsyncStream<WebHostSocketMessage> { clientContinuation = $0 }
+    let output = await session.channel.attach(client: client)
     let recorder = WebSocketOutputRecorder()
     let outputTask = Task {
       for await message in output {
@@ -168,9 +170,17 @@ struct WebHostRunnerTests {
       }
     }
 
+    // A newly attached client is pre-capabilities: surface records are dropped
+    // until its declaration re-anchors the encoder. The browser client sends
+    // this record first on every socket, so the runner's reader is what turns
+    // the session surface-active.
+    clientContinuation?.yield(
+      .data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+
     await recorder.waitForSurfaceFrame()
 
     outputTask.cancel()
+    clientContinuation?.finish()
     await cancelAndDrain(task)
   }
 }

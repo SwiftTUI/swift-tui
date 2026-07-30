@@ -50,16 +50,28 @@ struct WebHostServerTests {
   @Test("WebSocket upgrade receives output and forwards input")
   func webSocketUpgradeReceivesOutputAndForwardsInput() async throws {
     try await withServer { session in
-      var chunks = session.channel.chunks().makeAsyncIterator()
+      var events = session.channel.inboundEvents().makeAsyncIterator()
       let webSocket = try WebSocketTestClient.connect(to: session.webSocketURL)
 
-      try await session.channel.send(Array("surface-frame".utf8))
+      // A non-surface record reaches a pre-capabilities client immediately;
+      // surface records wait for its capability declaration.
+      try await session.channel.send(Array("clipboard-record".utf8))
       let received = try webSocket.receiveMessage()
-      #expect(String(decoding: received, as: UTF8.self) == "surface-frame")
+      #expect(String(decoding: received, as: UTF8.self) == "clipboard-record")
+
+      guard case .connectionOpened(let openedToken) = try #require(await events.next()) else {
+        Issue.record("expected the attach to open a tagged connection")
+        return
+      }
+      #expect(openedToken == 1)
 
       try webSocket.sendBinary(Data("input-record".utf8))
-      let chunk = try #require(await chunks.next())
-      #expect(String(decoding: chunk, as: UTF8.self) == "input-record")
+      guard case .bytes(let token, let bytes) = try #require(await events.next()) else {
+        Issue.record("expected tagged inbound bytes")
+        return
+      }
+      #expect(token == openedToken)
+      #expect(String(decoding: bytes, as: UTF8.self) == "input-record")
 
       webSocket.close()
     }
@@ -79,55 +91,55 @@ struct WebHostServerTests {
     #expect(await iterator.next() == .close(code: 1009, reason: "too large"))
   }
 
-  @Test(
-    "[characterization D11] detached channel retains every surface record before attached input"
-  )
-  func detachedChannelRetainsEverySurfaceRecordBeforeAttachedInput() async throws {
+  @Test("a detached channel drops surface records and bounds the rest")
+  func detachedChannelDropsSurfaceRecordsAndBoundsTheRest() async throws {
+    // The D11 regression pin, inverted. Before S3b this queued all 100 stale
+    // surface records unboundedly and flushed them into the next client ahead
+    // of its capability declaration — records naming an epoch that ended with
+    // the previous client.
     let channel = WebHostSceneChannel()
-    let detachedRecords = (0..<100).map { sequence in
-      Array("\u{001E}surface:{\"sequence\":\(sequence)}\n".utf8)
+    for sequence in 0..<100 {
+      try await channel.send(Array("\u{001E}surface:{\"sequence\":\(sequence)}\n".utf8))
     }
-    for record in detachedRecords {
+    let overflowingNonSurface = (0..<(WebHostSceneChannel.detachedNonSurfaceBacklogLimit + 8))
+      .map { index in
+        Array("\u{001E}runtimeIssue:{\"index\":\(index)}\n".utf8)
+      }
+    for record in overflowingNonSurface {
       try await channel.send(record)
     }
 
-    let attachedInput = Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)
-    let inputProcessedClose = WebHostSocketMessage.close(
-      code: 4001,
-      reason: "after attached input"
-    )
+    let detachedObservations = await channel.consumeObservations()
+    #expect(detachedObservations.phase == .detached)
+    #expect(detachedObservations.suppressedSurfaceRecords.isEmpty)
+    #expect(
+      detachedObservations.detachedNonSurfaceBacklogCount
+        == WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
+
     let client = AsyncStream<WebHostSocketMessage> { continuation in
-      continuation.yield(.data(attachedInput))
-      continuation.yield(inputProcessedClose)
-      continuation.finish()
+      continuation.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
     }
-    var inputIterator = channel.chunks().makeAsyncIterator()
     let output = await channel.attach(client: client)
     var outputIterator = output.makeAsyncIterator()
-    var flushedRecords: [[UInt8]] = []
-    for _ in detachedRecords.indices {
+
+    // Only the newest bounded non-surface records survive, in order, and not
+    // one surface record among them.
+    var flushed: [[UInt8]] = []
+    for _ in 0..<WebHostSceneChannel.detachedNonSurfaceBacklogLimit {
       guard case .data(let bytes) = try #require(await outputIterator.next()) else {
-        Issue.record("expected detached data record")
+        Issue.record("expected a flushed non-surface record")
         return
       }
-      flushedRecords.append(bytes)
+      flushed.append(bytes)
     }
-    let closeAfterInputProcessing = try #require(await outputIterator.next())
-    let forwardedInput = try #require(await inputIterator.next())
+    #expect(flushed == overflowingNonSurface.suffix(flushed.count))
 
-    // Known defect D11: all 100 stale surface records remain queued while
-    // detached and are synchronously placed ahead of the newly attached
-    // client's input task. The client's close is an observable effect of that
-    // task, so finding it after every stale record pins the unsafe ordering.
-    // S3b bounds this queue and drops detached surfaces.
-    #expect(flushedRecords == detachedRecords)
-    #expect(closeAfterInputProcessing == inputProcessedClose)
-    #expect(forwardedInput == attachedInput)
-    print(
-      "[wire-epoch-sv][D11] detachedSurfaceRecords=\(flushedRecords.count) "
-        + "detachedSurfaceBytes=\(flushedRecords.reduce(0) { $0 + $1.count }) "
-        + "attachedInputBytes=\(forwardedInput.count)"
-    )
+    let attachedObservations = await channel.consumeObservations()
+    #expect(attachedObservations.phase == .preCapabilities)
+    #expect(attachedObservations.currentToken == 1)
+    #expect(attachedObservations.detachedNonSurfaceBacklogCount == 0)
+    #expect(attachedObservations.detachedNonSurfaceBacklogBytes == 0)
+    #expect(!attachedObservations.sceneInputFinished)
   }
 }
 

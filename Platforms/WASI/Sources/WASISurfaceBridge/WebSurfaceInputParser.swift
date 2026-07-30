@@ -22,6 +22,17 @@ package struct WebSurfaceInputParser {
 
   package init() {}
 
+  /// The bytes of a control record the parser is still holding, waiting for
+  /// its terminating newline. Empty when nothing is buffered.
+  ///
+  /// Exposed because parser fragments belong to exactly one connection: the
+  /// WebHost reader has to be able to see, and discard, a fragment left behind
+  /// when a client is replaced. Terminal input is never buffered here — `feed`
+  /// flushes the byte parser on every call.
+  package var bufferedCommandBytes: [UInt8] {
+    bufferedCommand ?? []
+  }
+
   package mutating func feed(
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {

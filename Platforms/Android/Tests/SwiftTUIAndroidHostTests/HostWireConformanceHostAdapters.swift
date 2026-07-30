@@ -253,18 +253,26 @@ struct HostWireConformanceAndroidABIRunner {
   }
 }
 
+/// Drives the real `WebHostSceneChannel`, `WebSocketInputReader`, and
+/// `WebSocketSurfaceTransport` for `kind: "websocket-channel"` fixtures.
+///
+/// Every observation comes from live channel or reader state. The one piece of
+/// harness machinery is the gated source: the fixture must be able to withhold
+/// `drainInput` so bytes stay queued across a reconnect, which is exactly the
+/// case that decides whether a chunk is stale at ingress or at consumption.
+/// The reader itself is unmodified production code — it sees the channel's real
+/// tagged events, in order.
 struct HostWireConformanceWebSocketChannelRunner {
   private let channel: WebHostSceneChannel
   private let transport: WebSocketSurfaceTransport
+  private let reader: WebSocketInputReader
+  private let gate: GatedInboundSource
   private let state: State
   private var clients: [Int: AsyncStream<WebHostSocketMessage>.Continuation] = [:]
   private var outputTasks: [Task<Void, Never>] = []
+  private var inputContinuation: AsyncStream<InputEvent>.Continuation?
   private var inputTask: Task<Void, Never>?
-  private var currentToken: Int? = 1
-  private var lastIssuedToken = 1
-  private var phase = "active"
   private var pendingCapsSends: Int?
-  private var capsAwaitingDrain = false
 
   private init() async {
     let channel = WebHostSceneChannel()
@@ -273,34 +281,49 @@ struct HostWireConformanceWebSocketChannelRunner {
       surfaceSize: .init(width: 1, height: 1),
       sink: channel
     )
+    let gate = GatedInboundSource(channel: channel)
+    gate.start()
     self.channel = channel
     self.state = state
     self.transport = transport
-    let controlHandler: @Sendable (WebSurfaceInputControlMessage) -> Void = { message in
+    self.gate = gate
+    let hooks = WebSocketInputReaderTestHooks(
+      parserStateDidChange: { token, bufferedBytes in
+        gate.recordParserState(token: token, bufferedBytes: bufferedBytes)
+      }
+    )
+    reader = WebSocketInputReader(source: gate, hooks: hooks) { message, token in
       switch message {
       case .resize(let size, let cellPixelSize):
-        state.recordControl()
         transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
       case .style(let style):
-        state.recordControl()
         transport.updateStyle(style)
       case .capabilities(let capabilities):
-        state.recordCapabilities()
-        transport.declareCapabilities(capabilities)
+        await channel.applyCapabilities(
+          token: token,
+          reanchor: { transport.declareCapabilities(capabilities) },
+          requestRefresh: { transport.requestSurfaceRefresh() }
+        )
       case .resync(let request):
-        state.recordControl()
         transport.requestResync(request)
       }
     }
-    let reader = WebSocketInputReader(source: channel, controlHandler: controlHandler)
-    let inputEvents = reader.inputEvents()
-    inputTask = Task {
-      for await _ in inputEvents {
-        state.recordAcceptedInput()
+    var continuation: AsyncStream<InputEvent>.Continuation?
+    let events = AsyncStream<InputEvent> { continuation = $0 }
+    inputContinuation = continuation
+    inputTask = Task { [state] in
+      for await event in events {
+        state.recordAcceptedInput(event)
       }
-      state.recordInputFinished()
     }
+    // The runner starts active on token 1 with its initial capability
+    // declaration already processed, an empty backlog, and empty observation
+    // logs — the fixture's first `closeClient` therefore names a live token 1.
     await attach(token: 1)
+    clients[1]?.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+    await drainReader()
+    _ = await channel.consumeObservations()
+    state.reset()
   }
 
   static func runActiveFixtures(
@@ -331,6 +354,8 @@ struct HostWireConformanceWebSocketChannelRunner {
 
   private mutating func stop() {
     inputTask?.cancel()
+    inputContinuation?.finish()
+    gate.stop()
     for task in outputTasks { task.cancel() }
     for continuation in clients.values { continuation.finish() }
   }
@@ -353,37 +378,27 @@ struct HostWireConformanceWebSocketChannelRunner {
         try await apply(action, context: context)
       case .emit(let raw):
         try await channel.send(Array(raw.utf8))
-        if raw.hasPrefix("\u{001E}surface:"), phase == "pre-capabilities",
-          let remaining = pendingCapsSends
-        {
+        await settle()
+        if raw.hasPrefix("\u{001E}surface:"), let remaining = pendingCapsSends {
           let next = remaining - 1
           pendingCapsSends = next == 0 ? nil : next
           if next == 0 {
-            capsAwaitingDrain = true
             try enqueueCapsForCurrentClient(context: context)
           }
         }
-        await settle()
       case .reconnect(let capsAfter):
-        guard currentToken == nil, let capsAfter else {
+        guard await channel.currentConnectionToken() == nil, let capsAfter else {
           throw HostWireConformanceError.invalid("\(context): invalid reconnect")
         }
-        lastIssuedToken += 1
-        currentToken = lastIssuedToken
-        phase = "pre-capabilities"
+        let token = await nextToken()
+        await attach(token: token)
         pendingCapsSends = capsAfter == 0 ? nil : capsAfter
-        capsAwaitingDrain = capsAfter == 0
-        await attach(token: lastIssuedToken)
         if capsAfter == 0 {
           try enqueueCapsForCurrentClient(context: context)
         }
       case .expect(let expected):
         await settle()
-        let actual = try state.consumeObservation(
-          currentToken: currentToken,
-          lastIssuedToken: lastIssuedToken,
-          phase: phase
-        )
+        let actual = try await consumeObservation()
         observations.append(actual)
         if comparesExpectations {
           try HostWireConformanceExactComparator.requireEqual(
@@ -416,14 +431,9 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard let client = clients[token] else {
         throw HostWireConformanceError.invalid("\(context): unknown client token")
       }
-      client.yield(.normalClose)
-      if token == currentToken {
-        currentToken = nil
-        phase = "detached"
-        pendingCapsSends = nil
-        capsAwaitingDrain = false
-      }
-      await settle()
+      // Routed through the real receive path: only the channel decides whether
+      // this close detaches or is an ignored stale callback.
+      try await deliverToChannel { client.yield(.normalClose) }
     case "clientChunk":
       let token = try requiredInteger(object, "token", context: context)
       guard let client = clients[token], let encoded = object["bytesBase64"] else {
@@ -433,20 +443,37 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard let bytes = Data(base64Encoded: base64).map(Array.init) else {
         throw HostWireConformanceError.invalid("\(context): malformed bytesBase64")
       }
-      if token == currentToken {
-        state.enqueueInputCandidate(String(decoding: bytes, as: UTF8.self))
-      }
-      client.yield(.data(bytes))
-      await settle()
+      try await deliverToChannel { client.yield(.data(bytes)) }
     case "drainInput":
-      await settle()
-      if capsAwaitingDrain, state.capsProcessedCount() > 0 {
-        capsAwaitingDrain = false
-        phase = "active"
-      }
+      await drainReader()
     default:
       throw HostWireConformanceError.invalid("\(context): unsupported channel action \(name)")
     }
+  }
+
+  /// Performs a client-side yield and returns once the channel has handled it.
+  ///
+  /// Condition-based, not yield-count-based: the message crosses a real receive
+  /// task, and a fixed turn budget makes the fixture pass or fail on machine
+  /// load rather than on behavior.
+  private func deliverToChannel(
+    _ yieldMessage: () -> Void
+  ) async throws {
+    let before = await channel.processedInboundCallbackCount()
+    yieldMessage()
+    for _ in 0..<8_192 {
+      if await channel.processedInboundCallbackCount() > before {
+        await settle()
+        return
+      }
+      await Task.yield()
+    }
+    throw HostWireConformanceError.invalid(
+      "channel never handled a delivered client message")
+  }
+
+  private func nextToken() async -> Int {
+    Int(await channel.lastIssuedConnectionToken()) + 1
   }
 
   private mutating func attach(
@@ -471,10 +498,20 @@ struct HostWireConformanceWebSocketChannelRunner {
   private func enqueueCapsForCurrentClient(
     context: String
   ) throws {
-    guard let token = currentToken, let client = clients[token] else {
+    guard let token = clients.keys.max(), clients[token] != nil else {
       throw HostWireConformanceError.invalid("\(context): caps scheduler has no current client")
     }
-    client.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+    clients[token]?.yield(
+      .data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+  }
+
+  /// Advances the real reader over every queued tagged event to quiescence.
+  private func drainReader() async {
+    guard let inputContinuation else { return }
+    while let event = await gate.take() {
+      await reader.process(event, yielding: inputContinuation)
+      await settle()
+    }
   }
 
   private func settle() async {
@@ -504,17 +541,144 @@ struct HostWireConformanceWebSocketChannelRunner {
     return try value.integer(context: "\(context).\(key)")
   }
 
+  private func consumeObservation() async throws -> HostWireConformanceJSON {
+    let channelObservations = await channel.consumeObservations()
+    let adapterObservations = state.consume()
+    let delivered = try adapterObservations.delivered.map {
+      try HostWireConformanceRecordDecoding.conformanceJSON(
+        from: HostWireConformanceRecordDecoding.channelRecord(raw: $0),
+        context: "channel delivered observation"
+      )
+    }
+    let suppressed = try channelObservations.suppressedSurfaceRecords.map {
+      try HostWireConformanceRecordDecoding.conformanceJSON(
+        from: HostWireConformanceRecordDecoding.channelRecord(
+          raw: String(decoding: $0, as: UTF8.self)),
+        context: "channel suppressed observation"
+      )
+    }
+    let discarded: [HostWireConformanceJSON] = channelObservations.discardedInboundChunks.map {
+      .object([
+        "token": .integer(Int($0.token)),
+        "bytesBase64": .string(Data($0.bytes).base64EncodedString()),
+        "reason": .string($0.reason.rawValue),
+      ])
+    }
+    let parser = await gate.parserObservation()
+    return .object([
+      "deliveredRecords": .array(delivered),
+      "suppressedSurfaceRecords": .array(suppressed),
+      "detachedNonSurfaceBacklog": .object([
+        "count": .integer(channelObservations.detachedNonSurfaceBacklogCount),
+        "bytes": .integer(channelObservations.detachedNonSurfaceBacklogBytes),
+      ]),
+      "refreshRequestCount": .integer(channelObservations.refreshRequestCount),
+      "capsProcessedCount": .integer(channelObservations.capsProcessedCount),
+      "ignoredStaleCallbackCount": .integer(channelObservations.ignoredStaleCallbackCount),
+      "acceptedClientInputs": .array(
+        adapterObservations.acceptedInputs.map(HostWireConformanceJSON.string)),
+      "discardedInboundChunks": .array(discarded),
+      "parser": .object([
+        "token": parser.token.map(HostWireConformanceJSON.integer) ?? .null,
+        "bufferedBytes": .integer(parser.bufferedBytes),
+      ]),
+      "connection": .object([
+        "currentToken": channelObservations.currentToken.map {
+          HostWireConformanceJSON.integer(Int($0))
+        } ?? .null,
+        "lastIssuedToken": .integer(Int(channelObservations.lastIssuedToken)),
+        "phase": .string(channelObservations.phase.rawValue),
+        "sceneInputFinished": .bool(channelObservations.sceneInputFinished),
+      ]),
+    ])
+  }
+
+  /// Buffers the channel's real tagged events so a fixture can withhold
+  /// `drainInput`, and records the reader's parser observations.
+  private final class GatedInboundSource: WebHostByteSource, Sendable {
+    private struct Storage {
+      var queued: [WebHostInboundEvent] = []
+      var parserToken: Int?
+      var parserBufferedBytes = 0
+    }
+
+    private let channel: WebHostSceneChannel
+    private let storage = Mutex(Storage())
+    private let pumpTask = Mutex<Task<Void, Never>?>(nil)
+
+    init(channel: WebHostSceneChannel) {
+      self.channel = channel
+    }
+
+    /// Begins buffering the channel's tagged events. Separate from `init` so
+    /// the pump task captures the finished gate rather than a `Mutex`, which is
+    /// noncopyable and cannot cross into an escaping closure.
+    func start() {
+      let events = channel.inboundEvents()
+      pumpTask.withLock { task in
+        task = Task { [self] in
+          for await event in events {
+            enqueue(event)
+          }
+        }
+      }
+    }
+
+    func stop() {
+      pumpTask.withLock { task in
+        task?.cancel()
+        task = nil
+      }
+    }
+
+    private func enqueue(
+      _ event: WebHostInboundEvent
+    ) {
+      storage.withLock { $0.queued.append(event) }
+    }
+
+    func take() async -> WebHostInboundEvent? {
+      storage.withLock { storage in
+        storage.queued.isEmpty ? nil : storage.queued.removeFirst()
+      }
+    }
+
+    func recordParserState(
+      token: UInt64?,
+      bufferedBytes: Int
+    ) {
+      storage.withLock { storage in
+        storage.parserToken = token.map(Int.init)
+        storage.parserBufferedBytes = bufferedBytes
+      }
+    }
+
+    func parserObservation() async -> (token: Int?, bufferedBytes: Int) {
+      storage.withLock { ($0.parserToken, $0.parserBufferedBytes) }
+    }
+
+    func inboundEvents() -> AsyncStream<WebHostInboundEvent> {
+      // The reader is stepped explicitly through `process`, so this stream is
+      // never consumed; returning an empty one keeps the protocol honest.
+      AsyncStream { $0.finish() }
+    }
+
+    func currentConnectionToken() async -> UInt64? {
+      await channel.currentConnectionToken()
+    }
+
+    func recordDiscardedInboundChunk(
+      _ chunk: WebHostDiscardedInboundChunk
+    ) async {
+      await channel.recordDiscardedInboundChunk(chunk)
+    }
+  }
+
   private final class State: Sendable {
     private struct Storage {
       var activityCount = 0
       var delivered: [String] = []
       var acceptedInputs: [String] = []
-      var inputCandidates: [String] = []
-      var discarded: [(token: Int, bytes: [UInt8], reason: String)] = []
-      var refreshRequestCount = 0
-      var capsProcessedCount = 0
-      var ignoredStaleCallbackCount = 0
-      var inputFinished = false
     }
 
     private let storage = Mutex(Storage())
@@ -530,99 +694,61 @@ struct HostWireConformanceWebSocketChannelRunner {
       }
     }
 
-    func enqueueInputCandidate(_ raw: String) {
-      guard raw.hasPrefix("\u{001E}key:") else { return }
+    /// Records an accepted input event as the wire record it must have come
+    /// from. Derived from the event itself rather than paired against a
+    /// submission, so a stale chunk that was never parsed cannot be
+    /// misattributed to a later accepted one.
+    func recordAcceptedInput(_ event: InputEvent) {
       storage.withLock {
-        $0.inputCandidates.append(raw)
+        $0.acceptedInputs.append(Self.record(for: event))
         $0.activityCount += 1
       }
     }
 
-    func recordAcceptedInput() {
-      storage.withLock {
-        if !$0.inputCandidates.isEmpty {
-          $0.acceptedInputs.append($0.inputCandidates.removeFirst())
+    private static func record(
+      for event: InputEvent
+    ) -> String {
+      switch event {
+      case .key(let press):
+        switch press.key {
+        case .character(let character):
+          return "\u{001E}key:character:\(percentEncoded(character)):\(press.modifiers.rawValue)\n"
+        default:
+          return "\u{001E}key:\(press.key):\(press.modifiers.rawValue)\n"
         }
-        $0.activityCount += 1
+      case .paste(let paste):
+        return "\u{001E}paste:\(paste.content)\n"
+      case .mouse, .drop:
+        return "\u{001E}unsupported-observation\n"
       }
     }
 
-    func recordControl() {
+    private static func percentEncoded(
+      _ character: Character
+    ) -> String {
+      let unreserved = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~")
+      guard !unreserved.contains(character) else {
+        return String(character)
+      }
+      return String(character).utf8
+        .map { String(format: "%%%02X", $0) }
+        .joined()
+    }
+
+    func reset() {
       storage.withLock {
-        $0.activityCount += 1
+        $0.delivered.removeAll()
+        $0.acceptedInputs.removeAll()
       }
     }
 
-    func recordCapabilities() {
-      storage.withLock {
-        $0.capsProcessedCount += 1
-        $0.activityCount += 1
-      }
-    }
-
-    func capsProcessedCount() -> Int {
-      storage.withLock(\.capsProcessedCount)
-    }
-
-    func recordInputFinished() {
-      storage.withLock {
-        $0.inputFinished = true
-        $0.activityCount += 1
-      }
-    }
-
-    func consumeObservation(
-      currentToken: Int?,
-      lastIssuedToken: Int,
-      phase: String
-    ) throws -> HostWireConformanceJSON {
-      let snapshot = storage.withLock { storage -> Storage in
-        let snapshot = storage
+    func consume() -> (delivered: [String], acceptedInputs: [String]) {
+      storage.withLock { storage in
+        let snapshot = (storage.delivered, storage.acceptedInputs)
         storage.delivered.removeAll(keepingCapacity: true)
         storage.acceptedInputs.removeAll(keepingCapacity: true)
-        storage.discarded.removeAll(keepingCapacity: true)
-        storage.refreshRequestCount = 0
-        storage.capsProcessedCount = 0
-        storage.ignoredStaleCallbackCount = 0
         return snapshot
       }
-      let delivered = try snapshot.delivered.map {
-        try HostWireConformanceRecordDecoding.conformanceJSON(
-          from: HostWireConformanceRecordDecoding.channelRecord(raw: $0),
-          context: "channel delivered observation"
-        )
-      }
-      let discarded: [HostWireConformanceJSON] = snapshot.discarded.map {
-        .object([
-          "token": .integer($0.token),
-          "bytesBase64": .string(Data($0.bytes).base64EncodedString()),
-          "reason": .string($0.reason),
-        ])
-      }
-      let parserToken = snapshot.inputFinished ? nil : currentToken
-      return .object([
-        "deliveredRecords": .array(delivered),
-        "suppressedSurfaceRecords": .array([]),
-        "detachedNonSurfaceBacklog": .object([
-          "count": .integer(0),
-          "bytes": .integer(0),
-        ]),
-        "refreshRequestCount": .integer(snapshot.refreshRequestCount),
-        "capsProcessedCount": .integer(snapshot.capsProcessedCount),
-        "ignoredStaleCallbackCount": .integer(snapshot.ignoredStaleCallbackCount),
-        "acceptedClientInputs": .array(snapshot.acceptedInputs.map(HostWireConformanceJSON.string)),
-        "discardedInboundChunks": .array(discarded),
-        "parser": .object([
-          "token": parserToken.map(HostWireConformanceJSON.integer) ?? .null,
-          "bufferedBytes": .integer(0),
-        ]),
-        "connection": .object([
-          "currentToken": currentToken.map(HostWireConformanceJSON.integer) ?? .null,
-          "lastIssuedToken": .integer(lastIssuedToken),
-          "phase": .string(phase),
-          "sceneInputFinished": .bool(snapshot.inputFinished),
-        ]),
-      ])
     }
   }
 }

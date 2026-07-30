@@ -38,7 +38,15 @@ package struct WebHostServerSession: Sendable {
     self.stopHandler = stopHandler
   }
 
+  /// Stops the session, terminating the channel first.
+  ///
+  /// Channel shutdown lives here rather than in each server's stop handler so
+  /// no stop path can omit it: a stop that left the channel alive would leak
+  /// the reader and output tasks and leave the scene input continuation
+  /// unfinished forever. It runs *before* the server stops, so no client can
+  /// attach into a channel the session is tearing down.
   package func stop() async {
+    await channel.shutdown()
     await stopHandler()
   }
 
@@ -79,93 +87,6 @@ package enum WebHostServerError: Error, Equatable, Sendable, CustomStringConvert
     case .unableToDetermineListeningPort:
       return "Unable to determine WebHost listening port."
     }
-  }
-}
-
-package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
-  nonisolated let inputStream: AsyncStream<[UInt8]>
-
-  private let inputContinuation: AsyncStream<[UInt8]>.Continuation
-  private var outputContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
-  private var pendingOutput: [WebHostSocketMessage] = []
-  private var activeConnectionID: UInt64 = 0
-
-  package init() {
-    var continuation: AsyncStream<[UInt8]>.Continuation?
-    inputStream = AsyncStream { continuation = $0 }
-    inputContinuation = continuation!
-  }
-
-  package nonisolated func chunks() -> AsyncStream<[UInt8]> {
-    inputStream
-  }
-
-  package func send(_ bytes: [UInt8]) async throws {
-    let message = WebHostSocketMessage.data(bytes)
-    if let outputContinuation {
-      outputContinuation.yield(message)
-    } else {
-      pendingOutput.append(message)
-    }
-  }
-
-  package func attach(
-    client: AsyncStream<WebHostSocketMessage>
-  ) -> AsyncStream<WebHostSocketMessage> {
-    activeConnectionID += 1
-    let connectionID = activeConnectionID
-
-    if let previous = outputContinuation {
-      previous.yield(.normalClose)
-      previous.finish()
-      outputContinuation = nil
-    }
-
-    return AsyncStream { continuation in
-      outputContinuation = continuation
-      for message in pendingOutput {
-        continuation.yield(message)
-      }
-      pendingOutput.removeAll(keepingCapacity: true)
-
-      let task = Task {
-        for await message in client {
-          self.receive(message)
-        }
-        self.detach(connectionID: connectionID)
-      }
-
-      continuation.onTermination = { _ in
-        task.cancel()
-        Task {
-          await self.detach(connectionID: connectionID)
-        }
-      }
-    }
-  }
-
-  private func receive(
-    _ message: WebHostSocketMessage
-  ) {
-    switch message {
-    case .text(let text):
-      inputContinuation.yield(Array(text.utf8))
-    case .data(let bytes):
-      inputContinuation.yield(bytes)
-    case .close(let code, let reason):
-      outputContinuation?.yield(.close(code: code, reason: reason))
-      inputContinuation.finish()
-      outputContinuation?.finish()
-    }
-  }
-
-  private func detach(
-    connectionID: UInt64
-  ) {
-    guard activeConnectionID == connectionID else {
-      return
-    }
-    outputContinuation = nil
   }
 }
 

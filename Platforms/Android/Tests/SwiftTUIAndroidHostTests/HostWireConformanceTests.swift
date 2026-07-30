@@ -22,8 +22,8 @@ struct HostWireConformanceTests {
     }
   }
 
-  @Test("manifest census is exact and the S3b host adapter is inactive but parseable")
-  func manifestCensusIsExactAndFutureHostAdaptersAreInactive() throws {
+  @Test("manifest census is exact and every host adapter owns its stage")
+  func manifestCensusIsExactAndEveryHostAdapterOwnsItsStage() throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
     #expect(corpus.manifest.formatVersion == 1)
@@ -34,16 +34,13 @@ struct HostWireConformanceTests {
     let declarations: [HostWireConformanceRunnerDeclaration] = [
       .swiftAndroidABI, .swiftWebSocketChannel,
     ]
-    // S3a landed: the Android ABI runner now owns its census. S3b has not.
+    // S3a and S3b have both landed, so no host fixture is inactive: an
+    // unaccounted fixture is a failure, not a silent skip.
+    #expect(declarations.map(\.implementedStages) == [[.s3a], [.s3b]])
+    #expect(declarations.allSatisfy { $0.inactiveEntries(in: corpus.manifest).isEmpty })
     #expect(
-      declarations.map(\.implementedStages) == [[.s3a], []])
-    let inactive = declarations.flatMap { $0.inactiveEntries(in: corpus.manifest) }
-    #expect(inactive.map(\.requiresStage) == [.s3b])
-    #expect(inactive.map(\.kind) == [.websocketChannel])
-    #expect(inactive.map(\.runners) == [[.swiftWebSocketChannel]])
-    for entry in inactive {
-      #expect(corpus.fixtures[entry.file]?.steps.isEmpty == false)
-    }
+      declarations.map { $0.requiredEntries(in: corpus.manifest).map(\.requiresStage) }
+        == [[.s3a], [.s3b]])
   }
 
   @MainActor
@@ -64,30 +61,18 @@ struct HostWireConformanceTests {
       ).isEmpty)
   }
 
-  @Test("inactive WebSocket adapter interprets real channel and input seams")
-  func inactiveWebSocketAdapterInterpretsRealChannelAndInputSeams() async throws {
+  @Test("swift-websocket-channel executes the S3b detached-backlog scenario")
+  func webSocketChannelRunnerExecutesDetachedBacklogScenario() async throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
+    let executed = try await HostWireConformanceWebSocketChannelRunner.runActiveFixtures(
+      corpus)
+    #expect(executed == ["websocket-detached-backlog-reconnects-by-token"])
     #expect(
-      try await HostWireConformanceWebSocketChannelRunner.runActiveFixtures(corpus) == [])
-    let fixture = try #require(
-      corpus.fixtures["conformance-websocket-detached-backlog.jsonl"])
-    let observations =
-      try await HostWireConformanceWebSocketChannelRunner.observeInactiveFixture(fixture)
-    #expect(observations.count == 1)
-    let observation = try #require(observations.first)
-    guard case .object(let object) = observation else {
-      Issue.record("WebSocket adapter did not build its channel observation")
-      return
-    }
-    #expect(
-      Set(object.keys) == [
-        "deliveredRecords", "suppressedSurfaceRecords", "detachedNonSurfaceBacklog",
-        "refreshRequestCount", "capsProcessedCount", "ignoredStaleCallbackCount",
-        "acceptedClientInputs", "discardedInboundChunks", "parser", "connection",
-      ])
-    #expect(
-      try object["deliveredRecords"]?.array(context: "adapter.delivered").isEmpty == false)
+      executed
+        == HostWireConformanceRunnerDeclaration.swiftWebSocketChannel.requiredEntries(
+          in: corpus.manifest
+        ).map(\.scenario))
   }
 
   @Test("swift-reference executes every applicable S1 and S2 scenario")
@@ -586,8 +571,8 @@ struct HostWireConformanceTests {
     }
   }
 
-  @Test("inactive WebSocket channel expectation axes are exact")
-  func inactiveWebSocketChannelExpectationMetaTestsHaveTeeth() throws {
+  @Test("WebSocket channel expectation axes are exact")
+  func webSocketChannelExpectationMetaTestsHaveTeeth() throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
     let expected = try Self.expectation(

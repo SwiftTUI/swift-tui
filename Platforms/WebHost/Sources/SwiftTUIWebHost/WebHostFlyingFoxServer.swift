@@ -108,6 +108,7 @@ package struct WebHostFlyingFoxServer: WebHostServer {
     do {
       try await server.waitUntilListening()
       guard let port = await selectedPort(from: server) else {
+        await channel.shutdown()
         await server.stop()
         serverTask.cancel()
         throw WebHostServerError.unableToDetermineListeningPort
@@ -130,6 +131,7 @@ package struct WebHostFlyingFoxServer: WebHostServer {
         }
       )
     } catch {
+      await channel.shutdown()
       await server.stop()
       serverTask.cancel()
       throw error
