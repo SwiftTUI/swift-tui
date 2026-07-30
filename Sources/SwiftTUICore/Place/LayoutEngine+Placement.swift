@@ -67,6 +67,8 @@ extension LayoutEngine {
     switch resolved.drawPayload {
     case .list(let payload):
       return payload.style.viewportBackedListContentBounds(for: payload, in: bounds)
+    case .table(let payload):
+      return DrawExtractor().viewportBackedTableContentBounds(for: payload, in: bounds)
     default:
       return nil
     }

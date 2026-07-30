@@ -181,6 +181,52 @@ extension DrawExtractor {
     return commands
   }
 
+  /// Chrome display lines a table draws above and below its body.
+  ///
+  /// The arithmetic form of what ``materializedTableLines(for:widths:)`` emits
+  /// for a row-less payload: a top border, the header and its rule when the
+  /// table shows headers, and a bottom border. Structural, not stylistic — a
+  /// border glyph set that renders as blank still occupies its line, which is
+  /// why ``measuredTableIdealSize(for:)`` counts the same cells.
+  package func tableChromeLineCounts(
+    for payload: TablePayload
+  ) -> (top: Int, bottom: Int) {
+    (top: 1 + (payload.showsHeaders ? 2 : 0), bottom: 1)
+  }
+
+  /// The rect a viewport-backed table lays its body rows into: its bounds
+  /// minus the header and border chrome. `nil` for payloads whose line model
+  /// is materialized, where the same answer is not O(1).
+  ///
+  /// Scroll routing publishes this as the collection's viewport instead of the
+  /// node's full bounds, for the same reason
+  /// ``CollectionStylePresentation/viewportBackedListContentBounds(for:in:)``
+  /// does: publishing the full bounds makes every scroll consumer believe two
+  /// to four more rows are visible than are drawn — a table's chrome is
+  /// thicker than a list's — so reveal-shaped decisions fire while the target
+  /// is still on screen.
+  ///
+  /// The overflow-indicator lines are deliberately NOT subtracted here: they
+  /// live inside this rect, and the body-window arithmetic in
+  /// ``viewportBackedVisibleTableLines(for:viewportLineCount:showsIndicators:widths:)``
+  /// takes exactly this height as its input.
+  package func viewportBackedTableContentBounds(
+    for payload: TablePayload,
+    in bounds: CellRect
+  ) -> CellRect? {
+    guard payload.isViewportBacked else {
+      return nil
+    }
+    let chrome = tableChromeLineCounts(for: payload)
+    return CellRect(
+      origin: .init(x: bounds.origin.x, y: bounds.origin.y + chrome.top),
+      size: .init(
+        width: bounds.size.width,
+        height: max(0, bounds.size.height - chrome.top - chrome.bottom)
+      )
+    )
+  }
+
   /// The visible display lines for `payload` inside `bounds`, with each line's
   /// height and content-relative `yOffset` resolved.
   ///
