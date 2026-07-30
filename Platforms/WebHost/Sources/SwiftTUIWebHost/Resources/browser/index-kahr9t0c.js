@@ -607,6 +607,10 @@ class WebHostOutputDecoder {
     if (!baseline) {
       return;
     }
+    const styles = this.materializeDeltaStyles(frame, baseline);
+    if (!styles) {
+      return;
+    }
     const rows = baseline.rows.slice();
     for (const [row, cells] of frame.deltaRows) {
       if (!Number.isSafeInteger(row) || row < 0 || row >= frame.height) {
@@ -621,7 +625,7 @@ class WebHostOutputDecoder {
       sequence: frame.sequence,
       width: frame.width,
       height: frame.height,
-      styles: frame.styles,
+      styles,
       rows,
       images: frame.images,
       damage: frame.damage,
@@ -634,6 +638,15 @@ class WebHostOutputDecoder {
       preferredGridWidth: frame.preferredGridWidth,
       preferredGridHeight: frame.preferredGridHeight
     };
+  }
+  materializeDeltaStyles(frame, baseline) {
+    if (frame.stylesBase === undefined) {
+      return frame.styles;
+    }
+    if (frame.stylesBase !== baseline.styles.length) {
+      return;
+    }
+    return baseline.styles.concat(frame.styles);
   }
 }
 function boundedImageResyncIds(sortedIds, maximumEncodedBytes) {
@@ -706,7 +719,7 @@ function encodeRenderStyleControlMessage(style) {
 `);
 }
 function encodeCapabilitiesControlMessage() {
-  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true}
+  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true}
 `);
 }
 function encodeResyncControlMessage(request) {
@@ -758,7 +771,7 @@ function isWebHostSurfaceDeltaFrame(value) {
     return false;
   }
   const frame = value;
-  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
 }
 function hasValidAdditiveFrameFields(frame) {
   return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
