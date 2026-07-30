@@ -37,10 +37,15 @@ struct RealTerminalJourneySupportTests {
       ) { _ in true }
       Issue.record("expected an expired deadline to time out")
     } catch let error as RealTerminalJourneyError {
-      guard case .timedOut = error else {
+      guard case .timedOut(_, let transcript) = error else {
         Issue.record("expected timedOut, got \(error)")
         return
       }
+      // A silent host must be distinguishable from one that wrote only
+      // invisible control sequences; both render a blank screen.
+      #expect(transcript.byteCount == 0)
+      #expect(transcript.tail.isEmpty)
+      #expect(error.description.contains("wrote 0 bytes"))
     }
   }
 
@@ -70,13 +75,19 @@ struct RealTerminalJourneySupportTests {
       ) { _ in false }
       Issue.record("expected continuous output to time out")
     } catch let error as RealTerminalJourneyError {
-      guard case .timedOut = error else {
+      guard case .timedOut(_, let transcript) = error else {
         Issue.record("expected timedOut, got \(error)")
         writer.cancel()
         pty.close()
         _ = await writer.value
         return
       }
+      // The counterpart to the silent case: a host that did write is reported
+      // as such, and the retained tail stays bounded under a flood.
+      #expect(transcript.byteCount > 0)
+      #expect(!transcript.tail.isEmpty)
+      #expect(transcript.tail.count <= 512)
+      #expect(!error.description.contains("wrote 0 bytes"))
     }
 
     writer.cancel()

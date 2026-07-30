@@ -8,13 +8,65 @@ import Synchronization
   import Glibc
 #endif
 
+/// What actually arrived on the PTY while a wait was running.
+///
+/// A blank rendered screen is ambiguous on its own: the host may have written
+/// nothing at all, or it may have written control sequences that produced no
+/// visible glyphs. Separating those two cases is the first question worth
+/// asking when a journey times out, and it is not recoverable after the fact —
+/// the visible-screen projection has already discarded the evidence.
+@_spi(Testing) public struct PTYByteTranscript: Sendable {
+  /// Every byte read during the wait, including ones that produced no glyph.
+  @_spi(Testing) public private(set) var byteCount = 0
+  /// The most recent bytes, bounded so a chatty host cannot flood a failure.
+  @_spi(Testing) public private(set) var tail: [UInt8] = []
+
+  private static let tailByteBudget = 512
+
+  @_spi(Testing) public init() {}
+
+  mutating func append(_ bytes: [UInt8]) {
+    guard !bytes.isEmpty else { return }
+    byteCount += bytes.count
+    tail.append(contentsOf: bytes)
+    if tail.count > Self.tailByteBudget {
+      tail.removeFirst(tail.count - Self.tailByteBudget)
+    }
+  }
+
+  /// The tail rendered so control bytes survive a CI log verbatim.
+  @_spi(Testing) public var escapedTail: String {
+    var escaped = ""
+    for byte in tail {
+      switch byte {
+      case 0x1B: escaped += "\\e"
+      case 0x0A: escaped += "\\n"
+      case 0x0D: escaped += "\\r"
+      case 0x09: escaped += "\\t"
+      case 0x5C: escaped += "\\\\"
+      case 0x20...0x7E: escaped.append(Character(UnicodeScalar(byte)))
+      default: escaped += "\\x" + String(byte, radix: 16, uppercase: true)
+      }
+    }
+    return escaped
+  }
+
+  var summary: String {
+    guard byteCount > 0 else {
+      return "the host wrote 0 bytes to the PTY during the wait"
+    }
+    let elided = byteCount > tail.count ? " (last \(tail.count) of them)" : ""
+    return "the host wrote \(byteCount) bytes to the PTY\(elided):\n\(escapedTail)"
+  }
+}
+
 /// Failures reported by the shared real-terminal test primitives.
 @_spi(Testing) public enum RealTerminalJourneyError: Error, CustomStringConvertible, Sendable {
   case unsupportedPlatform
   case operationFailed(operation: String, errno: Int32)
   case writeMadeNoProgress
-  case reachedEndOfFile(rendered: String)
-  case timedOut(rendered: String)
+  case reachedEndOfFile(rendered: String, transcript: PTYByteTranscript)
+  case timedOut(rendered: String, transcript: PTYByteTranscript)
 
   @_spi(Testing) public var description: String {
     switch self {
@@ -24,10 +76,19 @@ import Synchronization
       "\(operation) failed with errno \(errorNumber)"
     case .writeMadeNoProgress:
       "Writing to the PTY made no progress"
-    case .reachedEndOfFile(let rendered):
-      "PTY reached end of file before the screen condition held; last screen was:\n\(rendered)"
-    case .timedOut(let rendered):
-      "Timed out waiting for the PTY screen condition; last screen was:\n\(rendered)"
+    case .reachedEndOfFile(let rendered, let transcript):
+      """
+      PTY reached end of file before the screen condition held; \
+      \(transcript.summary)
+      last screen was:
+      \(rendered)
+      """
+    case .timedOut(let rendered, let transcript):
+      """
+      Timed out waiting for the PTY screen condition; \(transcript.summary)
+      last screen was:
+      \(rendered)
+      """
     }
   }
 }
@@ -474,16 +535,18 @@ import Synchronization
   )
   do {
     var rendered = screen.renderedText
+    var transcript = PTYByteTranscript()
     let initial = try readAvailablePTYBytes(
       from: fileDescriptor,
       deadline: deadline
     )
+    transcript.append(initial.bytes)
     if !initial.bytes.isEmpty {
       screen.feed(initial.bytes)
       rendered = screen.renderedText
     }
     if initial.reachedDeadline || deadlineHasExpired(deadline) {
-      throw RealTerminalJourneyError.timedOut(rendered: rendered)
+      throw RealTerminalJourneyError.timedOut(rendered: rendered, transcript: transcript)
     }
     try Task.checkCancellation()
     if condition(rendered) {
@@ -492,23 +555,25 @@ import Synchronization
       return rendered
     }
     if initial.reachedEOF {
-      throw RealTerminalJourneyError.reachedEndOfFile(rendered: rendered)
+      throw RealTerminalJourneyError.reachedEndOfFile(
+        rendered: rendered,
+        transcript: transcript
+      )
     }
 
     var reachedEndOfFile = false
-    var reachedDeadline = false
 
     for await _ in readable.events {
       let next = try readAvailablePTYBytes(
         from: fileDescriptor,
         deadline: deadline
       )
+      transcript.append(next.bytes)
       if !next.bytes.isEmpty {
         screen.feed(next.bytes)
         rendered = screen.renderedText
       }
       if next.reachedDeadline || deadlineHasExpired(deadline) {
-        reachedDeadline = true
         break
       }
       try Task.checkCancellation()
@@ -526,12 +591,12 @@ import Synchronization
     await readable.cancel()
     try Task.checkCancellation()
     if reachedEndOfFile {
-      throw RealTerminalJourneyError.reachedEndOfFile(rendered: rendered)
+      throw RealTerminalJourneyError.reachedEndOfFile(
+        rendered: rendered,
+        transcript: transcript
+      )
     }
-    if reachedDeadline || deadlineHasExpired(deadline) {
-      throw RealTerminalJourneyError.timedOut(rendered: rendered)
-    }
-    throw RealTerminalJourneyError.timedOut(rendered: rendered)
+    throw RealTerminalJourneyError.timedOut(rendered: rendered, transcript: transcript)
   } catch {
     await readable.cancel()
     throw error
