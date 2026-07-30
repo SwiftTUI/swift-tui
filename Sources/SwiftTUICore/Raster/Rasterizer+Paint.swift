@@ -4,7 +4,7 @@ extension Rasterizer {
     var activeBlendMode: BlendMode?
     var presentationEffects: [DrawEffect]
     var dirtyRows: Set<Int>?
-    var dirtyRowRange: (min: Int, max: Int)?
+    var dirtySpans: DirtyRowSpans?
   }
 
   private struct PaintVisibility {
@@ -72,7 +72,7 @@ extension Rasterizer {
     imageAttachments: inout [RasterImageAttachment],
     clip: CellRect?,
     dirtyRows: Set<Int>?,
-    dirtyRowRange: (min: Int, max: Int)?,
+    dirtySpans: DirtyRowSpans?,
     visibleIdentities: inout Set<Identity>,
     presentationRecorder: RasterPresentationLayerRecorder?
   ) {
@@ -97,7 +97,7 @@ extension Rasterizer {
       activeBlendMode: nil,
       presentationEffects: [],
       dirtyRows: dirtyRows,
-      dirtyRowRange: dirtyRowRange
+      dirtySpans: dirtySpans
     )
     var stack: [Frame] = [.visit(node: node, context: initialContext)]
 
@@ -112,6 +112,7 @@ extension Rasterizer {
           clip: context.clip,
           blendMode: context.activeBlendMode,
           dirtyRows: context.dirtyRows,
+          dirtySpans: context.dirtySpans,
           presentationRecorder: presentationRecorder,
           presentationEffects: context.presentationEffects
         )
@@ -152,9 +153,9 @@ extension Rasterizer {
           visibleIdentities.insert(node.identity)
         }
 
-        if let dirtyRowRange = nodeContext.dirtyRowRange {
-          // O(1) range-overlap check on the SUBTREE's absolute painted-row span,
-          // not this node's own bounds. `.offset`/`.position` bake their
+        if let dirtySpans = nodeContext.dirtySpans {
+          // O(log k) span-overlap check on the SUBTREE's absolute painted-row
+          // span, not this node's own bounds. `.offset`/`.position` bake their
           // translation into the child's absolute bounds while the wrapper keeps
           // its slot, so a node's own rows can sit entirely outside the dirty band
           // while a translated descendant's rows are squarely inside it. Culling
@@ -162,10 +163,17 @@ extension Rasterizer {
           // stayed stale. `subtreeBounds` is a superset of the actual painted rows,
           // so a non-overlap is sound to skip; for contained layouts it equals the
           // node's bounds and the cull is unchanged.
+          //
+          // Testing the exact spans rather than their convex hull (D70) is what
+          // lets a subtree between two disjoint damage bands skip *compute*, not
+          // just cell writes: the hull spanned every row between the bands, so a
+          // clock in row 0 plus a spinner in the last row dragged the whole
+          // screen's content through style resolution and text layout every
+          // incremental frame.
           let subtreeTop = max(0, node.subtreeBounds.origin.y)
           let subtreeBottom = subtreeTop + max(0, node.subtreeBounds.size.height)
           if subtreeBottom > subtreeTop,
-            subtreeBottom <= dirtyRowRange.min || subtreeTop > dirtyRowRange.max
+            !dirtySpans.intersects(rows: subtreeTop..<subtreeBottom)
           {
             continue
           }
@@ -195,6 +203,7 @@ extension Rasterizer {
           clip: nodeContext.clip,
           blendMode: nodeContext.activeBlendMode,
           dirtyRows: nodeContext.dirtyRows,
+          dirtySpans: nodeContext.dirtySpans,
           presentationRecorder: presentationRecorder,
           presentationEffects: nodeContext.presentationEffects
         )
@@ -319,7 +328,7 @@ extension Rasterizer {
       imageAttachments: &layer.imageAttachments,
       clip: visibleBounds,
       dirtyRows: context.dirtyRows,
-      dirtyRowRange: context.dirtyRowRange,
+      dirtySpans: context.dirtySpans,
       visibleIdentities: &visibleIdentities,
       presentationRecorder: nil
     )
@@ -354,7 +363,7 @@ extension Rasterizer {
           activeBlendMode: nil,
           presentationEffects: [],
           dirtyRows: context.dirtyRows,
-          dirtyRowRange: context.dirtyRowRange
+          dirtySpans: context.dirtySpans
         )
       )
       compositeLayerCells(
@@ -464,6 +473,7 @@ extension Rasterizer {
     clip: CellRect?,
     blendMode: BlendMode? = nil,
     dirtyRows: Set<Int>? = nil,
+    dirtySpans: DirtyRowSpans? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
@@ -479,6 +489,25 @@ extension Rasterizer {
     }
 
     while let frame = stack.popLast() {
+      // Whole-command compute cull (D70). Every raster write path stays inside
+      // a single row, and every bounded command writes only within its own
+      // `bounds` rows (an inset subrect for the shape painters), so a command
+      // whose row span misses the exact dirty set cannot produce a surviving
+      // cell — the exact-set clamp in `write` would drop each one anyway. The
+      // difference is that this rejects the command *before* text layout and
+      // per-cluster style resolution run, which is where the cost lives.
+      //
+      // `.group` has no bounds of its own; its children are tested
+      // individually as they pop. `.clip` is tested on its clip rect, which
+      // bounds everything its child can reach. `.image` keeps its own
+      // exact-set guard below because it must mirror the attachment retention
+      // filter exactly (F125), not merely avoid wasted work.
+      if let dirtySpans, let commandRows = frame.command.culledRowBounds,
+        !dirtySpans.intersects(rows: commandRows)
+      {
+        continue
+      }
+
       switch frame.command {
       case .group(_, let children):
         for child in children.reversed() {

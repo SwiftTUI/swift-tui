@@ -81,6 +81,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticSingleTween = "synthetic-single-tween"
   case syntheticTextShimmer = "synthetic-text-shimmer"
   case syntheticNarrowInvalidation = "synthetic-narrow-invalidation"
+  case syntheticDisjointDamage = "synthetic-disjoint-damage"
   case syntheticObservableFanout = "synthetic-observable-fanout"
   case syntheticMeshGradient = "synthetic-mesh-gradient"
   case syntheticMeshText = "synthetic-mesh-text"

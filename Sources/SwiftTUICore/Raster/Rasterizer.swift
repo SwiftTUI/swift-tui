@@ -225,7 +225,7 @@ package struct Rasterizer: Sendable {
       imageAttachments: &imageAttachments,
       clip: nil,
       dirtyRows: nil,
-      dirtyRowRange: nil,
+      dirtySpans: nil,
       visibleIdentities: &visibleIdentities,
       presentationRecorder: presentationRecorder
     )
@@ -263,10 +263,13 @@ package struct Rasterizer: Sendable {
     )
     clear(cells: &cells, for: damage, surfaceWidth: surfaceSize.width)
 
-    let dirtyRowRange: (min: Int, max: Int)
-    if let lo = dirtyRows.min(), let hi = dirtyRows.max() {
-      dirtyRowRange = (min: lo, max: hi)
-    } else {
+    // Coalesced once per incremental raster, then reused by every cull
+    // altitude in the paint walk (D70). Building it costs one sort of the
+    // dirty rows; it replaces the convex hull the walk used to cull on, so a
+    // subtree or command sitting *between* two disjoint damage bands is now
+    // skipped before it resolves styles or lays out text, not merely stopped
+    // at the cell-write clamp.
+    guard let dirtySpans = DirtyRowSpans(dirtyRows: dirtyRows) else {
       return rasterizeFreshCollectingVisibleIdentities(
         draw,
         surfaceSize: surfaceSize
@@ -281,7 +284,7 @@ package struct Rasterizer: Sendable {
       imageAttachments: &imageAttachments,
       clip: nil,
       dirtyRows: dirtyRows,
-      dirtyRowRange: dirtyRowRange,
+      dirtySpans: dirtySpans,
       visibleIdentities: &visibleIdentities,
       presentationRecorder: presentationRecorder
     )

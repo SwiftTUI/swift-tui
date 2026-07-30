@@ -160,6 +160,7 @@ public enum PerfScenarioRegistry {
       SyntheticSingleTweenScenario(),
       SyntheticShimmerScenario(),
       SyntheticNarrowInvalidationScenario(),
+      SyntheticDisjointDamageScenario(),
       SyntheticObservableFanoutScenario(),
       SyntheticMeshGradientScenario(),
       SyntheticMeshTextScenario(),
