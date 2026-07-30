@@ -135,7 +135,12 @@ extension LayoutEngine {
       listLayout = payload.style.visibleListLayout(
         for: payload,
         in: bounds,
-        rowHeights: rowHeights
+        rowHeights: rowHeights,
+        // Only set on the hint path, where `bounds` is the collection's own
+        // content height rather than a viewport. Without it the line model
+        // would build a display line per row of the whole dataset before
+        // anything windowed it — the interim O(dataset) cost S2 left behind.
+        rowWindow: measuredWindow
       )
       measuredSize = measuredHostedListSize(
         for: payload,
@@ -202,7 +207,8 @@ extension LayoutEngine {
         for: payload,
         in: bounds,
         columnWidths: tableColumnWidths,
-        rowHeights: rowHeights
+        rowHeights: rowHeights,
+        rowWindow: measuredWindow
       )
       measuredSize = measuredHostedTableSize(
         for: payload,

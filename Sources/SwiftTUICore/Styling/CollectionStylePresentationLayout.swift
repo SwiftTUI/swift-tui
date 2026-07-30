@@ -108,18 +108,29 @@ extension CollectionStylePresentation {
   /// cell tall — the historical model, so those callers are unaffected.
   /// Supplying it is what makes measure, place, draw, and semantics agree on
   /// where a tall row's chrome goes (register item D19).
+  /// `rowWindow` bounds line GENERATION to a band of rows, for the case where
+  /// `bounds` is not the viewport: inside a `ScrollView` a hosted collection is
+  /// laid out against its own full content height, so asking for "the visible
+  /// lines" over those bounds builds one display line per row of the whole
+  /// dataset even though only a window of rows was ever realized. Passing the
+  /// measured window keeps the line array O(window); the skipped rows still
+  /// occupy their cells, arithmetically, because an unrealized row is one cell
+  /// tall by definition.
   package func visibleListLayout(
     for payload: ListPayload,
     in bounds: CellRect,
-    rowHeights: [Int: Int]? = nil
+    rowHeights: [Int: Int]? = nil,
+    rowWindow: Range<Int>? = nil
   ) -> ListVisibleLayout {
     ListLayoutDerivationProbe.recordDerivation()
     let contentBounds = listContentBounds(in: bounds)
-    var lines = visibleListLines(
+    let generated = visibleListLines(
       for: payload,
-      viewportLineCount: contentBounds.size.height
+      viewportLineCount: contentBounds.size.height,
+      rowWindow: rowWindow
     )
-    var cursor = 0
+    var lines = generated.lines
+    var cursor = generated.firstLinePosition
     for index in lines.indices {
       let height =
         lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1
@@ -127,12 +138,19 @@ extension CollectionStylePresentation {
       lines[index].yOffset = cursor
       cursor += height
     }
+    let totalContentHeight = cursor + generated.trailingLineCount
 
     return ListVisibleLayout(
       contentBounds: contentBounds,
       lines: lines,
-      sectionChromeBounds: listChromeBounds(for: lines, in: contentBounds),
-      totalContentHeight: cursor
+      sectionChromeBounds: listChromeBounds(
+        for: lines,
+        in: contentBounds,
+        coveringFullContent: generated.isWindowed
+          ? (height: totalContentHeight, yOffset: 0)
+          : nil
+      ),
+      totalContentHeight: totalContentHeight
     )
   }
 
@@ -285,19 +303,35 @@ extension CollectionStylePresentation {
     )
   }
 
+  /// Generated lines, plus what the caller needs to place them inside content
+  /// they do not fully cover: the content-relative line position the first
+  /// generated line sits at, and how many one-cell lines follow the last one.
+  /// Both are zero unless `rowWindow` bounded the generation.
+  private typealias GeneratedListLines = (
+    lines: [ListDisplayLine],
+    firstLinePosition: Int,
+    trailingLineCount: Int,
+    isWindowed: Bool
+  )
+
   private func visibleListLines(
     for payload: ListPayload,
-    viewportLineCount: Int
-  ) -> [ListDisplayLine] {
+    viewportLineCount: Int,
+    rowWindow: Range<Int>?
+  ) -> GeneratedListLines {
     if payload.isViewportBacked {
       return viewportBackedVisibleListLines(
         for: payload,
-        viewportLineCount: viewportLineCount
+        viewportLineCount: viewportLineCount,
+        rowWindow: rowWindow
       )
     }
+    // The materialized line model has no arithmetic row-to-line map (headers,
+    // footers, and section separators interleave), so it cannot be windowed
+    // this way; it is also the path with no hosted children to window against.
     let displayLines = materializedListLines(for: payload)
     guard viewportLineCount > 0 else {
-      return []
+      return ([], 0, 0, false)
     }
 
     if displayLines.count > viewportLineCount {
@@ -330,7 +364,7 @@ extension CollectionStylePresentation {
       }
       let end = min(displayLines.count, offset + visibleLineCount)
       guard payload.showsIndicators, viewportLineCount >= 3 else {
-        return Array(displayLines[offset..<end])
+        return (Array(displayLines[offset..<end]), 0, 0, false)
       }
       var visible: [ListDisplayLine] = []
       visible.reserveCapacity(visibleLineCount + 2)
@@ -365,18 +399,19 @@ extension CollectionStylePresentation {
           rowIndex: nil
         )
       }
-      return visible
+      return (visible, 0, 0, false)
     }
 
-    return Array(displayLines.prefix(viewportLineCount))
+    return (Array(displayLines.prefix(viewportLineCount)), 0, 0, false)
   }
 
   private func viewportBackedVisibleListLines(
     for payload: ListPayload,
-    viewportLineCount: Int
-  ) -> [ListDisplayLine] {
+    viewportLineCount: Int,
+    rowWindow: Range<Int>?
+  ) -> GeneratedListLines {
     guard viewportLineCount > 0, !payload.items.isEmpty else {
-      return []
+      return ([], 0, 0, false)
     }
 
     let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
@@ -390,8 +425,27 @@ extension CollectionStylePresentation {
     let rowSpan = window.rowSpan
     let bodyLineCount = payload.items.count * rowSpan - (rowSpan - 1)
     let displayLineCount = window.displayLineCount
-    let offset = window.offset
-    let end = window.end
+    var offset = window.offset
+    var end = window.end
+    // Bound generation to the rows that were actually realized — but ONLY when
+    // these bounds cover the whole content, which is the `ScrollView` case the
+    // window exists for. That condition is what makes a windowed line's
+    // `yOffset` mean the same thing as an unwindowed one's: with the content
+    // fully covered, `offset` is 0 and no overflow indicators are inserted, so
+    // a line's offset is its position in the content. Where the bounds really
+    // are a viewport, offsets are viewport-relative and windowing them would
+    // shift every row.
+    var isWindowed = false
+    if let rowWindow, !rowWindow.isEmpty, viewportLineCount >= displayLineCount {
+      let chromeInset = window.chromeInset
+      let windowStart = max(offset, chromeInset + rowWindow.lowerBound * rowSpan)
+      let windowEnd = min(end, chromeInset + rowWindow.upperBound * rowSpan)
+      if windowStart < windowEnd, windowEnd - windowStart < end - offset {
+        offset = windowStart
+        end = windowEnd
+        isWindowed = true
+      }
+    }
     var visible = (offset..<end).map { position in
       viewportBackedListLine(
         at: position,
@@ -402,11 +456,17 @@ extension CollectionStylePresentation {
       )
     }
 
+    if isWindowed {
+      // No overflow indicators: a windowed generation only happens when the
+      // bounds cover the whole content, where nothing is hidden to indicate.
+      return (visible, offset, max(0, displayLineCount - end), true)
+    }
+
     guard displayLineCount > viewportLineCount,
       payload.showsIndicators,
       viewportLineCount >= 3
     else {
-      return visible
+      return (visible, 0, 0, false)
     }
 
     let indicatorStyle = TextStyle(
@@ -428,7 +488,7 @@ extension CollectionStylePresentation {
         rowIndex: nil
       )
     )
-    return visible
+    return (visible, 0, 0, false)
   }
 
   private func viewportBackedListLine(
@@ -676,12 +736,37 @@ extension CollectionStylePresentation {
     return lines
   }
 
+  /// `coveringFullContent` replaces the line-derived section ranges with a
+  /// single range over the whole content. Windowed generation only produces
+  /// lines for the realized band, so deriving section chrome from them would
+  /// draw the section's border around the window instead of around the
+  /// section — and a viewport-backed payload has exactly one section anyway
+  /// (`viewportBackedListLine` stamps `sectionIndex: 0` on every line it
+  /// makes), so the whole-content range is the same answer the full line array
+  /// would have produced.
   private func listChromeBounds(
     for lines: [ListDisplayLine],
-    in contentBounds: CellRect
+    in contentBounds: CellRect,
+    coveringFullContent: (height: Int, yOffset: Int)? = nil
   ) -> [CellRect] {
     guard listContainer != nil, listChromeScope == .eachSection, !lines.isEmpty else {
       return []
+    }
+
+    if let coveringFullContent {
+      return [
+        CellRect(
+          origin: .init(
+            x: contentBounds.origin.x - listContentInsets.leading,
+            y: contentBounds.origin.y + coveringFullContent.yOffset
+          ),
+          size: .init(
+            width: contentBounds.size.width + listContentInsets.leading
+              + listContentInsets.trailing,
+            height: coveringFullContent.height
+          )
+        )
+      ]
     }
 
     var bounds: [CellRect] = []
