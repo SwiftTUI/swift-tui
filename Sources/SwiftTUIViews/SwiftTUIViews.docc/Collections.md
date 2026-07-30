@@ -126,8 +126,25 @@ widths grow to fit the widest row that has been visible and do not shrink again
 while the element IDs are stable, so a column does not twitch as rows scroll
 through it.
 
+Rows may be taller than one cell in both `List` and `Table`. The chrome a
+collection owns follows the measured row: a list paints its selection marker
+and separators against the row's own cells, and a table repeats a tall row's
+outer border down every cell the row spans, so the vertical rules stay
+unbroken.
+
+```swift
+Table(services, columns: [TableColumn("Service")]) { service in
+  VStack(alignment: .leading, spacing: 0) {
+    Text(service.id)
+    Text(service.status)
+  }
+}
+```
+
 Inside a `ScrollView` the enclosing scroll layout declares the viewport it will
-show the collection through, and the collection windows against that. A
+show the collection through, and the collection windows against that — both the
+rows it realizes and the display lines it generates for them, so the per-frame
+cost follows the viewport rather than the dataset. A
 collection given genuinely unbounded height — under `.fixedSize()`, or an
 ideal-height probe — has nothing to window against, so it realizes every row
 and reports `collection.unboundedRealization` once. That is deliberate: those
