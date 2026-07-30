@@ -71,47 +71,62 @@ extension Rasterizer {
       let minY = insetRect.origin.y
       let maxY = insetRect.origin.y + insetRect.size.height - 1
 
-      for x in minX...maxX {
-        writeStrokeGlyph(
-          glyphs.top,
-          borderSet: resolvedSet,
-          foregroundColorMode: foregroundColorMode,
-          backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-          fallbackBackgroundSides: [.top],
-          environment: environment,
-          bounds: shapeBounds,
-          x: x,
-          y: minY,
-          cells: &cells,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows,
-          presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
-        )
-        if maxY != minY {
-          writeStrokeGlyph(
-            glyphs.bottom,
-            borderSet: resolvedSet,
-            foregroundColorMode: foregroundColorMode,
-            backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-            fallbackBackgroundSides: [.bottom],
-            environment: environment,
-            bounds: shapeBounds,
-            x: x,
-            y: maxY,
-            cells: &cells,
-            clip: clip,
-            blendMode: blendMode,
-            dirtyRows: dirtyRows,
-            presentationRecorder: presentationRecorder,
-            presentationEffects: presentationEffects
-          )
+      // Per-row cull (D70). The top and bottom edges each occupy a single fixed
+      // row, so the decision is hoisted out of the column loop rather than
+      // retested per cell; the left/right edges are guarded per row below.
+      let paintsTopRow = dirtyRows?.contains(minY) ?? true
+      let paintsBottomRow = dirtyRows?.contains(maxY) ?? true
+
+      if paintsTopRow || paintsBottomRow {
+        for x in minX...maxX {
+          if paintsTopRow {
+            writeStrokeGlyph(
+              glyphs.top,
+              borderSet: resolvedSet,
+              foregroundColorMode: foregroundColorMode,
+              backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
+              fallbackBackgroundSides: [.top],
+              environment: environment,
+              bounds: shapeBounds,
+              x: x,
+              y: minY,
+              cells: &cells,
+              clip: clip,
+              blendMode: blendMode,
+              dirtyRows: dirtyRows,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
+            )
+          }
+          if maxY != minY, paintsBottomRow {
+            writeStrokeGlyph(
+              glyphs.bottom,
+              borderSet: resolvedSet,
+              foregroundColorMode: foregroundColorMode,
+              backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
+              fallbackBackgroundSides: [.bottom],
+              environment: environment,
+              bounds: shapeBounds,
+              x: x,
+              y: maxY,
+              cells: &cells,
+              clip: clip,
+              blendMode: blendMode,
+              dirtyRows: dirtyRows,
+              presentationRecorder: presentationRecorder,
+              presentationEffects: presentationEffects
+            )
+          }
         }
       }
 
       if maxY - minY > 1 {
         for y in (minY + 1)..<maxY {
+          // Per-row cull (D70): the side edges walk rows, so each clean row
+          // skips two `writeStrokeGlyph` calls and their colour resolution.
+          if let dirtyRows, !dirtyRows.contains(y) {
+            continue
+          }
           writeStrokeGlyph(
             glyphs.left,
             borderSet: resolvedSet,
@@ -263,6 +278,11 @@ extension Rasterizer {
       }
     if drawsHorizontal {
       let y = bounds.origin.y + (bounds.size.height / 2)
+      // Per-row cull (D70): a horizontal rule lives on one row, so one test
+      // replaces the whole column walk.
+      if let dirtyRows, !dirtyRows.contains(y) {
+        return
+      }
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
         writeStrokeGlyph(
           glyphs.horizontal,
@@ -285,6 +305,10 @@ extension Rasterizer {
     } else {
       let x = bounds.origin.x + (bounds.size.width / 2)
       for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
+        // Per-row cull (D70).
+        if let dirtyRows, !dirtyRows.contains(y) {
+          continue
+        }
         writeStrokeGlyph(
           glyphs.vertical,
           borderSet: resolvedSet,

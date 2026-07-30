@@ -102,7 +102,9 @@ extension Rasterizer {
       bounds: outer
     )
 
-    if topWidth > 0 {
+    // Per-row cull (D70). The top and bottom edges each occupy one fixed row,
+    // so a single membership test replaces the whole glyph walk.
+    if topWidth > 0, dirtyRows?.contains(outer.origin.y) ?? true {
       let y = outer.origin.y
       let startX = outer.origin.x + leftWidth
       let endX = outer.origin.x + outer.size.width - rightWidth
@@ -145,7 +147,9 @@ extension Rasterizer {
       }
     }
 
-    if bottomWidth > 0 {
+    if bottomWidth > 0,
+      dirtyRows?.contains(outer.origin.y + outer.size.height - 1) ?? true
+    {
       let y = outer.origin.y + outer.size.height - 1
       let startX = outer.origin.x + leftWidth
       let endX = outer.origin.x + outer.size.width - rightWidth
@@ -201,6 +205,14 @@ extension Rasterizer {
         guard let character = set.leftGlyph(at: glyphIndex) else {
           break
         }
+        // Per-row cull (D70). The skip wraps only the work: `y` and
+        // `glyphIndex` must still advance or the glyph pattern desynchronizes
+        // from the row it belongs to.
+        guard dirtyRows?.contains(y) ?? true else {
+          y += 1
+          glyphIndex += 1
+          continue
+        }
         let cellForeground =
           perimeterColor(
             atLocalX: x - outer.origin.x,
@@ -242,6 +254,12 @@ extension Rasterizer {
       while y < bottomExclusive {
         guard let character = set.rightGlyph(at: glyphIndex) else {
           break
+        }
+        // Per-row cull (D70) — same advance-then-skip shape as the left edge.
+        guard dirtyRows?.contains(y) ?? true else {
+          y += 1
+          glyphIndex += 1
+          continue
         }
         let cellForeground =
           perimeterColor(

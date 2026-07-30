@@ -110,6 +110,11 @@ extension Rasterizer {
     }
 
     for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
+      // Per-row cull (D70): skips `shapeContains` and the per-cell colour
+      // resolution below for rows `write` would clamp away anyway.
+      if let dirtyRows, !dirtyRows.contains(y) {
+        continue
+      }
       var x = shapeBounds.origin.x
       let rowEnd = shapeBounds.origin.x + shapeBounds.size.width
       while x < rowEnd {
@@ -314,6 +319,13 @@ extension Rasterizer {
     // Direct cells paint first so Braille drawing can layer foreground
     // dots over dense per-cell backgrounds.
     for cellY in 0..<cellH {
+      // Per-row cull (D70). The subpixel loops that built this canvas write
+      // only into the in-memory `CanvasGridBuffer`, never into `cells`, so this
+      // cell-row loop is the only surface-touching one and it maps 1:1 to
+      // surface rows.
+      if let dirtyRows, !dirtyRows.contains(originY + cellY) {
+        continue
+      }
       for cellX in 0..<cellW {
         guard let cell = context.directCells[cellY][cellX] else {
           continue
@@ -349,6 +361,10 @@ extension Rasterizer {
     )
 
     for cellY in 0..<cellH {
+      // Per-row cull (D70).
+      if let dirtyRows, !dirtyRows.contains(originY + cellY) {
+        continue
+      }
       for cellX in 0..<cellW {
         guard let character = context.canvas.character(x: cellX, y: cellY) else {
           continue
@@ -485,6 +501,13 @@ extension Rasterizer {
       }
 
     for cellY in 0..<cellH {
+      // Per-row cull (D70): skips the per-cell `resolveColor` — gradient and
+      // mesh sampling included — for rows outside the exact damage. The Braille
+      // subpixel work above touches only the local canvas, so this is the one
+      // loop that reaches the surface.
+      if let dirtyRows, !dirtyRows.contains(originY + cellY) {
+        continue
+      }
       for cellX in 0..<cellW {
         let cell = canvas.cell(x: cellX, y: cellY)
         guard cell.mask != 0 else {
