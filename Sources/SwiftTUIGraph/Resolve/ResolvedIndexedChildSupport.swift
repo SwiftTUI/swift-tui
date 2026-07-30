@@ -108,6 +108,12 @@ package protocol IndexedChildSource: Sendable {
   /// authoritative once the element is realized.
   func elementSelectionTag(at index: Int) -> SelectionTag?
 
+  /// The element index carrying `tag`, when the source can answer without a
+  /// scan. Locating the selected row of a viewport-backed collection is on the
+  /// resolve path of every frame, so an O(dataset) scan there is a per-frame
+  /// cost proportional to the dataset rather than the viewport.
+  func elementIndex(forSelectionTag tag: SelectionTag) -> Int?
+
   /// The element index whose derived identity satisfies `query`, or `nil` when
   /// none does. `scrollTo(_:)` reaches an out-of-window collection row through
   /// this: those rows have no placed frame and so no published scroll target,
@@ -141,6 +147,13 @@ extension IndexedChildSource {
 
   package func elementSelectionTag(at index: Int) -> SelectionTag? {
     nil
+  }
+
+  package func elementIndex(forSelectionTag tag: SelectionTag) -> Int? {
+    for index in 0..<count where elementSelectionTag(at: index) == tag {
+      return index
+    }
+    return nil
   }
 
   package func elementIndex(matching query: ScrollTargetQuery) -> Int? {

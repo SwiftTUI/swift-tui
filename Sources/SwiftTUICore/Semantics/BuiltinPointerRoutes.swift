@@ -107,6 +107,53 @@ package func listRowIdentity(
   controlIdentity.child(BuiltinPointerRouteComponent.listRow(rowIndex).identityComponent)
 }
 
+/// The row index encoded in `identity`, when it is `container`'s list-row
+/// identity. The inverse of ``listRowIdentity(for:rowIndex:)``.
+///
+/// Resolving the focused row by minting an identity per row until one matches
+/// is O(dataset) per frame (register item D18); the identity already carries
+/// the answer.
+package func listRowIndex(
+  parsedFrom identity: Identity,
+  container: Identity
+) -> Int? {
+  guard identity.parent == container,
+    let component = identity.lastComponent
+  else {
+    return nil
+  }
+  return builtinRouteRowIndex(in: component, kind: "ListRow")
+}
+
+/// The row index encoded in `identity`, when it is `container`'s table-row
+/// identity. The inverse of ``tableRowIdentity(for:rowIndex:)``.
+package func tableRowIndex(
+  parsedFrom identity: Identity,
+  container: Identity
+) -> Int? {
+  guard identity.parent == container,
+    let component = identity.lastComponent
+  else {
+    return nil
+  }
+  return builtinRouteRowIndex(in: component, kind: "TableRow")
+}
+
+private func builtinRouteRowIndex(
+  in component: String,
+  kind: String
+) -> Int? {
+  // `IdentityComponent.indexed` encodes as `Kind[n]`.
+  guard component.count > kind.count + 2,
+    component.hasPrefix(kind + "["),
+    component.hasSuffix("]")
+  else {
+    return nil
+  }
+  let digits = component.dropFirst(kind.count + 1).dropLast()
+  return Int(digits)
+}
+
 package func tableRowIdentity(
   for controlIdentity: Identity,
   rowIndex: Int

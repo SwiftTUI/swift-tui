@@ -123,14 +123,17 @@ package enum CollectionSelectionPolicy<Value: Hashable> {
 }
 
 /// Resolve-time interaction descriptors stay bounded for an indexed
-/// collection. The layout pass materializes the exact viewport later, so the
-/// selection/focus anchor is the only available resolve-time locator. Keeping
-/// a generous band around it covers the current terminal viewport and the
-/// next navigation step without restoring O(dataset) registry publication.
+/// collection: publishing one per row would restore the O(dataset) registry
+/// cost the windowed path exists to avoid.
+///
+/// The band is centred on `anchor` and holds `capacity` indices. Callers with
+/// live scroll geometry should pass ``collectionInteractionBand`` — a fixed
+/// capacity is a guess, and on a tall terminal it leaves rows that are plainly
+/// on screen with no registered handler at all (register item D20).
 func collectionInteractionIndices(
   count: Int,
   anchor: Int?,
-  capacity: Int = 64
+  capacity: Int = collectionInteractionFallbackCapacity
 ) -> Range<Int> {
   guard count > 0, capacity > 0 else {
     return 0..<0
@@ -140,6 +143,63 @@ func collectionInteractionIndices(
   let preferredLower = boundedAnchor - boundedCapacity / 2
   let lower = min(max(0, preferredLower), count - boundedCapacity)
   return lower..<(lower + boundedCapacity)
+}
+
+/// The band capacity used before any scroll geometry has synced (frame 1).
+let collectionInteractionFallbackCapacity = 64
+
+/// Rows the terminal viewport can hold beyond the visible window, registered
+/// so the row just off each edge responds the instant it scrolls in.
+private let collectionInteractionMargin = 16
+
+/// The interaction band for a collection, sized from its live viewport when
+/// the scroll registry has published geometry for it and centred on the
+/// visible window rather than on the selection.
+///
+/// Anchoring on the scroll anchor alone would centre the band on the window's
+/// FIRST row, wasting half its capacity above the viewport; the window's
+/// middle is what the band should straddle.
+@MainActor
+func collectionInteractionBand(
+  count: Int,
+  scrollAnchorRow: Int?,
+  selectionAnchor: Int?,
+  visibleRowCount: Int?
+) -> Range<Int> {
+  guard let visibleRowCount, visibleRowCount > 0, let scrollAnchorRow else {
+    return collectionInteractionIndices(count: count, anchor: selectionAnchor)
+  }
+  return collectionInteractionIndices(
+    count: count,
+    anchor: scrollAnchorRow + visibleRowCount / 2,
+    capacity: visibleRowCount + 2 * collectionInteractionMargin
+  )
+}
+
+/// Past this many top-level rows, an eagerly-resolved collection is worth
+/// reporting: every row is realized and measured on every frame, and the
+/// direct-data spelling of the same collection would have been windowed.
+private let eagerCollectionRowThreshold = 256
+
+/// The advisory issue for a collection that resolved eagerly at a scale where
+/// the windowed path would have mattered, or `nil` below the threshold.
+func eagerCollectionRuntimeIssue(
+  rowCount: Int,
+  identity: Identity,
+  source: String
+) -> RuntimeIssue? {
+  guard rowCount >= eagerCollectionRowThreshold else {
+    return nil
+  }
+  return RuntimeIssue(
+    severity: .warning,
+    code: "collection.eagerLargeCollection",
+    message:
+      "\(source) resolved \(rowCount) rows eagerly. Builder-authored content takes the "
+      + "unwindowed path; the data-source initializer realizes only the visible band.",
+    identity: identity,
+    source: source
+  )
 }
 
 func resolvedNodeLabelText(

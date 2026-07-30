@@ -7,48 +7,16 @@ import Testing
 /// Characterization suite for the scroll-currency program (root plan
 /// `docs/plans/2026-07-28-007-collection-scroll-currency-plan.md`, Stage S0).
 ///
-/// Every row here pins *current* behaviour — including the current defects the
-/// program exists to fix — so a later stage flips a row deliberately rather
+/// Every row here pinned *current* behaviour — including the defects the
+/// program exists to fix — so a later stage flipped a row deliberately rather
 /// than discovering the change as fixture churn. The `C-nn` ids match the S0
-/// table in the plan; the "flipped by" column names the stage that retires the
-/// row.
+/// table in the plan.
+///
+/// C-01..C-04 were retired by S1, C-06 by S3, C-05 and C-07 by S2/S4. What
+/// remains is the contract this program deliberately did NOT change.
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCharacterizationTests {
-  // MARK: - C-05 — the fixed 64-row interaction band (D20)
-
-  @Test("C-05: a visible row outside the fixed 64-index band registers no action")
-  func rowsOutsideTheInteractionBandAreInert() {
-    // Flipped by S4: the band is sized from live viewport geometry.
-    let listIdentity = testIdentity("CharBand")
-    let actions = LocalActionRegistry()
-    let artifacts = DefaultRenderer().render(
-      List(0..<500, id: \.self, selection: .constant(0 as Int?)) { row in
-        Text("«\(row)»")
-      },
-      context: .init(
-        identity: listIdentity,
-        localActionRegistry: actions,
-        applyEnvironmentValues: false
-      ),
-      proposal: .init(width: .finite(20), height: .finite(120))
-    )
-
-    // Row 100 is inside the drawn window on a 120-line viewport...
-    let visible = characterizationRows(artifacts)
-    #expect(visible.contains(100))
-    // ...but outside `collectionInteractionIndices(count:anchor:capacity: 64)`, so
-    // resolve never registers an action for it. Asserted against the registry's
-    // published set rather than by dispatching: a real dispatch miss is a
-    // soundness-trace signal, and this row pins a *registration* gap.
-    let registered = Set(actions.snapshot().keys)
-    #expect(registered.contains(listRowIdentity(for: listIdentity, rowIndex: 10)))
-    #expect(
-      !registered.contains(listRowIdentity(for: listIdentity, rowIndex: 100)),
-      "current behaviour: resolve registers row handlers only for a 64-index band"
-    )
-  }
-
   // MARK: - C-09 — the eager builder fork (D22)
 
   @Test("C-09: List { ForEach(...) } silently takes the eager, unwindowed path")

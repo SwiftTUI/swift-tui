@@ -83,6 +83,21 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
   let ids: [ID]
   let entityIdentities: [EntityIdentity]
   let signature: IndexedChildMeasurementSignature
+  /// Per-element identities and selection tags, materialized once per id-set
+  /// change instead of per call.
+  ///
+  /// `elementIdentity(at:)` built an `Identity` through `explicitID`, which
+  /// runs `String(reflecting:)` plus per-character escaping every time; the
+  /// collection containers and the windowed stack measurement called it in
+  /// O(dataset) loops each resolve (register item D18). These are pure
+  /// functions of (ids, identity root, entity scope) — the same triple the
+  /// artifacts are already content-verified against — so retaining them is
+  /// sound for exactly as long as retaining the identities themselves.
+  let elementIdentities: [Identity]
+  let selectionTags: [SelectionTag]
+  /// Element index by id, so locating a selected row is a hash lookup rather
+  /// than a scan of the whole dataset.
+  let indexByID: [ID: Int]
   var tableColumns: [TableColumnPayload]?
   var tableColumnWidths: [Int] = []
 
@@ -98,6 +113,13 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
     self.ids = ids
     self.entityIdentities = entityIdentities
     self.signature = signature
+    elementIdentities = zip(ids, entityIdentities).map { id, entityIdentity in
+      identityRoot.explicitID(id, occurrence: entityIdentity.occurrence)
+    }
+    selectionTags = ids.map { SelectionTag(value: $0, includeOptional: true) }
+    // First occurrence wins: a duplicated id is already a diagnostic elsewhere,
+    // and the earliest row is the one selection semantics resolve to.
+    indexByID = Dictionary(zip(ids, ids.indices), uniquingKeysWith: { first, _ in first })
   }
 
   func matches(
@@ -250,16 +272,22 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   /// requirement's note).
   nonisolated package func elementIdentity(at index: Int) -> Identity {
     withCheckedMainActorAccess("IndexedChildSource.elementIdentity(at:)") {
-      identityRootStorage.explicitID(
-        ids[index],
-        occurrence: entityIdentities[index].occurrence
-      )
+      identityArtifacts.elementIdentities[index]
     }
   }
 
   nonisolated package func elementSelectionTag(at index: Int) -> SelectionTag? {
     withCheckedMainActorAccess("IndexedChildSource.elementSelectionTag(at:)") {
-      SelectionTag(value: ids[index], includeOptional: true)
+      identityArtifacts.selectionTags[index]
+    }
+  }
+
+  nonisolated package func elementIndex(forSelectionTag tag: SelectionTag) -> Int? {
+    withCheckedMainActorAccess("IndexedChildSource.elementIndex(forSelectionTag:)") {
+      guard let id = tag.value(as: ID.self) else {
+        return nil
+      }
+      return identityArtifacts.indexByID[id]
     }
   }
 
@@ -362,6 +390,10 @@ package final class HostedCollectionIndexedChildSource: IndexedChildSource {
 
   nonisolated package func elementSelectionTag(at index: Int) -> SelectionTag? {
     base.elementSelectionTag(at: index)
+  }
+
+  nonisolated package func elementIndex(forSelectionTag tag: SelectionTag) -> Int? {
+    base.elementIndex(forSelectionTag: tag)
   }
 
   nonisolated package func retainedTableColumnWidths(

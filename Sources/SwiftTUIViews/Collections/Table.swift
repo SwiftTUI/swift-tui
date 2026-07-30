@@ -123,6 +123,14 @@ extension Table {
       )
     } else {
       resolvedContent = resolvedRows(in: rowContext)
+      // See the matching note in `List.resolvedNode` (register item D22).
+      if let issue = eagerCollectionRuntimeIssue(
+        rowCount: resolvedContent.payloads.count,
+        identity: context.identity,
+        source: "Table"
+      ) {
+        resolvedContent.runtimeIssues.append(issue)
+      }
     }
     let resolvedRows = resolvedContent.payloads
     if resolvedContent.indexedSource == nil {
@@ -263,7 +271,14 @@ extension Table {
           if resolvedContent.indexedSource == nil {
             selectableRowIndices
           } else {
-            collectionInteractionIndices(count: resolvedRows.count, anchor: selectedIndex)
+            collectionInteractionBand(
+              count: resolvedRows.count,
+              scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
+              selectionAnchor: selectedIndex,
+              visibleRowCount: scrollCurrency.map { currency in
+                currency.visibleLineCount / currency.geometry.rowSpan
+              }
+            )
           }
         for rowIndex in interactionIndices {
           guard let tag = resolvedRows[rowIndex].tag else {

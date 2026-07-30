@@ -81,7 +81,7 @@ extension List {
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
     let itemContext = context.child(component: .named("ListItems"))
-    let resolvedContent: ResolvedItems
+    var resolvedContent: ResolvedItems
     if usesIndexedDataSource,
       let source = makeIndexedChildSource(
         from: content,
@@ -91,18 +91,34 @@ extension List {
       resolvedContent = resolvedIndexedItems(from: source, in: context)
     } else {
       resolvedContent = resolvedItems(in: itemContext)
+      // D22: `usesIndexedDataSource` is set only by the direct-data
+      // initializers, so `List { ForEach(data) }` silently takes the eager
+      // path even though the recognition machinery would have succeeded on it.
+      // Flipping that spelling to windowed is its own characterization
+      // program; making the fork visible is not.
+      if let issue = eagerCollectionRuntimeIssue(
+        rowCount: resolvedContent.rows.count,
+        identity: context.identity,
+        source: "List"
+      ) {
+        resolvedContent.runtimeIssues.append(issue)
+      }
     }
     let rows = resolvedContent.rows
-    let selectedIndices = rows.indices.filter { index in
+    // NOTE: still O(dataset) — locating the selected row by its id would need
+    // a `SelectionTag` built from the policy's value, and `SelectionTag`
+    // requires `Sendable` while `List`'s public `SelectionValue` guarantees
+    // only `Hashable`. Narrowing that is a public-API question, so the scan
+    // stays; the far more expensive per-row identity MINT below is gone.
+    let selectedIndex = rows.indices.first { index in
       rows[index].tag.map(selectionPolicy.contains) == true
     }
-    let selectedIndex = selectedIndices.first
-    let focusedRowIndex = rows.indices.first { rowIndex in
-      context.environmentValues.focusedIdentity
-        == listRowIdentity(
-          for: context.identity,
-          rowIndex: rowIndex
-        )
+    // Likewise for focus: the focused identity already encodes its row index,
+    // so parsing it beats minting an identity per row until one matches.
+    let focusedRowIndex = context.environmentValues.focusedIdentity.flatMap { focused in
+      listRowIndex(parsedFrom: focused, container: context.identity)
+    }.flatMap { rowIndex in
+      rows.indices.contains(rowIndex) ? rowIndex : nil
     }
     let isListOrRowFocused = isFocused || focusedRowIndex != nil
     let activeRowIndex = focusedRowIndex ?? selectedIndex
@@ -250,7 +266,14 @@ extension List {
           if resolvedContent.indexedSource == nil {
             rows.indices
           } else {
-            collectionInteractionIndices(count: rows.count, anchor: activeRowIndex)
+            collectionInteractionBand(
+              count: rows.count,
+              scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
+              selectionAnchor: activeRowIndex,
+              visibleRowCount: scrollCurrency.map { currency in
+                currency.visibleLineCount / currency.geometry.rowSpan
+              }
+            )
           }
         for rowIndex in interactionIndices {
           let row = rows[rowIndex]
