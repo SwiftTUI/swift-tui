@@ -541,6 +541,14 @@ extension Rasterizer {
         )
 
         for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+          // Per-line cull (D70): hoists the exact-set clamp from cell to line
+          // granularity, so a command that STRADDLES two damage bands resolves
+          // styles only for the lines it will actually write. The whole-command
+          // cull cannot help here — the command does intersect the damage — and
+          // `write` would drop these cells anyway, just after paying for them.
+          if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
+            continue
+          }
           var x = bounds.origin.x
           for cluster in line.clusters {
             guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
@@ -597,6 +605,10 @@ extension Rasterizer {
         )
 
         for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+          // Per-line cull (D70) — also skips `clusterize` for clean lines.
+          if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
+            continue
+          }
           let clusters = clusterize(line)
           var x = bounds.origin.x
           for cluster in clusters {
@@ -646,6 +658,11 @@ extension Rasterizer {
         }
 
         for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+          // Per-line cull (D70) — also skips the per-run style merge and
+          // `clusterize` for clean lines.
+          if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
+            continue
+          }
           var x = bounds.origin.x
 
           for run in line.runs {
@@ -733,6 +750,10 @@ extension Rasterizer {
         )
 
         for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+          // Per-line cull (D70).
+          if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
+            continue
+          }
           var x = bounds.origin.x
           for cluster in line.clusters {
             guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {

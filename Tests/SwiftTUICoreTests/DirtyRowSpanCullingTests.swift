@@ -234,6 +234,78 @@ struct DirtyRowSpanCullingTests {
     #expect(result.surface.lines[10] == previousSurface.lines[10])
   }
 
+  // MARK: - Per-line culling inside a straddling command
+
+  /// One full-height text command covering every row, so the whole-command cull
+  /// cannot fire: the command genuinely intersects the damage. Only the
+  /// per-line guard can avoid resolving styles for the clean rows between the
+  /// bands, and the surface must stay identical to a fresh raster either way.
+  private func fullHeightTextTree(rows: Int, marker: Character) -> DrawNode {
+    let bounds = CellRect(origin: .init(x: 0, y: 0), size: .init(width: 6, height: rows))
+    // Only the first and last lines carry the marker, so the declared damage
+    // `{0, rows - 1}` is genuinely complete — the rows between are byte-identical
+    // across frames. Declaring less damage than the content actually changes
+    // would be an unsound-damage input, which the F13 oracle rejects on its own
+    // terms and would say nothing about the per-line cull.
+    let content = (0..<rows)
+      .map { row in
+        row == 0 || row == rows - 1 ? "\(marker)\(row)" : "mid\(row)"
+      }
+      .joined(separator: "\n")
+    return DrawNode(
+      identity: testIdentity("straddle"),
+      bounds: bounds,
+      commands: [
+        .text(
+          bounds: bounds,
+          content: content,
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+  }
+
+  @Test("a command straddling two bands repaints exactly the damaged lines")
+  func straddlingCommandRepaintsOnlyDamagedLines() {
+    // `.verifySoundDamage` forces the F13 oracle to diff this incremental
+    // surface against a fresh raster, so a per-line guard that skipped a line
+    // it should have painted fails here rather than shipping as corruption.
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .verifySoundDamage)
+    let rows = 12
+
+    let previousSurface = rasterizer.rasterize(fullHeightTextTree(rows: rows, marker: "a"))
+    #expect(previousSurface.lines[0] == "a0")
+    #expect(previousSurface.lines[5] == "mid5")
+
+    let updated = fullHeightTextTree(rows: rows, marker: "b")
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      updated,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(
+        textRows: [
+          .init(row: 0, columnRanges: [0..<6]),
+          .init(row: rows - 1, columnRanges: [0..<6]),
+        ]
+      )
+    )
+
+    // No oracle mismatch: the incremental surface agrees with a fresh raster on
+    // every row it claims to own.
+    #expect(result.incrementalMismatch == nil)
+    // Damaged lines took the new content...
+    #expect(result.surface.lines[0] == "b0")
+    #expect(result.surface.lines[rows - 1] == "b\(rows - 1)")
+    // ...and the clean lines between the bands are intact, whether the per-line
+    // guard skipped them or `write` clamped them.
+    for row in 1..<(rows - 1) {
+      #expect(result.surface.lines[row] == "mid\(row)", "row \(row)")
+    }
+  }
+
   @Test("an incremental raster over disjoint bands matches a fresh raster")
   func disjointBandIncrementalEqualsFresh() {
     let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
