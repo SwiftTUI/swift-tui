@@ -495,18 +495,21 @@ extension LayoutEngine {
       )
     }
 
-    let layout = DrawExtractor().visibleTableLayout(
-      for: payload,
-      in: bounds,
-      columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths
+    // The measured product, translated — not a fresh derivation. Recomputing
+    // here is the fallback for a parent that stretched the collection past the
+    // size it was measured at, where the measured line set no longer covers
+    // the bounds.
+    let layout = hostedTableVisibleLayout(
+      measured: measured,
+      payload: payload,
+      in: bounds
     )
     let leftWidth = layoutText(
       for: payload.style.tableBorderGlyphs.left,
       width: nil
     ).size.width
     var requests: [PlacementRequest] = []
-    var additionalYOffset = 0
-    for (lineIndex, line) in layout.lines.enumerated() {
+    for line in layout.lines {
       guard line.role == .row,
         let rowIndex = line.rowIndex
       else {
@@ -530,8 +533,8 @@ extension LayoutEngine {
       let childMeasurement = measured.childMeasurements[measurementIndex]
       let childBounds = CellRect(
         origin: .init(
-          x: bounds.origin.x + leftWidth + 1,
-          y: bounds.origin.y + lineIndex + additionalYOffset
+          x: layout.contentBounds.origin.x + leftWidth + 1,
+          y: layout.contentBounds.origin.y + line.yOffset
         ),
         size: childMeasurement.measuredSize
       )
@@ -547,7 +550,6 @@ extension LayoutEngine {
           )
         )
       }
-      additionalYOffset += max(0, childMeasurement.measuredSize.height - 1)
     }
     return requests
   }
@@ -580,5 +582,30 @@ extension LayoutEngine {
     in bounds: CellRect
   ) -> Int {
     payload.style.listContentHeight(in: bounds)
+  }
+
+  /// The visible layout to place a hosted Table against, on the same terms as
+  /// ``hostedListVisibleLayout(for:measured:payload:in:)``.
+  ///
+  /// A table's layout covers its whole bounds rather than an inset sub-rect,
+  /// so the "does the measured product still cover these bounds" test is a
+  /// plain size comparison: a table's line widths are baked from the column
+  /// widths, so a parent that stretched either axis invalidates the product.
+  func hostedTableVisibleLayout(
+    measured: MeasuredNode,
+    payload: TablePayload,
+    in bounds: CellRect
+  ) -> TableVisibleLayout {
+    guard
+      let stored = measured.containerAllocationSnapshot?.hostedCollection?.tableLayout,
+      stored.contentBounds.size == bounds.size
+    else {
+      return DrawExtractor().visibleTableLayout(
+        for: payload,
+        in: bounds,
+        columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths
+      )
+    }
+    return stored.translated(by: bounds.origin)
   }
 }

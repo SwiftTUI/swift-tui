@@ -128,10 +128,12 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
   package var hostedListVisibleLayout: ListVisibleLayout?
+  package var hostedTableVisibleLayout: TableVisibleLayout?
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && hostedCollectionTableColumnWidths == nil
       && scrollViewportRect == nil && hostedListVisibleLayout == nil
+      && hostedTableVisibleLayout == nil
   }
 }
 
@@ -269,6 +271,16 @@ package struct PlacedNode: Equatable, Sendable {
     set {
       var metadata = placementMetadata
       metadata.hostedListVisibleLayout = newValue
+      placementMetadata = metadata
+    }
+  }
+  /// The measure-derived visible layout for a hosted Table, translated into
+  /// absolute coordinates — the table twin of ``hostedListVisibleLayout``.
+  package var hostedTableVisibleLayout: TableVisibleLayout? {
+    get { placementMetadata.hostedTableVisibleLayout }
+    set {
+      var metadata = placementMetadata
+      metadata.hostedTableVisibleLayout = newValue
       placementMetadata = metadata
     }
   }

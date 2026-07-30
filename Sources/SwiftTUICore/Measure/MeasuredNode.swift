@@ -48,19 +48,23 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   /// one product instead of each re-deriving its own (register item D19).
   /// Origin-zero: placement owns the translation.
   package var listLayout: ListVisibleLayout?
+  /// The table twin of ``listLayout``, on the same terms.
+  package var tableLayout: TableVisibleLayout?
 
   package init(
     sourceIndices: [Int],
     tableColumnWidths: [Int]? = nil,
     measuredWindow: Range<Int>? = nil,
     estimatedRowStride: Int? = nil,
-    listLayout: ListVisibleLayout? = nil
+    listLayout: ListVisibleLayout? = nil,
+    tableLayout: TableVisibleLayout? = nil
   ) {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
     self.measuredWindow = measuredWindow
     self.estimatedRowStride = estimatedRowStride
     self.listLayout = listLayout
+    self.tableLayout = tableLayout
   }
 }
 

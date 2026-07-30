@@ -1,9 +1,74 @@
+import Synchronization
+
+/// Test instrumentation (the F118 probe pattern), the table twin of
+/// ``ListLayoutDerivationProbe``: counts how many times a table's visible
+/// layout is DERIVED, as opposed to consumed from the measured product.
+/// Increments compile out of release.
+package enum TableLayoutDerivationProbe {
+  private static let counter = Mutex<Int>(0)
+
+  package static var derivationCount: Int {
+    counter.withLock { $0 }
+  }
+
+  package static func recordDerivation() {
+    #if DEBUG
+      counter.withLock { $0 += 1 }
+    #endif
+  }
+
+  package static func reset() {
+    #if DEBUG
+      counter.withLock { $0 = 0 }
+    #endif
+  }
+}
+
+/// The visible display lines of a table, the column widths they were laid out
+/// against, and the rect they occupy.
+///
+/// The table twin of ``ListVisibleLayout``: derived once at measure from the
+/// real measured row heights, translated by placement, and consumed by draw
+/// and semantics rather than re-derived by each.
+package struct TableVisibleLayout: Equatable, Sendable {
+  package var contentBounds: CellRect
+  package var lines: [TableDisplayLine]
+  package var widths: [Int]
+  /// Total cells the visible lines occupy, which exceeds `lines.count`
+  /// whenever a hosted row measured taller than one cell.
+  package var totalContentHeight: Int
+
+  package init(
+    contentBounds: CellRect,
+    lines: [TableDisplayLine],
+    widths: [Int],
+    totalContentHeight: Int? = nil
+  ) {
+    self.contentBounds = contentBounds
+    self.lines = lines
+    self.widths = widths
+    self.totalContentHeight =
+      totalContentHeight ?? lines.reduce(0) { $0 + max(1, $1.height) }
+  }
+
+  /// Returns a copy translated into absolute coordinates by `delta`.
+  package func translated(by delta: CellPoint) -> TableVisibleLayout {
+    var copy = self
+    copy.contentBounds = CellRect(
+      origin: .init(x: contentBounds.origin.x + delta.x, y: contentBounds.origin.y + delta.y),
+      size: contentBounds.size
+    )
+    return copy
+  }
+}
+
 extension DrawExtractor {
   func tableCommands(
     for payload: TablePayload,
     in bounds: CellRect,
     hostsCommittedItems: Bool = false,
-    columnWidths: [Int]? = nil
+    columnWidths: [Int]? = nil,
+    placedLayout: TableVisibleLayout? = nil
   ) -> [DrawCommand] {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return []
@@ -22,17 +87,23 @@ extension DrawExtractor {
       )
     }
 
-    let layout = visibleTableLayout(
-      for: payload,
-      in: bounds,
-      columnWidths: columnWidths
-    )
+    // The placed product when there is one — that is what keeps a tall row's
+    // borders on the same cells as its content. The recompute stays for
+    // payload-only callers, whose rows are all one cell tall.
+    let layout =
+      placedLayout
+      ?? visibleTableLayout(
+        for: payload,
+        in: bounds,
+        columnWidths: columnWidths
+      )
+    let contentBounds = layout.contentBounds
     let lines = layout.lines
 
-    for (index, line) in lines.enumerated() {
+    for line in lines {
       let lineBounds = CellRect(
-        origin: .init(x: bounds.origin.x, y: bounds.origin.y + index),
-        size: .init(width: bounds.size.width, height: 1)
+        origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
+        size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
 
       if let backgroundStyle = line.backgroundStyle {
@@ -46,9 +117,6 @@ extension DrawExtractor {
           )
         )
       }
-
-      var cursorX = lineBounds.origin.x
-      let lineMaxX = lineBounds.origin.x + lineBounds.size.width
 
       let segments: [TableDisplaySegment]
       if hostsCommittedItems, line.role == .row, line.segments.count >= 2 {
@@ -70,58 +138,92 @@ extension DrawExtractor {
         segments = line.segments
       }
 
-      for segment in segments {
-        let segmentWidth = layoutText(for: segment.content, width: nil).size.width
-        guard segmentWidth > 0 else {
-          continue
-        }
-        if cursorX >= lineMaxX {
-          break
-        }
+      // A hosted row taller than one cell needs its outer border on every cell
+      // it spans, not just its first — the border is chrome the table owns,
+      // and the committed child only paints the interior.
+      let cellCount = hostsCommittedItems && line.role == .row ? lineBounds.size.height : 1
+      for cellOffset in 0..<max(1, cellCount) {
+        var cursorX = lineBounds.origin.x
+        let lineMaxX = lineBounds.origin.x + lineBounds.size.width
 
-        let visibleWidth = min(segmentWidth, lineMaxX - cursorX)
-        guard visibleWidth > 0 else {
-          continue
-        }
+        for segment in segments {
+          let segmentWidth = layoutText(for: segment.content, width: nil).size.width
+          guard segmentWidth > 0 else {
+            continue
+          }
+          if cursorX >= lineMaxX {
+            break
+          }
 
-        commands.append(
-          .text(
-            bounds: .init(
-              origin: .init(x: cursorX, y: lineBounds.origin.y),
-              size: .init(width: visibleWidth, height: 1)
-            ),
-            content: segment.content,
-            style: segment.style,
-            lineLimit: 1,
-            truncationMode: .tail,
-            wrappingStrategy: .wordBoundary
+          let visibleWidth = min(segmentWidth, lineMaxX - cursorX)
+          guard visibleWidth > 0 else {
+            continue
+          }
+
+          commands.append(
+            .text(
+              bounds: .init(
+                origin: .init(x: cursorX, y: lineBounds.origin.y + cellOffset),
+                size: .init(width: visibleWidth, height: 1)
+              ),
+              content: segment.content,
+              style: segment.style,
+              lineLimit: 1,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
           )
-        )
-        cursorX += segmentWidth
+          cursorX += segmentWidth
+        }
       }
     }
 
     return commands
   }
 
+  /// The visible display lines for `payload` inside `bounds`, with each line's
+  /// height and content-relative `yOffset` resolved.
+  ///
+  /// `rowHeights` maps a row index to the cells its hosted child measured.
+  /// Absent (payload-only callers, and any row not in the map) a row is one
+  /// cell tall — the historical model, so those callers are unaffected.
+  /// Supplying it is what makes measure, place, draw, and semantics agree on
+  /// where a tall row's borders and separators go (register item D19).
   func visibleTableLayout(
     for payload: TablePayload,
     in bounds: CellRect,
-    columnWidths: [Int]? = nil
-  ) -> (lines: [TableDisplayLine], widths: [Int]) {
+    columnWidths: [Int]? = nil,
+    rowHeights: [Int: Int]? = nil
+  ) -> TableVisibleLayout {
+    TableLayoutDerivationProbe.recordDerivation()
     let widths =
       columnWidths
       ?? measureTableColumnWidths(
         columns: payload.columns,
         rows: payload.isViewportBacked ? [] : payload.rows
       )
-    let lines = visibleTableLines(
+    var lines = visibleTableLines(
       for: payload,
       viewportLineCount: bounds.size.height,
       showsIndicators: payload.showsIndicators,
       widths: widths
     )
-    return (lines, widths)
+    var cursor = 0
+    for index in lines.indices {
+      let height =
+        lines[index].role == .row
+        ? (lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1)
+        : 1
+      lines[index].height = height
+      lines[index].yOffset = cursor
+      cursor += height
+    }
+    return TableVisibleLayout(
+      contentBounds: bounds,
+      lines: lines,
+      widths: widths,
+      totalContentHeight: cursor
+    )
   }
 
   private func visibleTableLines(

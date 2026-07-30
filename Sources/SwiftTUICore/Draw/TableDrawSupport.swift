@@ -1,10 +1,10 @@
-struct TableDisplaySegment {
+package struct TableDisplaySegment: Equatable, Sendable {
   var content: String
   var style: TextStyle
 }
 
-struct TableDisplayLine {
-  enum Role {
+package struct TableDisplayLine: Equatable, Sendable {
+  enum Role: Equatable, Sendable {
     case topBorder
     case header
     case headerSeparator
@@ -18,6 +18,35 @@ struct TableDisplayLine {
   var role: Role
   var isSelectedRow: Bool
   var rowIndex: Int?
+  /// Cells this line occupies. Greater than 1 when the hosted row measured
+  /// taller than one cell; 1 for every chrome line and for the payload-only
+  /// line model, whose rows are single-line text.
+  package var height: Int
+  /// This line's first cell, relative to the layout's content bounds.
+  ///
+  /// Tables carried the same D19 convention split lists did: draw painted
+  /// every line at `bounds.y + lineIndex` with height 1 while placement
+  /// separately accumulated an `additionalYOffset` for tall rows, so the two
+  /// disagreed for every line after a multi-cell row.
+  package var yOffset: Int
+
+  init(
+    segments: [TableDisplaySegment],
+    backgroundStyle: AnyShapeStyle?,
+    role: Role,
+    isSelectedRow: Bool,
+    rowIndex: Int?,
+    height: Int = 1,
+    yOffset: Int = 0
+  ) {
+    self.segments = segments
+    self.backgroundStyle = backgroundStyle
+    self.role = role
+    self.isSelectedRow = isSelectedRow
+    self.rowIndex = rowIndex
+    self.height = height
+    self.yOffset = yOffset
+  }
 }
 
 enum TableBorderPosition {

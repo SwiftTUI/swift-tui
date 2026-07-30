@@ -229,14 +229,18 @@ extension SemanticExtractor {
     guard allowsPointerHitTesting else {
       return
     }
-    let layout = DrawExtractor().visibleTableLayout(
-      for: payload,
-      in: node.bounds,
-      columnWidths: node.hostedCollectionTableColumnWidths
-    )
+    // The placed product when there is one, so semantics rects land on the
+    // same cells draw painted and placement positioned.
+    let layout =
+      node.hostedTableVisibleLayout
+      ?? DrawExtractor().visibleTableLayout(
+        for: payload,
+        in: node.bounds,
+        columnWidths: node.hostedCollectionTableColumnWidths
+      )
     let hostsCommittedRows = node.semanticMetadata.hostedCollectionContainer?.kind == .table
 
-    for (lineIndex, line) in layout.lines.enumerated() {
+    for line in layout.lines {
       guard line.role == .row, let rowIndex = line.rowIndex else {
         continue
       }
@@ -260,23 +264,23 @@ extension SemanticExtractor {
         if let hostedRow {
           CellRect(
             origin: .init(
-              x: node.bounds.origin.x,
+              x: layout.contentBounds.origin.x,
               y: hostedRow.bounds.origin.y
             ),
             size: .init(
-              width: node.bounds.size.width,
+              width: layout.contentBounds.size.width,
               height: max(1, hostedRow.bounds.size.height)
             )
           )
         } else {
           CellRect(
             origin: .init(
-              x: node.bounds.origin.x,
-              y: node.bounds.origin.y + lineIndex
+              x: layout.contentBounds.origin.x,
+              y: layout.contentBounds.origin.y + line.yOffset
             ),
             size: .init(
-              width: node.bounds.size.width,
-              height: 1
+              width: layout.contentBounds.size.width,
+              height: max(1, line.height)
             )
           )
         }

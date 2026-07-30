@@ -45,6 +45,15 @@ extension LayoutEngine {
         in: bounds
       )
     }
+    if case .table(let payload) = resolved.drawPayload,
+      resolved.semanticMetadata.hostedCollectionContainer?.kind == .table
+    {
+      node.hostedTableVisibleLayout = hostedTableVisibleLayout(
+        measured: measured,
+        payload: payload,
+        in: bounds
+      )
+    }
     return node
   }
 
