@@ -881,7 +881,158 @@ function isWebHostSurfaceScalingMode(value) {
 }
 
 // src/wasi/SharedInputQueue.ts
+var capacityWaitTimeoutMilliseconds = 50;
+var writeDeadlineMilliseconds = 500;
 var sharedInputQueueDefaultCapacity = 64 * 1024;
+function hydrateSharedInputQueue(buffers) {
+  return {
+    control: new Int32Array(buffers.controlBuffer),
+    data: new Uint8Array(buffers.dataBuffer)
+  };
+}
+
+class SharedInputQueueWriter {
+  queue;
+  writeChain = Promise.resolve();
+  pendingWrites = 0;
+  constructor(buffers) {
+    this.queue = hydrateSharedInputQueue(buffers);
+  }
+  writeAsync(chunk, options = {}) {
+    const bytes = normalizeChunk(chunk);
+    if (bytes.length == 0) {
+      return Promise.resolve({ status: "written" });
+    }
+    if (Atomics.load(this.queue.control, 2 /* closed */) !== 0) {
+      return Promise.resolve({ status: "closed", bytesWritten: 0 });
+    }
+    if (this.pendingWrites === 0 && bytes.length <= this.availableCapacity()) {
+      this.writeSegment(bytes);
+      return Promise.resolve({ status: "written" });
+    }
+    this.pendingWrites += 1;
+    const attempt = this.writeChain.then(() => this.performChunkedWrite(bytes, options), () => this.performChunkedWrite(bytes, options));
+    this.writeChain = attempt;
+    return attempt.finally(() => {
+      this.pendingWrites -= 1;
+    });
+  }
+  async performChunkedWrite(bytes, options) {
+    const now = options.now ?? (() => Date.now());
+    const deadline = now() + Math.max(0, options.deadlineMilliseconds ?? writeDeadlineMilliseconds);
+    let written = 0;
+    while (written < bytes.length) {
+      if (Atomics.load(this.queue.control, 2 /* closed */) !== 0) {
+        return { status: "closed", bytesWritten: written };
+      }
+      const free = this.availableCapacity();
+      if (free > 0) {
+        const segment = Math.min(free, bytes.length - written);
+        this.writeSegment(bytes.subarray(written, written + segment));
+        written += segment;
+        continue;
+      }
+      const remainingBudget = deadline - now();
+      if (remainingBudget <= 0) {
+        return {
+          status: "partial",
+          bytesWritten: written,
+          bytesRemaining: bytes.length - written
+        };
+      }
+      await this.waitForCapacity(1, {
+        timeoutMilliseconds: Math.min(capacityWaitTimeoutMilliseconds, remainingBudget),
+        singleWait: true
+      });
+    }
+    return { status: "written" };
+  }
+  writeSegment(segment) {
+    const length = this.queue.data.length;
+    const writeIndex = Atomics.load(this.queue.control, 1 /* writeIndex */);
+    writeToRingBuffer(this.queue.data, segment, writeIndex);
+    Atomics.store(this.queue.control, 1 /* writeIndex */, ringAdvance(writeIndex, segment.length, length));
+    Atomics.notify(this.queue.control, 1 /* writeIndex */);
+  }
+  write(chunk) {
+    if (Atomics.load(this.queue.control, 2 /* closed */) !== 0) {
+      return;
+    }
+    const bytes = normalizeChunk(chunk);
+    if (bytes.length == 0) {
+      return;
+    }
+    const length = this.queue.data.length;
+    const readIndex = Atomics.load(this.queue.control, 0 /* readIndex */);
+    const writeIndex = Atomics.load(this.queue.control, 1 /* writeIndex */);
+    const usedCapacity = ringUsed(readIndex, writeIndex, length);
+    const availableCapacity = length - usedCapacity;
+    if (bytes.length > availableCapacity) {
+      throw new Error(`Shared input queue overflow: cannot enqueue ${bytes.length} byte(s) into ${availableCapacity} byte(s) of free space.`);
+    }
+    writeToRingBuffer(this.queue.data, bytes, writeIndex);
+    Atomics.store(this.queue.control, 1 /* writeIndex */, ringAdvance(writeIndex, bytes.length, length));
+    Atomics.notify(this.queue.control, 1 /* writeIndex */);
+  }
+  availableCapacity() {
+    const length = this.queue.data.length;
+    const readIndex = Atomics.load(this.queue.control, 0 /* readIndex */);
+    const writeIndex = Atomics.load(this.queue.control, 1 /* writeIndex */);
+    return length - ringUsed(readIndex, writeIndex, length);
+  }
+  async waitForCapacity(minimumBytes, options = {}) {
+    const required = Math.max(0, Math.ceil(minimumBytes));
+    if (required > this.queue.data.length) {
+      return false;
+    }
+    const timeout = options.timeoutMilliseconds ?? capacityWaitTimeoutMilliseconds;
+    while (true) {
+      const readIndex = Atomics.load(this.queue.control, 0 /* readIndex */);
+      if (Atomics.load(this.queue.control, 2 /* closed */) !== 0) {
+        return false;
+      }
+      if (this.availableCapacity() >= required) {
+        return true;
+      }
+      if (typeof Atomics.waitAsync === "function") {
+        const waiting = Atomics.waitAsync(this.queue.control, 0 /* readIndex */, readIndex, timeout);
+        if (waiting.async) {
+          await waiting.value;
+        }
+      } else {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1);
+        });
+      }
+      if (options.singleWait) {
+        return this.availableCapacity() >= required;
+      }
+    }
+  }
+  close() {
+    Atomics.store(this.queue.control, 2 /* closed */, 1);
+    Atomics.notify(this.queue.control, 1 /* writeIndex */);
+    Atomics.notify(this.queue.control, 0 /* readIndex */);
+  }
+}
+function normalizeChunk(chunk) {
+  return typeof chunk == "string" ? new TextEncoder().encode(chunk) : new Uint8Array(chunk);
+}
+function ringUsed(readIndex, writeIndex, length) {
+  const span = 2 * length;
+  return ((writeIndex - readIndex) % span + span) % span;
+}
+function ringAdvance(index, delta, length) {
+  return (index + delta) % (2 * length);
+}
+function writeToRingBuffer(buffer, chunk, startIndex) {
+  const offset = startIndex % buffer.length;
+  const firstSegmentLength = Math.min(chunk.length, buffer.length - offset);
+  buffer.set(chunk.subarray(0, firstSegmentLength), offset);
+  if (firstSegmentLength < chunk.length) {
+    buffer.set(chunk.subarray(firstSegmentLength), 0);
+  }
+}
 
 // src/wasi/BrowserWASIBridge.ts
 var maximumWASIResyncControlBytes = sharedInputQueueDefaultCapacity - 1;
@@ -3238,7 +3389,8 @@ class WebHostSceneRuntime {
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
   }
   notifyRuntimeIssue(issue) {
-    console.log(issue.description);
+    this.writeOutput(`${issue.description}
+`);
   }
   recordFrameDiagnostic(diagnostic) {
     this.onFrameDiagnostic?.(diagnostic);
