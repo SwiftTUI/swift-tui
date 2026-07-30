@@ -730,8 +730,10 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard !unreserved.contains(character) else {
         return String(character)
       }
+      // `String(format:)` is a variadic C-interop call, hence `unsafe` under
+      // strict memory safety.
       return String(character).utf8
-        .map { String(format: "%%%02X", $0) }
+        .map { unsafe String(format: "%%%02X", $0) }
         .joined()
     }
 

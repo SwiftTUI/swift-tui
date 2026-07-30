@@ -62,8 +62,7 @@ struct WebHostSceneChannelTerminalLifecycleTests {
   @Test("session stop is idempotent, terminal, and reached by every stop path")
   func sessionStopIsIdempotentAndTerminal() async throws {
     let channel = WebHostSceneChannel()
-    var client: AsyncStream<WebHostSocketMessage>.Continuation?
-    let clientStream = AsyncStream<WebHostSocketMessage> { client = $0 }
+    let clientStream = AsyncStream<WebHostSocketMessage> { _ in }
     _ = await channel.attach(client: clientStream)
     try await channel.send(Array("\u{001E}runtimeIssue:{\"code\":\"before-stop\"}\n".utf8))
 

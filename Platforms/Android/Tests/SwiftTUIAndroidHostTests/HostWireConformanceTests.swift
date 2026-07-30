@@ -491,7 +491,7 @@ struct HostWireConformanceTests {
     let expected = try Self.expectation(in: fixture)
     // The undersized-copy interval carries the `copied:false` / `record:null`
     // axes the first interval cannot express; corrupting either must fail.
-    let undersized = try Self.expectations(in: fixture)[1]
+    let undersized = Self.expectations(in: fixture)[1]
     for path in [
       [JSONPathPart.key("androidDeliveries"), .index(0), .key("copied")],
       [JSONPathPart.key("androidDeliveries"), .index(0), .key("record")],
