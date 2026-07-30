@@ -354,6 +354,12 @@ extension List {
       opacity: chrome.opacity
     )
     payload.isViewportBacked = resolvedContent.indexedSource != nil
+    if resolvedContent.indexedSource != nil {
+      // The rows are committed child nodes; the payload's copies were N
+      // identical empty stubs carrying only their count (register item D18).
+      // Carry the count instead of the array.
+      payload.virtualRowCount = rows.count
+    }
     payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
 
     var metadata = focusableControlMetadata(
@@ -417,14 +423,16 @@ extension List {
     in context: ResolveContext
   ) -> ResolvedItems {
     var result = ResolvedItems()
-    result.items.reserveCapacity(source.count)
+    // No `items` array: every entry would be the same empty stub, so the
+    // payload carries `virtualRowCount` instead (register item D18). `rows`
+    // still materializes — the key handlers index it by row and hand its tags
+    // to the selection policy, which takes an ordered array.
     result.rows.reserveCapacity(source.count)
     for index in 0..<source.count {
       let candidateTag = source.elementSelectionTag(at: index)
       let compatibleTag = candidateTag.flatMap { tag in
         selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
       }
-      result.items.append(.init(kind: .row, text: ""))
       result.rows.append(
         .init(
           tag: compatibleTag,

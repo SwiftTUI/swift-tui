@@ -72,6 +72,25 @@ public struct ListPayload: Equatable, Sendable {
   /// so an anchor change denies retained-measurement reuse through payload
   /// equality, the same channel selection changes already use.
   package var scrollAnchorRowIndex: Int?
+  /// Rows a viewport-backed payload stands for without materializing an entry
+  /// per row in ``items``.
+  ///
+  /// A hosted collection's items were N *identical* stubs
+  /// (`.init(kind: .row, text: "")`) — the rows themselves are committed child
+  /// nodes, so the payload's copies carried no information but their count.
+  /// Building and comparing that array was O(dataset) on the resolve path of
+  /// every frame (register item D18). `nil` for payload-only callers, whose
+  /// items are the real content.
+  package var virtualRowCount: Int?
+
+  /// Rows this payload describes, however they are stored.
+  ///
+  /// Every arithmetic path must read this rather than `items.count`: for a
+  /// viewport-backed payload the two disagree, and `items.count` is the wrong
+  /// one.
+  package var rowCount: Int {
+    virtualRowCount ?? items.count
+  }
 
   public init(
     items: [ListItemPayload],

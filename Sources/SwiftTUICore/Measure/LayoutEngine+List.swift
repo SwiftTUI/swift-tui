@@ -17,14 +17,22 @@ extension LayoutEngine {
       return measuredListSize(for: payload, proposal: proposal)
     }
 
+    // A viewport-backed payload stores no items — its rows are committed child
+    // nodes and its copies were identical empty stubs — so the stub is
+    // synthesized here rather than looked up. Its only load-bearing field is
+    // `kind`, and a hosted row is always `.row`.
+    let stub = ListItemPayload(kind: .row, text: "")
+    func item(at index: Int) -> ListItemPayload {
+      payload.items.indices.contains(index) ? payload.items[index] : stub
+    }
+
     let pairs: [(item: ListItemPayload, measurement: MeasuredNode)]
     if let sourceIndices {
-      pairs = zip(sourceIndices, childMeasurements).compactMap { index, measurement in
-        guard payload.items.indices.contains(index) else {
-          return nil
-        }
-        return (payload.items[index], measurement)
+      pairs = zip(sourceIndices, childMeasurements).map { index, measurement in
+        (item(at: index), measurement)
       }
+    } else if payload.items.isEmpty {
+      pairs = childMeasurements.map { (stub, $0) }
     } else {
       pairs = Array(zip(payload.items, childMeasurements))
     }

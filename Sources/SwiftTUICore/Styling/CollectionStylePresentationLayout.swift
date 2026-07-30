@@ -176,11 +176,12 @@ extension CollectionStylePresentation {
     if payload.isViewportBacked {
       let horizontalInset = listContentInsets.leading + listContentInsets.trailing
       let verticalInset = listContentInsets.top + listContentInsets.bottom
-      let separatorCount = showsListRowSeparators ? max(0, payload.items.count - 1) : 0
-      let markerWidth = payload.showsSelectionMarker && !payload.items.isEmpty ? 2 : 0
+      let rowCount = payload.rowCount
+      let separatorCount = showsListRowSeparators ? max(0, rowCount - 1) : 0
+      let markerWidth = payload.showsSelectionMarker && rowCount > 0 ? 2 : 0
       return CellSize(
         width: markerWidth + horizontalInset,
-        height: payload.items.count + separatorCount + verticalInset
+        height: rowCount + separatorCount + verticalInset
       )
     }
     let horizontalInset = listContentInsets.leading + listContentInsets.trailing
@@ -410,20 +411,20 @@ extension CollectionStylePresentation {
     viewportLineCount: Int,
     rowWindow: Range<Int>?
   ) -> GeneratedListLines {
-    guard viewportLineCount > 0, !payload.items.isEmpty else {
+    guard viewportLineCount > 0, payload.rowCount > 0 else {
       return ([], 0, 0, false)
     }
 
     let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
     let window = viewportBackedListWindow(
-      itemCount: payload.items.count,
+      itemCount: payload.rowCount,
       selectedRowIndex: payload.selectedRowIndex,
       anchorRowIndex: payload.scrollAnchorRowIndex,
       showsIndicators: payload.showsIndicators,
       viewportLineCount: viewportLineCount
     )
     let rowSpan = window.rowSpan
-    let bodyLineCount = payload.items.count * rowSpan - (rowSpan - 1)
+    let bodyLineCount = payload.rowCount * rowSpan - (rowSpan - 1)
     let displayLineCount = window.displayLineCount
     var offset = window.offset
     var end = window.end
@@ -517,7 +518,13 @@ extension CollectionStylePresentation {
     }
 
     let rowIndex = bodyPosition / rowSpan
-    let item = payload.items[rowIndex]
+    // A viewport-backed payload stores no items: the row is a committed child
+    // node and the payload's copy was an empty stub carrying only defaults, so
+    // the default is exactly what the stub would have supplied.
+    let item =
+      payload.items.indices.contains(rowIndex)
+      ? payload.items[rowIndex]
+      : ListItemPayload(kind: .row, text: "")
     let isSelected = rowIndex == payload.selectedRowIndex
     var style = item.style
     if let rowForegroundStyle = item.rowForegroundStyle {

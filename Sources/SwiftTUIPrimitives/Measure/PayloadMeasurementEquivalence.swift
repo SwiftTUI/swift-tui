@@ -66,6 +66,10 @@ extension ListPayload {
     style == other.style
       && selectedRowIndex == other.selectedRowIndex
       && showsSelectionMarker == other.showsSelectionMarker
+      // Not `items.count`: a viewport-backed payload stores no items, so its
+      // row count lives in `virtualRowCount` and comparing the arrays alone
+      // would call two differently-sized collections equivalent.
+      && rowCount == other.rowCount
       && items.isEquivalentForMeasurement(to: other.items)
   }
 }
