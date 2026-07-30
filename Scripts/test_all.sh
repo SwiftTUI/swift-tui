@@ -185,6 +185,7 @@ Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - stable-doc source-path guardrails
   - explicit layout work-stack guardrails
+  - frame-tail tree-walker recursion guardrails (plus their self-test)
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
   - rendered-text fixture matrix guardrails
@@ -876,6 +877,18 @@ run_step \
   "$repo_root" \
   "Scripts/check_layout_work_stack_guardrails.sh" \
   Scripts/check_layout_work_stack_guardrails.sh
+
+run_step \
+  "Run tree-walker recursion guardrails" \
+  "$repo_root" \
+  "Scripts/check_tree_walker_recursion.sh" \
+  Scripts/check_tree_walker_recursion.sh
+
+run_step \
+  "Self-test tree-walker recursion guardrails" \
+  "$repo_root" \
+  "Scripts/check_tree_walker_recursion.sh --self-test" \
+  Scripts/check_tree_walker_recursion.sh --self-test
 
 run_step \
   "Check Foundation-free layers (transitive)" \
