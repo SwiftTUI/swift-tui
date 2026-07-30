@@ -110,15 +110,35 @@ extension HostWireConformanceTests {
     case index(Int)
   }
 
-  static func expectation(
+  /// The fixture's first expectation, plus the step index it occupies. Meta
+  /// tests corrupt *that* interval, so they need the index to splice a
+  /// corrupted expectation back into the step list at the right place —
+  /// a multi-interval fixture is no longer "the last step".
+  static func firstExpectation(
     in fixture: HostWireConformanceFixture
-  ) throws -> HostWireConformanceJSON {
-    for step in fixture.steps.reversed() {
+  ) throws -> (stepIndex: Int, expectation: HostWireConformanceJSON) {
+    for (index, step) in fixture.steps.enumerated() {
       if case .expect(let expectation) = step {
-        return expectation
+        return (index, expectation)
       }
     }
     throw HostWireConformanceError.invalid("\(fixture.entry.file): expectation missing")
+  }
+
+  static func expectation(
+    in fixture: HostWireConformanceFixture
+  ) throws -> HostWireConformanceJSON {
+    try firstExpectation(in: fixture).expectation
+  }
+
+  /// Every expectation interval, in fixture order.
+  static func expectations(
+    in fixture: HostWireConformanceFixture
+  ) -> [HostWireConformanceJSON] {
+    fixture.steps.compactMap { step in
+      guard case .expect(let expectation) = step else { return nil }
+      return expectation
+    }
   }
 
   static func replacingJSONValue(

@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"640752802ef20cfcd0683f7c206111ac3500a35339d2af08f764030d2478710a","bodySHA256":"27a5c95eab79def001b1fa807890f21122efca56641f5d153ba0ddc3536e737e"}
+{"formatVersion":1,"manifestSHA256":"d4bc47f6cc10c47de89239aa61c80e73c2a32e2780f8b187ec9ab4b45b30bbf9","bodySHA256":"27a5c95eab79def001b1fa807890f21122efca56641f5d153ba0ddc3536e737e"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":101,\"gen\":1,\"sequence\":1,\"width\":4,\"height\":1,\"styles\":[null],\"rows\":[[[0,\"A\",1,0],[2,\"界\",2,0]]],\"images\":[]}\n"}
 {"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":101,\"gen\":2,\"baselineGen\":1,\"sequence\":2,\"width\":4,\"height\":1,\"styles\":[null],\"deltaRows\":[[0,[[0,\"B\",1,0],[2,\"宽\",2,0]]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,4]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
 {"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"B"},{"column":2,"span":2,"text":"宽"}],"row":0}]}}

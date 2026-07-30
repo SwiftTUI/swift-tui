@@ -1,10 +1,10 @@
 import Foundation
-import SwiftTUIAndroidHost
 @_spi(Runners) import SwiftTUIRuntime
 import SwiftTUIWASISurfaceBridge
 import Synchronization
 import Testing
 
+@testable import SwiftTUIAndroidHost
 @testable import SwiftTUIWebHost
 
 @MainActor
@@ -22,6 +22,10 @@ struct HostWireConformanceAndroidABIRunner {
       throw HostWireConformanceError.invalid(
         "swift-android-abi: delta capability declaration failed")
     }
+    // Fresh host state, no published frame, delta enabled, `styleAppend`
+    // disabled — plus the runner's pinned epoch, which is what lets the
+    // fixture assert an exact `epoch` on every delivered record.
+    host.pinWireEncodingEpoch(HostWireConformanceCorpus.androidABIRunnerEpochID)
   }
 
   static func runActiveFixtures(

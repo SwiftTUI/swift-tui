@@ -102,9 +102,12 @@ repairable baseline/image state, but still has no delivery acknowledgement.
 
 Each newly negotiated encoding state receives a process-local `UInt32`
 `epochID`. Records emitted from that state carry the additive-optional keys
-`epoch` and `gen`; `gen` begins at 1 and increases once for every successfully
-encoded full or delta record. A delta also carries `baselineGen`, the
-generation immediately preceding it in that epoch.
+`epoch` and `gen`; `gen` begins at 1 and increases once for every full or delta
+record the encoding state commits. A delta also carries `baselineGen`, the
+generation immediately preceding it in that epoch. On the Android copy ABI the
+commit is the delivery leg, so a generation encoded for a handshake that never
+copied is discarded rather than consumed — a consumer therefore never receives
+a `baselineGen` naming a record it was never sent.
 
 The tuple `(epoch, gen)` is encoder-owned. It is not the runtime frame
 `sequence`: a keyframe repair can re-encode the same Android frame sequence
@@ -201,11 +204,13 @@ retained the bytes.
 | --- | --- |
 | WASI browser | Capabilities and state are created with the transport. `present` encodes and mutates state, then synchronously writes the complete record to stdout. A write error can occur after the mutation; there is no acknowledgement. Reloading constructs a fresh transport. A parsed `resync` record mutates the existing state under its mutex. |
 | Localhost WebHost | `present` encodes and mutates state before enqueuing bytes on the asynchronous FIFO sink pump. Send completion and failure are observed later through `drain` or a subsequent enqueue. Every accepted `caps` declaration replaces all encoding state and begins a new connection epoch; `resync` instead repairs the current epoch under the same state mutex. |
-| Host-managed Android | Encoding is deferred to `copyLatestFrameBytes`. The first size query for a new sequence encodes into committed state, increments the encoded-frame count, and clears accumulated damage before checking whether a destination buffer can receive the bytes. The following copy call reuses those scratch bytes if the sequence is unchanged. An accepted resync clears the scratch sequence so even the same latest frame is re-encoded with the repaired state. |
+| Host-managed Android | **Delivery-coupled.** Encoding is deferred to `copyLatestFrameBytes` and runs against a *candidate* copy of the encoding state. A size query for a newer sequence encodes and stores that candidate beside committed state; a copy serves the scratch its preceding size query measured — never a newer re-encode — and promotes candidate → committed only once bytes are written into the caller's buffer. An accepted resync drops the whole scratch, including any uncommitted candidate, so the next handshake re-encodes from repaired committed state. |
 
-These are encode-time epochs, not delivery-coupled epochs. A failed write,
-failed asynchronous send, abandoned Android size query, failed decode, or
-consumer eviction does not roll the encoder state back.
+The WASI and WebHost rows are encode-time epochs: a failed write, a failed
+asynchronous send, or a consumer eviction does not roll the encoder state back.
+Android is the one transport where encode and delivery are separate calls, and
+it is therefore the one transport whose ratchet is coupled to delivery — see
+[Android delivery-coupled commit](#android-delivery-coupled-commit).
 
 ## Capability ingress
 
@@ -311,22 +316,41 @@ structurally. Browser consumption applies the defaults above; Android retains
 focus, accessibility, and scaling strings, omits image format from its model,
 and applies host-side defaults.
 
-## Android single-looper convention
+## Android delivery-coupled commit
 
-The supported Android host runs frame polling on the Android main looper. Each
-iteration calls `tick()` and then performs the size/copy handshake
-sequentially. `tick()` drains ready Swift main-actor work, including frame
-commits. The exported lifecycle and frame-control entry points use checked
-main-actor access, but the mutex-guarded copy entry point does not. The shipped
-Kotlin poll loop's main-looper call order, rather than the copy ABI itself,
-maintains the single-looper convention.
+The two-phase copy ABI is a size query (`outBuffer == nil`) followed by a copy.
+Because those are two calls, a frame commit can land between them, and the
+first call can be abandoned entirely. The ABI is sound under both:
 
-This convention currently prevents a Swift frame commit from interleaving
-between the size query and copy in the supported host. Until delivery-coupled
-candidate commit exists, a host that permits a frame commit between those two
-calls must not use this handshake. The convention does not make the size query
-a delivery acknowledgement: abandoning the second call still leaves encoder
-state advanced.
+- **The size query is not a delivery acknowledgement.** It encodes against a
+  candidate copy of the encoding state — the transmitted-image set, the
+  accumulated style epoch, and the delta baseline — and leaves committed state
+  untouched. A handshake that is never copied consumes no generation, transmits
+  no image, and advances no baseline; the next size query re-encodes from
+  committed state, which is why an abandoned candidate's frame is followed by a
+  record whose generation and baseline generation are the ones the consumer
+  actually holds.
+- **A copy delivers what its size query measured.** A commit that lands
+  mid-handshake does not make the copy re-encode: reporting one frame's size
+  and delivering another is exactly the straddle this coupling closes. The
+  newer frame is picked up by the next poll.
+- **Accumulated damage follows the same candidate rule.** Damage unions across
+  committed-but-unpolled frames, because a consumed frame's own damage
+  under-covers the diff against the previous *consumed* frame. The candidate
+  encode consumes that union and frames arriving during the handshake
+  accumulate from empty, so a commit drops exactly the damage the delivered
+  record covered. An abandoned candidate folds its damage back into the live
+  accumulator instead of dropping it.
+- **An undersized copy is not a delivery.** When the caller's capacity cannot
+  hold the record, the reported size is returned, no bytes leave the process,
+  and nothing ratchets. The client retries with the reported size and receives
+  the same record.
+
+A host may therefore commit frames from a thread other than the one performing
+the handshake without corrupting the wire. The shipped Kotlin poll loop still
+calls `tick()` and then the handshake sequentially on the Android main looper,
+but that ordering is now a scheduling property of the client, not a soundness
+requirement of the ABI.
 
 ## Contract stage status
 
@@ -339,7 +363,7 @@ forward-looking; the rows below describe only the state at this package's
 | --- | --- |
 | S1 | Complete: every surface record carries an epoch and generation, deltas name their baseline generation, all three Swift host ingresses accept keyframe/image resync, and the sibling browser and Android decoders validate stamped baselines and emit deduplicated keyframe repairs. |
 | S2 | Resend-on-miss is complete: browser decode/cache misses enter bounded unresolved/request tracking, with overflow deferred and admitted IDs deduplicated until payload repair, disappearance, or epoch reset; Android bitmap-cache eviction requests selected IDs deduplicated until payload repair or epoch reset. Android treats a lazy-JNI old-host return of zero as unavailable rather than retrying it or treating an incidental keyframe as image repair. The wire still has no retained-image acknowledgement. |
-| S3a | Android's size query commits cross-frame encoder state before the bytes are copied and decoded. An abandoned handshake, a grown second query, or decode failure can strand that state. |
+| S3a | Complete: the Android copy ABI encodes against a candidate and commits only when bytes are copied out. An abandoned size query, an undersized copy, or a commit landing mid-handshake leaves committed encoder state and accumulated damage intact. See [Android delivery-coupled commit](#android-delivery-coupled-commit). |
 | S3b | `WebHostSceneChannel` retains an unbounded detached output backlog and flushes it when a client attaches, before processing that client's capability declaration. Detached surface records can therefore precede the epoch reset intended for the new client. |
 | S3d | Every delta retransmits the complete accumulated style table. Measured style churn makes late-record cost grow with the epoch rather than with current damage. |
 | S3e | The browser/WASI shared input queue rejects a control record larger than its remaining 64 KiB capacity as one chunk. The paste route catches and reports the error but drops the whole logical paste. |

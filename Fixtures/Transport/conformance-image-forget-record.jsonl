@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"640752802ef20cfcd0683f7c206111ac3500a35339d2af08f764030d2478710a","bodySHA256":"dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199"}
+{"formatVersion":1,"manifestSHA256":"d4bc47f6cc10c47de89239aa61c80e73c2a32e2780f8b187ec9ab4b45b30bbf9","bodySHA256":"dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":105,\"gen\":1,\"sequence\":1,\"width\":1,\"height\":1,\"styles\":[null],\"rows\":[[[0,\" \",1,0]]],\"images\":[{\"id\":\"png:827f0aac2fc7daf7:9\",\"format\":\"png\",\"bounds\":[0,0,1,1],\"visibleBounds\":[0,0,1,1],\"scalingMode\":\"stretch\",\"pixelSize\":[1,1],\"dataBase64\":\"iVBORw0KGgoB\"}]}\n"}
 {"expect":{"imagesVisible":["png:827f0aac2fc7daf7:9"],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":" "}],"row":0}]}}
 {"evictImages":["png:827f0aac2fc7daf7:9"]}

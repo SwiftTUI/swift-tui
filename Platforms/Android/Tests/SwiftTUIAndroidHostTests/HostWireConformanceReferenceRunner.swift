@@ -14,7 +14,89 @@ enum HostWireConformanceExactComparator {
     context: String
   ) throws {
     guard actual == expected else {
-      throw HostWireConformanceError.invalid("\(context): exact observation mismatch")
+      throw HostWireConformanceError.invalid(
+        "\(context): exact observation mismatch\(detail(actual, expected))")
+    }
+  }
+
+  /// The first differing JSON path, when both sides are conformance JSON.
+  /// A bare "mismatch" makes every oracle failure a bisecting exercise; the
+  /// path plus both values is what the message is for.
+  private static func detail<T>(
+    _ actual: T,
+    _ expected: T
+  ) -> String {
+    guard let actual = actual as? HostWireConformanceJSON,
+      let expected = expected as? HostWireConformanceJSON,
+      let difference = firstDifference(actual, expected, path: "")
+    else {
+      return ""
+    }
+    return
+      "\n  at \(difference.path.isEmpty ? "<root>" : difference.path)"
+      + "\n  actual:   \(difference.actual)"
+      + "\n  expected: \(difference.expected)"
+  }
+
+  private static func firstDifference(
+    _ actual: HostWireConformanceJSON,
+    _ expected: HostWireConformanceJSON,
+    path: String
+  ) -> (path: String, actual: String, expected: String)? {
+    guard actual != expected else { return nil }
+    switch (actual, expected) {
+    case (.object(let actualObject), .object(let expectedObject)):
+      for key in Set(actualObject.keys).union(expectedObject.keys).sorted() {
+        guard let actualValue = actualObject[key], let expectedValue = expectedObject[key]
+        else {
+          return (
+            "\(path).\(key)", describe(actualObject[key]), describe(expectedObject[key])
+          )
+        }
+        if let difference = firstDifference(
+          actualValue, expectedValue, path: "\(path).\(key)")
+        {
+          return difference
+        }
+      }
+    case (.array(let actualArray), .array(let expectedArray)):
+      for index in 0..<max(actualArray.count, expectedArray.count) {
+        guard index < actualArray.count, index < expectedArray.count else {
+          return (
+            "\(path)[\(index)]",
+            describe(actualArray.indices.contains(index) ? actualArray[index] : nil),
+            describe(expectedArray.indices.contains(index) ? expectedArray[index] : nil)
+          )
+        }
+        if let difference = firstDifference(
+          actualArray[index], expectedArray[index], path: "\(path)[\(index)]")
+        {
+          return difference
+        }
+      }
+    default:
+      break
+    }
+    return (path, describe(actual), describe(expected))
+  }
+
+  private static func describe(
+    _ value: HostWireConformanceJSON?
+  ) -> String {
+    guard let value else { return "<absent>" }
+    switch value {
+    case .object(let object):
+      return "{\(object.keys.sorted().joined(separator: ","))}"
+    case .array(let array):
+      return "[\(array.count) elements]"
+    case .string(let string):
+      return "\"\(string)\""
+    case .integer(let integer):
+      return "\(integer)"
+    case .bool(let bool):
+      return "\(bool)"
+    case .null:
+      return "null"
     }
   }
 }

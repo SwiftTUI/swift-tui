@@ -13,8 +13,20 @@ private struct AndroidHostSceneHostState: Sendable {
   // never encoded, and a future delta baseline tracks consumed frames by
   // construction (convergence proposal 2026-07-22-002, Stage C0).
   var encodedFrameBytes: [UInt8]?
-  var encodedFrameSequence: UInt64?
+  var encodedUpToSequence: UInt64?
   var encodedFrameCount = 0
+  // Delivery-coupled ratchet (plan 2026-07-28-006, S3a): the scratch above is
+  // encoded against a *candidate* encoding state that becomes committed only
+  // when the copy leg actually writes bytes out. A size query, an abandoned
+  // handshake, or an undersized copy therefore never advances the wire's
+  // cross-frame state, so the bytes a consumer receives always name a
+  // baseline the encoder still believes in.
+  var candidateEncodingState: HostWireEncodingState?
+  // The accumulated damage the candidate encode consumed. Held aside rather
+  // than dropped so an abandoned handshake can fold it back into the live
+  // accumulator; dropped for good only at commit.
+  var candidateDamage: PresentationDamage?
+  var hasCandidateDamage = false
   var latestEncodingErrorDescription: String?
   // Converged web-surface emission (convergence proposal 2026-07-22-002;
   // the legacy keyed-JSON wire retired in Stage C4): the encoding state
@@ -113,6 +125,24 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       // `declareCapabilities(json:)`), so this re-anchor always lands before
       // any frame has been emitted.
       state.webEncodingState = capabilities.negotiatedEncodingState()
+      Self.invalidateEncodeScratch(&state)
+    }
+  }
+
+  /// Re-anchors the encoding state on a caller-chosen epoch.
+  ///
+  /// Test-only seam, and deliberately not part of the host's public or
+  /// `package` surface: the byte-frozen host-wire conformance fixtures name an
+  /// exact `epoch`, which a process-global epoch counter cannot reproduce. It
+  /// still routes through the declaration's negotiated door, because that door
+  /// — not a transport — owns what an epoch is.
+  func pinWireEncodingEpoch(
+    _ epochID: UInt32
+  ) {
+    state.withLock { state in
+      state.webEncodingState = state.wireCapabilities.negotiatedEncodingState(
+        epochID: epochID)
+      Self.invalidateEncodeScratch(&state)
     }
   }
 
@@ -121,10 +151,11 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   ) {
     state.withLock { state in
       state.webEncodingState.requestResync(request)
-      // The latest frame may already have encode-at-copy scratch. Clearing
-      // its sequence forces the next size/copy handshake to re-encode that
-      // same frame with the repaired delivery state.
-      state.encodedFrameSequence = nil
+      // The latest frame may already have encode-at-copy scratch, encoded
+      // against a candidate that predates the repair. Dropping the whole
+      // scratch forces the next size/copy handshake to re-encode that same
+      // frame from the repaired committed state.
+      Self.invalidateEncodeScratch(&state)
     }
   }
 
@@ -148,6 +179,18 @@ private final class AndroidHostSceneHostStateBox: Sendable {
   /// Serves the latest frame's encoded bytes, encoding at most once per
   /// consumed frame: the two-phase ABI copy (size query, then copy) and
   /// repeated polls of an unchanged frame all reuse the scratch.
+  ///
+  /// Encode and delivery are two distinct legs here, which is what makes this
+  /// transport — alone among the three — able to ratchet encoder state for
+  /// bytes that never left the process. The split is therefore explicit:
+  ///
+  /// - **Encode leg.** A size query (`outBuffer == nil`) re-encodes whenever
+  ///   the scratch does not already hold the latest frame, against a
+  ///   *candidate* copy of the encoding state.
+  /// - **Delivery leg.** A copy serves the scratch the preceding size query
+  ///   measured — it never re-encodes a newer frame, because reporting one
+  ///   frame's size and delivering another is the straddle this stage closes —
+  ///   and promotes candidate → committed only once bytes are written out.
   func copyEncodedFrameBytes(
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int
@@ -156,30 +199,45 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       guard let frame = state.latestFrame else {
         return 0
       }
-      if state.encodedFrameSequence != frame.sequence || state.encodedFrameBytes == nil {
+      let isDeliveryLeg = unsafe outBuffer != nil
+      let scratchHoldsLatestFrame =
+        state.encodedFrameBytes != nil && state.encodedUpToSequence == frame.sequence
+      if !scratchHoldsLatestFrame, state.encodedFrameBytes == nil || !isDeliveryLeg {
         let style = state.encodingStyle ?? .default
+        // The candidate carries every axis of cross-frame state: the
+        // transmit-once image set, the accumulated style epoch, and the delta
+        // baseline. Committed state is untouched until delivery succeeds.
+        var candidate = state.webEncodingState
         // Converged web-surface emission (the only Android wire since the
         // Stage C4 retirement): the accumulated damage makes the record's
         // diff consumption-relative, which is what keeps delta records
-        // sound under the skipping poll (Stage C3).
+        // sound under the skipping poll (Stage C3). An earlier abandoned
+        // candidate's damage folds back in here so no committed frame's
+        // damage is lost by a handshake that never delivered.
+        let consumedDamage = Self.unionAccumulatedDamage(&state)
         let model = HostWireFrameModel(
           surface: frame.raster,
           sequence: frame.sequence,
           semanticSnapshot: frame.semantics,
           focusedIdentity: frame.focusedIdentity,
-          damage: state.hasPendingDamage ? state.pendingDamage : frame.rasterDamage,
+          damage: consumedDamage.hasDamage ? consumedDamage.damage : frame.rasterDamage,
           preferredLayoutSize: frame.preferredLayoutSize,
           terminalStyle: style.renderStyle
         )
         let output = WebSurfaceFrameEncoder.encode(
           model,
           fallbackBackground: style.renderStyle.appearance.backgroundColor,
-          state: &state.webEncodingState
+          state: &candidate
         )
         state.encodedFrameBytes = Array(output.utf8)
-        state.encodedFrameSequence = frame.sequence
+        state.encodedUpToSequence = frame.sequence
         state.encodedFrameCount += 1
         state.latestEncodingErrorDescription = nil
+        state.candidateEncodingState = candidate
+        state.candidateDamage = consumedDamage.damage
+        state.hasCandidateDamage = consumedDamage.hasDamage
+        // Frames arriving during this handshake accumulate from empty, so a
+        // commit drops exactly the damage the delivered record covered.
         state.pendingDamage = nil
         state.hasPendingDamage = false
       }
@@ -187,11 +245,49 @@ private final class AndroidHostSceneHostStateBox: Sendable {
         return 0
       }
       guard let outBuffer = unsafe outBuffer, capacity >= bytes.count else {
+        // A size query, or a copy whose buffer cannot hold the record: no
+        // bytes left the process, so no state ratchets. The client retries
+        // with the reported size.
         return bytes.count
       }
       unsafe outBuffer.update(from: bytes, count: bytes.count)
+      if let candidate = state.candidateEncodingState {
+        state.webEncodingState = candidate
+        state.candidateEncodingState = nil
+        state.candidateDamage = nil
+        state.hasCandidateDamage = false
+      }
       return bytes.count
     }
+  }
+
+  /// Folds an abandoned candidate's damage back into the live accumulator and
+  /// returns the union the next encode must cover.
+  private static func unionAccumulatedDamage(
+    _ state: inout AndroidHostSceneHostState
+  ) -> (damage: PresentationDamage?, hasDamage: Bool) {
+    guard state.hasCandidateDamage else {
+      return (state.pendingDamage, state.hasPendingDamage)
+    }
+    guard state.hasPendingDamage else {
+      return (state.candidateDamage, true)
+    }
+    return (unionDamage(state.candidateDamage, state.pendingDamage), true)
+  }
+
+  /// Drops the encode-at-copy scratch and any uncommitted candidate, folding
+  /// the candidate's damage back so the next encode still covers it.
+  private static func invalidateEncodeScratch(
+    _ state: inout AndroidHostSceneHostState
+  ) {
+    let restored = unionAccumulatedDamage(&state)
+    state.pendingDamage = restored.damage
+    state.hasPendingDamage = restored.hasDamage
+    state.candidateDamage = nil
+    state.hasCandidateDamage = false
+    state.candidateEncodingState = nil
+    state.encodedFrameBytes = nil
+    state.encodedUpToSequence = nil
   }
 
   func updateFocusPresentation(
@@ -354,6 +450,14 @@ public final class AndroidHostSceneHost {
   /// advance it, while a requested same-sequence resync re-encode must.
   package var consumedFrameEncodeCount: Int {
     state.encodedFrameCount
+  }
+
+  /// Test-only deterministic epoch pin for the host-wire conformance oracle;
+  /// see `AndroidHostSceneHostStateBox.pinWireEncodingEpoch(_:)`.
+  func pinWireEncodingEpoch(
+    _ epochID: UInt32
+  ) {
+    state.pinWireEncodingEpoch(epochID)
   }
 
   public var latestEncodingErrorDescription: String? {

@@ -386,18 +386,57 @@ extension HostWireConformanceStreamRecorder {
   }
 
   private static func androidDeliveryCommitScenario() throws -> Scenario {
-    var state = HostWireEncodingState(deltaEnabled: true, epochID: 301)
+    var state = HostWireEncodingState(
+      deltaEnabled: true,
+      epochID: HostWireConformanceCorpus.androidABIRunnerEpochID
+    )
+    // This scenario's bytes must be the bytes the *Android host seam* emits,
+    // not the bytes a bare encoder call emits: the host always encodes with
+    // its render style (`AndroidHostStyle.default.renderStyle`), so the record
+    // carries a `terminalStyle` object. Recording without it produced a
+    // fixture no real ABI delivery could ever satisfy.
+    let hostStyle = TerminalRenderStyle(appearance: .fallback)
+    // Two independently damageable columns with a gap between them: that is
+    // what makes the accumulated-damage half of the candidate rule observable
+    // in the delivered rows rather than only in the byte count.
     let first = encode(
-      surface: singleCellSurface("A"),
+      surface: gappedSurface("A", "Z"),
       sequence: 1,
       damage: nil,
-      state: &state
+      state: &state,
+      terminalStyle: hostStyle
     )
     let second = encode(
-      surface: singleCellSurface("B"),
+      surface: gappedSurface("B", "Z"),
       sequence: 2,
-      damage: fullRowDamage(width: 1),
-      state: &state
+      damage: columnDamage([0..<1]),
+      state: &state,
+      terminalStyle: hostStyle
+    )
+    // The abandoned-handshake discriminator. Sequence 3 changes the trailing
+    // column and is size-queried but never copied, so nothing of it ever
+    // reaches the wire: its generation must not be consumed and its damage
+    // must not be lost. The recorder therefore does *not* encode it — the next
+    // delivered record is sequence 4's delta, still generation 3 against
+    // baseline generation 2, and it must carry *both* changed columns.
+    //
+    // An encoder that ratchets at encode time instead hands the consumer
+    // generation 4 over a baseline generation 3 it never received; one that
+    // drops the abandoned candidate's damage silently strands the trailing
+    // column at its stale glyph forever.
+    let third = encode(
+      surface: gappedSurface("C", "Y"),
+      sequence: 4,
+      damage: columnDamage([0..<1, 2..<3]),
+      state: &state,
+      terminalStyle: hostStyle
+    )
+    let fourth = encode(
+      surface: gappedSurface("C", "X"),
+      sequence: 5,
+      damage: columnDamage([2..<3]),
+      state: &state,
+      terminalStyle: hostStyle
     )
     return Scenario(
       file: "conformance-android-delivery-commit.jsonl",
@@ -409,18 +448,20 @@ extension HostWireConformanceStreamRecorder {
       steps: [
         [
           "androidABI": [
-            "action": "publish", "sequence": 1, "width": 1, "height": 1,
-            "rows": [gridRow(0, [(0, "A", 1)])], "damage": NSNull(),
+            "action": "publish", "sequence": 1, "width": 3, "height": 1,
+            "rows": [gridRow(0, [(0, "A", 1), (2, "Z", 1)])], "damage": NSNull(),
           ]
         ],
         ["androidABI": ["action": "sizeQuery", "label": "q1"]],
         [
           "androidABI": [
-            "action": "publish", "sequence": 2, "width": 1, "height": 1,
-            "rows": [gridRow(0, [(0, "B", 1)])],
+            "action": "publish", "sequence": 2, "width": 3, "height": 1,
+            "rows": [gridRow(0, [(0, "B", 1), (2, "Z", 1)])],
             "damage": ["rows": [["row": 0, "ranges": [[0, 1]]]]],
           ]
         ],
+        // The straddle: sequence 2 committed between q1's size query and its
+        // copy. The copy must still deliver the bytes q1 measured.
         ["androidABI": ["action": "copy", "label": "q1", "capacity": 4096]],
         ["androidABI": ["action": "sizeQuery", "label": "q2"]],
         ["androidABI": ["action": "copy", "label": "q2", "capacity": 4096]],
@@ -441,6 +482,68 @@ extension HostWireConformanceStreamRecorder {
                 returned: second.utf8.count,
                 raw: second
               ),
+            ]
+          ]
+        ],
+        [
+          "androidABI": [
+            "action": "publish", "sequence": 3, "width": 3, "height": 1,
+            "rows": [gridRow(0, [(0, "B", 1), (2, "Y", 1)])],
+            "damage": ["rows": [["row": 0, "ranges": [[2, 3]]]]],
+          ]
+        ],
+        // Size-queried, never copied: the abandoned handshake.
+        ["androidABI": ["action": "sizeQuery", "label": "q3"]],
+        [
+          "androidABI": [
+            "action": "publish", "sequence": 4, "width": 3, "height": 1,
+            "rows": [gridRow(0, [(0, "C", 1), (2, "Y", 1)])],
+            "damage": ["rows": [["row": 0, "ranges": [[0, 1]]]]],
+          ]
+        ],
+        ["androidABI": ["action": "sizeQuery", "label": "q4"]],
+        // Undersized copy: the reported size comes back, no bytes go out.
+        ["androidABI": ["action": "copy", "label": "q4", "capacity": 4]],
+        ["androidABI": ["action": "copy", "label": "q4", "capacity": 4096]],
+        [
+          "expect": [
+            "androidDeliveries": [
+              try HostWireConformanceRecordDecoding.androidDelivery(
+                label: "q4",
+                reported: third.utf8.count,
+                capacity: 4,
+                returned: third.utf8.count,
+                raw: nil
+              ),
+              try HostWireConformanceRecordDecoding.androidDelivery(
+                label: "q4",
+                reported: third.utf8.count,
+                capacity: 4096,
+                returned: third.utf8.count,
+                raw: third
+              ),
+            ]
+          ]
+        ],
+        [
+          "androidABI": [
+            "action": "publish", "sequence": 5, "width": 3, "height": 1,
+            "rows": [gridRow(0, [(0, "C", 1), (2, "X", 1)])],
+            "damage": ["rows": [["row": 0, "ranges": [[2, 3]]]]],
+          ]
+        ],
+        ["androidABI": ["action": "sizeQuery", "label": "q5"]],
+        ["androidABI": ["action": "copy", "label": "q5", "capacity": 4096]],
+        [
+          "expect": [
+            "androidDeliveries": [
+              try HostWireConformanceRecordDecoding.androidDelivery(
+                label: "q5",
+                reported: fourth.utf8.count,
+                capacity: 4096,
+                returned: fourth.utf8.count,
+                raw: fourth
+              )
             ]
           ]
         ],
@@ -588,7 +691,8 @@ extension HostWireConformanceStreamRecorder {
     surface: RasterSurface,
     sequence: UInt64,
     damage: PresentationDamage?,
-    state: inout HostWireEncodingState
+    state: inout HostWireEncodingState,
+    terminalStyle: TerminalRenderStyle? = nil
   ) -> String {
     WebSurfaceFrameEncoder.encode(
       HostWireFrameModel(
@@ -597,7 +701,8 @@ extension HostWireConformanceStreamRecorder {
         semanticSnapshot: nil,
         focusedIdentity: nil,
         damage: damage,
-        preferredLayoutSize: nil
+        preferredLayoutSize: nil,
+        terminalStyle: terminalStyle
       ),
       fallbackBackground: TerminalAppearance.fallback.backgroundColor,
       state: &state
@@ -669,6 +774,30 @@ extension HostWireConformanceStreamRecorder {
   ) -> PresentationDamage {
     PresentationDamage(
       textRows: [.init(row: 0, columnRanges: [0..<width])]
+    )
+  }
+
+  private static func columnDamage(
+    _ columnRanges: [Range<Int>]
+  ) -> PresentationDamage {
+    PresentationDamage(textRows: [.init(row: 0, columnRanges: columnRanges)])
+  }
+
+  /// Two single-cell glyphs with an untouched column between them, so damage
+  /// over one column is observably distinct from damage over the other.
+  private static func gappedSurface(
+    _ leading: Character,
+    _ trailing: Character
+  ) -> RasterSurface {
+    RasterSurface(
+      size: .init(width: 3, height: 1),
+      cells: [
+        [
+          .init(character: leading),
+          .empty,
+          .init(character: trailing),
+        ]
+      ]
     )
   }
 

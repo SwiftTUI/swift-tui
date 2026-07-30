@@ -40,6 +40,20 @@ package struct HostWireCapabilities: Equatable, Sendable {
     HostWireEncodingState(deltaEnabled: acceptsDeltaFrames)
   }
 
+  /// The same negotiated state on a caller-chosen epoch.
+  ///
+  /// The epoch belongs to the declaration — which is why this overload lives
+  /// here rather than at a transport, and why the negotiation totality guard
+  /// keeps this file the only one allowed to build an encoding state. Its one
+  /// caller is the host-wire conformance oracle: the byte-frozen fixtures name
+  /// an exact `epoch`, and a process-global counter cannot reproduce one.
+  /// Production paths take the counter-allocated epoch above.
+  package func negotiatedEncodingState(
+    epochID: UInt32
+  ) -> HostWireEncodingState {
+    HostWireEncodingState(deltaEnabled: acceptsDeltaFrames, epochID: epochID)
+  }
+
   /// Parses the JSON object payload of a `caps:` declaration.
   ///
   /// Tolerant by policy: unknown keys are skipped (including nested

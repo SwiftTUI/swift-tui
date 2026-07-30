@@ -22,7 +22,7 @@ struct HostWireConformanceTests {
     }
   }
 
-  @Test("manifest census is exact and S3 host adapters are inactive but parseable")
+  @Test("manifest census is exact and the S3b host adapter is inactive but parseable")
   func manifestCensusIsExactAndFutureHostAdaptersAreInactive() throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
@@ -34,46 +34,34 @@ struct HostWireConformanceTests {
     let declarations: [HostWireConformanceRunnerDeclaration] = [
       .swiftAndroidABI, .swiftWebSocketChannel,
     ]
-    #expect(declarations.allSatisfy { $0.implementedStages.isEmpty })
-    let inactive = declarations.flatMap { $0.inactiveEntries(in: corpus.manifest) }
-    #expect(inactive.map(\.requiresStage) == [.s3a, .s3b])
-    #expect(inactive.map(\.kind) == [.androidABI, .websocketChannel])
+    // S3a landed: the Android ABI runner now owns its census. S3b has not.
     #expect(
-      inactive.map(\.runners) == [[.swiftAndroidABI], [.swiftWebSocketChannel]])
+      declarations.map(\.implementedStages) == [[.s3a], []])
+    let inactive = declarations.flatMap { $0.inactiveEntries(in: corpus.manifest) }
+    #expect(inactive.map(\.requiresStage) == [.s3b])
+    #expect(inactive.map(\.kind) == [.websocketChannel])
+    #expect(inactive.map(\.runners) == [[.swiftWebSocketChannel]])
     for entry in inactive {
       #expect(corpus.fixtures[entry.file]?.steps.isEmpty == false)
     }
   }
 
   @MainActor
-  @Test("inactive Android ABI adapter interprets the real public copy seam")
-  func inactiveAndroidABIAdapterInterpretsRealCopySeam() async throws {
+  @Test("swift-android-abi executes the S3a delivery-commit scenario")
+  func androidABIRunnerExecutesDeliveryCommitScenario() async throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
-    #expect(try await HostWireConformanceAndroidABIRunner.runActiveFixtures(corpus) == [])
-    let fixture = try #require(
-      corpus.fixtures["conformance-android-delivery-commit.jsonl"])
-    let observations = try await HostWireConformanceAndroidABIRunner.observeInactiveFixture(
-      fixture)
-    #expect(observations.count == 1)
-    let observation = try #require(observations.first)
-    guard case .object(let object) = observation,
-      case .array(let deliveries) = object["androidDeliveries"]
-    else {
-      Issue.record("Android ABI adapter did not build its delivery observation")
-      return
-    }
-    #expect(deliveries.count == 2)
-    for (index, expectedLabel) in ["q1", "q2"].enumerated() {
-      guard case .object(let delivery) = deliveries[index] else {
-        Issue.record("Android delivery \(index) is not an object")
-        continue
-      }
-      #expect(
-        try delivery["label"]?.string(context: "adapter.label") == expectedLabel)
-      #expect(
-        try delivery["capacity"]?.integer(context: "adapter.capacity") == 4_096)
-    }
+    let executed = try await HostWireConformanceAndroidABIRunner.runActiveFixtures(corpus)
+    #expect(executed == ["android-delivery-commits-copied-candidate"])
+    #expect(
+      executed
+        == HostWireConformanceRunnerDeclaration.swiftAndroidABI.requiredEntries(
+          in: corpus.manifest
+        ).map(\.scenario))
+    #expect(
+      HostWireConformanceRunnerDeclaration.swiftAndroidABI.inactiveEntries(
+        in: corpus.manifest
+      ).isEmpty)
   }
 
   @Test("inactive WebSocket adapter interprets real channel and input seams")
@@ -331,12 +319,12 @@ struct HostWireConformanceTests {
       )
     }
     var reorderedAndroid = android.steps
-    let androidExpectation = try Self.expectation(in: android)
+    let (androidExpectationStep, androidExpectation) = try Self.firstExpectation(in: android)
     let reversedDeliveries = try Self.reversingArrayOrder(
       "androidDeliveries",
       in: androidExpectation
     )
-    reorderedAndroid[reorderedAndroid.count - 1] = .expect(reversedDeliveries)
+    reorderedAndroid[androidExpectationStep] = .expect(reversedDeliveries)
     #expect(throws: HostWireConformanceError.self) {
       try HostWireConformanceCorpus.validateSequentialSemantics(
         reorderedAndroid,
@@ -359,7 +347,7 @@ struct HostWireConformanceTests {
         in: androidExpectation
       )
       var corruptedAndroid = android.steps
-      corruptedAndroid[corruptedAndroid.count - 1] = .expect(corruptedExpectation)
+      corruptedAndroid[androidExpectationStep] = .expect(corruptedExpectation)
       #expect(throws: HostWireConformanceError.self) {
         try HostWireConformanceCorpus.validateSequentialSemantics(
           corruptedAndroid,
@@ -505,12 +493,28 @@ struct HostWireConformanceTests {
     }
   }
 
-  @Test("inactive Android ABI expectation axes are exact")
-  func inactiveAndroidABIExpectationMetaTestsHaveTeeth() throws {
+  @Test("Android ABI expectation axes are exact")
+  func androidABIExpectationMetaTestsHaveTeeth() throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
-    let expected = try Self.expectation(
-      in: #require(corpus.fixtures["conformance-android-delivery-commit.jsonl"]))
+    let fixture = try #require(corpus.fixtures["conformance-android-delivery-commit.jsonl"])
+    let expected = try Self.expectation(in: fixture)
+    // The undersized-copy interval carries the `copied:false` / `record:null`
+    // axes the first interval cannot express; corrupting either must fail.
+    let undersized = try Self.expectations(in: fixture)[1]
+    for path in [
+      [JSONPathPart.key("androidDeliveries"), .index(0), .key("copied")],
+      [JSONPathPart.key("androidDeliveries"), .index(0), .key("record")],
+    ] {
+      let corrupted = try Self.replacingJSONValue(at: path, in: undersized)
+      #expect(throws: HostWireConformanceError.self) {
+        try HostWireConformanceExactComparator.requireEqual(
+          undersized,
+          corrupted,
+          context: "android-abi-undersized-meta"
+        )
+      }
+    }
     let paths: [[JSONPathPart]] = [
       [.key("androidDeliveries"), .index(0), .key("reported")],
       [.key("androidDeliveries"), .index(0), .key("capacity")],

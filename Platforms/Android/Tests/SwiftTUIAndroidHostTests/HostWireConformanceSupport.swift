@@ -100,6 +100,12 @@ struct HostWireConformanceCorpus {
   static let manifestFilename = "conformance-manifest.json"
   static let formatVersion = 1
   static let activeSwiftReferenceStages: Set<HostWireConformanceStage> = [.s1, .s2]
+  /// The epoch both the `android-abi` recorder and the `swift-android-abi`
+  /// runner pin the host's encoding state to, so the byte-frozen fixture can
+  /// name an exact `epoch` the process-global counter could never reproduce.
+  /// The assertion is real: the emitted record must carry *this* epoch, and
+  /// candidate-commit must not re-anchor it mid-handshake.
+  static let androidABIRunnerEpochID: UInt32 = 301
 
   var manifestData: Data
   var manifest: HostWireConformanceManifest
@@ -540,7 +546,7 @@ struct HostWireConformanceRunnerDeclaration: Equatable {
     id: .swiftReference,
     implementedStages: HostWireConformanceCorpus.activeSwiftReferenceStages
   )
-  static let swiftAndroidABI = Self(id: .swiftAndroidABI, implementedStages: [])
+  static let swiftAndroidABI = Self(id: .swiftAndroidABI, implementedStages: [.s3a])
   static let swiftWebSocketChannel = Self(
     id: .swiftWebSocketChannel,
     implementedStages: []

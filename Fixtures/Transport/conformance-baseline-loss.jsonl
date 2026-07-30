@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"640752802ef20cfcd0683f7c206111ac3500a35339d2af08f764030d2478710a","bodySHA256":"d6ead7f7073ea7de136b14b30b0e8e46ebc8c994b69e0dc1b8d27217ef87b440"}
+{"formatVersion":1,"manifestSHA256":"d4bc47f6cc10c47de89239aa61c80e73c2a32e2780f8b187ec9ab4b45b30bbf9","bodySHA256":"d6ead7f7073ea7de136b14b30b0e8e46ebc8c994b69e0dc1b8d27217ef87b440"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":102,\"gen\":1,\"sequence\":1,\"width\":1,\"height\":1,\"styles\":[null],\"rows\":[[[0,\"A\",1,0]]],\"images\":[]}\n"}
 {"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":102,\"gen\":2,\"baselineGen\":1,\"sequence\":2,\"width\":1,\"height\":1,\"styles\":[null],\"deltaRows\":[[0,[[0,\"B\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
 {"drop":1}

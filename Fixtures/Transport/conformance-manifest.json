@@ -1,7 +1,7 @@
 {
   "fixtures" : [
     {
-      "bodySHA256" : "f2dff5704b6f0719cab73fce8c3ef431f6c0dfec736fa45e3cafa67eed128286",
+      "bodySHA256" : "86f91a23618624a306493f5692ee84fcd45d385a6919beb1eab4afbcf9435311",
       "file" : "conformance-android-delivery-commit.jsonl",
       "kind" : "android-abi",
       "mutationClass" : "android-delivery-commit",
