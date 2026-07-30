@@ -22,10 +22,22 @@ package struct HostWireCapabilities: Equatable, Sendable {
   /// else.
   package var acceptsDeltaFrames: Bool
 
+  /// Whether the host applies a delta's `styles` array as an *append* onto its
+  /// retained style table, keyed by `stylesBase`.
+  ///
+  /// This one is negotiated rather than additive because it is a record-shape
+  /// change, not a new key: a delta whose `styles` array carries only entries
+  /// at index ≥ `stylesBase` would mis-index every style on a decoder that
+  /// replaces its table wholesale. Absence keeps the full retransmit, byte for
+  /// byte.
+  package var styleAppend: Bool
+
   package init(
-    acceptsDeltaFrames: Bool = false
+    acceptsDeltaFrames: Bool = false,
+    styleAppend: Bool = false
   ) {
     self.acceptsDeltaFrames = acceptsDeltaFrames
+    self.styleAppend = styleAppend
   }
 
   /// The encoding state a host with these capabilities receives.
@@ -37,7 +49,10 @@ package struct HostWireCapabilities: Equatable, Sendable {
   /// state itself — a transport that assembles its own can, and once did,
   /// disagree with the declaration it was handed.
   package func negotiatedEncodingState() -> HostWireEncodingState {
-    HostWireEncodingState(deltaEnabled: acceptsDeltaFrames)
+    HostWireEncodingState(
+      deltaEnabled: acceptsDeltaFrames,
+      styleAppendEnabled: styleAppend
+    )
   }
 
   /// The same negotiated state on a caller-chosen epoch.
@@ -51,7 +66,11 @@ package struct HostWireCapabilities: Equatable, Sendable {
   package func negotiatedEncodingState(
     epochID: UInt32
   ) -> HostWireEncodingState {
-    HostWireEncodingState(deltaEnabled: acceptsDeltaFrames, epochID: epochID)
+    HostWireEncodingState(
+      deltaEnabled: acceptsDeltaFrames,
+      styleAppendEnabled: styleAppend,
+      epochID: epochID
+    )
   }
 
   /// Parses the JSON object payload of a `caps:` declaration.
@@ -100,6 +119,12 @@ package struct HostWireCapabilities: Equatable, Sendable {
       case "acceptsDeltaFrames":
         if let value = scanner.consumeBool() {
           capabilities.acceptsDeltaFrames = value
+        } else {
+          guard scanner.skipValue() else { return nil }
+        }
+      case "styleAppend":
+        if let value = scanner.consumeBool() {
+          capabilities.styleAppend = value
         } else {
           guard scanner.skipValue() else { return nil }
         }

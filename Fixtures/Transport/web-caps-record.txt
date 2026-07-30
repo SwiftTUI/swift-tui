@@ -1,1 +1,1 @@
-\u001Ecaps:{"acceptsDeltaFrames":true}
+caps:{"acceptsDeltaFrames":true,"styleAppend":true}

@@ -271,6 +271,9 @@ package enum WebSurfaceFrameEncoder {
     state: inout HostWireEncodingState
   ) -> String? {
     var candidate = state
+    // Captured before the interning loop grows the table: everything at or
+    // after this index is new in *this* record.
+    let styleBase = state.persistentStyles.count
     var deltaRows: [String] = []
     deltaRows.reserveCapacity(model.deltaRowIndexes.count)
     for rowIndex in model.deltaRowIndexes {
@@ -303,9 +306,21 @@ package enum WebSurfaceFrameEncoder {
     }
     json += ",\"width\":\(max(0, model.gridSize.width))"
     json += ",\"height\":\(max(0, model.gridSize.height))"
-    json += ",\"styles\":["
-    json += candidate.persistentStyles.encodedElements.joined(separator: ",")
-    json += "]"
+    if candidate.styleAppendEnabled {
+      // Negotiated append shape: the styles array carries only what this
+      // record added, and `stylesBase` is where the consumer must splice it
+      // onto its retained table. Measured at Stage SV, the full retransmit was
+      // 69.7% of late-record bytes in a style-churning epoch.
+      json += ",\"stylesBase\":\(styleBase)"
+      json += ",\"styles\":["
+      json += candidate.persistentStyles.encodedElements.dropFirst(styleBase)
+        .joined(separator: ",")
+      json += "]"
+    } else {
+      json += ",\"styles\":["
+      json += candidate.persistentStyles.encodedElements.joined(separator: ",")
+      json += "]"
+    }
     json += ",\"deltaRows\":["
     json += deltaRows.joined(separator: ",")
     json += "]"

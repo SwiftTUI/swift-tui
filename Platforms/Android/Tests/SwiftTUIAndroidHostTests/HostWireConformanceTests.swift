@@ -27,9 +27,13 @@ struct HostWireConformanceTests {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
     #expect(corpus.manifest.formatVersion == 1)
-    #expect(corpus.manifest.fixtures.count == 9)
+    #expect(corpus.manifest.fixtures.count == 10)
     #expect(corpus.fixtures.count == corpus.manifest.fixtures.count)
-    #expect(!corpus.manifest.fixtures.contains { $0.requiresStage == .s3d })
+    // S3d recorded its fixture from the real changed encoder, so `s3d` is now
+    // part of the census rather than forbidden from it.
+    #expect(
+      corpus.manifest.fixtures.filter { $0.requiresStage == .s3d }.map(\.scenario)
+        == ["style-append-splices-onto-the-retained-table"])
 
     let declarations: [HostWireConformanceRunnerDeclaration] = [
       .swiftAndroidABI, .swiftWebSocketChannel,
@@ -75,8 +79,8 @@ struct HostWireConformanceTests {
         ).map(\.scenario))
   }
 
-  @Test("swift-reference executes every applicable S1 and S2 scenario")
-  func swiftReferenceExecutesEveryApplicableS1AndS2Scenario() throws {
+  @Test("swift-reference executes every applicable record scenario")
+  func swiftReferenceExecutesEveryApplicableRecordScenario() throws {
     let corpus = try HostWireConformanceCorpus.load(
       directory: HostWireConformanceStreamRecorder.fixtureDirectory)
     let executed = try HostWireConformanceReferenceRunner.runActiveFixtures(corpus)
@@ -90,6 +94,7 @@ struct HostWireConformanceTests {
         "control-steady-delta",
         "epoch-reanchor-and-style-budget-full",
         "image-forget-requests-and-reapplies",
+        "style-append-splices-onto-the-retained-table",
       ])
   }
 

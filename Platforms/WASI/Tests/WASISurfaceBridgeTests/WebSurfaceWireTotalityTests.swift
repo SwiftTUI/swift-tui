@@ -158,7 +158,11 @@ struct WebSurfaceWireTotalityTests {
 
   @Test("a fully-populated delta frame emits exactly the manifest key sets")
   func deltaFrameEmitsExactlyTheManifestSurface() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+    // Every optional delta key must be emitted for the manifest comparison to
+    // be exact, and `stylesBase` appears only under a negotiated
+    // `styleAppend` — so the fully-populated delta is a fully-negotiated one.
+    var state = HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true)
+      .negotiatedEncodingState(epochID: 2)
     _ = WebSurfaceFrameEncoder.encode(
       HostWireFrameModel(
         Self.fullyPopulatedFrame().hostProjection,

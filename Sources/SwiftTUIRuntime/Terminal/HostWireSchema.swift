@@ -248,6 +248,11 @@ package enum HostWireSchema {
       "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
       "accessibilityAnnouncements", "scrollRegions", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
+      // Present only when `styleAppend` is negotiated. Optional in the manifest
+      // because absence is the deployed shape; its *presence* changes how
+      // `styles` must be read, which is why the bit is negotiated rather than
+      // the key additive.
+      "stylesBase",
     ]
     package static let styleKeys: Set<String> = [
       "fg", "bg", "em", "underline", "strikethrough", "opacity",
@@ -294,7 +299,9 @@ package enum HostWireSchema {
   /// and style: these records change or repair cross-frame wire state.
   package enum DeliveryUplink {
     package static let recordTypes: Set<String> = ["caps", "resync"]
-    package static let capabilityKeys: Set<String> = ["acceptsDeltaFrames"]
+    package static let capabilityKeys: Set<String> = [
+      "acceptsDeltaFrames", "styleAppend",
+    ]
     package static let resyncRequiredKeys: Set<String> = ["scope"]
     package static let resyncOptionalKeys: Set<String> = ["ids"]
     package static let resyncScopeTokens: Set<String> = ["keyframe", "images"]
@@ -372,7 +379,14 @@ package enum HostWireSchema {
       wasi: "env SWIFTTUI_SURFACE_DELTA",
       webSocket: "caps record key acceptsDeltaFrames",
       android: "declareCapabilities key acceptsDeltaFrames"
-    )
+    ),
+    .init(
+      "styleAppend",
+      defaultValue: "false",
+      wasi: "env SWIFTTUI_SURFACE_STYLE_APPEND",
+      webSocket: "caps record key styleAppend",
+      android: "declareCapabilities key styleAppend"
+    ),
   ]
 
   // MARK: - Shared wire tokens

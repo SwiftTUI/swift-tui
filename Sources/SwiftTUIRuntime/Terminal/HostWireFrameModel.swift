@@ -270,6 +270,10 @@ package struct HostWireEncodingState: Sendable {
   package let epochID: UInt32
   package var recordsEncoded: UInt64
   package var deltaEnabled: Bool
+  /// Whether deltas may carry only the styles appended since their baseline,
+  /// keyed by `stylesBase`. Negotiated, because the shape mis-indexes on a
+  /// decoder that replaces its table wholesale.
+  package var styleAppendEnabled: Bool
   package var knownImageIDs: Set<String>
   package var persistentStyles: HostWireStyleTable
   package var hasBaseline: Bool
@@ -277,6 +281,7 @@ package struct HostWireEncodingState: Sendable {
 
   package init(
     deltaEnabled: Bool,
+    styleAppendEnabled: Bool = false,
     knownImageIDs: Set<String> = [],
     hasBaseline: Bool = false,
     baselineSize: CellSize? = nil,
@@ -285,6 +290,7 @@ package struct HostWireEncodingState: Sendable {
     self.epochID = epochID ?? nextHostWireEpochID()
     recordsEncoded = 0
     self.deltaEnabled = deltaEnabled
+    self.styleAppendEnabled = styleAppendEnabled
     self.knownImageIDs = knownImageIDs
     persistentStyles = HostWireStyleTable(gridSize: baselineSize)
     self.hasBaseline = hasBaseline

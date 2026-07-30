@@ -188,8 +188,27 @@ is full in the same epoch and consumes the next generation.
 
 A full frame builds a first-appearance-ordered style table and, on a
 delta-capable stream, starts a new persistent style epoch. Each delta interns
-new styles into that table. The `styles` field of every delta contains the
-entire accumulated table, not only the new suffix.
+new styles into that table.
+
+How a delta *transmits* that table depends on one negotiated bit:
+
+| `styleAppend` | Delta `styles` | `stylesBase` |
+| --- | --- | --- |
+| Undeclared (deployed default) | The entire accumulated table | Absent |
+| Declared | Only the styles this record added | The retained table's length |
+
+The append shape is negotiated rather than additive because its *presence*
+changes how `styles` must be read: a decoder that replaces its table wholesale
+would mis-index every style in the record. A consumer that declared
+`styleAppend` splices `styles` onto its retained table at `stylesBase`, and
+refuses the record — requesting a keyframe — when `stylesBase` does not equal
+that table's length. Splicing at the wrong offset silently repaints cells in
+the wrong style, which is strictly worse than refusing and recovering.
+
+The full retransmit it replaces was measured at Stage SV as 69.7% of
+late-record bytes in a style-churning epoch; the append shape cuts a
+300-frame 80×24 opacity-fade run by 62.9% overall and 75.8% across its last
+50 frames.
 
 The table budget is `max(1,024, grid area + 1)`, including the explicit
 `null` style in slot zero. If a delta would exceed the budget, encoding falls
@@ -220,6 +239,7 @@ currently one named bit:
 | Capability | Default | Effect |
 | --- | --- | --- |
 | `acceptsDeltaFrames` | `false` | Permits v3 delta records after a full baseline. |
+| `styleAppend` | `false` | A delta carries `stylesBase` plus only the styles it added, instead of the whole accumulated table. |
 
 Absence begins with full-frame output. A rejected declaration leaves the
 existing state unchanged. Each accepted declaration constructs the whole
@@ -420,7 +440,7 @@ forward-looking; the rows below describe only the state at this package's
 | S2 | Resend-on-miss is complete: browser decode/cache misses enter bounded unresolved/request tracking, with overflow deferred and admitted IDs deduplicated until payload repair, disappearance, or epoch reset; Android bitmap-cache eviction requests selected IDs deduplicated until payload repair or epoch reset. Android treats a lazy-JNI old-host return of zero as unavailable rather than retrying it or treating an incidental keyframe as image repair. The wire still has no retained-image acknowledgement. |
 | S3a | Complete: the Android copy ABI encodes against a candidate and commits only when bytes are copied out. An abandoned size query, an undersized copy, or a commit landing mid-handshake leaves committed encoder state and accumulated damage intact. See [Android delivery-coupled commit](#android-delivery-coupled-commit). |
 | S3b | Complete: the detached backlog drops surface records and bounds the rest at 32; a client close is connection-local and leaves scene input alive; every connection carries a token that gates input, close, and capability callbacks; and session stop is the sole idempotent terminal transition. See [WebHost connection lifecycle](#webhost-connection-lifecycle). |
-| S3d | Every delta retransmits the complete accumulated style table. Measured style churn makes late-record cost grow with the epoch rather than with current damage. |
+| S3d | Complete: with `styleAppend` negotiated, a delta carries `stylesBase` and only its appended styles; all three decoders splice onto their retained table and refuse a base that does not match it. Undeclared streams keep the full retransmit byte for byte. See [Style epoch](#persistent-style-epoch). |
 | S3e | The browser/WASI shared input queue rejects a control record larger than its remaining 64 KiB capacity as one chunk. The paste route catches and reports the error but drops the whole logical paste. |
 
 The Stage SV investigation also tested the claimed unbounded Android damage

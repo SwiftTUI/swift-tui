@@ -99,7 +99,7 @@ struct HostWireConformanceFixture: Equatable {
 struct HostWireConformanceCorpus {
   static let manifestFilename = "conformance-manifest.json"
   static let formatVersion = 1
-  static let activeSwiftReferenceStages: Set<HostWireConformanceStage> = [.s1, .s2]
+  static let activeSwiftReferenceStages: Set<HostWireConformanceStage> = [.s1, .s2, .s3d]
   /// The epoch both the `android-abi` recorder and the `swift-android-abi`
   /// runner pin the host's encoding state to, so the byte-frozen fixture can
   /// name an exact `epoch` the process-global counter could never reproduce.
@@ -265,10 +265,6 @@ struct HostWireConformanceCorpus {
     }
     guard Set(entries.map(\.scenario)).count == entries.count else {
       throw HostWireConformanceError.invalid("\(manifestFilename): duplicate scenario ID")
-    }
-    guard !entries.contains(where: { $0.requiresStage == .s3d }) else {
-      throw HostWireConformanceError.invalid(
-        "\(manifestFilename): S5 must not contain an s3d fixture")
     }
     return HostWireConformanceManifest(formatVersion: formatVersion, fixtures: entries)
   }

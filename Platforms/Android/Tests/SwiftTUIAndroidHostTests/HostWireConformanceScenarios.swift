@@ -12,6 +12,7 @@ extension HostWireConformanceStreamRecorder {
     scenarios.append(try imageForgetWebPainterScenario(image))
     scenarios.append(try imageDecodeFailureScenario(image))
     scenarios.append(try unknownTokenScenario())
+    scenarios.append(try styleAppendScenario())
     scenarios.append(try androidDeliveryCommitScenario())
     scenarios.append(try websocketDetachedBacklogScenario())
     return scenarios
@@ -385,6 +386,71 @@ extension HostWireConformanceStreamRecorder {
     )
   }
 
+  private static func styleAppendScenario() throws -> Scenario {
+    // Recorded from the real post-S3d encoder with `styleAppend` negotiated:
+    // the delta carries `stylesBase` plus only the styles it added, and the
+    // consumer must splice rather than replace. `styleRuns` is what catches
+    // mis-indexing — the grid is identical either way, only the resolved
+    // colours differ.
+    var state = HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true)
+      .negotiatedEncodingState(epochID: 401)
+    let first = encode(
+      surface: twoStyledCellSurface("A", .red, "B", nil),
+      sequence: 1,
+      damage: nil,
+      state: &state
+    )
+    let appended = encode(
+      surface: twoStyledCellSurface("C", .blue, "D", .red),
+      sequence: 2,
+      damage: fullRowDamage(width: 2),
+      state: &state
+    )
+    precondition(
+      appended.contains(#""stylesBase":2"#)
+        && appended.contains(##""styles":[{"fg":"#5BA3FFFF"}]"##),
+      "the negotiated delta must carry only its appended styles"
+    )
+    return Scenario(
+      file: "conformance-style-append.jsonl",
+      scenario: "style-append-splices-onto-the-retained-table",
+      kind: .record,
+      mutationClass: .styleAppend,
+      requiresStage: .s3d,
+      runners: [.swiftReference, .webCanvas, .webDOM, .android],
+      steps: [
+        ["emit": first],
+        ["emit": appended],
+        [
+          "expect": expectation(
+            rows: try HostWireConformanceRecordDecoding.structuredRows(
+              in: appended,
+              context: "style append delta"
+            ),
+            styleRuns: [
+              // Index 2 is the appended entry, index 1 the retained one: a
+              // wrong splice offset swaps these two colours.
+              styleRun(
+                row: 0,
+                startColumn: 0,
+                text: "C",
+                span: 1,
+                resolvedStyle: ["fg": "#5BA3FFFF"]
+              ),
+              styleRun(
+                row: 0,
+                startColumn: 1,
+                text: "D",
+                span: 1,
+                resolvedStyle: ["fg": "#E05757FF"]
+              ),
+            ]
+          )
+        ],
+      ]
+    )
+  }
+
   private static func androidDeliveryCommitScenario() throws -> Scenario {
     var state = HostWireEncodingState(
       deltaEnabled: true,
@@ -715,6 +781,31 @@ extension HostWireConformanceStreamRecorder {
     RasterSurface(
       size: .init(width: 1, height: 1),
       cells: [[RasterCell(character: character)]]
+    )
+  }
+
+  /// Two adjacent single-cell glyphs with independent styles, so a spliced
+  /// style table's index assignment is observable per cell.
+  private static func twoStyledCellSurface(
+    _ leading: Character,
+    _ leadingColor: Color?,
+    _ trailing: Character,
+    _ trailingColor: Color?
+  ) -> RasterSurface {
+    RasterSurface(
+      size: .init(width: 2, height: 1),
+      cells: [
+        [
+          RasterCell(
+            character: leading,
+            style: leadingColor.map { ResolvedTextStyle(foregroundColor: $0) }
+          ),
+          RasterCell(
+            character: trailing,
+            style: trailingColor.map { ResolvedTextStyle(foregroundColor: $0) }
+          ),
+        ]
+      ]
     )
   }
 

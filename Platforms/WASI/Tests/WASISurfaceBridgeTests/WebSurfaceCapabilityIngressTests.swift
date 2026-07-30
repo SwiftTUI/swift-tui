@@ -145,7 +145,8 @@ struct WebSurfaceCapabilityIngressTests {
     #expect(parsed.events.isEmpty)
     #expect(
       parsed.controlMessages == [
-        .capabilities(HostWireCapabilities(acceptsDeltaFrames: true))
+        .capabilities(
+          HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true))
       ]
     )
   }

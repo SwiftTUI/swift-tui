@@ -89,6 +89,20 @@
       "scenario" : "web-painter-image-forget-requests-and-reapplies"
     },
     {
+      "bodySHA256" : "001b288299ac902fae18831a234cf6e40c2a6728b96ed30c816fa8d278fc32a2",
+      "file" : "conformance-style-append.jsonl",
+      "kind" : "record",
+      "mutationClass" : "style-append",
+      "requiresStage" : "s3d",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "style-append-splices-onto-the-retained-table"
+    },
+    {
       "bodySHA256" : "28851ab5526ef11bfbb0e6f78369d403853022257b35d2dac8dd6ed25f41c63f",
       "file" : "conformance-unknown-token.jsonl",
       "kind" : "record",
