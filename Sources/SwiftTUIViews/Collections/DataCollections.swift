@@ -31,7 +31,6 @@ extension List {
   )
   where
     Data: RandomAccessCollection,
-    SelectionValue: Sendable,
     RowContent: View,
     Content
       == ForEach<
@@ -62,7 +61,6 @@ extension List {
   )
   where
     Data: RandomAccessCollection,
-    SelectionValue: Sendable,
     RowContent: View,
     Content
       == ForEach<
@@ -191,7 +189,6 @@ extension Table {
   )
   where
     Data: RandomAccessCollection,
-    SelectionValue: Sendable,
     CellContent: View,
     Rows
       == ForEach<
@@ -225,7 +222,6 @@ extension Table {
   )
   where
     Data: RandomAccessCollection,
-    SelectionValue: Sendable,
     CellContent: View,
     Rows
       == ForEach<

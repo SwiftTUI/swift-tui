@@ -175,7 +175,7 @@ extension List {
   }
 }
 
-extension List where SelectionValue: Hashable & Sendable {
+extension List {
   public init<Data, RowContent: View>(
     _ data: Data,
     selection: Binding<SelectionValue>,

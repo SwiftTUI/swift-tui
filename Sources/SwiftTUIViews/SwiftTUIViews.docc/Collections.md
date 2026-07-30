@@ -121,12 +121,46 @@ Table(
 In a finite viewport, direct data collections realize, measure, place, draw,
 and publish semantics for only the visible band plus bounded overscan. Their
 row identity follows the data ID through reordering. Source-backed table auto
-columns retain a monotonic high-water width as wider rows enter the viewport.
+columns retain a monotonic high-water width as wider rows enter the viewport:
+widths grow to fit the widest row that has been visible and do not shrink again
+while the element IDs are stable, so a column does not twitch as rows scroll
+through it.
+
+Inside a `ScrollView` the enclosing scroll layout declares the viewport it will
+show the collection through, and the collection windows against that. A
+collection given genuinely unbounded height — under `.fixedSize()`, or an
+ideal-height probe — has nothing to window against, so it realizes every row
+and reports `collection.unboundedRealization` once. That is deliberate: those
+callers asked for the true ideal size, and estimating it from a probe would
+quietly mis-size a collection whose rows differ in height.
 
 Arbitrary builder composition remains fully supported and keeps every authored
-node committed, but it can require eager work because SwiftTUI cannot prove a
-total indexed row source for heterogeneous content. Prefer the data initializers
-for large homogeneous collections.
+node committed, but it takes the eager path: SwiftTUI cannot prove a total
+indexed row source for heterogeneous content, so every row is realized and
+measured every frame. Past a few hundred rows this is reported as
+`collection.eagerLargeCollection`. Prefer the data initializers for large
+homogeneous collections.
+
+## Scrolling And Selection
+
+A collection's visible window is owned separately from its selection. Scrolling
+moves the window; selection moves within it.
+
+- The **mouse wheel** scrolls the window and leaves the selection alone, so you
+  can look at row 500 while row 3 stays selected.
+- **PageUp**, **PageDown**, **Home**, and **End** scroll the window. A
+  non-selectable data-backed collection is focusable so these reach it; a
+  selectable one keeps focus at the row layer, as before.
+- **Arrow keys** move the selection. The window follows only when it has to,
+  and then only far enough to reveal the new row with a row of context beyond
+  it — a selection step within the visible rows does not scroll at all.
+- ``ScrollViewProxy/scrollTo(_:anchor:)`` reaches a row by ID whether or not it
+  is currently realized.
+
+> Note: before this contract, the wheel stepped the selection and the window
+> was recomputed each frame from the selected row. Code that relied on
+> wheel-as-selection should move to the arrow-key path or drive the selection
+> binding directly.
 
 ## See Also
 

@@ -79,6 +79,45 @@ struct CollectionBookkeepingTests {
     }
   }
 
+  @Test("T-42: locating the selected row does not consult every row")
+  func selectedRowLookupIsIndexed() {
+    // The selected row used to be found by asking the policy about each row's
+    // tag in turn — a dynamic cast plus a binding read per row, on the resolve
+    // path of every frame. It is now one hash lookup in the source's id index,
+    // which the narrowed `SelectionValue: Hashable & Sendable` made possible.
+    CollectionSelectionProbe.reset()
+    _ = DefaultRenderer().render(
+      List(0..<2_000, id: \.self, selection: .constant(1_900 as Int?)) { row in
+        Text("row \(row)")
+      },
+      context: .init(identity: testIdentity("IndexedSelection"), applyEnvironmentValues: false),
+      proposal: .init(width: .finite(20), height: .finite(10))
+    )
+    let windowed = CollectionSelectionProbe.membershipTests
+
+    // The eager spelling of the same collection has no id index to consult,
+    // so it still asks about every row — the contrast is the measurement.
+    CollectionSelectionProbe.reset()
+    _ = DefaultRenderer().render(
+      List(selection: .constant(1_900 as Int?)) {
+        ForEach(0..<2_000, id: \.self) { row in
+          Text("row \(row)").tag(row)
+        }
+      },
+      context: .init(identity: testIdentity("EagerSelection"), applyEnvironmentValues: false),
+      proposal: .init(width: .finite(20), height: .finite(10))
+    )
+    let eager = CollectionSelectionProbe.membershipTests
+
+    #expect(eager > 1_000, "the eager path scans until it matches, as it always has: \(eager)")
+    #expect(
+      windowed == 0,
+      """
+      the windowed path locates the selection by id and asks about no row at       all, but asked about \(windowed) (eager asked about \(eager))
+      """
+    )
+  }
+
   @Test("T-45: an eagerly-resolved large collection reports the fork")
   func eagerLargeCollectionIsReported() {
     let large = DefaultRenderer().render(

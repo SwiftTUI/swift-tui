@@ -11,8 +11,29 @@ extension EnvironmentValues {
   }
 }
 
+/// Test instrumentation (the F118 probe pattern): counts how many rows a
+/// resolve asks the selection policy about. Register item D18 is exactly this
+/// count scaling with the dataset rather than the viewport; increments compile
+/// out of release.
 @MainActor
-package enum CollectionSelectionPolicy<Value: Hashable> {
+package enum CollectionSelectionProbe {
+  package private(set) static var membershipTests = 0
+
+  package static func recordMembershipTest() {
+    #if DEBUG
+      membershipTests += 1
+    #endif
+  }
+
+  package static func reset() {
+    #if DEBUG
+      membershipTests = 0
+    #endif
+  }
+}
+
+@MainActor
+package enum CollectionSelectionPolicy<Value: Hashable & Sendable> {
   case none
   case requiredSingle(Binding<Value>)
   case optionalSingle(Binding<Value?>)
@@ -39,6 +60,7 @@ package enum CollectionSelectionPolicy<Value: Hashable> {
   }
 
   package func contains(_ tag: SelectionTag) -> Bool {
+    CollectionSelectionProbe.recordMembershipTest()
     guard let value = value(from: tag) else {
       return false
     }
@@ -96,6 +118,30 @@ package enum CollectionSelectionPolicy<Value: Hashable> {
       binding.wrappedValue = values
       return true
     }
+  }
+
+  /// The bound selection as a tag, without consulting any row.
+  ///
+  /// A viewport-backed collection pairs this with
+  /// ``IndexedChildSource/elementIndex(forSelectionTag:)`` to locate the
+  /// selected row by id. The alternative — asking the policy about every
+  /// row's tag until one matches — is O(dataset) on the resolve path of every
+  /// frame (register item D18).
+  package func selectionTag() -> SelectionTag? {
+    let value: Value?
+    switch self {
+    case .none:
+      return nil
+    case .requiredSingle(let binding):
+      value = binding.wrappedValue
+    case .optionalSingle(let binding):
+      value = binding.wrappedValue
+    case .multiple(let binding):
+      // Multi-selection has no single anchor; the first member is what the
+      // window and the marker follow, matching `selectedIndices.first`.
+      value = binding.wrappedValue.first
+    }
+    return value.map { SelectionTag(value: $0, includeOptional: true) }
   }
 
   package func step(

@@ -4,7 +4,9 @@
 // `Section.swift`.
 
 /// Presents selectable rows in a vertically scrollable list.
-public struct List<SelectionValue: Hashable, Content: View>: PrimitiveView, ResolvableView {
+public struct List<SelectionValue: Hashable & Sendable, Content: View>: PrimitiveView,
+  ResolvableView
+{
   private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
   private var onActivate: (@MainActor (SelectionValue) -> Void)?
   private var content: Content
@@ -105,14 +107,18 @@ extension List {
       }
     }
     let rows = resolvedContent.rows
-    // NOTE: still O(dataset) — locating the selected row by its id would need
-    // a `SelectionTag` built from the policy's value, and `SelectionTag`
-    // requires `Sendable` while `List`'s public `SelectionValue` guarantees
-    // only `Hashable`. Narrowing that is a public-API question, so the scan
-    // stays; the far more expensive per-row identity MINT below is gone.
-    let selectedIndex = rows.indices.first { index in
-      rows[index].tag.map(selectionPolicy.contains) == true
-    }
+    // Locate the selected row through the source's id index when there is
+    // one: scanning every row and asking the policy about each tag is
+    // O(dataset) on the resolve path of every frame (register item D18).
+    // The eager path keeps the scan — it has already materialized every row.
+    let selectedIndex: Int? =
+      if let source = resolvedContent.indexedSource {
+        selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+      } else {
+        rows.indices.first { index in
+          rows[index].tag.map(selectionPolicy.contains) == true
+        }
+      }
     // Likewise for focus: the focused identity already encodes its row index,
     // so parsing it beats minting an identity per row until one matches.
     let focusedRowIndex = context.environmentValues.focusedIdentity.flatMap { focused in

@@ -37,7 +37,9 @@ extension TableRow {
 }
 
 /// Presents row and column data in a terminal table.
-public struct Table<SelectionValue: Hashable, Rows: View>: PrimitiveView, ResolvableView {
+public struct Table<SelectionValue: Hashable & Sendable, Rows: View>: PrimitiveView,
+  ResolvableView
+{
   public var columns: [TableColumn]
   private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
   private var rows: Rows
@@ -147,9 +149,15 @@ extension Table {
       }
       return pickerSelectionValue(from: tag, as: SelectionValue.self) != nil
     }
-    let selectedIndex = resolvedRows.firstIndex { row in
-      row.tag.map(selectionPolicy.contains) == true
-    }
+    // See the matching note in `List.resolvedNode` (register item D18).
+    let selectedIndex: Int? =
+      if let source = resolvedContent.indexedSource {
+        selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+      } else {
+        resolvedRows.firstIndex { row in
+          row.tag.map(selectionPolicy.contains) == true
+        }
+      }
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
