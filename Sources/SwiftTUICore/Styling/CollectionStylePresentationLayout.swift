@@ -1,3 +1,29 @@
+import Synchronization
+
+/// Test instrumentation (the F118 probe pattern): counts how many times a
+/// list's visible layout is DERIVED, as opposed to consumed from the measured
+/// product. Register item D19 is exactly this count being one per phase;
+/// increments compile out of release.
+package enum ListLayoutDerivationProbe {
+  private static let counter = Mutex<Int>(0)
+
+  package static var derivationCount: Int {
+    counter.withLock { $0 }
+  }
+
+  package static func recordDerivation() {
+    #if DEBUG
+      counter.withLock { $0 += 1 }
+    #endif
+  }
+
+  package static func reset() {
+    #if DEBUG
+      counter.withLock { $0 = 0 }
+    #endif
+  }
+}
+
 /// The resolved display-line window of a list, and the line arithmetic it was
 /// derived from.
 package struct ListLineWindow: Equatable, Sendable {
@@ -74,20 +100,39 @@ extension CollectionStylePresentation {
     )
   }
 
+  /// The visible display lines for `payload` inside `bounds`, with each line's
+  /// height and content-relative `yOffset` resolved.
+  ///
+  /// `rowHeights` maps a row index to the cells its hosted child measured.
+  /// Absent (payload-only callers, and any row not in the map) a row is one
+  /// cell tall — the historical model, so those callers are unaffected.
+  /// Supplying it is what makes measure, place, draw, and semantics agree on
+  /// where a tall row's chrome goes (register item D19).
   package func visibleListLayout(
     for payload: ListPayload,
-    in bounds: CellRect
+    in bounds: CellRect,
+    rowHeights: [Int: Int]? = nil
   ) -> ListVisibleLayout {
+    ListLayoutDerivationProbe.recordDerivation()
     let contentBounds = listContentBounds(in: bounds)
-    let lines = visibleListLines(
+    var lines = visibleListLines(
       for: payload,
       viewportLineCount: contentBounds.size.height
     )
+    var cursor = 0
+    for index in lines.indices {
+      let height =
+        lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1
+      lines[index].height = height
+      lines[index].yOffset = cursor
+      cursor += height
+    }
 
     return ListVisibleLayout(
       contentBounds: contentBounds,
       lines: lines,
-      sectionChromeBounds: listChromeBounds(for: lines, in: contentBounds)
+      sectionChromeBounds: listChromeBounds(for: lines, in: contentBounds),
+      totalContentHeight: cursor
     )
   }
 
@@ -212,6 +257,13 @@ extension CollectionStylePresentation {
       return nil
     }
     return listContentBounds(in: bounds)
+  }
+
+  /// The cells a list's display lines are laid into for `bounds`.
+  package func listContentHeight(
+    in bounds: CellRect
+  ) -> Int {
+    listContentBounds(in: bounds).size.height
   }
 
   private func listContentBounds(
@@ -657,20 +709,21 @@ extension CollectionStylePresentation {
 
     for (index, line) in lines.enumerated() {
       guard let sectionIndex = line.sectionIndex else {
-        appendRange(endingAt: index)
+        appendRange(endingAt: line.yOffset)
         rangeStart = nil
         activeSectionIndex = nil
         continue
       }
 
       if activeSectionIndex != sectionIndex {
-        appendRange(endingAt: index)
-        rangeStart = index
+        appendRange(endingAt: line.yOffset)
+        rangeStart = line.yOffset
         activeSectionIndex = sectionIndex
       }
+      _ = index
     }
 
-    appendRange(endingAt: lines.count)
+    appendRange(endingAt: lines.last.map { $0.yOffset + max(1, $0.height) } ?? 0)
     return bounds
   }
 

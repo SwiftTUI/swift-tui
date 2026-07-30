@@ -42,17 +42,25 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   package var measuredWindow: Range<Int>?
   /// Display lines per row used to derive `measuredWindow`.
   package var estimatedRowStride: Int?
+  /// The height-aware visible layout, derived ONCE here from the measured row
+  /// heights and carried forward. Placement translates it into absolute
+  /// coordinates and hands it to draw and semantics, so the four phases share
+  /// one product instead of each re-deriving its own (register item D19).
+  /// Origin-zero: placement owns the translation.
+  package var listLayout: ListVisibleLayout?
 
   package init(
     sourceIndices: [Int],
     tableColumnWidths: [Int]? = nil,
     measuredWindow: Range<Int>? = nil,
-    estimatedRowStride: Int? = nil
+    estimatedRowStride: Int? = nil,
+    listLayout: ListVisibleLayout? = nil
   ) {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
     self.measuredWindow = measuredWindow
     self.estimatedRowStride = estimatedRowStride
+    self.listLayout = listLayout
   }
 }
 

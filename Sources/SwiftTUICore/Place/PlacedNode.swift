@@ -127,10 +127,11 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
+  package var hostedListVisibleLayout: ListVisibleLayout?
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && hostedCollectionTableColumnWidths == nil
-      && scrollViewportRect == nil
+      && scrollViewportRect == nil && hostedListVisibleLayout == nil
   }
 }
 
@@ -256,6 +257,18 @@ package struct PlacedNode: Equatable, Sendable {
     set {
       var metadata = placementMetadata
       metadata.hostedCollectionTableColumnWidths = newValue
+      placementMetadata = metadata
+    }
+  }
+  /// The measure-derived visible layout for a hosted List, translated into
+  /// absolute coordinates. Draw and semantics consume this rather than
+  /// re-deriving their own, which is what keeps a tall row's marker,
+  /// separator, semantics rect, and content on the same cells.
+  package var hostedListVisibleLayout: ListVisibleLayout? {
+    get { placementMetadata.hostedListVisibleLayout }
+    set {
+      var metadata = placementMetadata
+      metadata.hostedListVisibleLayout = newValue
       placementMetadata = metadata
     }
   }

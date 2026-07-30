@@ -49,47 +49,6 @@ struct CollectionScrollCharacterizationTests {
     )
   }
 
-  // MARK: - C-06 — phase disagreement on tall rows (D19)
-
-  @Test("C-06: a 2-line hosted row leaves the selection marker misaligned with its content")
-  func tallRowChromeDisagreesWithContent() throws {
-    // Flipped by S3: one carried, height-aware layout product for all phases.
-    let artifacts = DefaultRenderer().render(
-      List(0..<3, id: \.self, selection: .constant(1 as Int?)) { row in
-        VStack(alignment: .leading, spacing: 0) {
-          Text("«\(row)»a")
-          Text("«\(row)»b")
-        }
-      },
-      context: .init(identity: testIdentity("CharTallRow"), applyEnvironmentValues: false),
-      proposal: .init(width: .finite(20), height: .finite(12))
-    )
-
-    let lines = artifacts.rasterSurface.lines
-    let surface = lines.joined(separator: "\n")
-    let markerLine = try #require(
-      lines.firstIndex { $0.contains("▌") },
-      "no selection marker in:\n\(surface)"
-    )
-    let firstRowLine = try #require(lines.firstIndex { $0.contains("«0»a") })
-    let selectedRowLine = try #require(lines.firstIndex { $0.contains("«1»a") })
-
-    // Placement advances hosted children by `additionalYOffset` so a 2-line
-    // row really occupies 2 cells, but `ListDisplayLine` has no height concept:
-    // draw paints the marker at `contentBounds.y + lineIndex` with height 1.
-    // For the selected row 1 the two conventions differ by exactly the extra
-    // cell row 0 consumed.
-    #expect(selectedRowLine - firstRowLine == 2, "content advances 2 cells per 2-line row")
-    #expect(
-      markerLine == selectedRowLine - 1,
-      """
-      current behaviour: the marker for row 1 is painted one cell ABOVE its \
-      content, because the line model counts row 0 as a single line. Surface:
-      \(surface)
-      """
-    )
-  }
-
   // MARK: - C-09 — the eager builder fork (D22)
 
   @Test("C-09: List { ForEach(...) } silently takes the eager, unwindowed path")

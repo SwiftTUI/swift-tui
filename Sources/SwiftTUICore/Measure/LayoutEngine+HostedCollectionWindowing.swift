@@ -120,11 +120,26 @@ extension LayoutEngine {
 
     let measuredSize: CellSize
     var tableColumnWidths: [Int]?
+    var listLayout: ListVisibleLayout?
     switch node.drawPayload {
     case .list(let payload):
+      // Derive the height-aware layout ONCE, from the real measured heights,
+      // and carry it forward. `bounds` here is origin-zero; placement
+      // translates.
+      let rowHeights = Dictionary(
+        uniqueKeysWithValues: zip(sourceIndices, measurements).map { index, measurement in
+          (index, max(1, measurement.measuredSize.height))
+        }
+      )
+      listLayout = payload.style.visibleListLayout(
+        for: payload,
+        in: bounds,
+        rowHeights: rowHeights
+      )
       measuredSize = measuredHostedListSize(
         for: payload,
         childMeasurements: measurements,
+        sourceIndices: sourceIndices,
         proposal: effectiveProposal
       )
     case .table(let payload):
@@ -180,7 +195,8 @@ extension LayoutEngine {
           sourceIndices: sourceIndices,
           tableColumnWidths: tableColumnWidths,
           measuredWindow: measuredWindow,
-          estimatedRowStride: measuredWindow == nil ? nil : rowStride
+          estimatedRowStride: measuredWindow == nil ? nil : rowStride,
+          listLayout: listLayout
         )
       )
     )

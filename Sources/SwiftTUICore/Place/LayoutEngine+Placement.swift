@@ -35,6 +35,16 @@ extension LayoutEngine {
       measured.containerAllocationSnapshot?
       .hostedCollection?.tableColumnWidths
     node.scrollViewportRect = scrollViewportRect(for: resolved, bounds: bounds)
+    if case .list(let payload) = resolved.drawPayload,
+      resolved.semanticMetadata.hostedCollectionContainer?.kind == .list
+    {
+      node.hostedListVisibleLayout = hostedListVisibleLayout(
+        for: resolved,
+        measured: measured,
+        payload: payload,
+        in: bounds
+      )
+    }
     return node
   }
 

@@ -1,5 +1,5 @@
-package struct ListDisplayLine {
-  enum Kind {
+package struct ListDisplayLine: Equatable, Sendable {
+  enum Kind: Equatable, Sendable {
     case text(String, TextStyle)
     case row(
       marker: String,
@@ -16,38 +16,92 @@ package struct ListDisplayLine {
   var rowIndex: Int?
   var sectionIndex: Int?
   var itemIndex: Int?
+  /// Cells this line occupies. Greater than 1 when the hosted row measured
+  /// taller than one cell; 1 for every chrome line and for the payload-only
+  /// line model, which has no measured children to ask.
+  package var height: Int
+  /// This line's first cell, relative to the layout's content bounds.
+  ///
+  /// The line model used to have no height concept at all: every consumer
+  /// assumed `y == lineIndex`, while placement separately accumulated an
+  /// `additionalYOffset` for tall rows. That is register item D19 — the two
+  /// conventions disagree for every line after a multi-cell row, which is
+  /// what painted a selection marker one cell above its own content.
+  package var yOffset: Int
 
   init(
     kind: Kind,
     isHeader: Bool,
     rowIndex: Int?,
     sectionIndex: Int? = nil,
-    itemIndex: Int? = nil
+    itemIndex: Int? = nil,
+    height: Int = 1,
+    yOffset: Int = 0
   ) {
     self.kind = kind
     self.isHeader = isHeader
     self.rowIndex = rowIndex
     self.sectionIndex = sectionIndex
     self.itemIndex = itemIndex
+    self.height = height
+    self.yOffset = yOffset
   }
 }
 
-package struct ListVisibleLayout {
+package struct ListVisibleLayout: Equatable, Sendable {
   package var contentBounds: CellRect
   package var lines: [ListDisplayLine]
   package var sectionChromeBounds: [CellRect]
+  /// Total cells the visible lines occupy, which exceeds `lines.count`
+  /// whenever any row measured taller than one cell.
+  package var totalContentHeight: Int
+
+  package init(
+    contentBounds: CellRect,
+    lines: [ListDisplayLine],
+    sectionChromeBounds: [CellRect],
+    totalContentHeight: Int? = nil
+  ) {
+    self.contentBounds = contentBounds
+    self.lines = lines
+    self.sectionChromeBounds = sectionChromeBounds
+    self.totalContentHeight =
+      totalContentHeight ?? lines.reduce(0) { $0 + max(1, $1.height) }
+  }
+
+  /// Returns a copy translated into absolute coordinates by `delta`.
+  package func translated(by delta: CellPoint) -> ListVisibleLayout {
+    var copy = self
+    copy.contentBounds = CellRect(
+      origin: .init(x: contentBounds.origin.x + delta.x, y: contentBounds.origin.y + delta.y),
+      size: contentBounds.size
+    )
+    copy.sectionChromeBounds = sectionChromeBounds.map { rect in
+      CellRect(
+        origin: .init(x: rect.origin.x + delta.x, y: rect.origin.y + delta.y),
+        size: rect.size
+      )
+    }
+    return copy
+  }
 }
 
 extension DrawExtractor {
   func listCommands(
     for payload: ListPayload,
     in bounds: CellRect,
-    hostsCommittedItems: Bool = false
+    hostsCommittedItems: Bool = false,
+    placedLayout: ListVisibleLayout? = nil
   ) -> [DrawCommand] {
-    let layout = payload.style.visibleListLayout(
-      for: payload,
-      in: bounds
-    )
+    // The placed product when there is one — that is what keeps a tall row's
+    // marker and separators on the same cells as its content. The recompute
+    // stays for payload-only callers, whose rows are all one cell tall.
+    let layout =
+      placedLayout
+      ?? payload.style.visibleListLayout(
+        for: payload,
+        in: bounds
+      )
     let contentBounds = layout.contentBounds
     guard contentBounds.size.width > 0, contentBounds.size.height > 0 else {
       return listChromeCommands(for: payload, in: bounds, layout: layout)
@@ -56,10 +110,10 @@ extension DrawExtractor {
     var commands = listChromeCommands(for: payload, in: bounds, layout: layout)
     let lines = layout.lines
 
-    for (index, line) in lines.enumerated() {
+    for line in lines {
       let lineBounds = CellRect(
-        origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + index),
-        size: .init(width: contentBounds.size.width, height: 1)
+        origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
+        size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
 
       switch line.kind {
@@ -92,7 +146,8 @@ extension DrawExtractor {
         let markerWidth = layoutText(for: marker, width: nil).size.width
         let markerBounds = CellRect(
           origin: lineBounds.origin,
-          size: .init(width: min(lineBounds.size.width, markerWidth), height: 1)
+          size: .init(
+            width: min(lineBounds.size.width, markerWidth), height: lineBounds.size.height)
         )
         let textBounds = CellRect(
           origin: .init(x: lineBounds.origin.x + markerBounds.size.width, y: lineBounds.origin.y),

@@ -132,13 +132,17 @@ extension SemanticExtractor {
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
   ) {
-    let layout = payload.style.visibleListLayout(
-      for: payload,
-      in: node.bounds
-    )
+    // The placed product when there is one, so semantics rects land on the
+    // same cells draw painted and placement positioned.
+    let layout =
+      node.hostedListVisibleLayout
+      ?? payload.style.visibleListLayout(
+        for: payload,
+        in: node.bounds
+      )
     let hostsCommittedRows = node.semanticMetadata.hostedCollectionContainer?.kind == .list
 
-    for (lineIndex, line) in layout.lines.enumerated() {
+    for line in layout.lines {
       guard let rowIndex = line.rowIndex else {
         continue
       }
@@ -171,11 +175,11 @@ extension SemanticExtractor {
           CellRect(
             origin: .init(
               x: layout.contentBounds.origin.x,
-              y: layout.contentBounds.origin.y + lineIndex
+              y: layout.contentBounds.origin.y + line.yOffset
             ),
             size: .init(
               width: layout.contentBounds.size.width,
-              height: 1
+              height: max(1, line.height)
             )
           )
         }

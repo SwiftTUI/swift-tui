@@ -416,11 +416,19 @@ extension LayoutEngine {
       )
     }
 
-    let layout = payload.style.visibleListLayout(for: payload, in: bounds)
+    // The measured product, translated — not a fresh derivation. Recomputing
+    // here is the fallback for a parent that stretched the collection past the
+    // size it was measured at, where the measured line set no longer covers
+    // the bounds.
+    let layout = hostedListVisibleLayout(
+      for: resolved,
+      measured: measured,
+      payload: payload,
+      in: bounds
+    )
     var requests: [PlacementRequest] = []
-    var additionalYOffset = 0
     var placedItemIndices: Set<Int> = []
-    for (lineIndex, line) in layout.lines.enumerated() {
+    for line in layout.lines {
       guard let itemIndex = line.itemIndex,
         placedItemIndices.insert(itemIndex).inserted
       else {
@@ -446,7 +454,7 @@ extension LayoutEngine {
       let markerWidth = line.rowIndex == nil || !payload.showsSelectionMarker ? 0 : 2
       let origin = CellPoint(
         x: layout.contentBounds.origin.x + markerWidth,
-        y: layout.contentBounds.origin.y + lineIndex + additionalYOffset
+        y: layout.contentBounds.origin.y + line.yOffset
       )
       let childBounds = CellRect(origin: origin, size: childMeasurement.measuredSize)
       let collectionBottom = bounds.origin.y + bounds.size.height
@@ -461,7 +469,6 @@ extension LayoutEngine {
           )
         )
       }
-      additionalYOffset += max(0, childMeasurement.measuredSize.height - 1)
     }
     return requests
   }
@@ -543,5 +550,35 @@ extension LayoutEngine {
       additionalYOffset += max(0, childMeasurement.measuredSize.height - 1)
     }
     return requests
+  }
+
+  /// The visible layout to place a hosted List against: the measured product
+  /// translated into `bounds`, or a fresh derivation when no measured product
+  /// covers these bounds (a payload-only caller, or a parent that stretched
+  /// the collection past its measured size).
+  func hostedListVisibleLayout(
+    for resolved: ResolvedNode,
+    measured: MeasuredNode,
+    payload: ListPayload,
+    in bounds: CellRect
+  ) -> ListVisibleLayout {
+    guard
+      let stored = measured.containerAllocationSnapshot?.hostedCollection?.listLayout,
+      stored.contentBounds.size.height
+        >= listVisibleLayoutHeightRequirement(
+          for: payload,
+          in: bounds
+        )
+    else {
+      return payload.style.visibleListLayout(for: payload, in: bounds)
+    }
+    return stored.translated(by: bounds.origin)
+  }
+
+  private func listVisibleLayoutHeightRequirement(
+    for payload: ListPayload,
+    in bounds: CellRect
+  ) -> Int {
+    payload.style.listContentHeight(in: bounds)
   }
 }
