@@ -760,10 +760,17 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard !unreserved.contains(character) else {
         return String(character)
       }
-      // `String(format:)` is a variadic C-interop call, hence `unsafe` under
-      // strict memory safety.
+      // Hand-rolled rather than `String(format:)`: that is a variadic C-interop
+      // call, which strict memory safety treats as `unsafe` on Darwin but not
+      // under swift-corelibs-foundation. Neither spelling of the `unsafe`
+      // marker compiles on both platforms — with it, Linux rejects the
+      // expression as having no unsafe operations; without it, Darwin demands
+      // one. The stdlib radix conversion sidesteps the divergence entirely.
       return String(character).utf8
-        .map { unsafe String(format: "%%%02X", $0) }
+        .map { byte in
+          let hex = String(byte, radix: 16, uppercase: true)
+          return byte < 0x10 ? "%0\(hex)" : "%\(hex)"
+        }
         .joined()
     }
 
