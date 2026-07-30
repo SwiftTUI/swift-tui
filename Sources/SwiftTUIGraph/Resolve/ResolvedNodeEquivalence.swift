@@ -47,24 +47,37 @@ extension ResolvedNode {
   package func isEquivalentForPlacement(
     to other: Self
   ) -> Bool {
-    structuralPath == other.structuralPath
-      && kind == other.kind
-      && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
-      && environmentSnapshot == other.environmentSnapshot
-      && layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior)
-      && layoutMetadata == other.layoutMetadata
-      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
-      // guide-carrying node can never prove its placement inputs unchanged.
-      && !layoutMetadata.hasExplicitAlignmentGuides
-      && layoutRealizedContent?.equivalenceSignature
-        == other.layoutRealizedContent?.equivalenceSignature
-      && drawPayload == other.drawPayload
-      && intrinsicSize == other.intrinsicSize
-      && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
-      && children.count == other.children.count
-      && zip(children, other.children).allSatisfy { lhsChild, rhsChild in
-        lhsChild.isEquivalentForPlacement(to: rhsChild)
+    // Iterative for the same reason `isEquivalentForMeasurement` is (45ffdc44):
+    // node-hosted collection rows and deep custom-layout chains reach this
+    // walker on the frame-tail worker's small Dispatch stack. Same field
+    // contract, heap-backed traversal.
+    var pending: [(Self, Self)] = [(self, other)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.structuralPath == rhs.structuralPath,
+        lhs.kind == rhs.kind,
+        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.layoutBehavior.isEquivalentForPlacement(to: rhs.layoutBehavior),
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+        // guide-carrying node can never prove its placement inputs unchanged.
+        !lhs.layoutMetadata.hasExplicitAlignmentGuides,
+        lhs.layoutRealizedContent?.equivalenceSignature
+          == rhs.layoutRealizedContent?.equivalenceSignature,
+        lhs.drawPayload == rhs.drawPayload,
+        lhs.intrinsicSize == rhs.intrinsicSize,
+        lhs.indexedChildSource?.measurementSignature
+          == rhs.indexedChildSource?.measurementSignature,
+        lhs.children.count == rhs.children.count
+      else {
+        return false
       }
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
+      }
+    }
+    return true
   }
 
   /// Result of `placementEquivalence(to:)` — how a current resolved subtree
@@ -93,57 +106,64 @@ extension ResolvedNode {
   package func placementEquivalence(
     to other: Self
   ) -> PlacementEquivalence {
-    guard
-      structuralPath == other.structuralPath,
-      kind == other.kind,
-      Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator),
-      environmentSnapshot == other.environmentSnapshot,
-      layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior),
-      layoutMetadata == other.layoutMetadata,
-      // Alignment-guide closures are invisible to `layoutMetadata ==`; a
-      // guide-carrying node can never prove its placement inputs unchanged.
-      !layoutMetadata.hasExplicitAlignmentGuides,
-      layoutRealizedContent?.equivalenceSignature
-        == other.layoutRealizedContent?.equivalenceSignature,
-      drawPayload == other.drawPayload,
-      intrinsicSize == other.intrinsicSize,
-      indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
-      children.count == other.children.count
-    else {
-      return .divergent
-    }
+    // The recursion folded a tri-state on the way back up; this walks the same
+    // pairs on the heap and folds globally instead. That is the same function
+    // because the lattice is order-independent: a failed geometry gate anywhere
+    // makes every ancestor `.divergent`, and a `.geometryReusable` anywhere
+    // poisons every ancestor to exactly `.geometryReusable`. So `.identical`
+    // holds iff no node in the subtree ever diverged on metadata.
+    var sawMetadataDivergence = false
+    var pending: [(Self, Self)] = [(self, other)]
 
-    // Metadata mirrored by `PlacedNode` beyond the geometry gate above. `kind`,
-    // `environmentSnapshot`, `layoutMetadata`, and `drawPayload` are already
-    // proven equal by the gate; `semanticRole` derives purely from
-    // `semanticMetadata` / focus / `layoutBehavior`, all compared here.
-    var metadataIdentical =
-      identity == other.identity
-      && structuralEdgeRole == other.structuralEdgeRole
-      && entityIdentity == other.entityIdentity
-      && entityStructuralPath == other.entityStructuralPath
-      && declarationOwnerEdge == other.declarationOwnerEdge
-      && layoutBehavior == other.layoutBehavior
-      && drawMetadata == other.drawMetadata
-      && drawEffects == other.drawEffects
-      && surfaceComposition == other.surfaceComposition
-      && semanticMetadata == other.semanticMetadata
-      && lifecycleMetadata == other.lifecycleMetadata
-      && isTransient == other.isTransient
-      && matchedGeometry == other.matchedGeometry
-
-    for (lhsChild, rhsChild) in zip(children, other.children) {
-      switch lhsChild.placementEquivalence(to: rhsChild) {
-      case .divergent:
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.structuralPath == rhs.structuralPath,
+        lhs.kind == rhs.kind,
+        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.layoutBehavior.isEquivalentForPlacement(to: rhs.layoutBehavior),
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        // Alignment-guide closures are invisible to `layoutMetadata ==`; a
+        // guide-carrying node can never prove its placement inputs unchanged.
+        !lhs.layoutMetadata.hasExplicitAlignmentGuides,
+        lhs.layoutRealizedContent?.equivalenceSignature
+          == rhs.layoutRealizedContent?.equivalenceSignature,
+        lhs.drawPayload == rhs.drawPayload,
+        lhs.intrinsicSize == rhs.intrinsicSize,
+        lhs.indexedChildSource?.measurementSignature
+          == rhs.indexedChildSource?.measurementSignature,
+        lhs.children.count == rhs.children.count
+      else {
         return .divergent
-      case .geometryReusable:
-        metadataIdentical = false
-      case .identical:
-        break
+      }
+
+      // Metadata mirrored by `PlacedNode` beyond the geometry gate above.
+      // `kind`, `environmentSnapshot`, `layoutMetadata`, and `drawPayload` are
+      // already proven equal by the gate; `semanticRole` derives purely from
+      // `semanticMetadata` / focus / `layoutBehavior`, all compared here.
+      if !sawMetadataDivergence {
+        sawMetadataDivergence =
+          lhs.identity != rhs.identity
+          || lhs.structuralEdgeRole != rhs.structuralEdgeRole
+          || lhs.entityIdentity != rhs.entityIdentity
+          || lhs.entityStructuralPath != rhs.entityStructuralPath
+          || lhs.declarationOwnerEdge != rhs.declarationOwnerEdge
+          || lhs.layoutBehavior != rhs.layoutBehavior
+          || lhs.drawMetadata != rhs.drawMetadata
+          || lhs.drawEffects != rhs.drawEffects
+          || lhs.surfaceComposition != rhs.surfaceComposition
+          || lhs.semanticMetadata != rhs.semanticMetadata
+          || lhs.lifecycleMetadata != rhs.lifecycleMetadata
+          || lhs.isTransient != rhs.isTransient
+          || lhs.matchedGeometry != rhs.matchedGeometry
+      }
+
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
       }
     }
 
-    return metadataIdentical ? .identical : .geometryReusable
+    return sawMetadataDivergence ? .geometryReusable : .identical
   }
 
   /// Two discriminators are "compatible" for equivalence purposes when
@@ -173,41 +193,48 @@ extension ResolvedNode {
   /// other field must match exactly, recursing into children. This is the
   /// sound oracle for memoization, vs the stricter `==` used elsewhere.
   package func memoReuseEquivalent(to other: ResolvedNode) -> Bool {
-    guard
-      identity == other.identity,
-      structuralEdgeRole == other.structuralEdgeRole,
-      entityIdentity == other.entityIdentity,
-      entityStructuralPath == other.entityStructuralPath,
-      declarationOwnerEdge == other.declarationOwnerEdge,
-      kind == other.kind,
-      Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator),
-      environmentSnapshot == other.environmentSnapshot,
-      transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot),
-      layoutBehavior == other.layoutBehavior,
-      layoutMetadata == other.layoutMetadata,
-      layoutRealizedContent?.equivalenceSignature
-        == other.layoutRealizedContent?.equivalenceSignature,
-      drawMetadata == other.drawMetadata,
-      drawEffects == other.drawEffects,
-      surfaceComposition == other.surfaceComposition,
-      semanticMetadata == other.semanticMetadata,
-      lifecycleMetadata == other.lifecycleMetadata,
-      handlerInventory == other.handlerInventory,
-      drawPayload == other.drawPayload,
-      intrinsicSize == other.intrinsicSize,
-      indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature,
-      preferenceValues == other.preferenceValues,
-      supportsRetainedReuse == other.supportsRetainedReuse,
-      // matchedGeometry is set at resolve time by .matchedGeometryEffect
-      // (F96): a config change served from memo would pair stale geometry.
-      // isTransient is a runtime-overlay product, always false at resolve —
-      // compared for totality, vacuous on the resolve path.
-      matchedGeometry == other.matchedGeometry,
-      isTransient == other.isTransient,
-      children.count == other.children.count
-    else { return false }
-    for (l, r) in zip(children, other.children) where !l.memoReuseEquivalent(to: r) {
-      return false
+    // Heap-backed traversal: this runs on the resolve leg of the fused frame
+    // tail (`ViewFoundation`'s memo gate), on the same small worker stack that
+    // overflowed `isEquivalentForMeasurement` in production.
+    var pending: [(ResolvedNode, ResolvedNode)] = [(self, other)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.identity == rhs.identity,
+        lhs.structuralEdgeRole == rhs.structuralEdgeRole,
+        lhs.entityIdentity == rhs.entityIdentity,
+        lhs.entityStructuralPath == rhs.entityStructuralPath,
+        lhs.declarationOwnerEdge == rhs.declarationOwnerEdge,
+        lhs.kind == rhs.kind,
+        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.transactionSnapshot.isReuseEquivalent(to: rhs.transactionSnapshot),
+        lhs.layoutBehavior == rhs.layoutBehavior,
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        lhs.layoutRealizedContent?.equivalenceSignature
+          == rhs.layoutRealizedContent?.equivalenceSignature,
+        lhs.drawMetadata == rhs.drawMetadata,
+        lhs.drawEffects == rhs.drawEffects,
+        lhs.surfaceComposition == rhs.surfaceComposition,
+        lhs.semanticMetadata == rhs.semanticMetadata,
+        lhs.lifecycleMetadata == rhs.lifecycleMetadata,
+        lhs.handlerInventory == rhs.handlerInventory,
+        lhs.drawPayload == rhs.drawPayload,
+        lhs.intrinsicSize == rhs.intrinsicSize,
+        lhs.indexedChildSource?.measurementSignature
+          == rhs.indexedChildSource?.measurementSignature,
+        lhs.preferenceValues == rhs.preferenceValues,
+        lhs.supportsRetainedReuse == rhs.supportsRetainedReuse,
+        // matchedGeometry is set at resolve time by .matchedGeometryEffect
+        // (F96): a config change served from memo would pair stale geometry.
+        // isTransient is a runtime-overlay product, always false at resolve —
+        // compared for totality, vacuous on the resolve path.
+        lhs.matchedGeometry == rhs.matchedGeometry,
+        lhs.isTransient == rhs.isTransient,
+        lhs.children.count == rhs.children.count
+      else { return false }
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
+      }
     }
     return true
   }
@@ -229,42 +256,69 @@ extension ResolvedNode {
   /// this class. Bookkeeping-only divergence burn-down is tracked with the
   /// comparator field-manifest work (F96 in the org findings registry).
   package func memoUnsoundContentDivergence(from other: ResolvedNode) -> String? {
-    if identity != other.identity { return "identity" }
-    if structuralEdgeRole != other.structuralEdgeRole { return "structuralEdgeRole" }
-    if declarationOwnerEdge != other.declarationOwnerEdge { return "declarationOwnerEdge" }
-    if kind != other.kind { return "kind" }
-    if !Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator) {
-      return "typeDiscriminator"
-    }
-    if environmentSnapshot != other.environmentSnapshot { return "environmentSnapshot" }
-    if !transactionSnapshot.isReuseEquivalent(to: other.transactionSnapshot) {
-      return "transactionSnapshot"
-    }
-    if layoutBehavior != other.layoutBehavior { return "layoutBehavior" }
-    if layoutMetadata != other.layoutMetadata { return "layoutMetadata" }
-    if layoutRealizedContent?.equivalenceSignature
-      != other.layoutRealizedContent?.equivalenceSignature
-    {
-      return "layoutRealizedContent"
-    }
-    if drawMetadata != other.drawMetadata { return "drawMetadata" }
-    if drawEffects != other.drawEffects { return "drawEffects" }
-    if surfaceComposition != other.surfaceComposition { return "surfaceComposition" }
-    if semanticMetadata != other.semanticMetadata { return "semanticMetadata" }
-    if lifecycleMetadata != other.lifecycleMetadata { return "lifecycleMetadata" }
-    if drawPayload != other.drawPayload { return "drawPayload" }
-    if intrinsicSize != other.intrinsicSize { return "intrinsicSize" }
-    if indexedChildSource?.measurementSignature != other.indexedChildSource?.measurementSignature {
-      return "indexedChildSource"
-    }
-    if preferenceValues != other.preferenceValues { return "preferenceValues" }
-    if supportsRetainedReuse != other.supportsRetainedReuse { return "supportsRetainedReuse" }
-    if matchedGeometry != other.matchedGeometry { return "matchedGeometry" }
-    if isTransient != other.isTransient { return "isTransient" }
-    if children.count != other.children.count { return "children.count" }
-    for (l, r) in zip(children, other.children) {
-      if let childField = l.memoUnsoundContentDivergence(from: r) {
-        return "child.\(childField)"
+    // Preorder in child order, carrying a depth so the reported
+    // `"child.child.…field"` string stays byte-identical to the recursion's:
+    // the probe histogram keys on it. The field ladder stays INLINE rather than
+    // factored into a per-node helper — the F96 comparator field-totality lock
+    // (`ResolvedNodeComparatorTotalityTests`) reads this function's own body
+    // text to prove every stored field is compared or exempted, and a helper
+    // would hide the fields from it.
+    var pending: [(ResolvedNode, ResolvedNode, Int)] = [(self, other, 0)]
+    while let (lhs, rhs, depth) = pending.popLast() {
+      // Builds the prefix only on divergence, so a clean walk stays allocation
+      // free rather than minting a string per node.
+      func diverged(_ field: String) -> String {
+        String(repeating: "child.", count: depth) + field
+      }
+
+      if lhs.identity != rhs.identity { return diverged("identity") }
+      if lhs.structuralEdgeRole != rhs.structuralEdgeRole {
+        return diverged("structuralEdgeRole")
+      }
+      if lhs.declarationOwnerEdge != rhs.declarationOwnerEdge {
+        return diverged("declarationOwnerEdge")
+      }
+      if lhs.kind != rhs.kind { return diverged("kind") }
+      if !Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator) {
+        return diverged("typeDiscriminator")
+      }
+      if lhs.environmentSnapshot != rhs.environmentSnapshot {
+        return diverged("environmentSnapshot")
+      }
+      if !lhs.transactionSnapshot.isReuseEquivalent(to: rhs.transactionSnapshot) {
+        return diverged("transactionSnapshot")
+      }
+      if lhs.layoutBehavior != rhs.layoutBehavior { return diverged("layoutBehavior") }
+      if lhs.layoutMetadata != rhs.layoutMetadata { return diverged("layoutMetadata") }
+      if lhs.layoutRealizedContent?.equivalenceSignature
+        != rhs.layoutRealizedContent?.equivalenceSignature
+      {
+        return diverged("layoutRealizedContent")
+      }
+      if lhs.drawMetadata != rhs.drawMetadata { return diverged("drawMetadata") }
+      if lhs.drawEffects != rhs.drawEffects { return diverged("drawEffects") }
+      if lhs.surfaceComposition != rhs.surfaceComposition {
+        return diverged("surfaceComposition")
+      }
+      if lhs.semanticMetadata != rhs.semanticMetadata { return diverged("semanticMetadata") }
+      if lhs.lifecycleMetadata != rhs.lifecycleMetadata { return diverged("lifecycleMetadata") }
+      if lhs.drawPayload != rhs.drawPayload { return diverged("drawPayload") }
+      if lhs.intrinsicSize != rhs.intrinsicSize { return diverged("intrinsicSize") }
+      if lhs.indexedChildSource?.measurementSignature
+        != rhs.indexedChildSource?.measurementSignature
+      {
+        return diverged("indexedChildSource")
+      }
+      if lhs.preferenceValues != rhs.preferenceValues { return diverged("preferenceValues") }
+      if lhs.supportsRetainedReuse != rhs.supportsRetainedReuse {
+        return diverged("supportsRetainedReuse")
+      }
+      if lhs.matchedGeometry != rhs.matchedGeometry { return diverged("matchedGeometry") }
+      if lhs.isTransient != rhs.isTransient { return diverged("isTransient") }
+      if lhs.children.count != rhs.children.count { return diverged("children.count") }
+
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index], depth + 1))
       }
     }
     return nil
@@ -282,49 +336,83 @@ extension ResolvedNode {
   /// fields are checked before bookkeeping fields so a content divergence is
   /// never masked by a coincident bookkeeping diff.
   package func memoFirstDifferingField(from other: ResolvedNode) -> String? {
+    // The content sweep is already a whole-subtree walk, so running it once at
+    // the root is equivalent to the recursion re-running it per level (where it
+    // returned nil every time after the first). What remains is a preorder
+    // sweep for the bookkeeping fields, which reproduces the recursion's order:
+    // a node's own bookkeeping before its children's, children in order.
     if let contentField = memoUnsoundContentDivergence(from: other) {
       return contentField
     }
-    if entityIdentity != other.entityIdentity { return "entityIdentity" }
-    if entityStructuralPath != other.entityStructuralPath { return "entityStructuralPath" }
-    if handlerInventory != other.handlerInventory { return "handlerInventory" }
-    for (l, r) in zip(children, other.children) {
-      if let childField = l.memoFirstDifferingField(from: r) {
-        return "child.\(childField)"
+
+    var pending: [(ResolvedNode, ResolvedNode, Int)] = [(self, other, 0)]
+    while let (lhs, rhs, depth) = pending.popLast() {
+      let prefix = String(repeating: "child.", count: depth)
+      if lhs.entityIdentity != rhs.entityIdentity { return prefix + "entityIdentity" }
+      if lhs.entityStructuralPath != rhs.entityStructuralPath {
+        return prefix + "entityStructuralPath"
+      }
+      if lhs.handlerInventory != rhs.handlerInventory { return prefix + "handlerInventory" }
+      // Counts already proven equal by the content sweep above.
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index], depth + 1))
       }
     }
+
+    // Unreachable in practice — the content and bookkeeping field sets union to
+    // exactly `memoReuseEquivalent`'s — but kept as the recursion's own
+    // defensive tail rather than silently dropped.
     return memoReuseEquivalent(to: other) ? nil : "other"
   }
 
+  /// Explicit, iterative `==`.
+  ///
+  /// The synthesized/`children ==` form recursed through array equality, which
+  /// is invisible at the call site and therefore the easiest way for this crash
+  /// class to reopen. Converted regardless of the current caller inventory:
+  /// enumerating "who compares a deep tree" is exactly the fragile analysis
+  /// this work exists to delete, and the lint gate can then cover the file
+  /// unconditionally.
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.identity == rhs.identity
-      && lhs.structuralPath == rhs.structuralPath
-      && lhs.structuralEdgeRole == rhs.structuralEdgeRole
-      && lhs.entityIdentity == rhs.entityIdentity
-      && lhs.entityStructuralPath == rhs.entityStructuralPath
-      && lhs.declarationOwnerEdge == rhs.declarationOwnerEdge
-      && lhs.kind == rhs.kind
-      && Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator)
-      && lhs.children == rhs.children
-      && lhs.environmentSnapshot == rhs.environmentSnapshot
-      && lhs.transactionSnapshot == rhs.transactionSnapshot
-      && lhs.layoutBehavior == rhs.layoutBehavior
-      && lhs.layoutMetadata == rhs.layoutMetadata
-      && lhs.layoutRealizedContent?.equivalenceSignature
-        == rhs.layoutRealizedContent?.equivalenceSignature
-      && lhs.drawMetadata == rhs.drawMetadata
-      && lhs.drawEffects == rhs.drawEffects
-      && lhs.surfaceComposition == rhs.surfaceComposition
-      && lhs.semanticMetadata == rhs.semanticMetadata
-      && lhs.lifecycleMetadata == rhs.lifecycleMetadata
-      && lhs.handlerInventory == rhs.handlerInventory
-      && lhs.drawPayload == rhs.drawPayload
-      && lhs.intrinsicSize == rhs.intrinsicSize
-      && lhs.indexedChildSource?.measurementSignature
-        == rhs.indexedChildSource?.measurementSignature
-      && lhs.preferenceValues == rhs.preferenceValues
-      && lhs.supportsRetainedReuse == rhs.supportsRetainedReuse
-      && lhs.matchedGeometry == rhs.matchedGeometry
-      && lhs.isTransient == rhs.isTransient
+    var pending: [(Self, Self)] = [(lhs, rhs)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.identity == rhs.identity,
+        lhs.structuralPath == rhs.structuralPath,
+        lhs.structuralEdgeRole == rhs.structuralEdgeRole,
+        lhs.entityIdentity == rhs.entityIdentity,
+        lhs.entityStructuralPath == rhs.entityStructuralPath,
+        lhs.declarationOwnerEdge == rhs.declarationOwnerEdge,
+        lhs.kind == rhs.kind,
+        Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
+        lhs.children.count == rhs.children.count,
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.transactionSnapshot == rhs.transactionSnapshot,
+        lhs.layoutBehavior == rhs.layoutBehavior,
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        lhs.layoutRealizedContent?.equivalenceSignature
+          == rhs.layoutRealizedContent?.equivalenceSignature,
+        lhs.drawMetadata == rhs.drawMetadata,
+        lhs.drawEffects == rhs.drawEffects,
+        lhs.surfaceComposition == rhs.surfaceComposition,
+        lhs.semanticMetadata == rhs.semanticMetadata,
+        lhs.lifecycleMetadata == rhs.lifecycleMetadata,
+        lhs.handlerInventory == rhs.handlerInventory,
+        lhs.drawPayload == rhs.drawPayload,
+        lhs.intrinsicSize == rhs.intrinsicSize,
+        lhs.indexedChildSource?.measurementSignature
+          == rhs.indexedChildSource?.measurementSignature,
+        lhs.preferenceValues == rhs.preferenceValues,
+        lhs.supportsRetainedReuse == rhs.supportsRetainedReuse,
+        lhs.matchedGeometry == rhs.matchedGeometry,
+        lhs.isTransient == rhs.isTransient
+      else {
+        return false
+      }
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
+      }
+    }
+    return true
   }
 }

@@ -179,36 +179,78 @@ extension LayoutEngine {
     placed: PlacedNode,
     from resolved: ResolvedNode
   ) -> PlacedNode {
-    var node = placed
-    node.synchronizeResolvedPhaseMetadata(
-      from: resolved,
-      semanticRole: semanticRole(for: resolved)
-    )
+    // Iterative post-order rebuild for the same reason as `translatedPlacement`:
+    // this runs on the frame-tail worker's small stack over node-hosted
+    // collection rows and deep custom-layout chains. Completed children are
+    // written back into the parent frame's value-typed `children[index]`.
+    struct Frame {
+      var node: PlacedNode
+      let resolved: ResolvedNode
+      var nextChildIndex: Int
+      /// Structural mismatch — should not happen because
+      /// `isEquivalentForPlacement` gated on `children.count`, but play it safe
+      /// and stop descending at this node rather than zipping mismatched trees.
+      let descendsIntoChildren: Bool
+    }
 
-    guard node.children.count == resolved.children.count else {
-      // Structural mismatch — should not happen because
-      // isEquivalentForPlacement gated on children.count, but play
-      // it safe and return the node without recursing further.
-      return node
+    func makeFrame(_ placed: PlacedNode, _ resolved: ResolvedNode) -> Frame {
+      var node = placed
+      node.synchronizeResolvedPhaseMetadata(
+        from: resolved,
+        semanticRole: semanticRole(for: resolved)
+      )
+      return Frame(
+        node: node,
+        resolved: resolved,
+        nextChildIndex: 0,
+        descendsIntoChildren: node.children.count == resolved.children.count
+      )
     }
-    let refreshedChildren = zip(node.children, resolved.children).map {
-      (placedChild, resolvedChild) in
-      synchronizeRetainedPhaseMetadata(placed: placedChild, from: resolvedChild)
+
+    var stack: [Frame] = [makeFrame(placed, resolved)]
+    while true {
+      let index = stack.count - 1
+      if stack[index].descendsIntoChildren,
+        stack[index].nextChildIndex < stack[index].node.children.count
+      {
+        let childIndex = stack[index].nextChildIndex
+        stack.append(
+          makeFrame(
+            stack[index].node.children[childIndex],
+            stack[index].resolved.children[childIndex]
+          )
+        )
+        continue
+      }
+
+      let finished = stack.removeLast().node
+      guard let parentIndex = stack.indices.last else {
+        return finished
+      }
+      stack[parentIndex].node.children[stack[parentIndex].nextChildIndex] = finished
+      stack[parentIndex].nextChildIndex += 1
     }
-    node.children = refreshedChildren
-    return node
   }
 
   internal func isEquivalentForViewportTranslation(
     _ lhs: MeasuredNode,
     _ rhs: MeasuredNode
   ) -> Bool {
-    lhs.identity == rhs.identity
-      && lhs.measuredSize == rhs.measuredSize
-      && lhs.childMeasurements.count == rhs.childMeasurements.count
-      && zip(lhs.childMeasurements, rhs.childMeasurements).allSatisfy {
-        isEquivalentForViewportTranslation($0, $1)
+    // Heap-backed pair walk; same field contract as the recursion.
+    var pending: [(MeasuredNode, MeasuredNode)] = [(lhs, rhs)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.identity == rhs.identity,
+        lhs.measuredSize == rhs.measuredSize,
+        lhs.childMeasurements.count == rhs.childMeasurements.count
+      else {
+        return false
       }
+      for index in lhs.childMeasurements.indices.reversed() {
+        pending.append((lhs.childMeasurements[index], rhs.childMeasurements[index]))
+      }
+    }
+    return true
   }
 
   internal func hasInvalidatedIndexedDescendant(

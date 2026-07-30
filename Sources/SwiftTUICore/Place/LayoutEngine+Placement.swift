@@ -246,14 +246,50 @@ extension LayoutEngine {
     }
   }
 
+  /// Translates a placed subtree by `delta`.
+  ///
+  /// Iterative post-order rebuild: reached from the frame tail through
+  /// `retainedPlacement`'s viewport-translation leg, over deep scroll content,
+  /// on the worker's small Dispatch stack. Each frame translates its own node's
+  /// geometry immediately and keeps the untranslated children as placeholders;
+  /// completed children are written back into the parent frame's value-typed
+  /// `children[index]` one at a time, so the tree is rebuilt bottom-up without
+  /// call-stack frames.
   package func translatedPlacement(
     _ node: PlacedNode,
     by delta: CellPoint
   ) -> PlacedNode {
-    let translatedBounds = translated(node.bounds, by: delta)
-    let translatedChildren = node.children.map { child in
-      translatedPlacement(child, by: delta)
+    struct Frame {
+      var node: PlacedNode
+      var nextChildIndex: Int
     }
+
+    var stack: [Frame] = [Frame(node: translatedNodeItself(node, by: delta), nextChildIndex: 0)]
+    while true {
+      let index = stack.count - 1
+      if stack[index].nextChildIndex < stack[index].node.children.count {
+        let child = stack[index].node.children[stack[index].nextChildIndex]
+        stack.append(Frame(node: translatedNodeItself(child, by: delta), nextChildIndex: 0))
+        continue
+      }
+
+      let finished = stack.removeLast().node
+      guard let parentIndex = stack.indices.last else {
+        return finished
+      }
+      stack[parentIndex].node.children[stack[parentIndex].nextChildIndex] = finished
+      stack[parentIndex].nextChildIndex += 1
+    }
+  }
+
+  /// Translates one node's own geometry, leaving `children` untouched for the
+  /// caller to replace as each is rebuilt.
+  private func translatedNodeItself(
+    _ node: PlacedNode,
+    by delta: CellPoint
+  ) -> PlacedNode {
+    let translatedBounds = translated(node.bounds, by: delta)
+    let translatedChildren = node.children
 
     var translatedNode = PlacedNode(
       viewNodeID: node.viewNodeID,

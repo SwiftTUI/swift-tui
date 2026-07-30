@@ -4825,3 +4825,96 @@ private func diagnosticRows(_ text: String) -> [[String: String]] {
     return row
   }
 }
+
+/// D72 end-to-end canary: a node-hosted `List` with deep authored row subtrees
+/// rendered for two frames with a geometry-stable metadata change between them.
+///
+/// The second frame drives `retainedPlacement` on the real frame-tail worker,
+/// which runs `placementEquivalence`, `MeasuredNode ==`, and — because the
+/// change is metadata-only — the `.geometryReusable` `synchronizeRetainedPhase`
+/// sync leg. Each of those was a recursive walker over the authored row
+/// subtrees before D72; this exercises them on the worker's own stack rather
+/// than a synthetic one, following the 0ed2028f canary pattern.
+@MainActor
+@Suite("Deep hosted-row frame-tail canary")
+struct DeepHostedRowFrameTailCanaryTests {
+  @Test("deep node-hosted rows survive a metadata-only second frame on the worker")
+  func deepHostedRowsSurviveMetadataOnlySecondFrameOnWorker() async throws {
+    let rootIdentity = testIdentity("DeepHostedRowCanaryRoot")
+    let renderer = DefaultRenderer()
+    let terminal = AsyncFrameTailTerminalHost(size: .init(width: 60, height: 16))
+    let stateContainer = StateContainer(
+      initialState: 1,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      presentationSurface: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { generation, _ in
+        DeepHostedRowCanaryView(generation: generation)
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    #expect(terminal.frames.last?.contains("row 0") == true)
+
+    // Generation 2 changes only an accessibility label deep inside each row —
+    // geometry-stable, so placement is reused and the metadata sync leg walks
+    // the whole authored subtree.
+    stateContainer.replace(with: 2)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+
+    #expect(renderedFrames == 2)
+    #expect(terminal.frames.last?.contains("row 0") == true)
+  }
+}
+
+private struct DeepHostedRowCanaryView: View {
+  var generation: Int
+
+  var body: some View {
+    List(0..<8, id: \.self) { row in
+      DeepHostedRowContent(row: row, generation: generation)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+/// Each row nests a deliberately deep authored wrapper chain — the shape that
+/// node-hosted collections preserve instead of collapsing into a draw payload,
+/// and the one that overflowed the worker stack in production.
+private struct DeepHostedRowContent: View {
+  var row: Int
+  var generation: Int
+
+  var body: some View {
+    DeepHostedRowNesting(depth: 24) {
+      Text("row \(row)")
+        .accessibilityLabel("row \(row) generation \(generation)")
+    }
+  }
+}
+
+private struct DeepHostedRowNesting<Content: View>: View {
+  var depth: Int
+  @ViewBuilder var content: Content
+
+  var body: some View {
+    if depth <= 0 {
+      content
+    } else {
+      HStack(spacing: 0) {
+        DeepHostedRowNesting(depth: depth - 1) { content }
+      }
+    }
+  }
+}

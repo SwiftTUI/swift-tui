@@ -483,27 +483,46 @@ package struct PlacedNode: Equatable, Sendable {
 }
 
 extension PlacedNode {
+  /// Explicit, iterative `==`.
+  ///
+  /// `children ==` recursed through array equality, which is invisible at the
+  /// call site and reachable over unbounded-depth placed trees. Converted
+  /// regardless of the current caller inventory: enumerating "who compares a
+  /// deep tree" is exactly the fragile analysis this work exists to delete.
+  /// Same field set; conjunct order is not observable, so `subtreeNodeCount`
+  /// moves first as an O(1) early-out.
   package static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.identity == rhs.identity
-      && lhs.kind == rhs.kind
-      && lhs.environmentSnapshot == rhs.environmentSnapshot
-      && lhs.bounds == rhs.bounds
-      && lhs.contentBounds == rhs.contentBounds
-      && lhs.clipBounds == rhs.clipBounds
-      && lhs.zIndex == rhs.zIndex
-      && lhs.children == rhs.children
-      && lhs.semanticRole == rhs.semanticRole
-      && lhs.layoutMetadata == rhs.layoutMetadata
-      && lhs.drawMetadata == rhs.drawMetadata
-      && lhs.drawEffects == rhs.drawEffects
-      && lhs.surfaceComposition == rhs.surfaceComposition
-      && lhs.semanticMetadata == rhs.semanticMetadata
-      && lhs.lifecycleMetadata == rhs.lifecycleMetadata
-      && lhs.drawPayload == rhs.drawPayload
-      && lhs.layoutBehavior == rhs.layoutBehavior
-      && lhs.subtreeNodeCount == rhs.subtreeNodeCount
-      && lhs.isTransient == rhs.isTransient
-      && lhs.matchedGeometry == rhs.matchedGeometry
-      && lhs.placementMetadata == rhs.placementMetadata
+    var pending: [(Self, Self)] = [(lhs, rhs)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.subtreeNodeCount == rhs.subtreeNodeCount,
+        lhs.identity == rhs.identity,
+        lhs.kind == rhs.kind,
+        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.bounds == rhs.bounds,
+        lhs.contentBounds == rhs.contentBounds,
+        lhs.clipBounds == rhs.clipBounds,
+        lhs.zIndex == rhs.zIndex,
+        lhs.children.count == rhs.children.count,
+        lhs.semanticRole == rhs.semanticRole,
+        lhs.layoutMetadata == rhs.layoutMetadata,
+        lhs.drawMetadata == rhs.drawMetadata,
+        lhs.drawEffects == rhs.drawEffects,
+        lhs.surfaceComposition == rhs.surfaceComposition,
+        lhs.semanticMetadata == rhs.semanticMetadata,
+        lhs.lifecycleMetadata == rhs.lifecycleMetadata,
+        lhs.drawPayload == rhs.drawPayload,
+        lhs.layoutBehavior == rhs.layoutBehavior,
+        lhs.isTransient == rhs.isTransient,
+        lhs.matchedGeometry == rhs.matchedGeometry,
+        lhs.placementMetadata == rhs.placementMetadata
+      else {
+        return false
+      }
+      for index in lhs.children.indices.reversed() {
+        pending.append((lhs.children[index], rhs.children[index]))
+      }
+    }
+    return true
   }
 }

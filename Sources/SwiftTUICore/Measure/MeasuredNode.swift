@@ -177,6 +177,38 @@ package struct MeasuredNode: Equatable, Sendable {
   private mutating func recomputeSubtreeNodeCount() {
     subtreeNodeCount = 1 + childMeasurements.reduce(0) { $0 + $1.subtreeNodeCount }
   }
+
+  /// Explicit, iterative `==`.
+  ///
+  /// The synthesized conformance recursed through `childMeasurements`' array
+  /// equality — invisible at the call site, and reached from the frame tail by
+  /// `previousMeasured == measured` in `retainedPlacement`, on the same small
+  /// worker stack that overflowed `isEquivalentForMeasurement` in production
+  /// (45ffdc44). Same field set; conjunct order is not observable.
+  ///
+  /// `subtreeNodeCount` is compared first as an O(1) early-out the synthesized
+  /// form could not have: it is maintained on every `childMeasurements` write,
+  /// so unequal counts prove unequal subtrees without walking either.
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    var pending: [(Self, Self)] = [(lhs, rhs)]
+    while let (lhs, rhs) = pending.popLast() {
+      guard
+        lhs.subtreeNodeCount == rhs.subtreeNodeCount,
+        lhs.viewNodeID == rhs.viewNodeID,
+        lhs.identity == rhs.identity,
+        lhs.proposal == rhs.proposal,
+        lhs.measuredSize == rhs.measuredSize,
+        lhs.containerAllocationSnapshot == rhs.containerAllocationSnapshot,
+        lhs.childMeasurements.count == rhs.childMeasurements.count
+      else {
+        return false
+      }
+      for index in lhs.childMeasurements.indices.reversed() {
+        pending.append((lhs.childMeasurements[index], rhs.childMeasurements[index]))
+      }
+    }
+    return true
+  }
 }
 
 /// Interface implemented by low-level custom layouts.
