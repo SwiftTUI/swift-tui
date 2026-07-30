@@ -1,8 +1,28 @@
 import DequeModule
 
 package final class TextLayoutCache: Sendable {
+  /// What the cached layout was computed from.
+  ///
+  /// Rich text is keyed on its **run texts**, not on the payload: `TextStyle`
+  /// holds an `AnyShapeStyle?` and is Equatable-only, so a `RichTextPayload`
+  /// cannot be hashed at all. It does not need to be. `explicitClusterLines`
+  /// reads `run.text` and assigns a *positional* `runIndex`; styles and link
+  /// destinations never influence a cluster or a wrap point. The array of run
+  /// texts therefore captures everything the layout depends on — including the
+  /// run split, which is what `runIndex` is assigned from — while letting two
+  /// payloads that differ only in styling (a link hover restyle, say) share one
+  /// entry. Paint reads the styles from the payload, never from the cache.
+  ///
+  /// If wrapping ever becomes style-sensitive, this key silently goes stale;
+  /// `richLayoutSharesAnEntryAcrossStyles` in the cache tests fails the day
+  /// that assumption breaks.
+  private enum Source: Hashable, Sendable {
+    case plain(String)
+    case rich([String])
+  }
+
   private struct Key: Hashable, Sendable {
-    let content: String
+    let source: Source
     let options: TextLayoutOptions
   }
 
@@ -132,8 +152,29 @@ package final class TextLayoutCache: Sendable {
     for content: String,
     options: TextLayoutOptions
   ) -> TextLayoutResult {
-    let key = Key(content: content, options: options)
+    layout(key: Key(source: .plain(content), options: options)) {
+      uncachedTextLayout(for: content, options: options)
+    }
+  }
 
+  /// Serves rich-text layout from the same store as plain text.
+  ///
+  /// Without this, `layoutRichText` recomputed the wrap on **every** raster of
+  /// every `.richText` command and again on every semantics extraction for link
+  /// regions — twice per frame for a payload that had not changed.
+  package func layoutRich(
+    for payload: RichTextPayload,
+    options: TextLayoutOptions
+  ) -> TextLayoutResult {
+    layout(key: Key(source: .rich(payload.runs.map(\.text)), options: options)) {
+      uncachedRichTextLayout(for: payload, options: options)
+    }
+  }
+
+  private func layout(
+    key: Key,
+    computeOnMiss: () -> TextLayoutResult
+  ) -> TextLayoutResult {
     if let cached = storage.withLock({ storage -> TextLayoutResult? in
       storage.lookups += 1
       guard var cached = storage.entries[key] else {
@@ -150,10 +191,7 @@ package final class TextLayoutCache: Sendable {
       return cached
     }
 
-    let result = uncachedTextLayout(
-      for: content,
-      options: options
-    )
+    let result = computeOnMiss()
 
     return storage.withLock { storage in
       if var cached = storage.entries[key] {

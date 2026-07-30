@@ -119,7 +119,10 @@ package func layoutRichText(
   for payload: RichTextPayload,
   options: TextLayoutOptions
 ) -> TextLayoutResult {
-  uncachedRichTextLayout(for: payload, options: options)
+  TextLayoutCache.shared.layoutRich(
+    for: payload,
+    options: options
+  )
 }
 
 func uncachedRichTextLayout(
