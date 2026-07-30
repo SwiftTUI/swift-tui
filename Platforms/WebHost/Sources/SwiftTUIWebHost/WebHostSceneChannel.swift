@@ -215,11 +215,14 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       // being refused — and "refused, with a reason" is the whole point of the
       // tagged stream. The task ends when the client stream finishes, and
       // `shutdown()` cancels whatever is left.
+      // This `Task` inherits the channel's actor isolation, so both calls are
+      // same-actor and take no `await`. The `onTermination` closure below is a
+      // different story: it is not isolated, so its call does.
       let task = Task {
         for await message in client {
-          await self.receive(message, token: token)
+          self.receive(message, token: token)
         }
-        await self.connectionDidEnd(token: token)
+        self.connectionDidEnd(token: token)
       }
       receiveTasks.append(task)
 
