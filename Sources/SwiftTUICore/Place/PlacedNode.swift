@@ -126,9 +126,11 @@ package struct LazyChildScrollEstimate: Equatable, Sendable {
 package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
   package var hostedCollectionTableColumnWidths: [Int]?
+  package var scrollViewportRect: CellRect?
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && hostedCollectionTableColumnWidths == nil
+      && scrollViewportRect == nil
   }
 }
 
@@ -254,6 +256,24 @@ package struct PlacedNode: Equatable, Sendable {
     set {
       var metadata = placementMetadata
       metadata.hostedCollectionTableColumnWidths = newValue
+      placementMetadata = metadata
+    }
+  }
+  /// The rect scroll routing should treat as this node's viewport, when that
+  /// differs from `bounds`.
+  ///
+  /// A hosted collection draws its rows into an INSET sub-rect of its bounds:
+  /// container chrome takes a border row, content insets take more, and the
+  /// overflow indicators claim two more lines. Publishing `bounds` as the
+  /// viewport makes every scroll consumer — focus-reveal above all — believe
+  /// two or three more rows are visible than are actually drawn, so it starts
+  /// scrolling while the target is still on screen. Publishing the drawn rect
+  /// makes the scroll registry and the collection's own window agree.
+  package var scrollViewportRect: CellRect? {
+    get { placementMetadata.scrollViewportRect }
+    set {
+      var metadata = placementMetadata
+      metadata.scrollViewportRect = newValue
       placementMetadata = metadata
     }
   }

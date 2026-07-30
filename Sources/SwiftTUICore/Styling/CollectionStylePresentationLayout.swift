@@ -1,4 +1,79 @@
+/// The resolved display-line window of a list, and the line arithmetic it was
+/// derived from.
+package struct ListLineWindow: Equatable, Sendable {
+  /// The first visible display line.
+  package var offset: Int
+  /// How many display lines the viewport shows, after reserving the two
+  /// overflow-indicator lines when they apply.
+  package var visibleLineCount: Int
+  /// The list's total display-line count.
+  package var displayLineCount: Int
+  /// Display lines per row: 2 when the style draws row separators.
+  package var rowSpan: Int
+  /// Display lines preceding row 0 (per-section chrome padding).
+  package var chromeInset: Int
+
+  package var end: Int {
+    min(displayLineCount, offset + visibleLineCount)
+  }
+}
+
 extension CollectionStylePresentation {
+  /// Display lines one row of a viewport-backed list occupies.
+  package var listRowDisplaySpan: Int {
+    showsListRowSeparators ? 2 : 1
+  }
+
+  /// Display lines preceding row 0 of a viewport-backed list.
+  package var listChromeLineInset: Int {
+    listContainer != nil && listChromeScope == .eachSection ? 1 : 0
+  }
+
+  /// The display-line window a viewport-backed list shows.
+  ///
+  /// This is the single place the window offset is derived: the draw-side line
+  /// builder and the input-side scroll currency both call it, so "where am I
+  /// looking" has one definition instead of one per phase.
+  ///
+  /// `anchorRowIndex` is the stored scroll currency. When it is `nil` the
+  /// offset falls back to the historical selection-centred derivation, which
+  /// keeps payload-only callers byte-identical.
+  package func viewportBackedListWindow(
+    itemCount: Int,
+    selectedRowIndex: Int?,
+    anchorRowIndex: Int?,
+    showsIndicators: Bool,
+    viewportLineCount: Int
+  ) -> ListLineWindow {
+    let sectionInsetCount = listContainer != nil && listChromeScope == .eachSection ? 2 : 0
+    let rowSpan = listRowDisplaySpan
+    let bodyLineCount = itemCount <= 0 ? 0 : itemCount * rowSpan - (rowSpan - 1)
+    let displayLineCount = sectionInsetCount + bodyLineCount
+    let visibleLineCount =
+      displayLineCount > viewportLineCount && showsIndicators && viewportLineCount >= 3
+      ? max(1, viewportLineCount - 2)
+      : viewportLineCount
+    let chromeInset = listChromeLineInset
+    let maxOffset = max(0, displayLineCount - visibleLineCount)
+    let offset: Int
+    if let anchorRowIndex {
+      let anchorRow = min(max(0, anchorRowIndex), max(0, itemCount - 1))
+      offset = min(max(0, chromeInset + anchorRow * rowSpan), maxOffset)
+    } else {
+      let selectedRow = min(max(selectedRowIndex ?? 0, 0), max(0, itemCount - 1))
+      let selectedLine = chromeInset + selectedRow * rowSpan
+      offset = min(max(0, selectedLine - (visibleLineCount / 2)), maxOffset)
+    }
+
+    return ListLineWindow(
+      offset: offset,
+      visibleLineCount: visibleLineCount,
+      displayLineCount: displayLineCount,
+      rowSpan: rowSpan,
+      chromeInset: chromeInset
+    )
+  }
+
   package func visibleListLayout(
     for payload: ListPayload,
     in bounds: CellRect
@@ -114,6 +189,31 @@ extension CollectionStylePresentation {
     )
   }
 
+  /// The rect a viewport-backed list lays its display lines into: its bounds
+  /// minus the style's content insets. `nil` for payloads whose line model is
+  /// materialized, where the same answer is not O(1).
+  ///
+  /// Scroll routing publishes this as the collection's viewport instead of the
+  /// node's full bounds. The difference is the container chrome and content
+  /// insets — two or three cells that the node occupies but never draws rows
+  /// into. Publishing the full bounds makes every scroll consumer believe that
+  /// many more rows are visible than are drawn, so reveal-shaped decisions
+  /// fire while the target is still on screen.
+  ///
+  /// The overflow-indicator lines are deliberately NOT subtracted here: they
+  /// live inside this rect, and the consumers that care re-derive them through
+  /// ``viewportBackedListWindow(itemCount:selectedRowIndex:anchorRowIndex:showsIndicators:viewportLineCount:)``,
+  /// which takes exactly this height as its input.
+  package func viewportBackedListContentBounds(
+    for payload: ListPayload,
+    in bounds: CellRect
+  ) -> CellRect? {
+    guard payload.isViewportBacked else {
+      return nil
+    }
+    return listContentBounds(in: bounds)
+  }
+
   private func listContentBounds(
     in bounds: CellRect
   ) -> CellRect {
@@ -153,18 +253,29 @@ extension CollectionStylePresentation {
         payload.showsIndicators && viewportLineCount >= 3
         ? max(1, viewportLineCount - 2)
         : viewportLineCount
-      let selectedLineIndex = selectedListLineIndex(
-        in: displayLines,
-        selectedRowIndex: payload.selectedRowIndex
-      )
-      let lineIndex = min(
-        max(selectedLineIndex ?? 0, 0),
-        max(0, displayLines.count - 1)
-      )
-      let offset = min(
-        max(0, lineIndex - (visibleLineCount / 2)),
-        max(0, displayLines.count - visibleLineCount)
-      )
+      let maxOffset = max(0, displayLines.count - visibleLineCount)
+      let offset: Int
+      if let anchorRowIndex = payload.scrollAnchorRowIndex {
+        // The materialized line array is not uniformly spaced (headers,
+        // footers, and section separators interleave), so the anchor ROW is
+        // mapped to its line here rather than by arithmetic. Falling back to
+        // the last line keeps a stale anchor past the end from collapsing the
+        // window to the top.
+        let anchorLineIndex =
+          displayLines.firstIndex { $0.rowIndex == anchorRowIndex }
+          ?? (anchorRowIndex > 0 ? displayLines.count - 1 : 0)
+        offset = min(max(0, anchorLineIndex), maxOffset)
+      } else {
+        let selectedLineIndex = selectedListLineIndex(
+          in: displayLines,
+          selectedRowIndex: payload.selectedRowIndex
+        )
+        let lineIndex = min(
+          max(selectedLineIndex ?? 0, 0),
+          max(0, displayLines.count - 1)
+        )
+        offset = min(max(0, lineIndex - (visibleLineCount / 2)), maxOffset)
+      }
       let end = min(displayLines.count, offset + visibleLineCount)
       guard payload.showsIndicators, viewportLineCount >= 3 else {
         return Array(displayLines[offset..<end])
@@ -217,24 +328,18 @@ extension CollectionStylePresentation {
     }
 
     let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
-    let sectionInsetCount = usesSectionChrome ? 2 : 0
-    let rowSpan = showsListRowSeparators ? 2 : 1
+    let window = viewportBackedListWindow(
+      itemCount: payload.items.count,
+      selectedRowIndex: payload.selectedRowIndex,
+      anchorRowIndex: payload.scrollAnchorRowIndex,
+      showsIndicators: payload.showsIndicators,
+      viewportLineCount: viewportLineCount
+    )
+    let rowSpan = window.rowSpan
     let bodyLineCount = payload.items.count * rowSpan - (rowSpan - 1)
-    let displayLineCount = sectionInsetCount + bodyLineCount
-    let visibleLineCount =
-      displayLineCount > viewportLineCount && payload.showsIndicators && viewportLineCount >= 3
-      ? max(1, viewportLineCount - 2)
-      : viewportLineCount
-    let selectedRow = min(
-      max(payload.selectedRowIndex ?? 0, 0),
-      payload.items.count - 1
-    )
-    let selectedLineIndex = (usesSectionChrome ? 1 : 0) + selectedRow * rowSpan
-    let offset = min(
-      max(0, selectedLineIndex - (visibleLineCount / 2)),
-      max(0, displayLineCount - visibleLineCount)
-    )
-    let end = min(displayLineCount, offset + visibleLineCount)
+    let displayLineCount = window.displayLineCount
+    let offset = window.offset
+    let end = window.end
     var visible = (offset..<end).map { position in
       viewportBackedListLine(
         at: position,

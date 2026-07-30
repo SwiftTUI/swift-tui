@@ -311,9 +311,18 @@ package struct HandlerDescriptorIntake {
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
-    bindingSourceID: AnyID? = nil
+    bindingSourceID: AnyID? = nil,
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
   ) {
     let scope = dispatchScope
+    var wrappedReveal: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)?
+    if let revealTarget {
+      wrappedReveal = { query, anchor in
+        withImperativeAuthoringContext(scope) {
+          revealTarget(query, anchor)
+        }
+      }
+    }
     context.localScrollPositionRegistry?.register(
       identity: identity,
       currentOffset: currentOffset,
@@ -322,7 +331,8 @@ package struct HandlerDescriptorIntake {
           applyOffset(offset)
         }
       },
-      bindingSourceID: bindingSourceID
+      bindingSourceID: bindingSourceID,
+      revealTarget: wrappedReveal
     )
   }
 

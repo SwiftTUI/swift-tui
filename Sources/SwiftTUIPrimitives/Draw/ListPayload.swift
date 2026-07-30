@@ -64,6 +64,14 @@ public struct ListPayload: Equatable, Sendable {
   public var showsIndicators: Bool
   public var opacity: Double
   package var isViewportBacked: Bool = false
+  /// The stored scroll currency: the dataset row pinned to the top of the
+  /// viewport. `nil` keeps the historical selection-centred window, which is
+  /// what payload-only callers of the public `init` get — `ListPayload` is
+  /// public API and its behaviour must not change because a `package` field
+  /// was added. Carried on the payload (rather than through a side channel)
+  /// so an anchor change denies retained-measurement reuse through payload
+  /// equality, the same channel selection changes already use.
+  package var scrollAnchorRowIndex: Int?
 
   public init(
     items: [ListItemPayload],

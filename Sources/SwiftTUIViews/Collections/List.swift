@@ -118,7 +118,34 @@ extension List {
       isSelected: true
     )
 
-    if isEnabled, selectionPolicy.isSelectable {
+    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+    var scrollCurrency: CollectionScrollCurrency?
+    if isEnabled, !rows.isEmpty {
+      let showsIndicatorLines = showsIndicators
+      let rowCount = rows.count
+      scrollCurrency = CollectionScrollCurrency(
+        identity: context.identity,
+        geometry: CollectionScrollGeometry(
+          rowCount: rowCount,
+          rowSpan: listStyle.listRowDisplaySpan,
+          chromeInset: listStyle.listChromeLineInset
+        ),
+        ownerNode: ownerNode,
+        registry: context.scrollCommandRegistry,
+        windowMetrics: { viewportLineCount in
+          let window = listStyle.viewportBackedListWindow(
+            itemCount: rowCount,
+            selectedRowIndex: activeRowIndex,
+            anchorRowIndex: nil,
+            showsIndicators: showsIndicatorLines,
+            viewportLineCount: viewportLineCount
+          )
+          return (window.offset, window.visibleLineCount)
+        }
+      )
+    }
+
+    if isEnabled {
       let policy = selectionPolicy
       let intake = HandlerDescriptorIntake(
         context: context,
@@ -134,7 +161,47 @@ extension List {
         onActivate?(value)
         return true
       }
+
+      if let scrollCurrency {
+        // Registration is unconditional for an enabled non-empty collection:
+        // scrolling is not a selection feature, and this registration is what
+        // lets `ScrollViewProxy` reach the collection at all.
+        let indexedSource = resolvedContent.indexedSource
+        intake.registerScrollPosition(
+          identity: context.identity,
+          currentOffset: { scrollCurrency.currentOffset() },
+          applyOffset: { scrollCurrency.applyOffset($0) },
+          revealTarget: { query, anchor in
+            scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
+              indexedSource?.elementIndex(matching: query)
+            }
+          }
+        )
+
+        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+        intake.registerPointerHandler(routeID: rootRouteID) { event in
+          guard case .scrolled(let deltaX, let deltaY) = event.kind,
+            let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
+          else {
+            return .ignored
+          }
+          // Behavioural flip (scroll-currency S1): the wheel moves the window
+          // and leaves the selection alone. Arrow keys keep selection
+          // semantics. Previously the wheel drove `policy.step`, so a
+          // non-selectable collection could not scroll at all and a selectable
+          // one could not be looked through without changing what was selected.
+          return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
+        }
+      }
+
       intake.registerKeyHandler(identity: context.identity) { event in
+        if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+          return true
+        }
+        guard policy.isSelectable else {
+          return false
+        }
+
         let delta: Int?
         switch event {
         case .arrowUp:
@@ -164,65 +231,75 @@ extension List {
           return false
         }
 
-        return policy.step(orderedTags: rows.compactMap(\.tag), delta: delta)
-      }
-
-      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      intake.registerPointerHandler(routeID: rootRouteID) { event in
-        guard case .scrolled(let deltaX, let deltaY) = event.kind,
-          let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
-        else {
-          return .ignored
-        }
-
-        return policy.step(orderedTags: rows.compactMap(\.tag), delta: delta)
-          ? .claimed : .ignored
-      }
-
-      let interactionIndices: any Sequence<Int> =
-        if resolvedContent.indexedSource == nil {
-          rows.indices
-        } else {
-          collectionInteractionIndices(count: rows.count, anchor: activeRowIndex)
-        }
-      for rowIndex in interactionIndices {
-        let row = rows[rowIndex]
-        guard let tag = row.tag else {
-          continue
-        }
-        let rowIdentity = listRowIdentity(
-          for: context.identity,
-          rowIndex: rowIndex
-        )
-        intake.registerAction(identity: rowIdentity) {
-          policy.isMultiple ? policy.toggle(tag) : activate(tag)
-        }
-        intake.registerKeyHandler(identity: rowIdentity) { event in
-          let delta: Int?
-          switch event {
-          case .arrowUp:
-            delta = -1
-          case .arrowDown:
-            delta = 1
-          default:
-            delta = nil
-          }
-
-          guard let delta, !rows.isEmpty else {
-            return false
-          }
-
-          let targetIndex = min(
-            max(rowIndex + delta, rows.startIndex),
-            rows.index(before: rows.endIndex)
-          )
-          guard let targetTag = rows[targetIndex].tag else {
-            return false
-          }
-          if !policy.isMultiple {
-            _ = policy.select(targetTag)
-          }
+        guard policy.step(orderedTags: rows.compactMap(\.tag), delta: delta) else {
           return false
+        }
+        if let scrollCurrency {
+          scrollCurrency.pinCurrentAnchor()
+          if let selectedRow = rows.firstIndex(where: { row in
+            row.tag.map(policy.contains) == true
+          }) {
+            scrollCurrency.reveal(row: selectedRow)
+          }
+        }
+        return true
+      }
+
+      if policy.isSelectable {
+        let interactionIndices: any Sequence<Int> =
+          if resolvedContent.indexedSource == nil {
+            rows.indices
+          } else {
+            collectionInteractionIndices(count: rows.count, anchor: activeRowIndex)
+          }
+        for rowIndex in interactionIndices {
+          let row = rows[rowIndex]
+          guard let tag = row.tag else {
+            continue
+          }
+          let rowIdentity = listRowIdentity(
+            for: context.identity,
+            rowIndex: rowIndex
+          )
+          intake.registerAction(identity: rowIdentity) {
+            policy.isMultiple ? policy.toggle(tag) : activate(tag)
+          }
+          intake.registerKeyHandler(identity: rowIdentity) { event in
+            let delta: Int?
+            switch event {
+            case .arrowUp:
+              delta = -1
+            case .arrowDown:
+              delta = 1
+            default:
+              delta = nil
+            }
+
+            guard let delta, !rows.isEmpty else {
+              return false
+            }
+
+            let targetIndex = min(
+              max(rowIndex + delta, rows.startIndex),
+              rows.index(before: rows.endIndex)
+            )
+            guard let targetTag = rows[targetIndex].tag else {
+              return false
+            }
+            if !policy.isMultiple {
+              _ = policy.select(targetTag)
+            }
+            if let scrollCurrency {
+              // This handler owns the common case: with focus on a row, the
+              // row's own handler sees the arrow and the container's never
+              // does. Pin before revealing — while nothing is stored the
+              // window IS the selection, so a minimal reveal would just be
+              // re-centred by the fallback underneath it.
+              scrollCurrency.pinCurrentAnchor()
+              scrollCurrency.reveal(row: targetIndex)
+            }
+            return false
+          }
         }
       }
     }
@@ -248,9 +325,18 @@ extension List {
       opacity: chrome.opacity
     )
     payload.isViewportBacked = resolvedContent.indexedSource != nil
+    payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
 
     var metadata = focusableControlMetadata(
-      isFocusable: rows.isEmpty ? nil : false,
+      // A selectable list signals focus at the row layer, so the container
+      // stays neutral. A non-selectable *viewport-backed* list has no row
+      // focus at all, so the container itself must be focusable or its
+      // PageUp/PageDown/Home/End handlers are unreachable — the same bargain
+      // `ScrollView` makes. Builder-spelled (eager) lists keep today's
+      // behaviour; they take the unwindowed path anyway.
+      isFocusable: rows.isEmpty
+        ? nil
+        : (selectionPolicy.isSelectable || resolvedContent.indexedSource == nil ? false : true),
       focusInteractions: .edit,
       scrollRole: .list,
       accessibilityRole: .list

@@ -215,6 +215,14 @@ public struct PerfScenarioDriver {
     inputReader.send(.mouse(.init(kind: .up(.primary), location: location)))
   }
 
+  /// Sends one key press. Collection scenarios step a selection with this:
+  /// since scroll-currency S1 the wheel moves a collection's window and leaves
+  /// the selection alone, so arrow keys are the selection-stepping input.
+  @MainActor
+  public func sendKey(_ key: KeyPress) {
+    inputReader.send(.key(key))
+  }
+
   @MainActor
   public func sendScroll(deltaY: Int, at cell: CellPoint) {
     inputReader.send(

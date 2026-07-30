@@ -34,20 +34,23 @@ public struct Table1Kx4Scenario: PerfScenario {
       _ = try await driver.waitForFrame(containing: "trow 0", timeout: .seconds(120))
       let lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
 
+      // Wheel over the table: since scroll-currency S1 this moves the window
+      // and leaves the selection alone, so the settle marker is a row that
+      // could not have been visible before the window moved.
       let scrollDispatch = monotonicSeconds()
       let tableCell = try driver.cell(containing: "trow 3")
-      driver.sendScroll(deltaY: 6, at: tableCell)
+      driver.sendScroll(deltaY: 40, at: tableCell)
       let scrolled = try await driver.waitForFrame(
-        containing: "sel:6|",
+        containing: "trow 40",
         afterFrame: lastFrame,
         timeout: .seconds(60)
       )
       return [
         PerfEventRecord(
-          eventID: "table-scroll-select",
+          eventID: "table-scroll-window",
           eventType: "scroll",
           dispatchTimeSeconds: scrollDispatch,
-          expectedVisualMarker: "sel:6|",
+          expectedVisualMarker: "trow 40",
           firstMatchingFrame: scrolled.frameNumber,
           firstMatchingTimeSeconds: scrolled.timestampSeconds,
           finalSettledFrame: scrolled.frameNumber,

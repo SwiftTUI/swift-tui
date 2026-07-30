@@ -17,7 +17,8 @@ public struct LazyList1KScenario: PerfScenario {
   public let name: PerfScenarioName = .lazyList1K
   public let defaultTerminalSize = PerfTerminalSize(columns: 80, rows: 32)
   public let scriptedEvents = [
-    "scroll bursts over a 1k-row List, then arrow-key selection moves"
+    "click-select and one arrow step over a 1k-row List, then wheel scrolls"
+      + " that drive the window to the end of the source"
   ]
   public let visualMarkers = ["lrow 0"]
   public let settlingDescription = "first frame showing the list's first row"
@@ -67,23 +68,50 @@ public struct LazyList1KScenario: PerfScenario {
         )
       )
 
-      // Wheel scroll over the list steps the bound selection (List's pointer
-      // contract) — each step is an interaction frame over the unchanged
-      // 1k-row source.
+      // One arrow step: the selection moves and, because the click above put
+      // focus on a row, the window follows it. A single key event per settle —
+      // a burst would coalesce into one frame, and every arrow in that burst
+      // would dispatch to the same (pre-move) row handler.
+      let stepDispatch = monotonicSeconds()
+      driver.sendKey(KeyPress(.arrowDown))
+      let stepped = try await driver.waitForFrame(
+        containing: "sel:4|",
+        afterFrame: lastFrame,
+        timeout: .seconds(60)
+      )
+      lastFrame = stepped.frameNumber
+      events.append(
+        PerfEventRecord(
+          eventID: "lazy-list-key-select",
+          eventType: "key_select",
+          dispatchTimeSeconds: stepDispatch,
+          expectedVisualMarker: "sel:4|",
+          firstMatchingFrame: stepped.frameNumber,
+          firstMatchingTimeSeconds: stepped.timestampSeconds,
+          finalSettledFrame: stepped.frameNumber,
+          finalSettledTimeSeconds: stepped.timestampSeconds
+        )
+      )
+
+      // Wheel scroll: since scroll-currency S1 the wheel moves the window and
+      // leaves the selection alone, so this leg measures exactly the
+      // rows-entering-and-leaving work over the unchanged 1k-row source. The
+      // settle marker is a row that was nowhere near the previous window, so
+      // it can only appear once the window has actually moved.
       let scrollDispatch = monotonicSeconds()
-      driver.sendScroll(deltaY: 6, at: rowCell)
+      driver.sendScroll(deltaY: 40, at: rowCell)
       let scrolled = try await driver.waitForFrame(
-        containing: "sel:9|",
+        containing: "lrow 40",
         afterFrame: lastFrame,
         timeout: .seconds(60)
       )
       lastFrame = scrolled.frameNumber
       events.append(
         PerfEventRecord(
-          eventID: "lazy-list-scroll-select",
+          eventID: "lazy-list-scroll-window",
           eventType: "scroll",
           dispatchTimeSeconds: scrollDispatch,
-          expectedVisualMarker: "sel:9|",
+          expectedVisualMarker: "lrow 40",
           firstMatchingFrame: scrolled.frameNumber,
           firstMatchingTimeSeconds: scrolled.timestampSeconds,
           finalSettledFrame: scrolled.frameNumber,
@@ -91,29 +119,29 @@ public struct LazyList1KScenario: PerfScenario {
         )
       )
 
-      // Deep selection walk: repeated wheel bursts push the selection (and
-      // the follow-focus viewport) well past the initial window, so the
-      // entering/leaving-row work is exercised, not just the first page.
-      // (Keyboard arrows deliberately not used: Tab's focus arrival snaps the
-      // selection to the arrived row, which makes step expectations
-      // machine-dependent.)
+      // Deep walk: drive the window all the way to the end of the source, so
+      // the entering/leaving-row work is exercised at depth rather than on
+      // page one. Settled on the CLAMPED end row rather than an intermediate
+      // one: scroll momentum can animate through a mid-range window without
+      // painting a frame at any particular offset, but the clamped end is
+      // where the anchor comes to rest.
       let walkDispatch = monotonicSeconds()
-      var settledFrame = scrolled
-      for burst in 1...5 {
-        driver.sendScroll(deltaY: 6, at: rowCell)
-        settledFrame = try await driver.waitForFrame(
-          containing: "sel:\(9 + burst * 6)|",
-          afterFrame: lastFrame,
-          timeout: .seconds(60)
-        )
-        lastFrame = settledFrame.frameNumber
-      }
+      // A few rows short of the very last: the final window certainly
+      // contains it, without depending on exactly how many rows the border
+      // and overflow indicators leave room for.
+      let lastRowMarker = "lrow \(rowCount - 5)"
+      driver.sendScroll(deltaY: rowCount, at: rowCell)
+      let settledFrame = try await driver.waitForFrame(
+        containing: lastRowMarker,
+        afterFrame: lastFrame,
+        timeout: .seconds(60)
+      )
       events.append(
         PerfEventRecord(
-          eventID: "lazy-list-selection-walk",
+          eventID: "lazy-list-scroll-walk",
           eventType: "scroll",
           dispatchTimeSeconds: walkDispatch,
-          expectedVisualMarker: "sel:39|",
+          expectedVisualMarker: lastRowMarker,
           firstMatchingFrame: settledFrame.frameNumber,
           firstMatchingTimeSeconds: settledFrame.timestampSeconds,
           finalSettledFrame: settledFrame.frameNumber,

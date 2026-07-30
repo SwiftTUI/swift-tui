@@ -1732,7 +1732,10 @@ struct InteractiveRuntimeTests {
     #expect(box.sliderValue == 10)
     #expect(box.pickerSelection == 3)
     #expect(box.listSelection == 2 || box.listSelection == 3)
-    #expect(box.tableSelection == 2)
+    // The table leg is wheel-only, and since scroll-currency S1 the wheel over
+    // a collection moves its window and leaves the selection alone. The list
+    // leg above still lands on a row because it clicks one after wheeling.
+    #expect(box.tableSelection == 1)
     #expect(box.scrollPosition.y == 1)
     #expect(box.text == "A")
   }

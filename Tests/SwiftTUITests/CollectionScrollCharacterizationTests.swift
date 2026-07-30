@@ -15,104 +15,6 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCharacterizationTests {
-  // MARK: - C-01 / C-02 / C-03 — the window IS the selection (D16)
-
-  @Test("C-01: a viewport-backed List re-centres its window on every selection change")
-  func windowRecentresOnSelectionChange() throws {
-    // Flipped by S1: selection moves inside the window must not scroll, and a
-    // move outside must scroll only far enough to reveal.
-    let atTop = characterizationRows(
-      renderingSelectableList(rowCount: 100, selection: 0, viewportHeight: 10)
-    )
-    let atMiddle = characterizationRows(
-      renderingSelectableList(rowCount: 100, selection: 50, viewportHeight: 10)
-    )
-
-    #expect(atTop.contains(0))
-    #expect(!atTop.contains(50))
-    // The window is *centred* on the selection rather than minimally adjusted:
-    // moving selection from 0 to 50 drags the whole viewport with it.
-    #expect(atMiddle.contains(50))
-    #expect(!atMiddle.contains(0))
-    let middleLow = try #require(atMiddle.min())
-    #expect(middleLow > 40, "window is centred on the selection, not merely revealing it")
-  }
-
-  @Test("C-02: a wheel tick over a selectable viewport-backed List steps the selection")
-  func wheelStepsSelection() throws {
-    // Flipped by S1: the wheel scrolls the window and leaves selection alone.
-    let harness = try StressRuntimeHarness(
-      rootIdentity: testIdentity("CharWheelSelection"),
-      size: .init(width: 30, height: 14)
-    ) {
-      SelectableCharacterizationList()
-    }
-    defer { harness.shutdown() }
-
-    #expect(harness.frame.contains("sel=0"))
-    let listPoint = try #require(harness.point(forText: "«0»"))
-    _ = try harness.scrollPointer(at: listPoint, deltaY: 1)
-
-    #expect(
-      harness.frame.contains("sel=1"),
-      "current behaviour: the wheel is wired to `policy.step`, so it moves the selection"
-    )
-  }
-
-  @Test("C-03: a non-selectable indexed List is pinned to its first screenful")
-  func nonSelectableListCannotScroll() throws {
-    // Flipped by S1: wheel + PageDown/End reveal every row.
-    let harness = try StressRuntimeHarness(
-      rootIdentity: testIdentity("CharNonSelectable"),
-      size: .init(width: 30, height: 12)
-    ) {
-      NonSelectableCharacterizationList()
-    }
-    defer { harness.shutdown() }
-
-    let firstFrame = harness.frame
-    #expect(firstFrame.contains("«0»"))
-    let listPoint = try #require(harness.point(forText: "«0»"))
-
-    for _ in 0..<5 {
-      _ = try harness.scrollPointer(at: listPoint, deltaY: 1)
-    }
-    #expect(
-      harness.frame.contains("«0»"),
-      "current behaviour: no scroll registration exists for a non-selectable collection"
-    )
-
-    _ = try harness.pressKey(KeyPress(.pageDown))
-    _ = try harness.pressKey(KeyPress(.end))
-    #expect(
-      harness.frame.contains("«0»"),
-      "current behaviour: PageDown/End are unhandled over a collection"
-    )
-    #expect(!harness.frame.contains("«9999»"))
-  }
-
-  @Test("C-04: ScrollViewProxy.scrollTo(id) is a no-op over a viewport-backed List")
-  func scrollToIsNoOpOverCollections() throws {
-    // Flipped by S1: the collection registers a scroll position, so the
-    // registry can find a route + registration for it.
-    let harness = try StressRuntimeHarness(
-      rootIdentity: testIdentity("CharScrollTo"),
-      size: .init(width: 30, height: 12)
-    ) {
-      ScrollToCharacterizationList()
-    }
-    defer { harness.shutdown() }
-
-    #expect(harness.frame.contains("«0»"))
-    _ = try harness.clickText("Jump")
-
-    #expect(
-      harness.frame.contains("result=false"),
-      "current behaviour: `scrollToTarget` finds no registration for a collection identity"
-    )
-    #expect(!harness.frame.contains("«500»"))
-  }
-
   // MARK: - C-05 — the fixed 64-row interaction band (D20)
 
   @Test("C-05: a visible row outside the fixed 64-index band registers no action")
@@ -270,51 +172,6 @@ struct CollectionScrollCharacterizationTests {
 // MARK: - Fixtures
 
 @MainActor
-private struct SelectableCharacterizationList: View {
-  @State private var selection: Int? = 0
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text("sel=\(selection ?? -1)")
-      List(0..<100, id: \.self, selection: $selection) { row in
-        Text("«\(row)»")
-      }
-      .frame(height: 10)
-    }
-  }
-}
-
-@MainActor
-private struct NonSelectableCharacterizationList: View {
-  var body: some View {
-    List(0..<10_000, id: \.self) { row in
-      Text("«\(row)»")
-    }
-    .frame(height: 10)
-  }
-}
-
-@MainActor
-private struct ScrollToCharacterizationList: View {
-  @State private var result = "none"
-
-  var body: some View {
-    ScrollViewReader { proxy in
-      VStack(alignment: .leading, spacing: 0) {
-        Text("result=\(result)")
-        Button("Jump") {
-          result = proxy.scrollTo(500) ? "true" : "false"
-        }
-        List(0..<1_000, id: \.self) { row in
-          Text("«\(row)»")
-        }
-        .frame(height: 8)
-      }
-    }
-  }
-}
-
-@MainActor
 private struct RatchetCharacterizationTable: View {
   @State private var selection: Int? = 0
 
@@ -406,22 +263,4 @@ private func characterizationOffset(
     return start
   }
   return nil
-}
-
-@MainActor
-private func renderingSelectableList(
-  rowCount: Int,
-  selection: Int,
-  viewportHeight: Int
-) -> RenderSnapshot {
-  DefaultRenderer().render(
-    List(0..<rowCount, id: \.self, selection: .constant(selection as Int?)) { row in
-      Text("«\(row)»")
-    },
-    context: .init(
-      identity: testIdentity("CharSelectableList", "\(selection)"),
-      applyEnvironmentValues: false
-    ),
-    proposal: .init(width: .finite(20), height: .finite(viewportHeight))
-  )
 }

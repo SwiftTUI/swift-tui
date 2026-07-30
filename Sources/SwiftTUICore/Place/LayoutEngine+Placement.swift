@@ -34,7 +34,23 @@ extension LayoutEngine {
     node.hostedCollectionTableColumnWidths =
       measured.containerAllocationSnapshot?
       .hostedCollection?.tableColumnWidths
+    node.scrollViewportRect = scrollViewportRect(for: resolved, bounds: bounds)
     return node
+  }
+
+  /// The rect scroll routing should treat as a collection's viewport: the rows
+  /// it actually draws, not its full bounds. See
+  /// ``PlacedNode/scrollViewportRect``.
+  private func scrollViewportRect(
+    for resolved: ResolvedNode,
+    bounds: CellRect
+  ) -> CellRect? {
+    switch resolved.drawPayload {
+    case .list(let payload):
+      return payload.style.viewportBackedListContentBounds(for: payload, in: bounds)
+    default:
+      return nil
+    }
   }
 
   /// Estimated frames for a lazy container's never-placed children. A

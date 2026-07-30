@@ -140,7 +140,7 @@ package struct SemanticExtractor: Sendable {
             ScrollRoute(
               identity: node.identity,
               viewNodeID: node.viewNodeID,
-              viewportRect: node.bounds,
+              viewportRect: node.scrollViewportRect ?? node.bounds,
               contentBounds: node.contentBounds,
               structuralHostChain: context.structuralHostChain
             )

@@ -25,17 +25,29 @@ package struct ScrollPositionRegistrationSnapshot {
   /// momentum to retire a fling whose binding was swapped out from under
   /// it. Nil (raw closures carry no identity) disables the distinction.
   package var bindingSourceID: AnyID?
+  /// Reveals a scroll target this route owns but that the placement walk never
+  /// saw — a viewport-backed collection's out-of-window rows, which have no
+  /// placed node and whose identities would cost O(dataset) to publish
+  /// eagerly. The producer performs the move itself and reports whether
+  /// anything changed, because a collection's usable window is smaller than
+  /// its raw viewport rect (overflow indicators, fixed table chrome), so the
+  /// offset arithmetic here cannot express the right answer for it. Returns
+  /// nil when the query matches nothing. Absent for producers whose targets
+  /// are all placed (every `ScrollView`).
+  package var revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)?
 
   package init(
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
-    bindingSourceID: AnyID? = nil
+    bindingSourceID: AnyID? = nil,
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
   ) {
     self.identity = identity
     self.currentOffset = currentOffset
     self.applyOffset = applyOffset
     self.bindingSourceID = bindingSourceID
+    self.revealTarget = revealTarget
   }
 }
 
@@ -71,13 +83,15 @@ package final class LocalScrollPositionRegistry: Equatable {
     identity: Identity,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
-    bindingSourceID: AnyID? = nil
+    bindingSourceID: AnyID? = nil,
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
   ) {
     let registration = ScrollPositionRegistrationSnapshot(
       identity: identity,
       currentOffset: currentOffset,
       applyOffset: applyOffset,
-      bindingSourceID: bindingSourceID
+      bindingSourceID: bindingSourceID,
+      revealTarget: revealTarget
     )
     registrations[identity] = registration
     ViewNodeContext.current?.recordScrollPositionRegistration(registration)
@@ -124,18 +138,44 @@ package final class LocalScrollPositionRegistry: Equatable {
     anchor: UnitPoint?,
     scopeIdentity: Identity?
   ) -> Bool {
-    guard
-      let target = firstTarget(matching: query, scopeIdentity: scopeIdentity),
+    if let target = firstTarget(matching: query, scopeIdentity: scopeIdentity),
       let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
       let registration = registrations[target.scrollIdentity]
-    else {
-      return false
+    {
+      return scrollTo(
+        rect: target.rect,
+        anchor: anchor,
+        route: route,
+        registration: registration
+      )
     }
 
+    // No placed target: ask the in-scope producers that answer for their own
+    // unplaced rows (viewport-backed collections).
+    for route in latestScrollRoutes.reversed()
+    where routeMatchesScope(route.identity, scopeIdentity: scopeIdentity)
+      || hostChainMatchesScope(route, scopeIdentity: scopeIdentity)
+    {
+      guard let registration = registrations[route.identity],
+        let handled = registration.revealTarget?(query, anchor)
+      else {
+        continue
+      }
+      return handled
+    }
+    return false
+  }
+
+  private func scrollTo(
+    rect targetRect: CellRect,
+    anchor: UnitPoint?,
+    route: ScrollRoute,
+    registration: ScrollPositionRegistrationSnapshot
+  ) -> Bool {
     let currentOffset = registration.currentOffset()
     let adjustedOffset = adjustedOffset(
       currentOffset,
-      scrolling: target.rect,
+      scrolling: targetRect,
       anchor: anchor,
       in: route
     )
@@ -464,6 +504,16 @@ package final class LocalScrollPositionRegistry: Equatable {
         in: route.viewportRect.origin.y, length: route.viewportRect.size.height, anchor.y)
 
     return clampedOffset(next, in: route)
+  }
+
+  /// The live viewport rect published for the route matching `scopeIdentity`,
+  /// or `nil` before the frame's geometry has synced (frame 1). Producers that
+  /// size their own paging or interaction bands from the real viewport read it
+  /// here rather than guessing a constant.
+  package func viewportRect(
+    scopeIdentity: Identity?
+  ) -> CellRect? {
+    firstRoute(matching: scopeIdentity)?.viewportRect
   }
 
   /// Clamps `offset` against the live geometry of the route matching

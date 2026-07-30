@@ -108,6 +108,14 @@ package protocol IndexedChildSource: Sendable {
   /// authoritative once the element is realized.
   func elementSelectionTag(at index: Int) -> SelectionTag?
 
+  /// The element index whose derived identity satisfies `query`, or `nil` when
+  /// none does. `scrollTo(_:)` reaches an out-of-window collection row through
+  /// this: those rows have no placed frame and so no published scroll target,
+  /// and publishing an estimate for every row would cost O(dataset) identity
+  /// derivations per frame — so the source answers on demand instead, which
+  /// only an explicit scroll command pays for.
+  func elementIndex(matching query: ScrollTargetQuery) -> Int?
+
   /// Merges visible table auto-width discoveries with source-retained
   /// monotonic high-water values. A changed column schema resets the cache.
   func retainedTableColumnWidths(
@@ -133,6 +141,22 @@ extension IndexedChildSource {
 
   package func elementSelectionTag(at index: Int) -> SelectionTag? {
     nil
+  }
+
+  package func elementIndex(matching query: ScrollTargetQuery) -> Int? {
+    guard query.identity != nil || query.explicitIDComponent != nil else {
+      return nil
+    }
+    for index in 0..<count {
+      let identity = elementIdentity(at: index)
+      if let target = query.identity, identity == target {
+        return index
+      }
+      if let component = query.explicitIDComponent, identity.lastComponent == component {
+        return index
+      }
+    }
+    return nil
   }
 
   package func retainedTableColumnWidths(

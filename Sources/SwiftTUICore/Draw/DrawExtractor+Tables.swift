@@ -262,11 +262,19 @@ extension DrawExtractor {
       max((payload.selectedRowIndex ?? 0) * 2, 0),
       max(0, bodyLineCount - 1)
     )
+    // A stored anchor pins the top of the body window; without one the window
+    // stays centred on the selection, which is what payload-only callers get.
+    let anchorLine = payload.scrollAnchorRowIndex.map { rowIndex in
+      min(max(0, rowIndex) * 2, max(0, bodyLineCount - 1))
+    }
     func window(capacity: Int) -> (offset: Int, end: Int) {
-      let offset = min(
-        max(0, selectedLine - capacity / 2),
-        max(0, bodyLineCount - capacity)
-      )
+      let maxOffset = max(0, bodyLineCount - capacity)
+      let offset =
+        if let anchorLine {
+          min(anchorLine, maxOffset)
+        } else {
+          min(max(0, selectedLine - capacity / 2), maxOffset)
+        }
       return (offset, min(bodyLineCount, offset + capacity))
     }
 

@@ -32,6 +32,7 @@ package enum StateSlotOrdinals {
   private static let tabOverflowMenuExpandedBase = -5_000_000
   private static let navigationDestinationActivationBase = -6_000_000
   private static let tabOptionSignatureBase = -7_000_000
+  private static let collectionScrollAnchorBase = -8_000_000
 
   package static func authored(
     line: UInt,
@@ -68,6 +69,10 @@ package enum StateSlotOrdinals {
 
   package static var tabOptionSignature: Int {
     tabOptionSignatureBase
+  }
+
+  package static var collectionScrollAnchor: Int {
+    collectionScrollAnchorBase
   }
 
   package static func navigationDestinationActivation(

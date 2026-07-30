@@ -152,7 +152,38 @@ extension Table {
       isSelected: true
     )
 
-    if isEnabled, selectionPolicy.isSelectable {
+    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+    var scrollCurrency: CollectionScrollCurrency?
+    if isEnabled, !resolvedRows.isEmpty {
+      // A table body always alternates row/separator lines, so the row span is
+      // 2 and no chrome precedes row 0 *within the body* — the header and
+      // footer rules are fixed lines outside the scrolling window.
+      let rowCount = resolvedRows.count
+      let bodyLineCount = rowCount * 2 - 1
+      let anchorRow = selectedIndex
+      scrollCurrency = CollectionScrollCurrency(
+        identity: context.identity,
+        geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2, chromeInset: 0),
+        ownerNode: ownerNode,
+        registry: context.scrollCommandRegistry,
+        windowMetrics: { viewportLineCount in
+          // Fixed chrome (header block + closing rule) sits outside the
+          // scrolling body, and overflow indicators claim up to two more
+          // lines. Under-counting here only makes `reveal` slightly eager,
+          // which is the safe direction.
+          let fixedLines = (showsHeaders ? 3 : 1) + 1 + 2
+          let bodyCapacity = max(1, viewportLineCount - fixedLines)
+          let selectedLine = min(max(0, (anchorRow ?? 0) * 2), max(0, bodyLineCount - 1))
+          let offset = min(
+            max(0, selectedLine - bodyCapacity / 2),
+            max(0, bodyLineCount - bodyCapacity)
+          )
+          return (offset, bodyCapacity)
+        }
+      )
+    }
+
+    if isEnabled {
       let policy = selectionPolicy
       let intake = HandlerDescriptorIntake(
         context: context,
@@ -161,7 +192,41 @@ extension Table {
       let selectableTags = selectableRowIndices.compactMap { rowIndex in
         resolvedRows[rowIndex].tag
       }
+
+      if let scrollCurrency {
+        let indexedSource = resolvedContent.indexedSource
+        intake.registerScrollPosition(
+          identity: context.identity,
+          currentOffset: { scrollCurrency.currentOffset() },
+          applyOffset: { scrollCurrency.applyOffset($0) },
+          revealTarget: { query, anchor in
+            scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
+              indexedSource?.elementIndex(matching: query)
+            }
+          }
+        )
+
+        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+        intake.registerPointerHandler(routeID: rootRouteID) { event in
+          guard case .scrolled(let deltaX, let deltaY) = event.kind,
+            let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
+          else {
+            return .ignored
+          }
+          // Behavioural flip (scroll-currency S1) — see the matching note in
+          // `List.resolvedNode`.
+          return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
+        }
+      }
+
       intake.registerKeyHandler(identity: context.identity) { event in
+        if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+          return true
+        }
+        guard policy.isSelectable else {
+          return false
+        }
+
         let delta: Int?
         switch event {
         case .arrowUp:
@@ -176,47 +241,51 @@ extension Table {
           return false
         }
 
-        return policy.step(orderedTags: selectableTags, delta: delta)
+        guard policy.step(orderedTags: selectableTags, delta: delta) else {
+          return false
+        }
+        if let scrollCurrency {
+          // Pin the currently-shown top row first: while nothing is stored the
+          // window IS the selection, so a minimal reveal would still be
+          // re-centred by the fallback underneath it.
+          scrollCurrency.pinCurrentAnchor()
+          if let selectedRow = resolvedRows.firstIndex(where: { row in
+            row.tag.map(policy.contains) == true
+          }) {
+            scrollCurrency.reveal(row: selectedRow)
+          }
+        }
+        return true
       }
 
-      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      intake.registerPointerHandler(routeID: rootRouteID) { event in
-        guard case .scrolled(let deltaX, let deltaY) = event.kind,
-          let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
-        else {
-          return .ignored
-        }
+      if policy.isSelectable {
+        let interactionIndices: any Sequence<Int> =
+          if resolvedContent.indexedSource == nil {
+            selectableRowIndices
+          } else {
+            collectionInteractionIndices(count: resolvedRows.count, anchor: selectedIndex)
+          }
+        for rowIndex in interactionIndices {
+          guard let tag = resolvedRows[rowIndex].tag else {
+            continue
+          }
 
-        return policy.step(orderedTags: selectableTags, delta: delta)
-          ? .claimed : .ignored
-      }
-
-      let interactionIndices: any Sequence<Int> =
-        if resolvedContent.indexedSource == nil {
-          selectableRowIndices
-        } else {
-          collectionInteractionIndices(count: resolvedRows.count, anchor: selectedIndex)
-        }
-      for rowIndex in interactionIndices {
-        guard let tag = resolvedRows[rowIndex].tag else {
-          continue
-        }
-
-        let routeID = runtimePrimaryRouteID(
-          for: tableRowIdentity(
-            for: context.identity,
-            rowIndex: rowIndex
+          let routeID = runtimePrimaryRouteID(
+            for: tableRowIdentity(
+              for: context.identity,
+              rowIndex: rowIndex
+            )
           )
-        )
-        intake.registerPointerHandler(routeID: routeID) { event in
-          switch event.kind {
-          case .down(.primary):
-            _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
-            return .claimed
-          case .up(.primary):
-            return .claimed
-          default:
-            return .ignored
+          intake.registerPointerHandler(routeID: routeID) { event in
+            switch event.kind {
+            case .down(.primary):
+              _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+              return .claimed
+            case .up(.primary):
+              return .claimed
+            default:
+              return .ignored
+            }
           }
         }
       }
@@ -239,9 +308,14 @@ extension Table {
       opacity: chrome.opacity
     )
     payload.isViewportBacked = resolvedContent.indexedSource != nil
+    payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
 
     var metadata = focusableControlMetadata(
-      isFocusable: isSelectable ? nil : false,
+      // See the matching note in `List.resolvedNode`: a non-selectable
+      // viewport-backed table needs container focus for its scroll keys.
+      isFocusable: isSelectable
+        ? nil
+        : (resolvedContent.indexedSource == nil ? false : true),
       focusInteractions: isSelectable ? .edit : .automatic,
       scrollRole: .table,
       accessibilityRole: .table
