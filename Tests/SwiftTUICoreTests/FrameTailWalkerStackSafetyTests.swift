@@ -30,6 +30,12 @@ struct FrameTailWalkerStackSafetyTests {
   /// Deep enough that every converted walker's recursive form exceeds
   /// ``workerStackSize`` — 64 B per frame would already overflow at this depth,
   /// and these walkers' frames are far larger than that.
+  ///
+  /// This depth was once *also* capped from above: releasing the fixtures
+  /// recursed one frame group per level, so a chain past ~1104 `ResolvedNode`
+  /// levels took the process down on this stack before any walker ran. That
+  /// ceiling is lifted — see ``DeepTreeTeardownTests`` — so the number here is
+  /// now chosen purely by the property under test.
   private static let deepChainDepth = 512
 
   // MARK: - Running work on a worker-sized stack

@@ -505,6 +505,17 @@ private struct HandlerInventoryReconciliationFrame {
   }
 }
 
+extension ResolvedNode: DeeplyNestedValueTree {
+  /// Storage-level child access for ``flattenForRelease()``. Deliberately not
+  /// the public ``children`` setter: the drain runs on a value that is about to
+  /// be destroyed, so the derived preference/node-count/reuse recomputes that
+  /// setter fires would be pure waste.
+  package var _childrenForRelease: [ResolvedNode] {
+    get { _storedChildren }
+    set { _storedChildren = newValue }
+  }
+}
+
 extension ResolvedNode {
   package mutating func attachingEntityIdentity(
     _ entityIdentity: EntityIdentity,

@@ -166,6 +166,32 @@ It may run inline or on a frame-tail worker, depending on renderer strategy and
 platform support. It consumes the resolved tree and retained inputs and returns
 the downstream products plus timing and reuse diagnostics.
 
+#### Tree depth on the worker stack
+
+The frame-tail worker is a plain Dispatch queue, so it carries the small default
+Dispatch stack (512 KiB) rather than the main thread's budget. Every tree walker
+reachable from the tail is an explicit-stack loop for that reason.
+
+One depth-limited operation remains on that thread and it is not a walker:
+**releasing** a phase-product tree. `ResolvedNode`, `MeasuredNode`, and
+`PlacedNode` store their children inline as `[Self]`, so the compiler's own
+value witnesses recurse once per level when a tree is destroyed — with no
+framework code in the trace. Measured on macOS/arm64, the cost is linear in
+depth: ~475 B per level for `ResolvedNode` (~1104 levels at 512 KiB) and ~267 B
+per level for `MeasuredNode` and `PlacedNode` (~1968 levels). One authored
+`VStack` nesting level costs about three `ResolvedNode` levels.
+
+Code that drops a tree of unbounded depth on a small stack should call
+`flattenForRelease()` (see `DeeplyNestedValueTree`), which drains the subtree
+through a heap worklist and makes the release cost O(1) stack. It is opt-in:
+making it automatic would need a mutable class interposed on the child storage,
+whose reads this package's `Sendable` policy would push through a `Mutex` — an
+unacceptable cost on the engine's hottest accessor.
+
+Nesting far shallower than these bounds is limited first by the resolve
+descent, which recurses per view level on the main actor; `DeferredResolveDriver`
+chunks it on hosts whose stack budget is small enough to need it.
+
 ### Commit
 
 Commit turns a completed draft into a committed frame candidate. It packages

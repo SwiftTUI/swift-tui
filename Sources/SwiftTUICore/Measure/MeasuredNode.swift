@@ -211,4 +211,11 @@ package struct MeasuredNode: Equatable, Sendable {
   }
 }
 
+extension MeasuredNode: DeeplyNestedValueTree {
+  package var _childrenForRelease: [MeasuredNode] {
+    get { childMeasurements }
+    set { childMeasurements = newValue }
+  }
+}
+
 /// Interface implemented by low-level custom layouts.

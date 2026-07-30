@@ -526,3 +526,10 @@ extension PlacedNode {
     return true
   }
 }
+
+extension PlacedNode: DeeplyNestedValueTree {
+  package var _childrenForRelease: [PlacedNode] {
+    get { children }
+    set { children = newValue }
+  }
+}
