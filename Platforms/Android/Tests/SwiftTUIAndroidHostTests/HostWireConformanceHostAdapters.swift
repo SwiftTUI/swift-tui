@@ -598,6 +598,9 @@ struct HostWireConformanceWebSocketChannelRunner {
   private final class GatedInboundSource: WebHostByteSource, Sendable {
     private struct Storage {
       var queued: [WebHostInboundEvent] = []
+      /// How many events this gate has pumped off the channel stream, so an
+      /// in-flight event is distinguishable from no event.
+      var pumpedEvents: UInt64 = 0
       var parserToken: Int?
       var parserBufferedBytes = 0
     }
@@ -634,10 +637,37 @@ struct HostWireConformanceWebSocketChannelRunner {
     private func enqueue(
       _ event: WebHostInboundEvent
     ) {
-      storage.withLock { $0.queued.append(event) }
+      storage.withLock { storage in
+        storage.queued.append(event)
+        storage.pumpedEvents += 1
+      }
     }
 
+    /// The next buffered event, waiting while the channel has yielded one this
+    /// gate has not pumped yet.
+    ///
+    /// Without that condition the drain can outrun its own pump: `take()`
+    /// returns nil for an event still in flight, the drain concludes early, and
+    /// the reader consumes the leftovers on a later drain — in the wrong
+    /// interval. The org gate caught exactly that under full-suite load.
     func take() async -> WebHostInboundEvent? {
+      if let queued = dequeue() {
+        return queued
+      }
+      for _ in 0..<8_192 {
+        let pumped = storage.withLock(\.pumpedEvents)
+        guard await channel.yieldedInboundEventCount() > pumped else {
+          return nil
+        }
+        await Task.yield()
+        if let queued = dequeue() {
+          return queued
+        }
+      }
+      return nil
+    }
+
+    private func dequeue() -> WebHostInboundEvent? {
       storage.withLock { storage in
         storage.queued.isEmpty ? nil : storage.queued.removeFirst()
       }

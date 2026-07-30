@@ -111,6 +111,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   private var sceneInputFinished = false
   private var receiveTasks: [Task<Void, Never>] = []
   private var processedInboundCallbacks: UInt64 = 0
+  private var yieldedInboundEvents: UInt64 = 0
 
   private var suppressedSurfaceRecords: [[UInt8]] = []
   private var discardedInboundChunks: [WebHostDiscardedInboundChunk] = []
@@ -146,6 +147,16 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   /// gauge is the condition to wait on instead.
   package func processedInboundCallbackCount() -> UInt64 {
     processedInboundCallbacks
+  }
+
+  /// Monotonic count of tagged events yielded onto the scene input stream.
+  ///
+  /// The second half of the same deterministic story as
+  /// `processedInboundCallbackCount()`: a consumer that buffers this stream can
+  /// tell whether an event it has not seen yet is still in flight, instead of
+  /// guessing from a turn budget.
+  package func yieldedInboundEventCount() -> UInt64 {
+    yieldedInboundEvents
   }
 
   package func recordDiscardedInboundChunk(
@@ -203,7 +214,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
 
     return AsyncStream { continuation in
       outputContinuation = continuation
-      inboundContinuation.yield(.connectionOpened(token: token))
+      yieldInbound(.connectionOpened(token: token))
       for bytes in detachedNonSurfaceBacklog {
         continuation.yield(.data(bytes))
       }
@@ -283,7 +294,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       task.cancel()
     }
     receiveTasks.removeAll(keepingCapacity: true)
-    inboundContinuation.yield(.shutdown)
+    yieldInbound(.shutdown)
     inboundContinuation.finish()
     sceneInputFinished = true
   }
@@ -328,9 +339,9 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       // Stale bytes are still yielded, tagged: the reader is the one place
       // that knows whether a chunk was current when it arrived, and refusing
       // here would erase the distinction between the two staleness reasons.
-      inboundContinuation.yield(.bytes(token: token, Array(text.utf8)))
+      yieldInbound(.bytes(token: token, Array(text.utf8)))
     case .data(let bytes):
-      inboundContinuation.yield(.bytes(token: token, bytes))
+      yieldInbound(.bytes(token: token, bytes))
     case .close(let code, let reason):
       guard token == currentToken else {
         // A late close from a replaced client must not detach its successor.
@@ -362,7 +373,14 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     phase = .detached
     outputContinuation?.finish()
     outputContinuation = nil
-    inboundContinuation.yield(.connectionClosed(token: token))
+    yieldInbound(.connectionClosed(token: token))
+  }
+
+  private func yieldInbound(
+    _ event: WebHostInboundEvent
+  ) {
+    yieldedInboundEvents += 1
+    inboundContinuation.yield(event)
   }
 
   private static func isSurfaceRecord(
