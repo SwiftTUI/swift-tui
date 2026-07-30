@@ -90,31 +90,7 @@ struct CollectionScrollCharacterizationTests {
     )
   }
 
-  // MARK: - C-07 / C-09 — realization cliffs (D17, D22)
-
-  @Test("C-07: ScrollView { List } collapses to full-dataset realization")
-  func nonFiniteProposalRealizesEverything() {
-    // Flipped by S2: the measure viewport hint bounds the window.
-    IndexedChildRealizationProbe.reset()
-    _ = DefaultRenderer().render(
-      ScrollView {
-        List(0..<2_000, id: \.self) { row in
-          Text("«\(row)»")
-        }
-      },
-      context: .init(identity: testIdentity("CharScrollViewList"), applyEnvironmentValues: false),
-      proposal: .init(width: .finite(20), height: .finite(12))
-    )
-
-    #expect(
-      IndexedChildRealizationProbe.realizedChildCount == 2_000,
-      """
-      current behaviour: `hostedCollectionWindow` returns `0..<count` for a \
-      non-finite height proposal, realized \
-      \(IndexedChildRealizationProbe.realizedChildCount) rows
-      """
-    )
-  }
+  // MARK: - C-09 — the eager builder fork (D22)
 
   @Test("C-09: List { ForEach(...) } silently takes the eager, unwindowed path")
   func builderSpelledListIsEager() {

@@ -273,6 +273,36 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  /// Records that a viewport-backed collection had to realize its whole
+  /// dataset because nothing bounded it (D17): the height proposal was
+  /// non-finite and no enclosing scroll layout declared a measure viewport.
+  ///
+  /// This is the deliberate fallback for `.fixedSize()`, ideal-height probes,
+  /// and `ViewThatFits` alternatives, where the caller has asked for the true
+  /// ideal size and estimating it from a probe would silently mis-size a
+  /// heterogeneous-row collection. Reporting the cliff is better than hiding
+  /// it behind a guess. Deduplicated per identity per pass.
+  package func recordUnboundedCollectionRealization(
+    identity: Identity,
+    count: Int,
+    source: String
+  ) {
+    state.withLock { state in
+      let issue = RuntimeIssue(
+        severity: .warning,
+        code: "collection.unboundedRealization",
+        message:
+          "\(source) realized all \(count) rows: the height proposal is unbounded and no "
+          + "enclosing scroll view declared a measure viewport to window against.",
+        identity: identity,
+        source: source
+      )
+      if !state.runtimeIssues.contains(issue) {
+        state.runtimeIssues.append(issue)
+      }
+    }
+  }
+
   package func exitCustomLayoutCompatibilityBoundary() {
     state.withLock { state in
       precondition(

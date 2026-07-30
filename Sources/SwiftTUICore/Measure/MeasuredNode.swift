@@ -33,13 +33,26 @@ package struct ContainerAllocationSnapshot: Equatable, Sendable {
 package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   package var sourceIndices: [Int]
   package var tableColumnWidths: [Int]?
+  /// The window this measurement was taken for, when it came from an enclosing
+  /// scroll layout's measure-viewport hint rather than from a finite proposal.
+  /// A hint-derived product is valid only for its window, and the scroll
+  /// layout's reuse signature is deliberately position-free, so the retained
+  /// gate recomputes the window and denies reuse on mismatch. `nil` on the
+  /// finite path, where the proposal itself already gates reuse.
+  package var measuredWindow: Range<Int>?
+  /// Display lines per row used to derive `measuredWindow`.
+  package var estimatedRowStride: Int?
 
   package init(
     sourceIndices: [Int],
-    tableColumnWidths: [Int]? = nil
+    tableColumnWidths: [Int]? = nil,
+    measuredWindow: Range<Int>? = nil,
+    estimatedRowStride: Int? = nil
   ) {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
+    self.measuredWindow = measuredWindow
+    self.estimatedRowStride = estimatedRowStride
   }
 }
 

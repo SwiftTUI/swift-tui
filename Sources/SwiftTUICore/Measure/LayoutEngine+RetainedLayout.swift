@@ -48,6 +48,24 @@ extension LayoutEngine {
       }
     }
 
+    // Same rule for a hint-windowed hosted collection: the stored product is
+    // valid only for the window it was measured for, and an offset-only change
+    // in the enclosing scroll view does not change anything the equivalence
+    // gate above compares.
+    if let hostedSnapshot = previousMeasured.containerAllocationSnapshot?.hostedCollection,
+      let storedWindow = hostedSnapshot.measuredWindow
+    {
+      guard let rowStride = hostedSnapshot.estimatedRowStride,
+        hostedCollectionHintWindow(
+          hint: currentMeasureViewportHint,
+          count: resolved.indexedChildSource?.count ?? 0,
+          rowStride: rowStride
+        ) == storedWindow
+      else {
+        return nil
+      }
+    }
+
     return previousMeasured
   }
 
