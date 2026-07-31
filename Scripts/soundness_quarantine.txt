@@ -6,5 +6,17 @@
 # A quarantined kind is a ratchet, not an unlimited allowance: the scanner
 # fails above count=N, warns at the exact baseline, and warns below it so this
 # ledger is reduced with the next fix.
+#
+# Enforcement is asymmetric, so a green gate proves only count <= N -- NOT that
+# N is current. A baseline left too high after a fix merely warns, and that is
+# not hypothetical: measured 2026-07-30, registration-publication is 1122, so
+# the 1194 below is 72 too high and the gate has been printing "is below
+# baseline; reduce the ledger" inside a passing run. Reduce it with the next
+# change that touches this area.
+#
+# See "Quarantined residuals" in docs/SOUNDNESS-ORACLES.md for each row's
+# provenance, what its residual actually is, its burn-down expectation, and its
+# reconciliation against the Program-5-S0 findings census (whose published
+# figures are pre-S1).
 registration-publication 2026-07-28 Program-5-S0 count=1194 post-suppression scoped-restore residual
 teardown-coherence-leak 2026-07-28 Program-5-S0 count=478 existing unreachable-node residual

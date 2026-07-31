@@ -10,12 +10,111 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- **Wheel scroll over a `List` or `Table` moves the viewport instead of
+  stepping the selection.** Viewport-backed collections now own an explicit
+  scroll anchor, and the visible window is derived from it; the selection
+  *follows* the window rather than *being* it. This matches SwiftUI. A
+  consequence worth knowing: a non-selectable indexed collection can now
+  scroll at all, and `ScrollViewProxy.scrollTo(id:)` reaches collection rows,
+  neither of which was previously possible.
+
+- **`ScrollView { List }` and `ScrollView { Table }` no longer realize the
+  whole dataset per frame.** Realization is viewport-bounded at every dataset
+  size. A 10,000-row table's first frame went from ~68 s to ~360 ms in the
+  measured A/B.
+
+### Changed (source-breaking)
+
+- **`List` and `Table` now require `SelectionValue: Hashable & Sendable`**,
+  narrowed from `Hashable`. In practice this mostly *removes* constraints:
+  four `DataCollections` initializers and the `OutlineViews` extension already
+  demanded `Sendable` by hand, and the peer `Tab` already required it, so those
+  hand-written clauses are gone. Code selecting by a non-`Sendable` value type
+  must make that type `Sendable`.
+
+  Note for anyone upgrading with a warm build directory: moving the constraint
+  onto the type parameter changes the mangled names of the affected
+  initializers, so a stale `.build` produces *link* errors rather than compile
+  errors. Clear it.
+
+## [0.4.4] - 2026-07-29
+
+### Fixed
+
+- Build-hygiene fixes only; no behaviour change. `0.4.3` did not pass its own
+  native gate — four warnings-as-errors defects and one test-harness race —
+  because every build check in that series filtered compiler warnings out. The
+  `0.4.3` tag was deliberately **not** moved: a moved tag trips SwiftPM's
+  fingerprint tamper check on every machine that already resolved it.
+
+## [0.4.3] - 2026-07-29
+
+### Changed
+
+- **A WebHost scene no longer exits when the browser tab closes.** A client
+  disconnect is now connection-local: scene input stays alive, the session ends
+  only on server or scene shutdown, and a reconnecting client is assigned a
+  greater connection token and re-enters capability negotiation. Late callbacks
+  from a superseded connection are ignored rather than acted on.
+
+- **Delta wire records carry their baseline generation.** Records emitted by an
+  encoding state now carry additive `epoch` and `gen` keys, and a delta also
+  carries `baselineGen`, so a consumer can *reject* a stale, reordered, or
+  non-contiguous delta instead of silently applying it to the wrong baseline.
+  A `resync` uplink lets any consumer request a keyframe or an image
+  re-transmission. All keys are additive-optional; undeclared streams are
+  unchanged byte for byte.
+
+## [0.4.2] - 2026-07-29
+
+### Fixed
+
+- Wire-contract and host-consumer fixes continuing the delivery-coupling work
+  begun in `0.4.1`. No authoring-surface API change.
+
+## [0.4.1] - 2026-07-29
+
+### Changed
+
 - **`Standard` and `FileOpenError` now each have one public identity.**
   The duplicate `SwiftTUIRuntime.Standard` and
   `SwiftTUIRuntime.FileOpenError` identities have been removed during the
   pre-0.9 API-hardening window. Unqualified uses under `import SwiftTUIRuntime`
   or `import SwiftTUI` are unchanged; module-qualified references should use
   `SwiftTUIViews.Standard` and `SwiftTUIViews.FileOpenError`.
+
+- **An unknown wire token degrades one record instead of the session.** Host
+  wire token vocabularies are now open-world: a value a newer encoder
+  introduces no longer bricks every subsequent frame on a deployed client.
+
+### Fixed
+
+- **`.simultaneousGesture` no longer swallows control activation on a
+  stationary click.** Recognizer role survives the RunLoop dispatch seam
+  instead of collapsing to a Bool, so a simultaneous gesture recognizes
+  *alongside* the control it was declared not to interfere with.
+  `Button { … }.simultaneousGesture(DragGesture().onEnded { … })` now activates
+  the button. The armed and captured activation paths were also unified, so
+  they cannot diverge again — previously a `TapGesture` suppressed its button
+  even when the tap *failed* on an off-target release.
+
+- **`myapp < /dev/null` exits instead of parking forever.** The
+  terminal-input-ended exit is now reachable in production; previously the
+  event pump's stream only finished when both the input and signal streams
+  ended, and the signal stream never ended.
+
+- **Dispatched `AsyncParsableCommand` verbs actually run.** All three
+  verb-dispatch launch layers now perform the async downcast; previously such a
+  verb silently printed help and exited 0.
+
+- **A gesture composed through `body` keeps pointer capture.** User-composed
+  gestures wrapping a drag no longer lose capture and stop receiving motion.
+
+## [0.4.0] - 2026-07-28
+
+### Changed
+
+- Internal pipeline and teardown work with no authoring-surface API change.
 
 ## [0.3.8] - 2026-07-27
 

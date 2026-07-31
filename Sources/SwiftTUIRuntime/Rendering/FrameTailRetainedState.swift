@@ -131,21 +131,45 @@ final class FrameTailRetainedState: Sendable {
     }
   }
 
+  /// Index the previous draw tree by `ViewNodeID` for retained-draw reuse.
+  ///
+  /// A `ViewNodeID` is **not** unique across the draw tree. Two siblings under
+  /// one `.id(_:)` claim the same entity home and report one `ViewNodeID` (see
+  /// `ViewNode.claimExactIdentityOccurrence`), so a plain
+  /// `storage[viewNodeID] = node` kept only the last writer and served it to
+  /// *both* siblings on the next frame — one sibling's content rendered twice
+  /// and the other's dropped. Duplicate ids are undefined user input, but
+  /// silently painting the wrong content is not an acceptable response to
+  /// them.
+  ///
+  /// Colliding keys are therefore **withheld** rather than disambiguated. The
+  /// extractor falls through to a fresh extraction for those nodes, which is
+  /// always correct — fresh extraction is the oracle retained reuse is
+  /// measured against. Disambiguating by occurrence is not available here:
+  /// `DrawNode` carries no occurrence, and this index is built after resolve.
+  /// The cost is lost reuse on duplicated ids only.
   private static func drawIndex(_ root: DrawNode) -> [ViewNodeID: DrawNode] {
     var storage: [ViewNodeID: DrawNode] = [:]
-    indexDrawNode(root, into: &storage)
+    var collided: Set<ViewNodeID> = []
+    indexDrawNode(root, into: &storage, collided: &collided)
+    for viewNodeID in collided {
+      storage.removeValue(forKey: viewNodeID)
+    }
     return storage
   }
 
   private static func indexDrawNode(
     _ node: DrawNode,
-    into storage: inout [ViewNodeID: DrawNode]
+    into storage: inout [ViewNodeID: DrawNode],
+    collided: inout Set<ViewNodeID>
   ) {
     if let viewNodeID = node.viewNodeID {
-      storage[viewNodeID] = node
+      if storage.updateValue(node, forKey: viewNodeID) != nil {
+        collided.insert(viewNodeID)
+      }
     }
     for child in node.children {
-      indexDrawNode(child, into: &storage)
+      indexDrawNode(child, into: &storage, collided: &collided)
     }
   }
 }

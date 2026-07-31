@@ -133,7 +133,30 @@ package struct RetainedDrawExtractionInput: Sendable {
     self.proof = proof
   }
 
+  /// The previous frame's draw node for `node`, or `nil` when no candidate can
+  /// be established *unambiguously*.
+  ///
+  /// Every arm below is confirmed against `identity` before the candidate is
+  /// served. `ViewNodeID` alone is not a sound key: two siblings under one
+  /// `.id(_:)` share an entity home and report the same `ViewNodeID`, so a
+  /// lookup that trusts it can hand a node its *sibling's* previous draw —
+  /// which rendered one sibling's content twice and dropped the other's.
+  ///
+  /// Returning `nil` is always safe: the extractor falls through to a fresh
+  /// extraction, which is the oracle retained reuse is measured against.
+  /// Serving a wrong node is not recoverable downstream — the mispaired tree
+  /// is content-wrong before damage is even computed.
   package func previousDrawNode(for node: PlacedNode) -> DrawNode? {
+    guard let candidate = unverifiedPreviousDrawNode(for: node) else {
+      return nil
+    }
+    guard candidate.identity == node.identity else {
+      return nil
+    }
+    return candidate
+  }
+
+  private func unverifiedPreviousDrawNode(for node: PlacedNode) -> DrawNode? {
     if let viewNodeID = node.viewNodeID,
       previousDraw.viewNodeID == viewNodeID
     {

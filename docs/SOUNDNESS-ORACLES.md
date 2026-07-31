@@ -81,6 +81,80 @@ every current recorder and counter to be represented. One recorder may serve
 several kinds, as the five interactive handler families do; one class may
 update combined and class-specific counters, as teardown leak does.
 
+## Quarantined residuals
+
+Two kinds are `T-ratchet` rather than `T-fail`. This section is their durable
+tracking reference — before it existed, the only record of *why* they were
+quarantined was a stage tag (`Program-5-S0`) in
+[`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt), which names a
+program but explains nothing.
+
+| Kind | Baseline | Measured 2026-07-30 | Provenance | What the residual is | Burn-down expectation |
+| --- | --: | --: | --- | --- | --- |
+| `registration-publication` | 1194 | **1122** | `Program-5-S0` | Post-suppression scoped-restore residual | Reduce with the next scoped-restore fix; not expected to reach zero on its own |
+| `teardown-coherence-leak` | 478 | 478 | `Program-5-S0` | Existing unreachable-node residual (under-removal arm) | Reduce with teardown-lifetime work; see the leak census currency |
+
+`registration-publication` is **72 below its baseline** at HEAD. The gate has
+been reporting this the whole time, as a warning inside a passing run:
+
+```
+WARNING: registration-publication count=1122 is below baseline=1194; reduce the ledger
+WARNING: teardown-coherence-leak count=478 matches baseline=478
+PASS: soundness trace counts are within their exact quarantine baselines
+```
+
+That is the ratchet working and nobody reading it. Reduce the ledger row to
+the measured count when landing the next change that touches this area — a
+baseline 72 too high is 72 regressions this gate would not catch.
+
+### What a green scan does and does not prove
+
+The ledger is described elsewhere as "exact-count". Read that carefully,
+because the enforcement is **asymmetric**
+([`scan_soundness_traces.sh`](../Scripts/scan_soundness_traces.sh)):
+
+| Observed vs baseline | Verdict |
+| --- | --- |
+| `actual > baseline` | **FAIL** — growth is a hard error |
+| `actual == baseline` | WARNING, "matches baseline" |
+| `actual < baseline` | WARNING, "reduce the ledger" |
+| any count with no ledger row | **FAIL** — "is not quarantined" |
+
+So the baseline is a **ceiling with a shrink nudge**, not an assertion of the
+current count. A green scan proves `actual ≤ baseline`. It does *not* prove
+`actual == baseline` — a baseline left too high after a fix merely warns, and a
+warning in a passing gate is easy to never read. **Do not treat a green gate as
+evidence that these numbers are current.** The `> 0` with no row → FAIL rule is
+what keeps a *new* kind from being silently absorbed.
+
+### Reconciliation with the S0 findings census (2026-07-30)
+
+The S0 findings report and this ledger disagree, and the disagreement is
+expected rather than a defect. The report is a **pre-S1** census; the ledger is
+**post-S1**:
+
+There are **three** numbers in play, not two, and only the third is current:
+
+| Kind | S0 raw | S0 injected | S0 residual | Ledger (post-S1) | **Measured at HEAD** |
+| --- | --: | --: | --: | --: | --: |
+| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | **1122** |
+| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | **478** |
+
+`teardown-coherence-leak` reconciles exactly across all three: S1's suppression
+work removed none of its lines, and nothing since has either.
+
+`registration-publication` moved twice. The S0 report's 1,196 → the ledger's
+1194 is S1's scoped-restore suppression, which is what the ledger row's reason
+string ("post-suppression scoped-restore residual") records. The ledger's 1194
+→ the measured 1122 is **72 lines that later work removed without anyone
+reducing the ledger** — invisible precisely because the scanner only warns
+below baseline.
+
+**None of the three documents was the current authority; only a fresh
+trace-armed run is.** The S0 report is a dated snapshot and is not maintained;
+the ledger is a ceiling that has drifted 72 above reality. Read the ledger as
+"what will fail the gate", not "what is true".
+
 ## Known blind spots and scoping debt
 
 The probe state remains process-global `@MainActor` storage. Concurrent graphs

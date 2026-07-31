@@ -885,8 +885,39 @@ compiled out under `#if !canImport(WASILibc)` — terminal byte I/O is not WASI-
 in Runtime, not the WASI bridge, because the wire is host-neutral. The
 frame becomes a `\u{1E}surface:{…}` record carrying `width`/`height`, a deduplicated
 `styles` table, per-row cell runs, image attachments, raster `damage`, accessibility
-tree, announcements, and scroll regions (versioned, with optional delta encoding). The
-three consumers differ in where the bytes go:
+tree, announcements, and scroll regions (versioned, with optional delta encoding).
+
+Records also carry **delivery-coupling** keys, so a consumer can tell whether a
+record is applicable to the state it actually holds rather than assuming it
+received everything:
+
+- `epoch` — the encoding state a record was produced from (a process-local
+  `epochID`). A consumer that sees a new epoch has a fresh baseline.
+- `gen` — the record's generation within that epoch, starting at 1 and
+  increasing once per committed full or delta record.
+- `baselineGen` — on a delta only: the generation immediately preceding it in
+  that epoch. With `epoch`, this is what lets a consumer *reject* a stale,
+  reordered, or non-contiguous delta instead of silently applying it to the
+  wrong baseline.
+- `stylesBase` — on a delta only, and only when the `styleAppend` capability is
+  negotiated: the retained style table's length, onto which the record's
+  `styles` are spliced. Undeclared streams retransmit the whole accumulated
+  table, byte for byte as before.
+
+The uplink is the other half: a `resync:{"scope":"keyframe"}` request clears
+the encoder's baseline so the next record is full within the same epoch, and an
+image-scoped resync requests re-transmission of specific attachment IDs. This
+is what makes the wire *self-recovering* rather than dependent on a consumer
+that never forgets — the `(epoch, gen)` tuple is encoder-owned and is **not**
+the runtime frame `sequence`.
+
+> **Normative source: [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md).** That
+> document, not this guide, defines wire mechanics — field semantics,
+> capability negotiation, applicability rules, and the per-stage state at
+> `HEAD`. The summary here exists to orient a reader walking the pipeline; if
+> the two ever disagree, the contract wins and this passage is the bug.
+
+The three consumers differ in where the bytes go:
 
 - **WASI** (`WebSurfaceTransport` in
   `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`) writes to a
