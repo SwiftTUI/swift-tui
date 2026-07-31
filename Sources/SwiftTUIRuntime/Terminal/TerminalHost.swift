@@ -474,7 +474,9 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         presentationWriterIfNeeded().submit(
           .init(
             sequence: sequence,
-            output: bufferedOutput
+            output: bufferedOutput,
+            frameOrdinal: PresentingFrameOrdinal.current,
+            submittedAt: .now()
           )
         )
       } else {
@@ -533,7 +535,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
 
       let presentationWriter = TerminalPresentationWriter(
         controller: controller,
-        outputFileDescriptor: outputFileDescriptor
+        outputFileDescriptor: outputFileDescriptor,
+        writeSink: ProfilingRegistry.shared.presentationWriteSink
       )
       presentationSession.writer = presentationWriter
       return presentationWriter

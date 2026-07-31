@@ -1,8 +1,14 @@
+import SwiftTUICore
 import Synchronization
 
 /// Thread-safe staging buffer for events flowing into the run loop's event
 /// pump. Coalescible pointer events are merged in place so a burst of mouse
 /// motion collapses to a single batch.
+///
+/// Every enqueued event is wrapped in an ``InputArrival`` envelope stamped at
+/// enqueue — the moment the runtime first sees the event. Merging fuses the
+/// envelopes rather than discarding one, so a merged burst still reports how
+/// many raw arrivals it stands for.
 ///
 /// Declared at module scope (rather than nested in the generic
 /// `RunLoop<State, Content>`) so its metatype stays `Sendable`: the buffer is
@@ -11,34 +17,52 @@ import Synchronization
 /// across that isolation boundary (see `RunLoop+EventPump.swift`).
 package final class EventPumpBuffer: Sendable {
   private struct BufferState {
-    var pendingBatches: [[RuntimeEvent]] = []
+    var pendingBatches: [[PumpedEvent]] = []
+    var nextArrivalID: UInt64 = 0
   }
 
   private let state = Mutex(BufferState())
+  /// Read-time clock. Injectable so latency tests can author arrival instants
+  /// instead of racing the wall clock; production reads the monotonic clock.
+  private let clock: @Sendable () -> MonotonicInstant
 
+  package init(clock: @escaping @Sendable () -> MonotonicInstant = { .now() }) {
+    self.clock = clock
+  }
+
+  @discardableResult
   func enqueue(_ event: RuntimeEvent) -> Bool {
-    state.withLock { state in
+    let arrivalInstant = clock()
+    return state.withLock { state in
+      let arrival = InputArrival(id: state.nextArrivalID, arrival: arrivalInstant)
+      state.nextArrivalID &+= 1
+
       if let lastBatch = state.pendingBatches.last,
         canAppendToBatch(event, batch: lastBatch)
       {
         let batchIndex = state.pendingBatches.count - 1
-        if let lastEvent = state.pendingBatches[batchIndex].last,
-          let mergedEvent = mergedEvent(lastEvent, with: event)
+        if let lastEntry = state.pendingBatches[batchIndex].last,
+          let mergedEvent = mergedEvent(lastEntry.event, with: event)
         {
           state.pendingBatches[batchIndex][state.pendingBatches[batchIndex].count - 1] =
-            mergedEvent
+            PumpedEvent(
+              event: mergedEvent,
+              arrival: lastEntry.arrival.fused(with: arrival)
+            )
         } else {
-          state.pendingBatches[batchIndex].append(event)
+          state.pendingBatches[batchIndex].append(
+            PumpedEvent(event: event, arrival: arrival)
+          )
         }
         return false
       }
 
-      state.pendingBatches.append([event])
+      state.pendingBatches.append([PumpedEvent(event: event, arrival: arrival)])
       return true
     }
   }
 
-  func drain() -> [RuntimeEvent] {
+  func drain() -> [PumpedEvent] {
     state.withLock { state in
       guard !state.pendingBatches.isEmpty else {
         return []
@@ -68,11 +92,11 @@ package final class EventPumpBuffer: Sendable {
 
   private func canAppendToBatch(
     _ event: RuntimeEvent,
-    batch: [RuntimeEvent]
+    batch: [PumpedEvent]
   ) -> Bool {
     isCoalesciblePointerEvent(event)
       && !batch.isEmpty
-      && batch.allSatisfy(isCoalesciblePointerEvent)
+      && batch.allSatisfy { isCoalesciblePointerEvent($0.event) }
   }
 
   private func isCoalesciblePointerEvent(

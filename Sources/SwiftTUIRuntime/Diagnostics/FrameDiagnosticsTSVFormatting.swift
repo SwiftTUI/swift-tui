@@ -1,5 +1,32 @@
 import SwiftTUICore
 
+/// Column layout for `frames.tsv`.
+///
+/// ## Input latency columns
+///
+/// `answered_inputs` is how many input events the frame answered:
+/// inputs dispatched since the previous frame acquisition whose dispatch asked
+/// the scheduler for work. A wheel burst that the pump merged into one summed
+/// `.scrolled` event still counts once per raw notch. A frame driven only by a
+/// deadline (animation, scroll momentum) answers `0`, and its two latency
+/// columns are `-`.
+///
+/// `input_to_commit_first_ms` and `input_to_commit_last_ms` are
+/// `commit instant − arrival instant` for the oldest and newest input the
+/// frame answered. **Arrival is pump enqueue** — the moment the runtime first
+/// saw the event, which is *after* the input reader's 1 ms coalescing flush.
+/// That flush is real user-perceived latency, but it happens before the
+/// runtime is involved; the PTY rig in the coordination root measures the full
+/// wire number. The commit reading comes from `RunLoop.frameClock`, the same
+/// clock family as the arrivals, so a virtual-clock test is deterministic.
+///
+/// These are **envelope semantics, not provenance**: the columns say the frame
+/// answered these inputs, not that any particular redraw was caused by any
+/// particular one.
+///
+/// Write completion is not here — it happens after commit, on the presentation
+/// writer's queue. It is reported in the sibling `presents.tsv`, joined to this
+/// file on the `frame` column.
 package enum FrameDiagnosticsTSVFormatting {
   package static let headerFields = [
     "frame",
@@ -104,6 +131,9 @@ package enum FrameDiagnosticsTSVFormatting {
     "drop_reconciliation_effects",
     "presentation_recovery_after_drop",
     "input_events_during_render_suspension",
+    "answered_inputs",
+    "input_to_commit_first_ms",
+    "input_to_commit_last_ms",
     "present_strategy",
     "present_ms",
     "present_bytes",
@@ -311,6 +341,9 @@ package enum FrameDiagnosticsTSVFormatting {
       record.dropReconciliationEffects,
       record.presentationRecoveryAfterDrop ? "1" : "0",
       String(record.inputEventsQueuedDuringRenderSuspension),
+      String(record.answeredInputCount),
+      formatMs(record.inputToCommitFirst),
+      formatMs(record.inputToCommitLast),
       record.presentationStrategy,
       presentMs,
       String(record.presentationBytesWritten),

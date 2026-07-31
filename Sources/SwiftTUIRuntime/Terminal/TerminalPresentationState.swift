@@ -20,6 +20,13 @@ import Synchronization
     /// cell content and therefore never moves the diff baseline.
     var sequence: UInt64?
     var output: String
+    /// Run-loop frame ordinal this submission carries, published by the frame
+    /// driver through ``PresentingFrameOrdinal``. The join key between
+    /// `frames.tsv` and `presents.tsv`; `nil` when nothing published one
+    /// (supplemental output, a host driven outside a frame).
+    var frameOrdinal: Int?
+    /// Instant the frame was handed to the writer.
+    var submittedAt: MonotonicInstant
   }
 
   struct TerminalPresentationEmission {
@@ -89,21 +96,39 @@ import Synchronization
     private let outputFileDescriptor: Int32
     private let queue = DispatchQueue(label: "swift-tui.presentation-writer")
     private let state = Mutex(State())
+    /// Per-submission write records, when profiling installed a sink. Resolved
+    /// once at construction: the registry read takes a lock, and the write
+    /// path must not pay for it per frame. `nil` — the default — makes every
+    /// recording site a single branch.
+    private let writeSink: (any PresentationWriteSink)?
 
     init(
       controller: any TerminalControlling,
-      outputFileDescriptor: Int32
+      outputFileDescriptor: Int32,
+      writeSink: (any PresentationWriteSink)? = nil
     ) {
       self.controller = controller
       self.outputFileDescriptor = outputFileDescriptor
+      self.writeSink = writeSink
     }
 
     func submit(
       _ frame: TerminalPresentationFrame
     ) {
+      // A pending content frame replaced here never reaches the terminal.
+      // Record the supersession rather than staying silent: a missing row
+      // would make the join partial, and the dropped frame's write latency
+      // would silently read as the latency of the frame that displaced it.
+      //
+      // Captured under the lock, recorded after it — a sink write is a
+      // syscall, and this is the main actor's present path. Instrumentation
+      // that stalls the thing it measures is not a measurement.
+      var superseded: TerminalPresentationFrame?
       startWriterIfNeeded { state in
+        superseded = state.pending
         state.pending = frame
       }
+      recordSupersessionIfNeeded(of: superseded)
     }
 
     func submitSupplementalOutput(_ output: String) {
@@ -115,7 +140,12 @@ import Synchronization
         if state.pending != nil {
           state.pending?.output.append(output)
         } else {
-          state.pending = .init(sequence: nil, output: output)
+          state.pending = .init(
+            sequence: nil,
+            output: output,
+            frameOrdinal: nil,
+            submittedAt: .now()
+          )
         }
       }
     }
@@ -126,12 +156,16 @@ import Synchronization
     /// terminal write. Supplemental-only pending output is left in place: it
     /// carries no cell content, so it cannot invalidate a diff baseline.
     func reconcileBeforePlanning() -> UInt64 {
-      state.withLock { state in
+      var superseded: TerminalPresentationFrame?
+      let lastCommittedSequence = state.withLock { state -> UInt64 in
         if state.pending?.sequence != nil {
+          superseded = state.pending
           state.pending = nil
         }
         return state.lastCommittedSequence
       }
+      recordSupersessionIfNeeded(of: superseded)
+      return lastCommittedSequence
     }
 
     func lastCommittedSequence() -> UInt64 {
@@ -204,6 +238,7 @@ import Synchronization
 
         do {
           try controller.write(frame.output, to: outputFileDescriptor)
+          recordWriteCompletion(of: frame)
         } catch let error as TerminalHostError {
           recordWriteFailure(error)
           return
@@ -215,11 +250,57 @@ import Synchronization
     }
 
     private func recordWriteFailure(_ error: TerminalHostError) {
+      var superseded: TerminalPresentationFrame?
       state.withLock { state in
+        superseded = state.pending
         state.pending = nil
         state.isWriting = false
         state.pendingError = error
       }
+      recordSupersessionIfNeeded(of: superseded)
+    }
+
+    /// Records a completed `write(2)` — called from the writer queue, right
+    /// after the bytes are on the wire.
+    private func recordWriteCompletion(of frame: TerminalPresentationFrame) {
+      guard let writeSink, let frameOrdinal = frame.frameOrdinal else {
+        return
+      }
+      writeSink.record(
+        PresentationWriteSample(
+          frame: frameOrdinal,
+          submittedAt: frame.submittedAt,
+          writtenAt: .now(),
+          bytes: frame.output.utf8.count,
+          outcome: .written
+        )
+      )
+    }
+
+    /// Records a pending submission that will never be written.
+    ///
+    /// Called at each of the three discard sites (supersede on submit,
+    /// supersede before planning, discard on write failure). Each captures the
+    /// displaced frame *under* the lock that clears `pending` — so a
+    /// submission is recorded as written or as superseded, never both and
+    /// never neither — and calls this *outside* it, keeping the sink's own
+    /// write off the presentation lock.
+    private func recordSupersessionIfNeeded(of frame: TerminalPresentationFrame?) {
+      guard let writeSink,
+        let frame,
+        let frameOrdinal = frame.frameOrdinal
+      else {
+        return
+      }
+      writeSink.record(
+        PresentationWriteSample(
+          frame: frameOrdinal,
+          submittedAt: frame.submittedAt,
+          writtenAt: nil,
+          bytes: frame.output.utf8.count,
+          outcome: .superseded
+        )
+      )
     }
   }
 

@@ -26,7 +26,8 @@ extension RunLoop {
   func presentCommittedFrameWithDiagnosticsTiming(
     _ artifacts: FrameArtifacts,
     damage: PresentationDamage?,
-    hasFrameSink: Bool
+    hasFrameSink: Bool,
+    frameOrdinal: Int
   ) throws -> CommittedFramePresentationResult {
     let presentStart: ContinuousClock.Instant?
     let presentClock: ContinuousClock?
@@ -39,10 +40,15 @@ extension RunLoop {
       presentStart = nil
     }
 
-    let metrics = try presentCommittedFrame(
-      artifacts,
-      damage: damage
-    )
+    // Publish the ordinal for the dynamic extent of the present so a host that
+    // submits to an asynchronous writer can stamp the submission with it —
+    // that stamp is the join key between `frames.tsv` and `presents.tsv`.
+    let metrics = try PresentingFrameOrdinal.$current.withValue(frameOrdinal) {
+      try presentCommittedFrame(
+        artifacts,
+        damage: damage
+      )
+    }
     let duration: Duration =
       if let presentStart, let presentClock {
         presentStart.duration(to: presentClock.now)

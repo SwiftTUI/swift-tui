@@ -120,6 +120,18 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// itself bounded by `progress_starvation`).
   package static var maxConsecutivePreStartCancels: Int { 2 }
   package var nextSemanticHostFrameSequence: UInt64 = 0
+  /// Arrival envelopes of inputs dispatched since the last frame acquisition
+  /// whose dispatch asked the scheduler for work (see
+  /// ``handle(_:arrival:)``). Transferred into the frame at acquisition and
+  /// reported as this frame's `answered_inputs` / `input_to_commit_*`
+  /// columns. Carried back when a frame is skipped or elided: nothing was
+  /// presented, so those inputs are still unanswered and belong to whichever
+  /// frame does present.
+  package var pendingAnsweredInputs: AnsweredInputs?
+  /// The injected scheduler's request-tally probe, resolved once. `nil` for a
+  /// scheduler that does not conform, in which case no input is attributed
+  /// and the latency columns stay empty.
+  package let schedulerIntentTally: (any IntentRequestTallying)?
   package var previousPresentedRasterSurface: RasterSurface?
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
@@ -200,6 +212,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.terminalInputReader = terminalInputReader
     self.signalReader = signalReader
     self.scheduler = scheduler
+    schedulerIntentTally = scheduler as? any IntentRequestTallying
     self.stateContainer = stateContainer
     self.focusTracker = focusTracker
     self.focusPresentationHandler = focusPresentationHandler
@@ -488,9 +501,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
 
       var handledNonExitEvent = false
-      for event in renderEventDrain.events {
+      for pumpedEvent in renderEventDrain.events {
         let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
-        if let exitReason = handle(event) {
+        if let exitReason = handle(pumpedEvent.event, arrival: pumpedEvent.arrival) {
           let shouldFlushBeforeExit =
             handledNonExitEvent
             || (hadReadyFrameBeforeEvent

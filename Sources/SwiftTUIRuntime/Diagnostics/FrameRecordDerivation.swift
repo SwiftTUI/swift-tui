@@ -131,6 +131,11 @@ package enum FrameRecordDerivation {
       elidedAnimationCommitDuration: nil,
       elidedCommitDuration: nil
     )
+    if let answeredInputs = sample.answeredInputs {
+      record.answeredInputCount = answeredInputs.count
+      record.inputToCommitFirst = answeredInputs.first.duration(to: sample.commitInstant)
+      record.inputToCommitLast = answeredInputs.last.duration(to: sample.commitInstant)
+    }
     record.rasterPath = diag.presentation.rasterReuse?.path ?? "-"
     record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers ?? []
     record.runtimePublicationMode = publication.publicationMode

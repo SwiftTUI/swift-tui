@@ -20,6 +20,11 @@ public final class ProfileActivation {
   private var activated = false
   private var sinks: [any ProfileSink] = []
   private var timerTasks: [Task<Void, Never>] = []
+  /// Candidate `presents.tsv` paths derived from the configured TSV sinks.
+  private var presentsPaths: [String] = []
+  /// Retains the installed presentation-write sink for this session; the
+  /// registry holds it too, but ownership belongs here alongside `sinks`.
+  private var presentationWriteSink: PresentationWriteTSVSink?
 
   package init() {}
 
@@ -51,13 +56,53 @@ public final class ProfileActivation {
 
   private func activate(_ config: ProfileConfig) {
     sinks = makeSinks(config.sinks)
+    presentsPaths = config.sinks.compactMap { descriptor in
+      guard case .tsv(let path) = descriptor else {
+        return nil
+      }
+      return Self.presentsPath(besideFramesPath: path)
+    }
     installSignals(config.signals)
+  }
+
+  /// Opens the `presents.tsv` sibling for each TSV sink the `frames` signal
+  /// writes to.
+  ///
+  /// The grammar is deliberately untouched: write completion is part of what
+  /// `frames` means, it just cannot ride the frame row (it happens after
+  /// commit, on another queue). The file is a sibling rather than extra
+  /// columns so every existing `frames.tsv` consumer keeps its per-row
+  /// independence.
+  ///
+  /// Only the real terminal host runs an asynchronous presentation writer, so
+  /// on other hosts this file is opened and stays empty — which is the honest
+  /// outcome. A synchronous host's "write latency" would be a fabricated zero.
+  private func installPresentationWriteSinkIfNeeded(_ signals: Set<ProfileConfig.Signal>) {
+    guard signals.contains(.frames), let path = presentsPaths.first else {
+      return
+    }
+    guard let sink = PresentationWriteTSVSink(path: path) else {
+      return
+    }
+    presentationWriteSink = sink
+    ProfilingRegistry.shared.presentationWriteSink = sink
+  }
+
+  /// `presents.tsv` beside the frames file: same directory, fixed name. Fixed
+  /// rather than derived from the frames file name so a reducer can find it
+  /// without knowing what the operator called the frames file.
+  nonisolated static func presentsPath(besideFramesPath framesPath: String) -> String {
+    guard let separatorIndex = framesPath.lastIndex(of: "/") else {
+      return "presents.tsv"
+    }
+    return framesPath[...separatorIndex] + "presents.tsv"
   }
 
   private func installSignals(_ signals: Set<ProfileConfig.Signal>) {
     if signals.contains(.frames) {
       ProfilingRegistry.shared.frameSink = ProfileFrameBridge(sinks: sinks)
     }
+    installPresentationWriteSinkIfNeeded(signals)
     for signal in signals {
       switch signal {
       case .frames:

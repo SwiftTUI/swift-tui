@@ -7,6 +7,38 @@ extension RunLoop {
     case exit(RunLoopExitReason)
   }
 
+  /// Dispatches one pumped event, attributing its arrival to the next
+  /// committed frame when the dispatch asked the scheduler for work.
+  ///
+  /// Attribution semantics (WP-1): a frame answers every *scheduler-affecting*
+  /// input processed since the previous frame acquisition. The probe brackets
+  /// the whole dispatch with the scheduler's coalesced request tally — an
+  /// input that raised it asked for an input frame, an invalidation, or a
+  /// deadline arm, and the next committed frame is that input's answer. An
+  /// input that asked for nothing (pointer motion over blank surface with no
+  /// hover subscriber and no active routing) commits no frame of its own and
+  /// is excluded, so it cannot smear a later deadline frame's latency.
+  ///
+  /// This is envelope semantics, not exact provenance: it says the frame
+  /// answered these inputs, not that any particular redraw was caused by any
+  /// particular one. That is what a latency distribution needs, and it matches
+  /// how the scheduler already coalesces causes.
+  @discardableResult
+  package func handle(
+    _ event: RuntimeEvent,
+    arrival: InputArrival?
+  ) -> RunLoopExitReason? {
+    guard case .input = event, let arrival, let tally = schedulerIntentTally else {
+      return handle(event)
+    }
+    let requestsBeforeDispatch = tally.coalescedIntentRequestCount
+    let exitReason = handle(event)
+    if tally.coalescedIntentRequestCount != requestsBeforeDispatch {
+      pendingAnsweredInputs.fold(arrival)
+    }
+    return exitReason
+  }
+
   package func handle(_ event: RuntimeEvent) -> RunLoopExitReason? {
     switch event {
     case .inputEnded:

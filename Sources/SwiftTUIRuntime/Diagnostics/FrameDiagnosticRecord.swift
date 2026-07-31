@@ -88,6 +88,17 @@ public struct FrameDiagnosticRecord: Sendable {
   public var dropReconciliationEffects: String
   public var presentationRecoveryAfterDrop: Bool
   public var inputEventsQueuedDuringRenderSuspension: Int
+  /// How many input events this frame answered — inputs dispatched since the
+  /// previous frame acquisition whose dispatch asked the scheduler for work.
+  /// `0` for a frame driven by a deadline alone (animation, momentum).
+  package var answeredInputCount: Int = 0
+  /// Commit instant minus the *oldest* answered input's arrival: the worst
+  /// latency this frame closed out. `nil` when the frame answered nothing.
+  package var inputToCommitFirst: Duration?
+  /// Commit instant minus the *newest* answered input's arrival: the best
+  /// latency this frame closed out. Equal to `inputToCommitFirst` when the
+  /// frame answered exactly one input.
+  package var inputToCommitLast: Duration?
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
   public var presentationLinesTouched: Int

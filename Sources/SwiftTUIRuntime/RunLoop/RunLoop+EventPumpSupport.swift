@@ -41,7 +41,7 @@ extension RunLoop {
   }
 
   package struct RenderEventDrain {
-    var events: [RuntimeEvent]
+    var events: [PumpedEvent]
     var coalescedEventBatches: Int
   }
 
@@ -72,5 +72,11 @@ extension RunLoop {
       return false
     }
     return mouseEvent.isCoalescible
+  }
+
+  package func isCoalesciblePointerPumpedEvent(
+    _ pumpedEvent: PumpedEvent
+  ) -> Bool {
+    isCoalesciblePointerRuntimeEvent(pumpedEvent.event)
   }
 }

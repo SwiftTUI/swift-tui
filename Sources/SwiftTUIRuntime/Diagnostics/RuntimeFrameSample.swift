@@ -78,6 +78,14 @@ import SwiftTUICore
   package var tailJobState: FrameTailJobState
   package var presentationMetrics: PresentationMetrics
   package var presentationDuration: Duration
+  /// The inputs this frame answered — how many, and the arrival edges that
+  /// bracket them. `nil` for a frame that answered none (a deadline-driven
+  /// animation or momentum tick).
+  package var answeredInputs: AnsweredInputs?
+  /// The frame clock reading taken at commit, paired with `answeredInputs` to
+  /// produce the two input→commit latency columns. Sampled through
+  /// `RunLoop.frameClock` so a virtual-clock test is deterministic.
+  package var commitInstant: MonotonicInstant
 
   package init(
     frameNumber: Int,
@@ -96,7 +104,9 @@ import SwiftTUICore
     completedFrameDropDecision: CompletedFrameDropDecision?,
     tailJobState: FrameTailJobState,
     presentationMetrics: PresentationMetrics,
-    presentationDuration: Duration
+    presentationDuration: Duration,
+    answeredInputs: AnsweredInputs? = nil,
+    commitInstant: MonotonicInstant = .zero
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
@@ -115,6 +125,8 @@ import SwiftTUICore
     self.tailJobState = tailJobState
     self.presentationMetrics = presentationMetrics
     self.presentationDuration = presentationDuration
+    self.answeredInputs = answeredInputs
+    self.commitInstant = commitInstant
   }
 }
 

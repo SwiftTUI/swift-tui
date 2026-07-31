@@ -17,11 +17,17 @@ extension RunLoop {
     animationControllerHasPendingWork: Bool,
     presentationMetrics: PresentationMetrics,
     presentationDuration: Duration,
+    answeredInputs: AnsweredInputs?,
     renderedFrames: Int
   ) {
     guard let frameSink else {
       return
     }
+    // Read past the guard: an unprofiled run must not pay a clock sample per
+    // frame for a column nobody is collecting. Reads the frame clock rather
+    // than the wall clock so the two latency columns and the arrivals they
+    // subtract come from the same clock family.
+    let commitInstant = frameClock()
     let inputEventsQueuedDuringRenderSuspension =
       renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
     let dropEligibilityBlockers = frameDropEligibilityBlockers(
@@ -52,7 +58,9 @@ extension RunLoop {
       completedFrameDropDecision: completedFrameDropDecision,
       tailJobState: tailJobState,
       presentationMetrics: presentationMetrics,
-      presentationDuration: presentationDuration
+      presentationDuration: presentationDuration,
+      answeredInputs: answeredInputs,
+      commitInstant: commitInstant
     )
     frameSink.record(.committed(sample))
   }

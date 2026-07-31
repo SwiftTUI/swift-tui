@@ -13,6 +13,7 @@ package final class ProfilingRegistry: Sendable {
   private struct State {
     var frameSink: (any FrameDiagnosticSink)?
     var progressObserver: (any RunLoopProgressObserver)?
+    var presentationWriteSink: (any PresentationWriteSink)?
   }
 
   private let state = Mutex(State())
@@ -27,5 +28,14 @@ package final class ProfilingRegistry: Sendable {
   package var progressObserver: (any RunLoopProgressObserver)? {
     get { state.withLock { $0.progressObserver } }
     set { state.withLock { $0.progressObserver = newValue } }
+  }
+
+  /// Sink for per-submission terminal write records (`presents.tsv`).
+  /// Read once by each ``TerminalPresentationWriter`` at construction, so it
+  /// must be installed before the first frame is presented — which the
+  /// profiling product's activation guarantees.
+  package var presentationWriteSink: (any PresentationWriteSink)? {
+    get { state.withLock { $0.presentationWriteSink } }
+    set { state.withLock { $0.presentationWriteSink = newValue } }
   }
 }

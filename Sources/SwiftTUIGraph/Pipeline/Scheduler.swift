@@ -130,6 +130,26 @@ package protocol PendingFrameAwaiting: AnyObject {
   func waitForPendingFrame(at now: MonotonicInstant) async
 }
 
+/// Reads the scheduler's coalesced `request*` tally without consuming a frame.
+///
+/// The run loop's input-attribution probe brackets each input dispatch with
+/// this read: an input whose dispatch raised the tally asked for scheduler
+/// work — an input frame, an invalidation, a deadline arm — and therefore
+/// belongs to the next committed frame's latency columns. `hasPendingFrame`
+/// cannot serve here: during a scroll burst it is already `true`, so it
+/// saturates and can never tell whether *this* input asked for anything.
+///
+/// Deliberately a narrow opt-in protocol reached by cast, like
+/// ``WakeNotifyingFrameScheduling`` — a required member on the public
+/// ``FrameScheduling`` would break out-of-tree conformers for a diagnostic.
+/// A scheduler that does not conform simply reports no answered inputs.
+package protocol IntentRequestTallying: AnyObject {
+  /// `request*` calls coalesced since the last `consumeReadyFrame`. Reset to
+  /// zero on consume, so only *differences* taken within one dispatch are
+  /// meaningful.
+  var coalescedIntentRequestCount: Int { get }
+}
+
 /// A drain-pass boundary for deadline consumption: deadlines armed at or after
 /// the cut are withheld from `consumeReadyFrame(at:armedBefore:)` — deferred to
 /// the next pass, never discarded. Captured by a frame driver at pass entry so
@@ -201,7 +221,9 @@ public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
 /// coalescing sets lock-free and safe only "by convention" (every caller on the
 /// main actor), which raced the run loop's `consumeReadyFrame` when that
 /// convention was broken.
-public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Sendable {
+public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, IntentRequestTallying,
+  Sendable
+{
   /// The coalescing state mutated by every `request*` call and drained by
   /// `consumeReadyFrame`. Held behind `coalescingLock` so requests from any
   /// thread cannot race the main-actor run loop.
@@ -263,6 +285,10 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Send
   /// post-action follow-up can be skipped.
   package var pendingInvalidatedIdentities: Set<Identity> {
     coalescingLock.withLock { $0.invalidatedIdentities }
+  }
+
+  package var coalescedIntentRequestCount: Int {
+    coalescingLock.withLock { $0.pendingIntentRequestCount }
   }
 
   public func requestInput() {

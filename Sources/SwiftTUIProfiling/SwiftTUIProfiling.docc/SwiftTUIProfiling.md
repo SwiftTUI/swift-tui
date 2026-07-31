@@ -73,6 +73,32 @@ SWIFTTUI_PROFILE="memory@500ms;summary" ./gallery-demo
 Call ``ProfileActivation/finish()`` at shutdown so buffered sinks (summary)
 emit their reduced report.
 
+### `presents.tsv`, the frames file's sibling
+
+A frame row is emitted at commit, but on a real terminal the `write(2)` that
+puts its bytes on the wire completes later, on the presentation writer's own
+queue. Delaying the frame row to wait for it would reorder the sink contract
+and lose rows on teardown, so write completion goes to a **separate file**:
+whenever the `frames` signal is paired with a `tsv=` sink, activation also opens
+`presents.tsv` in the same directory. Its name is fixed, not derived from the
+frames file, so a reducer can find it without knowing what you called the frames
+file.
+
+| column | meaning |
+| --- | --- |
+| `frame` | run-loop frame ordinal — joins `frames.tsv` on its `frame` column |
+| `submitted_ms` | when the frame was handed to the presentation writer |
+| `written_ms` | when `write(2)` returned; `-` when superseded |
+| `write_ms` | `written_ms − submitted_ms`; `-` when superseded |
+| `bytes` | UTF-8 size of the submitted emission |
+| `outcome` | `written`, or `superseded` when a newer frame displaced it |
+
+The join is total: every submission that carries a frame ordinal produces
+exactly one row, whether or not it reached the terminal. Only the terminal host
+runs an asynchronous writer, so on other hosts the file is opened and stays
+empty — a synchronous host's "write latency" would be a fabricated zero, and an
+absent measurement is more useful than a fake one.
+
 ## Topics
 
 ### Activation

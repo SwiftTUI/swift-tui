@@ -7,7 +7,7 @@ import SwiftTUICore
 extension RunLoop {
   package struct EventPump {
     var stream: AsyncStream<Void>
-    var drainEvents: () -> [RuntimeEvent]
+    var drainEvents: () -> [PumpedEvent]
     var hasPendingEvents: () -> Bool
     var cancel: () -> Void
     var scheduleDeadlineWake: @Sendable (Duration) -> Void
@@ -151,10 +151,10 @@ extension RunLoop {
 
   package func drainPendingEvents(
     from eventPump: EventPump
-  ) async -> [RuntimeEvent] {
+  ) async -> [PumpedEvent] {
     var drainedEvents = eventPump.drainEvents()
 
-    guard drainedEvents.allSatisfy(isCoalesciblePointerRuntimeEvent) else {
+    guard drainedEvents.allSatisfy(isCoalesciblePointerPumpedEvent) else {
       return drainedEvents
     }
 
@@ -164,7 +164,7 @@ extension RunLoop {
       guard !additionalEvents.isEmpty else {
         break
       }
-      guard additionalEvents.allSatisfy(isCoalesciblePointerRuntimeEvent) else {
+      guard additionalEvents.allSatisfy(isCoalesciblePointerPumpedEvent) else {
         drainedEvents.append(contentsOf: additionalEvents)
         break
       }
@@ -176,7 +176,7 @@ extension RunLoop {
 
   package func drainPendingRenderEvents(
     from eventPump: EventPump,
-    initialEvents: [RuntimeEvent]
+    initialEvents: [PumpedEvent]
   ) -> RenderEventDrain {
     var events = initialEvents
     var coalescedEventBatches = 0
@@ -219,9 +219,9 @@ extension RunLoop {
     pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
 
     var handledNonExitEvent = false
-    for event in renderEventDrain.events {
+    for pumpedEvent in renderEventDrain.events {
       let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
-      if let exitReason = handle(event) {
+      if let exitReason = handle(pumpedEvent.event, arrival: pumpedEvent.arrival) {
         let shouldFlushBeforeExit =
           handledNonExitEvent
           || (hadReadyFrameBeforeEvent

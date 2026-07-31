@@ -525,7 +525,7 @@ extension FrameworkStressRuntimeTransportTests {
           )
         )
       )
-      let event = try #require(buffer.drain().first)
+      let event = try #require(buffer.drain().first).event
       guard case .input(.mouse(let mouse)) = event else {
         Issue.record("expected a pointer event after empty drain generation \(generation)")
         return
@@ -550,9 +550,9 @@ extension FrameworkStressRuntimeTransportTests {
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 8, y: 1)))))
     _ = buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 9, y: 1)))))
 
-    let before = try #require(buffer.drain().first)
-    let signal = try #require(buffer.drain().first)
-    let after = try #require(buffer.drain().first)
+    let before = try #require(buffer.drain().first).event
+    let signal = try #require(buffer.drain().first).event
+    let after = try #require(buffer.drain().first).event
 
     guard case .input(.mouse(let beforeMouse)) = before,
       case .signal(let name) = signal,
@@ -590,7 +590,7 @@ extension FrameworkStressRuntimeTransportTests {
     #expect(buffer.enqueue(.input(.key(.character("q")))))
 
     let firstBatch = buffer.drain()
-    let firstEvent = try #require(firstBatch.first)
+    let firstEvent = try #require(firstBatch.first).event
     guard case .input(.mouse(let mouse)) = firstEvent else {
       Issue.record("expected a merged pointer event")
       return
@@ -599,7 +599,7 @@ extension FrameworkStressRuntimeTransportTests {
     #expect(mouse.location.cell == CellPoint(x: 5, y: 1))
 
     let secondBatch = buffer.drain()
-    guard case .input(.key(let key))? = secondBatch.first else {
+    guard case .input(.key(let key))? = secondBatch.first?.event else {
       Issue.record("expected a key in the second batch")
       return
     }
