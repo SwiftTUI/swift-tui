@@ -107,6 +107,7 @@ enum PerfFrameDiagnosticsTSVReader {
         elidedAnimationCommitMs: double("elided_animation_commit_ms", fields, column),
         elidedCommitMs: double("elided_commit_ms", fields, column),
         elided: bool("elided", fields, column),
+        answeredInputCount: int("answered_inputs", fields, column),
         customLayoutFallbacks: int("custom_layout_fallbacks", fields, column),
         layoutDependentMainActorFallbacks: int(
           "layout_dependent_main_actor_fallbacks",

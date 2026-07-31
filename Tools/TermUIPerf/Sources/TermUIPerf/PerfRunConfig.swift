@@ -97,6 +97,11 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case lazyList1K = "lazy-list-1k"
   case table1Kx4 = "table-1kx4"
   case lazyVStackScroll = "lazy-vstack-scroll"
+  case scrollNotchLatency = "scroll-notch-latency"
+  case scrollCadence60Hz = "scroll-cadence-60hz"
+  case scrollFlingMomentum = "scroll-fling-momentum"
+  case scrollJump = "scroll-jump"
+  case scrollDocumentMixed = "scroll-document-mixed"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()

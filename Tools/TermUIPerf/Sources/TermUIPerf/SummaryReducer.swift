@@ -26,6 +26,11 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var elidedAnimationCommitMs: Double?
   public var elidedCommitMs: Double?
   public var elided: Bool
+  /// How many input events this frame answered (WP-1). `0` for a frame driven
+  /// by a deadline alone. The rest of the WP-1/per-phase column set is parsed
+  /// in WP-3; this one lands early because the open-loop cadence test needs it
+  /// to prove every injected notch is accounted for.
+  public var answeredInputCount: Int
   public var customLayoutFallbacks: Int
   public var layoutDependentMainActorFallbacks: Int
   public var tailJobState: String
@@ -65,6 +70,7 @@ public struct PerfFrameRecord: Equatable, Sendable {
     elidedAnimationCommitMs: Double? = nil,
     elidedCommitMs: Double? = nil,
     elided: Bool = false,
+    answeredInputCount: Int = 0,
     customLayoutFallbacks: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
     tailJobState: String = "completed",
@@ -99,6 +105,7 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.elidedAnimationCommitMs = elidedAnimationCommitMs
     self.elidedCommitMs = elidedCommitMs
     self.elided = elided
+    self.answeredInputCount = answeredInputCount
     self.customLayoutFallbacks = customLayoutFallbacks
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
     self.tailJobState = tailJobState

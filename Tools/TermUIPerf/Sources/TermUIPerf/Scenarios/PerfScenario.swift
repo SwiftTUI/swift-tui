@@ -176,6 +176,11 @@ public enum PerfScenarioRegistry {
       LazyList1KScenario(),
       Table1Kx4Scenario(),
       LazyVStackScrollScenario(),
+      ScrollNotchLatencyScenario(),
+      ScrollCadence60HzScenario(),
+      ScrollFlingMomentumScenario(),
+      ScrollJumpScenario(),
+      ScrollDocumentMixedScenario(),
     ] + additionalScenarios
   }
 
@@ -234,6 +239,136 @@ public struct PerfScenarioDriver {
           kind: .scrolled(deltaX: 0, deltaY: deltaY),
           location: Point(x: Double(cell.x) + 0.5, y: Double(cell.y) + 0.5)
         )))
+  }
+
+  /// Sends one wheel notch and awaits the next frame the host presents.
+  ///
+  /// The per-notch closed loop. Deliberately content-free: settling on a
+  /// marker asks "did the window reach row N", which a coalesced or clamped
+  /// scroll may never satisfy exactly, while "did a frame come back" is the
+  /// question a latency measurement is actually asking.
+  @MainActor
+  public func scrollAwaitingFrame(
+    deltaY: Int,
+    at cell: CellPoint,
+    afterFrame frameNumber: Int,
+    timeout: Duration = .seconds(30)
+  ) async throws -> PerfPresentedFrame {
+    sendScroll(deltaY: deltaY, at: cell)
+    return try await waitForNextFrame(afterFrame: frameNumber, timeout: timeout)
+  }
+
+  /// Awaits the next presented frame after `frameNumber`, whatever it contains.
+  @MainActor
+  public func waitForNextFrame(
+    afterFrame frameNumber: Int,
+    timeout: Duration = .seconds(30)
+  ) async throws -> PerfPresentedFrame {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while clock.now < deadline {
+      if let frame = terminalHost.presentedFrames.last(where: {
+        $0.frameNumber > frameNumber
+      }) {
+        return frame
+      }
+      try await Task.sleep(nanoseconds: 500_000)
+    }
+    throw PerfScenarioError.markerTimedOut("<frame after \(frameNumber)>")
+  }
+
+  /// Injects `notches` wheel steps on a fixed cadence **without awaiting a
+  /// settle between them**.
+  ///
+  /// This is the open loop, and it is the whole point of the cadence
+  /// scenarios: a closed loop can only ever measure a runtime that is keeping
+  /// up, because it refuses to send the next input until the last one has been
+  /// answered. Latency for these runs is read from the runtime's own
+  /// `input_to_commit_*` columns and from `presents.tsv`, not from marker
+  /// matching — a per-notch marker wait would be a closed loop again.
+  @MainActor
+  public func driveScroll(
+    cadence: Duration,
+    notches: Int,
+    at cell: CellPoint,
+    deltaY: Int = 1
+  ) async {
+    for _ in 0..<notches {
+      sendScroll(deltaY: deltaY, at: cell)
+      try? await Task.sleep(for: cadence)
+    }
+  }
+
+  /// Presses at `from`, drags `cells` rows upward over `duration` in `samples`
+  /// steps, then releases — arming scroll momentum from the release velocity.
+  ///
+  /// Timestamps are authored rather than left to the wall clock because the
+  /// momentum controller derives fling velocity from the interval between
+  /// pointer events; leaving that to scheduling noise would make the initial
+  /// velocity, and therefore the entire decay, vary run to run. Real time is
+  /// paced to match, so this stays a genuine drag rather than a burst the pump
+  /// would merge into a single event.
+  @MainActor
+  public func sendFling(
+    from cell: CellPoint,
+    cells: Int,
+    over duration: Duration,
+    samples: Int
+  ) async {
+    precondition(samples > 0, "a fling needs at least one drag sample")
+    let start = MonotonicInstant.now()
+    let step = duration / samples
+    inputReader.send(
+      .mouse(
+        .init(
+          kind: .down(.primary),
+          location: Self.point(of: cell),
+          timestamp: start
+        )))
+    for sample in 1...samples {
+      try? await Task.sleep(for: step)
+      let travelled = Int((Double(cells) * Double(sample) / Double(samples)).rounded())
+      inputReader.send(
+        .mouse(
+          .init(
+            kind: .dragged(.primary),
+            location: Self.point(of: CellPoint(x: cell.x, y: max(0, cell.y - travelled))),
+            timestamp: start.advanced(by: step * sample)
+          )))
+    }
+    inputReader.send(
+      .mouse(
+        .init(
+          kind: .up(.primary),
+          location: Self.point(of: CellPoint(x: cell.x, y: max(0, cell.y - cells))),
+          timestamp: start.advanced(by: duration)
+        )))
+  }
+
+  /// Awaits `idle` of no new presented frames — the settle tail after an
+  /// open-loop burst or a fling, where momentum decay and the last coalesced
+  /// frames land.
+  @MainActor
+  public func waitForQuiescence(
+    idle: Duration = .milliseconds(300),
+    timeout: Duration = .seconds(30)
+  ) async {
+    let clock = ContinuousClock()
+    let hardDeadline = clock.now.advanced(by: timeout)
+    var newest = terminalHost.presentedFrames.last?.frameNumber ?? 0
+    var idleUntil = clock.now.advanced(by: idle)
+    while clock.now < hardDeadline, clock.now < idleUntil {
+      try? await Task.sleep(nanoseconds: 1_000_000)
+      let latest = terminalHost.presentedFrames.last?.frameNumber ?? 0
+      if latest > newest {
+        newest = latest
+        idleUntil = clock.now.advanced(by: idle)
+      }
+    }
+  }
+
+  private static func point(of cell: CellPoint) -> Point {
+    Point(x: Double(cell.x) + 0.5, y: Double(cell.y) + 0.5)
   }
 }
 

@@ -2102,7 +2102,7 @@ struct InteractiveRuntimeTests {
     )
 
     let t0 = MonotonicInstant.now()
-    let clock = VirtualClock(t0)
+    let clock = VirtualFrameClock(t0)
     let runLoop = try mountedMomentumRunLoop(
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
@@ -2184,7 +2184,7 @@ struct InteractiveRuntimeTests {
     )
 
     let t0 = MonotonicInstant.now()
-    let clock = VirtualClock(t0)
+    let clock = VirtualFrameClock(t0)
     let runLoop = try mountedMomentumRunLoop(
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
@@ -2253,7 +2253,7 @@ struct InteractiveRuntimeTests {
     )
 
     let t0 = MonotonicInstant.now()
-    let clock = VirtualClock(t0)
+    let clock = VirtualFrameClock(t0)
     let runLoop = try mountedMomentumRunLoop(
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
@@ -5904,17 +5904,6 @@ private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
   }
 }
 
-/// A mutable virtual clock for deterministic momentum tests. The run loop's
-/// `frameClock` reads `now`, which the test steps by the 33 ms tick
-/// cadence so a fling decays in virtual time with no sleeps and no async loop.
-@MainActor
-private final class VirtualClock {
-  var now: MonotonicInstant
-  init(_ now: MonotonicInstant) {
-    self.now = now
-  }
-}
-
 /// Builds and mounts a `RunLoop` for momentum tests, wiring its frame-readiness
 /// clock to `clock` so deadline-driven decay frames can be stepped determinist-
 /// ically. Returns the live run loop; the caller injects pointer events via
@@ -5925,7 +5914,7 @@ private func mountedMomentumRunLoop<V: View>(
   terminalSize: CellSize,
   rootIdentity: Identity,
   motion: RuntimeConfiguration.MotionMode = .normal,
-  clock: VirtualClock,
+  clock: VirtualFrameClock,
   viewBuilder: @escaping () -> V
 ) throws -> SwiftTUIRuntime.RunLoop<Int, V> {
   var environmentValues = EnvironmentValues()
