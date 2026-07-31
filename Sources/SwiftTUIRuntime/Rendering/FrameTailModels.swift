@@ -105,9 +105,12 @@ struct FrameTailInput {
   ///
   /// These changes are invisible to `invalidatedIdentities`: interpolation
   /// mutates the already-resolved tree, so an animating node's drawn output can
-  /// change with its identity absent from `directlyInvalidated`. The raster
-  /// reuse resolver's whole soundness argument rests on that set being the
-  /// complete set of changed identities, so a non-empty set here barriers.
+  /// change with its identity absent from `directlyInvalidated`. The damage
+  /// resolver does not consume these as damage — damage is a draw-tree diff —
+  /// but a non-empty set marks the frame as animation-rewritten, and the
+  /// resolver barriers it rather than extend its soundness argument across the
+  /// animation stages (see the barrier comment in
+  /// `FrameTailPresentationDamageResolver.resolve`).
   var animationRedrawIdentities: Set<Identity> = []
 }
 

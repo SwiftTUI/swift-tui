@@ -31,9 +31,11 @@ package struct RetainedFrameIndex: Sendable {
   fileprivate let measuredStructuralIndex: [Identity: MeasuredNode]
   fileprivate let placedStructuralIndex: [Identity: PlacedNode]
   /// The frame's placed tree. `PlacedNode` carries its whole subtree, so this
-  /// is the previous frame's placed root and, transitively, every placed node —
-  /// the diff basis the incremental-damage producer walks. Holding it costs
-  /// nothing beyond the reference the index's structural map already retains.
+  /// is the previous frame's placed root and, transitively, every placed node.
+  /// Held for ``placedRootIdentity`` — where ``placedPath(to:)`` terminates —
+  /// and for byte-equivalence; the incremental-damage producer diffs the
+  /// retained *draw* trees, not this tree. Holding it costs nothing beyond the
+  /// reference the index's structural map already retains.
   package let placedRoot: PlacedNode
   /// The identity of the frame's placed root — the node ``placedPath(to:)``
   /// terminates at.

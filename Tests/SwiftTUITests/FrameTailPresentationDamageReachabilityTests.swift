@@ -375,6 +375,110 @@ struct FrameTailPresentationDamageReachabilityTests {
     #expect(plan.damage == nil)
     #expect(plan.barriers == [.duplicateInvalidatedIdentity])
   }
+
+  @Test("an animation-interpolated frame barriers before any diff")
+  func animationInterpolatedFrameBarriers() throws {
+    let sceneIdentity = testIdentity("App", "scene")
+    let dirtyIdentity = testIdentity("App", "scene", "Layout[0]")
+
+    func tree(dirtyRow: Int) -> PlacedNode {
+      PlacedNode(
+        identity: sceneIdentity,
+        kind: .root,
+        bounds: .init(origin: .zero, size: .init(width: 20, height: 6)),
+        children: [
+          PlacedNode(
+            identity: dirtyIdentity,
+            kind: .view("Text"),
+            bounds: .init(origin: .init(x: 0, y: dirtyRow), size: .init(width: 20, height: 1))
+          )
+        ]
+      )
+    }
+
+    let previousPlaced = tree(dirtyRow: 1)
+    let currentPlaced = tree(dirtyRow: 2)
+
+    func plan(animationRedrawIdentities: Set<Identity>) -> FrameTailRasterReusePlan {
+      FrameTailPresentationDamageResolver.resolve(
+        rootIdentity: sceneIdentity,
+        placed: currentPlaced,
+        draw: Self.drawTree(from: currentPlaced),
+        retainedLayout: RetainedLayoutSession(
+          previousFrameIndex: RetainedFrameIndex(
+            frame: damageFrameArtifacts(placed: previousPlaced)
+          ),
+          invalidatedIdentities: [dirtyIdentity]
+        ),
+        previousDraw: Self.drawTree(from: previousPlaced),
+        previousSurfaceTopology: SurfaceTopologySignature(placedRoot: previousPlaced),
+        animationRedrawIdentities: animationRedrawIdentities
+      )
+    }
+
+    // The fixture is otherwise incremental-eligible, so this test reds if the
+    // guard is removed rather than vacuously passing on an unrelated barrier.
+    let control = plan(animationRedrawIdentities: [])
+    #expect(control.barriers.isEmpty)
+    #expect(control.damage != nil)
+
+    let animated = plan(animationRedrawIdentities: [dirtyIdentity])
+    #expect(animated.damage == nil)
+    #expect(animated.barriers == [.animationInterpolationApplied])
+  }
+
+  @Test("an animation-overlay-decorated frame barriers before any diff")
+  func animationOverlayDecoratedFrameBarriers() throws {
+    let sceneIdentity = testIdentity("App", "scene")
+    let dirtyIdentity = testIdentity("App", "scene", "Layout[0]")
+
+    func tree(dirtyRow: Int) -> PlacedNode {
+      PlacedNode(
+        identity: sceneIdentity,
+        kind: .root,
+        bounds: .init(origin: .zero, size: .init(width: 20, height: 6)),
+        children: [
+          PlacedNode(
+            identity: dirtyIdentity,
+            kind: .view("Text"),
+            bounds: .init(origin: .init(x: 0, y: dirtyRow), size: .init(width: 20, height: 1))
+          )
+        ]
+      )
+    }
+
+    let previousPlaced = tree(dirtyRow: 1)
+    let currentPlaced = tree(dirtyRow: 2)
+
+    func plan(overlaySnapshot: PlacedAnimationOverlaySnapshot) -> FrameTailRasterReusePlan {
+      FrameTailPresentationDamageResolver.resolve(
+        rootIdentity: sceneIdentity,
+        placed: currentPlaced,
+        draw: Self.drawTree(from: currentPlaced),
+        retainedLayout: RetainedLayoutSession(
+          previousFrameIndex: RetainedFrameIndex(
+            frame: damageFrameArtifacts(placed: previousPlaced)
+          ),
+          invalidatedIdentities: [dirtyIdentity]
+        ),
+        previousDraw: Self.drawTree(from: previousPlaced),
+        previousSurfaceTopology: SurfaceTopologySignature(placedRoot: previousPlaced),
+        animationOverlaySnapshot: overlaySnapshot
+      )
+    }
+
+    let control = plan(overlaySnapshot: .init())
+    #expect(control.barriers.isEmpty)
+    #expect(control.damage != nil)
+
+    let decorated = plan(
+      overlaySnapshot: .init(
+        insertionOffsets: [.init(identity: dirtyIdentity, dx: 0, dy: 1)]
+      )
+    )
+    #expect(decorated.damage == nil)
+    #expect(decorated.barriers == [.animationOverlayDecorated])
+  }
 }
 
 // MARK: - Shared fixture support

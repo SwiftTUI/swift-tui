@@ -357,7 +357,9 @@ extension DrawNode {
   /// much larger) slot: the ancestor is walked into, not painted over.
   ///
   /// Mirrors the stored properties minus `children` and the derived subtree
-  /// aggregates; keep the two in step.
+  /// aggregates; keep the two in step. `DrawNodePaintProjectionTotalityTests`
+  /// fails on any stored field that is neither compared here nor explicitly
+  /// exempted there.
   package func paintProjectionEquals(
     _ other: DrawNode
   ) -> Bool {

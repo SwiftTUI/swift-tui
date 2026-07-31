@@ -144,6 +144,84 @@ struct PlacedNodeMirrorTotalityTests {
   }
 }
 
+/// The same lock, for `DrawNode`'s one hand-maintained mirror.
+///
+/// `paintProjectionEquals` is the incremental-damage diff's per-node change
+/// detector: two draw nodes that agree there are assumed to paint identical
+/// cells, so their rows can be *reused* from the previous surface. A stored
+/// field that is raster-relevant but missing from the projection under-damages
+/// silently — the synthesized `==` still differs, so the diff walk descends,
+/// but the node's own slot is declared clean. Under release's
+/// `.trustSoundDamage` policy that ships as stale cells; the DEBUG verify
+/// oracle only catches it if some suite happens to exercise the new field on
+/// an incremental frame. This suite forces the classification decision at the
+/// moment the field is added instead.
+@Suite("DrawNode paint-projection totality")
+struct DrawNodePaintProjectionTotalityTests {
+  private static let drawTreeTypesPath = "Sources/SwiftTUICore/Draw/DrawTreeTypes.swift"
+
+  /// Stored fields the projection deliberately does NOT compare, each with the
+  /// reason. A field missing from both the projection body and this manifest
+  /// fails the totality test.
+  private static let exemptions: [String: String] = [
+    "viewNodeID":
+      "runtime node stamp — the raster layer never reads it (rasterization consumes geometry, "
+      + "commands, and style), so a re-minted node with byte-identical content paints identically",
+    "children":
+      "the projection is defined as \"this node ignoring its children\" — the damage diff pairs "
+      + "and walks children itself",
+    "subtreeNodeCount":
+      "derived aggregate recomputed by the children didSet; nothing about it paints",
+    "subtreeBounds":
+      "derived aggregate recomputed by the children didSet — the diff reads it directly for "
+      + "re-keyed, departed, and arrived subtrees, and per-node comparison covers bounds",
+  ]
+
+  private func drawNodeFieldNames() throws -> [String] {
+    try parsedStoredVarNames(
+      typeKind: "struct",
+      typeName: "DrawNode",
+      relativePath: Self.drawTreeTypesPath
+    )
+  }
+
+  @Test("every stored field is compared by the projection or explicitly exempted")
+  func projectionIsFieldTotal() throws {
+    let fields = try drawNodeFieldNames()
+    #expect(Set(fields).count == fields.count)
+    #expect(fields.count >= 10, "parser found implausibly few stored fields: \(fields)")
+    #expect(fields.contains("postCommands"), "parser lost the post-child command list")
+
+    let source = try sourceText(relativePath: Self.drawTreeTypesPath)
+    let body = functionBodyText(named: "paintProjectionEquals", in: source)
+    #expect(!body.isEmpty, "could not locate paintProjectionEquals in \(Self.drawTreeTypesPath)")
+
+    for field in fields {
+      let mentioned = body.contains(field)
+      let isExempt = Self.exemptions[field] != nil
+      #expect(
+        mentioned || isExempt,
+        "paintProjectionEquals neither compares nor exempts DrawNode.\(field) — classify the field: compare it, or add it to this suite's exemption manifest with a reason."
+      )
+      #expect(
+        !(mentioned && isExempt),
+        "paintProjectionEquals both compares and exempts DrawNode.\(field) — the manifest has drifted from the projection; remove the stale exemption."
+      )
+    }
+  }
+
+  @Test("exemption manifest only names real stored fields (no stale entries)")
+  func exemptionManifestNamesRealFields() throws {
+    let fields = Set(try drawNodeFieldNames())
+    for field in Self.exemptions.keys {
+      #expect(
+        fields.contains(field),
+        "the manifest exempts '\(field)', which is not a stored DrawNode field — remove or rename the entry."
+      )
+    }
+  }
+}
+
 // MARK: - File-private source parsing (SourceParsingTestSupport pattern)
 
 private func parsedStoredVarNames(

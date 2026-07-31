@@ -17,22 +17,29 @@ enum FrameTailPresentationDamageResolver {
     animationRedrawIdentities: Set<Identity> = [],
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot = .init()
   ) -> FrameTailRasterReusePlan {
-    // Every relaxation below rests on `directlyInvalidated` being the complete
-    // set of identities whose painted output changed. Animation breaks that
-    // premise twice over, in both cases *after* invalidation was computed:
+    // The draw-tree diff below rests on two premises: the previous surface is
+    // exactly the raster of `previousDraw` (the retained-products gate in
+    // `FrameTailRetainedState` stores that tree only when the effective placed
+    // tree byte-matches the baseline), and the current draw tree completely
+    // reflects everything this frame paints. Animation stresses both, in both
+    // cases *after* invalidation was computed:
     //
     //  - property interpolation rewrites values in the already-resolved tree
-    //    (`AnimationInjectionStage`), so an animating node repaints with its
-    //    identity absent from `directlyInvalidated`;
-    //  - the placed overlay snapshot decorates the current placed tree with
-    //    removal snapshots and insertion/matched-geometry offsets that the
-    //    retained *baseline* placed tree does not carry.
+    //    (`AnimationInjectionStage`), so what this frame paints depends on
+    //    stages the retained-reuse machinery never saw as changes;
+    //  - the placed overlay snapshot decorates the placed tree ahead of draw
+    //    extraction with removal snapshots and insertion/matched-geometry
+    //    offsets that the retained *baseline* placed tree does not carry.
     //
-    // Both are conservative barriers rather than damage contributions: an
-    // incomplete "damage is complete" answer is release-only corruption under
-    // `.trustSoundDamage`. Damaging the redraw identities' subtree extents
-    // instead would keep animating frames on the incremental path, but only if
-    // that set is provably exhaustive — which is a separate piece of work.
+    // The products gate already withholds `previousDraw` on the frame *after*
+    // an animated one, so barriering the animated frame itself costs at most
+    // one frame of reuse per animation and keeps this resolver's soundness
+    // argument local — no dependence on the extraction signature's sensitivity
+    // to interpolated values or on overlay application ordering. An incomplete
+    // "damage is complete" answer is release-only corruption under
+    // `.trustSoundDamage`, so putting animating frames back on the incremental
+    // path (e.g. damaging `redrawIdentities` subtree extents) must first prove
+    // those remote invariants, not merely that the redraw set is exhaustive.
     guard animationRedrawIdentities.isEmpty else {
       return .init(damage: nil, barriers: [.animationInterpolationApplied])
     }
