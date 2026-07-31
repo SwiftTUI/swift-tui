@@ -100,9 +100,28 @@ struct FrameTailInput {
   var rootIdentity: Identity
   var retained: FrameTailRetainedInput
   var layoutPassContext: LayoutPassContext
+  /// Identities whose rendered cells the head's animation-injection stage
+  /// rewrote *after* resolve, from ``AnimationTickResult/redrawIdentities``.
+  ///
+  /// These changes are invisible to `invalidatedIdentities`: interpolation
+  /// mutates the already-resolved tree, so an animating node's drawn output can
+  /// change with its identity absent from `directlyInvalidated`. The raster
+  /// reuse resolver's whole soundness argument rests on that set being the
+  /// complete set of changed identities, so a non-empty set here barriers.
+  var animationRedrawIdentities: Set<Identity> = []
 }
 
 struct FrameTailDiagnostics {
+  /// Which rasterizer path produced this frame's surface, and why damage
+  /// production barriered when it did.
+  ///
+  /// Institutionalized rather than reconstructed: the incremental tier was
+  /// dormant for the whole of its existence and nothing in the codebase could
+  /// say so — the TermUIPerf lanes checked in to prove it measured a flat zero,
+  /// and establishing that required hand-patching the rasterizer. Tests and the
+  /// perf harness now assert on this instead.
+  var rasterPath: Rasterizer.RasterPath
+  var rasterReuseBarriers: Set<FrameTailRasterReuseBarrier>
   var measureDuration: Duration
   var placeDuration: Duration
   var semanticsDuration: Duration
@@ -147,6 +166,7 @@ struct FrameTailDrawOutput {
 }
 
 struct FrameTailRasterOutput {
+  var path: Rasterizer.RasterPath
   var surface: RasterSurface
   var drawnIdentities: Set<Identity>
   var presentationDamage: PresentationDamage?

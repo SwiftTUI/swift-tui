@@ -229,7 +229,8 @@ SwiftTUICore.FrameDiagnosticInput.invalidatedIdentities
 SwiftTUICore.FrameDiagnosticInput.proposal
 SwiftTUICore.FrameDiagnosticPresentation
 SwiftTUICore.FrameDiagnosticPresentation.damage
-SwiftTUICore.FrameDiagnosticPresentation.init(damage:)
+SwiftTUICore.FrameDiagnosticPresentation.init(damage:rasterReuse:)
+SwiftTUICore.FrameDiagnosticPresentation.rasterReuse
 SwiftTUICore.FrameDiagnosticRuntime
 SwiftTUICore.FrameDiagnosticRuntime.init(registrations:issues:)
 SwiftTUICore.FrameDiagnosticRuntime.issues
@@ -352,6 +353,10 @@ SwiftTUICore.PresentationDamageDiagnostics.requiresFullTextRepaint
 SwiftTUICore.PresentationDamageDiagnostics.textCellCount
 SwiftTUICore.PresentationDamageDiagnostics.textRowCount
 SwiftTUICore.PresentationDamageDiagnostics.textSpanCount
+SwiftTUICore.RasterReuseDiagnostics
+SwiftTUICore.RasterReuseDiagnostics.barriers
+SwiftTUICore.RasterReuseDiagnostics.init(path:barriers:)
+SwiftTUICore.RasterReuseDiagnostics.path
 SwiftTUICore.RasterStyleRun
 SwiftTUICore.RasterStyleRun.init(x:y:length:style:)
 SwiftTUICore.RasterStyleRun.init(x:y:length:style:)
@@ -2376,6 +2381,8 @@ SwiftTUIRuntime.FrameDiagnosticRecord.presentationLinesTouched
 SwiftTUIRuntime.FrameDiagnosticRecord.presentationRecoveryAfterDrop
 SwiftTUIRuntime.FrameDiagnosticRecord.presentationStrategy
 SwiftTUIRuntime.FrameDiagnosticRecord.presentationUsedSynchronizedOutput
+SwiftTUIRuntime.FrameDiagnosticRecord.rasterPath
+SwiftTUIRuntime.FrameDiagnosticRecord.rasterReuseBarriers
 SwiftTUIRuntime.FrameDiagnosticRecord.renderGenerations
 SwiftTUIRuntime.FrameDiagnosticRecord.resolvedNodeCount
 SwiftTUIRuntime.FrameDiagnosticRecord.resolvedNodesComputed

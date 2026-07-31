@@ -158,8 +158,9 @@ struct DefaultRendererFrameHeadCoordinator {
     // instants and the later one won — invisible under the real clock, and a
     // guaranteed mismatch under a virtual one.
     let animationTimestamp = draft.animationTimestamp
+    var redrawIdentities: Set<Identity> = []
     elidedFrameTimingRecorder.measure(.animationTick) {
-      AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
+      redrawIdentities = AnimationInjectionStage(animationDraft: draft.animationDraft).apply(
         to: &resolved,
         transactionPlan: FrameAnimationTransactionPlan(
           base: draft.frameContext.transaction,
@@ -174,6 +175,10 @@ struct DefaultRendererFrameHeadCoordinator {
     }
 
     draft.resolved = resolved
+    // Injection rewrites already-resolved values, so the tail cannot infer
+    // these from `invalidatedIdentities`. Carry them so the raster reuse
+    // resolver can refuse to claim damage completeness on an animating frame.
+    draft.frameTailInput.animationRedrawIdentities = redrawIdentities
     // Worker-safe snapshotting of lazy indexed child sources is only needed
     // when the frame tail runs off-main. One-shot renders run the tail
     // synchronously on the main actor, so they skip it.
@@ -706,6 +711,9 @@ private struct PresentationPortalPreparation {
 private struct AnimationInjectionStage {
   var animationDraft: AnimationFrameDraft
 
+  /// Returns the identities whose rendered cells this injection rewrote, so
+  /// the frame tail can treat them as changed even though they never entered
+  /// `invalidatedIdentities`.
   @MainActor
   func apply(
     to resolved: inout ResolvedNode,
@@ -714,7 +722,7 @@ private struct AnimationInjectionStage {
     surfaceSize: CellSize?,
     resolvedNodesComputed: Int?,
     frameHeadTransaction: FrameHeadTransaction
-  ) {
+  ) -> Set<Identity> {
     let controller = animationDraft.controller
     frameHeadTransaction.measureHeadTiming(.animationProcessResolvedTree) {
       // A fully-reused resolve hands the controller a tree animation-process
@@ -735,13 +743,16 @@ private struct AnimationInjectionStage {
         )
       }
     }
+    var redrawIdentities: Set<Identity> = []
     frameHeadTransaction.measureHeadTiming(.animationApplyInterpolations) {
-      _ = controller.applyInterpolations(
-        to: &resolved,
-        at: timestamp,
-        surfaceSize: surfaceSize
-      )
+      redrawIdentities =
+        controller.applyInterpolations(
+          to: &resolved,
+          at: timestamp,
+          surfaceSize: surfaceSize
+        ).redrawIdentities
     }
+    return redrawIdentities
   }
 }
 

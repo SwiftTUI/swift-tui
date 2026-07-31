@@ -10,9 +10,36 @@ enum FrameTailPresentationDamageResolver {
   static func resolve(
     rootIdentity: Identity,
     placed: PlacedNode,
+    draw: DrawNode,
     retainedLayout: RetainedLayoutSession?,
-    previousSurfaceTopology: SurfaceTopologySignature?
+    previousDraw: DrawNode?,
+    previousSurfaceTopology: SurfaceTopologySignature?,
+    animationRedrawIdentities: Set<Identity> = [],
+    animationOverlaySnapshot: PlacedAnimationOverlaySnapshot = .init()
   ) -> FrameTailRasterReusePlan {
+    // Every relaxation below rests on `directlyInvalidated` being the complete
+    // set of identities whose painted output changed. Animation breaks that
+    // premise twice over, in both cases *after* invalidation was computed:
+    //
+    //  - property interpolation rewrites values in the already-resolved tree
+    //    (`AnimationInjectionStage`), so an animating node repaints with its
+    //    identity absent from `directlyInvalidated`;
+    //  - the placed overlay snapshot decorates the current placed tree with
+    //    removal snapshots and insertion/matched-geometry offsets that the
+    //    retained *baseline* placed tree does not carry.
+    //
+    // Both are conservative barriers rather than damage contributions: an
+    // incomplete "damage is complete" answer is release-only corruption under
+    // `.trustSoundDamage`. Damaging the redraw identities' subtree extents
+    // instead would keep animating frames on the incremental path, but only if
+    // that set is provably exhaustive — which is a separate piece of work.
+    guard animationRedrawIdentities.isEmpty else {
+      return .init(damage: nil, barriers: [.animationInterpolationApplied])
+    }
+    guard animationOverlaySnapshot.isEmpty else {
+      return .init(damage: nil, barriers: [.animationOverlayDecorated])
+    }
+
     let currentSurfaceTopology = SurfaceTopologySignature(placedRoot: placed)
     if currentSurfaceTopology.differs(from: previousSurfaceTopology) {
       // PROTOTYPE (opt-in via SWIFTTUI_OVERLAY_INCREMENTAL_DAMAGE): when the only
@@ -49,45 +76,51 @@ enum FrameTailPresentationDamageResolver {
       return .init(damage: nil, barriers: [.rootInvalidated])
     }
 
-    var currentPlacedByIdentity: [Identity: PlacedNode] = [:]
-    indexPlacedNodes(placed, into: &currentPlacedByIdentity)
+    // Damage is derived by diffing the previous committed *draw* tree against
+    // this frame's, NOT from `directlyInvalidated` and not from the placed
+    // trees.
+    //
+    // `directlyInvalidated` is the invalidation *seed* set — the identities
+    // whose state or observation changed. Re-resolution routinely changes what
+    // a node paints without that node being a seed: a sibling reading a derived
+    // value, an environment or preference propagation, a container relaying out
+    // around changed content. Keying damage on seed subtree extents under-reports,
+    // and an incomplete "damage is complete" answer is release-only corruption.
+    //
+    // The placed tree is not a sound basis either: draw extraction reuses
+    // retained subtrees (``RetainedPhaseExtractionProof``), so two frames with
+    // byte-identical placed subtrees can still emit different draw commands.
+    // The raster is a pure function of the draw tree, so diffing draw trees is
+    // sound by construction — it is the last product before the cells.
+    guard let previousDraw else {
+      return .init(damage: nil, barriers: [.missingRetainedFrame])
+    }
+    // Both trees' diffs are rooted together; a re-rooted tree has nothing to
+    // pair against. Topology-signature equality above should already imply
+    // this, but the resolver is a soundness gate and must not rely on another
+    // check's side effects.
+    guard previousDraw.identity == draw.identity else {
+      return .init(damage: nil, barriers: [.placedRootChanged])
+    }
+
+    let currentPlacedIndex = indexPlacedNodes(placed)
+    // G12: the identity-keyed retained tables collapse duplicate explicit ids
+    // last-writer-wins, so any consumer pairing "the" node for an identity can
+    // silently mix siblings. Duplicates already emit a deterministic
+    // `identity.duplicateEntity` `RuntimeIssue`, so barriering them costs
+    // nothing legitimate.
+    guard currentPlacedIndex.collidingIdentities.isEmpty,
+      previousFrameIndex.duplicateRuntimeIdentities.isEmpty
+    else {
+      return .init(damage: nil, barriers: [.duplicateInvalidatedIdentity])
+    }
 
     var textRowRanges: [Int: [Range<Int>]] = [:]
-    for identity in directlyInvalidated {
-      guard previousFrameIndex.resolvedNode(for: identity) != nil else {
-        return .init(damage: nil, barriers: [.unresolvedInvalidatedIdentity])
-      }
-      guard
-        let previousPath = previousFrameIndex.placedPath(to: identity),
-        let currentPath = placedPath(
-          to: identity,
-          in: currentPlacedByIdentity
-        )
-      else {
-        return .init(damage: nil, barriers: [.unresolvedInvalidatedIdentity])
-      }
-      guard
-        cleanSiblingBoundsAreStable(
-          previousPath: previousPath,
-          currentPath: currentPath
-        )
-      else {
-        return .init(damage: nil, barriers: [.unstableCleanSiblingBounds])
-      }
-
-      // Damage the invalidated node's *subtree* extent, not its own slot:
-      // `.offset`/`.position` bake their translation into the child's absolute
-      // bounds, so the rows the subtree actually paints (previously and now)
-      // can lie entirely outside the wrapper's own bounds. Producing only the
-      // slot rows shipped as a release-only ghost trail under
-      // `.trustSoundDamage` (F07); DEBUG's verify policy silently repaired it.
-      if let previousBounds = previousPath.last?.subtreeBounds {
-        textRows(for: previousBounds, into: &textRowRanges)
-      }
-      if let currentBounds = currentPath.last?.subtreeBounds {
-        textRows(for: currentBounds, into: &textRowRanges)
-      }
-    }
+    collectDrawTreeDamage(
+      previous: previousDraw,
+      current: draw,
+      into: &textRowRanges
+    )
 
     return .init(
       damage: PresentationDamage(
@@ -102,64 +135,144 @@ enum FrameTailPresentationDamageResolver {
     )
   }
 
-  private static func placedPath(
-    to identity: Identity,
-    in index: [Identity: PlacedNode]
-  ) -> [PlacedNode]? {
-    var identities: [Identity] = []
-    var currentIdentity: Identity? = identity
-
-    while let current = currentIdentity {
-      guard index[current] != nil else {
-        return nil
-      }
-      identities.append(current)
-      currentIdentity = current.parent
-    }
-
-    return identities.reversed().compactMap { index[$0] }
-  }
-
-  private static func cleanSiblingBoundsAreStable(
-    previousPath: [PlacedNode],
-    currentPath: [PlacedNode]
-  ) -> Bool {
-    guard previousPath.count == currentPath.count,
-      previousPath.count > 1
-    else {
-      return previousPath.count == currentPath.count
-    }
-
-    for index in previousPath.indices.dropLast() {
-      let previousAncestor = previousPath[index]
-      let currentAncestor = currentPath[index]
-      let dirtyChildIdentity = previousPath[index + 1].identity
-      let previousChildren = previousAncestor.children
-      let currentChildren = currentAncestor.children
-
-      guard previousChildren.map(\.identity) == currentChildren.map(\.identity) else {
-        return false
-      }
-
-      for (previousChild, currentChild) in zip(previousChildren, currentChildren)
-      where previousChild.identity != dirtyChildIdentity {
-        guard previousChild.bounds == currentChild.bounds else {
-          return false
-        }
-      }
-    }
-
-    return true
-  }
-
-  private static func indexPlacedNodes(
-    _ node: PlacedNode,
-    into storage: inout [Identity: PlacedNode]
+  /// Diffs the previous committed draw tree against this frame's and records
+  /// the rows every difference can repaint.
+  ///
+  /// The walk is *structural*: children are paired positionally and their
+  /// identities checked, never looked up in an identity index. Identity-keyed
+  /// pairing is not safe here — duplicate explicit ids collapse
+  /// last-writer-wins, and occurrence-qualified duplicates can swap which
+  /// sibling owns which identity between frames, both of which let a changed
+  /// node compare equal to a *different* node and vanish from the damage set.
+  ///
+  /// Whole-subtree equality prunes: an unchanged subtree costs one comparison
+  /// and contributes nothing. A node whose own projection is unchanged but
+  /// whose descendants differ is walked into rather than painted over, which is
+  /// what keeps a deep change from damaging every ancestor's slot up to the
+  /// full-surface root.
+  ///
+  /// Explicit stack, not recursion: draw trees are as deep as the authored view
+  /// hierarchy and the frame tail runs on 512 KiB Dispatch worker stacks.
+  private static func collectDrawTreeDamage(
+    previous previousRoot: DrawNode,
+    current currentRoot: DrawNode,
+    into textRowRanges: inout [Int: [Range<Int>]]
   ) {
-    storage[node.identity] = node
-    for child in node.children {
-      indexPlacedNodes(child, into: &storage)
+    var stack: [(previous: DrawNode, current: DrawNode)] = [(previousRoot, currentRoot)]
+
+    while let entry = stack.popLast() {
+      let previous = entry.previous
+      let current = entry.current
+      if previous == current {
+        continue
+      }
+      if !previous.paintProjectionEquals(current) {
+        damage(current.bounds, into: &textRowRanges)
+        damage(previous.bounds, into: &textRowRanges)
+      }
+
+      let pairedCount = min(previous.children.count, current.children.count)
+      for index in 0..<pairedCount {
+        let previousChild = previous.children[index]
+        let currentChild = current.children[index]
+        guard previousChild.identity == currentChild.identity else {
+          // A re-key at this slot: the two subtrees are unrelated, so both the
+          // ink that leaves and the ink that arrives has to be repainted.
+          damage(previousChild.subtreeBounds, into: &textRowRanges)
+          damage(currentChild.subtreeBounds, into: &textRowRanges)
+          continue
+        }
+        stack.append((previousChild, currentChild))
+      }
+      // Departed children paint nothing now, so their previous ink has to be
+      // erased explicitly; arrived children are all new ink.
+      for index in pairedCount..<previous.children.count {
+        damage(previous.children[index].subtreeBounds, into: &textRowRanges)
+      }
+      for index in pairedCount..<current.children.count {
+        damage(current.children[index].subtreeBounds, into: &textRowRanges)
+      }
     }
+  }
+
+  /// Records a changed rect, dilated by one cell on every side.
+  ///
+  /// A terminal cell is not the smallest unit this renderer paints: half-block
+  /// glyphs give it sub-cell resolution, and the cell that carries the half
+  /// block sits *outside* the region whose colour it shows. A panel's border
+  /// ring takes its background from the interior it encloses; a button's focus
+  /// fill shows through the boundary cell of the row below it. So a change
+  /// confined to a node's own bounds can repaint the cells immediately around
+  /// them, which damage derived from bounds alone misses — under release's
+  /// `.trustSoundDamage` policy that ships as a stale band beside every control
+  /// whose appearance changes. One cell is the whole reach: a half-block
+  /// painter reaches the adjacent cell, never further.
+  ///
+  /// Measured, not assumed: gating this margin on "is there border chrome
+  /// above me" left four scenarios in the full-suite F13 census still
+  /// diverging, every one of them exactly one row from a changed control fill
+  /// with no border node anywhere on the path.
+  private static func damage(
+    _ bounds: CellRect,
+    into textRowRanges: inout [Int: [Range<Int>]]
+  ) {
+    guard bounds.size.width > 0, bounds.size.height > 0 else {
+      return
+    }
+    textRows(
+      for: CellRect(
+        origin: .init(x: bounds.origin.x - 1, y: bounds.origin.y - 1),
+        size: .init(width: bounds.size.width + 2, height: bounds.size.height + 2)
+      ),
+      into: &textRowRanges
+    )
+  }
+
+  /// The current frame's placed tree, keyed by identity, together with the
+  /// tree's *real* parent edges.
+  ///
+  /// Ancestry is recorded here rather than derived from `Identity.parent`
+  /// because that projection is purely lexical: it drops the last path
+  /// component and terminates only at the empty identity. Deriving a placed
+  /// path from it both walks off the top of the placed tree — a real app roots
+  /// its placed tree at the window content, so `App` and `(root)` are
+  /// identities that never own a `PlacedNode` — and fails whenever a placed
+  /// child's identity extends its placed parent's by more than one component
+  /// (explicit ids and indexed components both make that shape reachable).
+  private struct CurrentPlacedIndex {
+    var rootIdentity: Identity
+    var nodesByIdentity: [Identity: PlacedNode] = [:]
+    var parentByIdentity: [Identity: Identity] = [:]
+    /// Identities indexed more than once. Storage is last-writer-wins, so a
+    /// path crossing one of these can silently mix nodes from different
+    /// siblings; the resolver barriers instead.
+    var collidingIdentities: Set<Identity> = []
+  }
+
+  /// Climbs recorded placed-tree edges from `identity` up to the placed root.
+  ///
+  /// Returns `nil` when the identity is not placed or any hop is missing, which
+  /// keeps the resolver conservative for genuinely unplaced subtrees.
+  private static func indexPlacedNodes(
+    _ root: PlacedNode
+  ) -> CurrentPlacedIndex {
+    var index = CurrentPlacedIndex(rootIdentity: root.identity)
+    var stack: [(node: PlacedNode, parent: Identity?)] = [(root, nil)]
+
+    while let entry = stack.popLast() {
+      let identity = entry.node.identity
+      if index.nodesByIdentity.updateValue(entry.node, forKey: identity) != nil {
+        index.collidingIdentities.insert(identity)
+      }
+      if let parent = entry.parent {
+        index.parentByIdentity[identity] = parent
+      }
+      for child in entry.node.children.reversed() {
+        stack.append((child, identity))
+      }
+    }
+
+    return index
   }
 
   private static func textRows(
@@ -266,12 +379,11 @@ enum FrameTailPresentationDamageResolver {
     guard !directlyInvalidated.contains(rootIdentity) else {
       return nil
     }
-    var currentPlacedByIdentity: [Identity: PlacedNode] = [:]
-    indexPlacedNodes(placed, into: &currentPlacedByIdentity)
+    let currentPlacedIndex = indexPlacedNodes(placed)
     for identity in directlyInvalidated {
       // Subtree extent, not own slot — same offset/position translation
       // reasoning as the stable-topology path above (F07).
-      if let current = currentPlacedByIdentity[identity] {
+      if let current = currentPlacedIndex.nodesByIdentity[identity] {
         addRows(current.subtreeBounds, into: &dirtyRows)
       }
       if let previous = previousFrameIndex.placedNode(for: identity) {
@@ -346,11 +458,24 @@ struct FrameTailRasterReusePlan: Sendable {
   var barriers: Set<FrameTailRasterReuseBarrier>
 }
 
-enum FrameTailRasterReuseBarrier: Hashable, Sendable {
-  case missingRetainedFrame
-  case rootInvalidated
-  case emptyInvalidation
-  case unresolvedInvalidatedIdentity
-  case unstableCleanSiblingBounds
-  case surfaceTopologyChanged
+enum FrameTailRasterReuseBarrier: String, Hashable, Sendable, CaseIterable {
+  case missingRetainedFrame = "missing_retained_frame"
+  case rootInvalidated = "root_invalidated"
+  case emptyInvalidation = "empty_invalidation"
+  case unresolvedInvalidatedIdentity = "unresolved_invalidated_identity"
+  case unstableCleanSiblingBounds = "unstable_clean_sibling_bounds"
+  case surfaceTopologyChanged = "surface_topology_changed"
+  /// The previous frame's placed tree was rooted at a different identity, so
+  /// the two placed paths are not comparable.
+  case placedRootChanged = "placed_root_changed"
+  /// An identity on one of the placed paths resolved to more than one node, so
+  /// the path may mix nodes from different duplicate siblings.
+  case duplicateInvalidatedIdentity = "duplicate_invalidated_identity"
+  /// The head's animation-injection stage rewrote resolved values after
+  /// invalidation was computed, so `directlyInvalidated` is not the complete
+  /// set of identities that repaint this frame.
+  case animationInterpolationApplied = "animation_interpolation_applied"
+  /// The current placed tree carries animation overlay decoration that the
+  /// retained baseline placed tree does not.
+  case animationOverlayDecorated = "animation_overlay_decorated"
 }

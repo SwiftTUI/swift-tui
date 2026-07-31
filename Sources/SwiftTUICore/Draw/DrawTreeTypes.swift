@@ -347,3 +347,27 @@ package struct DrawNode: Equatable, Sendable {
     subtreeBounds = extent
   }
 }
+
+extension DrawNode {
+  /// Whether two draw nodes paint identically *ignoring their children*.
+  ///
+  /// Rasterization is a pure function of the draw tree, so two nodes that agree
+  /// here write the same cells. The incremental-damage producer uses this to
+  /// keep an ancestor of a changed descendant from damaging its own (typically
+  /// much larger) slot: the ancestor is walked into, not painted over.
+  ///
+  /// Mirrors the stored properties minus `children` and the derived subtree
+  /// aggregates; keep the two in step.
+  package func paintProjectionEquals(
+    _ other: DrawNode
+  ) -> Bool {
+    identity == other.identity
+      && bounds == other.bounds
+      && clipBounds == other.clipBounds
+      && metadata == other.metadata
+      && drawEffects == other.drawEffects
+      && commands == other.commands
+      && postCommands == other.postCommands
+      && environmentSnapshot == other.environmentSnapshot
+  }
+}

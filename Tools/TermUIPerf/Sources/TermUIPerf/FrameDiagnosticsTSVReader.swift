@@ -116,7 +116,9 @@ enum PerfFrameDiagnosticsTSVReader {
         tailJobState: string("tail_job_state", fields, column, default: "completed"),
         staleFramePolicy: string("stale_frame_policy", fields, column, default: "commit_ordered"),
         dropDecision: string("drop_decision", fields, column, default: "commit_ordered"),
-        cancelledRenderCount: int("cancelled_render_count", fields, column)
+        cancelledRenderCount: int("cancelled_render_count", fields, column),
+        rasterPath: string("raster_path", fields, column, default: "-"),
+        rasterReuseBarriers: string("raster_reuse_barriers", fields, column, default: "-")
       )
     }
   }

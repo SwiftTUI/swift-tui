@@ -21,19 +21,32 @@ import Observation
 /// A/B: HEAD vs the span-culling change. The gradient style is deliberate — it
 /// makes the avoided per-cluster work large enough to read above frame noise.
 ///
-/// **Known dormant at the pin this scenario landed on.** Measured 2026-07-30:
-/// this lane reports *no* difference across the span-cull A/B, because the
-/// runtime never reaches the incremental rasterizer at all. Every frame in
-/// every TermUIPerf scenario (this one, `synthetic-narrow-invalidation`,
-/// `canvas-partial-reuse`, `synthetic-observable-fanout`) barriers out of
-/// damage production with `unresolvedInvalidatedIdentity`: the invalidated
-/// identity resolves as a `ResolvedNode` but `placedPath(to:)` finds it in
-/// neither the previous frame index nor the current placed tree, so
-/// `FrameTailPresentationDamageResolver` returns `damage: nil` and the tail
-/// takes the fresh-raster path. Fixing that is damage *production* — an
-/// explicit non-goal of the D70 plan — so the cull is instead proven at the
-/// rasterizer boundary by `DirtyRowSpanCullingTests`. This lane stays checked
-/// in and becomes the end-to-end proof the moment that barrier is closed.
+/// **Was dormant; live since 2026-07-30.** For the whole of this lane's
+/// existence it reported *no* difference across the span-cull A/B, because the
+/// runtime never reached the incremental rasterizer at all: every frame of
+/// every scenario barriered out of damage production, so
+/// `FrameTailPresentationDamageResolver` returned `damage: nil` and the tail
+/// took the fresh-raster path. Two things were wrong — `placedPath` climbed the
+/// purely lexical `Identity.parent` chain and so ran off the top of any real
+/// app's placed tree, and the damage model itself keyed on the subtree extents
+/// of `directlyInvalidated`, which is the invalidation *seed* set rather than
+/// the set of identities whose painted output changed. Damage is now derived by
+/// diffing the previous committed draw tree against the current one.
+///
+/// Measured on this lane the day that landed (release, `--iterations 1`,
+/// 80x40, 36 body rows), `worker_raster_compute_ms` p50:
+///
+/// | | before | after |
+/// | --- | --- | --- |
+/// | `synthetic-disjoint-damage` | 6.29 ms | **0.57 ms** |
+/// | `synthetic-narrow-invalidation` | 1.08 ms | **0.54 ms** |
+///
+/// with 16 of 17 committed frames rasterizing incrementally (the one exception
+/// is the first frame, which has no previous surface) and zero frames repaired
+/// by the F13 verification oracle. `summary.json` reports
+/// `incremental_raster_frame_count`, `repaired_incremental_raster_frame_count`,
+/// and `raster_reuse_barrier_counts` so this lane can never silently go dormant
+/// again.
 ///
 /// The static-body row count follows the terminal, but
 /// `SWIFTTUI_PERF_DISJOINT_DAMAGE_BODY_ROWS` overrides it to sweep the spread

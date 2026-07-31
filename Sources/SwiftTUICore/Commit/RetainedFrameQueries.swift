@@ -30,6 +30,27 @@ package struct RetainedFrameIndex: Sendable {
   fileprivate let resolvedStructuralIndex: [Identity: ResolvedNode]
   fileprivate let measuredStructuralIndex: [Identity: MeasuredNode]
   fileprivate let placedStructuralIndex: [Identity: PlacedNode]
+  /// The frame's placed tree. `PlacedNode` carries its whole subtree, so this
+  /// is the previous frame's placed root and, transitively, every placed node —
+  /// the diff basis the incremental-damage producer walks. Holding it costs
+  /// nothing beyond the reference the index's structural map already retains.
+  package let placedRoot: PlacedNode
+  /// The identity of the frame's placed root — the node ``placedPath(to:)``
+  /// terminates at.
+  package var placedRootIdentity: Identity {
+    placedRoot.identity
+  }
+  /// Real parent edges of the placed tree, child identity → placed parent
+  /// identity.
+  ///
+  /// Ancestry is recorded during the indexing walk rather than derived from
+  /// `StructuralPath.parent`, which is purely lexical: it drops the last path
+  /// component and terminates only at the empty identity. A lexical climb
+  /// walks off the top of the placed tree (a real app roots its placed tree at
+  /// the window content, so the app/scene identities above it never own a
+  /// `PlacedNode`) and also breaks whenever a placed child's identity extends
+  /// its placed parent's by more than one component.
+  private let placedParentByStructuralIdentity: [Identity: Identity]
   private let placedFrameEntries: [PlacedFrameTableEntry]
   private let placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>]
   private let placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>]
@@ -57,19 +78,24 @@ package struct RetainedFrameIndex: Sendable {
 
     var placedByNodeID: [ViewNodeID: PlacedNode] = [:]
     var placedStructuralIndex: [Identity: PlacedNode] = [:]
+    var placedParentByStructuralIdentity: [Identity: Identity] = [:]
     var placedFrameEntries: [PlacedFrameTableEntry] = []
     var placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>] = [:]
     var placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>] = [:]
     Self.index(
       frame.placedTree,
+      parent: nil,
       into: &placedByNodeID,
       structuralIndex: &placedStructuralIndex,
+      parentStructuralIndex: &placedParentByStructuralIdentity,
       placedFrameEntries: &placedFrameEntries,
       placedFrameEntryRangesByNodeID: &placedFrameEntryRangesByNodeID,
       placedFrameEntryRangesByStructuralIdentity: &placedFrameEntryRangesByStructuralIdentity
     )
     self.placedByNodeID = placedByNodeID
     self.placedStructuralIndex = placedStructuralIndex
+    self.placedRoot = frame.placedTree
+    self.placedParentByStructuralIdentity = placedParentByStructuralIdentity
     self.placedFrameEntries = placedFrameEntries
     self.placedFrameEntryRangesByNodeID = placedFrameEntryRangesByNodeID
     self.placedFrameEntryRangesByStructuralIdentity =
@@ -116,6 +142,8 @@ package struct RetainedFrameIndex: Sendable {
       && resolvedStructuralIndex == other.resolvedStructuralIndex
       && measuredStructuralIndex == other.measuredStructuralIndex
       && placedStructuralIndex == other.placedStructuralIndex
+      && placedRoot == other.placedRoot
+      && placedParentByStructuralIdentity == other.placedParentByStructuralIdentity
       && placedFrameEntries == other.placedFrameEntries
       && placedFrameEntryRangesByNodeID == other.placedFrameEntryRangesByNodeID
       && placedFrameEntryRangesByStructuralIdentity
@@ -163,21 +191,38 @@ package struct RetainedFrameIndex: Sendable {
     placedStructuralIndex[identity]
   }
 
+  /// Climbs recorded placed-tree edges from `identity` up to the placed root.
+  ///
+  /// Returns `nil` when the identity is not placed or any hop is missing, so
+  /// the damage resolver stays conservative for genuinely unplaced subtrees.
   package func placedPath(
     to identity: Identity
   ) -> [PlacedNode]? {
-    var identities: [Identity] = []
-    var currentIdentity: Identity? = identity
+    var reversedPath: [PlacedNode] = []
+    var current = identity
 
-    while let current = currentIdentity {
-      guard placedStructuralIndex[current] != nil else {
+    while true {
+      guard let node = placedStructuralIndex[current] else {
         return nil
       }
-      identities.append(current)
-      currentIdentity = StructuralPath(identity: current).parent?.identityProjection
+      reversedPath.append(node)
+      if current == placedRootIdentity {
+        break
+      }
+      guard let parent = placedParentByStructuralIdentity[current] else {
+        return nil
+      }
+      // Duplicate explicit ids collapse last-writer-wins, which can in
+      // principle point an identity at one of its own descendants. Bounding by
+      // the node count keeps the climb terminating; ``duplicateRuntimeIdentities``
+      // is what lets the damage resolver reject such a frame outright.
+      guard reversedPath.count <= placedStructuralIndex.count else {
+        return nil
+      }
+      current = parent
     }
 
-    return identities.reversed().compactMap { placedStructuralIndex[$0] }
+    return reversedPath.reversed()
   }
 
   package func placedFrameFragment(
@@ -219,8 +264,10 @@ package struct RetainedFrameIndex: Sendable {
 
   private static func index(
     _ node: PlacedNode,
+    parent: Identity?,
     into storage: inout [ViewNodeID: PlacedNode],
     structuralIndex: inout [Identity: PlacedNode],
+    parentStructuralIndex: inout [Identity: Identity],
     placedFrameEntries: inout [PlacedFrameTableEntry],
     placedFrameEntryRangesByNodeID: inout [ViewNodeID: Range<Int>],
     placedFrameEntryRangesByStructuralIdentity: inout [Identity: Range<Int>]
@@ -230,6 +277,9 @@ package struct RetainedFrameIndex: Sendable {
       storage[viewNodeID] = node
     }
     structuralIndex[node.identity] = node
+    if let parent {
+      parentStructuralIndex[node.identity] = parent
+    }
     placedFrameEntries.append(
       .init(
         viewNodeID: node.viewNodeID,
@@ -241,8 +291,10 @@ package struct RetainedFrameIndex: Sendable {
     for child in node.children {
       index(
         child,
+        parent: node.identity,
         into: &storage,
         structuralIndex: &structuralIndex,
+        parentStructuralIndex: &parentStructuralIndex,
         placedFrameEntries: &placedFrameEntries,
         placedFrameEntryRangesByNodeID: &placedFrameEntryRangesByNodeID,
         placedFrameEntryRangesByStructuralIdentity: &placedFrameEntryRangesByStructuralIdentity
@@ -509,5 +561,3 @@ package struct RetainedLayoutSession: Sendable {
     invalidationSummary.affectsIndexedChildSource(within: identity)
   }
 }
-
-

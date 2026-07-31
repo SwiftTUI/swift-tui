@@ -301,7 +301,8 @@ struct LatePreferenceReconciliationStage {
       layoutPassContext: LayoutPassContext(
         retainedLayout: input.retained.retainedLayout,
         invalidatedIdentities: input.layoutPassContext.invalidatedIdentities
-      )
+      ),
+      animationRedrawIdentities: input.animationRedrawIdentities
     )
   }
 }

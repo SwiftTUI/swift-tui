@@ -365,10 +365,27 @@ private func framePipelineArtifacts(
   }
 
   func draw(_ node: FramePipelineArtifactNode) -> DrawNode {
-    DrawNode(
+    // Carry the text payload into a paint command: damage is diffed from the
+    // draw tree, and a fixture whose draw nodes drop their content cannot
+    // express a content-only change.
+    var commands: [DrawCommand] = []
+    if case .text(let content) = node.drawPayload {
+      commands.append(
+        .text(
+          bounds: node.bounds,
+          content: content,
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      )
+    }
+    return DrawNode(
       viewNodeID: node.viewNodeID,
       identity: node.identity,
       bounds: node.bounds,
+      commands: commands,
       children: node.children.map(draw)
     )
   }
@@ -1642,18 +1659,25 @@ extension FrameworkStressFramePipelineTests {
     let plan = FrameTailPresentationDamageResolver.resolve(
       rootIdentity: rootIdentity,
       placed: current.placedTree,
+      draw: current.drawTree,
       retainedLayout: retained.retainedLayout,
+      previousDraw: previous.drawTree,
       previousSurfaceTopology: retained.previousSurfaceTopology
     )
     let damage = try #require(plan.damage)
 
     #expect(plan.barriers.isEmpty)
+    // The dirty subtree's old (2,1 4x2) and new (7,4 3x2) extents, each with
+    // the one-cell margin the renderer's half-block painters reach into.
     #expect(
       damage.textRows == [
-        .init(row: 1, columnRanges: [2..<6]),
-        .init(row: 2, columnRanges: [2..<6]),
-        .init(row: 4, columnRanges: [7..<10]),
-        .init(row: 5, columnRanges: [7..<10]),
+        .init(row: 0, columnRanges: [1..<7]),
+        .init(row: 1, columnRanges: [1..<7]),
+        .init(row: 2, columnRanges: [1..<7]),
+        .init(row: 3, columnRanges: [1..<11]),
+        .init(row: 4, columnRanges: [6..<11]),
+        .init(row: 5, columnRanges: [6..<11]),
+        .init(row: 6, columnRanges: [6..<11]),
       ]
     )
   }
@@ -1717,20 +1741,26 @@ extension FrameworkStressFramePipelineTests {
     let plan = FrameTailPresentationDamageResolver.resolve(
       rootIdentity: rootIdentity,
       placed: current.placedTree,
+      draw: current.drawTree,
       retainedLayout: retained.retainedLayout,
+      previousDraw: previous.drawTree,
       previousSurfaceTopology: retained.previousSurfaceTopology
     )
     let damage = try #require(plan.damage)
 
     #expect(plan.barriers.isEmpty)
+    // Both dirty siblings' extents plus their one-cell margins, unioned and
+    // normalized: overlapping spans on a row must merge into one range.
     #expect(
       damage.textRows == [
-        .init(row: 1, columnRanges: [1..<6]),
-        .init(row: 2, columnRanges: [1..<9]),
-        .init(row: 3, columnRanges: [4..<9]),
+        .init(row: 0, columnRanges: [0..<7]),
+        .init(row: 1, columnRanges: [0..<10]),
+        .init(row: 2, columnRanges: [0..<10]),
+        .init(row: 3, columnRanges: [0..<10]),
+        .init(row: 4, columnRanges: [3..<10]),
       ]
     )
-    #expect(damage.columnRanges(for: 2) == [1..<9])
+    #expect(damage.columnRanges(for: 2) == [0..<10])
   }
 }
 

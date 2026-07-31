@@ -48,6 +48,10 @@ extension CommittedFrameArtifactBuilder {
       dropEligibilityBlockers: dropEligibilityBlockers
     )
     diagnostics.runtime.registrations = input.runtimeRegistrationDiagnostics
+    diagnostics.presentation.rasterReuse = .init(
+      path: input.tail.diagnostics.rasterPath.rawValue,
+      barriers: input.tail.diagnostics.rasterReuseBarriers.map(\.rawValue).sorted()
+    )
     return diagnostics
   }
 

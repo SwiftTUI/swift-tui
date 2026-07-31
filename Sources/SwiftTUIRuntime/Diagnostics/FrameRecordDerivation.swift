@@ -131,6 +131,8 @@ package enum FrameRecordDerivation {
       elidedAnimationCommitDuration: nil,
       elidedCommitDuration: nil
     )
+    record.rasterPath = diag.presentation.rasterReuse?.path ?? "-"
+    record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers ?? []
     record.runtimePublicationMode = publication.publicationMode
     record.runtimeDirtyPlanResult = publication.dirtyPlanResult
     record.runtimePublicationSubtreeRootCount = publication.subtreeRootCount

@@ -109,6 +109,8 @@ package enum FrameDiagnosticsTSVFormatting {
     "present_bytes",
     "present_lines",
     "present_cells",
+    "raster_path",
+    "raster_reuse_barriers",
     "damage_rows",
     "damage_range_rows",
     "damage_spans",
@@ -314,6 +316,9 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.presentationBytesWritten),
       String(record.presentationLinesTouched),
       String(record.presentationCellsChanged),
+      record.rasterPath,
+      record.rasterReuseBarriers.isEmpty
+        ? "-" : record.rasterReuseBarriers.joined(separator: "+"),
       damageRows,
       damageRangeAwareRows,
       damageSpans,

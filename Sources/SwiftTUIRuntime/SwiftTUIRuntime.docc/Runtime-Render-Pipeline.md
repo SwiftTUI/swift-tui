@@ -275,6 +275,50 @@ Renderer-private reuse hints let the rasterizer reuse parts of the previous
 renderer-committed surface. They are inputs to frame-tail work, not a frontend
 contract.
 
+### How the reuse hint is produced
+
+`FrameTailPresentationDamageResolver` runs *after* draw extraction and derives
+damage by **diffing the previous committed draw tree against this frame's**. It
+walks both trees together, pairing children positionally and checking their
+identities, pruning wherever a subtree compares equal; where a node's own
+projection differs, or a child is inserted, removed, or re-keyed, the affected
+rects are recorded.
+
+Three properties are worth knowing, because each of them was learned the
+expensive way:
+
+- **The diff basis is the draw tree, not the placed tree and not the
+  invalidation set.** `directlyInvalidated` is the invalidation *seed* set — the
+  identities whose state or observation changed. Re-resolution routinely changes
+  what a node paints without that node being a seed (a sibling reading a derived
+  value, an environment or preference propagation, a container relaying out
+  around changed content), so damage keyed on seed subtree extents
+  under-reports. The placed tree is not a sound basis either: draw extraction
+  reuses retained subtrees, so two frames with byte-identical placed subtrees
+  can still emit different draw commands. Rasterization is a pure function of
+  the draw tree, which makes it the only sound basis.
+- **Every changed rect carries a one-cell margin.** A terminal cell is not the
+  smallest unit this renderer paints: half-block glyphs give it sub-cell
+  resolution, and the cell carrying the half block sits *outside* the region
+  whose colour it shows. A panel's border ring takes its background from the
+  interior it encloses; a control's focus fill shows through the boundary cell
+  of the adjacent row. A change confined to a node's bounds can therefore
+  repaint the cells immediately around them.
+- **Animation frames barrier.** Property interpolation rewrites the resolved
+  tree after invalidation is computed, and the placed animation overlay
+  decorates the current tree with state the retained baseline does not carry.
+  Both are conservative barriers rather than damage contributions, because an
+  incomplete "damage is complete" answer is release-only corruption under
+  `.trustSoundDamage`.
+
+A frame that produces no damage falls back to a fresh raster, so every relaxation
+is bounded by a conservative nil. `FrameDiagnostics.presentation.rasterReuse`
+reports which path each committed frame took and, when it barriered, why —
+`raster_path` and `raster_reuse_barriers` in the frame TSV. That reporting is
+not decoration: the whole incremental tier was unreachable from the day it
+landed until 2026-07-30, the perf lanes checked in to prove its win measured a
+flat zero, and nothing in the codebase could say so.
+
 Host-facing damage is derived by ``RunLoop`` against the previous
 `RasterSurface` actually presented to the same runtime/frontend pair. This
 derivation happens after frame acquisition because async artifacts can be

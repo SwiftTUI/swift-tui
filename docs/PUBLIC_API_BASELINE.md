@@ -18,7 +18,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 59 | 517 |
+| `SwiftTUIRuntime` | 59 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 276 | 1511 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
@@ -31,7 +31,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
-| `SwiftTUICore` | 39 | 267 |
+| `SwiftTUICore` | 40 | 272 |
 | `SwiftTUIPrimitives` | 167 | 1444 |
 | `SwiftTUIGraph` | 55 | 337 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
@@ -55,7 +55,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DefaultRenderer` — struct — 3 members
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 5 members
-- `FrameDiagnosticRecord` — struct — 85 members
+- `FrameDiagnosticRecord` — struct — 87 members
 - `HostedRasterSurface` — class — 14 members
 - `HostedSceneSession` — class — 11 members
 - `HostedSceneSessionError` — enum — 2 members
@@ -542,7 +542,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `FrameDiagnosticCounts` — struct — 9 members
 - `FrameDiagnosticDrop` — struct — 2 members
 - `FrameDiagnosticInput` — struct — 3 members
-- `FrameDiagnosticPresentation` — struct — 2 members
+- `FrameDiagnosticPresentation` — struct — 3 members
 - `FrameDiagnosticRuntime` — struct — 3 members
 - `FrameDiagnostics` — struct — 9 members
 - `FrameDiagnosticTiming` — struct — 6 members
@@ -571,6 +571,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TextLayoutLine` — struct — 4 members
 - `TextLayoutOptions` — struct — 5 members
 - `TextLayoutResult` — struct — 4 members
+
+### Package-only seams (1)
+
+- `RasterReuseDiagnostics` — struct — 3 members
 
 ## SwiftTUIPrimitives
 

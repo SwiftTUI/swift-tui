@@ -11,8 +11,27 @@ package struct Rasterizer: Sendable {
     surface: RasterSurface,
     visibleIdentities: Set<Identity>,
     presentationDamage: PresentationDamage?,
-    incrementalMismatch: IncrementalRasterMismatch?
+    incrementalMismatch: IncrementalRasterMismatch?,
+    /// Which path produced ``surface``. Institutionalized because the entire
+    /// incremental tier was dormant for the whole of its existence and nothing
+    /// in the codebase could say so: the four TermUIPerf scenarios checked in
+    /// to prove it measured a flat zero, and finding out required patching the
+    /// rasterizer by hand. Rides the result because the rasterizer may run on
+    /// the frame-tail worker.
+    path: RasterPath
   )
+
+  /// Which of the rasterizer's two paths produced a surface.
+  package enum RasterPath: String, Sendable, Equatable {
+    /// Painted from an empty surface.
+    case fresh
+    /// Reused the previous surface's clean rows and repainted only the damaged
+    /// ones.
+    case incremental
+    /// Took the incremental path, then the F13 verification oracle caught a
+    /// divergence and repaired it with a fresh raster.
+    case incrementalRepaired
+  }
 
   /// Evidence from the incremental-repaint verification oracle (F13): the
   /// incremental surface diverged from a fresh rasterization, meaning the
@@ -170,7 +189,7 @@ package struct Rasterizer: Sendable {
   ) -> RasterizationResult {
     let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
-      return (RasterSurface(), [], nil, nil)
+      return (RasterSurface(), [], nil, nil, .fresh)
     }
 
     if let previousSurface,
@@ -239,7 +258,8 @@ package struct Rasterizer: Sendable {
       ),
       visibleIdentities,
       nil,
-      nil
+      nil,
+      .fresh
     )
   }
 
@@ -303,11 +323,12 @@ package struct Rasterizer: Sendable {
       // incomplete, so the fresh result must force a full presentation repaint.
       // The `verifyIncrementalRasterDamage` path runs this same oracle on the
       // soundness probe's sampled release frames, not just DEBUG/env-forced ones.
-      if let freshFallback = freshRasterizationIfIncrementalMismatch(
+      if var freshFallback = freshRasterizationIfIncrementalMismatch(
         draw,
         surfaceSize: surfaceSize,
         incrementalSurface: surface
       ) {
+        freshFallback.path = .incrementalRepaired
         return freshFallback
       }
     }
@@ -320,7 +341,8 @@ package struct Rasterizer: Sendable {
         previousSurface: previousSurface,
         currentSurface: surface
       ),
-      nil
+      nil,
+      .incremental
     )
   }
 

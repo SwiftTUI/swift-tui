@@ -40,20 +40,26 @@ struct FrameTailPresentationDamageProducerTests {
     let plan = FrameTailPresentationDamageResolver.resolve(
       rootIdentity: rootIdentity,
       placed: currentPlaced,
+      draw: drawTree(from: currentPlaced),
       retainedLayout: RetainedLayoutSession(
         previousFrameIndex: RetainedFrameIndex(
           frame: frameArtifacts(placed: previousPlaced)
         ),
         invalidatedIdentities: [wrapperIdentity]
       ),
+      previousDraw: drawTree(from: previousPlaced),
       previousSurfaceTopology: SurfaceTopologySignature(placedRoot: previousPlaced)
     )
 
     #expect(plan.barriers.isEmpty)
     let dirtyRows = plan.damage?.dirtyRows ?? []
-    #expect(dirtyRows.contains(1), "the wrapper's own slot must stay damaged")
     #expect(dirtyRows.contains(10), "the subtree's previous rows must be erased")
     #expect(dirtyRows.contains(12), "the subtree's current rows must be painted")
+    // The wrapper's own slot (row 1) is deliberately NOT damaged: the wrapper's
+    // own paint projection is unchanged between the two frames, and the
+    // placed-tree diff damages what changed rather than the invalidated node's
+    // whole subtree. Damaging it was the seed-set producer's over-approximation.
+    #expect(!dirtyRows.contains(1))
   }
 
   @Test("a contained invalidated subtree damages exactly its own rows")
@@ -62,36 +68,47 @@ struct FrameTailPresentationDamageProducerTests {
     let wrapperIdentity = testIdentity("Wrapper")
     let contentIdentity = testIdentity("Wrapper", "Content")
 
-    // Content sits inside the wrapper's slot: subtree extent == own bounds,
-    // so the subtree-aware producer must not widen damage at all.
-    let placed = placedTree(
+    // Content sits inside the wrapper's slot, and only its width changes, so
+    // the producer must not widen damage past the row it paints and its
+    // one-cell half-block margin.
+    let previousPlaced = placedTree(
       rootIdentity: rootIdentity,
       wrapperIdentity: wrapperIdentity,
       contentIdentity: contentIdentity,
       contentRow: 1
     )
+    let currentPlaced = placedTree(
+      rootIdentity: rootIdentity,
+      wrapperIdentity: wrapperIdentity,
+      contentIdentity: contentIdentity,
+      contentRow: 1,
+      contentWidth: 12
+    )
 
     let plan = FrameTailPresentationDamageResolver.resolve(
       rootIdentity: rootIdentity,
-      placed: placed,
+      placed: currentPlaced,
+      draw: drawTree(from: currentPlaced),
       retainedLayout: RetainedLayoutSession(
         previousFrameIndex: RetainedFrameIndex(
-          frame: frameArtifacts(placed: placed)
+          frame: frameArtifacts(placed: previousPlaced)
         ),
         invalidatedIdentities: [wrapperIdentity]
       ),
-      previousSurfaceTopology: SurfaceTopologySignature(placedRoot: placed)
+      previousDraw: drawTree(from: previousPlaced),
+      previousSurfaceTopology: SurfaceTopologySignature(placedRoot: previousPlaced)
     )
 
     #expect(plan.barriers.isEmpty)
-    #expect(plan.damage?.dirtyRows == [1])
+    #expect(plan.damage?.dirtyRows == [0, 1, 2])
   }
 
   private func placedTree(
     rootIdentity: Identity,
     wrapperIdentity: Identity,
     contentIdentity: Identity,
-    contentRow: Int
+    contentRow: Int,
+    contentWidth: Int = 20
   ) -> PlacedNode {
     PlacedNode(
       identity: rootIdentity,
@@ -108,7 +125,7 @@ struct FrameTailPresentationDamageProducerTests {
               kind: .view("Text"),
               bounds: .init(
                 origin: .init(x: 0, y: contentRow),
-                size: .init(width: 20, height: 1)
+                size: .init(width: contentWidth, height: 1)
               )
             )
           ]

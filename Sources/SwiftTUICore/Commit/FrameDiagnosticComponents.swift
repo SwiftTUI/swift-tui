@@ -96,9 +96,41 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
 
 public struct FrameDiagnosticPresentation: Equatable, Sendable {
   public var damage: PresentationDamageDiagnostics?
+  /// Which rasterizer path this frame took, and why raster-reuse damage
+  /// production barriered when it did.
+  public var rasterReuse: RasterReuseDiagnostics?
 
-  public init(damage: PresentationDamageDiagnostics? = nil) {
+  public init(
+    damage: PresentationDamageDiagnostics? = nil,
+    rasterReuse: RasterReuseDiagnostics? = nil
+  ) {
     self.damage = damage
+    self.rasterReuse = rasterReuse
+  }
+}
+
+/// Whether a committed frame reached the incremental rasterizer, and what
+/// stopped it if not.
+///
+/// The incremental tier was unreachable for the whole of its existence and
+/// nothing in the codebase could report that: the perf lanes checked in to
+/// prove it measured a flat zero, and finding out required hand-patching the
+/// rasterizer. This makes the path a first-class frame diagnostic so tests and
+/// the perf harness assert on it instead.
+public struct RasterReuseDiagnostics: Equatable, Sendable {
+  /// `fresh`, `incremental`, or `incrementalRepaired` — the last meaning the
+  /// incremental surface diverged from a fresh raster and was repaired.
+  public var path: String
+  /// Sorted, stable tokens naming why damage production returned no damage.
+  /// Empty when damage was produced.
+  public var barriers: [String]
+
+  public init(
+    path: String,
+    barriers: [String] = []
+  ) {
+    self.path = path
+    self.barriers = barriers
   }
 }
 

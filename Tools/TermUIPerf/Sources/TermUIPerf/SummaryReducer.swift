@@ -32,6 +32,12 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var staleFramePolicy: String
   public var dropDecision: String
   public var cancelledRenderCount: Int
+  /// Which rasterizer path the frame took: `fresh`, `incremental`, or
+  /// `incrementalRepaired`. `-` for frames with no committed raster.
+  public var rasterPath: String
+  /// Why raster-reuse damage production barriered, `+`-joined; `-` when damage
+  /// was produced.
+  public var rasterReuseBarriers: String
 
   public init(
     frameNumber: Int,
@@ -64,7 +70,9 @@ public struct PerfFrameRecord: Equatable, Sendable {
     tailJobState: String = "completed",
     staleFramePolicy: String = "commit_ordered",
     dropDecision: String = "commit_ordered",
-    cancelledRenderCount: Int = 0
+    cancelledRenderCount: Int = 0,
+    rasterPath: String = "-",
+    rasterReuseBarriers: String = "-"
   ) {
     self.frameNumber = frameNumber
     self.presentedAtSeconds = presentedAtSeconds
@@ -97,6 +105,8 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.staleFramePolicy = staleFramePolicy
     self.dropDecision = dropDecision
     self.cancelledRenderCount = cancelledRenderCount
+    self.rasterPath = rasterPath
+    self.rasterReuseBarriers = rasterReuseBarriers
   }
 }
 
@@ -178,6 +188,17 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   public var elidedCommitRuntimeRegistrationsMs: PerfDistribution
   public var elidedAnimationCommitMs: PerfDistribution
   public var elidedCommitMs: PerfDistribution
+  /// Frames that reached the incremental rasterizer. This lane's headline
+  /// number: it was structurally zero for every scenario until the damage
+  /// producer was rebuilt, which is exactly why it is reported rather than
+  /// inferred from timings.
+  public var incrementalRasterFrameCount: Int
+  /// Frames whose incremental surface diverged from a fresh raster and had to
+  /// be repaired. Must be zero; any non-zero value is an under-damage bug that
+  /// ships as corruption in release.
+  public var repairedIncrementalRasterFrameCount: Int
+  /// Frames that took the fresh path, counted by the barrier that forced it.
+  public var rasterReuseBarrierCounts: [String: Int]
   public var completedDropCount: Int
   public var customLayoutFallbackCount: Int
   public var layoutDependentMainActorFallbackCount: Int
@@ -219,10 +240,16 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     elidedCommitRuntimeRegistrationsMs: PerfDistribution = PerfDistribution(values: []),
     elidedAnimationCommitMs: PerfDistribution = PerfDistribution(values: []),
     elidedCommitMs: PerfDistribution = PerfDistribution(values: []),
+    incrementalRasterFrameCount: Int = 0,
+    repairedIncrementalRasterFrameCount: Int = 0,
+    rasterReuseBarrierCounts: [String: Int] = [:],
     completedDropCount: Int,
     customLayoutFallbackCount: Int,
     layoutDependentMainActorFallbackCount: Int
   ) {
+    self.incrementalRasterFrameCount = incrementalRasterFrameCount
+    self.repairedIncrementalRasterFrameCount = repairedIncrementalRasterFrameCount
+    self.rasterReuseBarrierCounts = rasterReuseBarrierCounts
     self.scenario = scenario
     self.renderMode = renderMode
     self.iterationCount = iterationCount
@@ -302,6 +329,9 @@ public struct PerfSummary: Codable, Equatable, Sendable {
       "elided_commit_runtime_registrations_ms"
     case elidedAnimationCommitMs = "elided_animation_commit_ms"
     case elidedCommitMs = "elided_commit_ms"
+    case incrementalRasterFrameCount = "incremental_raster_frame_count"
+    case repairedIncrementalRasterFrameCount = "repaired_incremental_raster_frame_count"
+    case rasterReuseBarrierCounts = "raster_reuse_barrier_counts"
     case completedDropCount = "completed_drop_count"
     case customLayoutFallbackCount = "custom_layout_fallback_count"
     case layoutDependentMainActorFallbackCount = "layout_dependent_main_actor_fallback_count"
@@ -424,6 +454,18 @@ public struct PerfSummary: Codable, Equatable, Sendable {
         PerfDistribution.self,
         forKey: .elidedCommitMs
       ) ?? PerfDistribution(values: []),
+      incrementalRasterFrameCount: try container.decodeIfPresent(
+        Int.self,
+        forKey: .incrementalRasterFrameCount
+      ) ?? 0,
+      repairedIncrementalRasterFrameCount: try container.decodeIfPresent(
+        Int.self,
+        forKey: .repairedIncrementalRasterFrameCount
+      ) ?? 0,
+      rasterReuseBarrierCounts: try container.decodeIfPresent(
+        [String: Int].self,
+        forKey: .rasterReuseBarrierCounts
+      ) ?? [:],
       completedDropCount: try container.decode(Int.self, forKey: .completedDropCount),
       customLayoutFallbackCount: try container.decode(
         Int.self,
@@ -519,12 +561,29 @@ public enum SummaryReducer {
         values: frames.compactMap(\.elidedAnimationCommitMs)
       ),
       elidedCommitMs: PerfDistribution(values: frames.compactMap(\.elidedCommitMs)),
+      incrementalRasterFrameCount: frames.count { $0.rasterPath == "incremental" },
+      repairedIncrementalRasterFrameCount: frames.count {
+        $0.rasterPath == "incrementalRepaired"
+      },
+      rasterReuseBarrierCounts: rasterReuseBarrierCounts(frames),
       completedDropCount: completedDropCount(frames),
       customLayoutFallbackCount: frames.reduce(0) { $0 + $1.customLayoutFallbacks },
       layoutDependentMainActorFallbackCount: frames.reduce(0) {
         $0 + $1.layoutDependentMainActorFallbacks
       }
     )
+  }
+
+  private static func rasterReuseBarrierCounts(
+    _ frames: [PerfFrameRecord]
+  ) -> [String: Int] {
+    var counts: [String: Int] = [:]
+    for frame in frames where frame.rasterReuseBarriers != "-" {
+      for barrier in frame.rasterReuseBarriers.split(separator: "+") {
+        counts[String(barrier), default: 0] += 1
+      }
+    }
+    return counts
   }
 
   private static func inputToPresentLatencies(_ events: [PerfEventRecord]) -> [Double] {

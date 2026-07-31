@@ -93,6 +93,8 @@ public struct FrameDiagnosticRecord: Sendable {
   public var presentationLinesTouched: Int
   public var presentationCellsChanged: Int
   public var presentationDuration: Duration
+  public var rasterPath: String = "-"
+  public var rasterReuseBarriers: [String] = []
   public var damageRowCount: Int?
   public var damageRangeAwareRowCount: Int?
   public var damageTextSpanCount: Int?

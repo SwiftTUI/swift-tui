@@ -61,12 +61,6 @@ struct FrameTailInlineStageRenderer: Sendable {
     // draw, raster, and commit consumers. The retained layout baseline remains
     // `layout.baselinePlaced` and is the only placed tree stored for future
     // retained placement.
-    let rasterReusePlan = FrameTailPresentationDamageResolver.resolve(
-      rootIdentity: input.rootIdentity,
-      placed: placed,
-      retainedLayout: input.retained.retainedLayout,
-      previousSurfaceTopology: input.retained.previousSurfaceTopology
-    )
     let extractionProof = input.retained.phaseExtractionProof(
       for: input.proposal,
       placed: placed,
@@ -84,6 +78,20 @@ struct FrameTailInlineStageRenderer: Sendable {
       proof: extractionProof,
       clock: clock
     )
+    // Damage resolution runs *after* draw extraction, not before: draw
+    // extraction reuses retained subtrees, so the draw tree — not the placed
+    // tree — is the last product the raster is a pure function of, and the only
+    // sound diff basis.
+    let rasterReusePlan = FrameTailPresentationDamageResolver.resolve(
+      rootIdentity: input.rootIdentity,
+      placed: placed,
+      draw: draw.draw,
+      retainedLayout: input.retained.retainedLayout,
+      previousDraw: input.retained.previousPhaseProducts?.draw,
+      previousSurfaceTopology: input.retained.previousSurfaceTopology,
+      animationRedrawIdentities: input.animationRedrawIdentities,
+      animationOverlaySnapshot: animationOverlaySnapshot
+    )
     let raster = rasterizeDrawTree(
       input,
       draw: draw.draw,
@@ -93,6 +101,8 @@ struct FrameTailInlineStageRenderer: Sendable {
       beforeRaster: beforeRaster
     )
     let diagnostics = FrameTailDiagnostics(
+      rasterPath: raster.path,
+      rasterReuseBarriers: rasterReusePlan.barriers,
       measureDuration: layout.measureDuration,
       placeDuration: layout.placeDuration,
       semanticsDuration: semantics.duration,
@@ -187,6 +197,7 @@ struct FrameTailInlineStageRenderer: Sendable {
         current: rasterized.surface
       )
     return .init(
+      path: rasterized.path,
       surface: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,
       presentationDamage: finalPresentationDamage,
