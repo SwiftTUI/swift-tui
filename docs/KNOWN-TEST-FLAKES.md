@@ -371,6 +371,63 @@ loaded runner exercises it.
 
 ---
 
+### 10. `HostWireConformanceTests` — S3b detached-backlog discarded-chunk ORDER is scheduling-dependent
+
+**Signature.** `Run SwiftTUIAndroidHost tests` fails with exactly one issue:
+
+```
+conformance-websocket-detached-backlog.jsonl:step 15: exact observation mismatch
+  at .discardedInboundChunks[0].bytesBase64
+  actual:   "HmNhcHM6eyJhY2NlcHRzRGVsdGFGcmFtZXMiOnRydWV9Cg=="
+  expected: "HmNhcHM6eyJhY2NlcHRzRGVsdGE="
+```
+
+Note what the two values are: the "actual" at index `[0]` is the value the
+corpus expects at index `[2]`. This is a **reordering**, not corrupted
+content — every chunk is present, in the wrong order.
+
+**Mechanism.** `WebHostSceneChannel.discardedInboundChunks` is a plain array
+appended to from two different points: ingress (`receive`, reason
+`stale-at-ingress`) and consumption (reason `stale-at-consumption`). The
+corpus pins one exact interleaving of those two producers. When the
+consumption-side append lands after the ingress-side ones — which is a
+scheduling outcome, not a semantic one — the array order changes and the
+exact-observation comparison fails. The expectation is order-fragile by
+construction; nothing about the *bytes* is wrong.
+
+**Load-sensitive, and pre-existing.** Measured 2026-07-31 in the arm64 Linux
+container, `--filter HostWireConformanceTests`:
+
+| condition | pinned 0.4.5 tree (`7f4908ee`) | tree with WP-1 input stamping |
+| --- | --- | --- |
+| sequential, moderate load | 4 / 30 fail | 12 / 30 fail |
+| interleaved, heavy load | **40 / 40 fail** | **40 / 40 fail** |
+
+The interleaved run is the controlled one — both arms in one container,
+alternating, so load and time are shared. At 40/40 on **both**, the defect is
+plainly independent of any WP-1 change; the earlier 4-vs-12 split is sampling
+noise across two differently-loaded sessions, not a signal. A full head-mode
+container gate on an otherwise idle machine passes this lane, which is why the
+entry had gone unrecorded.
+
+**How to confirm it's this, not your change.** The mismatch path is
+`.discardedInboundChunks[N]` and every expected byte string appears somewhere
+in the actual array. If a chunk's *content* differs, or a chunk is missing
+entirely, it is not this entry. The cheap check is to run the filter against a
+pre-change tree under the same load — the rates above were obtained exactly
+that way.
+
+**How to investigate / candidate hardening.** Either make the expectation
+order-insensitive for entries that cannot be causally ordered (compare
+`discardedInboundChunks` as a multiset keyed by `(token, bytes, reason)`), or
+give the runner a deterministic drain point so consumption-side discards are
+always appended before the next ingress batch. The first is a fixture change
+and cheap; the second is the real fix and belongs with whoever owns the
+delivery-coupled wire epochs work. Do not "fix" it by re-recording the corpus
+against one lucky interleaving — that pins the flake instead of removing it.
+
+---
+
 ---
 
 ## Fixed flakes
