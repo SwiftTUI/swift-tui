@@ -90,6 +90,17 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   public var cpuSecondsPerDiagnosticFrame: PerfStat
   public var inputToPresentLatencyP95Ms: PerfStat
   public var frameIntervalP50Ms: PerfStat
+  /// Runtime-stamped arrival→commit for the oldest input each frame answered.
+  /// The scroll-latency headline, and the edge the gate watches: it is the
+  /// wait a user on a queued notch actually experiences, and unlike the newest
+  /// edge it moves when a backlog grows.
+  public var inputToCommitP50Ms: PerfStat
+  public var inputToCommitP95Ms: PerfStat
+  public var inputToCommitP99Ms: PerfStat
+  /// Bytes written per frame that moved the scene — the emission number the
+  /// program's mitigation tiers exist to reduce.
+  public var presentBytesPerMovingFrameMedian: PerfStat
+  public var pipelineP50Ms: PerfStat
   public var headPrepareP50Ms: PerfStat
   public var headGraphCheckpointCreateP50Ms: PerfStat
   public var headGraphCheckpointRestoreP50Ms: PerfStat
@@ -111,6 +122,11 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     cpuSecondsPerDiagnosticFrame: PerfStat,
     inputToPresentLatencyP95Ms: PerfStat,
     frameIntervalP50Ms: PerfStat,
+    inputToCommitP50Ms: PerfStat = PerfStat(values: []),
+    inputToCommitP95Ms: PerfStat = PerfStat(values: []),
+    inputToCommitP99Ms: PerfStat = PerfStat(values: []),
+    presentBytesPerMovingFrameMedian: PerfStat = PerfStat(values: []),
+    pipelineP50Ms: PerfStat = PerfStat(values: []),
     headPrepareP50Ms: PerfStat = PerfStat(values: []),
     headGraphCheckpointCreateP50Ms: PerfStat = PerfStat(values: []),
     headGraphCheckpointRestoreP50Ms: PerfStat = PerfStat(values: []),
@@ -131,6 +147,11 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.cpuSecondsPerDiagnosticFrame = cpuSecondsPerDiagnosticFrame
     self.inputToPresentLatencyP95Ms = inputToPresentLatencyP95Ms
     self.frameIntervalP50Ms = frameIntervalP50Ms
+    self.inputToCommitP50Ms = inputToCommitP50Ms
+    self.inputToCommitP95Ms = inputToCommitP95Ms
+    self.inputToCommitP99Ms = inputToCommitP99Ms
+    self.presentBytesPerMovingFrameMedian = presentBytesPerMovingFrameMedian
+    self.pipelineP50Ms = pipelineP50Ms
     self.headPrepareP50Ms = headPrepareP50Ms
     self.headGraphCheckpointCreateP50Ms = headGraphCheckpointCreateP50Ms
     self.headGraphCheckpointRestoreP50Ms = headGraphCheckpointRestoreP50Ms
@@ -153,6 +174,11 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case cpuSecondsPerDiagnosticFrame = "cpu_seconds_per_diagnostic_frame"
     case inputToPresentLatencyP95Ms = "input_to_present_latency_p95_ms"
     case frameIntervalP50Ms = "frame_interval_p50_ms"
+    case inputToCommitP50Ms = "input_to_commit_p50_ms"
+    case inputToCommitP95Ms = "input_to_commit_p95_ms"
+    case inputToCommitP99Ms = "input_to_commit_p99_ms"
+    case presentBytesPerMovingFrameMedian = "present_bytes_per_moving_frame_median"
+    case pipelineP50Ms = "pipeline_p50_ms"
     case headPrepareP50Ms = "head_prepare_p50_ms"
     case headGraphCheckpointCreateP50Ms = "head_graph_checkpoint_create_p50_ms"
     case headGraphCheckpointRestoreP50Ms = "head_graph_checkpoint_restore_p50_ms"
@@ -191,6 +217,30 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
         forKey: .inputToPresentLatencyP95Ms
       ),
       frameIntervalP50Ms: try container.decode(PerfStat.self, forKey: .frameIntervalP50Ms),
+      // decodeIfPresent, like every metric added after the format shipped: an
+      // aggregate recorded before this program existed is still a valid
+      // baseline to compare against, it simply has nothing to say about these.
+      // `compare` reports such one-sided metrics and never gates them.
+      inputToCommitP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .inputToCommitP50Ms
+      ) ?? PerfStat(values: []),
+      inputToCommitP95Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .inputToCommitP95Ms
+      ) ?? PerfStat(values: []),
+      inputToCommitP99Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .inputToCommitP99Ms
+      ) ?? PerfStat(values: []),
+      presentBytesPerMovingFrameMedian: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .presentBytesPerMovingFrameMedian
+      ) ?? PerfStat(values: []),
+      pipelineP50Ms: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .pipelineP50Ms
+      ) ?? PerfStat(values: []),
       headPrepareP50Ms: try container.decodeIfPresent(
         PerfStat.self,
         forKey: .headPrepareP50Ms
@@ -244,6 +294,12 @@ public enum AggregateReducer {
       inputToPresentLatencyP95Ms: PerfStat(
         values: summaries.compactMap(\.inputToPresentLatencyMs.p95)),
       frameIntervalP50Ms: PerfStat(values: summaries.compactMap(\.frameIntervalMs.p50)),
+      inputToCommitP50Ms: PerfStat(values: summaries.compactMap(\.inputToCommitFirstMs.p50)),
+      inputToCommitP95Ms: PerfStat(values: summaries.compactMap(\.inputToCommitFirstMs.p95)),
+      inputToCommitP99Ms: PerfStat(values: summaries.compactMap(\.inputToCommitFirstMs.p99)),
+      presentBytesPerMovingFrameMedian: PerfStat(
+        values: summaries.compactMap(\.presentBytesPerMovingFrame)),
+      pipelineP50Ms: PerfStat(values: summaries.compactMap(\.pipelineMs.p50)),
       headPrepareP50Ms: PerfStat(values: summaries.compactMap(\.headPrepareMs.p50)),
       headGraphCheckpointCreateP50Ms: PerfStat(
         values: summaries.compactMap(\.headGraphCheckpointCreateMs.p50)),
@@ -273,6 +329,13 @@ extension AggregateReducer {
     lines.append(line("CPU seconds/diagnostic frame", aggregate.cpuSecondsPerDiagnosticFrame))
     lines.append(line("input latency p95 ms", aggregate.inputToPresentLatencyP95Ms))
     lines.append(line("frame interval p50 ms", aggregate.frameIntervalP50Ms))
+    lines.append(line("input to commit p50 ms", aggregate.inputToCommitP50Ms))
+    lines.append(line("input to commit p95 ms", aggregate.inputToCommitP95Ms))
+    lines.append(line("input to commit p99 ms", aggregate.inputToCommitP99Ms))
+    lines.append(
+      line("present bytes/moving frame", aggregate.presentBytesPerMovingFrameMedian)
+    )
+    lines.append(line("pipeline p50 ms", aggregate.pipelineP50Ms))
     lines.append(line("head prepare p50 ms", aggregate.headPrepareP50Ms))
     lines.append(
       line("head graph checkpoint create p50 ms", aggregate.headGraphCheckpointCreateP50Ms)

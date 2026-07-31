@@ -136,6 +136,10 @@ package enum FrameRecordDerivation {
       record.inputToCommitFirst = answeredInputs.first.duration(to: sample.commitInstant)
       record.inputToCommitLast = answeredInputs.last.duration(to: sample.commitInstant)
     }
+    // Published for every committed frame, not just the ones answering input:
+    // the presents join is keyed on frame ordinal, and a momentum frame's write
+    // latency is as real as a notch frame's.
+    record.committedAt = sample.commitInstant.offset
     record.rasterPath = diag.presentation.rasterReuse?.path ?? "-"
     record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers ?? []
     record.runtimePublicationMode = publication.publicationMode

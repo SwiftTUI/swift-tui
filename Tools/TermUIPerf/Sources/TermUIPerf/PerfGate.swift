@@ -30,12 +30,23 @@ extension CompareCommand {
   /// its cost, so they should not auto-fail a comparison. (Resolve-time cost,
   /// which has no aggregate metric of its own, is proxied here by
   /// `CPU seconds/frame`: resolve is the dominant per-frame phase.)
+  ///
+  /// `input to commit p95 ms` is the scroll-latency watch: runtime-stamped
+  /// arrival→commit for the oldest input a frame answered. It is watched at
+  /// p95 rather than p50 because a scroll that is usually fine and
+  /// occasionally janky is the complaint being chased, and the median hides
+  /// exactly that. `present bytes/moving frame` is the emission watch — the
+  /// bytes a moving frame puts on the wire, which is what every emission-tier
+  /// mitigation in the program is trying to reduce and therefore what a
+  /// regression would silently undo.
   public static let regressionWatchedMetrics: Set<String> = [
     "total CPU seconds",
     "CPU seconds/frame",
     "CPU seconds/diagnostic frame",
     "input latency p95 ms",
     "frame interval p50 ms",
+    "input to commit p95 ms",
+    "present bytes/moving frame",
     "completed drops",
     "cancelled frames",
   ]
@@ -67,6 +78,13 @@ extension CompareCommand {
     var failures: [GateFailure] = []
 
     for metric in comparison.metrics where regressionWatchedMetrics.contains(metric.metric) {
+      // A metric only one side measured cannot be a regression: its delta is
+      // the format's history, not the code's. Sample count already forces
+      // `.inconclusive` here, but the guard is explicit so a future verdict
+      // rule cannot quietly start failing builds over an added column.
+      guard !metric.oneSided else {
+        continue
+      }
       if metric.verdict == .real, metric.delta > 0 {
         failures.append(
           GateFailure(
@@ -90,6 +108,21 @@ extension CompareCommand {
           GateFailure(
             metric: requested,
             reason: "unknown metric — cannot certify an improvement"
+          )
+        )
+        continue
+      }
+      // Deliberately still a failure: a one-sided metric cannot certify a win
+      // either, and silently accepting one would let a rerun against a
+      // pre-metric baseline manufacture an improvement out of an absent
+      // measurement.
+      if metric.oneSided {
+        failures.append(
+          GateFailure(
+            metric: metric.metric,
+            reason:
+              "only one run measured this metric — an absent baseline cannot "
+              + "certify an improvement"
           )
         )
         continue

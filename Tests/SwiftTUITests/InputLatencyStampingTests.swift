@@ -209,6 +209,51 @@ struct InputLatencyStampingTests {
     #expect(harness.sink.committedSamples.last?.answeredInputs == nil)
   }
 
+  // MARK: - The presents join coordinate
+
+  @Test("The commit coordinate makes an input's arrival exactly recoverable")
+  func committedAtRecoversTheArrivalInstant() throws {
+    // `presents.tsv` records write submission and completion as offsets on the
+    // process monotonic origin, while every other column of `frames.tsv` is a
+    // duration. Publishing the commit instant's offset is what lets a reducer
+    // cross between the two: arrival = committedAt − inputToCommitFirst. If
+    // this identity ever stopped holding, arrival→write would silently become
+    // an estimate while still being reported as a measurement.
+    let harness = try LatencyHarness()
+    let arrivedAt = harness.clock.now
+    harness.clock.advance(by: .milliseconds(11))
+
+    harness.scroll(deltaY: 1, arrivalAt: arrivedAt)
+    try harness.render()
+
+    let frame = try #require(harness.sink.committedSamples.last)
+    let record = FrameRecordDerivation.record(from: .committed(frame))
+    let committedAt = try #require(record.committedAt)
+    let inputToCommitFirst = try #require(record.inputToCommitFirst)
+
+    #expect(committedAt == frame.commitInstant.offset)
+    #expect(committedAt - inputToCommitFirst == arrivedAt.offset)
+  }
+
+  @Test("A frame that answered nothing still publishes its commit coordinate")
+  func deadlineFrameStillPublishesTheJoinCoordinate() throws {
+    // A momentum tick answers no input, so its latency columns are empty — but
+    // its bytes still reach the terminal, and the presents join is keyed on the
+    // frame ordinal. Withholding the coordinate here would drop exactly the
+    // frames a fling scenario is made of.
+    let harness = try LatencyHarness()
+    harness.clock.advance(by: .milliseconds(4))
+    harness.runLoop.scheduler.requestInvalidation(of: [harness.rootIdentity])
+    try harness.render()
+
+    let frame = try #require(harness.sink.committedSamples.last)
+    let record = FrameRecordDerivation.record(from: .committed(frame))
+
+    #expect(record.answeredInputCount == 0)
+    #expect(record.inputToCommitFirst == nil)
+    #expect(record.committedAt == frame.commitInstant.offset)
+  }
+
   private static func scrollEvent(deltaY: Int) -> MouseEvent {
     MouseEvent(
       kind: .scrolled(deltaX: 0, deltaY: deltaY),

@@ -1,491 +1,5 @@
 import Foundation
 
-public struct PerfFrameRecord: Equatable, Sendable {
-  public var frameNumber: Int
-  public var presentedAtSeconds: Double?
-  public var totalMs: Double?
-  public var workerLayoutEnqueueMs: Double?
-  public var workerLayoutComputeMs: Double?
-  public var workerRasterEnqueueMs: Double?
-  public var workerRasterComputeMs: Double?
-  public var mainActorBlockedMs: Double?
-  public var mainActorSuspendedMs: Double?
-  public var presentationDurationMs: Double?
-  public var headPrepareMs: Double?
-  public var headGraphCheckpointCreateMs: Double?
-  public var headGraphCheckpointRestoreMs: Double?
-  public var headResolveCheckpointRestoreMs: Double?
-  public var headAnimationProcessResolvedTreeMs: Double?
-  public var headAnimationApplyInterpolationsMs: Double?
-  public var elidedHeadTotalMs: Double?
-  public var elidedGraphCheckpointCreateMs: Double?
-  public var elidedGraphCheckpointRestoreMs: Double?
-  public var elidedResolveCheckpointRestoreMs: Double?
-  public var elidedAnimationTickMs: Double?
-  public var elidedCommitRuntimeRegistrationsMs: Double?
-  public var elidedAnimationCommitMs: Double?
-  public var elidedCommitMs: Double?
-  public var elided: Bool
-  /// How many input events this frame answered (WP-1). `0` for a frame driven
-  /// by a deadline alone. The rest of the WP-1/per-phase column set is parsed
-  /// in WP-3; this one lands early because the open-loop cadence test needs it
-  /// to prove every injected notch is accounted for.
-  public var answeredInputCount: Int
-  public var customLayoutFallbacks: Int
-  public var layoutDependentMainActorFallbacks: Int
-  public var tailJobState: String
-  public var staleFramePolicy: String
-  public var dropDecision: String
-  public var cancelledRenderCount: Int
-  /// Which rasterizer path the frame took: `fresh`, `incremental`, or
-  /// `incrementalRepaired`. `-` for frames with no committed raster.
-  public var rasterPath: String
-  /// Why raster-reuse damage production barriered, `+`-joined; `-` when damage
-  /// was produced.
-  public var rasterReuseBarriers: String
-
-  public init(
-    frameNumber: Int,
-    presentedAtSeconds: Double? = nil,
-    totalMs: Double? = nil,
-    workerLayoutEnqueueMs: Double? = nil,
-    workerLayoutComputeMs: Double? = nil,
-    workerRasterEnqueueMs: Double? = nil,
-    workerRasterComputeMs: Double? = nil,
-    mainActorBlockedMs: Double? = nil,
-    mainActorSuspendedMs: Double? = nil,
-    presentationDurationMs: Double? = nil,
-    headPrepareMs: Double? = nil,
-    headGraphCheckpointCreateMs: Double? = nil,
-    headGraphCheckpointRestoreMs: Double? = nil,
-    headResolveCheckpointRestoreMs: Double? = nil,
-    headAnimationProcessResolvedTreeMs: Double? = nil,
-    headAnimationApplyInterpolationsMs: Double? = nil,
-    elidedHeadTotalMs: Double? = nil,
-    elidedGraphCheckpointCreateMs: Double? = nil,
-    elidedGraphCheckpointRestoreMs: Double? = nil,
-    elidedResolveCheckpointRestoreMs: Double? = nil,
-    elidedAnimationTickMs: Double? = nil,
-    elidedCommitRuntimeRegistrationsMs: Double? = nil,
-    elidedAnimationCommitMs: Double? = nil,
-    elidedCommitMs: Double? = nil,
-    elided: Bool = false,
-    answeredInputCount: Int = 0,
-    customLayoutFallbacks: Int = 0,
-    layoutDependentMainActorFallbacks: Int = 0,
-    tailJobState: String = "completed",
-    staleFramePolicy: String = "commit_ordered",
-    dropDecision: String = "commit_ordered",
-    cancelledRenderCount: Int = 0,
-    rasterPath: String = "-",
-    rasterReuseBarriers: String = "-"
-  ) {
-    self.frameNumber = frameNumber
-    self.presentedAtSeconds = presentedAtSeconds
-    self.totalMs = totalMs
-    self.workerLayoutEnqueueMs = workerLayoutEnqueueMs
-    self.workerLayoutComputeMs = workerLayoutComputeMs
-    self.workerRasterEnqueueMs = workerRasterEnqueueMs
-    self.workerRasterComputeMs = workerRasterComputeMs
-    self.mainActorBlockedMs = mainActorBlockedMs
-    self.mainActorSuspendedMs = mainActorSuspendedMs
-    self.presentationDurationMs = presentationDurationMs
-    self.headPrepareMs = headPrepareMs
-    self.headGraphCheckpointCreateMs = headGraphCheckpointCreateMs
-    self.headGraphCheckpointRestoreMs = headGraphCheckpointRestoreMs
-    self.headResolveCheckpointRestoreMs = headResolveCheckpointRestoreMs
-    self.headAnimationProcessResolvedTreeMs = headAnimationProcessResolvedTreeMs
-    self.headAnimationApplyInterpolationsMs = headAnimationApplyInterpolationsMs
-    self.elidedHeadTotalMs = elidedHeadTotalMs
-    self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
-    self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
-    self.elidedResolveCheckpointRestoreMs = elidedResolveCheckpointRestoreMs
-    self.elidedAnimationTickMs = elidedAnimationTickMs
-    self.elidedCommitRuntimeRegistrationsMs = elidedCommitRuntimeRegistrationsMs
-    self.elidedAnimationCommitMs = elidedAnimationCommitMs
-    self.elidedCommitMs = elidedCommitMs
-    self.elided = elided
-    self.answeredInputCount = answeredInputCount
-    self.customLayoutFallbacks = customLayoutFallbacks
-    self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
-    self.tailJobState = tailJobState
-    self.staleFramePolicy = staleFramePolicy
-    self.dropDecision = dropDecision
-    self.cancelledRenderCount = cancelledRenderCount
-    self.rasterPath = rasterPath
-    self.rasterReuseBarriers = rasterReuseBarriers
-  }
-}
-
-public struct PerfDistribution: Codable, Equatable, Sendable {
-  public var count: Int
-  public var p50: Double?
-  public var p95: Double?
-  public var p99: Double?
-
-  public init(values: [Double]) {
-    let sortedValues = values.sorted()
-    count = sortedValues.count
-    p50 = Self.percentile(0.50, in: sortedValues)
-    p95 = Self.percentile(0.95, in: sortedValues)
-    p99 = Self.percentile(0.99, in: sortedValues)
-  }
-
-  public init(count: Int, p50: Double?, p95: Double?, p99: Double?) {
-    self.count = count
-    self.p50 = p50
-    self.p95 = p95
-    self.p99 = p99
-  }
-
-  private static func percentile(_ percentile: Double, in sortedValues: [Double]) -> Double? {
-    guard !sortedValues.isEmpty else {
-      return nil
-    }
-    guard sortedValues.count > 1 else {
-      return sortedValues[0]
-    }
-
-    let position = percentile * Double(sortedValues.count - 1)
-    let lowerIndex = Int(position.rounded(.down))
-    let upperIndex = Int(position.rounded(.up))
-    guard lowerIndex != upperIndex else {
-      return sortedValues[lowerIndex]
-    }
-
-    let weight = position - Double(lowerIndex)
-    return sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight
-  }
-}
-
-public struct PerfSummary: Codable, Equatable, Sendable {
-  public var scenario: String
-  public var renderMode: String
-  public var iterationCount: Int
-  public var committedFrameCount: Int
-  public var diagnosticFrameCount: Int
-  public var skippedFrameCount: Int
-  public var elidedFrameCount: Int
-  public var cancelledFrameCount: Int
-  public var inputToPresentLatencyMs: PerfDistribution
-  public var inputToSettledLatencyMs: PerfDistribution
-  public var frameIntervalMs: PerfDistribution
-  public var totalCPUSeconds: Double
-  public var cpuSecondsPerCommittedFrame: Double?
-  public var cpuSecondsPerDiagnosticFrame: Double?
-  public var cpuSecondsPerInputEvent: Double?
-  public var mainActorBlockedRatio: Double?
-  public var mainActorSuspendedRatio: Double?
-  public var workerLayoutEnqueueMs: PerfDistribution
-  public var workerLayoutComputeMs: PerfDistribution
-  public var workerRasterEnqueueMs: PerfDistribution
-  public var workerRasterComputeMs: PerfDistribution
-  public var presentationDurationMs: PerfDistribution
-  public var headPrepareMs: PerfDistribution
-  public var headGraphCheckpointCreateMs: PerfDistribution
-  public var headGraphCheckpointRestoreMs: PerfDistribution
-  public var headResolveCheckpointRestoreMs: PerfDistribution
-  public var headAnimationProcessResolvedTreeMs: PerfDistribution
-  public var headAnimationApplyInterpolationsMs: PerfDistribution
-  public var elidedHeadTotalMs: PerfDistribution
-  public var elidedGraphCheckpointCreateMs: PerfDistribution
-  public var elidedGraphCheckpointRestoreMs: PerfDistribution
-  public var elidedResolveCheckpointRestoreMs: PerfDistribution
-  public var elidedAnimationTickMs: PerfDistribution
-  public var elidedCommitRuntimeRegistrationsMs: PerfDistribution
-  public var elidedAnimationCommitMs: PerfDistribution
-  public var elidedCommitMs: PerfDistribution
-  /// Frames that reached the incremental rasterizer. This lane's headline
-  /// number: it was structurally zero for every scenario until the damage
-  /// producer was rebuilt, which is exactly why it is reported rather than
-  /// inferred from timings.
-  public var incrementalRasterFrameCount: Int
-  /// Frames whose incremental surface diverged from a fresh raster and had to
-  /// be repaired. Must be zero; any non-zero value is an under-damage bug that
-  /// ships as corruption in release.
-  public var repairedIncrementalRasterFrameCount: Int
-  /// Frames that took the fresh path, counted by the barrier that forced it.
-  public var rasterReuseBarrierCounts: [String: Int]
-  public var completedDropCount: Int
-  public var customLayoutFallbackCount: Int
-  public var layoutDependentMainActorFallbackCount: Int
-
-  public init(
-    scenario: String,
-    renderMode: String,
-    iterationCount: Int,
-    committedFrameCount: Int,
-    diagnosticFrameCount: Int,
-    skippedFrameCount: Int,
-    elidedFrameCount: Int,
-    cancelledFrameCount: Int,
-    inputToPresentLatencyMs: PerfDistribution,
-    inputToSettledLatencyMs: PerfDistribution,
-    frameIntervalMs: PerfDistribution,
-    totalCPUSeconds: Double,
-    cpuSecondsPerCommittedFrame: Double?,
-    cpuSecondsPerDiagnosticFrame: Double?,
-    cpuSecondsPerInputEvent: Double?,
-    mainActorBlockedRatio: Double?,
-    mainActorSuspendedRatio: Double?,
-    workerLayoutEnqueueMs: PerfDistribution,
-    workerLayoutComputeMs: PerfDistribution,
-    workerRasterEnqueueMs: PerfDistribution,
-    workerRasterComputeMs: PerfDistribution,
-    presentationDurationMs: PerfDistribution,
-    headPrepareMs: PerfDistribution = PerfDistribution(values: []),
-    headGraphCheckpointCreateMs: PerfDistribution = PerfDistribution(values: []),
-    headGraphCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
-    headResolveCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
-    headAnimationProcessResolvedTreeMs: PerfDistribution = PerfDistribution(values: []),
-    headAnimationApplyInterpolationsMs: PerfDistribution = PerfDistribution(values: []),
-    elidedHeadTotalMs: PerfDistribution = PerfDistribution(values: []),
-    elidedGraphCheckpointCreateMs: PerfDistribution = PerfDistribution(values: []),
-    elidedGraphCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
-    elidedResolveCheckpointRestoreMs: PerfDistribution = PerfDistribution(values: []),
-    elidedAnimationTickMs: PerfDistribution = PerfDistribution(values: []),
-    elidedCommitRuntimeRegistrationsMs: PerfDistribution = PerfDistribution(values: []),
-    elidedAnimationCommitMs: PerfDistribution = PerfDistribution(values: []),
-    elidedCommitMs: PerfDistribution = PerfDistribution(values: []),
-    incrementalRasterFrameCount: Int = 0,
-    repairedIncrementalRasterFrameCount: Int = 0,
-    rasterReuseBarrierCounts: [String: Int] = [:],
-    completedDropCount: Int,
-    customLayoutFallbackCount: Int,
-    layoutDependentMainActorFallbackCount: Int
-  ) {
-    self.incrementalRasterFrameCount = incrementalRasterFrameCount
-    self.repairedIncrementalRasterFrameCount = repairedIncrementalRasterFrameCount
-    self.rasterReuseBarrierCounts = rasterReuseBarrierCounts
-    self.scenario = scenario
-    self.renderMode = renderMode
-    self.iterationCount = iterationCount
-    self.committedFrameCount = committedFrameCount
-    self.diagnosticFrameCount = diagnosticFrameCount
-    self.skippedFrameCount = skippedFrameCount
-    self.elidedFrameCount = elidedFrameCount
-    self.cancelledFrameCount = cancelledFrameCount
-    self.inputToPresentLatencyMs = inputToPresentLatencyMs
-    self.inputToSettledLatencyMs = inputToSettledLatencyMs
-    self.frameIntervalMs = frameIntervalMs
-    self.totalCPUSeconds = totalCPUSeconds
-    self.cpuSecondsPerCommittedFrame = cpuSecondsPerCommittedFrame
-    self.cpuSecondsPerDiagnosticFrame = cpuSecondsPerDiagnosticFrame
-    self.cpuSecondsPerInputEvent = cpuSecondsPerInputEvent
-    self.mainActorBlockedRatio = mainActorBlockedRatio
-    self.mainActorSuspendedRatio = mainActorSuspendedRatio
-    self.workerLayoutEnqueueMs = workerLayoutEnqueueMs
-    self.workerLayoutComputeMs = workerLayoutComputeMs
-    self.workerRasterEnqueueMs = workerRasterEnqueueMs
-    self.workerRasterComputeMs = workerRasterComputeMs
-    self.presentationDurationMs = presentationDurationMs
-    self.headPrepareMs = headPrepareMs
-    self.headGraphCheckpointCreateMs = headGraphCheckpointCreateMs
-    self.headGraphCheckpointRestoreMs = headGraphCheckpointRestoreMs
-    self.headResolveCheckpointRestoreMs = headResolveCheckpointRestoreMs
-    self.headAnimationProcessResolvedTreeMs = headAnimationProcessResolvedTreeMs
-    self.headAnimationApplyInterpolationsMs = headAnimationApplyInterpolationsMs
-    self.elidedHeadTotalMs = elidedHeadTotalMs
-    self.elidedGraphCheckpointCreateMs = elidedGraphCheckpointCreateMs
-    self.elidedGraphCheckpointRestoreMs = elidedGraphCheckpointRestoreMs
-    self.elidedResolveCheckpointRestoreMs = elidedResolveCheckpointRestoreMs
-    self.elidedAnimationTickMs = elidedAnimationTickMs
-    self.elidedCommitRuntimeRegistrationsMs = elidedCommitRuntimeRegistrationsMs
-    self.elidedAnimationCommitMs = elidedAnimationCommitMs
-    self.elidedCommitMs = elidedCommitMs
-    self.completedDropCount = completedDropCount
-    self.customLayoutFallbackCount = customLayoutFallbackCount
-    self.layoutDependentMainActorFallbackCount = layoutDependentMainActorFallbackCount
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case scenario
-    case renderMode = "render_mode"
-    case iterationCount = "iteration_count"
-    case committedFrameCount = "committed_frame_count"
-    case diagnosticFrameCount = "diagnostic_frame_count"
-    case skippedFrameCount = "skipped_frame_count"
-    case elidedFrameCount = "elided_frame_count"
-    case cancelledFrameCount = "cancelled_frame_count"
-    case inputToPresentLatencyMs = "input_to_present_latency_ms"
-    case inputToSettledLatencyMs = "input_to_settled_latency_ms"
-    case frameIntervalMs = "frame_interval_ms"
-    case totalCPUSeconds = "total_cpu_seconds"
-    case cpuSecondsPerCommittedFrame = "cpu_seconds_per_committed_frame"
-    case cpuSecondsPerDiagnosticFrame = "cpu_seconds_per_diagnostic_frame"
-    case cpuSecondsPerInputEvent = "cpu_seconds_per_input_event"
-    case mainActorBlockedRatio = "main_actor_blocked_ratio"
-    case mainActorSuspendedRatio = "main_actor_suspended_ratio"
-    case workerLayoutEnqueueMs = "worker_layout_enqueue_ms"
-    case workerLayoutComputeMs = "worker_layout_compute_ms"
-    case workerRasterEnqueueMs = "worker_raster_enqueue_ms"
-    case workerRasterComputeMs = "worker_raster_compute_ms"
-    case presentationDurationMs = "presentation_duration_ms"
-    case headPrepareMs = "head_prepare_ms"
-    case headGraphCheckpointCreateMs = "head_graph_checkpoint_create_ms"
-    case headGraphCheckpointRestoreMs = "head_graph_checkpoint_restore_ms"
-    case headResolveCheckpointRestoreMs = "head_resolve_checkpoint_restore_ms"
-    case headAnimationProcessResolvedTreeMs = "head_animation_process_resolved_tree_ms"
-    case headAnimationApplyInterpolationsMs = "head_animation_apply_interpolations_ms"
-    case elidedHeadTotalMs = "elided_head_total_ms"
-    case elidedGraphCheckpointCreateMs = "elided_graph_checkpoint_create_ms"
-    case elidedGraphCheckpointRestoreMs = "elided_graph_checkpoint_restore_ms"
-    case elidedResolveCheckpointRestoreMs = "elided_resolve_checkpoint_restore_ms"
-    case elidedAnimationTickMs = "elided_animation_tick_ms"
-    case elidedCommitRuntimeRegistrationsMs =
-      "elided_commit_runtime_registrations_ms"
-    case elidedAnimationCommitMs = "elided_animation_commit_ms"
-    case elidedCommitMs = "elided_commit_ms"
-    case incrementalRasterFrameCount = "incremental_raster_frame_count"
-    case repairedIncrementalRasterFrameCount = "repaired_incremental_raster_frame_count"
-    case rasterReuseBarrierCounts = "raster_reuse_barrier_counts"
-    case completedDropCount = "completed_drop_count"
-    case customLayoutFallbackCount = "custom_layout_fallback_count"
-    case layoutDependentMainActorFallbackCount = "layout_dependent_main_actor_fallback_count"
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.init(
-      scenario: try container.decode(String.self, forKey: .scenario),
-      renderMode: try container.decode(String.self, forKey: .renderMode),
-      iterationCount: try container.decode(Int.self, forKey: .iterationCount),
-      committedFrameCount: try container.decode(Int.self, forKey: .committedFrameCount),
-      diagnosticFrameCount: try container.decode(Int.self, forKey: .diagnosticFrameCount),
-      skippedFrameCount: try container.decode(Int.self, forKey: .skippedFrameCount),
-      elidedFrameCount: try container.decode(Int.self, forKey: .elidedFrameCount),
-      cancelledFrameCount: try container.decode(Int.self, forKey: .cancelledFrameCount),
-      inputToPresentLatencyMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .inputToPresentLatencyMs
-      ),
-      inputToSettledLatencyMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .inputToSettledLatencyMs
-      ),
-      frameIntervalMs: try container.decode(PerfDistribution.self, forKey: .frameIntervalMs),
-      totalCPUSeconds: try container.decode(Double.self, forKey: .totalCPUSeconds),
-      cpuSecondsPerCommittedFrame: try container.decodeIfPresent(
-        Double.self,
-        forKey: .cpuSecondsPerCommittedFrame
-      ),
-      cpuSecondsPerDiagnosticFrame: try container.decodeIfPresent(
-        Double.self,
-        forKey: .cpuSecondsPerDiagnosticFrame
-      ),
-      cpuSecondsPerInputEvent: try container.decodeIfPresent(
-        Double.self,
-        forKey: .cpuSecondsPerInputEvent
-      ),
-      mainActorBlockedRatio: try container.decodeIfPresent(
-        Double.self,
-        forKey: .mainActorBlockedRatio
-      ),
-      mainActorSuspendedRatio: try container.decodeIfPresent(
-        Double.self,
-        forKey: .mainActorSuspendedRatio
-      ),
-      workerLayoutEnqueueMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .workerLayoutEnqueueMs
-      ),
-      workerLayoutComputeMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .workerLayoutComputeMs
-      ),
-      workerRasterEnqueueMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .workerRasterEnqueueMs
-      ),
-      workerRasterComputeMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .workerRasterComputeMs
-      ),
-      presentationDurationMs: try container.decode(
-        PerfDistribution.self,
-        forKey: .presentationDurationMs
-      ),
-      headPrepareMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headPrepareMs
-      ) ?? PerfDistribution(values: []),
-      headGraphCheckpointCreateMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headGraphCheckpointCreateMs
-      ) ?? PerfDistribution(values: []),
-      headGraphCheckpointRestoreMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headGraphCheckpointRestoreMs
-      ) ?? PerfDistribution(values: []),
-      headResolveCheckpointRestoreMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headResolveCheckpointRestoreMs
-      ) ?? PerfDistribution(values: []),
-      headAnimationProcessResolvedTreeMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headAnimationProcessResolvedTreeMs
-      ) ?? PerfDistribution(values: []),
-      headAnimationApplyInterpolationsMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .headAnimationApplyInterpolationsMs
-      ) ?? PerfDistribution(values: []),
-      elidedHeadTotalMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedHeadTotalMs
-      ) ?? PerfDistribution(values: []),
-      elidedGraphCheckpointCreateMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedGraphCheckpointCreateMs
-      ) ?? PerfDistribution(values: []),
-      elidedGraphCheckpointRestoreMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedGraphCheckpointRestoreMs
-      ) ?? PerfDistribution(values: []),
-      elidedResolveCheckpointRestoreMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedResolveCheckpointRestoreMs
-      ) ?? PerfDistribution(values: []),
-      elidedAnimationTickMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedAnimationTickMs
-      ) ?? PerfDistribution(values: []),
-      elidedCommitRuntimeRegistrationsMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedCommitRuntimeRegistrationsMs
-      ) ?? PerfDistribution(values: []),
-      elidedAnimationCommitMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedAnimationCommitMs
-      ) ?? PerfDistribution(values: []),
-      elidedCommitMs: try container.decodeIfPresent(
-        PerfDistribution.self,
-        forKey: .elidedCommitMs
-      ) ?? PerfDistribution(values: []),
-      incrementalRasterFrameCount: try container.decodeIfPresent(
-        Int.self,
-        forKey: .incrementalRasterFrameCount
-      ) ?? 0,
-      repairedIncrementalRasterFrameCount: try container.decodeIfPresent(
-        Int.self,
-        forKey: .repairedIncrementalRasterFrameCount
-      ) ?? 0,
-      rasterReuseBarrierCounts: try container.decodeIfPresent(
-        [String: Int].self,
-        forKey: .rasterReuseBarrierCounts
-      ) ?? [:],
-      completedDropCount: try container.decode(Int.self, forKey: .completedDropCount),
-      customLayoutFallbackCount: try container.decode(
-        Int.self,
-        forKey: .customLayoutFallbackCount
-      ),
-      layoutDependentMainActorFallbackCount: try container.decode(
-        Int.self,
-        forKey: .layoutDependentMainActorFallbackCount
-      )
-    )
-  }
-}
-
 public enum SummaryReducer {
   public static func reduce(
     metadata: PerfRunMetadata,
@@ -500,6 +14,18 @@ public enum SummaryReducer {
     let committedFrameCount = committedFrames.count
     let inputEvents = events.filter(\.isLatencyBearing)
     let cancelledFrameCount = cancelledFrameCount(frames)
+    // Moving frames are classified over committed frames only: an elided or
+    // dropped frame emitted nothing, so folding it into a per-moving-frame
+    // emission average would divide real bytes by phantom frames.
+    let movingFrames = committedFrames.filter(\.isMoving)
+    // Hoisted rather than inlined into the initializer call below: that call
+    // takes enough arguments that leaving these as inline closure expressions
+    // pushes the type checker past its budget and fails the build with a
+    // "unable to type-check in reasonable time" error rather than a real
+    // diagnostic.
+    let latency = InputLatencyDistributions(committedFrames)
+    let phases = PhaseDistributions(committedFrames)
+    let emission = EmissionAggregates(movingFrames: movingFrames, allFrames: frames)
 
     return PerfSummary(
       scenario: metadata.scenario,
@@ -568,6 +94,23 @@ public enum SummaryReducer {
         values: frames.compactMap(\.elidedAnimationCommitMs)
       ),
       elidedCommitMs: PerfDistribution(values: frames.compactMap(\.elidedCommitMs)),
+      inputToCommitFirstMs: latency.commitFirst,
+      inputToCommitLastMs: latency.commitLast,
+      inputToWriteMs: latency.write,
+      resolveMs: phases.resolve,
+      measureMs: phases.measure,
+      placeMs: phases.place,
+      semanticsMs: phases.semantics,
+      drawMs: phases.draw,
+      rasterMs: phases.raster,
+      commitMs: phases.commit,
+      pipelineMs: phases.pipeline,
+      movingFrameCount: movingFrames.count,
+      presentBytesPerMovingFrame: emission.bytesPerMovingFrame,
+      answeredInputsPerMovingFrame: emission.answeredInputsPerMovingFrame,
+      fullRepaintMovingFrameCount: emission.fullRepaintMovingFrameCount,
+      damageRowsPerBoundedMovingFrame: emission.damageRowsPerBoundedMovingFrame,
+      supersededPresentCount: emission.supersededPresentCount,
       incrementalRasterFrameCount: frames.count { $0.rasterPath == "incremental" },
       repairedIncrementalRasterFrameCount: frames.count {
         $0.rasterPath == "incrementalRepaired"
@@ -579,6 +122,73 @@ public enum SummaryReducer {
         $0 + $1.layoutDependentMainActorFallbacks
       }
     )
+  }
+
+  /// The runtime-stamped latency distributions, over committed frames.
+  private struct InputLatencyDistributions {
+    var commitFirst: PerfDistribution
+    var commitLast: PerfDistribution
+    var write: PerfDistribution
+
+    init(_ frames: [PerfFrameRecord]) {
+      commitFirst = PerfDistribution(values: frames.compactMap(\.inputToCommitFirstMs))
+      commitLast = PerfDistribution(values: frames.compactMap(\.inputToCommitLastMs))
+      write = PerfDistribution(values: frames.compactMap(\.inputToWriteMs))
+    }
+  }
+
+  /// The seven typed phases plus the pipeline total, over committed frames.
+  private struct PhaseDistributions {
+    var resolve: PerfDistribution
+    var measure: PerfDistribution
+    var place: PerfDistribution
+    var semantics: PerfDistribution
+    var draw: PerfDistribution
+    var raster: PerfDistribution
+    var commit: PerfDistribution
+    var pipeline: PerfDistribution
+
+    init(_ frames: [PerfFrameRecord]) {
+      resolve = PerfDistribution(values: frames.compactMap(\.phases.resolveMs))
+      measure = PerfDistribution(values: frames.compactMap(\.phases.measureMs))
+      place = PerfDistribution(values: frames.compactMap(\.phases.placeMs))
+      semantics = PerfDistribution(values: frames.compactMap(\.phases.semanticsMs))
+      draw = PerfDistribution(values: frames.compactMap(\.phases.drawMs))
+      raster = PerfDistribution(values: frames.compactMap(\.phases.rasterMs))
+      commit = PerfDistribution(values: frames.compactMap(\.phases.commitMs))
+      pipeline = PerfDistribution(values: frames.compactMap(\.phases.pipelineMs))
+    }
+  }
+
+  /// What the moving frames put on the wire, and what the writer did with it.
+  private struct EmissionAggregates {
+    var bytesPerMovingFrame: Double?
+    var answeredInputsPerMovingFrame: Double?
+    var fullRepaintMovingFrameCount: Int
+    var damageRowsPerBoundedMovingFrame: Double?
+    var supersededPresentCount: Int
+
+    init(movingFrames: [PerfFrameRecord], allFrames: [PerfFrameRecord]) {
+      let movingCount = Double(movingFrames.count)
+      bytesPerMovingFrame = SummaryReducer.ratio(
+        Double(movingFrames.reduce(0) { $0 + $1.emission.presentBytes }),
+        movingCount
+      )
+      answeredInputsPerMovingFrame = SummaryReducer.ratio(
+        Double(movingFrames.reduce(0) { $0 + $1.answeredInputCount }),
+        movingCount
+      )
+      fullRepaintMovingFrameCount = movingFrames.count {
+        $0.emission.damageRows.isFullRepaint
+      }
+      damageRowsPerBoundedMovingFrame = SummaryReducer.mean(
+        movingFrames.compactMap { $0.emission.damageRows.count }.map(Double.init)
+      )
+      // Counted over every frame, not just moving ones: a supersede is the
+      // writer dropping a frame, and a settle frame superseded by the next
+      // notch is exactly the backlog this metric exists to expose.
+      supersededPresentCount = allFrames.count { $0.present?.wasWritten == false }
+    }
   }
 
   private static func rasterReuseBarrierCounts(
@@ -630,6 +240,12 @@ public enum SummaryReducer {
       return nil
     }
     return numerator / denominator
+  }
+
+  /// `nil` rather than `0` for an empty set: no samples is not an average of
+  /// zero, and a gate that cannot tell them apart certifies silence as a win.
+  private static func mean(_ values: [Double]) -> Double? {
+    ratio(values.reduce(0, +), Double(values.count))
   }
 
   private static func timeRatio(_ numerators: [Double], _ denominators: [Double]) -> Double? {

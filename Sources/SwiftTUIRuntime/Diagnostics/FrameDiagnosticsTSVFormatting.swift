@@ -27,6 +27,15 @@ import SwiftTUICore
 /// Write completion is not here — it happens after commit, on the presentation
 /// writer's queue. It is reported in the sibling `presents.tsv`, joined to this
 /// file on the `frame` column.
+///
+/// `committed_at_ms` is the one *absolute* column in a file of durations: the
+/// commit instant's offset from the process monotonic origin. It exists to make
+/// that join exact. `presents.tsv` stamps submission and completion as offsets
+/// on the same origin, so a reducer recovers an input's arrival as
+/// `committed_at_ms − input_to_commit_first_ms` and gets arrival→write by
+/// subtraction. Without it the two files share no origin and arrival→write
+/// could only be bounded. Being process-relative it is meaningless across runs
+/// — it is a join coordinate, not a measurement.
 package enum FrameDiagnosticsTSVFormatting {
   package static let headerFields = [
     "frame",
@@ -134,6 +143,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "answered_inputs",
     "input_to_commit_first_ms",
     "input_to_commit_last_ms",
+    "committed_at_ms",
     "present_strategy",
     "present_ms",
     "present_bytes",
@@ -344,6 +354,7 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.answeredInputCount),
       formatMs(record.inputToCommitFirst),
       formatMs(record.inputToCommitLast),
+      formatMs(record.committedAt),
       record.presentationStrategy,
       presentMs,
       String(record.presentationBytesWritten),

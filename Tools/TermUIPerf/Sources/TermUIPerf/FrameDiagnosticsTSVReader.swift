@@ -15,6 +15,13 @@ enum PerfFrameDiagnosticsTSVError: Error, Equatable, CustomStringConvertible {
 }
 
 enum PerfFrameDiagnosticsTSVReader {
+  /// Reads `frames.tsv`, joining the optional `presents.tsv` sibling that sits
+  /// beside it.
+  ///
+  /// The presents file is looked for in the frames file's own directory under
+  /// its fixed name — the same rule the runtime writes it by. Absence is not an
+  /// error: a run against the in-process perf host has no asynchronous
+  /// presentation writer and legitimately produces none.
   static func read(
     from url: URL,
     presentedFrames: [PerfPresentedFrame]
@@ -23,12 +30,21 @@ enum PerfFrameDiagnosticsTSVReader {
     let presentedAt = Dictionary(
       uniqueKeysWithValues: presentedFrames.map { ($0.frameNumber, $0.timestampSeconds) }
     )
-    return try parse(text, presentedAt: presentedAt)
+    let presents = PerfPresentsTSVReader.read(
+      from: url.deletingLastPathComponent().appendingPathComponent(presentsFileName)
+    )
+    return try parse(text, presentedAt: presentedAt, presents: presents)
   }
+
+  /// Fixed, not derived from the frames file's name — matching
+  /// `ProfileActivation`, which opens it beside whatever the frames sink was
+  /// configured as.
+  static let presentsFileName = "presents.tsv"
 
   static func parse(
     _ text: String,
-    presentedAt: [Int: Double] = [:]
+    presentedAt: [Int: Double] = [:],
+    presents: [Int: PerfPresentRecord] = [:]
   ) throws -> [PerfFrameRecord] {
     let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
     guard let headerLine = lines.first else {
@@ -119,7 +135,32 @@ enum PerfFrameDiagnosticsTSVReader {
         dropDecision: string("drop_decision", fields, column, default: "commit_ordered"),
         cancelledRenderCount: int("cancelled_render_count", fields, column),
         rasterPath: string("raster_path", fields, column, default: "-"),
-        rasterReuseBarriers: string("raster_reuse_barriers", fields, column, default: "-")
+        rasterReuseBarriers: string("raster_reuse_barriers", fields, column, default: "-"),
+        causes: string("causes", fields, column, default: ""),
+        phases: PerfFramePhaseTimings(
+          resolveMs: double("resolve_ms", fields, column),
+          measureMs: double("measure_ms", fields, column),
+          placeMs: double("place_ms", fields, column),
+          semanticsMs: double("semantics_ms", fields, column),
+          drawMs: double("draw_ms", fields, column),
+          rasterMs: double("raster_ms", fields, column),
+          commitMs: double("commit_ms", fields, column),
+          pipelineMs: double("pipeline_ms", fields, column)
+        ),
+        emission: PerfFrameEmission(
+          presentBytes: int("present_bytes", fields, column),
+          presentCells: int("present_cells", fields, column),
+          // Parsed through its own type, not `int`: this column's `full`
+          // sentinel would otherwise fall through to 0 and report a
+          // whole-surface repaint as the cheapest frame in the trace.
+          damageRows: PerfDamageRows(field: rawField("damage_rows", fields, column)),
+          damageCells: optionalInt("damage_cells", fields, column),
+          coalescedEventBatches: int("coalesced_event_batches", fields, column)
+        ),
+        inputToCommitFirstMs: double("input_to_commit_first_ms", fields, column),
+        inputToCommitLastMs: double("input_to_commit_last_ms", fields, column),
+        committedAtMs: double("committed_at_ms", fields, column),
+        present: presents[frameNumber]
       )
     }
   }
@@ -150,6 +191,34 @@ enum PerfFrameDiagnosticsTSVReader {
       return 0
     }
     return Int(fields[index]) ?? 0
+  }
+
+  /// The raw column text, or `nil` when the column is absent from this file.
+  ///
+  /// Needed by columns whose vocabulary is wider than a number — `damage_rows`
+  /// carries a `full` sentinel — so the caller can tell "the column said
+  /// something I must interpret" from "the column was never written".
+  private static func rawField(
+    _ name: String,
+    _ fields: [String],
+    _ column: [String: Int]
+  ) -> String? {
+    guard let index = column[name], index < fields.count else {
+      return nil
+    }
+    return fields[index]
+  }
+
+  /// An integer column that distinguishes absent/`-` from zero.
+  private static func optionalInt(
+    _ name: String,
+    _ fields: [String],
+    _ column: [String: Int]
+  ) -> Int? {
+    guard let value = rawField(name, fields, column), value != "-", !value.isEmpty else {
+      return nil
+    }
+    return Int(value)
   }
 
   private static func bool(

@@ -99,6 +99,17 @@ public struct FrameDiagnosticRecord: Sendable {
   /// latency this frame closed out. Equal to `inputToCommitFirst` when the
   /// frame answered exactly one input.
   package var inputToCommitLast: Duration?
+  /// The commit instant itself, as its offset from the process monotonic
+  /// origin — the one absolute coordinate in a file of durations.
+  ///
+  /// It exists so `presents.tsv` can be joined *exactly* rather than
+  /// approximately. That file records write submission and completion as
+  /// offsets on the same origin (`MonotonicInstant.now()`), so publishing the
+  /// commit coordinate lets a reducer recover an input's arrival
+  /// (`committedAt − inputToCommitFirst`) and subtract it from the write
+  /// completion. Without it the two files share no origin and arrival→write
+  /// can only be bounded, never measured.
+  package var committedAt: Duration?
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
   public var presentationLinesTouched: Int
