@@ -39,28 +39,49 @@ package enum IndexedChildSourceArtifactsProbe {
   }
 }
 
-/// Test instrumentation (the F118 probe pattern): counts how many distinct
+/// Instrumentation (the F118 probe pattern): counts how many distinct
 /// elements an indexed source actually *realizes* — resolves a child view
 /// for — during a pass. Realization dominates hosted-collection frame cost,
 /// so this is the counter that distinguishes a windowed collection (O(viewport)
 /// realizations) from one that collapsed to full-dataset realization. Cache
 /// hits are deliberately not counted: the per-source cache lives exactly one
-/// resolve, so a pass's miss count *is* its realized-row count. Increments
-/// compile out of release.
+/// resolve, so a pass's miss count *is* its realized-row count.
+///
+/// Armed by ``FeatureGate/collectionProbes`` (`SWIFTTUI_COLLECTION_PROBES`):
+/// always on in DEBUG, opt-in in release. Disarmed, `recordRealization()` is a
+/// static `Bool` read and a branch — this fires once per realized row, which is
+/// why the check is a plain main-actor-isolated load rather than anything
+/// synchronized. The run loop resets it at each frame head and samples it at
+/// commit into the `realized_rows` column of `frames.tsv`.
 @MainActor
 package enum IndexedChildRealizationProbe {
+  /// Whether the probe counts. Latched from the environment on first access;
+  /// settable so a test can measure the disarmed path (DEBUG defaults armed,
+  /// so an unarmed assertion has no other way to reach that state).
+  package static var isArmed: Bool = FeatureGate.collectionProbes.initialIsEnabled()
+
+  /// Rows realized since the last ``reset()``. Always readable — the existing
+  /// DEBUG suites assert on it directly and arming is additive to them.
   package private(set) static var realizedChildCount = 0
 
+  /// The same count, or `nil` when the probe is disarmed. This is what the
+  /// per-frame diagnostics sample reads: `nil` and `0` are opposite findings —
+  /// no measurement was taken versus a pass that realized nothing — and the
+  /// `realized_rows` column preserves the distinction rather than reporting an
+  /// unconfigured run as a perfectly windowed one.
+  package static var realizedChildCountIfArmed: Int? {
+    isArmed ? realizedChildCount : nil
+  }
+
   package static func recordRealization() {
-    #if DEBUG
-      realizedChildCount += 1
-    #endif
+    guard isArmed else {
+      return
+    }
+    realizedChildCount += 1
   }
 
   package static func reset() {
-    #if DEBUG
-      realizedChildCount = 0
-    #endif
+    realizedChildCount = 0
   }
 }
 

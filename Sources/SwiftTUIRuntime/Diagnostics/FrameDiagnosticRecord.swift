@@ -99,6 +99,12 @@ public struct FrameDiagnosticRecord: Sendable {
   /// latency this frame closed out. Equal to `inputToCommitFirst` when the
   /// frame answered exactly one input.
   package var inputToCommitLast: Duration?
+  /// Rows an indexed child source realized during this frame. `nil` when the
+  /// collection probes are disarmed — which is *not* the same as zero rows.
+  package var realizedRowCount: Int?
+  /// Times a list derived its visible layout during this frame. `nil` when the
+  /// collection probes are disarmed.
+  package var listLayoutDerivationCount: Int?
   /// The commit instant itself, as its offset from the process monotonic
   /// origin — the one absolute coordinate in a file of durations.
   ///

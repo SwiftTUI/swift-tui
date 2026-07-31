@@ -28,6 +28,28 @@ import SwiftTUICore
 /// writer's queue. It is reported in the sibling `presents.tsv`, joined to this
 /// file on the `frame` column.
 ///
+/// ## Collection probe columns
+///
+/// `realized_rows` and `list_layout_derivations` are magnitude counters for
+/// hosted collections, armed by `SWIFTTUI_COLLECTION_PROBES` (always on in
+/// DEBUG, opt-in in release). They exist so a millisecond can be *read*: a
+/// scrolling collection whose `resolve_ms` doubled either realized twice the
+/// rows or paid twice per row, and only the counter separates those.
+///
+/// **`-` means disarmed, not zero.** A run without the probes armed reports `-`
+/// in both columns; a run with them armed that realized nothing reports `0`.
+/// Collapsing the two would make an unconfigured run indistinguishable from a
+/// perfectly windowed one.
+///
+/// `realized_rows` is *not* `layout_dependent_realizations` a few columns
+/// earlier. That one counts realizations forced by the custom-layout fallback
+/// path; this one counts every element an indexed child source resolved a view
+/// for, by any route — the number that separates a windowed collection
+/// (O(viewport)) from one that collapsed to full-dataset realization.
+///
+/// Both are scoped to the frame *head attempt*, matching the timing columns
+/// they divide into: a retried head re-reports from its retry.
+///
 /// `committed_at_ms` is the one *absolute* column in a file of durations: the
 /// commit instant's offset from the process monotonic origin. It exists to make
 /// that join exact. `presents.tsv` stamps submission and completion as offsets
@@ -87,6 +109,8 @@ package enum FrameDiagnosticsTSVFormatting {
     "layout_dependent_realizations",
     "layout_dependent_cache_hits",
     "layout_dependent_main_actor_fallbacks",
+    "realized_rows",
+    "list_layout_derivations",
     "geometry_anchor_resolution_misses",
     "first_geometry_anchor_resolution_miss",
     "geometry_missing_named_coordinate_spaces",
@@ -294,6 +318,8 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.layoutDependentRealizations),
       String(record.layoutDependentRealizationCacheHits),
       String(record.layoutDependentMainActorFallbacks),
+      formatOptionalInt(record.realizedRowCount),
+      formatOptionalInt(record.listLayoutDerivationCount),
       String(record.geometryAnchorResolutionMissCount),
       record.firstGeometryAnchorResolutionMissIdentity ?? "-",
       String(record.geometryMissingNamedCoordinateSpaceCount),

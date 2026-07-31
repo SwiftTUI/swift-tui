@@ -86,6 +86,9 @@ import SwiftTUICore
   /// produce the two input→commit latency columns. Sampled through
   /// `RunLoop.frameClock` so a virtual-clock test is deterministic.
   package var commitInstant: MonotonicInstant
+  /// Rows realized and list layouts derived during this frame, when the
+  /// collection probes are armed. Both `nil` in an unarmed release run.
+  package var collectionProbes: CollectionProbeSample
 
   package init(
     frameNumber: Int,
@@ -106,7 +109,11 @@ import SwiftTUICore
     presentationMetrics: PresentationMetrics,
     presentationDuration: Duration,
     answeredInputs: AnsweredInputs? = nil,
-    commitInstant: MonotonicInstant = .zero
+    commitInstant: MonotonicInstant = .zero,
+    collectionProbes: CollectionProbeSample = .init(
+      realizedRows: nil,
+      listLayoutDerivations: nil
+    )
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
@@ -127,6 +134,7 @@ import SwiftTUICore
     self.presentationDuration = presentationDuration
     self.answeredInputs = answeredInputs
     self.commitInstant = commitInstant
+    self.collectionProbes = collectionProbes
   }
 }
 

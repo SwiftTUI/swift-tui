@@ -130,6 +130,11 @@ enum PerfFrameDiagnosticsTSVReader {
           fields,
           column
         ),
+        // `optionalInt`, not `int`: these columns write `-` when the probes
+        // were disarmed, and a disarmed run reported as zero realized rows
+        // would read as a perfectly windowed one.
+        realizedRows: optionalInt("realized_rows", fields, column),
+        listLayoutDerivations: optionalInt("list_layout_derivations", fields, column),
         tailJobState: string("tail_job_state", fields, column, default: "completed"),
         staleFramePolicy: string("stale_frame_policy", fields, column, default: "commit_ordered"),
         dropDecision: string("drop_decision", fields, column, default: "commit_ordered"),

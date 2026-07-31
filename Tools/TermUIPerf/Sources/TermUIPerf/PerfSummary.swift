@@ -125,6 +125,15 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   /// have no row number to average, and substituting one would understate the
   /// damage.
   public var damageRowsPerBoundedMovingFrame: Double?
+  /// Rows realized per moving frame, when the run armed
+  /// `SWIFTTUI_COLLECTION_PROBES`. `nil` for an unarmed run — the number that
+  /// makes `resolve_ms` readable rather than merely observed, so its absence
+  /// has to be visible rather than reported as zero work.
+  public var realizedRowsPerMovingFrame: Double?
+  /// List visible-layout derivations per moving frame, when armed. `nil`
+  /// otherwise. One per phase is the D19 target; more means the measured
+  /// product is being re-derived instead of consumed.
+  public var listLayoutDerivationsPerMovingFrame: Double?
   /// Submissions a newer frame replaced before they reached `write(2)`. Under
   /// open-loop cadence this is the backlog made visible.
   public var supersededPresentCount: Int
@@ -196,6 +205,8 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     answeredInputsPerMovingFrame: Double? = nil,
     fullRepaintMovingFrameCount: Int = 0,
     damageRowsPerBoundedMovingFrame: Double? = nil,
+    realizedRowsPerMovingFrame: Double? = nil,
+    listLayoutDerivationsPerMovingFrame: Double? = nil,
     supersededPresentCount: Int = 0,
     incrementalRasterFrameCount: Int = 0,
     repairedIncrementalRasterFrameCount: Int = 0,
@@ -259,6 +270,8 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     self.answeredInputsPerMovingFrame = answeredInputsPerMovingFrame
     self.fullRepaintMovingFrameCount = fullRepaintMovingFrameCount
     self.damageRowsPerBoundedMovingFrame = damageRowsPerBoundedMovingFrame
+    self.realizedRowsPerMovingFrame = realizedRowsPerMovingFrame
+    self.listLayoutDerivationsPerMovingFrame = listLayoutDerivationsPerMovingFrame
     self.supersededPresentCount = supersededPresentCount
     self.completedDropCount = completedDropCount
     self.customLayoutFallbackCount = customLayoutFallbackCount
@@ -319,6 +332,8 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     case answeredInputsPerMovingFrame = "answered_inputs_per_moving_frame"
     case fullRepaintMovingFrameCount = "full_repaint_moving_frame_count"
     case damageRowsPerBoundedMovingFrame = "damage_rows_per_bounded_moving_frame"
+    case realizedRowsPerMovingFrame = "realized_rows_per_moving_frame"
+    case listLayoutDerivationsPerMovingFrame = "list_layout_derivations_per_moving_frame"
     case supersededPresentCount = "superseded_present_count"
     case incrementalRasterFrameCount = "incremental_raster_frame_count"
     case repairedIncrementalRasterFrameCount = "repaired_incremental_raster_frame_count"
@@ -489,6 +504,14 @@ public struct PerfSummary: Codable, Equatable, Sendable {
       damageRowsPerBoundedMovingFrame: try container.decodeIfPresent(
         Double.self,
         forKey: .damageRowsPerBoundedMovingFrame
+      ),
+      realizedRowsPerMovingFrame: try container.decodeIfPresent(
+        Double.self,
+        forKey: .realizedRowsPerMovingFrame
+      ),
+      listLayoutDerivationsPerMovingFrame: try container.decodeIfPresent(
+        Double.self,
+        forKey: .listLayoutDerivationsPerMovingFrame
       ),
       supersededPresentCount: try container.decodeIfPresent(
         Int.self,

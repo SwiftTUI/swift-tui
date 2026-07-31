@@ -152,6 +152,13 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var answeredInputCount: Int
   public var customLayoutFallbacks: Int
   public var layoutDependentMainActorFallbacks: Int
+  /// Rows an indexed child source realized this frame (WP-4). `nil` when the
+  /// collection probes were disarmed for the run — which is not the same as a
+  /// frame that realized nothing, and must not be averaged as zero.
+  public var realizedRows: Int?
+  /// Times a list derived its visible layout this frame (WP-4). `nil` when the
+  /// collection probes were disarmed.
+  public var listLayoutDerivations: Int?
   public var tailJobState: String
   public var staleFramePolicy: String
   public var dropDecision: String
@@ -212,6 +219,8 @@ public struct PerfFrameRecord: Equatable, Sendable {
     answeredInputCount: Int = 0,
     customLayoutFallbacks: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
+    realizedRows: Int? = nil,
+    listLayoutDerivations: Int? = nil,
     tailJobState: String = "completed",
     staleFramePolicy: String = "commit_ordered",
     dropDecision: String = "commit_ordered",
@@ -254,6 +263,8 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.answeredInputCount = answeredInputCount
     self.customLayoutFallbacks = customLayoutFallbacks
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
+    self.realizedRows = realizedRows
+    self.listLayoutDerivations = listLayoutDerivations
     self.tailJobState = tailJobState
     self.staleFramePolicy = staleFramePolicy
     self.dropDecision = dropDecision

@@ -28,6 +28,9 @@ extension RunLoop {
     // than the wall clock so the two latency columns and the arrivals they
     // subtract come from the same clock family.
     let commitInstant = frameClock()
+    // Also past the guard: reading the probes is cheap, but an unprofiled run
+    // should touch nothing it will not report.
+    let collectionProbes = CollectionProbeSample.sampleAtCommit()
     let inputEventsQueuedDuringRenderSuspension =
       renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
     let dropEligibilityBlockers = frameDropEligibilityBlockers(
@@ -60,7 +63,8 @@ extension RunLoop {
       presentationMetrics: presentationMetrics,
       presentationDuration: presentationDuration,
       answeredInputs: answeredInputs,
-      commitInstant: commitInstant
+      commitInstant: commitInstant,
+      collectionProbes: collectionProbes
     )
     frameSink.record(.committed(sample))
   }

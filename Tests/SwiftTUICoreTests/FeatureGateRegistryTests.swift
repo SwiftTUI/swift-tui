@@ -15,6 +15,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_RASTER_VERIFY_INCREMENTAL",
         "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE",
         "SWIFTTUI_PRESENTED_PROGRESS_GUARD",
+        "SWIFTTUI_COLLECTION_PROBES",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -28,6 +29,20 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
+  }
+
+  @Test("the collection probes default on in DEBUG and off in release")
+  func collectionProbesDefaultSplitsByConfiguration() {
+    // WP-4: the DEBUG suites that assert on these counters read them
+    // unconditionally, so DEBUG must stay armed. Release defaults off because
+    // the realization counter fires once per realized row — but it stays
+    // armable, because debug and release disagree about per-cell work and a
+    // release timing can only be explained by a release counter.
+    #if DEBUG
+      #expect(FeatureGate.collectionProbes.defaultIsEnabled)
+    #else
+      #expect(!FeatureGate.collectionProbes.defaultIsEnabled)
+    #endif
   }
 
   @Test("the soundness probe defaults on in every configuration")

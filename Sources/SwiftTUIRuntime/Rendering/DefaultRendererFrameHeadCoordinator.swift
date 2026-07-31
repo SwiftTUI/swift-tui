@@ -34,6 +34,11 @@ struct DefaultRendererFrameHeadCoordinator {
     let clock = ContinuousClock()
     let frameHeadTimingRecorder = FrameHeadTimingRecorder()
     elidedFrameTimingRecorder.reset()
+    // Same scope as the timing recorders above: the realized-row and
+    // list-derivation counters are read at commit and divided into this
+    // frame's milliseconds, so they must cover the same head attempt those
+    // milliseconds do.
+    CollectionProbeSample.resetForFrameHead()
     let headStart = elidedFrameTimingRecorder.start()
     let prepareStart = frameHeadTimingRecorder.start()
     defer {

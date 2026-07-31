@@ -136,6 +136,8 @@ package enum FrameRecordDerivation {
       record.inputToCommitFirst = answeredInputs.first.duration(to: sample.commitInstant)
       record.inputToCommitLast = answeredInputs.last.duration(to: sample.commitInstant)
     }
+    record.realizedRowCount = sample.collectionProbes.realizedRows
+    record.listLayoutDerivationCount = sample.collectionProbes.listLayoutDerivations
     // Published for every committed frame, not just the ones answering input:
     // the presents join is keyed on frame ordinal, and a momentum frame's write
     // latency is as real as a notch frame's.

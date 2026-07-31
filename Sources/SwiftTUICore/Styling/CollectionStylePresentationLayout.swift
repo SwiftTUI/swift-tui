@@ -1,26 +1,65 @@
 import Synchronization
 
-/// Test instrumentation (the F118 probe pattern): counts how many times a
+/// Instrumentation (the F118 probe pattern): counts how many times a
 /// list's visible layout is DERIVED, as opposed to consumed from the measured
-/// product. Register item D19 is exactly this count being one per phase;
-/// increments compile out of release.
+/// product. Register item D19 is exactly this count being one per phase.
+///
+/// Armed by ``FeatureGate/collectionProbes`` (`SWIFTTUI_COLLECTION_PROBES`):
+/// always on in DEBUG, opt-in in release. The run loop resets it at each frame
+/// head and samples it at commit into the `list_layout_derivations` column of
+/// `frames.tsv`.
+///
+/// Unlike its sibling ``IndexedChildRealizationProbe`` this probe is not
+/// main-actor isolated — list layout derivation runs on the frame-tail worker —
+/// so the armed latch lives inside the same `Mutex` as the counter. Folding it
+/// in costs nothing: a call already takes that lock, and the probe fires once
+/// per derivation rather than once per row.
 package enum ListLayoutDerivationProbe {
-  private static let counter = Mutex<Int>(0)
+  private struct State {
+    var isArmed: Bool
+    var derivationCount: Int
+  }
 
+  private static let state = Mutex(
+    State(
+      isArmed: FeatureGate.collectionProbes.initialIsEnabled(),
+      derivationCount: 0
+    )
+  )
+
+  /// Whether the probe counts. Settable so a test can measure the disarmed
+  /// path (DEBUG defaults armed, so an unarmed assertion has no other way to
+  /// reach that state).
+  package static var isArmed: Bool {
+    get { state.withLock { $0.isArmed } }
+    set { state.withLock { $0.isArmed = newValue } }
+  }
+
+  /// Derivations since the last ``reset()``. Always readable — the existing
+  /// DEBUG suites assert on it directly and arming is additive to them.
   package static var derivationCount: Int {
-    counter.withLock { $0 }
+    state.withLock { $0.derivationCount }
+  }
+
+  /// The same count, or `nil` when the probe is disarmed — the read the
+  /// per-frame diagnostics sample takes. See
+  /// ``IndexedChildRealizationProbe/realizedChildCountIfArmed`` for why the
+  /// disarmed case must not collapse to zero.
+  package static var derivationCountIfArmed: Int? {
+    state.withLock { $0.isArmed ? $0.derivationCount : nil }
   }
 
   package static func recordDerivation() {
-    #if DEBUG
-      counter.withLock { $0 += 1 }
-    #endif
+    state.withLock {
+      guard $0.isArmed else {
+        return
+      }
+      $0.derivationCount += 1
+    }
   }
 
   package static func reset() {
-    #if DEBUG
-      counter.withLock { $0 = 0 }
-    #endif
+    state.withLock { $0.derivationCount = 0 }
   }
 }
 

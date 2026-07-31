@@ -110,6 +110,8 @@ public enum SummaryReducer {
       answeredInputsPerMovingFrame: emission.answeredInputsPerMovingFrame,
       fullRepaintMovingFrameCount: emission.fullRepaintMovingFrameCount,
       damageRowsPerBoundedMovingFrame: emission.damageRowsPerBoundedMovingFrame,
+      realizedRowsPerMovingFrame: emission.realizedRowsPerMovingFrame,
+      listLayoutDerivationsPerMovingFrame: emission.listLayoutDerivationsPerMovingFrame,
       supersededPresentCount: emission.supersededPresentCount,
       incrementalRasterFrameCount: frames.count { $0.rasterPath == "incremental" },
       repairedIncrementalRasterFrameCount: frames.count {
@@ -166,6 +168,8 @@ public enum SummaryReducer {
     var answeredInputsPerMovingFrame: Double?
     var fullRepaintMovingFrameCount: Int
     var damageRowsPerBoundedMovingFrame: Double?
+    var realizedRowsPerMovingFrame: Double?
+    var listLayoutDerivationsPerMovingFrame: Double?
     var supersededPresentCount: Int
 
     init(movingFrames: [PerfFrameRecord], allFrames: [PerfFrameRecord]) {
@@ -183,6 +187,15 @@ public enum SummaryReducer {
       }
       damageRowsPerBoundedMovingFrame = SummaryReducer.mean(
         movingFrames.compactMap { $0.emission.damageRows.count }.map(Double.init)
+      )
+      // `compactMap` over an optional column, so a run with the collection
+      // probes disarmed contributes no samples and the metric stays `nil`
+      // rather than averaging to zero rows realized.
+      realizedRowsPerMovingFrame = SummaryReducer.mean(
+        movingFrames.compactMap(\.realizedRows).map(Double.init)
+      )
+      listLayoutDerivationsPerMovingFrame = SummaryReducer.mean(
+        movingFrames.compactMap(\.listLayoutDerivations).map(Double.init)
       )
       // Counted over every frame, not just moving ones: a supersede is the
       // writer dropping a frame, and a settle frame superseded by the next

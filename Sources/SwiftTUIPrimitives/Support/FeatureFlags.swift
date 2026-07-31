@@ -17,6 +17,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case rasterVerifyIncremental
   case rasterTrustSoundDamage
   case presentedProgressGuard
+  case collectionProbes
 
   package var environmentVariableName: String {
     switch self {
@@ -30,6 +31,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE"
     case .presentedProgressGuard:
       "SWIFTTUI_PRESENTED_PROGRESS_GUARD"
+    case .collectionProbes:
+      "SWIFTTUI_COLLECTION_PROBES"
     }
   }
 
@@ -55,6 +58,24 @@ package enum FeatureGate: CaseIterable, Sendable {
       // coverage vs the 0.72 fix band — `async-no-cancel` stays the cadence
       // mechanism; the guard stays opt-in insurance.
       false
+    case .collectionProbes:
+      // Configuration-split default (WP-4 of the scroll-latency program).
+      // The collection probes are magnitude counters — realized rows, list
+      // layout derivations — that the existing DEBUG-only test consumers read
+      // unconditionally, so DEBUG must stay armed or those suites lose their
+      // instrument. Release defaults OFF because the realization counter fires
+      // once per realized row: free when disarmed (a static Bool read),
+      // not free enough to impose on every shipped app.
+      //
+      // Release must nonetheless be *armable*: debug scroll timings contradict
+      // release for per-cell work (the D71 lesson), so a release run has to be
+      // able to correlate its milliseconds with rows realized, or every A/B in
+      // this program argues by faith.
+      #if DEBUG
+        true
+      #else
+        false
+      #endif
     }
   }
 
