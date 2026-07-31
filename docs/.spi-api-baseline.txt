@@ -21,7 +21,8 @@ SwiftTUIProfiling.ProfiledMemory.snapshot()
 SwiftTUIProfiling.ProfiledMemorySnapshot
 SwiftTUIProfiling.ProfiledMemorySnapshot.approxBytes
 SwiftTUIProfiling.ProfiledMemorySnapshot.count
-SwiftTUIProfiling.ProfiledMemorySnapshot.init(name:count:approxBytes:)
+SwiftTUIProfiling.ProfiledMemorySnapshot.detail
+SwiftTUIProfiling.ProfiledMemorySnapshot.init(name:count:approxBytes:detail:)
 SwiftTUIProfiling.ProfiledMemorySnapshot.name
 SwiftTUIProfiling.TSVFileSink
 SwiftTUIProfiling.TSVFileSink.init(path:)
