@@ -34,14 +34,31 @@ final class PerfMemorySampler {
   }
 
   func tsv() -> String {
-    var lines = ["elapsed_s\tprovider\tcount\tapprox_bytes"]
+    var lines = ["elapsed_s\tprovider\tcount\tapprox_bytes\tdetail"]
     for sample in samples {
       let elapsed = String(format: "%.3f", sample.elapsedSeconds)
       for snapshot in sample.snapshots {
         let bytes = snapshot.approxBytes.map(String.init) ?? "-"
-        lines.append("\(elapsed)\t\(snapshot.name)\t\(snapshot.count)\t\(bytes)")
+        lines.append(
+          "\(elapsed)\t\(snapshot.name)\t\(snapshot.count)\t\(bytes)"
+            + "\t\(Self.formattedDetail(snapshot.detail))"
+        )
       }
     }
     return lines.joined(separator: "\n") + "\n"
+  }
+
+  /// `key=value` pairs joined by `,`, sorted so a diff between two runs is
+  /// stable. `-` when the provider carries none.
+  ///
+  /// Without this column a cache's occupancy plateau is ambiguous — 20 entries
+  /// serving every lookup and 20 entries missing every lookup produce the same
+  /// `count`. Recorded as the fifth column rather than as extra rows so every
+  /// existing `memory.tsv` consumer keeps its row shape.
+  private static func formattedDetail(_ detail: [String: Int]?) -> String {
+    guard let detail, !detail.isEmpty else {
+      return "-"
+    }
+    return detail.keys.sorted().map { "\($0)=\(detail[$0]!)" }.joined(separator: ",")
   }
 }
