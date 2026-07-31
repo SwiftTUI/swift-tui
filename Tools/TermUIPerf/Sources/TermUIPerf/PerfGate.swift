@@ -184,6 +184,33 @@ extension CompareCommand {
     return try JSONDecoder().decode(PerfAggregateSummary.self, from: data)
   }
 
+  /// Loads the A/A envelope recorded beside an aggregate, if there is one.
+  ///
+  /// Absence is the normal case and is never an error: an envelope is optional
+  /// evidence, and a compare that refused to run without one would make the
+  /// annotation a requirement rather than an improvement.
+  public static func loadAAEnvelope(
+    besideAggregateAt path: String,
+    scenario: String,
+    renderMode: String
+  ) -> PerfAAEnvelope? {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
+      return nil
+    }
+    let directory =
+      isDirectory.boolValue
+      ? URL(fileURLWithPath: path, isDirectory: true)
+      : URL(fileURLWithPath: path).deletingLastPathComponent()
+    let envelopeURL = directory.appendingPathComponent(
+      PerfAAEnvelope.fileName(scenario: scenario, renderMode: renderMode)
+    )
+    guard let data = try? Data(contentsOf: envelopeURL) else {
+      return nil
+    }
+    return try? JSONDecoder().decode(PerfAAEnvelope.self, from: data)
+  }
+
   private static func formatValue(_ value: Double) -> String {
     String(format: "%.4f", value)
   }

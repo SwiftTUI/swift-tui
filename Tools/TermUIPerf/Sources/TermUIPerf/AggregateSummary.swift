@@ -80,6 +80,14 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   public var scenario: String
   public var renderMode: String
   public var iterationCount: Int
+  /// ISO-8601 instant this aggregate was written. Identity, not measurement:
+  /// aggregate filenames are stable and overwrite in place, so without a stamp
+  /// inside the file there is no way to tell a fresh aggregate from one a
+  /// previous session left behind under the same name.
+  ///
+  /// `nil` when the aggregate was reduced rather than written by a run, which
+  /// keeps `AggregateReducer` deterministic and its tests clock-free.
+  public var generatedAt: String?
   public var totalCPUSeconds: PerfStat
   public var committedFrameCount: PerfStat
   public var diagnosticFrameCount: PerfStat
@@ -100,6 +108,13 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   /// Bytes written per frame that moved the scene — the emission number the
   /// program's mitigation tiers exist to reduce.
   public var presentBytesPerMovingFrameMedian: PerfStat
+  /// Rows realized per moving frame, over the iterations that armed the
+  /// collection probes. Empty when the run did not arm them — which is what
+  /// makes a milliseconds-only aggregate legible as such rather than as a
+  /// collection that realized nothing.
+  public var realizedRowsPerMovingFrameMedian: PerfStat
+  /// List visible-layout derivations per moving frame, when armed.
+  public var listLayoutDerivationsPerMovingFrameMedian: PerfStat
   public var pipelineP50Ms: PerfStat
   public var headPrepareP50Ms: PerfStat
   public var headGraphCheckpointCreateP50Ms: PerfStat
@@ -112,6 +127,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     scenario: String,
     renderMode: String,
     iterationCount: Int,
+    generatedAt: String? = nil,
     totalCPUSeconds: PerfStat,
     committedFrameCount: PerfStat,
     diagnosticFrameCount: PerfStat,
@@ -126,6 +142,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     inputToCommitP95Ms: PerfStat = PerfStat(values: []),
     inputToCommitP99Ms: PerfStat = PerfStat(values: []),
     presentBytesPerMovingFrameMedian: PerfStat = PerfStat(values: []),
+    realizedRowsPerMovingFrameMedian: PerfStat = PerfStat(values: []),
+    listLayoutDerivationsPerMovingFrameMedian: PerfStat = PerfStat(values: []),
     pipelineP50Ms: PerfStat = PerfStat(values: []),
     headPrepareP50Ms: PerfStat = PerfStat(values: []),
     headGraphCheckpointCreateP50Ms: PerfStat = PerfStat(values: []),
@@ -137,6 +155,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.scenario = scenario
     self.renderMode = renderMode
     self.iterationCount = iterationCount
+    self.generatedAt = generatedAt
     self.totalCPUSeconds = totalCPUSeconds
     self.committedFrameCount = committedFrameCount
     self.diagnosticFrameCount = diagnosticFrameCount
@@ -151,6 +170,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.inputToCommitP95Ms = inputToCommitP95Ms
     self.inputToCommitP99Ms = inputToCommitP99Ms
     self.presentBytesPerMovingFrameMedian = presentBytesPerMovingFrameMedian
+    self.realizedRowsPerMovingFrameMedian = realizedRowsPerMovingFrameMedian
+    self.listLayoutDerivationsPerMovingFrameMedian = listLayoutDerivationsPerMovingFrameMedian
     self.pipelineP50Ms = pipelineP50Ms
     self.headPrepareP50Ms = headPrepareP50Ms
     self.headGraphCheckpointCreateP50Ms = headGraphCheckpointCreateP50Ms
@@ -164,6 +185,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case scenario
     case renderMode = "render_mode"
     case iterationCount = "iteration_count"
+    case generatedAt = "generated_at"
     case totalCPUSeconds = "total_cpu_seconds"
     case committedFrameCount = "committed_frame_count"
     case diagnosticFrameCount = "diagnostic_frame_count"
@@ -178,6 +200,9 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case inputToCommitP95Ms = "input_to_commit_p95_ms"
     case inputToCommitP99Ms = "input_to_commit_p99_ms"
     case presentBytesPerMovingFrameMedian = "present_bytes_per_moving_frame_median"
+    case realizedRowsPerMovingFrameMedian = "realized_rows_per_moving_frame_median"
+    case listLayoutDerivationsPerMovingFrameMedian =
+      "list_layout_derivations_per_moving_frame_median"
     case pipelineP50Ms = "pipeline_p50_ms"
     case headPrepareP50Ms = "head_prepare_p50_ms"
     case headGraphCheckpointCreateP50Ms = "head_graph_checkpoint_create_p50_ms"
@@ -195,6 +220,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
       scenario: try container.decode(String.self, forKey: .scenario),
       renderMode: try container.decode(String.self, forKey: .renderMode),
       iterationCount: try container.decode(Int.self, forKey: .iterationCount),
+      generatedAt: try container.decodeIfPresent(String.self, forKey: .generatedAt),
       totalCPUSeconds: try container.decode(PerfStat.self, forKey: .totalCPUSeconds),
       committedFrameCount: try container.decode(PerfStat.self, forKey: .committedFrameCount),
       diagnosticFrameCount: try container.decode(
@@ -236,6 +262,14 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
       presentBytesPerMovingFrameMedian: try container.decodeIfPresent(
         PerfStat.self,
         forKey: .presentBytesPerMovingFrameMedian
+      ) ?? PerfStat(values: []),
+      realizedRowsPerMovingFrameMedian: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .realizedRowsPerMovingFrameMedian
+      ) ?? PerfStat(values: []),
+      listLayoutDerivationsPerMovingFrameMedian: try container.decodeIfPresent(
+        PerfStat.self,
+        forKey: .listLayoutDerivationsPerMovingFrameMedian
       ) ?? PerfStat(values: []),
       pipelineP50Ms: try container.decodeIfPresent(
         PerfStat.self,
@@ -299,6 +333,10 @@ public enum AggregateReducer {
       inputToCommitP99Ms: PerfStat(values: summaries.compactMap(\.inputToCommitFirstMs.p99)),
       presentBytesPerMovingFrameMedian: PerfStat(
         values: summaries.compactMap(\.presentBytesPerMovingFrame)),
+      realizedRowsPerMovingFrameMedian: PerfStat(
+        values: summaries.compactMap(\.realizedRowsPerMovingFrame)),
+      listLayoutDerivationsPerMovingFrameMedian: PerfStat(
+        values: summaries.compactMap(\.listLayoutDerivationsPerMovingFrame)),
       pipelineP50Ms: PerfStat(values: summaries.compactMap(\.pipelineMs.p50)),
       headPrepareP50Ms: PerfStat(values: summaries.compactMap(\.headPrepareMs.p50)),
       headGraphCheckpointCreateP50Ms: PerfStat(
@@ -334,6 +372,15 @@ extension AggregateReducer {
     lines.append(line("input to commit p99 ms", aggregate.inputToCommitP99Ms))
     lines.append(
       line("present bytes/moving frame", aggregate.presentBytesPerMovingFrameMedian)
+    )
+    lines.append(
+      line("realized rows/moving frame", aggregate.realizedRowsPerMovingFrameMedian)
+    )
+    lines.append(
+      line(
+        "list layout derivations/moving frame",
+        aggregate.listLayoutDerivationsPerMovingFrameMedian
+      )
     )
     lines.append(line("pipeline p50 ms", aggregate.pipelineP50Ms))
     lines.append(line("head prepare p50 ms", aggregate.headPrepareP50Ms))

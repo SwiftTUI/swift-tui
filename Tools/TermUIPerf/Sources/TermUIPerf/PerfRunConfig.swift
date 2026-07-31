@@ -19,6 +19,13 @@ public struct PerfRunConfig: Equatable, Sendable {
   public var artifactsRoot: String
   public var configuration: String
   public var terminalSize: PerfTerminalSize?
+  /// Suffix for the aggregate filename, so two runs into one artifact root do
+  /// not overwrite each other. `nil` keeps the historical filename exactly, so
+  /// every existing compare invocation and script still resolves.
+  public var tag: String?
+  /// Run the scenario twice back-to-back and record the observed A/A envelope
+  /// instead of producing a single result.
+  public var aaCheck: Bool
 
   public init(
     scenario: PerfScenarioName,
@@ -26,7 +33,9 @@ public struct PerfRunConfig: Equatable, Sendable {
     iterations: Int = defaultIterations,
     artifactsRoot: String = defaultArtifactsRoot,
     configuration: String = defaultConfiguration,
-    terminalSize: PerfTerminalSize? = nil
+    terminalSize: PerfTerminalSize? = nil,
+    tag: String? = nil,
+    aaCheck: Bool = false
   ) {
     self.scenario = scenario
     self.modes = modes
@@ -34,6 +43,8 @@ public struct PerfRunConfig: Equatable, Sendable {
     self.artifactsRoot = artifactsRoot
     self.configuration = configuration
     self.terminalSize = terminalSize
+    self.tag = tag
+    self.aaCheck = aaCheck
   }
 }
 
@@ -122,6 +133,7 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
   case compareArgumentCount(Int)
   case invalidSigma(String)
   case invalidTerminalSize(String)
+  case invalidTag(String)
 
   public var description: String {
     switch self {
@@ -151,6 +163,10 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
       return "invalid sigma '\(value)'. Use a non-negative number."
     case .invalidTerminalSize(let value):
       return "invalid terminal size '\(value)'. Use positive CxR dimensions."
+    case .invalidTag(let value):
+      return
+        "invalid tag '\(value)'. Use letters, digits, '.', '_' or '-' — the tag "
+        + "becomes part of a filename."
     }
   }
 
@@ -197,6 +213,8 @@ public enum PerfCommandParser {
     var artifactsRoot = PerfRunConfig.defaultArtifactsRoot
     var configuration = PerfRunConfig.defaultConfiguration
     var terminalSize: PerfTerminalSize?
+    var tag: String?
+    var aaCheck = false
 
     var index = arguments.startIndex
     while index < arguments.endIndex {
@@ -224,6 +242,11 @@ public enum PerfCommandParser {
       case "--terminal-size":
         let value = try value(after: argument, in: arguments, at: &index)
         terminalSize = try parseTerminalSize(value)
+      case "--tag":
+        let value = try value(after: argument, in: arguments, at: &index)
+        tag = try validatedTag(value)
+      case "--aa-check":
+        aaCheck = true
       default:
         if argument.hasPrefix("-") {
           throw PerfParseError.unknownOption(argument)
@@ -243,7 +266,9 @@ public enum PerfCommandParser {
       iterations: iterations,
       artifactsRoot: artifactsRoot,
       configuration: configuration,
-      terminalSize: terminalSize
+      terminalSize: terminalSize,
+      tag: tag,
+      aaCheck: aaCheck
     )
   }
 
@@ -300,6 +325,18 @@ public enum PerfCommandParser {
     guard arguments.isEmpty else {
       throw PerfParseError.unexpectedArgument(arguments[0])
     }
+  }
+
+  /// A tag becomes part of a filename, so it is validated at the boundary
+  /// rather than trusted: a value containing `/` would silently write the
+  /// aggregate somewhere other than the artifact root, and an empty one would
+  /// produce a trailing-dash filename that no longer round-trips.
+  private static func validatedTag(_ value: String) throws -> String {
+    let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+    guard !value.isEmpty, value.allSatisfy({ allowed.contains($0) }) else {
+      throw PerfParseError.invalidTag(value)
+    }
+    return value
   }
 
   private static func parseTerminalSize(_ value: String) throws -> PerfTerminalSize {

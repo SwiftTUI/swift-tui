@@ -120,6 +120,51 @@ struct ScrollLatencyReductionTests {
     #expect(records[2].inputToWriteMs == 11.00)
   }
 
+  // MARK: - T-30 collection probe columns
+
+  @Test("the collection probe columns distinguish disarmed from zero")
+  func collectionProbeColumnsDistinguishDisarmedFromZero() throws {
+    let records = try PerfFrameDiagnosticsTSVReader.parse(
+      """
+      frame\trealized_rows\tlist_layout_derivations\ttail_job_state
+      1\t160\t8\tcompleted
+      2\t0\t0\tcompleted
+      3\t-\t-\tcompleted
+      """
+    )
+
+    #expect(records[0].realizedRows == 160)
+    #expect(records[0].listLayoutDerivations == 8)
+    // Frame 2 is a real measurement of no work — a fully windowed collection
+    // that realized nothing. Frame 3 is the absence of a measurement.
+    #expect(records[1].realizedRows == 0)
+    #expect(records[1].listLayoutDerivations == 0)
+    #expect(records[2].realizedRows == nil)
+    #expect(records[2].listLayoutDerivations == nil)
+  }
+
+  @Test("a disarmed run reduces to nil rather than averaging absence as zero")
+  func disarmedProbesReduceToNil() {
+    let armed = reduce([
+      frame(
+        1, causes: "input", answered: 1, bytes: 100, realizedRows: 160, listLayoutDerivations: 8),
+      frame(
+        2, causes: "input", answered: 1, bytes: 100, realizedRows: 200, listLayoutDerivations: 12),
+    ])
+    #expect(armed.realizedRowsPerMovingFrame == 180)
+    #expect(armed.listLayoutDerivationsPerMovingFrame == 10)
+
+    // The same two frames from a run that never armed the probes. Reporting 0
+    // here would read as a collection that realized nothing per frame — the
+    // exact shape of a windowing win, invented out of an unconfigured run.
+    let disarmed = reduce([
+      frame(1, causes: "input", answered: 1, bytes: 100),
+      frame(2, causes: "input", answered: 1, bytes: 100),
+    ])
+    #expect(disarmed.realizedRowsPerMovingFrame == nil)
+    #expect(disarmed.listLayoutDerivationsPerMovingFrame == nil)
+  }
+
   // MARK: - T-21 reducer
 
   @Test("moving frames are the ones that answered input or woke on a deadline")
@@ -356,10 +401,14 @@ struct ScrollLatencyReductionTests {
     causes: String,
     answered: Int,
     bytes: Int,
-    damageRows: PerfDamageRows = .unknown
+    damageRows: PerfDamageRows = .unknown,
+    realizedRows: Int? = nil,
+    listLayoutDerivations: Int? = nil
   ) -> PerfFrameRecord {
     PerfFrameRecord(
       frameNumber: number,
+      realizedRows: realizedRows,
+      listLayoutDerivations: listLayoutDerivations,
       tailJobState: "completed",
       causes: causes,
       emission: PerfFrameEmission(presentBytes: bytes, damageRows: damageRows),
