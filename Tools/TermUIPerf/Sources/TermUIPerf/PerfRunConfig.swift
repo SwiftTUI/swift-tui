@@ -85,6 +85,8 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case syntheticObservableFanout = "synthetic-observable-fanout"
   case syntheticMeshGradient = "synthetic-mesh-gradient"
   case syntheticMeshText = "synthetic-mesh-text"
+  case syntheticLineLimitPreview = "synthetic-line-limit-preview"
+  case syntheticRichSteadyRepaint = "synthetic-rich-steady-repaint"
   case sheetOpenLatency = "sheet-open-latency"
   case galleryTabSwitch = "gallery-tab-switch"
   case fileBrowserSelection = "file-browser-selection"

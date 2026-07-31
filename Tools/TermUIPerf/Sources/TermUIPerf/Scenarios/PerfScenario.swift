@@ -164,6 +164,8 @@ public enum PerfScenarioRegistry {
       SyntheticObservableFanoutScenario(),
       SyntheticMeshGradientScenario(),
       SyntheticMeshTextScenario(),
+      SyntheticLineLimitPreviewScenario(),
+      SyntheticRichSteadyRepaintScenario(),
       SheetOpenLatencyScenario(),
       GalleryTabSwitchScenario(),
       FileBrowserSelectionScenario(),
