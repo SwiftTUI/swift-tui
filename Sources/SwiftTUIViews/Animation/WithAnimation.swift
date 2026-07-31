@@ -122,6 +122,19 @@ public func withTransaction<Result>(
 /// and lets the closure write view state directly — without it the
 /// closure would be `nonisolated` and every `@State` write inside would
 /// need a `MainActor.assumeIsolated` hop.
+///
+/// The closure is wrapped in its registration-time
+/// ``ImperativeAuthoringContextSnapshot``, the same way toolbar and key
+/// handlers are.  This is what makes the paragraph above *true* rather
+/// than merely intended: the controller fires completions outside any
+/// resolve pass, and a `@State` write with no authoring context bound
+/// does not fail — `State.wrappedValue`'s setter silently falls back to
+/// `box.updateSeedValue`, updating the seed a *fresh* node would start
+/// from instead of the live slot.  Nothing invalidates and the value
+/// never changes, which is indistinguishable from the write not
+/// happening.  Snapshotting stores identity rather than the `ViewNode`,
+/// so a completion that fires after its owner is gone recovers no
+/// location and is inert rather than resurrecting a dead node.
 @MainActor
 @discardableResult
 public func withAnimation<Result>(
@@ -132,9 +145,15 @@ public func withAnimation<Result>(
 ) rethrows -> Result {
   _ = completionCriteria  // reserved for when logically/removed diverge
   let batchID = AnimationBatchIDAllocator.next()
+  let scopedCompletion: @MainActor @Sendable () -> Void
+  if let snapshot = currentImperativeAuthoringContextSnapshot() {
+    scopedCompletion = { withImperativeAuthoringContext(snapshot) { completion() } }
+  } else {
+    scopedCompletion = completion
+  }
   AnimationCompletionStorage.effectiveSink?.registerCompletion(
     batchID: batchID,
-    closure: completion
+    closure: scopedCompletion
   )
   return try AnimationContextStorage.$currentBatchID.withValue(batchID) {
     try withAnimation(animation, body)

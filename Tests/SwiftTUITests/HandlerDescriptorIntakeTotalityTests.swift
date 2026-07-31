@@ -36,12 +36,23 @@ struct HandlerDescriptorIntakeTotalityTests {
   ///   decorators ARE the dispatch seam for gesture callbacks; they
   ///   re-establish the scope captured at `_makeRecognizer` (which runs
   ///   under the intake's `withRegistrationEnvironmentScope`).
+  /// - `Animation/WithAnimation.swift` — `withAnimation(…, completion:)` is a
+  ///   free function the *user* calls (from an action closure, a `.task`, or
+  ///   anywhere else), so it has no `ResolveContext` to build an intake from
+  ///   and no registry to forward to; it self-wraps at registration, the same
+  ///   shape as `EnvironmentActions`. The wrap is required rather than
+  ///   optional: the controller fires completions outside any resolve pass,
+  ///   and an unwrapped `@State` write there degrades to
+  ///   `box.updateSeedValue` — silently, since the setter has no failure
+  ///   channel. That is this comment block's own "missed capture" family,
+  ///   which is why the site is named here rather than left to drift.
   private static let imperativeWrapExemptions: Set<String> = [
     "State/AuthoringContext.swift",
     "State/HandlerDescriptorIntake.swift",
     "Environment/EnvironmentActions.swift",
     "ActionScopes/ToolbarItem.swift",
     "Gestures/GestureModifierDecorators.swift",
+    "Animation/WithAnimation.swift",
   ]
 
   /// Files allowed to call registry registration methods directly:
