@@ -373,3 +373,16 @@ extension DrawNode {
       && environmentSnapshot == other.environmentSnapshot
   }
 }
+
+extension DrawNode: DeeplyNestedValueTree {
+  /// `children` *is* the storage here, so the drain pays one
+  /// `recomputeSubtreeAggregates` on the root being drained and touches no
+  /// other node. Measured teardown bound without the flatten: 248 B inline,
+  /// ~267 B of stack per level, depth (1952, 1984] on a 512 KiB worker stack —
+  /// the same cliff class as `MeasuredNode`/`PlacedNode`, and reachable from
+  /// the retained previous-frame draw products, not just live frame trees.
+  package var _childrenForRelease: [DrawNode] {
+    get { children }
+    set { children = newValue }
+  }
+}

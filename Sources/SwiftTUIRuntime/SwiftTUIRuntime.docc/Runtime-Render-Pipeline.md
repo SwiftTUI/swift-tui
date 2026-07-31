@@ -173,13 +173,18 @@ Dispatch stack (512 KiB) rather than the main thread's budget. Every tree walker
 reachable from the tail is an explicit-stack loop for that reason.
 
 One depth-limited operation remains on that thread and it is not a walker:
-**releasing** a phase-product tree. `ResolvedNode`, `MeasuredNode`, and
-`PlacedNode` store their children inline as `[Self]`, so the compiler's own
-value witnesses recurse once per level when a tree is destroyed — with no
-framework code in the trace. Measured on macOS/arm64, the cost is linear in
-depth: ~475 B per level for `ResolvedNode` (~1104 levels at 512 KiB) and ~267 B
-per level for `MeasuredNode` and `PlacedNode` (~1968 levels). One authored
-`VStack` nesting level costs about three `ResolvedNode` levels.
+**releasing** a phase-product tree. `ResolvedNode`, `MeasuredNode`,
+`PlacedNode`, and `DrawNode` store their children inline as `[Self]`, so the
+compiler's own value witnesses recurse once per level when a tree is destroyed
+— with no framework code in the trace. Measured on macOS/arm64, the cost is
+linear in depth: ~475 B per level for `ResolvedNode` (~1104 levels at 512 KiB)
+and ~267 B per level for `MeasuredNode`, `PlacedNode`, and `DrawNode` (~1968
+levels; the per-level cost floors at the array-storage destroy frames, so
+`DrawNode`'s smaller inline size lands in the same bracket). One authored
+`VStack` nesting level costs about three `ResolvedNode` levels. The retained
+previous-frame products hold a full `DrawNode` tree between frames, so deep
+draw trees are reachable from retained-state teardown as well as from live
+frames.
 
 Code that drops a tree of unbounded depth on a small stack should call
 `flattenForRelease()` (see `DeeplyNestedValueTree`), which drains the subtree
@@ -303,7 +308,11 @@ expensive way:
   whose colour it shows. A panel's border ring takes its background from the
   interior it encloses; a control's focus fill shows through the boundary cell
   of the adjacent row. A change confined to a node's bounds can therefore
-  repaint the cells immediately around them.
+  repaint the cells immediately around them. The one-cell reach is an assumed
+  painter invariant rather than a statically checked one; its enforcement is
+  the F13 verify oracle, which re-rasters every incremental frame in DEBUG and
+  asserts on divergence, so a painter that outgrows the margin reds the suites
+  instead of shipping quietly.
 - **Animation frames barrier.** Property interpolation rewrites the resolved
   tree after invalidation is computed, and the placed animation overlay
   decorates the current tree with state the retained baseline does not carry.

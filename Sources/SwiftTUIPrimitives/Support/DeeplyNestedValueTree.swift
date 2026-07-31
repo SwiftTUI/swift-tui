@@ -16,6 +16,11 @@
 /// | `ResolvedNode` | 1410 B      | ~475 B          | ~1104               |
 /// | `MeasuredNode` | 376 B       | ~267 B          | ~1968               |
 /// | `PlacedNode`   | 552 B       | ~267 B          | ~1968               |
+/// | `DrawNode`     | 248 B       | ~267 B          | ~1968               |
+///
+/// The per-level cost floors at the array-storage destroy frames, which is why
+/// `DrawNode`'s smaller inline size lands in the same bracket as `MeasuredNode`
+/// and `PlacedNode`.
 ///
 /// 512 KiB is the number that matters: it is the Dispatch worker stack class
 /// the frame tail runs on, and after the D72 walker conversions teardown is the

@@ -110,13 +110,12 @@ enum FrameTailPresentationDamageResolver {
       return .init(damage: nil, barriers: [.placedRootChanged])
     }
 
-    let currentPlacedIndex = indexPlacedNodes(placed)
     // G12: the identity-keyed retained tables collapse duplicate explicit ids
     // last-writer-wins, so any consumer pairing "the" node for an identity can
     // silently mix siblings. Duplicates already emit a deterministic
     // `identity.duplicateEntity` `RuntimeIssue`, so barriering them costs
     // nothing legitimate.
-    guard currentPlacedIndex.collidingIdentities.isEmpty,
+    guard !hasCollidingPlacedIdentities(placed),
       previousFrameIndex.duplicateRuntimeIdentities.isEmpty
     else {
       return .init(damage: nil, barriers: [.duplicateInvalidatedIdentity])
@@ -219,6 +218,13 @@ enum FrameTailPresentationDamageResolver {
   /// above me" left four scenarios in the full-suite F13 census still
   /// diverging, every one of them exactly one row from a changed control fill
   /// with no border node anywhere on the path.
+  ///
+  /// The one-cell reach is an assumed painter invariant, not a statically
+  /// checked one — nothing prevents a future painter from sampling state two
+  /// cells away. The enforcement is the F13 verify oracle: DEBUG re-rasters
+  /// every incremental frame and the soundness probe asserts on divergence, so
+  /// a painter that outgrows the margin reds the suites rather than shipping
+  /// quietly — provided some suite paints it on an incremental frame.
   private static func damage(
     _ bounds: CellRect,
     into textRowRanges: inout [Int: [Range<Int>]]
@@ -233,6 +239,23 @@ enum FrameTailPresentationDamageResolver {
       ),
       into: &textRowRanges
     )
+  }
+
+  /// Whether any identity appears on more than one placed node.
+  ///
+  /// A lightweight scan rather than ``indexPlacedNodes(_:)``: the
+  /// stable-topology path needs only the collision fact, not the node and
+  /// parent maps the opt-in overlay prototype builds.
+  private static func hasCollidingPlacedIdentities(_ root: PlacedNode) -> Bool {
+    var seen: Set<Identity> = []
+    var stack: [PlacedNode] = [root]
+    while let node = stack.popLast() {
+      if !seen.insert(node.identity).inserted {
+        return true
+      }
+      stack.append(contentsOf: node.children)
+    }
+    return false
   }
 
   /// The current frame's placed tree, keyed by identity, together with the
@@ -469,8 +492,6 @@ enum FrameTailRasterReuseBarrier: String, Hashable, Sendable, CaseIterable {
   case missingRetainedFrame = "missing_retained_frame"
   case rootInvalidated = "root_invalidated"
   case emptyInvalidation = "empty_invalidation"
-  case unresolvedInvalidatedIdentity = "unresolved_invalidated_identity"
-  case unstableCleanSiblingBounds = "unstable_clean_sibling_bounds"
   case surfaceTopologyChanged = "surface_topology_changed"
   /// The previous frame's placed tree was rooted at a different identity, so
   /// the two placed paths are not comparable.
