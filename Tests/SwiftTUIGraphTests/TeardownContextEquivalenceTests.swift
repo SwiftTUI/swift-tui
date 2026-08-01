@@ -135,10 +135,16 @@ struct TeardownContextEquivalenceTests {
     }
 
     graph.beginFrame()
-    let countBefore = graph.debugReachabilityContextBuildCount
+    // The context-build counter only exists in DEBUG builds; the release
+    // soundness lane still exercises the teardown's behavioral expectations.
+    #if DEBUG
+      let countBefore = graph.debugReachabilityContextBuildCount
+    #endif
     graph.removeSubtree(rootedAt: nodes[0])
 
-    #expect(graph.debugReachabilityContextBuildCount == countBefore + 1)
+    #if DEBUG
+      #expect(graph.debugReachabilityContextBuildCount == countBefore + 1)
+    #endif
     #expect(nodes.allSatisfy { graph.nodeIfExists(for: $0.viewNodeID) == nil })
   }
 
@@ -175,10 +181,14 @@ struct TeardownContextEquivalenceTests {
     }
 
     graph.beginFrame()
-    let countBefore = graph.debugReachabilityContextBuildCount
+    #if DEBUG
+      let countBefore = graph.debugReachabilityContextBuildCount
+    #endif
     graph.removeSubtree(rootedAt: subtreeRoot)
 
-    #expect(graph.debugReachabilityContextBuildCount == countBefore)
+    #if DEBUG
+      #expect(graph.debugReachabilityContextBuildCount == countBefore)
+    #endif
     #expect(identities.allSatisfy { graph.nodeIfExists(for: $0) == nil })
   }
 
