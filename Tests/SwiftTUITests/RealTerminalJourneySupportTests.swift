@@ -54,8 +54,16 @@ struct RealTerminalJourneySupportTests {
     let pty = try RealTerminalPTYPair.open(size: CellSize(width: 80, height: 24))
     var screen = ANSIVisibleScreen(size: CellSize(width: 80, height: 24))
     let slave = pty.slave
+    // Seed a small burst synchronously before arming the wait: on a starved
+    // CI runner the detached writer may not be scheduled inside the wait
+    // window at all, and this test measures transcript reporting under
+    // output, not task-startup latency. The seed must stay well under the
+    // smallest PTY input queue (macOS caps near 1 KiB) — with no reader
+    // armed yet, a larger synchronous write deadlocks the test.
+    let seed = Array(repeating: UInt8(ascii: "x"), count: 256)
+    try writeAllBytes(seed, to: slave)
+    let chunk = Array(repeating: UInt8(ascii: "x"), count: 4_096)
     let writer = Task.detached {
-      let chunk = Array(repeating: UInt8(ascii: "x"), count: 4_096)
       while !Task.isCancelled {
         do {
           try writeAllBytes(chunk, to: slave)
@@ -71,7 +79,7 @@ struct RealTerminalJourneySupportTests {
       _ = try await waitForANSIVisibleScreen(
         on: pty.master,
         screen: &screen,
-        deadline: .now() + .milliseconds(100)
+        deadline: .now() + .seconds(1)
       ) { _ in false }
       Issue.record("expected continuous output to time out")
     } catch let error as RealTerminalJourneyError {
@@ -93,7 +101,7 @@ struct RealTerminalJourneySupportTests {
     writer.cancel()
     pty.close()
     _ = await writer.value
-    #expect(startedAt.duration(to: clock.now) < .seconds(2))
+    #expect(startedAt.duration(to: clock.now) < .seconds(5))
   }
 
   @Test("cancelling a visible-screen wait tears down its readable source")

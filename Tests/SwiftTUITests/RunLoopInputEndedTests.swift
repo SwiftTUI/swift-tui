@@ -5,8 +5,12 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
+// Five minutes is the cadence-suite hang bound, not an expectation: on the
+// degraded amd64 CI runner class (docs/KNOWN-TEST-FLAKES.md entry 12) these
+// EOF exits run 60–120 s wall under parallel-gate load, and a one-minute
+// limit turned starvation into a deterministic red.
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(5)))
 struct RunLoopInputEndedTests {
   @Test("input EOF exits while the production-shaped signal stream stays live")
   func inputEOFExitsWithLiveSignalReader() async throws {

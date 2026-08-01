@@ -444,6 +444,30 @@ rows before the assertion. The test now sends `.down` and `.dragged`, asserts
 the activation-threshold outcome, then sends `.up` for cleanup — the entry-6
 boundary.
 
+### 12. amd64 runner-class degradation since 2026-07-29 — timing-sensitive suites turned deterministically red
+
+**Signature.** `Linux repo gate (amd64)` red on every run from 2026-07-29
+01:24 onward (last green: `b9100b145`, 2026-07-28 23:52), always with
+`RunLoopInputEndedTests` ×3 exceeding the old 60 s suite limit (tests wind
+down at 84–112 s wall), usually with the visible-screen transcript test
+(0 bytes inside its old 100 ms window), intermittently with entry 6/11-class
+momentum overshoots.
+
+**Why this is environmental, with direct evidence.** The commit window
+between the last green and the first red (`b9100b145..9b4d82a64`) contains
+only a docs commit and a public-API-inventory script commit. The decisive
+experiment: rerunning the last-green run itself (`gh run rerun 30409356099`,
+2026-08-01) — identical tree, identical workflow — reproduced the
+`RunLoopInputEndedTests` trio plus a scroll-024 firing on unchanged code.
+The arm64 Linux container gate and macOS gate stayed green throughout.
+
+**Response.** Timing-sensitive suites get condition-based or widened
+boundaries rather than wall-clock optimism: `RunLoopInputEndedTests` moved to
+the five-minute cadence-suite hang bound, the visible-screen test pre-seeds
+its PTY before arming the wait (entry-6/11 fixes cover the momentum class).
+A suite that still exceeds the five-minute bound on this runner class is a
+real wedge, not this entry.
+
 ---
 
 ---
