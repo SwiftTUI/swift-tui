@@ -37,6 +37,10 @@ fi
 SWIFTTUI_SOUNDNESS_PROBE=1 && export SWIFTTUI_SOUNDNESS_PROBE
 SWIFTTUI_SOUNDNESS_PROBE_SAMPLE=1 && export SWIFTTUI_SOUNDNESS_PROBE_SAMPLE
 SWIFTTUI_SOUNDNESS_PROBE_TRACE=1 && export SWIFTTUI_SOUNDNESS_PROBE_TRACE
+# The collection probes (realization + list-layout derivation) are DEBUG-default
+# and release-opt-in; the windowing suites assert through them, so this lane
+# arms them the same way it forces the soundness probe on.
+SWIFTTUI_COLLECTION_PROBES=1 && export SWIFTTUI_COLLECTION_PROBES
 
 mode="${1:-}"
 case "$mode" in

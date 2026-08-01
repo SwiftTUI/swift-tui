@@ -93,7 +93,9 @@ struct CollectionBookkeepingTests {
       context: .init(identity: testIdentity("IndexedSelection"), applyEnvironmentValues: false),
       proposal: .init(width: .finite(20), height: .finite(10))
     )
-    let windowed = CollectionSelectionProbe.membershipTests
+    #if DEBUG
+      let windowed = CollectionSelectionProbe.membershipTests
+    #endif
 
     // The eager spelling of the same collection has no id index to consult,
     // so it still asks about every row — the contrast is the measurement.
@@ -107,15 +109,19 @@ struct CollectionBookkeepingTests {
       context: .init(identity: testIdentity("EagerSelection"), applyEnvironmentValues: false),
       proposal: .init(width: .finite(20), height: .finite(10))
     )
-    let eager = CollectionSelectionProbe.membershipTests
-
-    #expect(eager > 1_000, "the eager path scans until it matches, as it always has: \(eager)")
-    #expect(
-      windowed == 0,
-      """
-      the windowed path locates the selection by id and asks about no row at       all, but asked about \(windowed) (eager asked about \(eager))
-      """
-    )
+    // The selection probe's increments compile out of release, so the
+    // contrast oracle only exists in DEBUG builds; both renders still run in
+    // release.
+    #if DEBUG
+      let eager = CollectionSelectionProbe.membershipTests
+      #expect(eager > 1_000, "the eager path scans until it matches, as it always has: \(eager)")
+      #expect(
+        windowed == 0,
+        """
+        the windowed path locates the selection by id and asks about no row at       all, but asked about \(windowed) (eager asked about \(eager))
+        """
+      )
+    #endif
   }
 
   @Test("T-45: an eagerly-resolved large collection reports the fork")

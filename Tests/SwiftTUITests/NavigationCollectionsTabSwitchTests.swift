@@ -135,17 +135,22 @@ struct NavigationCollectionsTabSwitchTests {
     // wake-frame reuse certification ever stops these re-resolves entirely,
     // adoptionCount drops to 0 — revisit this expectation together with the
     // F145 evidence; both premises change at once.
-    #expect(
-      IndexedChildSourceArtifactsProbe.adoptionCount > 0,
-      "wake-frame source rebuilds must adopt retained identity artifacts"
-    )
-    #expect(
-      IndexedChildSourceArtifactsProbe.freshMintCount == 0,
-      """
-      no lazy container's ids changed across idle wakes — a fresh mint means \
-      adoption silently disengaged
-      """
-    )
+    // The artifacts probe's increments compile out of release, so the
+    // adoption oracle only exists in DEBUG builds; the release soundness
+    // lane still exercises the wake-frame re-resolve path itself.
+    #if DEBUG
+      #expect(
+        IndexedChildSourceArtifactsProbe.adoptionCount > 0,
+        "wake-frame source rebuilds must adopt retained identity artifacts"
+      )
+      #expect(
+        IndexedChildSourceArtifactsProbe.freshMintCount == 0,
+        """
+        no lazy container's ids changed across idle wakes — a fresh mint means \
+        adoption silently disengaged
+        """
+      )
+    #endif
   }
 
   /// Wake-frame reuse certification (proposal 2026-07-21-001, closed via
