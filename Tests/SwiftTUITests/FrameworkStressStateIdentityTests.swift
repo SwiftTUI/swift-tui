@@ -2336,6 +2336,152 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
+// MARK: - Attempt 035: Conditional branch under a background modifier starts a fresh lifetime
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 035 background conditional branch does not resurrect state")
+  func stateIdentity035BackgroundConditionalBranchDoesNotResurrectState() throws {
+    // Hypothesis: a single composite child inside `.background { if flag { … } }` resolves
+    // through the conditional's elements path without a graph node of its own, so its state
+    // slots land on a still-live ambient owner and survive branch removal.
+    let shared = StateIdentitySharedCounter(label: "035")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity035"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StateIdentity035Root(shared: shared)
+    }
+    defer { harness.shutdown() }
+
+    var reinsertionFrames: [String] = []
+    for _ in 0..<4 {
+      _ = try harness.clickText("035 Increment")
+      var frame = try harness.clickText("Remove 035")
+      #expect(!frame.contains("035 Count"))
+      frame = try harness.clickText("Insert 035")
+      reinsertionFrames.append(frame)
+    }
+
+    #expect(reinsertionFrames.allSatisfy { $0.contains("035 Count 0") })
+  }
+
+  private struct StateIdentity035Root: View {
+    let shared: StateIdentitySharedCounter
+    @State private var isVisible = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isVisible ? "Remove 035" : "Insert 035") { isVisible.toggle() }
+        Text("035 Host")
+          .frame(width: 40, height: 5, alignment: .topLeading)
+          .background(alignment: .bottomLeading) {
+            if isVisible {
+              shared
+            }
+          }
+      }
+    }
+  }
+}
+
+// MARK: - Attempt 036: Conditional branch under an overlay modifier starts a fresh lifetime
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 036 overlay conditional branch does not resurrect state")
+  func stateIdentity036OverlayConditionalBranchDoesNotResurrectState() throws {
+    // Overlay twin of 035: same elements-path seam, secondary content hosted above the base.
+    let shared = StateIdentitySharedCounter(label: "036")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity036"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StateIdentity036Root(shared: shared)
+    }
+    defer { harness.shutdown() }
+
+    var reinsertionFrames: [String] = []
+    for _ in 0..<4 {
+      _ = try harness.clickText("036 Increment")
+      var frame = try harness.clickText("Remove 036")
+      #expect(!frame.contains("036 Count"))
+      frame = try harness.clickText("Insert 036")
+      reinsertionFrames.append(frame)
+    }
+
+    #expect(reinsertionFrames.allSatisfy { $0.contains("036 Count 0") })
+  }
+
+  private struct StateIdentity036Root: View {
+    let shared: StateIdentitySharedCounter
+    @State private var isVisible = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isVisible ? "Remove 036" : "Insert 036") { isVisible.toggle() }
+        Text("036 Host")
+          .frame(width: 40, height: 5, alignment: .topLeading)
+          .overlay(alignment: .bottomLeading) {
+            if isVisible {
+              shared
+            }
+          }
+      }
+    }
+  }
+}
+
+// MARK: - Attempt 037: Body-level conditional branch starts a fresh lifetime
+
+extension FrameworkStressStateIdentityTests {
+  @Test("stress state identity 037 body-level conditional branch does not resurrect state")
+  func stateIdentity037BodyLevelConditionalBranchDoesNotResurrectState() throws {
+    // No modifier involved: a wrapper whose body IS the conditional resolves the branch
+    // through the same elements path, so the branch child's state must still reset.
+    let shared = StateIdentitySharedCounter(label: "037")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StateIdentity037"),
+      size: .init(width: 48, height: 9)
+    ) {
+      StateIdentity037Root(shared: shared)
+    }
+    defer { harness.shutdown() }
+
+    var reinsertionFrames: [String] = []
+    for _ in 0..<4 {
+      _ = try harness.clickText("037 Increment")
+      var frame = try harness.clickText("Remove 037")
+      #expect(!frame.contains("037 Count"))
+      frame = try harness.clickText("Insert 037")
+      reinsertionFrames.append(frame)
+    }
+
+    #expect(reinsertionFrames.allSatisfy { $0.contains("037 Count 0") })
+  }
+
+  private struct StateIdentity037Branch: View {
+    let shared: StateIdentitySharedCounter
+    let isVisible: Bool
+
+    var body: some View {
+      if isVisible {
+        shared
+      }
+    }
+  }
+
+  private struct StateIdentity037Root: View {
+    let shared: StateIdentitySharedCounter
+    @State private var isVisible = true
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 0) {
+        Button(isVisible ? "Remove 037" : "Insert 037") { isVisible.toggle() }
+        StateIdentity037Branch(shared: shared, isVisible: isVisible)
+      }
+    }
+  }
+}
+
 private struct StateIdentitySharedCounter: View {
   let label: String
   @State private var count = 0

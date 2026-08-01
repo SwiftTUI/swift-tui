@@ -1010,6 +1010,29 @@ package final class AnimationController: Sendable {
       activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
     )
 
+    // Re-home registrations whose node id was aliased away by single-child
+    // subtree re-stamping: a node-backed conditional branch child registers
+    // under its own mint, but a one-element chain level absorbs its output
+    // and the committed tree carries the absorber's stamp. Every channel
+    // below — the occurrence diff, the insertion lookup, the adopted-slot
+    // removal channel, and the live-node prune — keys on committed stamps,
+    // so a registration left keyed to the aliased-away mint is invisible to
+    // all of them: insertions never fire and branch-flip removals plan no
+    // exit overlay. Moving it onto the stamp-owning id restores the
+    // host-keyed registration the value-only fallback used to produce.
+    for (nodeID, identity) in transitionIdentitiesByNodeID
+    where !newLiveNodeIDs.contains(nodeID) {
+      guard let liveNodeID = newNodeIDByIdentity[identity],
+        liveNodeID != nodeID,
+        transitionIdentitiesByNodeID[liveNodeID] == nil,
+        let transition = transitionsByNodeID[nodeID]
+      else { continue }
+      transitionsByNodeID[liveNodeID] = transition
+      transitionIdentitiesByNodeID[liveNodeID] = identity
+      transitionsByNodeID.removeValue(forKey: nodeID)
+      transitionIdentitiesByNodeID.removeValue(forKey: nodeID)
+    }
+
     // Detect insertions and removals by diffing identity sets.  Skip
     // identities that are already mid-removal: they exist in the
     // injected overlay but not in the live tree, so they should not be
