@@ -38,9 +38,11 @@ struct PerTickPresentCadenceTests {
 
   @Test(
     "ordered-commit-only never drops a superseded frame, for any counter",
-    arguments: [0, 1, CompletedFramePolicy.maxConsecutiveVisualOnlyDrops - 1,
+    arguments: [
+      0, 1, CompletedFramePolicy.maxConsecutiveVisualOnlyDrops - 1,
       CompletedFramePolicy.maxConsecutiveVisualOnlyDrops,
-      CompletedFramePolicy.maxConsecutiveVisualOnlyDrops + 7, Int.max]
+      CompletedFramePolicy.maxConsecutiveVisualOnlyDrops + 7, Int.max,
+    ]
   )
   func orderedCommitOnlyNeverDrops(consecutiveDrops: Int) {
     let decision = CompletedFramePolicy.orderedCommitOnly.decide(
@@ -161,12 +163,22 @@ struct PerTickPresentCadenceTests {
     let detailsByKindBefore = SoundnessProbeConfiguration.lastViolationDetailByKind
     SoundnessProbeConfiguration.isEnabled = false
     SoundnessProbeConfiguration.isTraceEnabled = false
+    // The alarm this witness pins fires through the memo shadow oracle, which
+    // samples 1-in-256 frames in release — ambient sampling would leave the
+    // manufactured violation unobserved. Pin the oracle to every frame for
+    // the witness's duration.
+    let memoTraceEnabled = MemoSkipTrace.isEnabled
+    let memoTraceSampling = MemoSkipTrace.sampleEveryNFrames
+    MemoSkipTrace.isEnabled = true
+    MemoSkipTrace.sampleEveryNFrames = 1
     defer {
       SoundnessProbeConfiguration.isEnabled = probeEnabled
       SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
       SoundnessProbeConfiguration.memoUnsoundSkipCount = memoAlarmBefore
       SoundnessProbeConfiguration.lastViolationDetail = detailBefore
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKindBefore
+      MemoSkipTrace.isEnabled = memoTraceEnabled
+      MemoSkipTrace.sampleEveryNFrames = memoTraceSampling
     }
 
     let harness = PerTickCadenceHarness(rootName: "PerTickCadenceAsyncRoot")
