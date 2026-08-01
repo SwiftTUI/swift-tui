@@ -28,13 +28,13 @@ enum ScrollScenarioContent {
   /// Block count for the heterogeneous-document shape.
   ///
   /// The default is deliberately *under* the worker-snapshot budget
-  /// (`4 * max(columns, rows)`), because that is where real documents sit and
-  /// where today's eligibility cliff bites: a document small enough to be
-  /// pre-realized on the main actor reports `canRunOnWorker == true`, which is
-  /// exactly the condition windowed measurement refuses — so the small
-  /// document is measured exhaustively, every frame, and the large one is not.
-  /// Raising this above the budget flips the same scenario onto the windowed
-  /// path, which makes the cliff a free A/B lever rather than a rebuild.
+  /// (`4 * max(columns, rows)`), because that is where real documents sit:
+  /// small enough to be pre-realized on the main actor for tail offload
+  /// (`canRunOnWorker == true`). Before Stage 2 (plan 2026-07-31-002) that
+  /// was exactly the condition windowed measurement refused — the
+  /// eligibility cliff this scenario was built to pin. Both regimes window
+  /// now; raising this above the budget flips the same scenario onto the
+  /// live-source path as a consistency lever rather than a rebuild.
   static func documentBlockCount(default defaultBlockCount: Int = 120) -> Int {
     guard let raw = environmentValue("SWIFTTUI_PERF_SCROLL_DOCUMENT_BLOCKS"),
       let parsed = Int(raw),

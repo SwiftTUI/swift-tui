@@ -95,4 +95,20 @@ indirect enum MeasurementWorkItem {
     measurements: [MeasuredNode],
     replacementIndices: [Int]
   )
+  /// Windowed lazy stacks measure through the work stack (scroll-latency
+  /// Stage 2): the element-0 probe's finish derives the window and schedules
+  /// the band, and the band's finish assembles the windowed product. Native
+  /// per-row measure re-entry overflowed the frame-tail worker's stack under
+  /// nested custom-layout + scroll shapes.
+  case finishWindowedLazyStackProbe(
+    WindowedLazyStackMeasurementContext,
+    probeElement: ResolvedNode
+  )
+  case finishWindowedLazyStack(
+    WindowedLazyStackMeasurementContext,
+    window: Range<Int>,
+    windowChildren: [ResolvedNode],
+    reusedProbeMeasurement: MeasuredNode?,
+    scheduledChildCount: Int
+  )
 }

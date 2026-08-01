@@ -933,6 +933,439 @@ struct LayoutEngineTests {
     )
   }
 
+  // MARK: - Windowing eligibility inversion + heterogeneous estimator
+  // (scroll-latency program Stage 2, plan 2026-07-31-002)
+
+  @Test("a frame-head worker snapshot source windows exactly like its live twin")
+  func snapshotSourceWindowsUnderHint() throws {
+    // The old `!source.canRunOnWorker` gate refused snapshots on the premise
+    // that windowing an already-realized source saves nothing — but the
+    // measure phase was the Stage-0-measured wall, so an under-budget
+    // document was exhaustively measured every frame while an over-budget
+    // one was windowed. Both source kinds must now produce the same product.
+    let engine = LayoutEngine()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 1))
+    }
+    let live = indexedLazyStack("lazy", axis: .vertical, children: rows)
+    var snapshotted = live
+    snapshotted.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: testIdentity("lazy"),
+      measurementSignature: .init(elementPaths: rows.map(\.identity.path)),
+      children: rows
+    )
+
+    func windowedProduct(_ node: ResolvedNode) -> MeasuredNode {
+      let passContext = LayoutPassContext(retainedLayout: nil)
+      passContext.pushMeasureViewportHint(
+        .init(
+          axes: [.vertical],
+          contentOffset: .init(x: 0, y: 10),
+          viewportSize: .init(width: 8, height: 5)
+        )
+      )
+      defer { passContext.popMeasureViewportHint() }
+      return engine.measure(
+        node,
+        proposal: ProposedSize(width: .finite(8), height: .unspecified),
+        passContext: passContext
+      )
+    }
+
+    let liveProduct = windowedProduct(live)
+    let snapshotProduct = windowedProduct(snapshotted)
+
+    let snapshotLazy = try #require(
+      snapshotProduct.containerAllocationSnapshot?.lazyStack
+    )
+    #expect(snapshotLazy.measuredWindow == 9..<17)
+    #expect(snapshotProduct.measuredSize == liveProduct.measuredSize)
+    #expect(
+      snapshotProduct.containerAllocationSnapshot?.lazyStack
+        == liveProduct.containerAllocationSnapshot?.lazyStack
+    )
+  }
+
+  @Test("a nested indexed stack cannot window against the outer scroll's claimed hint")
+  func nestedIndexedStackDeclinesClaimedHint() throws {
+    // The hint's contentOffset is meaningful only at the scroll content's
+    // origin. A nested stack anchoring `offset / ownStride` at its own
+    // origin parks its window at its end once the outer offset exceeds
+    // `count × stride` — so the outer stack claims the hint and the nested
+    // one must measure exhaustively (every nested row realized).
+    let engine = LayoutEngine()
+    let nestedCounter = RealizationCounter()
+    let nestedRows = (0..<50).map { index in
+      leaf("nested-\(index)", size: .init(width: 4, height: 1))
+    }
+    let nested = indexedLazyStack(
+      "nested",
+      axis: .vertical,
+      children: nestedRows,
+      realizationCounter: nestedCounter
+    )
+    let outerCounter = RealizationCounter()
+    let outerElements =
+      [nested]
+      + (1..<40).map { index in
+        leaf("outer-\(index)", size: .init(width: 4, height: 1))
+      }
+    let outer = indexedLazyStack(
+      "outer",
+      axis: .vertical,
+      children: outerElements,
+      realizationCounter: outerCounter
+    )
+
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .zero,
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    defer { passContext.popMeasureViewportHint() }
+    let measured = engine.measure(
+      outer,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+
+    #expect(measured.containerAllocationSnapshot?.lazyStack?.measuredWindow != nil)
+    // The nested stack fell back to exhaustive: every one of its 50 rows
+    // realized (the exhaustive arm realizes the full source per
+    // `stackChildren` derivation, so the count can exceed 50 — what matters
+    // is that it is not a ~9-row window against the outer offset).
+    #expect(nestedCounter.count >= 50)
+  }
+
+  @Test("heterogeneous band refines the stride past the element-0 probe")
+  func heterogeneousBandRefinesStride() throws {
+    // Element 0 is 1 row tall while the document body is 5 — the shape that
+    // made an element-0-probe estimate under-length the content ~5× (and the
+    // enclosing scroll clamps its offset against that length, truncating
+    // scroll reach). The refined stride is the band's rounded mean extent.
+    let engine = LayoutEngine()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: index == 0 ? 1 : 5))
+    }
+    let lazy = indexedLazyStack("lazy", axis: .vertical, children: rows)
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .zero,
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    defer { passContext.popMeasureViewportHint() }
+
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+
+    // Probe stride 1 anchors the window at 0..<7; the band measures
+    // extents [1, 5, 5, 5, 5, 5, 5] whose rounded mean is 4.
+    #expect(snapshot.measuredWindow == 0..<7)
+    #expect(snapshot.estimatedRowStride == 4)
+    // In-window rows keep exact extents; the 93 out-of-window rows are
+    // synthesized at the refined 4, not the probe's 1.
+    #expect(snapshot.contentMainLength == 31 + 93 * 4)
+    #expect(snapshot.windowHint?.contentOffset == .zero)
+  }
+
+  @Test("the previous windowed product's stride seeds the next window's anchor")
+  func retainedStrideSeedsNextAnchor() throws {
+    // Frame 1 windows at the top and stores its refined stride; frame 2's
+    // anchor divides the new offset by that stride instead of re-probing
+    // element 0 — no probe realization, and the window lands where rows of
+    // the measured extent actually sit.
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 3))
+    }
+    let lazy = indexedLazyStack(
+      "lazy", axis: .vertical, children: rows, realizationCounter: counter
+    )
+
+    let firstContext = LayoutPassContext(retainedLayout: nil)
+    firstContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .zero,
+        viewportSize: .init(width: 8, height: 6)
+      )
+    )
+    let firstProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: firstContext
+    )
+    firstContext.popMeasureViewportHint()
+    #expect(
+      firstProduct.containerAllocationSnapshot?.lazyStack?.estimatedRowStride == 3
+    )
+
+    let placed = engine.place(
+      lazy,
+      measured: firstProduct,
+      in: .init(origin: .zero, size: firstProduct.measuredSize),
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: lazy,
+      measuredTree: firstProduct,
+      placedTree: placed,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: lazy.identity,
+        bounds: .init(origin: .zero, size: firstProduct.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let secondContext = LayoutPassContext(
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: .init(frame: previousFrame),
+        invalidatedIdentities: [lazy.identity]
+      )
+    )
+    secondContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 30),
+        viewportSize: .init(width: 8, height: 6)
+      )
+    )
+    defer { secondContext.popMeasureViewportHint() }
+    let realizationsBefore = counter.count
+
+    let secondProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: secondContext
+    )
+    let snapshot = try #require(secondProduct.containerAllocationSnapshot?.lazyStack)
+
+    // Stride 3, offset 30 -> anchor 10, viewport 6 -> 2 rows -> 9..<14.
+    // A probe-anchored stride of 1 would have anchored at 30 instead.
+    #expect(snapshot.measuredWindow == 9..<14)
+    // Band realizations only — element 0 was never probed.
+    #expect(counter.count - realizationsBefore == 5)
+  }
+
+  @Test("an exhaustive previous product seeds the stride from its exact mean")
+  func exhaustivePreviousProductSeedsStride() throws {
+    // The first windowed frame after an exhaustive one (the moment an
+    // under-budget document first scrolls) anchors from the exhaustive
+    // product's exact mean — (contentMainLength + spacing) / count — so its
+    // content estimate starts right instead of at the element-0 guess.
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<20).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 2))
+    }
+    var lazy = indexedLazyStack(
+      "lazy", axis: .vertical, children: rows, realizationCounter: counter
+    )
+    lazy.layoutBehavior = .lazyStack(
+      axis: .vertical,
+      spacing: 1,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let exhaustive = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: LayoutPassContext(retainedLayout: nil)
+    )
+    #expect(exhaustive.containerAllocationSnapshot?.lazyStack?.measuredWindow == nil)
+    // 20 rows × 2 + 19 × 1 spacing = 59.
+    #expect(exhaustive.containerAllocationSnapshot?.lazyStack?.contentMainLength == 59)
+
+    let placed = engine.place(
+      lazy,
+      measured: exhaustive,
+      in: .init(origin: .zero, size: exhaustive.measuredSize),
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: lazy,
+      measuredTree: exhaustive,
+      placedTree: placed,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: lazy.identity,
+        bounds: .init(origin: .zero, size: exhaustive.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let passContext = LayoutPassContext(
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: .init(frame: previousFrame),
+        invalidatedIdentities: [lazy.identity]
+      )
+    )
+    passContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 12),
+        viewportSize: .init(width: 8, height: 6)
+      )
+    )
+    defer { passContext.popMeasureViewportHint() }
+    let realizationsBefore = counter.count
+
+    let windowed = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: passContext
+    )
+    let snapshot = try #require(windowed.containerAllocationSnapshot?.lazyStack)
+
+    // Seed stride (59 + 1) / 20 = 3; offset 12 -> anchor 4, viewport 6 ->
+    // 2 rows -> window 3..<8; no element-0 probe.
+    #expect(snapshot.measuredWindow == 3..<8)
+    #expect(counter.count - realizationsBefore == 5)
+    #expect(snapshot.estimatedRowStride == 3)
+  }
+
+  @Test("re-measuring under any hint stays band-bounded and restamps the product's hint")
+  func rewindowingStaysBandBoundedAndRestampsHint() throws {
+    // Indexed-source nodes are `.viewportBarrier` edges: neither they nor
+    // their ancestors ever reuse whole retained products (soundness — their
+    // interiors are viewport-clipped subsets). The cost model is therefore
+    // O(band) per re-measure, seeded by the previous product's stride, with
+    // `windowHint` restamped to whatever hint the product was built under —
+    // the field the (defense-in-depth) retained gate compares.
+    let engine = LayoutEngine()
+    let counter = RealizationCounter()
+    let rows = (0..<100).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: 1))
+    }
+    let lazy = indexedLazyStack(
+      "lazy", axis: .vertical, children: rows, realizationCounter: counter
+    )
+    let hint = MeasureViewportHint(
+      axes: [.vertical],
+      contentOffset: .init(x: 0, y: 10),
+      viewportSize: .init(width: 8, height: 5)
+    )
+
+    let firstContext = LayoutPassContext(retainedLayout: nil)
+    firstContext.pushMeasureViewportHint(hint)
+    let firstProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: firstContext
+    )
+    firstContext.popMeasureViewportHint()
+
+    let placed = engine.place(
+      lazy,
+      measured: firstProduct,
+      in: .init(origin: .zero, size: firstProduct.measuredSize),
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: lazy,
+      measuredTree: firstProduct,
+      placedTree: placed,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: lazy.identity,
+        bounds: .init(origin: .zero, size: firstProduct.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+
+    func remeasure(offset: Int) -> (MeasuredNode, Int) {
+      let passContext = LayoutPassContext(
+        retainedLayout: RetainedLayoutSession(
+          previousFrameIndex: .init(frame: previousFrame),
+          invalidatedIdentities: []
+        )
+      )
+      passContext.pushMeasureViewportHint(
+        .init(
+          axes: [.vertical],
+          contentOffset: .init(x: 0, y: offset),
+          viewportSize: .init(width: 8, height: 5)
+        )
+      )
+      defer { passContext.popMeasureViewportHint() }
+      let before = counter.count
+      let product = engine.measure(
+        lazy,
+        proposal: ProposedSize(width: .finite(8), height: .unspecified),
+        passContext: passContext
+      )
+      return (product, counter.count - before)
+    }
+
+    // Identical hint: the re-measure is band-bounded (8 window rows, no
+    // probe — the retained stride seeds the anchor), never O(dataset).
+    let (samehint, samehintRealizations) = remeasure(offset: 10)
+    #expect(samehintRealizations == 8)
+    #expect(samehint.containerAllocationSnapshot?.lazyStack?.measuredWindow == 9..<17)
+
+    // Offset moved: a fresh window is measured and the product's hint moves
+    // with it.
+    let (fresh, freshRealizations) = remeasure(offset: 11)
+    #expect(freshRealizations > 0)
+    #expect(freshRealizations <= 10)
+    #expect(
+      fresh.containerAllocationSnapshot?.lazyStack?.windowHint?.contentOffset
+        == CellPoint(x: 0, y: 11)
+    )
+  }
+
+  @Test("hint claims are identity-keyed and re-entrant for the claimer")
+  func hintClaimsAreIdentityKeyedAndReentrant() {
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    let hint = MeasureViewportHint(
+      axes: [.vertical],
+      contentOffset: .zero,
+      viewportSize: .init(width: 8, height: 5)
+    )
+
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("a")) == nil)
+
+    passContext.pushMeasureViewportHint(hint)
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("a")) == hint)
+    // Re-claim by the same identity (an enclosing stack's flexibility
+    // second round re-measuring the claimer) still windows.
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("a")) == hint)
+    // A different container is refused.
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("b")) == nil)
+
+    // A nested scroll's fresh hint is independently claimable...
+    let inner = MeasureViewportHint(
+      axes: [.vertical],
+      contentOffset: .init(x: 0, y: 3),
+      viewportSize: .init(width: 8, height: 2)
+    )
+    passContext.pushMeasureViewportHint(inner)
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("b")) == inner)
+    passContext.popMeasureViewportHint()
+
+    // ...and popping restores the outer entry with its claim intact.
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("b")) == nil)
+    #expect(passContext.claimCurrentMeasureViewportHint(for: testIdentity("a")) == hint)
+    passContext.popMeasureViewportHint()
+  }
+
   @Test("flexible frame resolves unspecified finite and infinite proposals")
   func flexibleFrameResolvesProposalKinds() {
     let engine = LayoutEngine()

@@ -314,6 +314,33 @@ extension LayoutEngine {
             passContext: passContext
           )
         )
+      case .finishWindowedLazyStackProbe(let context, let probeElement):
+        let probeMeasurement = popMeasurement(from: &results)
+        finishWindowedLazyStackProbe(
+          context: context,
+          probeElement: probeElement,
+          probeMeasurement: probeMeasurement,
+          work: &work
+        )
+      case .finishWindowedLazyStack(
+        let context,
+        let window,
+        let windowChildren,
+        let reusedProbeMeasurement,
+        let scheduledChildCount
+      ):
+        var windowMeasurements = popMeasurements(from: &results, count: scheduledChildCount)
+        if let reusedProbeMeasurement {
+          windowMeasurements.insert(reusedProbeMeasurement, at: 0)
+        }
+        results.append(
+          assembleWindowedLazyStackProduct(
+            context: context,
+            window: window,
+            windowChildren: windowChildren,
+            windowMeasurements: windowMeasurements
+          )
+        )
       }
     }
 
@@ -348,7 +375,7 @@ extension LayoutEngine {
         proposal: proposal,
         retainedLayout: passContext?.retainedLayout,
         hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant,
-        currentMeasureViewportHint: passContext?.currentMeasureViewportHint
+        passContext: passContext
       )
     {
       localMetrics.measuredNodesReused += retained.subtreeNodeCount
@@ -413,36 +440,26 @@ extension LayoutEngine {
       // Windowed lazy measurement (Stage 2.2): under a scroll-declared
       // measure viewport, an eligible indexed-source lazy stack realizes and
       // measures only the visible band — the exhaustive scheduling below
-      // realizes EVERY element. Ineligible shapes fall through unchanged.
+      // realizes EVERY element. Ineligible shapes fall through unchanged;
+      // the band measures through the work stack (never native re-entry —
+      // the frame-tail worker's stack is small).
       if case .lazyStack = node.layoutBehavior,
-        let windowed = windowedLazyStackMeasurement(
+        scheduleWindowedLazyStackMeasurement(
           for: node,
           originalProposal: proposal,
           effectiveProposal: effectiveProposal,
-          passContext: passContext
+          passContext: passContext,
+          work: &work
         )
       {
-        results.append(windowed)
         return
       }
-      let children = stackChildren(for: node)
-      let idealProposal = stackProposal(
+      scheduleExhaustiveStackMeasurement(
+        for: node,
+        originalProposal: proposal,
+        effectiveProposal: effectiveProposal,
         axis: axis,
-        main: .unspecified,
-        cross: crossDimension(of: effectiveProposal, for: axis)
-      )
-      scheduleChildren(
-        children,
-        proposal: idealProposal,
-        finish: .finishStackIdeal(
-          node,
-          originalProposal: proposal,
-          effectiveProposal: effectiveProposal,
-          children: children,
-          axis: axis,
-          spacing: spacing,
-          childCount: children.count
-        ),
+        spacing: spacing,
         work: &work
       )
     case .padding(let insets):

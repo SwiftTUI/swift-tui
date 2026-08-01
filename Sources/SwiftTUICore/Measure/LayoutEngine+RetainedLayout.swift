@@ -11,7 +11,7 @@ extension LayoutEngine {
     proposal: ProposedSize,
     retainedLayout: RetainedLayoutSession?,
     hasInvalidatedIndexedDescendant: Bool,
-    currentMeasureViewportHint: MeasureViewportHint? = nil
+    passContext: LayoutPassContext? = nil
   ) -> MeasuredNode? {
     guard let retainedLayout,
       !hasInvalidatedIndexedDescendant,
@@ -27,22 +27,22 @@ extension LayoutEngine {
       return nil
     }
 
-    // A windowed lazy product (Stage 2.2) is valid only for its window: the
-    // scroll layout's measurement-reuse signature is deliberately
-    // position-free, so an offset change alone would otherwise reuse the
-    // stale window. Recompute the window the current hint would produce and
-    // deny reuse on any mismatch (including a missing hint).
+    // A windowed lazy product (Stage 2.2) is valid only for the hint it was
+    // built under: the scroll layout's measurement-reuse signature is
+    // deliberately position-free, so an offset change alone would otherwise
+    // reuse the stale window. Reuse requires the current hint to equal the
+    // stored one exactly AND to be unclaimed; approving claims it, because
+    // the reused product stands in for the fresh measure that would have
+    // claimed (scroll-latency Stage 2, plan 2026-07-31-002 — the stored
+    // hint replaced a stride-based window recompute, which was no longer
+    // self-consistent once the stride became a running refinement).
     if let lazySnapshot = previousMeasured.containerAllocationSnapshot?.lazyStack,
-      let storedWindow = lazySnapshot.measuredWindow
+      lazySnapshot.measuredWindow != nil
     {
-      guard let currentMeasureViewportHint,
-        let rowStride = lazySnapshot.estimatedRowStride,
-        lazyStackEstimatedVisibleWindow(
-          hint: currentMeasureViewportHint,
-          axis: lazySnapshot.axis,
-          count: lazySnapshot.childMainOffsets.count,
-          rowStride: rowStride
-        ) == storedWindow
+      guard let passContext,
+        let storedHint = lazySnapshot.windowHint,
+        passContext.currentMeasureViewportHint == storedHint,
+        passContext.claimCurrentMeasureViewportHint(for: resolved.identity) == storedHint
       else {
         return nil
       }
@@ -51,16 +51,20 @@ extension LayoutEngine {
     // Same rule for a hint-windowed hosted collection: the stored product is
     // valid only for the window it was measured for, and an offset-only change
     // in the enclosing scroll view does not change anything the equivalence
-    // gate above compares.
+    // gate above compares. Hosted strides are probe-stable (no running
+    // refinement), so the window recompute remains self-consistent here; the
+    // claim keeps fresh and reused paths symmetric.
     if let hostedSnapshot = previousMeasured.containerAllocationSnapshot?.hostedCollection,
       let storedWindow = hostedSnapshot.measuredWindow
     {
-      guard let rowStride = hostedSnapshot.estimatedRowStride,
+      guard let passContext,
+        let rowStride = hostedSnapshot.estimatedRowStride,
         hostedCollectionHintWindow(
-          hint: currentMeasureViewportHint,
+          hint: passContext.currentMeasureViewportHint,
           count: resolved.indexedChildSource?.count ?? 0,
           rowStride: rowStride
-        ) == storedWindow
+        ) == storedWindow,
+        passContext.claimCurrentMeasureViewportHint(for: resolved.identity) != nil
       else {
         return nil
       }

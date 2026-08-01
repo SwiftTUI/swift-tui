@@ -1,17 +1,19 @@
 @_spi(Runners) import SwiftTUI
 
 /// Program Stage 0, WP-2: the heterogeneous-document shape — the mrkdwn
-/// silhouette, and the scenario that pins today's windowing-eligibility cliff.
+/// silhouette, and the scenario that pinned the windowing-eligibility cliff
+/// Stage 2 removed (plan 2026-07-31-002).
 ///
 /// The default block count sits **under** the frame-head worker-snapshot
-/// budget (`4 * max(columns, rows)`) on purpose. Under the budget the runtime
-/// pre-realizes every block on the main actor and the resulting snapshot
-/// reports `canRunOnWorker == true` — which is precisely the condition
-/// windowed measurement refuses. So a *small* document is measured
-/// exhaustively every frame and a *large* one is windowed: the optimisation
-/// misses real documents because they are small. Raising
-/// `SWIFTTUI_PERF_SCROLL_DOCUMENT_BLOCKS` above the budget flips this same
-/// scenario onto the windowed path, which makes the cliff a free A/B lever.
+/// budget (`4 * max(columns, rows)`) on purpose: under the budget the runtime
+/// pre-realizes every block on the main actor so the frame tail can offload,
+/// and the resulting snapshot reports `canRunOnWorker == true` — which the
+/// pre-Stage-2 windowed measurement refused, so a *small* document was
+/// measured exhaustively every frame while a *large* one was windowed. Both
+/// sides of the budget now window; the default keeps this scenario on the
+/// snapshot-source path (the real-document regime), and raising
+/// `SWIFTTUI_PERF_SCROLL_DOCUMENT_BLOCKS` above the budget still flips it
+/// onto the live-source path as a consistency lever.
 ///
 /// Both drive shapes run here, back to back, because a document's cost is not
 /// the same question closed-loop and open-loop: closed-loop shows the

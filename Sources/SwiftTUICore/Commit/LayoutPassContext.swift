@@ -53,9 +53,24 @@ package struct MeasureViewportHint: Equatable, Sendable {
 }
 
 package final class LayoutPassContext: Sendable {
+  /// One entry of the measure-viewport hint stack. `claimedBy` records the
+  /// indexed container that anchored a window against this hint: the hint's
+  /// `contentOffset` is meaningful only at the scroll content's origin, so the
+  /// outermost indexed container on the hint's axis claims it and every deeper
+  /// (or later-sibling) container measures exhaustively instead of anchoring
+  /// `offset / ownStride` at its own origin — which parks a nested stack's
+  /// window at its end once the outer offset exceeds `count × stride`. The
+  /// claim is keyed by identity so a legitimate re-measure of the SAME
+  /// container inside one hint scope (an enclosing stack's flexibility
+  /// second round) windows again instead of degrading to exhaustive.
+  private struct MeasureViewportHintEntry: Sendable {
+    var hint: MeasureViewportHint
+    var claimedBy: Identity?
+  }
+
   private struct MutableState: Sendable {
     var scrollViewportContext: ScrollViewportContext?
-    var measureViewportHints: [MeasureViewportHint]
+    var measureViewportHints: [MeasureViewportHintEntry]
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
@@ -108,11 +123,40 @@ package final class LayoutPassContext: Sendable {
   /// pass on the same context), which is what makes a scoped stack sound
   /// here.
   package var currentMeasureViewportHint: MeasureViewportHint? {
-    state.withLock { $0.measureViewportHints.last }
+    state.withLock { $0.measureViewportHints.last?.hint }
+  }
+
+  /// Atomically claims the innermost hint for the indexed container
+  /// `identity`: returns the hint when the entry is unclaimed or already
+  /// claimed by this same identity, or `nil` when a DIFFERENT container
+  /// holds the claim (the caller must fall back to exhaustive measurement).
+  /// Only the outermost indexed container on the hint's axis may window
+  /// against a hint — its `contentOffset` is origin-relative and unadjusted
+  /// for nesting depth — while same-identity re-claims keep an enclosing
+  /// stack's flexibility re-measure of the claimer windowed.
+  package func claimCurrentMeasureViewportHint(
+    for identity: Identity
+  ) -> MeasureViewportHint? {
+    state.withLock {
+      guard let last = $0.measureViewportHints.indices.last else {
+        return nil
+      }
+      switch $0.measureViewportHints[last].claimedBy {
+      case nil:
+        $0.measureViewportHints[last].claimedBy = identity
+        return $0.measureViewportHints[last].hint
+      case identity:
+        return $0.measureViewportHints[last].hint
+      default:
+        return nil
+      }
+    }
   }
 
   package func pushMeasureViewportHint(_ hint: MeasureViewportHint) {
-    state.withLock { $0.measureViewportHints.append(hint) }
+    state.withLock {
+      $0.measureViewportHints.append(.init(hint: hint, claimedBy: nil))
+    }
   }
 
   package func popMeasureViewportHint() {

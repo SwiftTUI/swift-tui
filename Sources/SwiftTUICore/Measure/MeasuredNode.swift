@@ -86,13 +86,24 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   /// The realized-and-measured index band when this snapshot was built under
   /// a measure-viewport hint (proposal 2026-07-13-002 Stage 2.2); `nil`
   /// means exhaustive — every entry is a real measurement. Entries outside
-  /// the window are synthesized from the probe row's extent, so a windowed
+  /// the window are synthesized from the estimated row extent, so a windowed
   /// product is only valid for its window: the retained-measurement gate
-  /// recomputes the current window and denies reuse on mismatch.
+  /// denies reuse whenever the current hint differs from ``windowHint``.
   package var measuredWindow: Range<Int>?
-  /// The per-row main-axis stride (probe extent + spacing) the estimated
-  /// entries were synthesized with; feeds the retained-gate recompute.
+  /// The per-row main-axis stride (estimated row extent + spacing) the
+  /// out-of-window entries were synthesized with. Derived as the running
+  /// mean of the rows actually measured in the window (seeded from the
+  /// previous frame's product, else an element-0 probe), so heterogeneous
+  /// content converges toward its true mean instead of trusting element 0
+  /// (scroll-latency Stage 2, plan 2026-07-31-002). Next frame's window
+  /// anchor starts from this value.
   package var estimatedRowStride: Int?
+  /// The measure-viewport hint this windowed product was built under.
+  /// Retained reuse requires the current hint to equal it exactly: the
+  /// window and the stored stride are only mutually consistent for the hint
+  /// they were derived from, and any offset change re-windows anyway.
+  /// `nil` on exhaustive products.
+  package var windowHint: MeasureViewportHint?
 
   package init(
     axis: Axis,
@@ -103,7 +114,8 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     crossLeading: Int = 0,
     crossTrailing: Int = 0,
     measuredWindow: Range<Int>? = nil,
-    estimatedRowStride: Int? = nil
+    estimatedRowStride: Int? = nil,
+    windowHint: MeasureViewportHint? = nil
   ) {
     self.axis = axis
     self.childMainOffsets = childMainOffsets
@@ -114,6 +126,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     self.crossTrailing = crossTrailing
     self.measuredWindow = measuredWindow
     self.estimatedRowStride = estimatedRowStride
+    self.windowHint = windowHint
   }
 }
 

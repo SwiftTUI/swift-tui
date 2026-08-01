@@ -85,11 +85,17 @@ extension LayoutEngine {
       hint: hint,
       count: source.count,
       rowStride: rowStride
-    ) {
+    ),
+      passContext?.claimCurrentMeasureViewportHint(for: node.identity) != nil
+    {
       // Deriving the window from the hint — rather than from the line model
       // over the full content height — is the whole point: asking the line
       // model here would generate a display line per row before windowing
       // anything, which is the O(dataset) collapse this path exists to avoid.
+      // The claim keeps a collection NESTED inside an outer windowed stack
+      // from anchoring the outer scroll's offset at its own origin: the
+      // outermost indexed container per hint wins, everything deeper falls
+      // back (scroll-latency Stage 2, plan 2026-07-31-002).
       sourceIndices = Array(window)
       measuredWindow = window
     } else {
