@@ -1223,9 +1223,16 @@ extension FrameworkStressGestureScrollTests {
     #expect(activations.value == 1)
     #expect(position.value == .zero)
 
-    _ = try harness.drag(from: start, to: Point(x: start.x, y: start.y - 3))
+    let end = Point(x: start.x, y: start.y - 3)
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: end)
+
     #expect(activations.value == 1)
     #expect(position.value.y == 3)
+
+    // Assert the pan result before release: `.up` may start a wall-clock
+    // momentum tick, which is outside this test's activation-threshold scope.
+    _ = try harness.sendMouse(.up(.primary), at: end)
   }
 }
 

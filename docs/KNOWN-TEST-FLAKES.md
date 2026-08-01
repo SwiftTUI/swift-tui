@@ -426,6 +426,24 @@ and cheap; the second is the real fix and belongs with whoever owns the
 delivery-coupled wire epochs work. Do not "fix" it by re-recording the corpus
 against one lucky interleaving — that pins the flake instead of removing it.
 
+### 11. `FrameworkStressGestureScrollTests` — stress gesture scroll 024 nested-control pan overshoots on Linux CI (resolved 2026-08-01)
+
+**Signature.** "stress gesture scroll 024 nested control yields only after
+scroll threshold" fails with `Expectation failed: (position.value.y → 5) == 3`
+— the same two-row `5` vs `3` overshoot as entry 6, in the same suite, on the
+`Linux repo gate (amd64)` lane.
+
+**Firings.** 2026-07-31 at `76f01d0b` (run 30666881062) and 2026-08-01 at
+`9a25004b` (run 30681771490). Both trees were green on the macOS gate and the
+arm64 Linux container worktree gate.
+
+**Mechanism and resolution.** Identical to entry 6: the test drove the pan
+with `harness.drag`, whose trailing `.up` may start a wall-clock momentum
+tick; on the slow amd64 runner the first 33 ms tick advanced the pan two more
+rows before the assertion. The test now sends `.down` and `.dragged`, asserts
+the activation-threshold outcome, then sends `.up` for cleanup — the entry-6
+boundary.
+
 ---
 
 ---
