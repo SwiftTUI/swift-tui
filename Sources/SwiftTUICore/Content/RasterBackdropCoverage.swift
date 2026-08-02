@@ -32,7 +32,9 @@ package func rasterBackdropCoverage(
     return .full
   case "▀":
     return .quadrant(mask: 0b0011)
-  case "▄":
+  // Backdrop sampling is quadrant-resolution, so lower fractional blocks use
+  // the bottom-row approximation.
+  case "▄", "▂":
     return .quadrant(mask: 0b1100)
   case "▌":
     return .quadrant(mask: 0b0101)

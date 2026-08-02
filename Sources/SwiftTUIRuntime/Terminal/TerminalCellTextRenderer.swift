@@ -322,7 +322,7 @@ struct TerminalCellTextRenderer {
       return "-"
     case "▌", "▐":
       return "|"
-    case "▀", "▄":
+    case "▀", "▄", "▂":
       return "-"
     case "┌", "┐", "└", "┘",
       "╭", "╮", "╰", "╯",

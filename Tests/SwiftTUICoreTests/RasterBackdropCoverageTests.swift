@@ -24,6 +24,7 @@ struct RasterBackdropCoverageTests {
   func coverageClassifierMapsHalfAndQuadrantGlyphsToMasks() {
     #expect(rasterBackdropCoverage(for: "▀", spanWidth: 1) == .quadrant(mask: 0b0011))
     #expect(rasterBackdropCoverage(for: "▄", spanWidth: 1) == .quadrant(mask: 0b1100))
+    #expect(rasterBackdropCoverage(for: "▂", spanWidth: 1) == .quadrant(mask: 0b1100))
     #expect(rasterBackdropCoverage(for: "▌", spanWidth: 1) == .quadrant(mask: 0b0101))
     #expect(rasterBackdropCoverage(for: "▐", spanWidth: 1) == .quadrant(mask: 0b1010))
     #expect(rasterBackdropCoverage(for: "▗", spanWidth: 1) == .quadrant(mask: 0b1000))

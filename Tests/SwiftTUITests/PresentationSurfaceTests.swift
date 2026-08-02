@@ -231,7 +231,7 @@ struct PresentationSurfaceTests {
     #expect(surface.contains("Archive project"))
     #expect(surface.contains("This workspace has"))
     #expect(surface.contains("Archive"))
-    #expect(surface.contains("█") || surface.contains("▼"))
+    #expect(surface.contains("▐") || surface.contains("▼"))
   }
 
   @Test("toast and alert overlays share the first frame and use fixed family order")

@@ -4143,8 +4143,8 @@ struct SwiftUISurfaceTests {
 
     #expect(visibleArtifacts.resolvedTree.semanticMetadata.accessibilityRole == nil)
     #expect(visibleArtifacts.semanticSnapshot.scrollRoutes.count == 1)
-    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("█"))
-    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("█"))
+    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("▐"))
+    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("▐"))
     #expect(hiddenArtifacts.rasterSurface.lines.prefix(2) == ["One ", "Two "])
   }
 
@@ -4171,14 +4171,15 @@ struct SwiftUISurfaceTests {
     .id(testIdentity("ProportionalScroll"))
     .frame(width: 8, height: 5, alignment: .topLeading)
 
-    let topArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    let topArtifacts = renderer.render(
       view,
       context: .init(identity: testIdentity("Root"))
     )
 
     box.position.scrollTo(y: 5)
 
-    let bottomArtifacts = DefaultRenderer().render(
+    let bottomArtifacts = renderer.render(
       view,
       context: .init(identity: testIdentity("Root"))
     )
@@ -4190,8 +4191,8 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(topThumbColumn == ["█", "█", "█", "┃", "┃"])
-    #expect(bottomThumbColumn == ["┃", "┃", "█", "█", "█"])
+    #expect(topThumbColumn == ["▐", "▐", "▐", " ", " "])
+    #expect(bottomThumbColumn == [" ", " ", "▐", "▐", "▐"])
   }
 
   @Test("ScrollView indicator keeps a usable thumb size for large content")
@@ -4216,7 +4217,25 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(thumbColumn == ["█", "█", "┃", "┃", "┃", "┃"])
+    #expect(thumbColumn == ["▐", "▐", " ", " ", " ", " "])
+  }
+
+  @Test("horizontal ScrollView renders a floating lower-block thumb without a track")
+  func horizontalScrollViewRendersFloatingThumb() {
+    let view =
+      ScrollView(.horizontal) {
+        Text("0123456789")
+      }
+      .frame(width: 5, height: 2, alignment: .topLeading)
+
+    let artifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("HorizontalFloatingThumb"))
+    )
+
+    let indicatorRow = artifacts.rasterSurface.cells[1].map(\.character)
+
+    #expect(indicatorRow == ["▂", "▂", "▂", " ", " "])
   }
 
   @Test("ScrollView indicator focus highlights only the indicator")
@@ -4224,14 +4243,13 @@ struct SwiftUISurfaceTests {
     let view =
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
-          Text("Row 0")
-          Text("Row 1")
-          Text("Row 2")
-          Text("Row 3")
+          ForEach(0..<10) { index in
+            Text("Row \(index)")
+          }
         }
       }
       .id(testIdentity("Scrollable"))
-      .frame(width: 6, height: 3, alignment: .topLeading)
+      .frame(width: 6, height: 5, alignment: .topLeading)
 
     let idleArtifacts = DefaultRenderer().render(
       view,
@@ -4257,6 +4275,8 @@ struct SwiftUISurfaceTests {
       idleArtifacts.rasterSurface.cells[1][5].style?.foregroundColor
         != focusedArtifacts.rasterSurface.cells[1][5].style?.foregroundColor
     )
+    #expect(focusedArtifacts.rasterSurface.cells[4][5].character == " ")
+    #expect(focusedArtifacts.rasterSurface.cells[4][5].style == nil)
   }
 
   @Test("focused controls inside a ScrollView keep their own focus chrome")

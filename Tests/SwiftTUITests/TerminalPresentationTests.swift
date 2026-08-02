@@ -391,6 +391,20 @@ struct TerminalPresentationTests {
     #expect(rendered == "+-+\r\n|??|\r\n+-+")
   }
 
+  @Test("ascii renderer degrades floating scrollbar thumb glyphs")
+  func asciiRendererDegradesFloatingScrollbarThumbGlyphs() {
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: .previewASCII
+    ).render(
+      RasterSurface(
+        size: .init(width: 3, height: 1),
+        lines: ["▐▂█"]
+      )
+    )
+
+    #expect(rendered == "|-#")
+  }
+
   @Test("renderer emits OSC 8 hyperlinks on full repaint and preserves style ordering")
   func rendererEmitsHyperlinksOnFullRepaint() {
     let renderer = TerminalSurfaceRenderer(

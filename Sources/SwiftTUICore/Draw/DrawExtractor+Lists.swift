@@ -302,21 +302,14 @@ extension DrawExtractor {
       return []
     }
 
-    let x = bounds.origin.x + bounds.size.width - 1
-    let thumbRange = metrics.thumbRange(for: offset)
-
-    var commands: [DrawCommand] = []
-    for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
-      commands.append(
-        contentsOf: singleCellIndicatorCommand(
-          x: x,
-          y: y,
-          glyph: thumbRange?.contains(y) == true ? "█" : "┃",
-          style: style
-        )
-      )
+    guard let thumbRange = metrics.thumbRange(for: offset) else {
+      return []
     }
-    return commands
+
+    let x = bounds.origin.x + bounds.size.width - 1
+    return thumbRange.flatMap { y in
+      singleCellIndicatorCommand(x: x, y: y, glyph: "▐", style: style)
+    }
   }
 
   private func horizontalScrollIndicatorCommands(
@@ -330,21 +323,14 @@ extension DrawExtractor {
       return []
     }
 
-    let y = bounds.origin.y + bounds.size.height - 1
-    let thumbRange = metrics.thumbRange(for: offset)
-
-    var commands: [DrawCommand] = []
-    for x in bounds.origin.x..<(bounds.origin.x + trackWidth) {
-      commands.append(
-        contentsOf: singleCellIndicatorCommand(
-          x: x,
-          y: y,
-          glyph: thumbRange?.contains(x) == true ? "█" : "━",
-          style: style
-        )
-      )
+    guard let thumbRange = metrics.thumbRange(for: offset) else {
+      return []
     }
-    return commands
+
+    let y = bounds.origin.y + bounds.size.height - 1
+    return thumbRange.flatMap { x in
+      singleCellIndicatorCommand(x: x, y: y, glyph: "▂", style: style)
+    }
   }
 
   private func singleCellIndicatorCommand(
