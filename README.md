@@ -4,7 +4,7 @@
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI%20%C2%B7%20Android-1E90FF)
-![Status](https://img.shields.io/badge/status-0.4.6%20pre--release-DAA520)
+![Status](https://img.shields.io/badge/status-0.4.7%20pre--release-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 > Run the live demo and read the API reference at **<https://swifttui.sh>**.
@@ -92,7 +92,7 @@ pin to the current beta with `.upToNextMinor`. This requirement prevents a
 minor release from breaking your build. Then add the `SwiftTUI` product:
 
 ```swift
-.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.4.6"))
+.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.4.7"))
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui")
 ```
