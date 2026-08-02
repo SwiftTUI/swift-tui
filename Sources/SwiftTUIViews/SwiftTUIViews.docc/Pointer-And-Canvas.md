@@ -52,6 +52,24 @@ Hover events are local to the view that installed the handler. The terminal
 runtime enables high-volume all-motion reporting only while the rendered tree
 contains hover subscribers.
 
+Virtualized views that cannot materialize their full content in a
+``ScrollView`` can handle wheel deltas directly with
+``View/onScrollWheel(perform:)``:
+
+```swift
+virtualizedGrid.onScrollWheel { event in
+  guard model.scrollBy(x: event.deltaX, y: event.deltaY) else {
+    return .ignored
+  }
+  return .handled
+}
+```
+
+Return ``ScrollWheelResult/ignored`` at a boundary to let an enclosing handler
+or scroll view consume the event. Regular finite content should continue to use
+``ScrollView``, which already provides wheel, drag, keyboard, and indicator
+behavior.
+
 ## Gesture Precedence
 
 Use ``View/gesture(_:including:)`` for ordinary recognition and

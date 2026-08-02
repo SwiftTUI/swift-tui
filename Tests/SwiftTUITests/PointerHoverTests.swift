@@ -96,11 +96,89 @@ struct PointerHoverTests {
 }
 
 @MainActor
+@Suite
+struct ScrollWheelTests {
+  @Test("onScrollWheel receives deltas and ignores other pointer events")
+  func wheelReceivesOnlyScrollEvents() throws {
+    let events = ScrollWheelEventBox()
+    let runLoop = makeHoverRunLoop {
+      Text("wheel")
+        .onScrollWheel { event in
+          events.append(event)
+          return .handled
+        }
+    }
+
+    try renderInitial(runLoop)
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .moved, location: Point(x: 1, y: 0)))))
+    _ = runLoop.handle(
+      .input(
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: -2, deltaY: 3),
+            location: Point(x: 1, y: 0)
+          )
+        )
+      )
+    )
+
+    #expect(events.values == [ScrollWheelEvent(deltaX: -2, deltaY: 3)])
+  }
+
+  @Test("ignored wheel events bubble to an enclosing handler")
+  func ignoredWheelBubbles() throws {
+    let events = ScrollWheelEventBox()
+    let runLoop = makeHoverRunLoop {
+      VStack {
+        Text("child")
+          .onScrollWheel { event in
+            events.append(ScrollWheelEvent(deltaX: event.deltaX, deltaY: 100))
+            return .ignored
+          }
+      }
+      .onScrollWheel { event in
+        events.append(event)
+        return .handled
+      }
+    }
+
+    try renderInitial(runLoop)
+    _ = runLoop.handle(
+      .input(
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 1, deltaY: 2),
+            location: Point(x: 1, y: 0)
+          )
+        )
+      )
+    )
+
+    #expect(
+      events.values == [
+        ScrollWheelEvent(deltaX: 1, deltaY: 100),
+        ScrollWheelEvent(deltaX: 1, deltaY: 2),
+      ]
+    )
+  }
+}
+
+@MainActor
 private final class HoverPhaseBox {
   private(set) var values: [HoverPhase] = []
 
   func append(_ phase: HoverPhase) {
     values.append(phase)
+  }
+}
+
+@MainActor
+private final class ScrollWheelEventBox {
+  private(set) var values: [ScrollWheelEvent] = []
+
+  func append(_ event: ScrollWheelEvent) {
+    values.append(event)
   }
 }
 

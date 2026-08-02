@@ -743,6 +743,7 @@ SwiftTUIGraph.TerminationDisposition.allow
 SwiftTUIGraph.TerminationDisposition.cancel
 SwiftTUIGraph.TerminationRequest
 SwiftTUIGraph.TerminationRequest.inputEnded
+SwiftTUIGraph.TerminationRequest.programmatic
 SwiftTUIGraph.TerminationRequest.signal(_:)
 SwiftTUIGraph.TerminationRequest.userExit(_:)
 SwiftTUIGraph.ThreadSafeInvalidating
@@ -2540,6 +2541,7 @@ SwiftTUIRuntime.RunLoop.run()
 SwiftTUIRuntime.RunLoop.runtimeIssueSink
 SwiftTUIRuntime.RunLoopExitReason
 SwiftTUIRuntime.RunLoopExitReason.inputEnded
+SwiftTUIRuntime.RunLoopExitReason.programmatic
 SwiftTUIRuntime.RunLoopExitReason.signal(_:)
 SwiftTUIRuntime.RunLoopExitReason.userExit(_:)
 SwiftTUIRuntime.RunLoopResult
@@ -3407,6 +3409,7 @@ SwiftTUIViews.EnvironmentValues.openLinkAction
 SwiftTUIViews.EnvironmentValues.outlineStyle
 SwiftTUIViews.EnvironmentValues.pickerStyle
 SwiftTUIViews.EnvironmentValues.pointerInputCapabilities
+SwiftTUIViews.EnvironmentValues.requestTermination
 SwiftTUIViews.EnvironmentValues.resetFocus
 SwiftTUIViews.EnvironmentValues.safeAreaInsets
 SwiftTUIViews.EnvironmentValues.scrollIndicatorVisibility
@@ -3851,6 +3854,11 @@ SwiftTUIViews.RadioGroupPickerStyle.snapshotLabel
 SwiftTUIViews.Rectangle
 SwiftTUIViews.Rectangle.geometry
 SwiftTUIViews.Rectangle.init()
+SwiftTUIViews.RequestTerminationAction
+SwiftTUIViews.RequestTerminationAction.callAsFunction()
+SwiftTUIViews.RequestTerminationAction.debugDescription
+SwiftTUIViews.RequestTerminationAction.description
+SwiftTUIViews.RequestTerminationAction.init(_:)
 SwiftTUIViews.ResetFocusAction
 SwiftTUIViews.ResetFocusAction.callAsFunction(_:)
 SwiftTUIViews.ResetFocusAction.callAsFunction(in:)
@@ -3904,6 +3912,14 @@ SwiftTUIViews.ScrollViewProxy.scrollTo(edge:)
 SwiftTUIViews.ScrollViewProxy.scrollTo(x:y:)
 SwiftTUIViews.ScrollViewReader
 SwiftTUIViews.ScrollViewReader.init(content:)
+SwiftTUIViews.ScrollWheelEvent
+SwiftTUIViews.ScrollWheelEvent.deltaX
+SwiftTUIViews.ScrollWheelEvent.deltaY
+SwiftTUIViews.ScrollWheelEvent.init(deltaX:deltaY:)
+SwiftTUIViews.ScrollWheelModifier
+SwiftTUIViews.ScrollWheelResult
+SwiftTUIViews.ScrollWheelResult.handled
+SwiftTUIViews.ScrollWheelResult.ignored
 SwiftTUIViews.Section
 SwiftTUIViews.Section.init(_:content:)
 SwiftTUIViews.Section.init(content:header:)
@@ -4447,6 +4463,7 @@ SwiftTUIViews.View.onKeyPress(_:perform:)
 SwiftTUIViews.View.onLongPressGesture(minimumDuration:maximumDistance:perform:)
 SwiftTUIViews.View.onPointerHover(_:)
 SwiftTUIViews.View.onPreferenceChange(_:perform:)
+SwiftTUIViews.View.onScrollWheel(perform:)
 SwiftTUIViews.View.onTapGesture(count:perform:)
 SwiftTUIViews.View.onTerminationRequest(perform:)
 SwiftTUIViews.View.opacity(_:)

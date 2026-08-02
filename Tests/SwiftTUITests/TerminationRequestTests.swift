@@ -45,6 +45,70 @@ struct TerminationRequestTests {
     #expect(recorder.requests == [.signal("SIGTERM")])
   }
 
+  @Test("environment action requests programmatic termination")
+  func environmentActionRequestsTermination() async throws {
+    let recorder = TerminationRecorder()
+    let rootIdentity = testIdentity("ProgrammaticTerminationRoot")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: TerminationTestInputReader(
+        events: [],
+        finishAfterEvents: false
+      ),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      viewBuilder: { _, _ in
+        ProgrammaticTerminationFixture()
+          .onTerminationRequest { request in
+            recorder.requests.append(request)
+            return .allow
+          }
+      }
+    )
+
+    let result = try await runLoop.run()
+    #expect(result.exitReason == .programmatic)
+    #expect(recorder.requests == [.programmatic])
+  }
+
+  @Test("synchronous event pump consumes programmatic termination")
+  func synchronousEventPumpConsumesProgrammaticTermination() throws {
+    let rootIdentity = testIdentity("SynchronousProgrammaticTerminationRoot")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: TerminationTestInputReader(
+        events: [],
+        finishAfterEvents: false
+      ),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      viewBuilder: { _, _ in Text("Root") }
+    )
+    runLoop.isSessionActive = true
+    defer { runLoop.isSessionActive = false }
+    let eventPump = runLoop.makeEventPump()
+    defer { eventPump.cancel() }
+
+    #expect(runLoop.runtimeRequestTerminationAction()())
+    var renderedFrames = 0
+    #expect(
+      try runLoop.processPendingEventsSynchronously(
+        from: eventPump,
+        renderedFrames: &renderedFrames
+      ) == .programmatic
+    )
+  }
+
   @Test("signal exit is honored promptly during a self-invalidating animation")
   func signalExitIsBoundedDuringSelfInvalidatingAnimation() async throws {
     let rootIdentity = testIdentity("TerminationAnimationRoot")
@@ -99,6 +163,15 @@ struct TerminationRequestTests {
 
 private final class TerminationRecorder {
   var requests: [TerminationRequest] = []
+}
+
+private struct ProgrammaticTerminationFixture: View {
+  @Environment(\.requestTermination) private var requestTermination
+
+  var body: some View {
+    Text("requesting termination")
+      .task { _ = requestTermination() }
+  }
 }
 
 @MainActor

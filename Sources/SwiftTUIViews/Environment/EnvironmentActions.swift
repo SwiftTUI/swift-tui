@@ -12,6 +12,53 @@ public import SwiftTUICore
 // environment storage and `ResolveContext`. Each action's private
 // `EnvironmentKey` and its `EnvironmentValues` accessor travel with it.
 
+/// A semantic action that asks the active interactive session to terminate.
+///
+/// The request follows the same ``View/onTerminationRequest(perform:)``
+/// policy as an exit key or signal. It returns `false` when no live run loop
+/// owns the environment value.
+public struct RequestTerminationAction: Sendable, CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler: @MainActor @Sendable () -> Bool
+
+  @MainActor
+  public init(_ handler: @escaping @MainActor @Sendable () -> Bool) {
+    snapshotLabel = "RequestTerminationAction.custom"
+    isPlaceholder = false
+    self.handler = handler
+  }
+
+  @discardableResult
+  @MainActor
+  public func callAsFunction() -> Bool { handler() }
+
+  public var description: String { snapshotLabel }
+  public var debugDescription: String { snapshotLabel }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler: @escaping @MainActor @Sendable () -> Bool
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "RequestTerminationAction.default",
+    isPlaceholder: true,
+    handler: { false }
+  )
+}
+
+private enum RequestTerminationActionKey: EnvironmentKey {
+  static let defaultValue = RequestTerminationAction.placeholder
+}
+
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   package let isPlaceholder: Bool
@@ -359,6 +406,16 @@ extension OpenLinkAction: TypedReuseEqualityProviding {
   }
 }
 
+extension RequestTerminationAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self,
+      snapshotLabel != "RequestTerminationAction.custom",
+      other.snapshotLabel != "RequestTerminationAction.custom"
+    else { return false }
+    return snapshotLabel == other.snapshotLabel && isPlaceholder == other.isPlaceholder
+  }
+}
+
 extension ResetFocusAction: TypedReuseEqualityProviding {
   package func isEqualForReuse(to other: any Sendable) -> Bool {
     guard let other = other as? Self,
@@ -412,6 +469,12 @@ extension TerminalHandoffAction: TypedReuseEqualityProviding {
 }
 
 extension EnvironmentValues {
+  /// Requests that the active interactive session terminate.
+  public var requestTermination: RequestTerminationAction {
+    get { self[RequestTerminationActionKey.self] }
+    set { self[RequestTerminationActionKey.self] = newValue }
+  }
+
   public var openLinkAction: OpenLinkAction {
     get { self[OpenLinkActionKey.self] }
     set { self[OpenLinkActionKey.self] = newValue }

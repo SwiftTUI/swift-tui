@@ -200,10 +200,14 @@ extension RunLoop {
     from eventPump: EventPump,
     renderedFrames: inout Int
   ) throws -> RunLoopExitReason? {
+    if let exitReason = consumeProgrammaticTerminationRequest() {
+      return exitReason
+    }
+
     let pendingEvents = eventPump.drainEvents()
     guard !pendingEvents.isEmpty else {
       try renderPendingFrames(renderedFrames: &renderedFrames)
-      return nil
+      return consumeProgrammaticTerminationRequest()
     }
 
     let renderEventDrain = drainPendingRenderEvents(
@@ -245,7 +249,7 @@ extension RunLoop {
     }
 
     try renderPendingFrames(renderedFrames: &renderedFrames)
-    return nil
+    return consumeProgrammaticTerminationRequest()
   }
 
 }

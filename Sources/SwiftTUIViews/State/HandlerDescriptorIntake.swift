@@ -215,11 +215,13 @@ package struct HandlerDescriptorIntake {
 
   package func registerPointerHandler(
     routeID: RouteID,
+    structuralKey: Identity? = nil,
     handler: @escaping @MainActor (LocalPointerEvent) -> PointerDispatchOutcome
   ) {
     let scope = dispatchScope
     context.localPointerHandlerRegistry?.register(
       routeID: routeID,
+      structuralKey: structuralKey,
       handler: { event in
         withImperativeAuthoringContext(scope) {
           handler(event)

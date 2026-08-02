@@ -48,6 +48,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var terminalHandoffInProgress = false
   package var terminalRenderPassInProgress = false
   package var terminalRenderPassWaiters: [CheckedContinuation<Void, Never>] = []
+  package var isSessionActive = false
+  package var hasPendingProgrammaticTermination = false
   package var nextTerminalHandoffSessionGeneration: UInt64 = 0
   package var activeTerminalHandoffSessionGeneration: UInt64?
 
@@ -345,6 +347,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     // violations recorded during this run loop's own lifetime.
     lastSeenSoundnessViolationCounts = .currentTotals()
     stateContainer.invalidator = scheduler
+    isSessionActive = true
     installFocusTrackerInvalidator()
     observationBridge.attachInvalidator(scheduler)
 
@@ -359,6 +362,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       }
     }
     defer {
+      isSessionActive = false
+      hasPendingProgrammaticTermination = false
       lifecycleCoordinator.shutdown()
       deactivateTerminalHandoffSession()
       if usesRawTerminalMode {
@@ -433,6 +438,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 
     scheduleNextWakeIfNeeded(using: eventPump)
 
+    if let exitReason = consumeProgrammaticTerminationRequest() {
+      return RunLoopResult(
+        finalState: stateContainer.state,
+        renderedFrames: renderedFrames,
+        exitReason: exitReason
+      )
+    }
+
     if scheduler.hasPendingFrame(at: .now()) {
       if let exitReason = try await renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
@@ -448,6 +461,13 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     }
 
     while await iterator.next() != nil {
+      if let exitReason = consumeProgrammaticTerminationRequest() {
+        return RunLoopResult(
+          finalState: stateContainer.state,
+          renderedFrames: renderedFrames,
+          exitReason: exitReason
+        )
+      }
       #if os(Android)
         if let error = directPumpState.error {
           throw error

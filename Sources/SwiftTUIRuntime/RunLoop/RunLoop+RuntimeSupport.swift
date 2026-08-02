@@ -65,6 +65,8 @@ extension RunLoop {
 extension TerminationRequest {
   package init(_ exitReason: RunLoopExitReason) {
     switch exitReason {
+    case .programmatic:
+      self = .programmatic
     case .userExit(let keyPress):
       self = .userExit(keyPress)
     case .signal(let name):

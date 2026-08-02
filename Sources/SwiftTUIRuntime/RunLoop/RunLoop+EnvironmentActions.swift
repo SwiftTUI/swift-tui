@@ -9,6 +9,30 @@ import SwiftTUIViews
 // action for the live runtime implementation built here: focus reset wired to
 // the scheduler, and clipboard read/write wired to the presentation surface.
 extension RunLoop {
+  /// Live termination action. The scheduler wake lets requests from lifecycle
+  /// tasks leave a run loop even when no input event is pending.
+  package func runtimeRequestTerminationAction() -> RequestTerminationAction {
+    RequestTerminationAction(
+      snapshotLabel: "RequestTerminationAction.runtime",
+      isPlaceholder: false
+    ) { [weak self] in
+      guard let self, isSessionActive else { return false }
+      hasPendingProgrammaticTermination = true
+      scheduler.requestExternalWake(reason: "programmatic-termination")
+      return true
+    }
+  }
+
+  package func consumeProgrammaticTerminationRequest() -> RunLoopExitReason? {
+    guard hasPendingProgrammaticTermination else { return nil }
+    hasPendingProgrammaticTermination = false
+    if terminationDisposition(for: .programmatic) == .cancel {
+      scheduler.requestInvalidation(of: [rootIdentity])
+      return nil
+    }
+    return .programmatic
+  }
+
   /// Live `resetFocus` action: clears local default-focus state for the given
   /// namespace and asks the scheduler to re-resolve the root.
   package func runtimeResetFocusAction() -> ResetFocusAction {

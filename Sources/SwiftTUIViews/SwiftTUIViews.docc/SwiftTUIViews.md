@@ -25,7 +25,8 @@ It provides:
   layouts. Viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``
   support the single-``ForEach`` full-lazy path
 - continuous cell-space gestures and drawing through ``DragGesture``,
-  ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
+  ``SpatialTapGesture``, ``View/onPointerHover(_:)``,
+  ``View/onScrollWheel(perform:)``, ``Canvas``, and
   `CanvasDrawing` / ``CanvasClosureDrawing``
 - controls, containers, metrics, and modifiers for most terminal interfaces.
   These include single-line and multiline text entry, split navigation, tab
@@ -92,6 +93,8 @@ Lowering helpers remain package-only implementation details.
 - ``CanvasClosureDrawing``
 - ``DragGesture``
 - ``SpatialTapGesture``
+- ``ScrollWheelEvent``
+- ``ScrollWheelResult``
 - <doc:Pointer-And-Canvas>
 
 ### Shape Primitives

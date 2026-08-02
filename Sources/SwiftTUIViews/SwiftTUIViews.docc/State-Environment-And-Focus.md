@@ -58,10 +58,23 @@ Environment writes are part of authored structure. They are not a late-stage
 rendering override.
 
 Runtime-injected environment actions expose host-owned verbs without putting
-host mechanics in views. For example, ``EnvironmentValues/terminalHandoff``
-temporarily restores the user's terminal while an asynchronous external
-operation runs. The “Terminal Handoffs” guide in `SwiftTUIRuntime` describes
-the ownership and restoration contract.
+host mechanics in views. ``EnvironmentValues/requestTermination`` asks the
+active session to end through the same ``View/onTerminationRequest(perform:)``
+policy used for exit keys and signals. For example:
+
+```swift
+struct QuitButton: View {
+  @Environment(\.requestTermination) private var requestTermination
+
+  var body: some View {
+    Button("Quit") { _ = requestTermination() }
+  }
+}
+```
+
+``EnvironmentValues/terminalHandoff`` temporarily restores the user's terminal
+while an asynchronous external operation runs. The “Terminal Handoffs” guide
+in `SwiftTUIRuntime` describes the ownership and restoration contract.
 
 ## Focus
 
@@ -86,4 +99,5 @@ The runtime is keyboard-first, but focus also matters for:
 - ``FocusState``
 - ``FocusedValue``
 - ``FocusedBinding``
+- ``RequestTerminationAction``
 - ``TerminalHandoffAction``

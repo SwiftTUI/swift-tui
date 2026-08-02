@@ -1,5 +1,7 @@
 /// A request to end an interactive terminal session.
 public enum TerminationRequest: Equatable, Sendable {
+  /// Authored content explicitly asked the active session to end.
+  case programmatic
   /// A configured exit key was pressed.
   case userExit(KeyPress)
   /// A host signal requested termination.

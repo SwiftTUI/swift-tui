@@ -38,6 +38,9 @@ extension RunLoop {
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
+    if effectiveEnvironmentValues.requestTermination.isPlaceholder {
+      effectiveEnvironmentValues.requestTermination = runtimeRequestTerminationAction()
+    }
     if effectiveEnvironmentValues.resetFocus.isPlaceholder {
       effectiveEnvironmentValues.resetFocus = runtimeResetFocusAction()
     }

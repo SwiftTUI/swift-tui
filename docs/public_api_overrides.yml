@@ -98,6 +98,7 @@ classifications:
     - SwiftTUIViews.PopoverTipAction
     - SwiftTUIViews.ProgressView
     - SwiftTUIViews.Rectangle
+    - SwiftTUIViews.RequestTerminationAction
     - SwiftTUIViews.ResetFocusAction
     - SwiftTUIViews.RoundedRectangle
     - SwiftTUIViews.ScrollView
@@ -385,6 +386,9 @@ classifications:
     - SwiftTUIViews.PhaseAnimator
     - SwiftTUIViews.PointerHoverModifier
     - SwiftTUIViews.PointerPath
+    - SwiftTUIViews.ScrollWheelEvent
+    - SwiftTUIViews.ScrollWheelModifier
+    - SwiftTUIViews.ScrollWheelResult
     - SwiftTUIViews.TapGesture
 
     # ─── Timeline-driven views ────────────────────────────────────────────

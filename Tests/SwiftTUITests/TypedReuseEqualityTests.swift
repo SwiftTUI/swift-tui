@@ -131,11 +131,21 @@ struct TypedReuseEqualityTests {
       isPlaceholder: false,
       handler: { _ in true }
     )
+    left.requestTermination = RequestTerminationAction(
+      snapshotLabel: "RequestTerminationAction.runtime",
+      isPlaceholder: false,
+      handler: { true }
+    )
     var right = EnvironmentValues()
     right.resetFocus = ResetFocusAction(
       snapshotLabel: "ResetFocusAction.runtime",
       isPlaceholder: false,
       handler: { _ in false }
+    )
+    right.requestTermination = RequestTerminationAction(
+      snapshotLabel: "RequestTerminationAction.runtime",
+      isPlaceholder: false,
+      handler: { false }
     )
 
     #expect(left == right)
