@@ -4,9 +4,9 @@
 
 SwiftTUI is a UI framework for the terminal that an iOS or macOS engineer can
 pick up without relearning UI. You write `View` values with a declarative,
-body-only, state-driven API; SwiftTUI resolves them through a typed rendering
-pipeline and presents the result as terminal text, a browser canvas, or a
-raster surface inside a host application.
+body-only, state-driven API. SwiftTUI resolves them through a typed rendering
+pipeline. It presents the result as terminal text, a browser canvas, or a raster
+surface inside a host application.
 
 ## The guiding principle: SwiftUI faithfulness
 
@@ -19,19 +19,19 @@ Concretely, faithfulness means:
 - **Recursive layout negotiation.** A parent proposes a size, a child reports
   what it wants, the parent places it. Modifier order changes the result.
 - **Graph-scoped state.** `@State`, `@Binding`, `@Environment`, `@FocusState`,
-  and the repo-owned `@Bindable` keep their SwiftUI semantics: unkeyed state is
-  tied to structural position in the resolved graph, while explicit `.id(...)`
-  and `ForEach` data identities can preserve a runtime owner across structural
+  and the repo-owned `@Bindable` keep their SwiftUI semantics. Unkeyed state is
+  tied to structural position in the resolved graph. Explicit `.id(...)` and
+  `ForEach` data identities can preserve a runtime owner across structural
   moves.
 - **A body-only `View` protocol.** Authoring views never see the rendering
   pipeline. Lowering to primitives is internal.
 - **Declarative composition.** `@ViewBuilder`, `ViewModifier`, presentation
   modifiers, and scenes compose the same way they do in SwiftUI.
 
-Faithfulness is a *constraint*, not a veneer. When a literal translation of a
-desktop behavior would degrade the terminal experience, SwiftTUI reinterprets
-it toward a terminal-native default — but the API shape stays SwiftUI-shaped so
-the reinterpretation is the only thing a developer has to learn.
+Faithfulness is a *constraint*, not a veneer. When a literal desktop behavior
+can degrade the terminal experience, SwiftTUI uses a terminal-native default.
+The API shape stays SwiftUI-shaped. Thus, a developer only has to learn the
+terminal reinterpretation.
 
 ## Deliberate terminal-native deviations
 
@@ -54,13 +54,14 @@ makes a small number of intentional departures:
   `\.dismiss`.** These two SwiftUI APIs are omitted on principle, not as gaps.
   `NavigationLink` subverts data-driven UI: it fuses a control to a navigation
   side effect, so navigation state stops being derivable from (and mutable
-  through) the app's data. `@Environment(\.dismiss)` is an antipattern: a view
-  inherently cannot know the context in which it is displayed, so a
-  self-dismissal command couples reusable content to an assumed presenter.
-  Navigation and presentation are driven by bindings to data — pushing is
-  mutating the data that declares a destination, and dismissal is clearing the
-  binding (or item) that presents the surface. Presenter-side observation
-  (e.g. an `onDismiss:` callback) is compatible with this stance; child-side
+  through) the app's data. `@Environment(\.dismiss)` is an antipattern. A view
+  cannot know the context in which it is displayed. Thus, a self-dismissal
+  command couples reusable content to an assumed presenter. Bindings to data
+  drive navigation and presentation. A push mutates the data that declares a
+  destination. Dismissal clears the binding (or item) that presents the surface.
+  Presenter-side observation
+  (for example, an `onDismiss:` callback) is compatible with this stance.
+  Child-side
   dismissal commands are not.
 - **Structured tab declarations — no `.tabItem`.** Terminal tab chrome is
   structured value metadata, not an arbitrary label view tree. Declare tabs
@@ -97,6 +98,6 @@ The near-term direction is stabilizing the public surface toward a `0.9.0`
 public beta and then `1.0.0`. The project does not document speculative
 roadmaps here.
 
-The honest, current distance between this vision and the shipped code is
-tracked — concretely and without aspiration creeping back into the rest of the
-documentation — in [VISION-GAP.md](VISION-GAP.md).
+[VISION-GAP.md](VISION-GAP.md) tracks the current distance between this vision
+and the shipped code. It keeps future goals out of the rest of the
+documentation.

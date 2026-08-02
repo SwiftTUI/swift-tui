@@ -46,7 +46,7 @@ public struct MouseEvent: Equatable, Sendable {
 
   /// Builds a cell-only fallback event for the cell containing `location`.
   ///
-  /// Callers with fractional input should pass a `PointerLocation` directly.
+  /// For fractional input, pass a `PointerLocation` directly.
   public init(
     kind: Kind,
     location: Point,
@@ -61,10 +61,10 @@ public struct MouseEvent: Equatable, Sendable {
     )
   }
 
-  /// Equality deliberately ignores `timestamp`: it records *when* an event
-  /// occurred, not *what* it is. Two events with the same kind, location, and
-  /// modifiers are the same event — so a parser/coalescer test can assert the
-  /// decoded events without pinning their wall-clock arrival times.
+  /// Equality deliberately ignores `timestamp`.
+  /// It records *when* an event occurred, not *what* the event is.
+  /// Two events are equal if they have the same kind, location, and modifiers.
+  /// Thus, a parser or coalescer test does not need to specify wall-clock arrival times.
   public static func == (lhs: MouseEvent, rhs: MouseEvent) -> Bool {
     lhs.kind == rhs.kind
       && lhs.location == rhs.location
@@ -74,9 +74,9 @@ public struct MouseEvent: Equatable, Sendable {
 
 /// A bracketed-paste burst emitted by the terminal between
 /// `ESC[200~` and `ESC[201~`. The `content` is the raw payload with
-/// no terminal framing — callers decide whether the bytes represent a
-/// file drop (routed to `.dropDestination` destinations) or ordinary
-/// pasted text (routed back as character `KeyPress` events).
+/// no terminal framing. Callers decide how to interpret the bytes.
+/// They send a file drop to `.dropDestination` destinations.
+/// They send ordinary pasted text back as character `KeyPress` events.
 public struct PasteEvent: Equatable, Sendable {
   public var content: String
 

@@ -21,10 +21,9 @@ public enum CanvasPixelGridMode: Equatable, Sendable {
 
 /// A dense row-major pixel grid that renders through `Canvas`.
 ///
-/// The grid stores pre-resolved terminal colors. Callers with indexed
-/// colors or transparency policies should resolve those choices before
-/// constructing the drawing. `nil` pixels are transparent and leave the
-/// destination cell/half-cell untouched.
+/// The grid stores pre-resolved terminal colors.
+/// Resolve indexed colors and transparency policies before you create the drawing.
+/// Pixels with `nil` are transparent and do not change the destination cell or half-cell.
 public struct CanvasPixelGridDrawing: CanvasDrawing, Equatable {
   /// Logical pixel width.
   public var width: Int

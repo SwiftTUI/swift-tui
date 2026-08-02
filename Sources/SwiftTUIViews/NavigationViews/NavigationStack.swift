@@ -9,8 +9,8 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Resolvabl
   /// The framework-derived identity used by the stack's `ActionScope`
   /// conformance.
   ///
-  /// Stack lifetime and navigation identity follow structural view identity;
-  /// callers do not supply an identifier to the initializer.
+  /// Stack lifetime and navigation identity follow structural view identity.
+  /// Callers do not supply an identifier to the initializer.
   public let id: AnyID
   private let pathBinding: NavigationPathBinding?
   private let root: Root

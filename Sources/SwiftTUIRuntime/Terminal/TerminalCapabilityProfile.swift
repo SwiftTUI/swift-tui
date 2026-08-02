@@ -1,12 +1,12 @@
 /// The terminal capabilities assumed when presenting a raster surface.
 public struct TerminalCapabilityProfile: Equatable, Sendable {
-  /// The glyph repertoire the presentation layer may emit.
+  /// The glyph repertoire that the presentation layer can emit.
   public enum GlyphLevel: String, Equatable, Sendable {
     case ascii
     case unicode
   }
 
-  /// The color repertoire the presentation layer may emit.
+  /// The color repertoire that the presentation layer can emit.
   public enum ColorLevel: String, Equatable, Sendable {
     case none
     case ansi16
@@ -184,17 +184,17 @@ extension TerminalCapabilityProfile {
   ///   - `.never`: forces `colorLevel = .none` and disables style escape
   ///     sequences. Wins regardless of TTY status.
   ///   - `.always`: forces `colorLevel` to at least `.ansi16` even when
-  ///     the detected profile would have disabled color (non-TTY, etc.).
-  ///   - `.auto`: no override; the detected level stands.
+  ///     the detected profile disables color, such as for a non-TTY output.
+  ///   - `.auto`: does not override the detected level.
   /// - `RuntimeConfiguration.glyphs`:
   ///   - `.ascii`: forces `glyphLevel = .ascii`.
-  ///   - `.unicode`: no override (unicode is the strict superset; if
+  ///   - `.unicode`: does not override the detected level. Unicode is the strict superset. If
   ///     detection picked ascii because of locale, the user's `.unicode`
-  ///     preference is treated as a "don't restrict me" hint rather than
+  ///     preference is treated as a "permit Unicode" hint rather than
   ///     a "force unicode glyphs" override).
   ///
   /// Other `RuntimeConfiguration` fields (motion, output, web, debug) are not
-  /// terminal capability inputs; this method ignores them.
+  /// terminal capability inputs. This method ignores them.
   public func applying(_ configuration: RuntimeConfiguration) -> Self {
     var result = self
     switch configuration.color {

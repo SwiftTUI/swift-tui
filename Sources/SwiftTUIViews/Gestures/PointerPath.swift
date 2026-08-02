@@ -8,8 +8,8 @@ public import SwiftTUICore
 ///
 /// `PointerPath` is complete for one in-flight gesture: samples are retained
 /// from pointer-down through the current value and cleared when the recognizer
-/// tears down. Persist the samples into app state if they should outlive the
-/// gesture, for example when committing a sketch stroke.
+/// tears down. To keep the samples after the gesture, save them in app state.
+/// A committed sketch stroke is one example.
 public struct PointerPath: Equatable, Hashable, Sendable, RandomAccessCollection {
   public struct Sample: Equatable, Hashable, Sendable {
     /// The sample location in the gesture value's coordinate space.

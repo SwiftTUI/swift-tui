@@ -1,8 +1,7 @@
 /// A type-erased `Hashable & Sendable` identity.
 ///
-/// Used as the `ID` type for scopes whose identity is framework-derived
-/// rather than consumer-supplied (e.g. the pseudonymous variant of
-/// `Panel` produced by `.panel()` without an explicit id).
+/// Used as the `ID` type for scopes with framework-derived identities.
+/// One example is the pseudonymous `Panel` variant from `.panel()` without an explicit identifier.
 ///
 /// Consumers supply their own `Hashable & Sendable` values through
 /// `.panel(id:)` rather than constructing `AnyID` directly.

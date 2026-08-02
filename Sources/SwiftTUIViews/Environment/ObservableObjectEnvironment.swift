@@ -77,7 +77,7 @@ extension Environment {
   /// Reads a type-keyed observable model from the environment, trapping
   /// when no ancestor injected one — matching SwiftUI's non-optional
   /// `@Environment(Model.self)` contract. Use the optional form when the
-  /// model may legitimately be absent.
+  /// model can be absent.
   public init(_ objectType: Value.Type)
   where Value: AnyObject & Observable & Sendable {
     self.init(read: { values in

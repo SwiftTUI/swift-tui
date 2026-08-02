@@ -4,7 +4,8 @@ Pure frame-pipeline types and algorithms for SwiftTUI.
 
 ## Overview
 
-The `SwiftTUICore` module owns the parts of the system that should stay independent from terminal I/O:
+The `SwiftTUICore` module owns the parts of the system that remain independent
+from terminal I/O:
 
 - geometry and proposal types
 - layout and placement infrastructure
@@ -16,7 +17,7 @@ The `SwiftTUICore` module owns the parts of the system that should stay independ
 
 If `SwiftTUIViews` is the authoring layer and `SwiftTUIRuntime` is the runtime
 layer, `SwiftTUICore` is the engine in between them. Its intermediate phase IR is
-package-only; public callers usually reach committed output through
+package-only. Public callers usually reach committed output through
 `SwiftTUIRuntime.RenderSnapshot`, ``RasterSurface``, ``SemanticSnapshot``, and
 diagnostics types.
 
@@ -30,7 +31,7 @@ vocabulary such as `PreferenceKey`, `FocusedValues`, and
 
 ## Design Boundary
 
-`SwiftTUICore` should not talk to the terminal directly.
+`SwiftTUICore` must not communicate with the terminal directly.
 
 That means this module can be reused for:
 

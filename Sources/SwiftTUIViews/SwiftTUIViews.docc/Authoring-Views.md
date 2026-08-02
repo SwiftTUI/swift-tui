@@ -2,11 +2,11 @@
 
 ## Overview
 
-Use the `SwiftTUIViews` module the same way you would approach a small SwiftUI
-feature: compose containers, local state, focused controls, and modifiers around
-a body-driven tree.
+Use the `SwiftTUIViews` module like a small SwiftUI feature. Compose containers,
+local state, focused controls, and modifiers around a body-driven tree.
 
-The main difference is that SwiftTUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
+SwiftTUI renders into a cell surface instead of a pixel buffer. Use these
+concepts:
 
 - integer cell sizes for layout, with continuous cell-space points reserved for
   input, drawing, and interpolation
@@ -20,8 +20,12 @@ SwiftTUI now follows SwiftUI-style actor isolation for authored view trees.
 
 - `View` bodies are `@MainActor`
 - `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor
-- `Binding.init(get:set:)` requires explicitly `@MainActor` get/set closures, `.task(...)` inherits the current actor context, and button actions, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`
-- because `View.body` itself is `@MainActor`, ordinary authored view code still uses those APIs from the main actor
+- `Binding.init(get:set:)` requires explicit `@MainActor` get and set closures.
+- `.task(...)` inherits the current actor context.
+- Button actions, `.onAppear`, `.onDisappear`, and
+  `.onChange(of:initial:_:)` stay explicitly `@MainActor`.
+- `View.body` is `@MainActor`. Thus, ordinary authored view code uses these
+  APIs from the main actor.
 
 The pure `SwiftTUICore` pipeline remains nonisolated. If you need off-main
 inspection, move to already-resolved or already-rendered pipeline artifacts
@@ -29,13 +33,15 @@ rather than evaluating a fresh `View` tree off the main actor.
 
 ## Containers And Controls
 
-The core container and control surface is already broad enough for many dashboards, forms, and editor-like flows:
+The core container and control surface supports many dashboards, forms, and
+editor-like flows:
 
 - stacks, sections, scroll views, lists, outline groups, and tables
 - text, labels, group boxes, control groups, and shapes
 - buttons, toggles, steppers, sliders, pickers, disclosure groups, and text fields
 
-Use built-in containers first. Reach for custom ``Layout`` only when the authored structure genuinely has a reusable layout rule that stacks and frames cannot express clearly.
+Use built-in containers first. Use a custom ``Layout`` only for a reusable
+layout rule that stacks and frames cannot express clearly.
 
 Custom ``Layout`` cache values are pass-local scratch state. SwiftTUI shares
 ``Layout/Cache`` between measurement and placement for one layout pass, then
@@ -51,9 +57,9 @@ Prefer typed `@ViewBuilder` composition, `some View` helpers, and generic
 call site must store or transport heterogeneous view values.
 
 `AnyView` participates in the retained graph, but it still hides concrete
-structure from the surrounding API. State that must survive a change between
-different erased payload types should be owned above the erased boundary and
-passed down through bindings or model references.
+structure from the surrounding API. Own state above the erased boundary when it
+must survive a change between erased payload types. Pass it down through
+bindings or model references.
 
 ## Modifiers
 
@@ -72,21 +78,19 @@ Most familiar modifier categories are available:
 
 Modifiers are first-class public API through `ViewModifier`,
 `View.modifier(_:)`, and `ModifiedContent`. Direct lowering hooks remain
-package-only; ordinary call sites should stay on the modifier surface.
+package-only. Ordinary call sites must stay on the modifier surface.
 
-Blend modifiers follow SwiftUI ordering. Use `.blendMode(_:)` when a subtree's
-cell writes should blend with the current backdrop as they stream through the
-rasterizer. Add `.compositingGroup()` when the subtree should first flatten into
-one terminal-cell layer before later effects, such as an outer blend mode, are
-applied.
+Blend modifiers use SwiftUI ordering. Use `.blendMode(_:)` to blend a subtree's
+cell writes with the current backdrop. Add `.compositingGroup()` to flatten the
+subtree into one terminal-cell layer before later effects apply.
 
 Image attachments follow the same ordering for decodable PNG/JPEG sources. When
 an `Image` has an active blend mode, hosts receive a precomposed image variant
-blended against the visible cell backdrop; unblended images keep the normal
+blended against the visible cell backdrop. Unblended images keep the normal
 high-fidelity attachment path. `AnimatedImage` frames rendered through
 `Image(data:)` inherit this behavior because GIF input is decoded into
 pre-composed PNG-backed frames first. Raw GIF container bytes passed directly to
-`Image(data:)` are different: web surfaces may pass them through unchanged when
+`Image(data:)` are different. Web surfaces can pass them through unchanged when
 unblended, and SwiftTUI does not decode or blend those GIF containers. The
 backdrop includes cell backgrounds and explicit foreground glyphs, with
 deterministic coverage approximations for block, braille, and ordinary text.
@@ -96,10 +100,10 @@ image-layer blending, or direct GIF byte blending.
 
 ## Preview And Inspection
 
-When you want to inspect authored output without running a full terminal
-session, use the `DefaultRenderer` type from `SwiftTUIRuntime` or `SwiftTUI`,
-from the main actor, to produce resolved trees, frame artifacts, or rendered
-terminal text.
+When you want to inspect authored output without a full terminal session, use
+the `DefaultRenderer` type from `SwiftTUIRuntime` or `SwiftTUI`. Run it from the
+main actor. It produces resolved trees, frame artifacts, or rendered terminal
+text.
 
 See also:
 

@@ -8,7 +8,7 @@ public enum TerminalMouseInputMode: Equatable, Sendable {
   case sgrPixels(metrics: CellPixelMetrics)
 }
 
-/// How much evidence an automatic terminal mouse resolver may trust.
+/// How much evidence an automatic terminal mouse resolver can trust.
 public enum TerminalMouseInputTrustPolicy: Equatable, Sendable {
   /// Use SGR-Pixels only after a live DECRQM probe recognizes mode 1016.
   case liveProbeOnly
@@ -17,8 +17,9 @@ public enum TerminalMouseInputTrustPolicy: Equatable, Sendable {
   /// Also trust explicit terminal identities known to be compatible even when
   /// their current docs do not advertise SGR-Pixels clearly.
   case liveProbeOrKnownTerminalIdentity
-  /// Trust rough terminal-name heuristics. This may be wrong behind wrappers or
-  /// multiplexers, so prefer narrower policies when possible.
+  /// Trusts approximate terminal-name heuristics.
+  /// Wrappers or multiplexers can make these heuristics incorrect.
+  /// Use a narrower policy when one is available.
   case roughTerminalIdentityHeuristics
   /// Use SGR-Pixels whenever cell metrics and mouse reporting are available.
   case assumeWhenCellMetricsKnown

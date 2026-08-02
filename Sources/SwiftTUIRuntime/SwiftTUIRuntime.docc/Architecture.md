@@ -1,12 +1,13 @@
 # Architecture
 
-A tour of the package boundaries, the composed runtime pipeline, and the data products that flow between phases.
+A guide to the package boundaries, composed runtime pipeline, and phase data
+products.
 
 ## Overview
 
-SwiftTUI is split into focused targets so that pure pipeline work, authoring
-work, runtime work, terminal convenience, platform hosts, and domain products
-can each evolve without blurring concerns. This article documents those
+SwiftTUI uses focused targets. Pure pipeline work, authoring work, runtime work,
+terminal convenience, platform hosts, and domain products can evolve without
+blurring their concerns. This article documents those
 boundaries, the runtime pipeline, and the phase products that connect them.
 
 ## Target Boundaries
@@ -41,7 +42,9 @@ boundaries, the runtime pipeline, and the phase products that connect them.
 - Re-exports the public authoring and core surface that matters for shared runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing,
   capability-aware presentation, ``RunLoop``, and rendering entry points
-- Provides host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Provides scene manifests and retained hosted-scene sessions for hosts
+- Provides shared terminal control-message parsing and injected input streams
+- Provides streaming terminal output sinks for non-terminal hosts
 
 ### `SwiftTUI`
 
@@ -65,7 +68,7 @@ boundaries, the runtime pipeline, and the phase products that connect them.
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
 - terminal-program embedding lives in `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`; tabbed and split-pane terminal workspaces live in
+  `SwiftTUIPTYPrimitives`. Tabbed and split-pane terminal workspaces live in
   `SwiftTUITerminalWorkspace`
 
 The conceptual model is:
@@ -81,7 +84,7 @@ That last integration layer comes in two forms:
 - compound products must say which side is in scope: runner, host bridge, or
   presentation surface
 
-For a deeper look at how those pieces fit together at the host boundary, see <doc:Host-Integration>.
+For more information about the host boundary, see <doc:Host-Integration>.
 
 ## Frame Pipeline
 
@@ -120,7 +123,9 @@ provide.
 
 ## Runtime Model
 
-``RunLoop`` wraps the pure frame pipeline in an interactive session, coordinating terminal I/O, input parsing, signal handling, frame scheduling, state invalidation, focus routing, and lifecycle staging around the pure frame products.
+``RunLoop`` wraps the pure frame pipeline in an interactive session. It
+coordinates terminal I/O, input parsing, signals, frames, state, focus, and
+lifecycle staging.
 
 The core runtime is intentionally narrow today:
 
@@ -140,7 +145,7 @@ runtime seams used by executable and retained-session integrations, see
 <doc:Host-Integration>.
 
 CLI scene management is executable-runner policy rather than an authored-scene
-rule. One-window and multi-window apps share the same runner story; composed
+rule. One-window and multi-window apps share the same runner story. Composed
 hosts depend on `SwiftTUIRuntime` instead of the `SwiftTUI` terminal
 convenience product.
 
@@ -160,14 +165,19 @@ convenience product.
 
 ## Styling And Presentation
 
-- The public styling story is semantic-token-first: TUI views author against `.foreground`, `.background`, `.warning`, `.tint`, and related roles
-- The active host integration chooses the active theme; the inner TUI app does not branch on host style variants or inspect theme choice directly
-- Terminal appearance can be inferred heuristically or queried actively from the host and can synthesize the default semantic theme when no explicit host theme is provided
-- Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
+- The public styling model uses semantic tokens. TUI views author against
+  `.foreground`, `.background`, `.warning`, `.tint`, and related roles.
+- The active host integration selects the active theme. The inner TUI app does
+  not select or inspect host style variants.
+- The runtime can infer the terminal appearance or query it from the host.
+- If the host provides no theme, the runtime creates the default semantic
+  theme.
+- Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or
+  true-color output.
 - Presentation sanitizes authored text and OSC 8 hyperlink destinations before
-  emitting terminal bytes; layout, semantics, and raster artifacts never need to
-  encode terminal-control safety rules themselves
-- Terminal capability affects presentation, not layout semantics
+  it emits terminal bytes. Layout, semantics, and raster artifacts do not
+  encode terminal-control safety rules.
+- Terminal capability affects presentation, not layout semantics.
 
 ## See Also
 

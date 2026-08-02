@@ -7,8 +7,8 @@ Build batteries-included SwiftTUI apps with one import.
 `SwiftTUI` is the release-facing convenience module. It re-exports the
 platform-neutral runtime, standard argument parsing, the combined
 terminal/WebHost runner, and animated GIF/image support. Its `App` protocol is
-the batteries-included overlay: it conforms to `SwiftTUICommand` while still
-building on `SwiftTUIRuntime.App`, so apps can write:
+the batteries-included overlay. It conforms to `SwiftTUICommand` and builds on
+`SwiftTUIRuntime.App`. Thus, apps can use this form:
 
 ```swift
 import SwiftTUI
@@ -23,13 +23,13 @@ struct DemoApp: App {
 }
 ```
 
-> Important: Launch SwiftTUI apps with `@main`. `App.main()` is `async`, and
-> `@main` binds that asynchronous entry point. Do **not** add a top-level
-> `DemoApp.main()` call in a `main.swift`: unlike synchronous `SwiftUI.App`,
-> that resolves to swift-argument-parser's synchronous `ParsableCommand.main()`
-> overload and never starts the runtime (`await DemoApp.main()` does not change
-> the selection). SwiftTUI rejects that path with a precise diagnostic instead
-> of starting silently, so use `@main`.
+> Important: Launch SwiftTUI apps with `@main`. `App.main()` is `async`.
+> `@main` binds this asynchronous entry point. Do **not** add a top-level
+> `DemoApp.main()` call in `main.swift`. Unlike `SwiftUI.App`, this app uses an
+> asynchronous entry point. A direct call selects the synchronous
+> `ParsableCommand.main()` overload from swift-argument-parser. It does not
+> start the runtime. `await DemoApp.main()` does not change the overload
+> selection. SwiftTUI rejects this path with a precise diagnostic.
 
 Apps that define their own command-line options keep those options on the app
 type and add the standard option group:
@@ -55,10 +55,10 @@ parsed configuration requests `--web`, in which case it launches the localhost
 WebHost bridge. Use `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWebHost`, or
 `SwiftTUIWebHostCLI` directly when building a narrower custom graph. Add peer
 products such as `SwiftTUITerminal` or `SwiftTUITerminalWorkspace` only when
-that surface is part of your app; charts ship separately from
+that surface is part of your app. Charts ship separately from
 [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
-Import `SwiftTUIRuntime` directly for host-managed app declarations that should
-not conform to `SwiftTUICommand`.
+For host-managed app declarations that do not conform to `SwiftTUICommand`,
+import `SwiftTUIRuntime` directly.
 
 ## Topics
 

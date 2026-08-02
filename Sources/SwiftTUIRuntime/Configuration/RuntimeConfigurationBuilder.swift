@@ -1,8 +1,8 @@
 extension RuntimeConfiguration {
   /// Returns a new fluent builder initialized with `RuntimeConfiguration.default`.
   ///
-  /// Use this API in runners that construct `RuntimeConfiguration` programmatically
-  /// (e.g., `WebHost`, platform-specific hosts) rather than through argv parsing.
+  /// Use this API in runners that create `RuntimeConfiguration` without argument parsing.
+  /// Examples include `WebHost` and platform-specific hosts.
   public static func builder() -> Builder {
     Builder()
   }

@@ -29,7 +29,7 @@ public enum ControlProminence: Hashable, Sendable {
   case increased
 }
 
-/// A semantic role for buttons and other confirm or cancel actions.
+/// A semantic role for buttons and other acceptance or cancellation actions.
 public enum ButtonRole: Hashable, Sendable {
   case cancel
   case destructive
@@ -348,10 +348,10 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
 
   /// Derives the semantic theme exposed to higher-level styling APIs.
   ///
-  /// Memoized on appearance value equality: the derivation is pure, so the
-  /// last-synthesized theme is returned whenever the appearance is unchanged
-  /// (the steady state — style-key environment edits re-mint snapshots far
-  /// more often than the appearance itself changes).
+  /// This function memoizes the theme by appearance value equality.
+  /// The derivation is pure, so an unchanged appearance returns the last theme.
+  /// This is the steady state.
+  /// Style-key environment changes create new snapshots more frequently than the appearance changes.
   public func synthesizedTheme() -> Theme {
     if let cached = synthesizedThemeMemo.withLock({ $0 }), cached.appearance == self {
       return cached.theme

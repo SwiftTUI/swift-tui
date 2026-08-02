@@ -8,7 +8,7 @@ public import SwiftTUICore
 /// previously configured set wholesale — there is no accumulation.
 ///
 /// The default is a single binding: `Ctrl+D`. Pass an empty array to
-/// disable framework-provided exit keys entirely; the runtime will then
+/// disable framework-provided exit keys entirely. The runtime will then
 /// only exit on OS signals, `stdin` EOF, or an explicit exit returned by
 /// a consumer `keyHandler` / `keyCommand`.
 ///

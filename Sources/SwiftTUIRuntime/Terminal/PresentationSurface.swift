@@ -174,9 +174,8 @@ public protocol RasterPresentationSurface: AnyObject {
 
 /// Terminal-shaped aggregate presentation target used by terminal hosts.
 ///
-/// Non-terminal hosts should conform to the narrower roles they need, such as
-/// ``PresentationSurfaceMetricsProvider`` and
-/// `SemanticHostFramePresentationSurface`.
+/// Non-terminal hosts must conform only to the narrower roles that they require.
+/// These roles include ``PresentationSurfaceMetricsProvider`` and `SemanticHostFramePresentationSurface`.
 public protocol PresentationSurface:
   PresentationSurfaceMetricsProvider, TerminalCommandPresentationSurface,
   RasterPresentationSurface

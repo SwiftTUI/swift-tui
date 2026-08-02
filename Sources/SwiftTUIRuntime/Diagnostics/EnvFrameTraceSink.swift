@@ -13,23 +13,23 @@ import Synchronization
 
 /// Env-gated frame-pipeline trace sink.
 ///
-/// When `SWIFTTUI_FRAME_TRACE=<path>` is set in the environment, the runtime
-/// installs this sink (see `SceneSession`) and appends one tab-separated line
-/// per committed, dropped/cancelled, or elided frame to `<path>`. It is a
-/// low-overhead way to capture *what the frame pipeline actually did* during an
-/// interaction — e.g. a tab switch that feels slow or flashes blank — in a real
-/// terminal, where timing races that never appear under deterministic test
-/// drivers do surface.
+/// When the environment contains `SWIFTTUI_FRAME_TRACE=<path>`, the runtime installs this sink.
+/// See `SceneSession` for the installation point.
+/// The sink appends one tab-separated line to `<path>` for each committed, dropped, cancelled, or elided frame.
+/// This trace records the actual frame-pipeline work during an interaction in a real terminal.
+/// For example, it can record a slow tab switch or a blank flash.
+/// A real terminal can expose timing races that deterministic test drivers do not expose.
 ///
-/// Diagnostic-only and entirely opt-in: with the env var unset nothing is
-/// installed and the per-frame emit stays a single nil branch.
+/// This diagnostic is opt-in.
+/// If the environment variable is absent, the runtime installs nothing.
+/// The per-frame emit then stays a single nil branch.
 ///
-/// Columns: `seq`, `kind` (COMMIT / ZEROART / ELIDE), `frame`, `causes`
-/// (scheduler wake causes), `tail` (frame-tail job state), `anim`
-/// (active-animation-count / has-pending-work), `focusRerenders` (focus-sync
-/// convergence passes), `drop` (completed-frame drop decision), `blockers`
-/// (drop-eligibility blockers), and free-form `extra`. A `ZEROART` row is a
-/// frame that produced no pixels — the prime suspect for a momentary blank.
+/// The columns are `seq`, `kind` (COMMIT / ZEROART / ELIDE), `frame`, and `causes` (scheduler wake causes).
+/// They also include `tail` (frame-tail job state) and `anim` (active-animation-count / has-pending-work).
+/// The remaining columns are `focusRerenders`, `drop`, `blockers`, and free-form `extra`.
+/// `focusRerenders` contains the number of focus-sync convergence passes.
+/// `drop` contains the completed-frame drop decision, and `blockers` contains the drop-eligibility blockers.
+/// A `ZEROART` row is a frame that produced no pixels and can identify a momentary blank.
 @_spi(Runners) public final class EnvFrameTraceSink: FrameDiagnosticSink {
   #if !canImport(WASILibc)
     private let descriptor: Mutex<Int32>
@@ -49,8 +49,8 @@ import Synchronization
     }
   #endif
 
-  /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
-  /// writable path; otherwise `nil`. Safe to call on every session build.
+  /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty, writable path.
+  /// Otherwise, returns `nil`. Each session build can call this method safely.
   ///
   /// WASI has no path-based file sink — its capability model makes
   /// arbitrary-path `open` a no-op — so this always returns `nil` there.

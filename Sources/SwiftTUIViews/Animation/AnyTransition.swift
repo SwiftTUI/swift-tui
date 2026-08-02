@@ -75,8 +75,8 @@ package struct TransitionModifiers: Sendable, Equatable {
 
 /// A type-erased transition wrapper.
 ///
-/// Built-in transitions (``opacity``, ``move(edge:)``, etc.) construct
-/// `AnyTransition` values directly.  Custom ``Transition`` conformances
+/// Built-in transitions, such as ``opacity`` and ``move(edge:)``, create
+/// `AnyTransition` values directly. Custom ``Transition`` conformances
 /// are wrapped via ``AnyTransition/init(_:)``.
 public struct AnyTransition: Sendable {
   package let insertionModifiers: @Sendable () -> TransitionModifiers

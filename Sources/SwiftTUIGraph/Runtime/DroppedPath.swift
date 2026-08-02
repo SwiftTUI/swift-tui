@@ -1,7 +1,7 @@
-/// A single path that arrived via a drop or paste of file-shaped content. Kept
-/// as a raw string so the `Core` layer — which may not `import Foundation` — can
-/// represent paths without pulling in `URL`. Consumers convert to `URL` or
-/// `FilePath` at their own layer.
+/// One path from dropped or pasted file content.
+/// It stays a raw string because the `Core` layer cannot `import Foundation`.
+/// Thus, `Core` can represent paths without a dependency on `URL`.
+/// Consumers convert the value to `URL` or `FilePath` in their own layer.
 public struct DroppedPath: Equatable, Hashable, Sendable,
   CustomStringConvertible, CustomDebugStringConvertible,
   ExpressibleByStringLiteral

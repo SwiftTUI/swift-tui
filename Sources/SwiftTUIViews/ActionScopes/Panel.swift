@@ -4,8 +4,8 @@ public import SwiftTUICore
 public enum FocusContainment: Sendable {
   /// Default: Tab reaches focusable descendants of the Panel.
   case open
-  /// Panel is the focus stop; Tab skips the Panel's focusable
-  /// descendants. Drill-in mechanism deferred to a future design.
+  /// Panel is the focus stop. Tab skips the focusable descendants of the Panel.
+  /// A future design will add a drill-in mechanism.
   case sealed
 }
 
@@ -13,15 +13,15 @@ public enum FocusContainment: Sendable {
 /// `ActionScope`.
 ///
 /// Panel has no default UI chrome. Visual treatment is the consumer's
-/// responsibility via standard modifiers (`.border`, `.background`,
-/// `.padding`, etc.).
+/// responsibility through standard modifiers, such as `.border`, `.background`, and `.padding`.
 ///
-/// A Panel is a command/chrome-hosting *container*, not a control: it is a
-/// focus *scope* (so commands and focused values resolve along its chain) but
-/// **not** a focus *target*. Tab passes through it to the focusable item leaves
-/// inside; the Panel itself is never focused. Its commands activate by the
-/// active/visible context — never by focusing the container — matching how
-/// SwiftUI hoists toolbar/commands to system regions without focusing a view.
+/// A Panel is a *container* that hosts commands and chrome. It is not a control.
+/// It is a focus *scope*, so commands and focused values resolve along its chain.
+/// It is not a focus *target*. Tab passes through it to the focusable item leaves inside.
+/// The Panel itself is never focused.
+/// Its commands activate through the active and visible context.
+/// Focusing the container does not activate them.
+/// This behavior matches SwiftUI toolbars and commands in system regions.
 ///
 /// Pair with `.keyCommand(...)`, `.paletteCommand(...)`, or
 /// `.focusContainment(_:)` to configure.
@@ -90,9 +90,8 @@ extension View {
     Panel(id: id, containment: .open, content: self)
   }
 
-  /// Wraps `self` in a Panel whose identity is derived from the
-  /// structural identity path at the call site. Derived from the
-  /// structural-identity path at the call site; stable across
+  /// Wraps `self` in a Panel whose identity comes from the structural identity path at the call site.
+  /// This identity is stable across
   /// re-resolves of the same view hierarchy.
   ///
   /// Use when Panel identity can be derived from structural position

@@ -1,17 +1,16 @@
 /// A 1D gradient sampled continuously around a border's perimeter.
 ///
-/// `BorderBlend` drives border foreground colors by walking the
-/// rectangle's edge cells clockwise (top L→R, right T→B, bottom R→L,
-/// left B→T) and interpolating between `stops` based on the cell's
-/// position around the perimeter. The `phase` parameter rotates the
-/// gradient start point around the perimeter, enabling chasing-light
-/// animation when driven by the animation pipeline in a later task.
+/// `BorderBlend` sets border foreground colors by walking the edge cells clockwise.
+/// The order is top L→R, right T→B, bottom R→L, and left B→T.
+/// It interpolates between `stops` based on the cell position along the perimeter.
+/// The `phase` parameter rotates the
+/// gradient start point around the perimeter.
+/// The animation pipeline uses this rotation for a chasing-light animation.
 ///
 /// Stops use the same `(location, color)` shape as ``Gradient/Stop``
 /// where `location` is in `[0, 1]`. To produce a closed loop (the
-/// typical chasing-light effect), repeat the first color as the last
-/// stop: `BorderBlend([.red, .blue, .red])` fades red → blue → red
-/// smoothly around the perimeter.
+/// typical chasing-light effect), repeat the first color as the last stop.
+/// For example, `BorderBlend([.red, .blue, .red])` fades red → blue → red around the perimeter.
 public struct BorderBlend: Equatable, Sendable {
   public var stops: [Gradient.Stop]
 
@@ -20,8 +19,8 @@ public struct BorderBlend: Equatable, Sendable {
   }
 
   /// Evenly-spaced stops built from a color list. The first and
-  /// last colors are placed at locations 0 and 1 respectively; to
-  /// close the loop, pass the first color again at the end.
+  /// last colors are at locations 0 and 1, respectively.
+  /// To close the loop, pass the first color again at the end.
   public init(_ colors: [Color]) {
     guard !colors.isEmpty else {
       self.stops = []
@@ -63,19 +62,18 @@ extension BorderBlend {
     return stops.last?.color
   }
 
-  /// Samples a color for every cell on the perimeter of a rectangle
-  /// with dimensions `(width × height)`, walking clockwise:
-  ///   top edge L→R, right edge T→B, bottom edge R→L, left edge B→T.
+  /// Samples a color for each cell on the perimeter of a `(width × height)` rectangle.
+  /// It walks clockwise: top L→R, right T→B, bottom R→L, and left B→T.
   ///
   /// The total number of perimeter cells is `2*(width + height) - 4`
   /// for `width ≥ 2 && height ≥ 2`. Degenerate sizes return a flat
-  /// array sized to whatever perimeter exists:
+  /// array with the size of the available perimeter:
   ///  - `1×1` → 1 cell
   ///  - `N×1` → N cells
   ///  - `1×N` → N cells
   ///
-  /// `phase` rotates the start point around the perimeter: a phase of
-  /// `0.25` shifts the gradient start by 25% of the perimeter length.
+  /// `phase` rotates the start point around the perimeter.
+  /// A phase of `0.25` shifts the gradient start by 25% of the perimeter length.
   public func samplePerimeter(
     width: Int,
     height: Int,

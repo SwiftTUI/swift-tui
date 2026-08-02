@@ -12,8 +12,8 @@ renders the consumed wire frame and sends input and surface metrics back to the
 session.
 
 ``AndroidHostStyle`` supplies the terminal appearance and initial cell size.
-The initial size defaults to 80×24; `resize` updates both the cell grid and
-reported cell-pixel metrics before requesting a surface refresh.
+The initial size is 80×24 by default. `resize` updates the cell grid and the
+reported cell-pixel metrics. Then it requests a surface refresh.
 
 This Swift product is one half of the Android integration. The Compose host,
 JNI shim, AAR, and Gradle plugin ship from
@@ -25,10 +25,9 @@ canonical packaging and engine-profile boundaries.
 ## Converged Frame Wire
 
 Android does not define a separate frame snapshot or encoder. It emits the
-same converged `web-surface` wire used by the WASI and WebHost transports:
-package-only `HostWireFrameModel` derives the host-facing fields, and
-package-only `WebSurfaceFrameEncoder` formats the versioned full or delta
-record.
+same converged `web-surface` wire that the WASI and WebHost transports use.
+Package-only `HostWireFrameModel` derives the host-facing fields. Package-only
+`WebSurfaceFrameEncoder` formats the versioned full or delta record.
 
 Encoding happens when the client copies a frame, not when the runtime commits
 it:
@@ -41,13 +40,13 @@ it:
 3. `WebSurfaceFrameEncoder` emits a full record by default or a delta record
    when capabilities declared before scene start allow it.
 4. The encoded UTF-8 bytes are cached by sequence. The ABI's size query,
-   subsequent copy, and repeated polls of the same frame reuse those bytes;
-   frames skipped by the polling client are never serialized.
+   subsequent copy, and repeated polls of the same frame reuse those bytes.
+   The encoder does not serialize frames that the polling client skips.
 
-The consumed record carries styled cells, hyperlink and image records,
-accessibility nodes and announcements, scroll regions, focus presentation,
-damage, preferred sizing, and terminal style through the one shared wire
-model. Accumulating damage until consumption keeps deltas relative to the
+The consumed record carries styled cells, hyperlink records, image records,
+accessibility nodes, announcements, and scroll regions. It also carries focus
+presentation, damage, preferred sizing, and terminal style through the shared
+wire model. Accumulating damage until consumption keeps deltas relative to the
 previous frame selected by the client's copy handshake, rather than merely the
 previous runtime commit.
 
@@ -55,13 +54,14 @@ previous runtime commit.
 
 ``AndroidHostHandleRegistry`` maps opaque integer handles to retained scene
 hosts. The exported `swift_tui_android_*` C entry points let the JNI bridge
-start, stop, destroy, tick, resize, send input, declare wire capabilities, copy
-the latest frame, and drain app-requested clipboard text.
+start, stop, destroy, tick, resize, and send input. They also let the bridge
+declare wire capabilities, copy the latest frame, and drain app-requested
+clipboard text.
 
 Frame and clipboard copies use a two-call contract: a nil or undersized output
-buffer reports the required UTF-8 byte count without consuming the value; a
-large-enough buffer performs the copy. Clipboard text drains after a successful
-copy, while frame bytes remain cached until a newer sequence is consumed.
+buffer reports the required UTF-8 byte count without consuming the value. A
+large-enough buffer copies the value. A successful copy drains clipboard text.
+Frame bytes stay cached until the client consumes a newer sequence.
 
 The Android render poll also drives the Swift main-actor executor so ready
 runtime continuations, tasks, and animation wakes make progress on the host

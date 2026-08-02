@@ -90,10 +90,11 @@ public func swift_tui_android_destroy(
   }
 }
 
-/// Installs the host-driven main-actor executor. Called by the JNI bridge as
-/// the very first thing in `createHost`, before any main-actor work, so every
-/// Android host app gets a drivable Swift main executor without each app's
-/// `create_host` having to remember to do it. Idempotent.
+/// Installs the host-driven main-actor executor.
+/// The JNI bridge calls this first in `createHost`, before all main-actor work.
+/// Thus, each Android host app gets a drivable Swift main executor.
+/// The app does not need a separate call in `create_host`.
+/// Repeated calls have no effect.
 @_cdecl("swift_tui_android_install_executor")
 public func swift_tui_android_install_executor() {
   #if os(Android)

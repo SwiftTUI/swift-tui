@@ -6,11 +6,10 @@ public enum RuntimeIssueSeverity: String, Sendable, Hashable {
 
 /// A host-facing runtime issue.
 ///
-/// Runtime issues are narrower than frame diagnostics: they represent actionable
-/// problems in authored or runtime state that a host should surface. Frame
-/// diagnostics may include many non-issue performance counters, but every
-/// runtime issue recorded for a frame is also attached to that frame's
-/// diagnostics.
+/// Runtime issues are narrower than frame diagnostics.
+/// They describe actionable errors in authored or runtime state that a host must show.
+/// Frame diagnostics can include performance counters that are not errors.
+/// Each runtime issue for a frame is also part of the diagnostics for that frame.
 public struct RuntimeIssue: Sendable, Hashable, CustomStringConvertible {
   public var severity: RuntimeIssueSeverity
   public var code: String

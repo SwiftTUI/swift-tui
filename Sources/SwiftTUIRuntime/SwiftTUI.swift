@@ -185,17 +185,16 @@ public struct DefaultRenderer {
 
   /// Renders `root` into a committed frame snapshot.
   ///
-  /// This is a one-shot snapshot/preview entry point. It is **not focus/press
-  /// reuse-safe across successive calls on the same renderer**: focus and press
-  /// state are runtime side-fields excluded from the reuse-equality snapshot, and
-  /// their correctness under memoized-body reuse depends on the run loop's
-  /// retained-reuse suppression scope, which the one-shot path does not compute.
-  /// So an `Equatable`/`View.equatable()` boundary wrapping a
-  /// focus/press-reading control can serve a stale pressed/focused visual across
-  /// one-shot frames where focus/press changed and an ancestor was invalidated.
+  /// This is a one-shot entry point for snapshots and previews.
+  /// It is **not safe for focus or press reuse across successive calls on the same renderer**.
+  /// Focus and press state are runtime side fields that the reuse-equality snapshot excludes.
+  /// Correct memoized-body reuse depends on the retained-reuse suppression scope of the run loop.
+  /// The one-shot path does not compute this scope.
+  /// Thus, an `Equatable` or `View.equatable()` boundary can show stale focus or press output.
+  /// This error can occur after focus or press changes and an ancestor invalidates the control.
   /// For interactive rendering, drive frames through the run loop
   /// (`TerminalRunner`/host integration), which suppresses reuse of focus/press
-  /// cones; use `render(_:)` for snapshots, previews, and tests.
+  /// cones. Use `render(_:)` for snapshots, previews, and tests.
   @MainActor
   public func render<V: View>(
     _ root: V,

@@ -5,12 +5,12 @@ public import SwiftTUICore
 /// A schedule describing the moments at which a ``TimelineView``
 /// re-evaluates its content.
 ///
-/// Conforming types produce a sequence of `MonotonicInstant`s; the
-/// view sleeps until each successive instant and then re-resolves the
-/// body with the updated context.  Schedules are free to return an
-/// infinite sequence — `TimelineView` will keep walking it until the
-/// view is removed from the hierarchy (the underlying `.task` cancels
-/// at teardown).
+/// Conforming types produce a sequence of `MonotonicInstant` values.
+/// The view sleeps until each successive instant.
+/// Then it resolves the body again with the updated context.
+/// Schedules can return an infinite sequence.
+/// `TimelineView` walks the sequence until the view leaves the hierarchy.
+/// The underlying `.task` cancels at teardown.
 ///
 /// Built-in schedules:
 ///
@@ -24,19 +24,19 @@ public import SwiftTUICore
 /// with a `Sendable` `Entries` sequence whose elements are
 /// `MonotonicInstant`.
 public protocol TimelineSchedule: Sendable {
-  /// A sequence of instants at which the timeline view should update.
+  /// A sequence of instants at which the timeline view updates.
   associatedtype Entries: Sequence & Sendable
   where Entries.Element == MonotonicInstant
 
-  /// The instants this schedule wants the timeline view to fire at,
+  /// The instants at which this schedule fires the timeline view,
   /// starting at or after `startInstant`.
   ///
   /// - Parameters:
   ///   - startInstant: The earliest instant the caller is interested
-  ///     in.  Implementations should not emit instants strictly
+  ///     in. Implementations must not emit instants strictly
   ///     before this.
   ///   - mode: A cadence hint.  In ``TimelineScheduleMode/lowFrequency``
-  ///     the schedule should throttle its updates — for example when
+  ///     the schedule must decrease its update rate. For example, this mode applies when
   ///     the system is in reduce-motion mode or the host has signalled
   ///     a lower preferred frame rate.
   func entries(
@@ -47,7 +47,7 @@ public protocol TimelineSchedule: Sendable {
 
 /// Cadence hint passed to a ``TimelineSchedule``.
 public enum TimelineScheduleMode: Hashable, Sendable {
-  /// Normal cadence — the schedule may fire as fast as it likes.
+  /// Normal cadence. The schedule can fire at any supported rate.
   case normal
   /// Throttled cadence — fire less often to respect reduce-motion or
   /// other low-frequency-update signals from the host.
@@ -63,7 +63,7 @@ public enum TimelineScheduleMode: Hashable, Sendable {
 /// from `startInstant` that is at or after the timeline view's start
 /// instant.  In ``TimelineScheduleMode/lowFrequency`` the effective
 /// interval is rounded up to one second so that timer-driven UI
-/// surfaces don't keep redrawing under reduce-motion.
+/// surfaces do not continue to draw under reduce-motion.
 public struct PeriodicTimelineSchedule: TimelineSchedule, Hashable, Sendable {
   public let startInstant: MonotonicInstant
   public let interval: Duration
@@ -218,8 +218,9 @@ extension TimelineSchedule where Self == PeriodicTimelineSchedule {
 }
 
 extension TimelineSchedule where Self == AnimationTimelineSchedule {
-  /// A schedule suitable for driving smooth animation; defaults to
-  /// ~20 fps and throttles to ~4 fps under reduce-motion.
+  /// A schedule for smooth animation.
+  /// The default rate is ~20 fps.
+  /// Under reduce-motion, the rate decreases to ~4 fps.
   public static var animation: AnimationTimelineSchedule {
     AnimationTimelineSchedule()
   }
@@ -278,10 +279,10 @@ package func timelineTickPlan(delay: Duration) -> TimelineTickPlan {
 /// builder.
 ///
 /// Lives outside `TimelineView` so that callers using trailing-closure
-/// syntax don't trip Swift's generic-inference resolution — a closure
-/// parameter typed `(TimelineView<...>.Context) -> Content` requires
-/// the generics to be known before the closure can be type-checked,
-/// which defeats the trailing-closure call site.
+/// syntax do not cause an error in Swift generic inference.
+/// A closure parameter typed `(TimelineView<...>.Context) -> Content` requires known generic types.
+/// Swift must know these types before it analyzes the closure type.
+/// This requirement prevents the trailing-closure call site.
 public struct TimelineViewContext: Sendable, Hashable {
   /// The schedule's fire instant currently being displayed.
   public let instant: MonotonicInstant
@@ -297,13 +298,12 @@ public struct TimelineViewContext: Sendable, Hashable {
 /// A view that re-evaluates its content at the instants supplied by a
 /// ``TimelineSchedule``.
 ///
-/// `TimelineView` is the SwiftTUI analogue of SwiftUI's `TimelineView`
-/// — it lets a view compute its body from "the current time" without
-/// hand-rolling a tick loop in `@State`.  Combine it with
+/// `TimelineView` is the SwiftTUI equivalent of SwiftUI `TimelineView`.
+/// It lets a view compute its body from the current time without a custom tick loop in `@State`.
+/// Combine it with
 /// `LinearGradient` and `Color/interpolated(to:progress:method:)` to
-/// build shimmer/marquee/clock surfaces that pause cleanly when the
-/// view leaves the hierarchy (the underlying `.task` cancels on
-/// teardown).
+/// build shimmer, marquee, or clock surfaces.
+/// These surfaces pause when the view leaves the hierarchy because teardown cancels the underlying `.task`.
 ///
 ///     TimelineView(.periodic(by: .seconds(1))) { context in
 ///       // Use context.instant.duration(to: .now()) for elapsed math.

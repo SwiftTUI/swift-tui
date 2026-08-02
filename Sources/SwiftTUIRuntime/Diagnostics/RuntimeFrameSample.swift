@@ -12,12 +12,12 @@ import SwiftTUICore
   case elided(ElidedFrameSample)
 }
 
-/// Inputs for an off-screen-elided frame. Like ``ZeroArtifactFrameSample`` it
-/// produces no pipeline artifacts, but it is distinct: the frame ran its
-/// reduced commit (firing completions, advancing animation state) and is
-/// recorded as `elided` rather than cancelled or dropped. The animation
-/// controller scalars are captured at the emit point, after the reduced commit
-/// has published the advanced live state.
+/// Inputs for an off-screen-elided frame.
+/// Like ``ZeroArtifactFrameSample``, it produces no pipeline artifacts.
+/// However, the frame ran its reduced commit and is distinct.
+/// The reduced commit fires completions and advances animation state.
+/// The runtime records the frame as `elided`, not as cancelled or dropped.
+/// The emit point captures the animation-controller scalars after the reduced commit publishes the advanced live state.
 @_spi(Runners) public struct ElidedFrameSample: Sendable {
   package var frameNumber: Int
   package var scheduledFrame: ScheduledFrame

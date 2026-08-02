@@ -154,10 +154,10 @@ extension View {
   /// view builders. The contributed item is delivered to the nearest
   /// enclosing ActionScope with a `.toolbar(style:)` modifier.
   ///
-  /// Deprecated: the `icon` builder is evaluated and discarded — it never
+  /// Deprecated: the function evaluates and discards the `icon` builder. It never
   /// renders. The toolbar strip renders `Image` icons supplied through
-  /// ``ToolbarItemConfig/init(title:icon:position:isEnabled:systemHint:action:)``;
-  /// use ``toolbarItem(_:)`` with a config instead.
+  /// ``ToolbarItemConfig/init(title:icon:position:isEnabled:systemHint:action:)``.
+  /// Use ``toolbarItem(_:)`` with a configuration instead.
   @available(
     *, deprecated,
     message:

@@ -1,7 +1,8 @@
 public import SwiftTUICore
 
-/// A gesture that delivers events to `first`; if first fails, the same
-/// events flow to `second`. The value types of both gestures must match.
+/// A gesture that delivers events to `first`.
+/// If `first` fails, the same events continue to `second`.
+/// The value types of both gestures must match.
 ///
 /// Canonical use: `TapGesture(count: 2).exclusively(before: TapGesture())`
 /// to disambiguate double-tap from single-tap.

@@ -1,10 +1,8 @@
 # Architecture
 
-This internal document describes how the SwiftTUI codebase is organized: its
-modules, products, dependency graph, source layout, and layout model. For the
-developer-facing rendering internals, see
-[`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md);
-for internal execution-environment notes, see
+This internal document describes the SwiftTUI modules, products, dependency
+graph, source layout, and layout model. For the rendering internals, see
+[`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md). For internal execution-environment notes, see
 [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 
 ## The big picture
@@ -33,10 +31,10 @@ or terminal bytes.
 ## Modules and the dependency graph
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
-examples, and the public website may live in sibling organization repositories,
-but the public Swift products below remain in this package unless a later
-extraction explicitly promotes their package-private seams into stable public
-API. Internally the engine is a layered stack of internal targets
+examples, and the public website can live in sibling organization repositories.
+The public Swift products below remain in this package unless a later
+extraction promotes their package-private seams to stable public API. The engine
+is a layered stack of internal targets
 (`SwiftTUIPrimitives` → `SwiftTUIGraph` → `SwiftTUICore` → `SwiftTUIViews` →
 `SwiftTUIRuntime`), with a set of product targets layered on top.
 
@@ -73,53 +71,58 @@ flowchart TD
 
 ### Core targets
 
-The engine is factored into three internal targets with a compiler-enforced
-boundary — an AttributeGraph-shaped separation of the reconciliation engine from
-the render machinery. None is a published product; all reach consumers
-re-exported (`@_exported`) through `SwiftTUICore` and then `SwiftTUIRuntime`.
+The engine uses five internal targets with compiler-enforced boundaries. These
+boundaries separate the reconciliation engine from the render machinery in an
+AttributeGraph-shaped design. None of these targets is a published product.
+Consumers get their APIs through re-exports (`@_exported`) from `SwiftTUICore`
+and then `SwiftTUIRuntime`.
 
-- **`SwiftTUIPrimitives`** — the leaf vocabulary. Inert `Equatable`/`Sendable`
-  value types with no engine and no render-pipeline algorithms: geometry
-  (cells/points/rects, `Identity`/`StructuralPath`/`EntityIdentity`), the style
-  and color-science values, the draw/layout metadata value types (`DrawPayload`
-  and its payload cluster, `LayoutBehavior`, `LayoutMetadata`), the pointer and
-  semantic value types, and the `Animatable` math stack. Foundation-free;
-  depends on nothing but the stdlib (plus `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload
-  value). It builds standalone.
+- **`SwiftTUIPrimitives`** — the leaf vocabulary. It contains inert
+  `Equatable`/`Sendable` value types with no engine or render-pipeline
+  algorithms. These include geometry
+  (cells/points/rects, `Identity`/`StructuralPath`/`EntityIdentity`), style and
+  color-science values, and draw/layout metadata (`DrawPayload` and its payload
+  cluster, `LayoutBehavior`, `LayoutMetadata`). They also include pointer and
+  semantic values and the `Animatable` math stack. It does not use
+  Foundation. It depends only on the standard library, plus
+  `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload value. It builds on
+  its own.
 - **`SwiftTUIGraph`** — the reconciliation engine (the AttributeGraph analog).
-  The retained `ViewGraph`/`ViewNode`/`ResolvedNode` graph, state slots,
-  dependency tracking, invalidation and dirty-evaluation planning, reuse gates,
-  checkpoints, entity routing, lifecycle planning, the identity-keyed runtime
-  registries, the frame scheduler, and the animation *intent* types. It performs
+  It owns the retained `ViewGraph`/`ViewNode`/`ResolvedNode` graph, state slots,
+  dependency tracking, invalidation planning, dirty-evaluation planning, reuse
+  gates, checkpoints, entity routing, and lifecycle planning. It also owns the
+  identity-keyed runtime registries, frame scheduler, and animation *intent*
+  types. It performs
   no layout/draw/raster/commit work — it stores render values opaquely and hands
   erased evaluator thunks up to the Views driver. Depends on `SwiftTUIPrimitives`
-  **only**; `swift build --target SwiftTUIGraph` compiling in isolation is the
-  compiler proof that graph code never names a render type. Foundation-free.
+  **only**. A successful `swift build --target SwiftTUIGraph` proves that graph
+  code does not name a render type. It does not use Foundation.
 - **`SwiftTUICore`** — the render engine. Consumes the graph's immutable
-  `ResolvedNode` snapshots and runs the render phases: measure, place, the
-  semantic and draw extractors, the rasterizer, the commit planner, the text/
-  image content engine, style *resolution*, focus tracking, and frame-drop/
-  elision policy. The one sanctioned back-edge from render to graph is the
+  `ResolvedNode` snapshots. It runs measure, place, the semantic and draw
+  extractors, the rasterizer, and the commit planner. It also runs the text/image
+  content engine, style *resolution*, focus tracking, and frame-drop/elision
+  policy. The one sanctioned back-edge from render to graph is the
   layout-dependent-content realization callback (the GeometryReader analog).
   Depends on `SwiftTUIGraph` + `SwiftTUIPrimitives` and `@_exported`-imports both
   so downstream `import SwiftTUICore` is unchanged. Foundation-free.
 - **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
   builders, containers, controls, layout, state, focus, gestures, modifiers,
-  and shapes. `View` is body-only and `@MainActor`-isolated; lowering to
+  and shapes. `View` is body-only and `@MainActor`-isolated. Lowering to
   primitives is package-internal.
 - **`SwiftTUIRuntime`** — the run loop, the renderer, scenes (`App`, `Scene`,
   `WindowGroup`), terminal hosting, and the host-frame contracts.
 
 The graph and render layers also carry sampled reconciliation soundness probes.
 Their canonical invariant, enforcement, sampling, and test-owner inventory is
-the [soundness oracle map](SOUNDNESS-ORACLES.md); the repository policy phase
-checks that every source recorder, trace kind, and counter remains represented.
+the [soundness oracle map](SOUNDNESS-ORACLES.md). The repository policy phase
+makes sure that every source recorder, trace kind, and counter remains
+represented.
 
 ### Published library products
 
 - **`SwiftTUI`** — the batteries-included convenience product. It re-exports
-  the combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, so an
-  ordinary app writes only `import SwiftTUI` and gets standard flags, default
+  the combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`. An
+  ordinary app writes only `import SwiftTUI`. It gets standard flags, default
   terminal `App.main()`, `--web` localhost launch, and animated GIF/image
   support.
 - **`SwiftTUIRuntime`**, **`SwiftTUIViews`** — usable directly by hosts and
@@ -132,18 +135,19 @@ checks that every source recorder, trace kind, and counter remains represented.
   GIF import/export. It is available as a standalone product for narrow
   compositions and is included by the `SwiftTUI` convenience product.
 - **`SwiftTUIProfiling`** — optional, opt-in profiling and diagnostics. It adds a
-  `.profiling()` scene modifier (env-gated via `SWIFTTUI_PROFILE`) carrying three
-  independently selectable signals — per-frame timing, memory occupancy, and
-  CPU/RSS — routed to TSV, JSONL, or summary sinks. Nothing in the default graph
-  depends on it; activation is zero-cost until requested. It builds on the
+  `.profiling()` scene modifier (env-gated via `SWIFTTUI_PROFILE`). This modifier
+  carries three independently selectable signals: per-frame timing, memory
+  occupancy, and CPU/RSS. It routes them to TSV, JSONL, or summary sinks. Nothing
+  in the default graph
+  depends on it. Activation is zero-cost until requested. It builds on the
   runtime's neutral emit contract (`FrameDiagnosticSink` / `RuntimeFrameSample`)
   and the `SwiftTUICore` occupancy registry, so the runtime never depends on the
-  product. Not included in the `SwiftTUI` convenience import.
+  product. The `SwiftTUI` convenience import does not include it.
 
 ### Platform, host, and embedding products
 
 Except for the explicitly external SwiftUI host, these live in the **root
-package** (`Package.swift`); the `Platforms/` directory holds their sources but
+package** (`Package.swift`). The `Platforms/` directory holds their sources but
 contains no nested Swift packages.
 
 - **In-package integrations** — `SwiftTUICLI` (`TerminalRunner`),
@@ -195,7 +199,7 @@ Tools/TermUIPerf/      Performance scenario harness
 ```
 
 Runnable example apps live in the sibling `SwiftTUI/swift-tui-examples`
-repository; they are demos and regression coverage, not published products.
+repository. They are demos and regression coverage, not published products.
 
 ### Vendored target naming
 
@@ -211,10 +215,10 @@ Sources under `Vendor/` keep their upstream directory names, but the SwiftPM
 | `JPEG` | `SwiftTUIVendorJPEG` | `Vendor/swift-jpeg/` |
 | `PNG` | `SwiftTUIVendorPNG` | `Vendor/swift-png/` |
 
-SwiftPM requires target names to be unique across the **entire** package graph,
-and any target reachable from one of our products enters every consumer's graph.
-Under their upstream names these modules break consumers outright: a package that
-depends on both swift-tui and swift-service-lifecycle (which ships its own
+SwiftPM requires unique target names across the **entire** package graph. Any
+target reachable from one of our products enters every consumer's graph. Under
+their upstream names, these modules break consumers. For example, a package that
+depends on both swift-tui and swift-service-lifecycle, which ships its own
 `UnixSignals`) fails resolution with
 
 ```
@@ -222,18 +226,18 @@ error: multiple packages ('swift-service-lifecycle', 'swift-tui') declare
 targets with a conflicting name: 'UnixSignals'
 ```
 
-`GIF` / `JPEG` / `PNG` / `SwiftFiglet` are no safer — they are exactly the names
-an image or text package would reach for. The prefix removes the hazard and makes
-the vendoring legible at the use site: `import SwiftTUIVendorPNG` is obviously our
-absorbed copy, not upstream swift-png.
+The names `GIF`, `JPEG`, `PNG`, and `SwiftFiglet` can cause the same problem.
+Image and text packages are likely to use these names. The prefix removes the
+conflict and shows which copy the code imports. For example,
+`import SwiftTUIVendorPNG` imports our vendored copy, not upstream swift-png.
 
 The same reasoning covers first-party `SwiftTUIWASISurfaceBridge` (sources at
 `Platforms/WASI/Sources/WASISurfaceBridge/`), which is reachable from the
 `SwiftTUIWASI` and `SwiftTUIWebHost` products.
 
 Only the `import` line carries the vendored name. `GIF`, `JPEG`, and `PNG` each
-declare a `public enum` matching their old module name, so use sites such as
-`PNG.Image` continue to resolve against the enum and are unaffected.
+declare a `public enum` that matches their old module name. Thus, use sites such
+as `PNG.Image` continue to resolve against the enum without changes.
 
 ## The frame pipeline, in one paragraph
 
@@ -241,22 +245,27 @@ A frame is built by running an authored view tree through **seven typed
 phases** — `resolve → measure → place → semantics → draw → raster → commit` —
 each producing a distinct package-owned product (`ResolvedNode`, `MeasuredNode`,
 `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`, `CommitPlan`).
-The public one-shot renderer returns a `RenderSnapshot`, which exposes the
-committed raster, semantic snapshot, presentation damage, and diagnostics while
-keeping intermediate phase IR package-only.
-The runtime drives those phases through a small **stage pipeline**
+The public one-shot renderer returns a `RenderSnapshot`. It exposes the
+committed raster, semantic snapshot, presentation damage, and diagnostics. The
+intermediate phase IR remains package-only.
+The runtime drives these phases through a small **stage pipeline**
 (`head → animationInjection → latePreferenceReconciliation → fusedFrameTail →
 commit`) that decides what runs on the main actor versus a frame-tail worker.
 The full developer-facing mechanics are in
 [`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
 
-`resolve` reuses unchanged work two ways. **Retained reuse** skips a subtree
-disjoint from the frame's invalidation. **Memoized-body reuse** (on by default)
-additionally skips a subtree reached *under* an invalidated ancestor when its
-view value is `Equatable`-equal to last frame's, it read no
-`@State`/`@Observable`/focus state, and it passes the retained-reuse guards —
-the `EquatableView` / `View.equatable()` opt-in. It is `Equatable`-only, so it is
-inert on views that do not opt in; set `SWIFTTUI_MEMO_REUSE=0` to disable it.
+`resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
+that is separate from the frame's invalidation. **Memoized-body reuse** is on by
+default. It can also skip a subtree under an invalidated ancestor when all of
+these conditions are true:
+
+- Its view value is `Equatable`-equal to the previous frame's value.
+- It did not read `@State`, `@Observable`, or focus state.
+- It passes the retained-reuse guards through the `EquatableView` or
+  `View.equatable()` opt-in.
+
+This reuse applies only to `Equatable` views. It has no effect on views that do
+not opt in. Set `SWIFTTUI_MEMO_REUSE=0` to turn it off.
 The complete ordering, input contracts, freshness-stamp algebra, suppression
 rules, and oracle boundaries are documented in
 [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).
@@ -270,18 +279,19 @@ solver.
 2. Each child reports the size it wants for that proposal.
 3. The parent places each child within its own bounds.
 
-Modifier order matters, because each modifier is a node in the tree that
+Modifier order matters because each modifier is a node in the tree that
 re-proposes or re-places. `Layout`, `AnyLayout`, and `ViewThatFits` expose this
-to authored code; `LayoutValueKey` carries per-child layout data.
+to authored code. `LayoutValueKey` carries per-child layout data.
 
-Some content cannot be sized until its container's geometry is known —
-`GeometryReader` and anchor-based preferences. SwiftTUI handles this with
-**layout-dependent content realization**: the affected subtree is realized once
-the enclosing geometry resolves, rather than guessed and corrected.
+Some content cannot be sized until its container's geometry is known. Examples
+include `GeometryReader` and anchor-based preferences. SwiftTUI handles this
+with **layout-dependent content realization**. SwiftTUI realizes the affected
+subtree after it resolves the enclosing geometry. It does not guess and then
+correct the geometry.
 
-Custom layouts are `Sendable` values with `Sendable` caches — `Layout` itself
-requires both — so the renderer can evaluate any custom layout on the
-frame-tail worker. Layouts may additionally publish stable
+Custom layouts are `Sendable` values with `Sendable` caches. `Layout` requires
+both, so the renderer can evaluate any custom layout on the frame-tail worker.
+Layouts can also publish stable
 measurement/placement reuse signatures to opt into cross-frame reuse.
 
 ## Host modes and engine profiles
@@ -293,23 +303,24 @@ selective-evaluation, and stack-depth policies are not identical.
 
 ## Concurrency model
 
-The package builds in Swift 6 language mode with `.defaultIsolation(.none)` —
-isolation is stated explicitly, never inferred. `View`, `Scene`, and `App` are
+The package builds in Swift 6 language mode with `.defaultIsolation(.none)`.
+Code states isolation explicitly. It does not rely on inferred isolation.
+`View`, `Scene`, and `App` are
 `@MainActor` authoring protocols, and the public APIs that evaluate authored
 `body` trees (`DefaultRenderer.render` and `DefaultRenderer.renderAsync`) are
 `@MainActor`. The package-only `Resolver.resolve` entry point is also
 `@MainActor`. The heavy middle of the pipeline runs off the main actor on a
-frame-tail worker; the boundaries are spelled out in
+frame-tail worker. The boundaries are described in
 [`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md). The repo
-forbids `@unchecked Sendable` and `nonisolated(unsafe)`; shared mutable state
+forbids `@unchecked Sendable` and `nonisolated(unsafe)`. Shared mutable state
 uses honest isolation or `Synchronization` primitives.
 
 ## Glossary
 
-- **Phase product** — the package-only typed value a pipeline phase emits
+- **Phase product** — the package-only typed value that a pipeline phase emits
   (`ResolvedNode`, `MeasuredNode`, `PlacedNode`, `SemanticSnapshot`, `DrawNode`,
   `RasterSurface`, `CommitPlan`). All seven are gathered on package-only
-  `FrameArtifacts`; public snapshot and host code consumes `RenderSnapshot`,
+  `FrameArtifacts`. Public snapshot and host code consumes `RenderSnapshot`,
   `RasterSurface`, `SemanticSnapshot`, or `SemanticHostFrame`.
 - **Resolve** — turning an authored `View` tree into a `ResolvedNode` graph
   with the resolved identity projection, structural position, entity identity,
@@ -326,19 +337,36 @@ uses honest isolation or `Synchronization` primitives.
   host/graphics interop.
 - **Semantic snapshot** — the per-frame `SemanticSnapshot`, including the flat
   `accessibilityNodes` array, consumed by accessibility and focus.
-- **Host** — the component that presents a committed frame; the canonical host
+- **Host** — the component that presents a committed frame. The canonical host
   matrix is in [HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md).
 - **Action scope** — a node in the focus chain that can own key commands,
   palette commands, and toolbar items (`ActionScope`).
-- **Publication** — committing graph-recorded runtime registrations into the live dispatch registries after resolve; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Fingerprint** — an equality-friendly registration projection used to compute publication deltas or compare a scoped restore with a scratch rebuild; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Frontier** — the highest stitchable evaluator targets that collectively cover all queued graph-local dirty work; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Cone** — the self/ancestor/descendant region whose resolved output may be affected by an invalidation or structural churn; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Rail** — one of the parallel invalidated-node and graph-local-dirty work ledgers reconciled before frontier planning; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Strand** — stored, listed, or published graph state whose ownership path no longer makes it reachable or retires it; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Island** — resolved content connected to its host through `evaluationHost` rather than an ordinary live `parent` edge; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Servable** — having enough gate-specific evidence for a committed subtree to be returned without evaluating its body; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Freshness stamp** — one of `CommittedFreshness`'s fresh, island-stale, and foreign-parented verdicts governing snapshot service and rebuild; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Reuse door** — the single `ViewGraph.reuseResolvedSubtree` seam that owns retained-before-memo ordering and common acceptance effects; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Suppression scope** — a finite focus/press identity set that names forced recomputation not fully represented by ordinary invalidation; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
-- **Oracle** — an independently evaluated invariant that exposes false reuse, lost work, incoherent stamps, or stranded ownership; see [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md)
+- **Publication** — the act of committing graph-recorded runtime registrations
+  to the live dispatch registries after resolve.
+- **Fingerprint** — a registration projection that supports equality. SwiftTUI
+  uses it to compute publication changes or compare a scoped restore with a
+  scratch rebuild.
+- **Frontier** — the highest stitchable evaluator targets that cover all queued
+  graph-local dirty work.
+- **Cone** — the self, ancestor, and descendant region whose resolved output can
+  change because of an invalidation or structural churn.
+- **Rail** — one of the parallel work ledgers for invalidated nodes and
+  graph-local dirty work. SwiftTUI reconciles these ledgers before frontier
+  planning.
+- **Strand** — stored, listed, or published graph state that is no longer
+  reachable through its ownership path, or that the path no longer retires.
+- **Island** — resolved content connected to its host through `evaluationHost`
+  instead of an ordinary live `parent` edge.
+- **Servable** — a committed subtree with enough gate-specific evidence to
+  return without evaluating its body.
+- **Freshness stamp** — one of the fresh, island-stale, and foreign-parented
+  `CommittedFreshness` verdicts that control snapshot service and rebuild.
+- **Reuse door** — the single `ViewGraph.reuseResolvedSubtree` seam. It owns the
+  retained-before-memo order and the common acceptance effects.
+- **Suppression scope** — a finite set of focus or press identities. It names
+  forced recomputation that ordinary invalidation does not fully represent.
+- **Oracle** — an independently evaluated invariant that exposes false reuse,
+  lost work, incoherent stamps, or stranded ownership.
+
+For more information about these graph terms, see
+[Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).

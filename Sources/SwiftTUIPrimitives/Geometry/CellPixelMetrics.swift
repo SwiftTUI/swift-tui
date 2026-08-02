@@ -1,9 +1,9 @@
 /// Read-only display metrics describing how cells map to device pixels.
 ///
-/// Advisory runtime metadata. SwiftTUI's layout, placement, and alignment
-/// story remain cell-denominated; this type exists so authors can apply
-/// aspect correction to shapes, motion, or image sizing without reinventing
-/// the fallback.
+/// This type contains advisory runtime metadata.
+/// SwiftTUI layout, placement, and alignment continue to use cells.
+/// Authors use these metrics to apply aspect correction to shapes, motion, or image sizes.
+/// The type also supplies the standard fallback.
 public struct CellPixelMetrics: Equatable, Hashable, Sendable {
   /// Width of a single cell in device pixels.
   public let width: Int
@@ -28,7 +28,7 @@ public struct CellPixelMetrics: Equatable, Hashable, Sendable {
   public enum Source: Equatable, Hashable, Sendable {
     /// The terminal reported its cell size via `ioctl` or an escape query.
     case reported
-    /// No cell size was reported; this is the conventional 8x16 fallback.
+    /// No cell size was reported. This value is the standard 8x16 fallback.
     case estimated
   }
 

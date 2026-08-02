@@ -1,6 +1,6 @@
 /// The result of a key press handler.
 public enum KeyPressResult: Equatable, Sendable {
-  /// The key event was not handled and should propagate.
+  /// The handler did not consume the key event, so the event continues to the next handler.
   case ignored
   /// The key event was consumed.
   case handled
@@ -51,7 +51,7 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
   case pageDown
   /// A function key, 1-based (`F1` = `.functionKey(1)`). Terminals deliver
   /// F1–F4 as SS3 (`ESC O P…S`) or modified CSI, and F5+ as VT220 tilde
-  /// sequences; the parser normalizes all of them here.
+  /// sequences. The parser normalizes all of them here.
   case functionKey(Int)
 }
 

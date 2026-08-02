@@ -1,4 +1,4 @@
-/// A public diagnostic reason a completed frame could not be dropped as
+/// A public diagnostic reason that prevents a completed frame from being dropped as
 /// visual-only work.
 public enum FrameDropBlocker: String, Sendable, CaseIterable, Hashable {
   case lifecycleAppear
@@ -23,9 +23,9 @@ public enum FrameDropBlocker: String, Sendable, CaseIterable, Hashable {
   case graphicsReplay
   /// Presented-Progress Guard (opt-in via `SWIFTTUI_PRESENTED_PROGRESS_GUARD`):
   /// the completed frame carries a non-empty presentation diff against the
-  /// last presented surface. Dropping it would leave those pixels undelivered
-  /// until some later frame happens to repaint them — the bounded-starvation
-  /// coalescing class the browser 0.1.9 incident exposed. With the guard on,
+  /// last presented surface. If the runtime drops it, those pixels stay undelivered.
+  /// A later frame must repaint them.
+  /// The browser 0.1.9 incident exposed this bounded-starvation coalescing class. With the guard on,
   /// undelivered pixels are never droppable, uniformly for every host.
   case undeliveredPresentationDamage
   case diagnosticsFullRecord

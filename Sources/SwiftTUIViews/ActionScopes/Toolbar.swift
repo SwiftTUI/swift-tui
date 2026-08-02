@@ -4,10 +4,9 @@ public import SwiftTUICore
 // built-in `Default*ToolbarStyle` conformances — lives in `ToolbarStyle.swift`.
 
 extension ActionScope where Self: View {
-  /// Declares that this scope has a toolbar. Toolbar items contributed
-  /// by descendant views via `.toolbarItem(_:)` are absorbed at this
-  /// scope and rendered as a horizontal strip above or below the
-  /// scope's content per `style.placement`.
+  /// Declares that this scope has a toolbar.
+  /// This scope absorbs toolbar items that descendant views supply through `.toolbarItem(_:)`.
+  /// It shows them as a horizontal strip above or below the content according to `style.placement`.
   @MainActor
   public func toolbar<S: ToolbarStyle>(
     style: S
@@ -20,11 +19,10 @@ extension ActionScope where Self: View {
   }
 }
 
-/// Primitive lowering for `.toolbar(style:)`. Reads accumulated
-/// `ToolbarItemsPreferenceKey` contributions off the resolved content
-/// node, composes a toolbar strip next to the content using
-/// `style.itemLayout` + `style.placement`, and clears the preference
-/// so items do not bubble past this scope.
+/// The primitive implementation of `.toolbar(style:)`.
+/// It reads accumulated `ToolbarItemsPreferenceKey` contributions from the resolved content node.
+/// Then it uses `style.itemLayout` and `style.placement` to compose a toolbar strip next to the content.
+/// It clears the preference so items do not continue past this scope.
 public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable {
   package let style: S
 

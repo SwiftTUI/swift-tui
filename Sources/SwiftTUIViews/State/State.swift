@@ -225,15 +225,13 @@ private final class StateGraphBindingRegistry: Sendable {
 @MainActor
 /// Local value storage owned by a view identity within a runtime graph.
 ///
-/// `@State` persistence is keyed by the view's identity path plus source
-/// location within that view. Interactive runtime callbacks, bindings, and
-/// local actions use a graph-scoped storage identity so reusing the same view
-/// value in a different live graph does not leak mutations across sessions.
+/// The view identity path and source location within the view identify persistent `@State` storage.
+/// Interactive runtime callbacks, bindings, and local actions use a graph-scoped storage identity.
+/// Thus, reuse of the same view value in another live graph does not leak mutations between sessions.
 ///
-/// Snapshot-style renders without an invalidating runtime graph retain the
-/// same-instance fallback used by one-shot tests and previews: if you reuse the
-/// same stateful view instance with `DefaultRenderer`, imperative writes can
-/// feed a later snapshot of that same instance.
+/// Snapshot-style renders without an invalidating runtime graph retain the same-instance fallback.
+/// One-shot tests and previews use this fallback.
+/// If you reuse one stateful view instance with `DefaultRenderer`, imperative writes can change a later snapshot of that instance.
 public struct State<Value> {
   private let box: StateBox<Value>
 

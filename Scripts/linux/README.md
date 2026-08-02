@@ -1,18 +1,18 @@
-# SwiftTUI Linux dev environment
+# SwiftTUI Linux Development Environment
 
 This directory owns the Linux build/test environment for SwiftTUI. It exists
 because most contributors develop on macOS, but the project ships on Linux
-(via `swift:6.3` on native amd64 and arm64 Ubuntu runners) and to the browser
-(via the Wasm Swift SDK). Reproducing a Linux failure on a Mac means running
-it inside Linux — which is what this setup gives you, with one command.
+(through `swift:6.3` on native amd64 and arm64 Ubuntu runners) and in browsers
+(through the Wasm Swift SDK). Use this environment to reproduce a Linux failure
+on a Mac with one command.
 
-If you've never touched the Docker side of the project before, read all of
-[What's in here](#whats-in-here) and [Daily workflow](#daily-workflow). The
-later sections are reference for when something breaks or needs bumping.
+If you have not used the project Docker tools, read [Contents](#contents) and
+[Daily workflow](#daily-workflow). Use the later sections as a reference for
+errors and version updates.
 
 ---
 
-## What's in here
+## Contents
 
 ```
 Scripts/
@@ -54,39 +54,40 @@ These four files cooperate as follows:
 
 The image is built **once per Linux architecture** in CI, published as one
 multi-arch manifest, and consumed by both the script and the devcontainer.
-Nothing in the image references the repo source — the repo is bind-mounted at
-runtime.
+The image does not contain the repository source. The container bind-mounts the
+repository at runtime.
 
 ---
 
-## What's in the image
+## Image contents
 
 `Scripts/linux/Dockerfile` layers the following onto the upstream
 `swift:6.3.3` base:
 
-| Tool          | Why it's preinstalled                                       |
+| Tool          | Why it is preinstalled                                      |
 |---------------|-------------------------------------------------------------|
 | Swiftly       | Selects the repo-pinned Swift toolchain                     |
 | Swift 6.3.3   | Installed and selected through Swiftly                      |
 | bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
 | binaryen      | Provides `wasm-opt` for local primary-repo Wasm diagnostics |
-| brotli        | Available for local primary-repo web artifact checks        |
-| ripgrep       | Used by repo tests; matches the GH Actions runner setup     |
+| brotli        | Available for local primary-repo web artifact comparisons   |
+| ripgrep       | Used by repo tests. Matches the GitHub Actions runner setup. |
 | git, curl, unzip, ca-certificates, jq | General build prerequisites           |
 
-Everything in this table used to be installed lazily on first use by
-`Scripts/linux.sh` (`apt-get install`, `curl | bash`, `swiftly install`,
-`swiftly run swift sdk install`).
-Baking it into the image moves a one-time cost from "every container reset"
-to "every Dockerfile change", which is roughly 100x less often.
+Earlier versions of `Scripts/linux.sh` installed these tools during the first
+use. It ran `apt-get install`, `curl | bash`, `swiftly install`, and
+`swiftly run swift sdk install`.
+The current image contains these tools. Thus, installation occurs after a
+Dockerfile change instead of after each container reset. A Dockerfile change
+occurs approximately 100 times less often.
 
 ---
 
 ## Daily workflow
 
-All CLI calls go through `Scripts/linux.sh`. Run it from anywhere — it
-resolves the repo root from its own location. Built-in Linux build and test
+Run all CLI calls through `Scripts/linux.sh`. You can run it from any directory.
+It resolves the repository root from its own location. Built-in Linux build and test
 commands invoke Swift through `swiftly run swift ...`, matching the host-side
 toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 
@@ -116,9 +117,9 @@ toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
 ```
 
 `start` is idempotent: if the container is already running with the expected
-bind-mounted repo it does nothing, if it exists but is stopped it starts it,
-and if it doesn't exist or points at an old checkout path it recreates it. You
-don't need to babysit it.
+bind-mounted repository, it does nothing. If the container is stopped, the
+command starts it. If the container is absent, the command creates it. It also
+recreates a container that points to an old checkout path.
 
 ---
 
@@ -126,9 +127,9 @@ don't need to babysit it.
 
 When you run `./Scripts/linux.sh test`, the script:
 
-1. Checks for `docker` (or falls back to `podman`).
-2. Pulls `ghcr.io/swifttui/swift-tui-linux:latest` if you don't have it
-   locally. Docker selects the host-native image from the multi-arch manifest
+1. Looks for `docker`. If it is unavailable, uses `podman`.
+2. If the image is not local, pulls `ghcr.io/swifttui/swift-tui-linux:latest`.
+   Docker selects the host-native image from the multi-arch manifest
    unless you set `LINUX_PLATFORM` explicitly.
 3. Creates a named volume `swift-tui-…-swiftpm-cache` for SwiftPM's
    dependency + build artifact cache.
@@ -136,16 +137,16 @@ When you run `./Scripts/linux.sh test`, the script:
    - The repo root, **bind-mounted** at `/workspace`. Edits on your Mac
      show up immediately inside the container.
    - The SwiftPM cache **volume**, mounted at `/root/.cache/org.swift.swiftpm`.
-5. Sets `WORKDIR=/workspace`, then runs `sleep infinity` as PID 1 so the
+5. Sets `WORKDIR=/workspace`. Then runs `sleep infinity` as PID 1, so the
    container stays alive between commands.
-6. `docker exec`s `sh ./Scripts/test_gate.sh --skip-bun-install` inside it,
-   with `DISABLE_EXPLICIT_PLATFORMS=1` so `Package.swift` skips the macOS/iOS
-   platform pins, and with the same public-API / TermUIPerf skip environment
-   that the GitHub Linux repo gate uses.
+6. Runs `sh ./Scripts/test_gate.sh --skip-bun-install` through `docker exec`.
+   Sets `DISABLE_EXPLICIT_PLATFORMS=1`, so `Package.swift` skips the macOS and
+   iOS platform pins. Uses the same public-API and TermUIPerf skip environment
+   as the GitHub Linux repository gate.
 
-Use `./Scripts/linux.sh root-build-tests` when a Linux failure is a compile
-error and you want to avoid running tests. Use `./Scripts/linux.sh root-test`
-when you specifically need a raw root-package `swiftly run swift test` run. The
+If a Linux failure is a compile error, use `./Scripts/linux.sh root-build-tests`.
+This command does not run tests. For a raw root-package
+`swiftly run swift test` run, use `./Scripts/linux.sh root-test`. The
 CI-shaped gate intentionally splits root tests by target through
 `Scripts/test_gate.sh`, and the broad SwiftTUI runtime step isolates the
 high-contention async lifecycle and frame-tail suites. CI also runs the Linux
@@ -161,10 +162,9 @@ separate CI workflows.
 - **Bind mount** (`type=bind`): a path on your host is exposed inside the
   container. Two-way visibility. Used for the repo so your edits are live.
 - **Named volume** (`type=volume`): Docker manages an opaque chunk of
-  storage. The container sees a normal directory; the host doesn't have an
-  obvious path to it. Used for the SwiftPM cache because it's
-  Linux-format build artifacts that have no business living on your Mac
-  filesystem and would only confuse you.
+  storage. The container sees a normal directory. The host has no direct path
+  to it. The SwiftPM cache uses this volume because it contains Linux build
+  artifacts. These artifacts do not belong on the Mac file system.
 
 ---
 
@@ -178,10 +178,10 @@ separate CI workflows.
 - `.swift-version`
 - the workflow file itself
 
-Other commits don't rebuild — the image is a build *input*, not an output of
-each commit. PRs that modify these paths build both native architectures but
-don't push; only `main` pushes (and manual `workflow_dispatch` runs) publish
-the multi-arch manifest to GHCR.
+Other commits do not rebuild the image. The image is a build *input*, not an
+output of each commit. Pull requests that modify these paths build both native
+architectures. They do not push the image. Only `main` and manual
+`workflow_dispatch` runs publish the multi-arch manifest to GHCR.
 
 ### Tags published to GHCR
 
@@ -222,12 +222,12 @@ LINUX_IMAGE=ghcr.io/swifttui/swift-tui-linux:sha-abc1234 \
    - `Scripts/linux.sh` (top of the file)
    - `Scripts/linux/Dockerfile` (`ARG WASM_SDK_URL=` / `ARG WASM_SDK_CHECKSUM=`)
    - `.github/workflows/cloudflare-pages.yml` (the existing copy lives in the deploy step)
-2. Push — CI rebuilds the image. Local devs rerun `./Scripts/linux.sh pull`.
+2. Push the change. CI rebuilds the image. Run `./Scripts/linux.sh pull` on
+   each development machine.
 
 ### Building the image locally
 
-When iterating on the Dockerfile itself, you don't want to push for every
-attempt. Do it locally:
+During Dockerfile development, build the image locally:
 
 ```bash
 ./Scripts/linux.sh build              # native docker build with current ARGs
@@ -237,12 +237,12 @@ attempt. Do it locally:
 ./Scripts/linux.sh push               # push only when you're satisfied
 ```
 
-`build` defaults to the host-native platform and tags the image with whatever
-`LINUX_IMAGE` is — so by default you'll overwrite the `:latest` tag on your
-local machine. Override with
+`build` uses the host-native platform by default. It tags the image with the
+`LINUX_IMAGE` value. Thus, the default command overwrites the local `:latest`
+tag. Use
 `LINUX_IMAGE_BUILD_TAG=ghcr.io/swifttui/swift-tui-linux:experiment` to keep
 the published image around. Set `LINUX_PLATFORM=linux/amd64` or
-`LINUX_PLATFORM=linux/arm64` only when you intentionally want a cross-platform
+`LINUX_PLATFORM=linux/arm64` only for an intentional cross-platform
 diagnostic build.
 
 ---
@@ -254,18 +254,18 @@ diagnostic build.
 - **VS Code**: install the *Dev Containers* extension, then `Cmd+Shift+P` →
   *Dev Containers: Reopen in Container*.
 - **Cursor**: same flow, same extension.
-- **GitHub Codespaces**: just create a Codespace from the repo. Codespaces
+- **GitHub Codespaces**: create a Codespace from the repository. Codespaces
   reads `.devcontainer/devcontainer.json` automatically.
 
 The devcontainer uses an independent volume name
 (`swift-tui-devcontainer-swiftpm-cache`) so the editor's SwiftPM cache
-doesn't fight with the cache used by `Scripts/linux.sh`. You can run both
-side-by-side: edit in the devcontainer, run `./Scripts/linux.sh test` from
-your host terminal.
+does not conflict with the cache from `Scripts/linux.sh`. You can run both at
+the same time. Edit in the devcontainer. Run `./Scripts/linux.sh test` from the
+host terminal.
 
 The devcontainer and `linux.sh` are independent surfaces over the same
-image. If `linux.sh test` passes but the devcontainer behaves differently,
-99% of the time the difference is environment, not the image — see
+image. If `linux.sh test` passes but the devcontainer behaves differently, the
+environment causes the difference in 99% of cases, not the image. See
 [Troubleshooting](#troubleshooting).
 
 ---
@@ -283,12 +283,12 @@ LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh full
 `linux.sh` keeps lazy installers for Swiftly, bun, and the Wasm SDK
 (`ensure_swiftly`, `ensure_bun`, `ensure_wasm_sdk`) specifically so this
 fallback continues to work. The first command that needs Swift will install
-Swiftly and the pinned Swift toolchain; the first command that needs Bun will
+Swiftly and the pinned Swift toolchain. The first command that needs Bun will
 install Bun and its apt prerequisites. Subsequent runs reuse what got installed
 inside the container until `nuke`.
 
-This path exists for resilience — don't make it the default. Every time it
-runs it re-downloads ~200MB of toolchain.
+Use this path only as a fallback. Each run downloads approximately 200 MB of
+toolchain data.
 
 ---
 
@@ -298,7 +298,7 @@ The new setup uses **one** named volume:
 
 | Volume                          | Mount path                          | Why                                              |
 |---------------------------------|-------------------------------------|--------------------------------------------------|
-| `swift-tui-…-swiftpm-cache`     | `/root/.cache/org.swift.swiftpm`    | SwiftPM dep + build artifact cache; survives `reset` |
+| `swift-tui-…-swiftpm-cache`     | `/root/.cache/org.swift.swiftpm`    | SwiftPM dependency and build cache. It survives `reset`. |
 
 Things that **used to** be volumes and are now baked into the image:
 
@@ -308,21 +308,19 @@ Things that **used to** be volumes and are now baked into the image:
 | `swift-tui-…-swiftpm-home`       | Wasm SDK preinstalled in image (`/root/.swiftpm/swift-sdks`) |
 | `swift-tui-…-bun`                | bun installed system-wide in image (`/usr/local/bun`)        |
 
-Why this matters: a named volume mounted on top of a path in the image
-**hides** whatever the image had at that path on first use. If you mounted
-a volume at `/root/.swiftpm`, the Wasm SDK installed there at build time
-would vanish behind the volume. Removing those mounts is what lets us bake
-toolchains into the image at all.
+A named volume mounted on an image path **hides** the existing image content
+at that path. For example, a volume at `/root/.swiftpm` hides the installed
+Wasm SDK. The current mount layout keeps installed toolchains visible.
 
 `./Scripts/linux.sh nuke` removes the container and the SwiftPM cache
 volume. Use it when:
 
 - The cache feels stale or wrong (rare — SwiftPM is good at invalidating)
 - You want to time a cold build
-- You're freeing disk space
+- You need to free disk space
 
-The image itself isn't affected by `nuke`; remove it with
-`docker image rm ghcr.io/swifttui/swift-tui-linux:latest` if needed.
+`nuke` does not affect the image. If you must remove it, run
+`docker image rm ghcr.io/swifttui/swift-tui-linux:latest`.
 
 ---
 
@@ -330,19 +328,19 @@ The image itself isn't affected by `nuke`; remove it with
 
 ### `docker pull` fails with `denied` or `unauthorized`
 
-The image is public, but Docker may try to authenticate first if you've
-ever run `docker login ghcr.io`. Either:
+The image is public. Docker can try to authenticate first after you run
+`docker login ghcr.io`. Use one of these commands:
 
 - `docker logout ghcr.io` and retry, or
 - `docker login ghcr.io` with a GitHub PAT that has `read:packages`.
 
-### `swiftly run swift sdk list` doesn't show the Wasm SDK
+### `swiftly run swift sdk list` does not show the Wasm SDK
 
 Two possible causes:
 
-1. You're on a vanilla `swift:*` image (not the prebuilt one). Run
+1. You are on a vanilla `swift:*` image, not the prebuilt image. Run
    `./Scripts/linux.sh web` once — it triggers `ensure_wasm_sdk`.
-2. You're on the prebuilt image but the SDK didn't make it in. Pull the
+2. You are on the prebuilt image, but it does not contain the SDK. Pull the
    latest tag (`./Scripts/linux.sh pull`) and `reset` the container.
 
 ### `bun: command not found` inside the container
@@ -352,54 +350,54 @@ or stale prebuilt image (re-`pull` and `reset`).
 
 ### Builds are slow even after the second run
 
-Check that the cache volume is actually mounted:
+Make sure that Docker mounts the cache volume:
 
 ```bash
 ./Scripts/linux.sh run mount | grep swiftpm
 ```
 
-You should see `…swiftpm-cache on /root/.cache/org.swift.swiftpm`. If not,
-the container was created against an older script version — rerun the command
-with the current script so it can recreate the container.
+The output must include `…swiftpm-cache on /root/.cache/org.swift.swiftpm`. If
+it does not, rerun the command with the current script. The script recreates a
+container that uses an older version.
 
 ### `./linux.sh shell` exits immediately
 
-Means the container failed to start. Look at recent logs:
+The container failed to start. Read the recent logs:
 
 ```bash
 docker ps --format '{{.Names}}' | grep swift-tui
 docker logs <container-name>
 ```
 
-Most common cause: image manifest changed and the named container is bound
-to an older config. Rerun `./Scripts/linux.sh shell`; the current script
-recreates containers whose bind mount or workdir no longer matches.
+The image manifest usually changed while the named container kept an older
+configuration. Rerun `./Scripts/linux.sh shell`. The current script recreates
+containers whose bind mount or work directory does not match.
 
 ### Switching between the prebuilt image and a vanilla one mid-session
 
-The container name encodes the image and requested platform, so switching
-`LINUX_IMAGE` or `LINUX_PLATFORM` creates a *second* container alongside the
-first rather than reconfiguring. To free disk space when you're done with one:
+The container name contains the image and requested platform. If you change
+`LINUX_IMAGE` or `LINUX_PLATFORM`, the script creates a *second* container. It does not
+reconfigure the first container. To free disk space after this change, run:
 
 ```bash
 LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh nuke
 ```
 
-If you pulled the old amd64-only `:latest` image on Apple Silicon before the
-multi-arch image existed, `linux.sh` will detect the architecture mismatch and
-pull the host-native manifest before creating the new default container.
+If you pulled the old amd64-only `:latest` image on Apple Silicon, `linux.sh`
+detects the architecture mismatch. It pulls the host-native manifest before it
+creates the new default container.
 
 ### `permission denied` on bind-mounted files inside the container
 
-You're probably on Linux (Docker doesn't UID-remap on Linux). The
-container runs as root (UID 0); files it creates inside `/workspace` will
+You are probably on Linux. Docker does not remap the UID on Linux. The
+container runs as root (UID 0). Files that it creates inside `/workspace` will
 be owned by root on the host too. On macOS and Windows this is invisible
 because Docker Desktop handles UID mapping. On Linux, either:
 
 - `chown` the files back after a build, or
-- run with `--user "$(id -u):$(id -g)"` (but then SwiftPM may complain
-  about the cache volume being owned by root from earlier runs — `nuke`
-  first).
+- run with `--user "$(id -u):$(id -g)"`. SwiftPM can report that root owns the
+  cache volume from earlier runs. Run `nuke`
+  first.
 
 ### Anything `./Scripts/linux.sh build` does, you can do directly
 
@@ -415,8 +413,8 @@ docker build \
   Scripts/linux
 ```
 
-Useful when iterating on `Dockerfile` syntax errors that fail before
-`linux.sh` can even parse args.
+If a `Dockerfile` syntax error occurs before `linux.sh` parses arguments, use
+this command.
 
 ---
 
@@ -425,11 +423,10 @@ Useful when iterating on `Dockerfile` syntax errors that fail before
 - **Emulated default validation.** The published image is multi-arch and
   `linux.sh` leaves Docker's platform unset by default so local runs use the
   host-native image. `LINUX_PLATFORM` remains available for explicit
-  cross-architecture diagnostics, but that path may use emulation depending on
+  cross-architecture diagnostics, but that path can use emulation depending on
   your host.
-- **A Compose stack.** There's only one service, with no networking
-  between containers. A `docker-compose.yml` would add ceremony without
-  removing anything.
+- **A Compose stack.** There is only one service and no network between
+  containers. A `docker-compose.yml` adds unnecessary files.
 - **Auto-cleanup of old SHA tags.** GHCR will retain every `:sha-…` tag
   forever unless we add a retention workflow. This is fine until the tag
-  list gets unwieldy; then we can add a `keep-last-N` cleanup job.
+  list becomes too long. Then we can add a `keep-last-N` cleanup job.

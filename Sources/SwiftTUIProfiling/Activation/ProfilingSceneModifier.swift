@@ -1,8 +1,8 @@
 public import SwiftTUIRuntime
 
-/// Scene wrapper that activates profiling when the runtime traverses its
-/// `body` during scene setup — which happens before the first session is
-/// built, satisfying the activation-ordering requirement. Activation is
+/// A scene wrapper that activates profiling when the runtime traverses its `body` during scene setup.
+/// This traversal occurs before the runtime builds the first session.
+/// Thus, it obeys the activation-order requirement. Activation is
 /// idempotent, so repeated `body` access is safe.
 @MainActor
 public struct ProfilingScene<Wrapped: Scene>: Scene {
@@ -25,8 +25,9 @@ public struct ProfilingScene<Wrapped: Scene>: Scene {
 extension Scene {
   /// Enables env-gated profiling for this scene tree.
   ///
-  /// With no argument it reads `SWIFTTUI_PROFILE`; if unset it is a complete
-  /// no-op (no sinks, no timers, the runtime registry stays empty). Pass an
+  /// With no argument, it reads `SWIFTTUI_PROFILE`.
+  /// If the variable is not set, the modifier adds no sinks or timers, and the runtime registry stays empty.
+  /// Pass an
   /// explicit ``ProfileConfig`` to activate regardless of the environment.
   public func profiling(_ config: ProfileConfig? = nil) -> ProfilingScene<Self> {
     ProfilingScene(wrapped: self, config: config)

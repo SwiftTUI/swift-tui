@@ -1,6 +1,7 @@
-/// The resolved runtime configuration handed to a SwiftTUI runner. Produced by argument parsers
-/// and env-var resolvers; consumed by `TerminalRunner.run(_:configuration:)` and peer runners.
-/// Foundation-free, `Sendable`, value-typed.
+/// The resolved runtime configuration for a SwiftTUI runner.
+/// Argument parsers and environment-variable resolvers produce this value.
+/// `TerminalRunner.run(_:configuration:)` and peer runners consume it.
+/// This value is Foundation-free, `Sendable`, and value-typed.
 public struct RuntimeConfiguration: Sendable, Equatable {
   public enum ColorMode: String, Sendable, Equatable {
     /// Auto-detect from TTY status and env vars (`NO_COLOR`, `FORCE_COLOR`, ...).
@@ -21,7 +22,8 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public enum MotionMode: String, Sendable, Equatable {
     /// Animations and spinners run as authored.
     case normal
-    /// Suppress animations and spinners; honor accessibility / `prefers-reduced-motion` semantics.
+    /// Suppresses animations and spinners.
+    /// It also applies accessibility and `prefers-reduced-motion` behavior.
     case reduced
   }
 
@@ -51,13 +53,13 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     }
   }
 
-  /// Configuration for serving a SwiftTUI app over HTTP via a runner that supports it (e.g., the embedded web host).
+  /// The configuration for a runner that serves a SwiftTUI app over HTTP, such as the embedded web host.
   public struct WebConfig: Sendable, Equatable {
     /// TCP port. `0` means OS-assigned ephemeral port.
     public let port: Int
     /// Bind address. Defaults to `127.0.0.1` (loopback only).
     public let bind: String
-    /// Whether the runner should auto-open the user's browser when serving.
+    /// Whether the runner automatically opens the user browser when it starts the server.
     public let openBrowser: Bool
     /// Optional scene identifier to launch when serving over WebHost.
     public let sceneID: WindowIdentifier?
@@ -85,13 +87,15 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var output: OutputMode
   /// Log verbosity level for framework-internal diagnostics.
   public var verbosity: Verbosity
-  /// If non-nil, serve the app over HTTP using these settings instead of (or in addition to) a local terminal.
+  /// If this value is not `nil`, the runner serves the app over HTTP.
+  /// The runner can use HTTP instead of a local terminal, or it can use both.
   public var web: WebConfig?
   /// Enable framework-internal debug instrumentation (frame timings, render-tree diagnostics).
   public var debug: Bool
   /// Replace progress bars with static status messages.
   public var noProgress: Bool
-  /// Linearize side-by-side layouts (e.g., HStacks) top-to-bottom for narrow terminals or screen readers.
+  /// Changes side-by-side layouts, such as `HStack`, to a top-to-bottom layout.
+  /// This mode supports narrow terminals and screen readers.
   public var linear: Bool
   /// Move the terminal hardware cursor to the focused accessibility node after each TUI commit.
   public var cursorFollowsFocus: Bool

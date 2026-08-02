@@ -1,14 +1,12 @@
-/// Variable-length animatable storage for compound values whose size
-/// isn't fixed at type level — e.g. ``Gradient`` stop arrays.
+/// Variable-length animatable storage for compound values that have no fixed size at the type level.
+/// An array of ``Gradient`` stops is one example.
 ///
 /// Arithmetic operations require both operands to have the same
 /// element count. With mismatched counts, `+`, `-`, `+=`, `-=`
 /// return a zero-element result (which propagates through subsequent
-/// arithmetic as zero).  The animation controller checks
-/// ``isInterpolable(to:)`` before composing arithmetic and snaps to
-/// the target value when the counts don't match — this matches
-/// SwiftUI's behavior of snapping gradient animations when the stop
-/// count changes between frames.
+/// arithmetic as zero). The animation controller calls ``isInterpolable(to:)`` before it composes arithmetic.
+/// If the counts do not match, the controller changes directly to the target value.
+/// This behavior matches SwiftUI gradient animations when the stop count changes between frames.
 public struct AnimatableArray<Element: VectorArithmetic & Sendable>:
   VectorArithmetic, Sendable
 {

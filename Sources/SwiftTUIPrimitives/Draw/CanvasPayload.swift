@@ -1,8 +1,7 @@
 /// The draw-tree payload that carries a type-erased ``CanvasDrawing``
-/// through the pipeline. The layout engine reserves a cell frame for the
-/// view, and the rasterizer instantiates a sized ``CanvasGrid`` buffer at
-/// paint time, calls ``CanvasDrawing/draw(into:)``, and emits the resulting
-/// glyphs into the raster buffer.
+/// through the pipeline. The layout engine reserves a cell frame for the view.
+/// At paint time, the rasterizer creates a ``CanvasGrid`` buffer with this size.
+/// Then it calls ``CanvasDrawing/draw(into:)`` and writes the glyphs to the raster buffer.
 public struct CanvasPayload: Equatable, Sendable {
   /// The user-provided drawing, type-erased to the ``CanvasDrawing``
   /// existential.

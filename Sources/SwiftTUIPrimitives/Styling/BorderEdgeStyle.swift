@@ -3,7 +3,7 @@
 /// Parallel to ``BorderBackgroundStyle`` but targeting the glyph
 /// foreground rather than the cell background.  Each side carries its
 /// own optional ``AnyShapeStyle`` so callers can paint asymmetric
-/// borders (e.g. a highlighted top edge).  1/2/3/4-argument shorthand
+/// borders, such as a highlighted top edge. The 1/2/3/4-argument shorthand
 /// initializers mirror CSS's border-color rules so that common cases
 /// stay terse at the call site.
 public struct BorderEdgeStyle: Equatable, Sendable {

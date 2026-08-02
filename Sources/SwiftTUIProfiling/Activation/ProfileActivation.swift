@@ -10,9 +10,10 @@
   import Musl
 #endif
 
-/// Owns the live profiling session: builds the configured sinks, bridges the
-/// runtime frame contract into them, and runs the periodic memory/CPU timers.
-/// Activation is idempotent and a complete no-op when no config resolves.
+/// Owns the live profiling session.
+/// It builds the configured sinks and connects the runtime frame contract to them.
+/// It also runs the periodic memory and CPU timers.
+/// Activation is idempotent. It does nothing if no configuration resolves.
 @MainActor
 public final class ProfileActivation {
   public static let shared = ProfileActivation()

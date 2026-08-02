@@ -6,7 +6,7 @@ extension View {
   /// Associates an animation with a value-gated trigger.
   ///
   /// When `value` changes between resolves, the child subtree sees the
-  /// specified animation in its transaction; otherwise the subtree
+  /// specified animation in its transaction. Otherwise, the subtree
   /// inherits whatever animation intent the parent transaction carries.
   ///
   /// Passing `nil` explicitly suppresses any inherited animation for the
@@ -39,8 +39,8 @@ extension View {
 
 /// A mutable view of the current transaction used with ``View/transaction(_:)``.
 ///
-/// Only the animation intent is currently exposed; other SwiftUI
-/// transaction fields are out of scope for the initial public slice.
+/// Only the animation intent is currently available.
+/// Other SwiftUI transaction fields are not part of the initial public API.
 public struct Transaction: Sendable {
   /// The animation associated with the current transaction, if any.
   ///

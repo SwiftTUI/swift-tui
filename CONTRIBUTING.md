@@ -1,19 +1,18 @@
 # Contributing
 
 > [!Important]
-> SwiftTUI is currently a single-maintainer pre-release project. I would be excited to get more people involved.  
-> Expect some friction as the project's tooling currently lags its ambitions.
+> SwiftTUI is a single-maintainer pre-release project. New contributors are
+> welcome. Some project tools are incomplete.
 >
-> Please join the discord if trying to land something non-trivial. https://discord.gg/8j35kYDFxn
-
-
+> For a large contribution, join the Discord server first:
+> <https://discord.gg/8j35kYDFxn>
 
 ## Development Setup
 
 - Read [AGENTS.md](AGENTS.md) for repository-specific build, test, and style
   rules.
-- Use the repo-pinned Swift toolchain through `swiftly run swift ...`; do not
-  use bare `swift` or `xcrun swift` for repo-local builds.
+- Use the repository-pinned Swift toolchain through `swiftly run swift ...`.
+- Do not use bare `swift` or `xcrun swift` for repository builds.
 - Use Bun from the root workspace for the standard test entrypoints.
 
 ```bash
@@ -21,21 +20,22 @@ bun run test
 swiftly run swift test
 ```
 
-Run `bun run test` before proposing shared runtime, platform product, or tooling
-changes in this repo. Use `bun run test:all` when the change affects broad
-primary-package behavior. Runnable examples are validated from the sibling
-`SwiftTUI/swift-tui-examples` checkout.
+Before you propose a shared runtime, platform product, or tooling change, run
+`bun run test`. If the change affects broad primary-package behavior, run
+`bun run test:all`. The sibling `SwiftTUI/swift-tui-examples` checkout contains
+the tests for runnable examples.
 
 ## Pull Request Expectations
 
 - Keep changes scoped to one behavior, subsystem, or documentation correction.
-- Update the documentation in [`docs/`](docs/README.md) when a public contract,
-  product boundary, or architectural behavior changes.
-- Include tests for behavior changes unless the change is documentation-only or
-  the validation path is already covered by an existing gate.
+- If a public contract changes, update the documentation in
+  [`docs/`](docs/README.md).
+- If a product boundary or architectural behavior changes, update the same
+  documentation.
+- Include tests for each behavior change. A documentation-only change does not
+  require tests. An existing gate can supply the required coverage.
 
 ## Code Style
 
-Swift code uses 2-space indentation and `.swift-format.json`. The repository
-policy scripts are part of the gate; do not bypass them by weakening checks for
-a local patch.
+Swift code uses 2-space indentation and `.swift-format.json`. Repository policy
+scripts are part of the gate. Do not weaken these scripts for a local patch.

@@ -81,7 +81,7 @@ extension View {
   /// Sets the local cell used by cursor-following accessibility mode.
   ///
   /// The anchor is relative to this view's semantic bounds. It does not change
-  /// focus traversal or hit testing; the terminal runtime uses it only when
+  /// focus traversal or hit testing. The terminal runtime uses it only when
   /// cursor-following is enabled.
   public func accessibilityCursorAnchor(_ anchor: CellPoint) -> some View {
     semanticMetadata(.init(accessibilityCursorAnchor: anchor))

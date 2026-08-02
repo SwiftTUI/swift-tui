@@ -1,14 +1,13 @@
 # Security Policy
 
 SwiftTUI is pre-1.0 software. The project does not yet offer a formal security
-SLA, but security reports should still be handled privately first.
+SLA. Report security vulnerabilities privately first.
 
 ## Reporting
 
-Use GitHub's private vulnerability reporting for
-`SwiftTUI/swift-tui` when available. If that path is unavailable, contact the
-maintainers privately before opening a public issue; `security@swifttui.sh` is
-the intended contact for release-facing security reports.
+If GitHub private vulnerability reporting is available, use it for
+`SwiftTUI/swift-tui`. If it is not available, email `security@swifttui.sh`.
+Contact the maintainers privately before you open a public issue.
 
 Please include:
 
@@ -16,11 +15,11 @@ Please include:
 - reproduction steps or a minimal proof of concept
 - expected impact and any known mitigations
 
-Do not disclose a vulnerability publicly until a maintainer has had a
-reasonable chance to investigate and coordinate a fix.
+Do not disclose a vulnerability publicly until a maintainer investigates it
+and coordinates a fix.
 
 ## Supported Versions
 
 Only the latest tagged pre-1.0 release and the current `main` branch are
-supported for security triage. Older alpha tags may receive fixes only when the
-fix is low-risk and practical to backport.
+supported for security triage. An older alpha tag can receive a fix if the
+fix has low risk and is practical to backport.

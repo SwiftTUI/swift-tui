@@ -363,10 +363,10 @@ public final class AndroidHostSceneHost {
 
   @MainActor private var runTask: Task<Void, Never>?
   @MainActor private var hasStartedScene = false
-  /// The Kotlin host's declared wire capabilities (``declareCapabilities``;
-  /// absence keeps the defaults — today's bytes). Every Android host receives
-  /// converged web-surface frames since the legacy keyed-JSON wire retired in
-  /// Stage C4; the declaration's one bit chooses full or delta records.
+  /// The Kotlin host's declared wire capabilities from ``declareCapabilities``.
+  /// An absent declaration keeps the defaults and today's bytes.
+  /// Every Android host receives converged web-surface frames.
+  /// The declaration's one bit selects full or delta records.
   @MainActor package private(set) var wireCapabilities = HostWireCapabilities()
 
   @MainActor
@@ -483,8 +483,8 @@ public final class AndroidHostSceneHost {
   /// Declares the host's wire capabilities from a `caps`-shaped JSON object
   /// (see `HostWireSchema.capabilityMappings` for the key set). Accepted
   /// only before the scene starts — capability-gated emission must never
-  /// change shape mid-session. Returns whether the declaration was
-  /// accepted; a rejected or malformed declaration keeps the defaults,
+  /// change shape mid-session. Returns whether the declaration was accepted.
+  /// A rejected or malformed declaration keeps the defaults,
   /// which reproduce today's wire bytes exactly.
   @MainActor
   @discardableResult

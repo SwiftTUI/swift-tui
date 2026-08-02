@@ -30,8 +30,8 @@ public enum TerminalRunner {
 
   /// Runs a scene-based app with explicit runtime configuration.
   ///
-  /// Use this overload when CLI flags or env vars have been parsed externally
-  /// (e.g., by `SwiftTUIArguments`).
+  /// Use this overload after an external parser parses CLI flags or environment variables.
+  /// For example, `SwiftTUIArguments` can parse these values.
   @MainActor
   public static func run<A: App>(_ app: A, configuration: RuntimeConfiguration) async throws {
     try await launch(app, configuration: configuration)

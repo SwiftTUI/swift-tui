@@ -4,8 +4,8 @@ import SwiftTUICore
 
 /// Visual chrome treatment applied to a prompt presentation's surface.
 ///
-/// Sheets, alerts, and confirmation dialogs share one rendering path;
-/// this enum selects how the chrome around the content is drawn.
+/// Sheets, alerts, and confirmation dialogs share one rendering path.
+/// This enum selects how the chrome around the content is drawn.
 public enum PresentationChrome: Equatable, Sendable {
   /// Default: rounded inset surface with a foreground-tint stroke on
   /// every side. Used by alerts, confirmation dialogs, and standard
@@ -15,15 +15,15 @@ public enum PresentationChrome: Equatable, Sendable {
   /// Flat, edge-to-edge strip with no side or top border and a single
   /// soft divider along the bottom that reads like a shadow under the
   /// content. Used for command-palette dropdowns and similar banners
-  /// that should read as part of the window chrome rather than a
+  /// that appear as part of the window chrome rather than a
   /// floating card.
   case dropdown
 
   /// Compact, intrinsic-width bordered box with no header — the
   /// rendering used by `Menu` to float its expanded content above the
-  /// surrounding layout without reflowing siblings. Smaller and
-  /// chromier than `.surface` (no title row, no close button), this
-  /// chrome anchors at the presentation's `alignment` and sizes to its
+  /// surrounding layout without reflowing siblings.
+  /// This chrome is smaller than `.surface` and has no title row or close button.
+  /// It anchors at the presentation `alignment` and sizes to its
   /// content rather than expanding to fill.
   case menu
 }

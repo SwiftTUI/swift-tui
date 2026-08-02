@@ -3,7 +3,7 @@
 public enum GestureRecognizerPhase: Equatable, Sendable {
   /// No event yet relevant to this recognizer.
   case possible
-  /// Recognition has begun but isn't yet final (e.g. first drag event).
+  /// Recognition started but is not final, such as after the first drag event.
   case began
   /// Recognizer has produced an intermediate value.
   case changed
@@ -11,7 +11,7 @@ public enum GestureRecognizerPhase: Equatable, Sendable {
   case ended
   /// Recognizer will not produce a value. Terminal.
   case failed
-  /// Recognizer was externally cancelled (subtree teardown, etc.). Terminal.
+  /// An external action canceled recognition, such as a subtree teardown. This state is terminal.
   case cancelled
 
   public var isTerminal: Bool {
@@ -26,22 +26,22 @@ public enum GestureRecognizerPhase: Equatable, Sendable {
 public enum GestureRecognizerEventDisposition: Equatable, Sendable {
   /// Recognizer consumed the event. The event must not bubble.
   case handled
-  /// Recognizer inspected the event but didn't claim it (e.g. below
-  /// minimumDistance for a drag). The event may bubble to parent routes.
+  /// The recognizer examined the event but did not claim it.
+  /// For example, the drag distance can be less than `minimumDistance`.
+  /// The event can continue to parent routes.
   case ignored
-  /// Recognizer explicitly failed on this event. Terminal for this
-  /// recognizer; the registry removes it and the event may bubble.
+  /// The recognizer explicitly failed on this event. This state is terminal for this recognizer.
+  /// The registry removes the recognizer, and the event can continue to a parent route.
   case failed
 }
 
-/// Environment used by `Gesture._makeRecognizer` to wire the recognizer
-/// to runtime services.
+/// The environment that `Gesture._makeRecognizer` uses to connect the recognizer to runtime services.
 ///
-/// The type is `public` so it appears in the `_makeRecognizer` signature
-/// of `public` gesture types, but its stored fields and initializer are
-/// `package` — only the SwiftTUI runtime constructs this. External
-/// gesture authors receive it as a parameter and forward it to child
-/// gestures; they never construct it directly.
+/// The type is `public`, so it appears in the `_makeRecognizer` signature of `public` gesture types.
+/// Its stored fields and initializer are `package`.
+/// Only the SwiftTUI runtime creates this value.
+/// External gesture authors receive it as a parameter and pass it to child gestures.
+/// They do not create it directly.
 public struct GestureRecognizerBuildContext: Sendable {
   public let attachingIdentity: Identity
   package let gestureStateRegistry: LocalGestureStateRegistry?
@@ -241,8 +241,8 @@ public final class AnyGestureRecognizer {
     _tearDown()
   }
 
-  /// Reads the inner recognizer's `currentValue()` and casts to `T`.
-  /// Returns `nil` if the inner value is nil or the type doesn't match.
+  /// Reads `currentValue()` from the inner recognizer and casts the value to `T`.
+  /// If the inner value is `nil` or has a different type, returns `nil`.
   public func currentValue<T>(as type: T.Type = T.self) -> T? {
     _currentValue() as? T
   }

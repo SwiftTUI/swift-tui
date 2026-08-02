@@ -54,15 +54,15 @@ VStack(alignment: .leading) {
 }
 ```
 
-Named coordinate-space names should be unique in a rendered frame. Duplicate
+Named coordinate-space names must be unique in a rendered frame. Duplicate
 names currently keep last-writer-wins behavior, and missing names fall back to
 global coordinates for compatibility with gesture resolution. Both cases are
 recorded in frame diagnostics.
 
 Anchor resolution is intentionally layout-time. Measuring a ``GeometryReader``
 or an unselected ``ViewThatFits`` candidate does not realize its authored
-content or commit lifecycle, task, gesture, command, drop, focus, or semantic
-side effects.
+content. It also does not commit lifecycle, task, gesture, command, drop, focus,
+or semantic side effects.
 
 ## Cookbook
 
@@ -121,7 +121,7 @@ struct MarkedLabel: View {
 
 ### Align Overlay To A Named Space
 
-Use ``View/coordinateSpace(name:)`` when the overlay should align to a sibling
+Use ``View/coordinateSpace(name:)`` to align an overlay to a sibling
 or ancestor region instead of the overlay's own local bounds.
 
 ```swift
@@ -182,7 +182,7 @@ struct MissingNameProbe: View {
 }
 ```
 
-When running a profiled build, enable the frame TSV via `SwiftTUIProfiling` and
+For a profiled build, enable the frame TSV through `SwiftTUIProfiling`. Then
 inspect the geometry columns:
 
 ```swift
@@ -201,7 +201,7 @@ missing name. Duplicate names are also recorded in
 ## Container And Layout Boundaries
 
 Containers that defer child placement also defer local geometry. `ScrollView`,
-lazy stacks, ``ViewThatFits``, and safe-area containers may measure a
+lazy stacks, ``ViewThatFits``, and safe-area containers can measure a
 layout-dependent subtree without realizing the `GeometryReader` body. The body
 runs only when the selected or visible branch is placed with concrete bounds.
 

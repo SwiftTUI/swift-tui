@@ -4,7 +4,7 @@
 /// border/stroke story (the other is ``StrokeStyle``):
 ///
 /// - **`BorderSet`** — *what* glyphs to draw. Top, bottom, side, and
-///   corner characters; optional middle-junction glyphs for tables and
+///   corner characters. It also specifies optional middle-junction glyphs for tables and
 ///   subdivided containers.
 /// - **`StrokeStyle`** — *how* to draw them: line width, layout
 ///   placement (``StrokeStyle/Placement/outset`` or

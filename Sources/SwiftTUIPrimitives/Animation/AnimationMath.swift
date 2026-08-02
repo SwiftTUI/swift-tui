@@ -116,27 +116,21 @@ extension Double: VectorArithmetic {
 
 // MARK: - Int + VectorArithmetic
 
-/// Integer scaling truncates toward zero: `scale(by: t)` computes
-/// `self = Int(Double(self) * t)`.  This has two notable quirks for
-/// animation call sites:
+/// Integer scaling truncates toward zero.
+/// `scale(by: t)` computes `self = Int(Double(self) * t)`.
+/// This behavior has two effects at animation call sites:
 ///
-/// 1. **Sub-unit deltas are lost.** A delta of `1` scaled by
-///    `t = 0.4` produces `Int(0.4) = 0`, so small integer deltas
-///    animate as a single jump at the end of the curve rather than
-///    a smooth per-frame step.  Acceptable for terminal cell
-///    coordinates (which are inherently integer-quantized), but
-///    callers that need sub-cell precision should use `Double`
-///    instead.
+/// 1. **Sub-unit deltas are lost.** A delta of `1` scaled by `t = 0.4` produces `Int(0.4) = 0`.
+///    Thus, a small integer delta causes one jump at the end of the curve.
+///    Terminal cell coordinates are integer-quantized, so this behavior is acceptable for them.
+///    Callers that need sub-cell precision must use `Double`.
 ///
-/// 2. **Asymmetric rounding.** Truncation toward zero means `-1`
-///    scaled by `0.5` yields `0`, while `+1` scaled by `0.5` also
-///    yields `0`.  Both are off-by-one from round-to-nearest, but
-///    symmetrically so — no sign-dependent drift.
+/// 2. **Asymmetric rounding.** A value of `-1` scaled by `0.5` gives `0`.
+///    A value of `+1` scaled by `0.5` also gives `0`.
+///    Both differ by one from round-to-nearest, with no sign-dependent drift.
 ///
-/// The composed interpolation primitive used by the animation
-/// controller produces `from + (to - from).scaled(by: progress)` at
-/// the ``VectorArithmetic`` level; the `scale`-then-add sequence is
-/// what matters for rounding analysis.
+/// The animation controller produces `from + (to - from).scaled(by: progress)` at the ``VectorArithmetic`` level.
+/// The `scale`-then-add sequence determines the rounding behavior.
 extension Int: VectorArithmetic {
   public mutating func scale(by rhs: Double) {
     self = Int(Double(self) * rhs)

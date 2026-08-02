@@ -1,4 +1,4 @@
-# Synchronising Without Polling
+# Synchronizing Without Polling
 
 Pick the right wait primitive for what a test is observing.
 
@@ -17,7 +17,7 @@ observed state lives** and **whether the wait carries a failure bound**.
 
 - Use ``MainActorConditionSignal`` when the observed state lives **on the
   `MainActor`** and changes more than once. The producer calls `notify()` after
-  each change it owns; waiters re-test their predicate only then, never on a
+  each change it owns. Waiters evaluate their predicate only then, never on a
   clock.
 
 - Use ``ConditionSignal`` for the same job when the observed state lives
@@ -32,15 +32,15 @@ change, not on the wall clock.
 ## Adding A Failure Bound
 
 A test that waits forever on a real bug is as unhelpful as a flaky one. When a
-wait should *fail* if progress genuinely stops, bound it with a stage budget
-rather than a wall-clock timeout.
+wait must fail after progress stops, use a stage budget instead of a wall-clock
+timeout.
 
 A ``StageClock`` counts units of runtime progress — for the run loop, one
 completed turn. ``withStageBudget(_:within:on:_:)`` races an operation against
 a ``ProgressBudget`` of stages and throws ``StageBudgetExceeded`` if the budget
-runs out first. Because the bound is a stage *count*, it is identical on a fast
-laptop and a slow CI runner — the same budget that finishes in 6 s on the
-laptop finishes in 30 s under load, and passes on both.
+runs out first. The bound is a stage *count*, so it is identical on a fast
+laptop and a slow CI runner. The same budget can finish in 6 s on the laptop and
+30 s under load. Both runs pass.
 
 Budgeted overloads on ``AsyncEvent`` and ``MainActorConditionSignal`` let a
 bounded wait read as a single call:
@@ -49,7 +49,7 @@ bounded wait read as a single call:
 try await event.wait(for: "runtime start", within: budget, on: clock)
 ```
 
-To unit-test budget logic itself, drive a ``ManualStageClock`` by hand, or use
+To do a unit test of budget logic, drive a ``ManualStageClock`` by hand. Or use
 ``ExhaustedStageClock`` to exercise the budget-exceeded path deterministically
 without racing a real clock past its deadline.
 
@@ -61,5 +61,5 @@ wall-clock timeout, scaled by the `SWIFTTUI_TEST_TIMEOUT_SCALE` environment
 variable so slow runners get proportionally longer.
 
 They remain only as a fallback for waits not yet migrated to the poll-free
-primitives. `Scripts/check_test_sync_policies.sh` ratchets their use downward —
+primitives. `Scripts/check_test_sync_policies.sh` ratchets their use downward.
 prefer ``AsyncEvent`` or a condition signal for any new test.

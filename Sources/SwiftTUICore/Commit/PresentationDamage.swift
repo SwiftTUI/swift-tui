@@ -63,9 +63,9 @@ extension PresentationDamageDiagnostics {
 }
 /// Optional retained-frame presentation damage produced by the renderer.
 ///
-/// Hosts may use this value to avoid repainting a full ``RasterSurface`` when
-/// the previous submitted frame is still compatible. A `nil` damage value means
-/// the host must treat the frame as a full repaint.
+/// Hosts can use this value to avoid repainting a full ``RasterSurface``.
+/// The previous submitted frame must remain compatible.
+/// A `nil` damage value means that the host must treat the frame as a full repaint.
 public struct PresentationDamage: Equatable, Sendable {
   /// A dirty text row and the column ranges changed within that row.
   ///

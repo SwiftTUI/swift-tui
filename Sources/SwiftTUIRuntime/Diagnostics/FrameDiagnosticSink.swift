@@ -4,10 +4,10 @@ import SwiftTUICore
 /// product.
 ///
 /// The runtime calls ``record(_:)`` once per committed, cancelled, or dropped
-/// frame, passing a flat ``RuntimeFrameSample``. All derivation, formatting,
-/// and persistence belong to the sink (the profiling product), so the runtime
-/// pays only for gathering raw inputs — and nothing at all when no sink is
-/// installed.
+/// frame and passes a flat ``RuntimeFrameSample``.
+/// The sink (the profiling product) owns all derivation, formatting, and persistence.
+/// Thus, the runtime gathers only the raw inputs.
+/// It does no diagnostic work when no sink is installed.
 @_spi(Runners) public protocol FrameDiagnosticSink: Sendable {
   @MainActor func record(_ sample: RuntimeFrameSample)
 }

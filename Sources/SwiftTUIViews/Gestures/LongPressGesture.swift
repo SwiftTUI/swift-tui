@@ -2,10 +2,9 @@ public import SwiftTUICore
 
 /// A gesture that recognizes a press held for at least `minimumDuration`.
 ///
-/// `Value == Bool` — matches SwiftUI's shape. The recognizer transitions
-/// to `.ended` when the deadline fires while the pointer is still pressed,
-/// and `.failed` when the pointer lifts early or moves beyond
-/// `maximumDistance`.
+/// `Value == Bool` matches the SwiftUI structure.
+/// The recognizer changes to `.ended` if the deadline occurs while the pointer is pressed.
+/// It changes to `.failed` if the pointer lifts early or moves past `maximumDistance`.
 ///
 /// ## Terminal-faithful defaults
 ///

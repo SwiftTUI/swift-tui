@@ -2,11 +2,12 @@ public import SwiftTUICore
 
 /// A gesture that requires `first` to complete before `second` receives
 /// events — SwiftUI's `SequenceGesture`. The composite ends when `second`
-/// ends; either child failing fails the whole sequence.
+/// ends. If either child fails, the whole sequence fails.
 public struct SequenceGesture<First: Gesture, Second: Gesture>: Gesture {
-  /// The value of a gesture sequence, matching SwiftUI's shape: `.first`
-  /// while only the first gesture has recognized, `.second` once the second
-  /// stage is underway (its value is `nil` until it produces one).
+  /// The value of a gesture sequence, with the same structure as SwiftUI.
+  /// The value is `.first` while only the first gesture has recognized.
+  /// It is `.second` after the second stage starts.
+  /// The value of the second stage is `nil` until that stage produces a value.
   public enum Value {
     case first(First.Value)
     case second(First.Value, Second.Value?)

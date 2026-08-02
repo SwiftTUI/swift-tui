@@ -32,9 +32,9 @@ public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
 
 /// Marker for visual-only content that needs an accessibility label or hidden policy.
 ///
-/// Attach through ``SemanticMetadata/init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)``
-/// so accessibility renderers can diagnose visual views that reach users
-/// without a label. The `kind` names the visual family (for example
+/// Attach this value through ``SemanticMetadata/init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)``.
+/// Then accessibility renderers can diagnose visual views that reach users without a label.
+/// The `kind` names the visual family (for example
 /// `"BarChart"` or `"Image"`) in those diagnostics.
 public struct AccessibilityVisualContent: Equatable, Sendable {
   /// The visual family named in missing-label diagnostics.
@@ -51,8 +51,8 @@ public struct SemanticMetadata: Equatable, Sendable {
   private var flags: UInt16
   package var focusScopeIdentity: Identity?
   /// When `true`, focusable descendants of this node are suppressed
-  /// during semantic extraction — the node itself remains focusable
-  /// (if its other metadata marks it so) but its descendants do not
+  /// during semantic extraction. The node remains focusable if its other metadata specifies focus.
+  /// Its descendants do not
   /// appear in the focus region list. Set by
   /// `Panel.focusContainment(.sealed)`.
   public var focusInteractions: FocusInteractions

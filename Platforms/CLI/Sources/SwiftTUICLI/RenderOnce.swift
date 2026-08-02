@@ -23,9 +23,8 @@ import SwiftTUIRuntime
 /// env-var precedence (`NO_COLOR`, `CLICOLOR`, `FORCE_COLOR`, `CLICOLOR_FORCE`,
 /// `TERM=dumb`, `LANG`/`LC_*` for Unicode).
 public enum RenderOnce {
-  /// Resolves / measures / places / draws / rasters the view tree once at the
-  /// requested width, then emits the resulting cell buffer as ANSI-decorated
-  /// text to stdout.
+  /// Resolves, measures, places, draws, and rasters the view tree once at the requested width.
+  /// Then it writes the ANSI-decorated text of the cell buffer to stdout.
   ///
   /// - Parameters:
   ///   - view: The root view to render.

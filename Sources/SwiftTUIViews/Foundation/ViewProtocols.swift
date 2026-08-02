@@ -15,7 +15,7 @@ package protocol ViewNode {
 
 /// A declarative unit of terminal UI content.
 ///
-/// Implement `body` the same way you would in SwiftUI: compose smaller views,
+/// Implement `body` in the same way as SwiftUI. Compose smaller views,
 /// modifiers, and property wrappers rather than constructing render nodes
 /// directly.
 @MainActor

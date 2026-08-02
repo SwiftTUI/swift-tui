@@ -6,8 +6,8 @@ geometry, color and style, draw payloads, and animation math.
 ## Overview
 
 `SwiftTUIPrimitives` is the bottom of the module stack. It holds **values, not
-engines** — no reconciliation, no render algorithms, no terminal I/O. It builds
-standalone and is Foundation-free.
+engines**. It contains no reconciliation, render algorithms, or terminal I/O.
+It builds independently and is Foundation-free.
 
 ```
 SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUIRuntime
@@ -15,9 +15,10 @@ SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUI
 
 You rarely import this module directly. Every layer above it
 `@_exported`-imports it, so `import SwiftTUIViews` (or `SwiftTUI`) already puts
-`Point`, `Rect`, `Color`, `Path`, and the rest in scope. This reference exists
-because those types are part of the published public surface: they appear in
-the signatures of shape, canvas, pointer, and styling APIs you author against.
+`Point`, `Rect`, `Color`, `Path`, and the rest in scope. This reference
+documents those types because they are part of the published public surface.
+They appear in the signatures of shape, canvas, pointer, and styling APIs that
+you use.
 
 ## Design Boundary
 
@@ -28,14 +29,14 @@ A type belongs here when it is inert and universally useful:
 - it can be constructed and compared in a test with no runtime standing up
 
 That boundary is compiler-enforced. `SwiftTUIGraph` depends on
-`SwiftTUIPrimitives` **only**, so graph code cannot name a render type — and
+`SwiftTUIPrimitives` **only**. Thus, graph code cannot name a render type, and
 primitives code cannot name a view type.
 
 ## Topics
 
 ### Cell And Continuous Geometry
 
-Layout is measured in integer cells; pointer and canvas APIs carry continuous
+SwiftTUI measures layout in integer cells. Pointer and canvas APIs carry continuous
 cell-space values.
 
 - ``CellPoint``

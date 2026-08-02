@@ -24,7 +24,7 @@ GIF input is decoded into pre-composed PNG-backed frames before rendering.
 Those frames flow through the same `Image(data:)` surface as static images, so
 `AnimatedImage(...).blendMode(...)` participates in image blend-mode
 precomposition. Passing raw GIF container bytes directly to `Image(data:)`
-remains a host transport path for unblended web surfaces; SwiftTUI does not
+remains a host transport path for unblended web surfaces. SwiftTUI does not
 decode and blend arbitrary GIF containers outside `SwiftTUIAnimatedImage`.
 
 ## Topics

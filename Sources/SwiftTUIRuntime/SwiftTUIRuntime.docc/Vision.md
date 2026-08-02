@@ -7,8 +7,8 @@ runtime contract that are deliberately shaped after SwiftUI.
 ## Principles
 
 - Implement subsets of SwiftUI only if they map to high-value TUI use cases.
-- Avoid everything deprecated, and anything questionable.
-- Once implementing, do so uncompromisingly.
+- Do not implement deprecated or questionable APIs.
+- If you implement an API, preserve its important semantics.
 
 The goal is not to expose a terminal-specific DSL. The goal is to preserve the
 parts of SwiftUI that make large UI codebases composable and predictable while
@@ -19,7 +19,8 @@ targeting cell-based rendering.
 SwiftTUI provides:
 
 - SwiftUI-shaped layout, state, environment, and focus
-- ``RunLoop``-driven interactive sessions with alternate-screen ownership and ANSI rendering
+- ``RunLoop``-driven interactive sessions with alternate-screen ownership and
+  ANSI rendering
 - Tree-forward collection presentation as a first-class authoring pattern
 - PNG and baseline JPEG image presentation
 - GIF import/export and finite animation through `SwiftTUIAnimatedImage`, which
@@ -32,7 +33,8 @@ SwiftTUI provides:
   with path mutation for deep links, pushes, pops, and pop-to-root
 - Keyboard-based focus and navigation model with pointer-based augmentation
 - Terminal capability detection for colors, images, pointer precision, and more
-- Shared accessibility semantics with terminal, Web/WASI, and SwiftUI host delivery
+- Shared accessibility semantics for terminal, Web/WASI, and SwiftUI host
+  delivery
 
 ## See Also
 

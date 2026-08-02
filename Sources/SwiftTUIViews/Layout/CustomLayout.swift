@@ -208,21 +208,22 @@ protocol MeasureViewportDeclaringLayout {
 public typealias LayoutSubviews = [LayoutSubview]
 /// A custom layout algorithm.
 ///
-/// A layout is a `Sendable` value: SwiftTUI may evaluate
+/// A layout is a `Sendable` value. SwiftTUI can evaluate
 /// ``sizeThatFits(proposal:subviews:cache:)`` and
 /// ``placeSubviews(in:proposal:subviews:cache:)`` on the frame-tail layout
 /// worker, away from the main actor. Store only value-semantic,
-/// concurrency-safe state in a layout; read mutable app state before
+/// concurrency-safe state in a layout. Read mutable app state before
 /// constructing the layout and pass the resolved values in.
 public protocol Layout: Sendable {
   /// Scratch state for one measure/place layout pass.
   ///
   /// SwiftTUI shares this cache between ``sizeThatFits(proposal:subviews:cache:)``
-  /// and ``placeSubviews(in:proposal:subviews:cache:)`` for the same container
-  /// identity and proposal in a single pass. The cache is discarded after
-  /// placement, so custom layouts must not rely on it persisting across frames,
+  /// and ``placeSubviews(in:proposal:subviews:cache:)``.
+  /// This sharing applies to one container identity and proposal in one pass.
+  /// The cache is discarded after
+  /// placement. Thus, custom layouts must not rely on it across frames,
   /// proposals, structural changes, or binding-driven invalidations. SwiftTUI
-  /// intentionally does not expose a cross-frame cache reuse hook; store durable
+  /// intentionally does not provide a cross-frame cache reuse hook. Store durable
   /// layout state outside `Cache`. The cache must be `Sendable` because layout
   /// passes can run on the frame-tail worker.
   associatedtype Cache: Sendable = Void
@@ -231,7 +232,7 @@ public protocol Layout: Sendable {
   /// out of cross-frame measurement reuse.
   ///
   /// Include every layout value field that can change measurement. Two layout
-  /// instances with the same measurement signature may reuse retained
+  /// Instances with the same measurement signature can reuse retained
   /// measurement work.
   var measurementReuseSignature: String? { get }
 
@@ -239,7 +240,7 @@ public protocol Layout: Sendable {
   /// out of cross-frame placement reuse.
   ///
   /// Include every layout value field that can change placement. Two layout
-  /// instances with the same placement signature may reuse retained placement
+  /// instances with the same placement signature can reuse retained placement
   /// work.
   var placementReuseSignature: String? { get }
 
@@ -252,7 +253,8 @@ public protocol Layout: Sendable {
     subviews: LayoutSubviews
   )
 
-  /// Returns this layout's measured size and may write data needed later in
+  /// Returns the measured size of this layout.
+  /// It can write data needed later in
   /// ``placeSubviews(in:proposal:subviews:cache:)`` to `cache`.
   func sizeThatFits(
     proposal: ProposedViewSize,

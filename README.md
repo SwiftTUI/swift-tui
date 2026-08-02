@@ -11,9 +11,9 @@
 
 Author your `App` once with the SwiftUI shapes you already know — `View`,
 `Scene`, `@State`, `@FocusState`, `VStack`, `ProgressView`, custom `Layout`.
-Ship that same view tree five ways: a terminal executable, a static WASI bundle,
-a localhost WebHost, a native SwiftUI surface, or a native Android surface. There
-is no rewrite per target — and both browser paths paint to the DOM with a real
+Ship that same view tree in five forms. Choose a terminal executable, a static
+WASI bundle, a localhost WebHost, a native SwiftUI surface, or a native Android
+surface. There is no rewrite per target. Both browser paths paint to the DOM with a real
 accessibility tree, not a terminal emulator.
 
 No global constraint solver, no virtual DOM, no `curses`. Every view is lowered
@@ -43,14 +43,13 @@ snapshot-testable.
 
 - **Your SwiftUI knowledge ports unchanged.** Stacks, frames, `@State`,
   `@Environment`, `ProgressView`, `LabeledContent`, custom `Layout` types, and
-  view modifiers behave the way SwiftUI taught you — so there is no second API to
-  learn.
+  view modifiers behave as they do in SwiftUI. There is no second API to learn.
 - **Frames are a pure function of the view tree and a size proposal.** The same
   input always produces the same cells, which makes snapshot tests trivial and
   regressions cheap to catch.
 - **Accessibility ships with the frame.** A semantic substrate under every frame
-  drives a linear accessible output path, `--no-color` / `--ascii` fallbacks, and
-  reduce-motion behavior — so you get it without wiring it up. See
+  drives a linear accessible output path. It also drives `--no-color` /
+  `--ascii` fallbacks and reduce-motion behavior. See
   [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - **One source across host presentations.** The same authored app reaches the
   [canonical host matrix](docs/HOSTS-AND-PLATFORMS.md#canonical-host-matrix);
@@ -59,7 +58,8 @@ snapshot-testable.
 
 ## Quick start
 
-Author a view and an `@main` `App` — the same shapes you would write for SwiftUI:
+Author a view and an `@main` `App`. Use the same shapes that you use for
+SwiftUI:
 
 ```swift
 import SwiftTUI
@@ -87,9 +87,9 @@ struct DemoApp: App {
 }
 ```
 
-Add SwiftTUI to your `Package.swift`. While the package is pre-1.0, pin to the
-current beta with `.upToNextMinor` so a minor release cannot break your
-build, then depend on the batteries-included `SwiftTUI` product:
+Add SwiftTUI to your `Package.swift`. While the package is before version 1.0,
+pin to the current beta with `.upToNextMinor`. This requirement prevents a
+minor release from breaking your build. Then add the `SwiftTUI` product:
 
 ```swift
 .package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.4.6"))
@@ -97,17 +97,19 @@ build, then depend on the batteries-included `SwiftTUI` product:
 .product(name: "SwiftTUI", package: "swift-tui")
 ```
 
-`swift run` builds and launches it in the terminal; the app takes the alternate
-screen until you exit, then restores your shell. Add `--web` to run the exact
-same app through the localhost WebHost in a browser — no code change. That single
-`SwiftTUI` import re-exports the platform-neutral runtime, argument parsing, the
-combined terminal/WebHost runner, and animated GIF/image playback; charts ship
-separately from [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
+`swift run` builds the app and launches it in the terminal. The app uses the
+alternate screen until you exit. Then it restores your shell. Add `--web` to
+run the same app through the localhost WebHost in a browser. This mode requires
+no code change.
+
+The `SwiftTUI` import re-exports the platform-neutral runtime, argument parser,
+combined terminal/WebHost runner, and animated-image playback. Charts ship in
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
 
 <details>
 <summary>Full <code>Package.swift</code>, platform requirements, standard CLI flags, and lower-level rendering</summary>
 
-A complete minimal `Package.swift` for a terminal app:
+Use this minimal `Package.swift` for a terminal app:
 
 ```swift
 // swift-tools-version: 6.3
@@ -145,7 +147,8 @@ let package = Package(
 [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) for the full
 platform-by-product matrix.
 
-**Standard CLI flags.** Conform your `App` to `SwiftTUICommand` to get the
+**Standard CLI flags.** Conform your `App` to `SwiftTUICommand`. This protocol
+adds the
 framework's standard flag surface (`--accessible`, `--no-color`, `--ascii`,
 `--reduce-motion`, `--json`, `--linear`, `--debug`, …) alongside your own
 options:
@@ -165,14 +168,14 @@ struct MyApp: App, SwiftTUICommand {
 }
 ```
 
-Apps without `SwiftTUICommand` still honor `NO_COLOR`, `LANG=C`, and the
-`SWIFTTUI_*` environment variables automatically. See the
+Apps without `SwiftTUICommand` still use `NO_COLOR`, `LANG=C`, and the
+`SWIFTTUI_*` environment variables. See the
 [`argparse`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/argparse)
 example.
 
-**Lower-level rendering.** For a single deterministic frame rather than an
-interactive session — snapshots, previews, non-interactive output — resolve a
-`View` directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. See the
+**Lower-level rendering.** For one deterministic frame, resolve a `View`
+directly with `DefaultRenderer` and `TerminalSurfaceRenderer`. This method
+supports snapshots, previews, and non-interactive output. See the
 [`minimal`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/minimal)
 example and the
 [SwiftTUIRuntime DocC](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
@@ -181,7 +184,8 @@ example and the
 
 ## Ship it five ways
 
-Author once; pick the product that matches how you ship. The full
+Author the app once. Select the product that matches the delivery method. The
+full
 platform-by-product matrix lives in
 [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md).
 
@@ -194,19 +198,20 @@ platform-by-product matrix lives in
 | Custom runner / host | `SwiftTUIRuntime` + composed products | [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) |
 
 **Using SwiftTUI from the web.** The same `App` compiles to `wasm32-wasi` and
-streams a structured raster surface that a small browser host draws into a
-`<canvas>` — no terminal emulator, no rewrite. The two npm packages
+streams a structured raster surface. A small browser host draws this surface
+into a `<canvas>`. This path does not use a terminal emulator. It requires no
+application rewrite. The two npm packages
 [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) and
-[`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) own that path;
+[`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) own that path.
 [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) documents it, and
 [`swift-tui-examples/WebExample`](https://github.com/SwiftTUI/swift-tui-examples/tree/main/WebExample)
-is the reference template — a complete Bun-served browser app you can copy.
+is the reference template. You can copy this complete Bun-served browser app.
 
 ## Examples
 
 The maintained examples live in the sibling
 [`SwiftTUI/swift-tui-examples`](https://github.com/SwiftTUI/swift-tui-examples)
-repository — the fastest way to find a sample for a given product surface or run
+repository. Use these examples to find a sample for a product surface or run
 mode.
 
 ## Documentation
@@ -233,7 +238,7 @@ Scripts/build_docc_archive.sh
 ## Contributing
 
 Small, well-scoped issues and pull requests are easiest to review. The repo uses
-the pinned Swift 6.3.3 toolchain through `swiftly`; build and test with:
+the pinned Swift 6.3.3 toolchain through `swiftly`. Build and run tests with:
 
 ```bash
 swiftly run swift test
@@ -241,9 +246,9 @@ bun run test
 ```
 
 `bun run test` is the repo gate. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
-[AGENTS.md](AGENTS.md) for the full build, test, style, and pull-request rules,
-and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the exhaustive test surface and
-the performance-evaluation harness.
+[AGENTS.md](AGENTS.md) for the full build, test, style, and pull-request rules.
+Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the complete test surface
+and performance-evaluation harness.
 
 ## License
 

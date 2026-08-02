@@ -3,14 +3,12 @@
 /// dragged into them: backslash-escaped POSIX paths, single-quoted
 /// POSIX paths, and `file://`-prefixed URLs with percent-encoding.
 ///
-/// Returns an empty list for input that contains no path-shaped
-/// tokens; callers treat empty as "not a drop, fall through to text
-/// paste". A token is considered path-shaped when it starts with `/`
-/// or `~`, or when it is a `file://`-prefixed URL (the URL decodes to
-/// an absolute POSIX path). Pasted text that happens to be
-/// whitespace-separated words (e.g. "plain typed text") yields an
-/// empty result so bracketed paste of ordinary prose still falls
-/// through to the character-input pipeline.
+/// Returns an empty list for input that contains no path-shaped tokens.
+/// Callers interpret an empty list as "not a drop, use text paste".
+/// A path-shaped token starts with `/` or `~`.
+/// A `file://` URL that decodes to an absolute POSIX path is also a path-shaped token.
+/// Pasted text with only whitespace-separated words, such as "plain typed text", gives an empty result.
+/// Thus, a bracketed paste of ordinary text continues to the character-input pipeline.
 public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
   var results: [DroppedPath] = []
   var current = ""

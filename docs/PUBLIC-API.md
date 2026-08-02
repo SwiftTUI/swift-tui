@@ -1,44 +1,45 @@
 # Public API
 
-This document defines the shape of SwiftTUI's public surface: what is canonical
-app-facing API, what is package-only, what was removed, and the policies that
-keep new API consistent with the rest.
+This document defines the shape of SwiftTUI's public surface. It identifies the
+canonical app-facing API, package-only API, removed API, and policies for
+consistent new API.
 
 A machine-generated enumeration of every public symbol lives in
 `PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
-`@_spi` surface — most importantly `@_spi(Runners)`, the host contract the
-swiftui/web/android host repos consume — is tracked separately in
-`.spi-api-baseline.txt`, so an SPI break is a reviewable diff here instead of
-a silent downstream failure. All are generated and checked by
+The `.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
+important part is `@_spi(Runners)`, the host contract for the swiftui/web/android
+host repos. Thus, an SPI break creates a reviewable diff instead of a silent
+downstream failure. The inventory script generates and compares all
+three files:
 `Scripts/generate_public_api_inventory.sh` — see
 [DEVELOPMENT.md](DEVELOPMENT.md#public-api-baseline). Those files answer "is
-symbol X public?"; this document answers "should I use X, and why is it shaped
-this way?".
+symbol X public?". This document explains when to use a symbol and why it has
+its current shape.
 
 ## The one authoring story
 
 The package presents a single primary authoring story:
 
 - Write views with the SwiftUI-shaped surface on `View`.
-- Use `SwiftTUI` for one-import apps that should include terminal launch,
-  localhost WebHost launch, and animated GIF/image support, or `SwiftTUIRuntime`
-  for platform-neutral runtime composition with explicit host products.
+- Use `SwiftTUI` for one-import apps. It includes terminal launch, localhost
+  WebHost launch, and animated GIF/image support. Use `SwiftTUIRuntime` for
+  platform-neutral runtime composition with explicit host products.
 - Treat `SwiftTUICore` as pipeline and data-model infrastructure.
 
-Anything outside that shape has to justify being public. The supported package
-model is one Swift package exposing `SwiftTUI` for the default batteries-included
-app story, `SwiftTUIRuntime` for shared runtime integration, and sibling
-platform integration products for narrow execution, hosting, charting, and
+Anything outside that shape has to justify being public. One Swift package
+provides the supported model. It exposes `SwiftTUI` for the default
+batteries-included app story and `SwiftTUIRuntime` for shared runtime
+integration. Sibling products provide narrow execution, hosting, charting, and
 terminal-program embedding.
 
 ## The canonical surface
 
 The canonical public surface is the API ordinary app code uses first:
 
-- `View` and the SwiftUI-shaped containers, controls, and leaves — `VStack`,
-  `HStack`, `ZStack`, `ScrollView`, `List`, `Table`, `OutlineGroup`,
-  `NavigationStack`, `TabView`, `Button`, `Toggle`, `Slider`, `TextField`,
-  `TextEditor`, `Picker`, `Text`, `Image`, and the rest.
+- `View` and the SwiftUI-shaped containers, controls, and leaves. These include
+  `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `Table`, `OutlineGroup`,
+  `NavigationStack`, `TabView`, and `Button`. They also include `Toggle`,
+  `Slider`, `TextField`, `TextEditor`, `Picker`, `Text`, `Image`, and the rest.
 - Property wrappers and environment plumbing: `@State`, `@Binding`,
   `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and the
   repo-owned `@Bindable`.
@@ -52,12 +53,11 @@ The canonical public surface is the API ordinary app code uses first:
   ships separately from
   [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
 
-If a feature can be expressed on this surface, it should be documented there
-first.
+Document a feature on this surface first when the surface can express it.
 
 `NavigationStack` supports both a root-only initializer and a homogeneous
 `Binding<[Route]>` path. Register route rendering with
-`.navigationDestination(for:destination:)`; append or remove path values to
+`.navigationDestination(for:destination:)`. Append or remove path values to
 push, pop, deep-link, or return to the root. Boolean- and item-binding
 destinations remain available for presentation-shaped routes. A visible
 destination can contribute `.navigationTitle(_:)` to an enclosing toolbar
@@ -66,7 +66,7 @@ environment dismiss command.
 
 ## Actor isolation model
 
-The authoring surface is honestly isolated; the package does not suppress the
+The authoring surface is honestly isolated. The package does not suppress the
 concurrency checker.
 
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols, and
@@ -75,8 +75,8 @@ concurrency checker.
   and `DefaultRenderer.renderAsync(...)` — are `@MainActor`. The lower
   `Resolver.resolve(...)` entry point is package-only.
 - Callback-bearing APIs follow the model: `Binding.init(get:set:)` takes
-  explicitly `@MainActor` closures; `.task(...)` uses actor-inheriting
-  closures; button actions and `.onChange` callbacks stay `@MainActor`.
+  explicitly `@MainActor` closures. `.task(...)` uses actor-inheriting
+  closures. Button actions and `.onChange` callbacks stay `@MainActor`.
 - The package forbids `@unchecked Sendable` and `nonisolated(unsafe)`. Shared
   mutable state uses explicit isolation, `Sendable` constraints, or
   `Synchronization` primitives.
@@ -88,7 +88,7 @@ hatch. It is not the default authoring model.
 
 - Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
 - `AnyView` is type-aware in the retained graph: the same erased static payload
-  type preserves the payload subtree; a changed payload type replaces it
+  type preserves the payload subtree. A changed payload type replaces it
   through normal structural removal.
 - Public APIs must not expose `[AnyView]`, builder closures returning
   `AnyView`, or direct node-erasure construction seams.
@@ -110,7 +110,7 @@ hatch. It is not the default authoring model.
 Semantic styling is the preferred model: views write semantic style roles, and
 a host-owned `Theme` resolves them to concrete colors. `Theme` is not part of
 the `View` authoring surface. The old public string-style helpers and public
-`Theme` shims have been removed from `View`.
+The `View` surface no longer includes the `Theme` shims.
 
 Authoring-facing control and container style APIs converge on public,
 extensible style protocols rather than closed public enums.
@@ -120,17 +120,17 @@ extensible style protocols rather than closed public enums.
 - **Protocol-backed style families today** are `ShapeStyle`, `ToolbarStyle`,
   `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, `ListStyle`, `OutlineStyle`,
   `ToastStyle`, and `TabViewStyle`.
-- **Type-erased style storage** — `AnyShapeStyle`, `AnyButtonStyle`,
-  `AnyTextFieldStyle`, `AnyPickerStyle`, `AnyListStyle`, `AnyOutlineStyle`,
-  `AnyToastStyle`, and `AnyTabViewStyle` — provides the concrete values used
-  where environment or modifier plumbing needs a non-generic stored style.
+- **Type-erased style storage** provides concrete values where environment or
+  modifier plumbing needs a non-generic stored style. The types are
+  `AnyShapeStyle`, `AnyButtonStyle`, `AnyTextFieldStyle`, `AnyPickerStyle`,
+  `AnyListStyle`, `AnyOutlineStyle`, `AnyToastStyle`, and `AnyTabViewStyle`.
 - Built-in styles are concrete values conforming to those protocols.
 - `TabViewStyle` is a full-body container style. Styles receive routeable tab
   item configurations, a routeable overflow trigger, routeable overflow item
   configurations, presentation metadata, and an active-content placeholder.
   Built-in tab styles are implemented through those same public hooks.
-- New public enum-backed authoring `*Style` surfaces should not be added, and
-  previously removed enum-backed style families should not return as shims.
+- New public enum-backed authoring `*Style` surfaces should not be added. Do not
+  restore removed enum-backed style families as shims.
 
 ## Geometry, pointer, and Canvas
 
@@ -143,10 +143,10 @@ Public naming keeps coordinate roles visible:
 - `Pixel*` only for host/device-pixel provenance.
 
 `PointerLocation`, `PointerInputCapabilities`, and `CellPixelMetrics` describe
-input quality without changing the layout contract; cell-only fallback is
+input quality without changing the layout contract. Cell-only fallback is
 always supported. `Canvas` is the public arbitrary-drawing escape hatch:
 prefer value drawings conforming to `CanvasDrawing` for stable structural
-equality; the closure-backed `Canvas { ... }` compares by identity.
+equality. The closure-backed `Canvas { ... }` compares by identity.
 
 ## Action scopes and commands
 
@@ -154,14 +154,14 @@ The full ActionScope/commands surface is public:
 
 - `ActionScope` (with `AnyID`) and `CommandRegistry`.
 - `Panel<ID, Content>` plus `.panel(id:)` and `.panel()`.
-- `.keyCommand(...)` with shallowest-wins dispatch along the focus chain;
-  modifier-less bindings are framework-reserved.
+- `.keyCommand(...)` with shallowest-wins dispatch along the focus chain.
+  Modifier-less bindings are framework-reserved.
 - `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
 - `.toolbar(style:)` and `.toolbarItem(...)`.
 - `Scene` and the presentation modifiers (`.alert`, `.confirmationDialog`,
   `.sheet`, `.fullScreenCover`, `.popover`, `.popoverTip`, `.toast`) conform
   to `ActionScope`. Boolean and optional-item presentation state is owned by
-  the presenter; `onDismiss` observes committed teardown after the entry has
+  the presenter. `onDismiss` observes committed teardown after the entry has
   left the rendered tree.
 
 ## Products
@@ -169,9 +169,9 @@ The full ActionScope/commands surface is public:
 ### `SwiftTUI`
 
 `SwiftTUI` is the batteries-included app convenience product. It re-exports the
-combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, so an
-ordinary app writes only `import SwiftTUI` and gets standard flags, the default
-terminal `App.main()`, `--web` localhost launch, and animated GIF/image support.
+combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`. An ordinary
+app writes only `import SwiftTUI`. It gets standard flags, the default terminal
+`App.main()`, `--web` localhost launch, and animated GIF/image support.
 Charting/graph views live in the external
 [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package.
 
@@ -179,8 +179,8 @@ Charting/graph views live in the external
 custom launchers that do not want the convenience product.
 `SwiftTUICore` is target-level pipeline infrastructure, re-exported through
 `SwiftTUIRuntime` rather than published as its own product. Public host code
-should consume `RenderSnapshot`, `RasterSurface`, `SemanticSnapshot`, and
-`SemanticHostFrame`; resolved/measured/placed/draw/commit phase IR stays
+uses `RenderSnapshot`, `RasterSurface`, `SemanticSnapshot`, and
+`SemanticHostFrame`. Resolved/measured/placed/draw/commit phase IR stays
 package-only.
 
 ### `SwiftTUIProfiling`
@@ -193,15 +193,15 @@ public surface is the activation entry point and the reusable CPU sampler:
   via `SWIFTTUI_PROFILE`, or an explicit `ProfileConfig`.
 - `ProfileConfig` (with `Signal` and `SinkDescriptor`) — the programmatic
   selection of signals and sinks.
-- `ProfileActivation` — owns the live session; call `finish()` at shutdown to
+- `ProfileActivation` — owns the live session. Call `finish()` at shutdown to
   flush buffered sinks.
 - The CPU sampler family — `CPUSampler`, `CPUSample`, `CPUSampleCollector`,
   `ProcessCPUReading`, `CPUSamplerError`.
 
 The record/derivation/TSV types it consumes stay in `SwiftTUIRuntime` (they are
 also used by `SwiftTUIWASISurfaceBridge` and the runners), so the runtime never depends
-on the product. The sink and record-envelope types are package-internal for now;
-the environment grammar builds them.
+on the product. The sink and record-envelope types are package-internal for now.
+The environment grammar builds them.
 
 ### Platform integration products
 
@@ -246,13 +246,13 @@ These migration-era APIs are no longer public:
   `MeasuredNode`, `PlacedNode`, `DrawNode`, `FrameArtifacts`, `CommitPlan`,
   `CommitPlanner`, `LayoutEngine`, `SemanticExtractor`, `DrawExtractor`,
   `Rasterizer`, `SnapshotRenderer`, and `FrameDropEligibility`. The public
-  one-shot renderer result is `RenderSnapshot`; public diagnostics use
+  one-shot renderer result is `RenderSnapshot`. Public diagnostics use
   `FrameDropBlocker` for completed-frame drop blocker vocabulary.
 
 ## Package-Only Transitional Seams
 
-These symbols still exist for internal reuse and narrow compatibility, but they
-are not part of the public API story and should not shape app authoring:
+These symbols still exist for internal reuse and narrow compatibility. They are
+not part of the public API story and must not shape app authoring:
 
 - `PrimitiveView` and `ResolvableView` — internal lowering protocols.
 - `ViewNode` — internal runtime plumbing.
@@ -271,11 +271,11 @@ Before making a symbol public, ask:
 2. Does it help new app code, or only package-local migration and tests?
 3. Will the README and architecture docs still read as one coherent story?
 4. Can it live behind an internal or test-support seam?
-5. Is it a real product surface, or showcase code that should stay
-   target-only — example apps and showcase targets should not be exported as
-   package products. Experimental or showcase targets follow the same rule:
-   they may live in the repo for demos and tests without becoming products.
+5. Is it a real product surface or showcase code that must stay target-only?
+   Do not export example apps or showcase targets as package products.
+   Experimental or showcase targets follow the same rule: they can remain for
+   demos and tests without becoming products.
 
 If the answer points toward internal compatibility rather than product
-direction, the symbol should stay non-public. When a new public symbol does
+direction, keep the symbol non-public. When a new public symbol does
 land, classify it here before it becomes a default example elsewhere.

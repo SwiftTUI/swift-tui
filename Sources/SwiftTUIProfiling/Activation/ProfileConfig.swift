@@ -1,8 +1,9 @@
 /// Selects which profiling signals run, with what cadence, and where their
 /// records go. Every signal is off unless explicitly named.
 public struct ProfileConfig: Sendable, Equatable {
-  /// A profiling signal. `frames` is event-driven (one record per committed
-  /// frame); `memory` and `cpu` are periodic with an explicit interval.
+  /// A profiling signal.
+  /// `frames` is event-driven and records one value for each committed frame.
+  /// `memory` and `cpu` are periodic signals with an explicit interval.
   public enum Signal: Sendable, Hashable {
     case frames
     case memory(interval: Duration)
@@ -27,7 +28,7 @@ public struct ProfileConfig: Sendable, Equatable {
   /// Where records go. Empty falls back to a stderr ``SinkDescriptor/summary``.
   public var sinks: [SinkDescriptor]
 
-  /// Creates a config that runs `signals` and routes their records to `sinks`.
+  /// Creates a configuration that runs `signals` and sends their records to `sinks`.
   public init(signals: Set<Signal>, sinks: [SinkDescriptor]) {
     self.signals = signals
     self.sinks = sinks

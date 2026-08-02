@@ -4,12 +4,12 @@ Build tabbed and split-pane terminal workspaces above `TerminalView`.
 
 ## Overview
 
-`SwiftTUITerminalWorkspace` is the first-party workspace layer for apps that
-need retained terminal sessions, tabs, split panes, directional focus, pane
+`SwiftTUITerminalWorkspace` is the first-party workspace layer. It provides
+retained terminal sessions, tabs, split panes, directional focus, pane
 commands, zoom, and serializable layout metadata.
 
-Use this product when an app needs a multiplexer-like surface. Use
-`SwiftTUITerminal` directly for a single embedded terminal pane.
+For a multiplexer-like surface, use this product. For one embedded terminal
+pane, use `SwiftTUITerminal` directly.
 
 ## Topics
 

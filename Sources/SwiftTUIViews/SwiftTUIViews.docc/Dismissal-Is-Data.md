@@ -29,8 +29,8 @@ struct InspectorHost: View {
 ```
 
 Escape, a built-in close action, or an application write of `false` all clear
-the binding. The optional `onDismiss` callback observes the resulting teardown;
-it is not the command that performs dismissal.
+the binding. The optional `onDismiss` callback observes the resulting teardown.
+It is not the command that performs dismissal.
 
 ## Present an identifiable item
 
@@ -71,12 +71,12 @@ border, or implicit close button.
 
 When multiple presentation sources are active, SwiftTUI preserves each
 source's own binding, mounted state, tasks, and dismissal callback. Sheets,
-full-screen covers, popovers, and menus remain mounted as separate surfaces;
+full-screen covers, popovers, and menus remain mounted as separate surfaces.
 the most recently activated surface is drawn above earlier surfaces.
 
 Alerts and confirmation dialogs instead form first-in, first-out queues. Only
 the oldest active prompt is visible. A waiting prompt's source remains active,
-and its content mounts when every earlier prompt has been dismissed. Escape
+and its content mounts after the runtime dismisses each earlier prompt. Escape
 dismisses the most recently activated *visible* presentation across families,
 so a queued prompt cannot intercept dismissal from a visible surface.
 

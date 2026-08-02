@@ -85,10 +85,10 @@ public indirect enum DrawCommand: Equatable, Sendable {
   case rule(bounds: CellRect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
   /// A layout-reserved border drawn by the rasterizer into the cells
   /// that `LayoutBehavior.border(...)`
-  /// reserved during layout.  The outer `bounds` is the full wrapper
-  /// frame, including the reserved border rows/cols — the rasterizer
-  /// inset this by the border set's per-side display widths to compute
-  /// the interior (content) region that the border surrounds.
+  /// reserved during layout. The outer `bounds` is the full wrapper frame.
+  /// It includes the reserved border rows and columns.
+  /// The rasterizer applies the display width for each border side as an inset.
+  /// This calculation gives the interior region that the border surrounds.
   ///
   /// When `blend` is non-nil the rasterizer ignores the per-side
   /// `foreground` and instead samples a color for every perimeter cell
@@ -104,11 +104,11 @@ public indirect enum DrawCommand: Equatable, Sendable {
     blendPhase: Double,
     sides: Edge.Set
   )
-  /// A `Canvas` view's draw payload + the cell bounds the rasterizer
-  /// should size a `CanvasGrid` buffer to before invoking the user's
-  /// `CanvasDrawing.draw(into:)`. The rasterizer resolves the
-  /// `foregroundStyle` to a concrete `Color` at paint time and
-  /// passes it to the `CanvasContext` as its initial foreground.
+  /// The draw payload and cell bounds for a `Canvas` view.
+  /// The rasterizer uses the cell bounds to set the size of a `CanvasGrid` buffer.
+  /// Then it calls the user implementation of `CanvasDrawing.draw(into:)`.
+  /// At paint time, the rasterizer resolves `foregroundStyle` to a concrete `Color`.
+  /// It passes this color to `CanvasContext` as the initial foreground.
   case canvas(
     bounds: CellRect,
     payload: CanvasPayload,

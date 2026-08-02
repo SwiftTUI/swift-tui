@@ -1,8 +1,8 @@
-/// A registered file-drop handler. Returning `true` marks the drop
-/// consumed; returning `false` bubbles to the next outer scope on the
-/// focus chain. The final outer scope that returns `false` yields
-/// overall consumption=false, and the runtime falls back to re-emitting
-/// the paste as ordinary characters.
+/// A registered file-drop handler.
+/// A return value of `true` marks the drop as consumed.
+/// A return value of `false` sends the drop to the next outer scope on the focus chain.
+/// If the final outer scope returns `false`, the overall consumption value is `false`.
+/// Then the runtime emits the paste as ordinary characters.
 public struct DropContext: Equatable, Sendable {
   public var location: Point?
   public var pointer: PointerLocation?

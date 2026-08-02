@@ -1,7 +1,7 @@
 # Accessibility
 
 SwiftTUI builds accessibility into the render pipeline rather than bolting it
-on. Every frame produces one semantic snapshot; five different consumers
+on. Every frame produces one semantic snapshot. Five different consumers
 present it. This document describes the substrate and those consumers.
 
 ## The semantic substrate
@@ -22,15 +22,15 @@ whose `accessibilityNodes` is a flat array of `AccessibilityNode` values.
 An `AccessibilityNode` carries: `identity`, `parentIdentity` (parent links are
 stored, so the array reconstructs a tree), `rect`, `role`, `label`, `hint`,
 `hidden`, `liveRegion`, and `cursorAnchor`. It deliberately does **not** bake in
-focus state — consumers cross-reference live focus from `FocusTracker` when
-they present, so one snapshot stays valid regardless of focus movement.
+focus state. Consumers cross-reference live focus from `FocusTracker` during
+presentation. Thus, one snapshot stays valid when focus moves.
 
 `AccessibilityRole` is an open-ended enum covering controls and structures
 (button, link, text field, toggle, slider, tab, table, heading, and many more).
 `AccessibilityPoliteness` has `.off`, `.polite`, and `.assertive`.
 `AccessibilityAnnouncer.announce(_:politeness:)` lets app code push an
-announcement to whatever accessibility target the active runtime exposes; calls
-made outside a running runtime are silently ignored.
+announcement to the accessibility target of the active runtime. The runtime
+ignores calls that occur outside a running runtime.
 
 ## One snapshot, five consumers
 
@@ -63,7 +63,7 @@ flowchart TD
    browser, the canvas is `aria-hidden` and a sibling DOM tree is populated
    from that JSON so assistive technology reads the ARIA tree.
 4. **SwiftUI host.** `HostedAccessibilityOverlay` mounts a zero-size native
-   accessibility overlay over the raster surface; each `AccessibilityNode`
+   accessibility overlay over the raster surface. Each `AccessibilityNode`
    becomes a native element with role-derived traits. Runtime focus is pushed
    to VoiceOver (the overlay's focused element follows the runtime).
 5. **Android host.** `SwiftTUIAndroidHost` serializes accessibility nodes and

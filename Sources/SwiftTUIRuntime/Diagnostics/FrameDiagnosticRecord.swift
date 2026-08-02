@@ -138,8 +138,8 @@ public struct FrameDiagnosticRecord: Sendable {
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
   /// Whether this frame was elided (skipped) because all drawn identities
-  /// were off-screen. Defaults to `false`; set to `true` by the run loop
-  /// when off-screen frame elision fires (wired in a later task).
+  /// were off-screen. The default is `false`.
+  /// The run loop sets it to `true` after off-screen frame elision occurs.
   public var elided: Bool
   public var elidedHeadTotalDuration: Duration?
   public var elidedGraphCheckpointCreateDuration: Duration?

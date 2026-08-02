@@ -12,15 +12,14 @@ import SwiftTUIWebHostCLI
 ///
 /// `SwiftTUI.App` refines the platform-neutral `SwiftTUIRuntime.App` with the
 /// command surface that the convenience product already exports. Import
-/// `SwiftTUIRuntime` directly when a host-managed app should stay independent
-/// from command-line parsing.
+/// A host-managed app can import `SwiftTUIRuntime` directly to remain independent of command-line parsing.
 @MainActor
 public protocol App: SwiftTUIRuntime.App, SwiftTUICommand {}
 
 extension App {
   /// Source-compatible default for plain apps that do not declare command
   /// options. Apps with app-specific `@Option`, `@Flag`, or `@Argument`
-  /// properties should declare a stored `@OptionGroup var swiftTUIOptions`.
+  /// properties must declare a stored `@OptionGroup var swiftTUIOptions`.
   public var swiftTUIOptions: SwiftTUIOptions {
     SwiftTUIOptions()
   }
@@ -59,20 +58,20 @@ extension App {
   ///
   /// `App` refines `SwiftTUICommand` → `AsyncParsableCommand`, whose entry
   /// point is `static func main() async` — bound correctly by `@main`. A bare
-  /// top-level `MyApp.main()` (the muscle-memory from synchronous
-  /// `SwiftUI.App.main()`), or `await MyApp.main()`, instead resolves to
-  /// swift-argument-parser's *synchronous* `ParsableCommand.main()` overload,
-  /// which never starts the runtime: in DEBUG it aborts with a misleading
-  /// "asynchronous root command needs availability annotation" message, and in
-  /// release the guard is compiled out, so it silently parses-as-root and
-  /// prints the usage screen.
+  /// A top-level `MyApp.main()` call can come from experience with the synchronous `SwiftUI.App.main()`.
+  /// An `await MyApp.main()` call has the same result.
+  /// Both calls resolve to the synchronous `ParsableCommand.main()` overload in swift-argument-parser.
+  /// This overload does not start the runtime.
+  /// In DEBUG, it stops with the misleading "asynchronous root command needs availability annotation" message.
+  /// In release builds, the guard does not exist.
+  /// Then the overload parses the app as the root command and prints the usage screen.
   ///
   /// This overload, co-located with the async `main()` above, shadows that
-  /// path. It is the most-derived *synchronous* `main()`, so a bare call
-  /// selects it and gets a single loud, accurate failure in DEBUG and release
-  /// alike, while its `-> Never` return keeps it invisible to `@main` synthesis
-  /// (`() -> Never` is not a valid `@main` entry-point signature). `@main` apps
-  /// still bind the async entry point with no ambiguity.
+  /// path. It is the most-derived synchronous `main()`, so a call selects it.
+  /// The result is one clear failure in DEBUG and release builds.
+  /// Its `-> Never` return keeps it invisible to `@main` synthesis.
+  /// A `() -> Never` function is not a valid `@main` entry-point signature.
+  /// Thus, an `@main` app binds the asynchronous entry point without ambiguity.
   public static func main() -> Never {
     failSynchronousLaunch(commandType: self)
   }

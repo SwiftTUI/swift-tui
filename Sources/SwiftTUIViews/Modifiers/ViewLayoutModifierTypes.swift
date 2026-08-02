@@ -151,9 +151,9 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
   }
 }
 
-/// Wrapper that installs a `LayoutBehavior.border` on its child so the
-/// layout engine reserves frame space for the border glyphs and the
-/// rasterizer paints them into the reserved cells.
+/// A wrapper that installs a `LayoutBehavior.border` on its child.
+/// The layout engine reserves frame space for the border glyphs.
+/// The rasterizer paints the glyphs into the reserved cells.
 public struct BorderModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var set: BorderSet
   package var placement: StrokeStyle.Placement

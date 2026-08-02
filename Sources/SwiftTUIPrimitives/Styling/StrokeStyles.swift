@@ -1,10 +1,10 @@
-/// Stroke settings used when drawing outlines and rules.
+/// The stroke configuration for outlines and rules.
 ///
 /// `StrokeStyle` pairs:
 /// - a numeric `lineWidth` (currently always 1, reserved for future use)
-/// - a ``BorderSet`` (the glyph palette; see ``BorderSet`` for details)
+/// - a ``BorderSet`` (the glyph palette. See ``BorderSet`` for details.)
 /// - a ``Placement`` (`.outset` reserves a cell on each side for the
-///   border to live in; `.inset` draws the border into the outermost
+///   border. `.inset` draws the border into the outermost
 ///   cells of the content frame).
 ///
 /// The default (``init(lineWidth:borderSet:placement:)`` with no
@@ -14,8 +14,8 @@
 /// For a single-line look matching pre-2026-04 framework defaults,
 /// pass `borderSet: .single` explicitly. For the half-block look
 /// matching the previous framework default, pass
-/// `borderSet: .outerHalfBlock` - there is no
-/// implicit upgrade; what you ask for is what you get drawn.
+/// `borderSet: .outerHalfBlock`. No implicit upgrade occurs.
+/// The renderer draws the specified border set.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
   public var borderSet: BorderSet

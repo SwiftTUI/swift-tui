@@ -17,16 +17,16 @@ public struct CellPoint: Equatable, Hashable, Sendable {
 
 /// An integer coordinate in a canvas's grid-sample space.
 ///
-/// A `Canvas` is sized in terminal cells, but its ``CanvasGrid`` subdivides
-/// each cell into a fixed number of drawing samples (for example, 2×4 for
-/// Braille). `GridSample` addresses one of those sub-cell samples directly.
+/// A `Canvas` is sized in terminal cells.
+/// Its ``CanvasGrid`` divides each cell into a fixed number of drawing samples.
+/// Braille uses 2×4 samples, for example. `GridSample` directly addresses one of those subcell samples.
 ///
 /// `GridSample` is intentionally distinct from ``CellPoint``: both carry an
 /// integer `x`/`y`, but they live in different coordinate spaces. A
-/// `GridSample` of `(1, 1)` is a single Braille dot, while a ``CellPoint`` of
-/// `(1, 1)` is a whole terminal cell (a 2×4 block of samples). Keeping them as
-/// separate types lets the compiler catch coordinate-space mix-ups that loose
-/// integers would silently allow. Map a continuous ``Point`` to the sample
+/// `GridSample` of `(1, 1)` is a single Braille dot.
+/// A ``CellPoint`` of `(1, 1)` is a whole terminal cell (a 2×4 block of samples). Keeping them as
+/// separate types lets the compiler detect coordinate-space errors that loose
+/// integers do not detect. Map a continuous ``Point`` to the sample
 /// containing it with ``CanvasContext/gridSample(for:)-(Point)``.
 public struct GridSample: Equatable, Hashable, Sendable {
   public var x: Int

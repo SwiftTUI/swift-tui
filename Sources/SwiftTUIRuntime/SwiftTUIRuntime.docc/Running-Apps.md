@@ -11,11 +11,13 @@ Choose the level that matches your app:
 - use ``SceneManifest`` and ``HostedSceneSession`` when you want a host product
   to retain scenes on top of the shared runtime
 
-`App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting snapshot or runtime object to whichever layer you need next.
+`App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct
+app values on the main actor. Evaluate fresh `View` trees there. Then give the
+resulting snapshot or runtime object to the next layer.
 
 ## `DefaultRenderer`
 
-`DefaultRenderer` is the simplest way to turn a `View` into inspectable output from the main actor.
+`DefaultRenderer` turns a `View` into inspectable output from the main actor.
 
 It gives you:
 
@@ -24,13 +26,13 @@ It gives you:
 - diagnostics about computed versus reused work, worker timing, and main-actor
   blocked versus suspended render time
 
-That makes it useful for snapshot tests, previews, and deep debugging.
+Use it for snapshot tests, previews, and debugging.
 
 When there is no invalidating runtime graph, `DefaultRenderer` keeps snapshot
-tests ergonomic: reusing the same stateful view instance can carry imperative
-writes into later snapshots of that instance. In an interactive ``RunLoop``
-session, the same callback paths are scoped to the view graph that registered
-them so reused view values do not leak state across live sessions.
+tests convenient. The same stateful view instance can carry imperative writes
+into its later snapshots. In an interactive ``RunLoop`` session, the view graph
+that registered the callback owns its paths. Thus, reused view values do not
+leak state across live sessions.
 
 ## `RunLoop`
 
@@ -44,7 +46,8 @@ them so reused view values do not leak state across live sessions.
 - lifecycle staging
 - task reconciliation
 
-Use it when your app wants explicit control over state containers, focus trackers, and rendered frames.
+Use it when your app needs explicit control over state containers, focus
+trackers, and rendered frames.
 
 When frame diagnostics are installed, `RunLoop` writes one tab-separated row per
 presented frame. The timing columns include pipeline phase timings, worker
@@ -63,7 +66,7 @@ The same authored `App` and `Scene` declarations feed every integration in the
 canonical [host matrix](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
 That owner
 records the execution modes, packaging boundaries, and per-host engine
-profiles; this article focuses on the shared runtime entry points.
+profiles. This article describes the shared runtime entry points.
 
 `SwiftTUIRuntime` owns scene declarations, manifests, and hosted-session APIs.
 It does not pull in runner products on its own.
@@ -78,9 +81,9 @@ localhost WebHost when `--web` is present.
 `AsyncParsableCommand`, `App.main()` is `async` and only `@main` binds it
 correctly. A bare top-level `MyApp.main()` (or `await MyApp.main()`) instead
 selects swift-argument-parser's synchronous `ParsableCommand.main()` overload
-and never starts the runtime; SwiftTUI rejects that path with a precise
-diagnostic in DEBUG and release alike rather than failing silently. Mark the
-app type `@main` and do not add an explicit `main()` call.
+and never starts the runtime. SwiftTUI rejects that path with a precise
+diagnostic in DEBUG and release builds. Mark the app type `@main`. Do not add
+an explicit `main()` call.
 
 When you need a terminal-only explicit launcher, compose `SwiftTUIRuntime` with
 `SwiftTUICLI` and call:
@@ -94,9 +97,9 @@ For WASI apps, import `SwiftTUIWASI` and either rely on its default
 
 ### Host products
 
-For host-managed embedding, keep the authored `App` in `SwiftTUIRuntime`, then
-let a host product build `SceneManifest` values, retain one or more
-`HostedSceneSession` values, and provide explicit presentation surfaces such as
+For host-managed embedding, keep the authored `App` in `SwiftTUIRuntime`. Let a
+host product build `SceneManifest` values and retain one or more
+`HostedSceneSession` values. Provide explicit presentation surfaces such as
 `HostedRasterSurface`. Hosted raster surfaces deliver ``SemanticHostFrame``
 values so host shells receive producer sequence, raster output, semantics,
 focus, and raster damage as one committed frame.
@@ -104,13 +107,13 @@ focus, and raster damage as one committed frame.
 The in-package `SwiftTUIAndroidHost` product uses this path for Android
 embedding. The external
 [`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses it
-to embed SwiftTUI scenes inside a SwiftUI app, while `@swifttui/web` consumes
-the same authored scene model on top of a `SwiftTUIWASI` build.
+to embed SwiftTUI scenes inside a SwiftUI app. The `@swifttui/web` product
+consumes the same authored scene model on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`
 provides `WebHostCLIRunner` for binaries that support both terminal-native and
-`--web` launch. `SwiftTUI` includes that combined runner by default; import
+`--web` launch. `SwiftTUI` includes that combined runner by default. Import
 `SwiftTUIWebHostCLI` directly only for a narrower graph.
 
 ## See Also

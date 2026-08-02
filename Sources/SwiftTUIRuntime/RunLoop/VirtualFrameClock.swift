@@ -2,18 +2,20 @@ import SwiftTUICore
 
 /// A steppable stand-in for the run loop's frame clock.
 ///
-/// Install with `runLoop.frameClock = { [clock] in clock.now }` and step `now`
-/// by hand: deadline-driven work (animation ticks, scroll-momentum decay) then
-/// advances in virtual time with no sleeps and no async loop, and latency
-/// arithmetic becomes exact instead of racing the wall clock.
+/// Install the clock with `runLoop.frameClock = { [clock] in clock.now }`.
+/// Then step `now` manually.
+/// Deadline-driven work (animation ticks and scroll-momentum decay) advances in virtual time.
+/// This work uses no sleeps or asynchronous loop.
+/// Thus, latency arithmetic is exact and does not race the wall clock.
 ///
-/// Only the *frame* clock is virtualized. Real-time waiting — the event pump's
-/// sleeps, `waitForPendingFrame`, and pointer-event stamping — deliberately
-/// keeps the wall clock, because those are about the real world rather than
-/// about the frame in hand; see the `frameClock` documentation on `RunLoop`.
+/// Only the *frame* clock is virtual.
+/// Real-time waits continue to use the wall clock.
+/// These waits include event-pump sleeps, `waitForPendingFrame`, and pointer-event timestamps.
+/// They describe the real world, not the current frame.
+/// See the `frameClock` documentation on `RunLoop`.
 ///
-/// Perf scenarios deliberately do **not** use this: they measure wall-clock
-/// cost on a quiet machine, and a virtual clock would measure nothing.
+/// Performance scenarios do **not** use this clock.
+/// They measure wall-clock cost on a quiet machine, and a virtual clock measures nothing.
 @MainActor
 @_spi(Runners) public final class VirtualFrameClock {
   @_spi(Runners) public var now: MonotonicInstant

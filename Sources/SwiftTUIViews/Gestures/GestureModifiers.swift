@@ -142,8 +142,8 @@ extension Gesture {
 /// on gesture termination.
 ///
 /// > Warning: The `inout Transaction` parameter passed to the updater
-/// > closure is currently a no-op stand-in; mutations to the transaction
-/// > are silently discarded. See `Gesture.updating(_:body:)` documentation
+/// > closure is currently a no-op stand-in. The function discards changes to the transaction.
+/// > See `Gesture.updating(_:body:)` documentation
 /// > for details and tracking information.
 public struct GestureStateGesture<Child: Gesture, State>: Gesture {
   public typealias Value = Child.Value
@@ -199,11 +199,11 @@ extension Gesture {
   /// > no-op stand-in. SwiftUI threads the frame's active transaction
   /// > (from `withAnimation` or the frame scheduler) here so authors
   /// > can inspect or mutate animation semantics. SwiftTUI does
-  /// > not yet plumb this through; mutations to the transaction
-  /// > inside the closure are silently discarded.
+  /// > does not yet provide this transaction. The function discards changes to the transaction
+  /// > inside the closure.
   ///
-  /// Full transaction threading is a deferred enhancement; mutations to
-  /// the transaction inside the closure are currently silently discarded.
+  /// Full transaction threading is a future enhancement.
+  /// The function currently discards changes to the transaction inside the closure.
   public func updating<State>(
     _ state: GestureStateBinding<State>,
     body: @escaping @MainActor (Value, inout State, inout Transaction) -> Void

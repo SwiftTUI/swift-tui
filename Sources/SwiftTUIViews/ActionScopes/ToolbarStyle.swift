@@ -26,7 +26,7 @@ public enum ToolbarPlacement: Sendable {
 /// Implementations control the layout of toolbar items (horizontal,
 /// wrapped, top vs. bottom placement) via the framework's existing
 /// `Layout` protocol. The strip runs `itemLayout` to arrange the
-/// toolbar items; the host composes the strip above or below its
+/// toolbar items. The host composes the strip above or below its
 /// content per `placement`.
 public protocol ToolbarStyle: Sendable {
   associatedtype ItemLayout: Layout

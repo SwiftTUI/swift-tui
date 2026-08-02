@@ -18,8 +18,8 @@ Use it when you want to:
   presentation-boundary terminal sanitization
 
 `SwiftTUIRuntime` re-exports `SwiftTUIViews` and `SwiftTUICore`. Import it for
-shared view packages, explicit host composition, or custom launchers that should
-not inherit the batteries-included convenience product.
+shared view packages, explicit host composition, or custom launchers. These
+users do not inherit the batteries-included convenience product.
 
 ## Runtime Story
 

@@ -9,7 +9,7 @@ Conform to ``Shape`` by implementing **either** ``Shape/path(in:)`` (SwiftUI-sty
 return the outline for the proposed rect) **or** ``Shape/geometry`` (one of the
 analytic primitive cases). The two are bridged automatically, so a custom shape
 usually implements only `path(in:)`. SwiftTUI ships the primitives
-``Rectangle``, ``RoundedRectangle``, ``Circle``, ``Ellipse``, and ``Capsule``;
+``Rectangle``, ``RoundedRectangle``, ``Circle``, ``Ellipse``, and ``Capsule``.
 ``Circle``, ``Ellipse``, and ``Capsule`` are aspect-corrected so they read true
 on any terminal cell ratio (see <doc:AspectCorrectShapes>).
 
@@ -33,10 +33,10 @@ RoundedRectangle(cornerRadius: 1)
   .strokeBorder()                            // inset ring, inherited foreground
 ```
 
-`fill`, `stroke`, and `strokeBorder` each come in two families: one taking an
-explicit `ShapeStyle` and one with no style that resolves through
-the inherited `foregroundStyle` (and ultimately a semantic role) — the same way
-a bare `Circle()` fills with the foreground. `strokeBorder` is available on
+`fill`, `stroke`, and `strokeBorder` each come in two families. One family takes
+an explicit `ShapeStyle`. The other has no style and resolves through the
+inherited `foregroundStyle` (and ultimately a semantic role). A bare `Circle()`
+also fills with the foreground. `strokeBorder` is available on
 ``InsettableShape`` only, because it insets before stroking so the ring stays
 inside the frame.
 
@@ -49,7 +49,7 @@ Build a `Path` from lines and Bézier curves (`move(to:)`,
 polylines and filled with a winding rule (`FillRule` — `.nonZero`
 by default, `.evenOdd` available). A custom shape composes with the full
 modifier algebra (`fill` / `stroke` / `strokeBorder` / `foregroundStyle` /
-`inset(by:)`), and a custom-path `strokeBorder` clips a background to the shape's
+`inset(by:)`). A custom-path `strokeBorder` clips a background to the shape's
 interior the same way a rounded-rectangle border does.
 
 Two properties to keep in mind, both consequences of the cell grid:
@@ -61,7 +61,7 @@ Two properties to keep in mind, both consequences of the cell grid:
   Draw the proportions you want relative to the proposed rect.
 - **Sub-cell-quantized, not analytic-bit-exact.** Custom paths rasterize to the
   2×4 Braille subpixel grid with one foreground color per cell. The five
-  primitives carry exact, fixture-pinned output; arbitrary paths do not — their
+  primitives carry exact, fixture-pinned output. Arbitrary paths do not. Their
   edges are quantized to subpixels and cannot blend color across a cell.
 
 ## Differences from SwiftUI
@@ -72,15 +72,15 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 
 - **No `trim(from:to:)`, `offset`, `rotation`, `scale`, or `transform`.** These
   are path/vector transforms with no faithful meaning over discrete cells.
-- **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide;
+- **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide.
   `StrokeStyle` carries `lineWidth` only as a reserved field.
   Stroke weight is expressed through the glyph palette (`borderSet`: `.single`,
   `.heavy`, `.double`, …) instead.
-- **No `addArc` (yet).** Arc construction needs an angle type; it is a planned
+- **No `addArc` (yet).** Arc construction needs an angle type. It is a planned
   follow-on. Use `addQuadCurve`/`addCurve`, or `Path(ellipseIn:)`.
 - **No general `clipShape(_:)` to an arbitrary path.** Masking is available at
   the border level (a custom-path `strokeBorder` clips its background to the
-  interior); a general path clip is a planned follow-on.
+  interior). A general path clip is a planned follow-on.
 - **No animatable path morphing.** Parameterized shapes animate via their own
   animatable parameters, not by interpolating dissimilar paths.
 

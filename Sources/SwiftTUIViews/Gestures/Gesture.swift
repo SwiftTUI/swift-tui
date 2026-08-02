@@ -3,8 +3,8 @@ public import SwiftTUICore
 /// An input handler that produces values of `Value` over time.
 ///
 /// Conforms to SwiftUI's `Gesture` protocol shape: primitives declare
-/// `typealias Body = Never` and implement `_makeRecognizer(context:)`;
-/// composed gestures (combinators and `.onEnded`/`.updating` modifiers)
+/// `typealias Body = Never` and implement `_makeRecognizer(context:)`.
+/// Composed gestures (combinators and `.onEnded`/`.updating` modifiers)
 /// have a body expressed in terms of other gestures.
 @MainActor
 public protocol Gesture<Value> {

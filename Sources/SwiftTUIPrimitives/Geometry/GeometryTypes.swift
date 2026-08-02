@@ -145,13 +145,12 @@ public struct EdgeInsets: Equatable, Sendable {
 /// A normalized point in a shape's bounds where `(0, 0)` is the
 /// top-leading corner and `(1, 1)` is the bottom-trailing corner.
 ///
-/// Used by gradient start/end points where interpolation requires
-/// continuous unit coordinates — ``Alignment`` identifies named
-/// layout slots via `AlignmentID`-keyed guides, while ``UnitPoint``
-/// is a concrete `(x, y)` pair that can be interpolated element-wise
-/// by the animation pipeline.  The named static constants
-/// (``topLeading``, ``center``, etc.) mirror ``Alignment``'s named
-/// constants so most gradient call sites compile unchanged.
+/// Gradient start and end points use this type for continuous unit coordinates.
+/// ``Alignment`` identifies named layout slots through `AlignmentID`-keyed guides.
+/// ``UnitPoint`` is a concrete `(x, y)` pair.
+/// The animation pipeline can interpolate each element of the pair. The named static constants, such as
+/// ``topLeading`` and ``center``, mirror the named ``Alignment`` constants.
+/// Thus, most gradient call sites compile without changes.
 public struct UnitPoint: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double

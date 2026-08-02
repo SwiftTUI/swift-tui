@@ -3,13 +3,15 @@ public import ArgumentParser
 // Verb dispatch for a root command that also declares a positional argument.
 //
 // swift-argument-parser's `descendingParse` parses the *current* command's
-// arguments and only then looks for a subcommand, so a leading bare value binds
-// to the root's positional and the parser never descends: `myapp info x.gif`
-// means "open the file named `info`". `SwiftTUICommand` has always worked around
-// this for one verb, by matching `completions` against the raw arguments inside
-// `parseSwiftTUIRootCommand`. This file generalizes that move to a conformer's
-// own verbs, and carries the attribution a dispatched verb needs so its usage
-// text survives the trip back to a launch site's `exit(withError:)`.
+// arguments first. It then looks for a subcommand. Thus, a leading bare value
+// binds to the root's positional, and the parser never descends. In
+// `myapp info x.gif`, `info` names the file to open.
+//
+// `SwiftTUICommand` already handles the `completions` verb this way.
+// `parseSwiftTUIRootCommand` matches that verb against the raw arguments. This
+// file extends the approach to a conformer's own verbs. It also carries the
+// attribution needed to preserve usage text through the launch site's
+// `exit(withError:)` call.
 //
 // The protocol requirement itself lives with the protocol, in
 // `SwiftTUICommand.swift`; everything that implements or supports it lives here.
@@ -18,13 +20,14 @@ extension SwiftTUICommand {
   /// Default: claim nothing, so the root command parses `arguments` itself.
   ///
   /// Kept deliberately inert rather than defaulting to
-  /// ``registeredSubcommand(forRawArguments:)``. Raw-verb interception is not
-  /// equivalent to swift-argument-parser's descent: the parser binds the root's
-  /// options greedily across the whole argument list *before* it descends, so
-  /// for an app whose root and subcommand declare the same option name,
-  /// intercepting at `arguments[0]` binds that option to the subcommand where
-  /// the parser bound it to the root. A default-on table would therefore change
-  /// behavior for existing apps; opting in stays a per-app decision.
+  /// ``registeredSubcommand(forRawArguments:)``.
+  /// Raw-verb interception is different from the descent of swift-argument-parser.
+  /// The parser binds the root options across the full argument list before it descends.
+  /// An app can declare the same option name for its root and subcommand.
+  /// In that case, interception at `arguments[0]` binds the option to the subcommand.
+  /// The parser binds the option to the root.
+  /// Thus, a default-on table changes the behavior of existing apps.
+  /// Each app must explicitly select interception.
   public nonisolated static func swiftTUIRootSubcommand(
     forRawArguments arguments: [String]
   ) throws -> (any ParsableCommand)? {
@@ -43,28 +46,30 @@ extension SwiftTUICommand {
   /// }
   /// ```
   ///
-  /// Matches against ``configuration``'s `subcommands`, comparing each
-  /// candidate's command name and its declared aliases. `CompletionsCommand` is
+  /// Matches the `subcommands` in ``configuration``.
+  /// It compares the command name and declared aliases of each candidate.
+  /// `CompletionsCommand` is
   /// excluded, because the framework resolves that verb before the hook runs.
   ///
-  /// Returns `nil` — leaving the arguments to the root command — when
-  /// `arguments` is empty, when its first element is empty or begins with `-`,
-  /// or when no registered subcommand matches. The leading-`-` rule is what
+  /// Returns `nil` when `arguments` is empty.
+  /// It also returns `nil` when the first element is empty or begins with `-`.
+  /// It returns `nil` when no registered subcommand matches.
+  /// In these cases, the root command receives the arguments.
+  /// The leading-`-` rule
   /// makes `--help`, `--version`, and the `--` terminator fall through by
   /// construction rather than by luck.
   ///
-  /// Only `arguments.first` is examined: a verb behind a root flag
-  /// (`myapp --json info x`) is *not* claimed. Keeping interception strictly
-  /// narrower than the parser's own descent is what bounds the set of apps
-  /// whose option binding could change.
+  /// The function examines only `arguments.first`.
+  /// It does *not* claim a verb behind a root flag (`myapp --json info x`).
+  /// This narrow interception limits the apps whose option binding can change.
   ///
-  /// A verb always beats a file of the same name. `myapp info` runs the `info`
-  /// verb even when a file named `info` exists in the working directory, and no
-  /// filesystem probe is performed — a command line whose meaning depends on
-  /// the contents of the current directory is neither reproducible nor
-  /// testable, and `git`, `docker`, and `swift` all resolve it this way. To
-  /// name such a file, qualify it (`myapp ./info`) or push it past the argument
-  /// terminator (`myapp -- info`).
+  /// A verb always takes precedence over a file of the same name.
+  /// `myapp info` runs the `info` verb when the working directory contains a file named `info`.
+  /// The function does not examine the file system.
+  /// Thus, directory contents cannot change the meaning of the command line.
+  /// The `git`, `docker`, and `swift` tools resolve this case in the same way.
+  /// To name the file, qualify it as `myapp ./info`.
+  /// You can also put it after the argument terminator as `myapp -- info`.
   ///
   /// - Throws: The dispatched command's own parse error, wrapped so that a
   ///   launch site can attribute usage text to the verb. See
@@ -108,30 +113,30 @@ package func runDispatchedRootSubcommand(
 }
 
 /// A failure while parsing a verb claimed by
-/// ``SwiftTUICommand/swiftTUIRootSubcommand(forRawArguments:)``, carrying the
-/// verb's type so a launch site can render usage for the verb rather than for
-/// the root command.
+/// ``SwiftTUICommand/swiftTUIRootSubcommand(forRawArguments:)``.
+/// It carries the verb's type. Thus, a launch site can render usage for the verb
+/// instead of the root command.
 ///
 /// This exists because one attribution case cannot be recovered downstream.
-/// swift-argument-parser normally attaches the command stack to the error it
-/// throws, and `MessageInfo` prefers that stack over the type it is handed — so
-/// `myapp info --help` and `myapp info --bogus` print `info`'s help without any
-/// help from us. But when the dispatched verb receives *no* further arguments,
-/// `CommandParser.parse` rewraps the failure as `ParserError.noArguments`, and
-/// the renderer special-cases that by ignoring the stack and generating help
-/// for `type.asCommand` instead. `myapp info` (with `<file>` missing) would
-/// therefore print the root's usage under the verb's error message.
+/// The swift-argument-parser library normally attaches the command stack to its error.
+/// `MessageInfo` prefers that stack over the type it receives.
+/// Thus, `myapp info --help` and `myapp info --bogus` print the help for `info`
+/// without help from us. A different path applies when the dispatched verb has
+/// no further arguments. `CommandParser.parse` rewraps that failure as
+/// `ParserError.noArguments`. The renderer ignores the stack for this error and
+/// generates help for `type.asCommand`. Thus, `myapp info` with a missing
+/// `<file>` would print the root usage under the verb error.
 ///
-/// Rather than have every launch site re-derive the verb from raw arguments —
-/// which cannot tell a claimed verb from a positional that merely looks like
-/// one — the claim carries its own attribution back out.
+/// A launch site must not re-derive the verb from raw arguments. Raw arguments
+/// cannot distinguish a claimed verb from a similar positional argument. The
+/// claim therefore carries its attribution back out.
 ///
 /// Deliberately not public: launch sites resolve it through
 /// ``exitAttributingDispatchedSubcommand(_:dispatchedCommandType:root:)``, and
 /// consumers neither construct nor catch it. `description` renders the fully
-/// attributed message so that a consumer who hand-rolls a launch sequence and
-/// passes this straight to `exit(withError:)` still gets readable, correctly
-/// attributed output rather than a struct dump.
+/// attributed message. A consumer can create a custom launch sequence and pass
+/// this error directly to `exit(withError:)`. The result is readable, correctly
+/// attributed output instead of a struct dump.
 package struct DispatchedSubcommandError: Error, CustomStringConvertible {
   package let subcommandType: any ParsableCommand.Type
   package let underlying: any Error
@@ -156,10 +161,10 @@ package struct DispatchedSubcommandError: Error, CustomStringConvertible {
 ///      which carries no command stack of its own.
 ///   3. Otherwise the failure is the root command's.
 ///
-/// Errors that already carry a command stack — parse errors, `--help`,
-/// `--version` — are unaffected by which type they are rendered through, since
-/// `MessageInfo` prefers the stack on the error. `ExitCode` is likewise
-/// untouched: it maps to an exact status with no usage text at all.
+/// Some errors already carry a command stack. These include parse errors,
+/// `--help`, and `--version`. The rendered type does not affect them because
+/// `MessageInfo` prefers the stack on the error. `ExitCode` is also unchanged.
+/// It maps to an exact status and has no usage text.
 package func exitAttributingDispatchedSubcommand(
   _ error: any Error,
   dispatchedCommandType: (any ParsableCommand.Type)?,

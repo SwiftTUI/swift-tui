@@ -11,10 +11,10 @@ private struct GestureStateLocation<Value> {
   var resetToSeed: @MainActor () -> Void
 }
 
-/// Storage for a `@GestureState` cell. Structurally mirrors `StateBox`:
-/// a slot-ordinal-keyed store with a seed, a remembered ViewNode-scoped
-/// or graph-scoped location when bound, and a fallback local value for
-/// out-of-context access (tests, construction-time reads).
+/// Storage for a `@GestureState` cell. Its structure mirrors `StateBox`.
+/// A slot-ordinal-keyed store contains a seed.
+/// It remembers a ViewNode-scoped or graph-scoped location when bound.
+/// A local fallback value supports tests and reads during construction.
 @MainActor
 public final class GestureStateBox<Value> {
   public let slotOrdinal: Int
@@ -179,9 +179,8 @@ public struct GestureStateBinding<Value> {
 /// Structurally parallels `@State`: slot-ordinal storage keyed by
 /// source location, lazy-bound to the current `ViewNode` during body
 /// evaluation so reads/writes participate in the dependency tracker.
-/// Bound locations are graph-scoped for imperative gesture updates so reusing
-/// the same gesture-state box in another live render graph starts from that
-/// graph's own seed and reset lifecycle.
+/// Bound locations are graph-scoped for imperative gesture updates.
+/// Thus, a reused gesture-state box starts from the seed and reset lifecycle of its current render graph.
 @propertyWrapper
 @MainActor
 public struct GestureState<Value> {

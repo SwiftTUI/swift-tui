@@ -10,7 +10,7 @@ package typealias ViewBuilderInput<State: Equatable & Sendable> = (
 package typealias DeferredStateBodyBuilder<State: Equatable & Sendable, Content: View> =
   ScopedMapper<ViewBuilderInput<State>, Content>
 
-/// Handles a key event and may mutate run-loop state.
+/// Handles a key event and can change the run-loop state.
 public typealias StateKeyHandler<State: Equatable & Sendable> =
   (_ keyPress: KeyPress, _ focusedIdentity: Identity?, _ stateContainer: StateContainer<State>) ->
   KeyHandlingResult

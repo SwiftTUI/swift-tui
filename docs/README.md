@@ -1,7 +1,7 @@
 # SwiftTUI Documentation
 
 SwiftTUI is a SwiftUI-shaped UI framework for the terminal, written in Swift.
-You author `View` values the same way you would for SwiftUI; SwiftTUI resolves,
+You author `View` values in the same way as SwiftUI. SwiftTUI resolves,
 lays out, and renders them as terminal text, a browser canvas, or a raster
 surface embedded in a host app.
 
@@ -81,5 +81,5 @@ are not part of this hierarchy:
 - `public_api_overrides.yml` — public-symbol classifications consumed by the API tooling.
 - `PUBLIC_API_BASELINE.md` and `.public-api-baseline.txt` — generated public-symbol baselines.
 
-They are produced and checked by `Scripts/generate_public_api_inventory.sh`. See
+`Scripts/generate_public_api_inventory.sh` produces and compares them. See
 [DEVELOPMENT.md](DEVELOPMENT.md#public-api-baseline).

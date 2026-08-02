@@ -2,16 +2,15 @@
 ///
 /// Conformers implement ``draw(into:)``, which mutates the context's
 /// configurable cell-space drawing grid via the context's public drawing
-/// methods. ``CanvasDrawing`` is the escape hatch sitting alongside the
-/// `Shape` protocol — use it when you need to render something that doesn't
-/// fit the shape fill/stroke algebra (sparklines, plots, hand-drawn meters,
-/// arbitrary curves).
+/// methods. ``CanvasDrawing`` supplies a drawing path in addition to the `Shape` protocol.
+/// Use it for content that does not fit the shape fill and stroke model.
+/// Examples include sparklines, plots, hand-drawn meters, and arbitrary curves.
 ///
-/// Conformance requires both `Sendable` (so drawings can cross
-/// isolation boundaries between the view tree, layout, and rasterizer
-/// passes) and `Equatable` (so two canvas views carrying structurally
-/// identical drawings compare equal in the draw tree and can dedup
-/// across re-renders). Most drawings are small value types where
+/// Conformance requires `Sendable`, so drawings can cross isolation boundaries.
+/// These boundaries occur between the view tree, layout, and rasterizer passes.
+/// Conformance also requires `Equatable`.
+/// Thus, canvas views with structurally identical drawings compare equal in the draw tree.
+/// The renderer can reuse this work across renders. Most drawings are small value types where
 /// `Equatable` is synthesized automatically, for example:
 ///
 /// ```swift
@@ -58,7 +57,7 @@ public struct CanvasCell: Equatable, Sendable {
 ///
 /// Coordinates are in continuous terminal cell space. A line from
 /// `(0, 0)` to `(10, 1.5)` spans ten cells horizontally and one and a half
-/// cells vertically; ``CanvasGrid`` decides how those fractional cell
+/// cells vertically. ``CanvasGrid`` decides how those fractional cell
 /// locations pack back into terminal glyphs. Out-of-range samples are
 /// silently clipped.
 ///
@@ -78,8 +77,8 @@ public struct CanvasContext: Sendable {
   ///
   /// This is ``size`` scaled by the active ``CanvasGrid``'s subdivisions — the
   /// valid range for ``GridSample`` coordinates. Authored drawings normally
-  /// work in continuous cell space (``size`` plus ``Point`` APIs); reach for
-  /// `gridSize` only when addressing individual samples through ``GridSample``.
+  /// work in continuous cell space with ``size`` and the ``Point`` APIs.
+  /// Use `gridSize` only to address individual samples through ``GridSample``.
   public var gridSize: GridSize {
     GridSize(width: gridWidth, height: gridHeight)
   }
@@ -272,8 +271,8 @@ public struct CanvasContext: Sendable {
   /// Grid samples are discrete sub-cell coordinates in the active
   /// ``CanvasGrid`` (for example, the 2×4 Braille dots inside one terminal
   /// cell). This is the escape hatch for drawings that already work in sample
-  /// coordinates; for continuous, resolution-independent drawing prefer
-  /// ``setPixel(at:)`` with a ``Point``. Map a ``Point`` to the sample
+  /// coordinates. For continuous, resolution-independent drawing, use ``setPixel(at:)`` with a ``Point``.
+  /// Map a ``Point`` to the sample
   /// containing it with ``gridSample(for:)-(Point)``.
   public mutating func setSample(_ sample: GridSample) {
     canvas.setPixel(x: sample.x, y: sample.y)

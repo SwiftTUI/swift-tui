@@ -1,6 +1,7 @@
 # ``SwiftTUIViews``
 
-Author terminal interfaces with a SwiftUI-shaped view system, state model, layout contract, and focus environment.
+Author terminal interfaces with a SwiftUI-shaped view system, state model,
+layout contract, and focus environment.
 
 ## Overview
 
@@ -12,25 +13,35 @@ It provides:
 - first-class public modifier algebra through ``ViewModifier``,
   ``View/modifier(_:)``, and ``ModifiedContent``
 - typed builders through ``ViewBuilder``
-- graph-scoped state and data flow through ``State``, ``Binding``, and ``Bindable``
-- environment and focused-value access through ``Environment``, ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
+- graph-scoped state and data flow through ``State``, ``Binding``, and
+  ``Bindable``
+- environment and focused-value access through ``Environment``,
+  ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``,
+  ``FocusedValue``, and ``FocusedBinding``
 - geometry-bound preferences through `Anchor`, `AnchorSource`, and
   ``GeometryProxy``
 - focus coordination through ``FocusState``
-- layout composition through ``Layout``, ``AnyLayout``, the built-in stack layouts,
-  and viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``, including
-  the single-``ForEach`` full-lazy path
+- layout composition through ``Layout``, ``AnyLayout``, and the built-in stack
+  layouts. Viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``
+  support the single-``ForEach`` full-lazy path
 - continuous cell-space gestures and drawing through ``DragGesture``,
   ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
   `CanvasDrawing` / ``CanvasClosureDrawing``
-- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `fullScreenCover`, `popover`, `popoverTip`, `toast`)
-- ASCII-art banner text through ``TextFigure``, backed by embedded FIGlet fonts that participate in normal layout proposals without requiring external font files
+- controls, containers, metrics, and modifiers for most terminal interfaces.
+  These include single-line and multiline text entry, split navigation, tab
+  shells, and terminal-native presentations: `alert`, `confirmationDialog`,
+  `sheet`, `fullScreenCover`, `popover`, `popoverTip`, and `toast`.
+- ASCII-art banner text through ``TextFigure``. Embedded FIGlet fonts support
+  normal layout proposals without external font files.
 
-`SwiftTUIViews` is intentionally close to SwiftUI in shape. The goal is not to expose a terminal-specific DSL. The goal is to preserve the parts of SwiftUI that make large UI codebases composable and predictable while still targeting cell-based rendering.
+`SwiftTUIViews` is intentionally close to SwiftUI in shape. It does not expose
+a terminal-specific DSL. It preserves the SwiftUI parts that keep large UI
+codebases composable and predictable. It targets cell-based rendering.
 
 ## Authoring Model
 
-Views are resolved into a strict downstream pipeline, but authors do not work with render nodes directly. You declare structure and modifiers in terms of views:
+SwiftTUI sends views through a strict downstream pipeline. Authors do not work
+with render nodes directly. You declare structure and modifiers in terms of views:
 
 ```swift
 struct DeployPanel: View {

@@ -68,11 +68,10 @@ extension View {
   /// Positions the center of this view at `(x, y)` in its parent's
   /// coordinate space.
   ///
-  /// Unlike ``offset(x:y:)``, which translates the view without
-  /// affecting parent layout, `.position` wraps the view in a
-  /// container that takes the full proposed space so the parent
-  /// reserves room for the absolute placement area.  Matches
-  /// SwiftUI's `View.position(x:y:)` semantics.
+  /// ``offset(x:y:)`` translates the view without affecting parent layout.
+  /// In contrast, `.position` wraps the view in a container that takes the full proposed space.
+  /// Thus, the parent reserves room for the absolute placement area.
+  /// This behavior matches SwiftUI `View.position(x:y:)`.
   public func position(
     x: Int = 0,
     y: Int = 0
@@ -85,11 +84,10 @@ extension View {
     )
   }
 
-  /// Tags this view with a matched-geometry key so the animation
-  /// controller can recognize it across conditional re-creation
-  /// (e.g. `if`/`else` branches that swap between two layouts)
-  /// and animate the transition as if a single view moved from
-  /// the old location to the new one.
+  /// Tags this view with a matched-geometry key.
+  /// The animation controller uses this key across conditional re-creation.
+  /// For example, `if` and `else` branches can swap between two layouts.
+  /// The controller animates the transition as one view that moves between the locations.
   ///
   /// Matches SwiftUI's `.matchedGeometryEffect(id:in:isSource:)`
   /// API shape.  Scope keys with `@Namespace` or pass a
@@ -97,13 +95,13 @@ extension View {
   ///
   /// `isSource: false` lets you have multiple views with the same
   /// key where only the designated source view contributes its
-  /// geometry as the "from" reference; the non-source instances
+  /// geometry as the "from" reference. The non-source instances
   /// still receive the match and are positioned at the source's
   /// location when they appear.
   ///
   /// - Note: The current implementation interpolates position only,
-  ///   not size.  A view that changes width between its source and
-  ///   destination will appear at its natural destination size
+  ///   not size. A view that changes width between its source and
+  ///   destination appears at its natural destination size
   ///   throughout the animation and translate its origin smoothly.
   public func matchedGeometryEffect<ID: Hashable>(
     id: ID,

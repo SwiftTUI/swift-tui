@@ -13,13 +13,13 @@ public import SwiftTUIRuntime
 /// A SwiftTUI command with framework-managed argument parsing.
 ///
 /// Conformers gain:
-///   - automatic parsing of `CommandLine.arguments` against `SwiftTUIOptions` +
-///     any `@Option`/`@Flag`/`@Argument` they declare;
-///   - env-var honoring via `SwiftTUIOptions.runtimeConfiguration(...)`;
-///   - `--help` with the SWIFTTUI OPTIONS section rendered separately;
-///   - completion-script generation helpers.
 ///
-/// Conformers MUST declare a `swiftTUIOptions` stored property:
+/// - Automatic parsing of `CommandLine.arguments` against `SwiftTUIOptions` and each declared `@Option`, `@Flag`, or `@Argument`.
+/// - Environment-variable support through `SwiftTUIOptions.runtimeConfiguration(...)`.
+/// - A separate SWIFTTUI OPTIONS section in `--help`.
+/// - Helpers that generate completion scripts.
+///
+/// Conformers must declare a stored `swiftTUIOptions` property:
 ///
 /// ```swift
 /// @main
@@ -30,17 +30,17 @@ public import SwiftTUIRuntime
 /// }
 /// ```
 ///
-/// This protocol is intentionally additive to `App`: it owns argument parsing
-/// and runtime-configuration resolution, while runner products such as
-/// `SwiftTUICLI` and `SwiftTUIWebHostCLI` own launch behavior.
+/// This protocol adds argument parsing and runtime-configuration resolution to `App`.
+/// Runner products such as `SwiftTUICLI` and `SwiftTUIWebHostCLI` own the launch behavior.
 @MainActor
 public protocol SwiftTUICommand: AsyncParsableCommand {
-  /// The framework option group. Conformers MUST declare:
+  /// The framework option group. Conformers must declare:
   /// `@OptionGroup public var swiftTUIOptions: SwiftTUIOptions`.
   var swiftTUIOptions: SwiftTUIOptions { get }
 
-  /// Resolves `swiftTUIOptions` + environment into the runtime configuration.
-  /// Override to customize (e.g. force `accessible: true` regardless of flags).
+  /// Resolves `swiftTUIOptions` and the environment into the runtime configuration.
+  /// Override this method to customize the result.
+  /// For example, an override can force `accessible: true` regardless of the flags.
   func runtimeConfiguration(
     environment: [String: String],
     isStdoutTTY: Bool
@@ -49,15 +49,16 @@ public protocol SwiftTUICommand: AsyncParsableCommand {
   /// Claims a subcommand verb from raw arguments, before this root command's
   /// own positional parsing runs.
   ///
-  /// Returns the parsed subcommand to run, or `nil` to parse `arguments` as
-  /// this root command. **The default implementation returns `nil`**, so an app
-  /// that does not implement this behaves exactly as it did before.
+  /// Returns the parsed subcommand to run.
+  /// A `nil` result makes this root command parse `arguments`.
+  /// **The default implementation returns `nil`**.
+  /// Thus, an app that does not implement this method keeps its prior behavior.
   ///
-  /// Implement it when the root command declares an `@Argument` *and*
-  /// registers subcommands. swift-argument-parser parses the current command's
-  /// arguments before it looks for a verb, so a leading bare value binds to the
-  /// root's positional and the parser never descends — `myapp info x.gif` means
-  /// "open the file named `info`". Most apps want the one-line body:
+  /// Implement this method when the root command declares an `@Argument` *and* registers subcommands.
+  /// The swift-argument-parser library parses the current command arguments before it searches for a verb.
+  /// Thus, a leading bare value binds to the root positional argument, and the parser does not descend.
+  /// `myapp info x.gif` means "open the file named `info`".
+  /// Most apps use this one-line body:
   ///
   /// ```swift
   /// nonisolated static func swiftTUIRootSubcommand(
@@ -67,9 +68,9 @@ public protocol SwiftTUICommand: AsyncParsableCommand {
   /// }
   /// ```
   ///
-  /// This routes; it does not register. `--help` and the generated completion
-  /// scripts are both built from ``configuration``, so the verbs must still be
-  /// listed in its `subcommands`.
+  /// This method routes a command. It does not register a command.
+  /// Both `--help` and the generated completion scripts use ``configuration``.
+  /// Thus, its `subcommands` must still list the verbs.
   ///
   /// `completions` is resolved by the framework *before* this is called and
   /// cannot be shadowed, disabled, or forgotten by an implementation.

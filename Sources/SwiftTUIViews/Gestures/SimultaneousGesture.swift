@@ -2,11 +2,11 @@ public import SwiftTUICore
 
 /// A gesture combining two gestures that can recognize at the same time —
 /// SwiftUI's `SimultaneousGesture`. Every event is delivered to both
-/// children; the composite ends when either child ends, and fails only when
+/// children. The composite ends when either child ends. It fails only when
 /// both children have given up.
 public struct SimultaneousGesture<First: Gesture, Second: Gesture>: Gesture {
-  /// The value of a simultaneous gesture: whichever children have
-  /// recognized carry their values; the other side is `nil`.
+  /// The value of a simultaneous gesture.
+  /// A child that recognized the gesture contains its value. The other child contains `nil`.
   public struct Value {
     public var first: First.Value?
     public var second: Second.Value?

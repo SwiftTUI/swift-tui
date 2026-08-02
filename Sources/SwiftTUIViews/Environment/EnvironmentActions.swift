@@ -232,7 +232,7 @@ public enum TerminalHandoffError: Error, Equatable, Sendable, CustomStringConver
   case unavailable
   /// The active terminal session is already running another handoff operation.
   case alreadyInProgress
-  /// SwiftTUI could not reclaim terminal ownership after the operation completed.
+  /// SwiftTUI did not reclaim terminal ownership after the operation completed.
   case failedToRestoreTerminal
 
   public var description: String {
@@ -249,9 +249,10 @@ public enum TerminalHandoffError: Error, Equatable, Sendable, CustomStringConver
 
 /// Temporarily hands the active terminal to an asynchronous external operation.
 ///
-/// The live terminal runtime suspends its input reader, restores cooked mode
-/// and the primary screen, awaits `operation`, then re-enters its presentation
-/// mode and schedules a full redraw. Restoration also runs when `operation`
+/// The live terminal runtime suspends its input reader.
+/// It restores cooked mode and the primary screen, and then waits for `operation`.
+/// Then it starts its presentation mode again and schedules a full redraw.
+/// Restoration also runs when `operation`
 /// throws or cooperatively observes cancellation.
 ///
 /// Read this value through ``EnvironmentValues/terminalHandoff`` when a view
@@ -296,9 +297,9 @@ public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
 
   /// Performs `operation` using the terminal session scoped to the current task.
   ///
-  /// Child tasks inherit the active session. Detached tasks do not; they throw
+  /// Child tasks inherit the active session. Detached tasks do not inherit it. They throw
   /// ``TerminalHandoffError/unavailable`` rather than consulting process-global
-  /// state that could belong to another scene.
+  /// state that can belong to another scene.
   @MainActor
   public static func perform(
     _ operation: @escaping @MainActor @Sendable () async throws -> Void

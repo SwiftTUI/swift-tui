@@ -65,20 +65,19 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
     resolvedNode(in: context)
   }
 
-  /// Attaches a muted, right-aligned shortcut hint that renders inside
-  /// the button's label area (so the active control chrome — focus
-  /// highlight, press state, role coloring — covers it consistently).
+  /// Attaches a muted, right-aligned shortcut hint inside the button label area.
+  /// Thus, the active control chrome covers the hint.
+  /// This chrome includes the focus highlight, press state, and role color.
   ///
   /// The hint uses `Spacer(minLength: 1)` between the label and the
-  /// hint text: when the row provides extra width (e.g. a menu row that
-  /// has been width-equalized), the spacer expands and the hint rests
-  /// against the trailing edge; when the row is intrinsically sized
-  /// (e.g. a toolbar item), the spacer collapses to a single-cell gap
-  /// and the hint sits flush after the label.
+  /// hint text. If the row provides extra width, the spacer expands and the hint rests
+  /// against the trailing edge. A width-equalized menu row is one example.
+  /// If the row uses its intrinsic size, the spacer collapses to a single-cell gap.
+  /// A toolbar item is one example. Then the hint sits flush after the label.
   ///
   /// A `nil`, empty, or whitespace-only hint suppresses the suffix
-  /// entirely — the button renders exactly as it would without the
-  /// modifier (no ghost spacer or trailing whitespace).
+  /// entirely. The button output is the same as the output without the
+  /// modifier. It adds no unused spacer or trailing whitespace.
   public func systemHint(_ hint: String?) -> Button {
     var copy = self
     copy.systemHintText = Self.normalizeSystemHint(hint)

@@ -4,14 +4,14 @@ Launch SwiftTUI apps in a terminal process.
 
 ## Overview
 
-`SwiftTUICLI` owns terminal-native process startup, standard CLI mode routing,
-scene discovery, attach flows, pty-backed secondary scenes, and one-shot
-rendering helpers.
+`SwiftTUICLI` starts SwiftTUI apps in a terminal process. It handles standard
+CLI mode routing, scene discovery, attach flows, pty-backed secondary scenes,
+and one-shot rendering.
 
-The `SwiftTUI` convenience product reaches terminal launch through
-`SwiftTUIWebHostCLI`, so `--web` works by default. Import `SwiftTUICLI`
-directly when building a terminal-only custom launch path around
-`SwiftTUIRuntime`.
+The `SwiftTUI` convenience product launches the terminal through
+`SwiftTUIWebHostCLI`. This also makes `--web` available by default. For a
+terminal-only custom launch path around `SwiftTUIRuntime`, import
+`SwiftTUICLI` directly.
 
 ## Topics
 

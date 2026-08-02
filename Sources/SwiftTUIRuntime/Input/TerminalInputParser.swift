@@ -80,9 +80,9 @@ public struct TerminalInputParser: Sendable {
   /// byte-identical to the first byte of a real Escape keypress and of every
   /// escape sequence. The run loop calls this on a short idle timeout (the vim
   /// `ttimeoutlen` model) to commit a bare Escape once no continuation byte has
-  /// followed. Returns `[.key(.escape)]` when a lone ESC was pending, otherwise
-  /// an empty array — a continuation byte already completed or advanced the
-  /// buffer, so there is nothing to flush.
+  /// followed. If a lone ESC was pending, this function returns `[.key(.escape)]`.
+  /// Otherwise, it returns an empty array.
+  /// A continuation byte already completed or advanced the buffer, so there is nothing to flush.
   public mutating func flush() -> [InputEvent] {
     guard isAwaitingEscapeDisambiguation else {
       return []

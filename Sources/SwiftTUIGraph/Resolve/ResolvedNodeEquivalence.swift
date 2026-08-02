@@ -367,12 +367,10 @@ extension ResolvedNode {
 
   /// Explicit, iterative `==`.
   ///
-  /// The synthesized/`children ==` form recursed through array equality, which
-  /// is invisible at the call site and therefore the easiest way for this crash
-  /// class to reopen. Converted regardless of the current caller inventory:
-  /// enumerating "who compares a deep tree" is exactly the fragile analysis
-  /// this work exists to delete, and the lint gate can then cover the file
-  /// unconditionally.
+  /// The synthesized `children ==` form recursed through array equality.
+  /// This recursion is not visible at the call site and can cause the same crash again.
+  /// This implementation does not depend on the current callers.
+  /// Thus, the lint gate can cover the file without a caller inventory.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     var pending: [(Self, Self)] = [(lhs, rhs)]
     while let (lhs, rhs) = pending.popLast() {

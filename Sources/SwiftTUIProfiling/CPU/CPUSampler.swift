@@ -71,9 +71,9 @@ public struct CPUSample: Sendable, Equatable {
   }
 }
 
-/// Why a CPU reading could not be taken.
+/// The reason that a CPU reading is not available.
 public enum CPUSamplerError: Error, Equatable, Sendable, CustomStringConvertible {
-  /// Process CPU sampling is not supported on this platform (e.g. WASI).
+  /// This platform does not support process CPU sampling, such as WASI.
   case unavailable
   /// The underlying `getrusage` call failed with this `errno`.
   case getrusageFailed(errno: Int32)
@@ -89,7 +89,7 @@ public enum CPUSamplerError: Error, Equatable, Sendable, CustomStringConvertible
 }
 
 /// Reads process CPU/RSS via `getrusage`. Available on Darwin/Glibc/Android/
-/// Musl; a no-op that throws `.unavailable` on WASI.
+/// Musl. On WASI, it does no work and throws `.unavailable`.
 public enum CPUSampler {
   public static let defaultSampleInterval: Duration = .milliseconds(250)
 
@@ -140,7 +140,7 @@ public enum CPUSampler {
   }
 
   /// Samples CPU at `interval` across `operation`, returning the per-interval
-  /// deltas. Convenience for scripted runs; the periodic profiling signal uses
+  /// deltas. This function supports scripted runs. The periodic profiling signal uses
   /// the lower-level primitives directly.
   @MainActor
   public static func collect(

@@ -1,19 +1,19 @@
 # Repository Split
 
-SwiftTUI uses multiple GitHub repositories, but one repo remains the Swift
-release anchor: `SwiftTUI/swift-tui`.
+SwiftTUI uses several GitHub repositories. `SwiftTUI/swift-tui` remains the
+anchor for Swift releases.
 
 ## Consumer Contract
 
-A terminal or localhost-browser app depends on `SwiftTUI/swift-tui` and imports
-`SwiftTUI`. The package continues to include terminal launch and WebHost launch
-through `SwiftTUIWebHostCLI`, so `--web` remains a runtime mode selection.
+A terminal app or localhost browser app depends on `SwiftTUI/swift-tui` and
+imports `SwiftTUI`. The package includes terminal launch and WebHost launch
+through `SwiftTUIWebHostCLI`. The `--web` option selects a runtime mode.
 
-`Tests/SwiftTUITests/SwiftTUIConvenienceImportTests.swift` locks this contract
-with a consumer-shaped `App, SwiftTUICommand` fixture. The split can move
-browser TypeScript, examples, and site deployment out of this repository without
-requiring downstream apps to add extra SwiftPM dependencies or import lower-level
-SwiftTUI products directly.
+`Tests/SwiftTUITests/SwiftTUIConvenienceImportTests.swift` protects this contract
+with an `App, SwiftTUICommand` fixture that represents a consumer. This split
+moves browser TypeScript, examples, and site deployment out of this repository.
+Downstream apps do not need extra SwiftPM dependencies or direct imports of
+lower-level SwiftTUI products.
 
 ## Repository Ownership
 
@@ -26,14 +26,15 @@ SwiftTUI products directly.
 
 ## Extraction Boundary
 
-No Swift target leaves `swift-tui` in this split: every target in
-`Package.swift` stays. Only TypeScript browser source (`@swifttui/web`,
-`@swifttui/build`), the runnable examples, and the website move to sibling
-repos. A Swift target is extracted only when a later, explicit decision
-promotes its package-private seams into stable public API.
+This split keeps every Swift target in `swift-tui`. Every target in
+`Package.swift` stays. Only the TypeScript browser source (`@swifttui/web` and
+`@swifttui/build`), runnable examples, and website move to sibling repositories.
+A later explicit decision can extract a Swift target after its package-private
+seams become stable public API.
 
 ## Documentation Contract
 
-Every externally linkable Swift product has DocC and is included in the public
-web build. Example repositories are excluded from DocC coverage unless an
-example becomes a published library product.
+Every externally linkable Swift product provides DocC documentation. The public
+web build includes this documentation. DocC coverage excludes example
+repositories. When an example becomes a published library product, DocC
+coverage includes its repository.

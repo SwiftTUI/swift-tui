@@ -124,14 +124,14 @@ extension App where Self: SwiftTUICommand {
     }
   }
 
-  /// Diagnostic shim for the synchronous-`main()` launch trap, co-located with
-  /// the async `main()` above. See `SwiftTUI.App.main() -> Never` for the full
-  /// rationale: a bare `MyApp.main()` (or `await MyApp.main()`) otherwise
-  /// resolves to swift-argument-parser's synchronous `ParsableCommand.main()`
-  /// overload and never starts the runtime. This `-> Never` overload is the
-  /// most-derived *synchronous* `main()` for terminal/WebHost commands, so a
-  /// bare call selects it for a loud, accurate failure, while staying invisible
-  /// to `@main` synthesis.
+  /// Diagnostic shim for the synchronous-`main()` launch trap.
+  /// This shim is next to the asynchronous `main()` method above.
+  /// See `SwiftTUI.App.main() -> Never` for the full rationale.
+  /// Otherwise, a bare `MyApp.main()` or `await MyApp.main()` selects the synchronous `ParsableCommand.main()` overload.
+  /// That overload does not start the runtime.
+  /// This `-> Never` overload is the most-derived synchronous `main()` for terminal/WebHost commands.
+  /// Thus, a bare call selects this overload and gives an accurate failure.
+  /// The overload remains invisible to `@main` synthesis.
   public static func main() -> Never {
     failSynchronousLaunch(commandType: self)
   }

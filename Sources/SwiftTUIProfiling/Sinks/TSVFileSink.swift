@@ -8,9 +8,10 @@
 
 /// Frame sink that appends one tab-separated record per frame to a file,
 /// reincarnating the legacy `FrameDiagnosticsLogger`'s output on the neutral
-/// ``FrameDiagnosticSink`` contract. The header row is written lazily before
-/// the first record and each line is flushed immediately, so the file stays
-/// current even if the process is killed.
+/// ``FrameDiagnosticSink`` contract.
+/// The sink writes the header row before the first record.
+/// It flushes each line immediately.
+/// Thus, the file stays current if the process stops.
 ///
 /// File I/O is unavailable on WASI, where `init(path:)` fails just as the
 /// legacy logger did.

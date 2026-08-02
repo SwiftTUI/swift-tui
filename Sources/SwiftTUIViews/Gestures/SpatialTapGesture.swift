@@ -3,8 +3,8 @@ public import SwiftTUICore
 /// A tap gesture that carries the tap location in its value.
 ///
 /// `Value.location` is resolved via the configured `coordinateSpace`
-/// (.local subtracts targetRect origin; .global uses the raw terminal
-/// point). Matches SwiftUI's `SpatialTapGesture` shape.
+/// `.local` subtracts the `targetRect` origin. `.global` uses the raw terminal point.
+/// This behavior matches the SwiftUI `SpatialTapGesture` shape.
 public struct SpatialTapGesture: Gesture {
   public typealias Body = Never
 

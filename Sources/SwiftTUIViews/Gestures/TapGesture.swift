@@ -7,16 +7,15 @@ public import SwiftTUICore
 ///
 /// ## Terminal-faithful semantics
 ///
-/// A single tap (`count: 1`) has no timing component: one on-target
-/// down+up fires it regardless of press duration — terminals have no
-/// OS-level tap coalescing, so this is the faithful translation to a
-/// discrete-event environment.
+/// A single tap (`count: 1`) has no timing component.
+/// One on-target down-and-up sequence fires it for any press duration.
+/// Terminals have no OS-level tap coalescing, so this behavior matches a discrete-event environment.
 ///
-/// A multi-tap sequence (`count >= 2`) bounds the gap BETWEEN taps with
-/// ``interTapWindow`` (F158): a sequence whose next tap does not arrive
-/// inside the window transitions to `.failed`. Without a failure path,
+/// A multi-tap sequence (`count >= 2`) limits the gap between taps with ``interTapWindow`` (F158).
+/// If the next tap does not arrive in the window, the sequence changes to `.failed`.
+/// Without a failure path,
 /// `TapGesture(count: 2).exclusively(before: TapGesture())` — the
-/// canonical double-vs-single disambiguation — could never hand off to
+/// canonical double-versus-single disambiguation cannot continue to
 /// its fallback.
 public struct TapGesture: Gesture {
   /// The maximum gap between taps of a multi-tap sequence before the
@@ -24,10 +23,11 @@ public struct TapGesture: Gesture {
   /// interval closely enough for terminal input cadences.
   public static let interTapWindow: Duration = .milliseconds(350)
 
-  /// Test seam: real-run-loop harnesses process scripted events far slower
-  /// than interactive cadence (a DEBUG first render alone can exceed the
-  /// window), so gesture-dispatch tests widen the window instead of
-  /// depending on wall-clock timing. `nil` uses ``interTapWindow``.
+  /// Test seam for real-run-loop harnesses.
+  /// These harnesses process scripted events much slower than the interactive cadence.
+  /// A DEBUG first render alone can exceed the window.
+  /// Thus, gesture-dispatch tests widen the window instead of using wall-clock timing.
+  /// A `nil` value uses ``interTapWindow``.
   @MainActor package static var interTapWindowOverride: Duration?
 
   @MainActor static var effectiveInterTapWindow: Duration {

@@ -2,9 +2,10 @@ public import SwiftTUICore
 
 /// A reference frame for gesture event locations.
 ///
-/// Terminal UI ships `.local` (origin at the gesture's target rect), `.global`
-/// (origin at the terminal canvas), and `.named(_:)` for frames recorded by
-/// ``View/coordinateSpace(name:)``.
+/// Terminal UI supplies `.local`, `.global`, and `.named(_:)`.
+/// `.local` has its origin at the target rectangle of the gesture.
+/// `.global` has its origin at the terminal canvas.
+/// `.named(_:)` identifies frames that ``View/coordinateSpace(name:)`` records.
 public struct CoordinateSpace: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case local

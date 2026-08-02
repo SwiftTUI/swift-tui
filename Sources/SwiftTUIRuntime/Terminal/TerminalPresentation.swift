@@ -3,10 +3,10 @@ import SwiftTUICore
 /// Renders a raster surface into terminal text for a specific capability
 /// profile.
 ///
-/// This is the terminal presentation boundary. It adapts glyphs, style, color,
-/// and hyperlink support for the selected profile, and sanitizes authored text
-/// and OSC 8 link destinations so raster content cannot inject terminal control
-/// sequences into the output stream.
+/// This is the terminal presentation boundary.
+/// It adapts glyphs, style, color, and hyperlink support for the selected profile.
+/// It also sanitizes authored text and OSC 8 link destinations.
+/// Thus, raster content cannot add terminal control sequences to the output stream.
 public struct TerminalSurfaceRenderer {
   public let capabilityProfile: TerminalCapabilityProfile
   let terminalBackgroundColor: Color?

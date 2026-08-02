@@ -160,17 +160,17 @@ extension View {
 
   /// Draws a border around this view.
   ///
-  /// The default chrome is `BorderSet.rounded` in
-  /// `StrokeStyle.Placement.outset` placement — the wrapped view's
-  /// frame grows by the border set's per-side display widths so that
+  /// The default chrome is `BorderSet.rounded` in `StrokeStyle.Placement.outset` placement.
+  /// The wrapped view frame grows by the display widths for each border side.
+  /// Thus,
   /// content is never occluded.
   ///
   /// Pass `placement: .inset` to draw the border into the outermost
-  /// cells of the content frame instead of reserving extra space; use
+  /// cells of the content frame instead of reserving extra space. Use
   /// this with inset-style border sets like `BorderSet.innerHalfBlock`.
   ///
   /// For other glyph palettes (single-line, half-block, double-line,
-  /// heavy, etc.) pass an explicit `set:`. See `BorderSet` for the
+  /// or heavy) pass an explicit `set:`. See `BorderSet` for the
   /// full catalog.
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
@@ -213,8 +213,7 @@ extension View {
   /// The blend's stops are interpolated as the rasterizer walks the
   /// rectangle's edges clockwise (top L→R, right T→B, bottom R→L,
   /// left B→T).  The `phase` parameter shifts the gradient start point
-  /// around the perimeter, enabling chasing-light animation: changing
-  /// `phase` inside `withAnimation { … }` drives the pipeline's
+  /// around the perimeter. Changing `phase` inside `withAnimation { … }` drives the pipeline's
   /// animation controller to interpolate the phase smoothly frame by
   /// frame.
   public func border(

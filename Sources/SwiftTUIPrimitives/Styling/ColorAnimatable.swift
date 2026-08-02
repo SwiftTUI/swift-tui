@@ -1,38 +1,25 @@
-/// ``Color``'s ``Animatable`` conformance uses OKLab components so
-/// that linear ``VectorArithmetic`` arithmetic — which is what the
-/// animation controller performs during interpolation —
-/// corresponds to perceptually linear color transitions.  OKLab is
-/// designed so that `a + (b - a) * t` in L-a-b space equals the
-/// result of ``Color/interpolated(to:progress:method:)`` with
-/// ``Color/MixingMethod/perceptual``, preserving the existing
-/// visual behavior of color animation introduced in
-/// `ANIMATION_PLAN.md`'s Phase 6.
+/// The ``Animatable`` conformance of ``Color`` uses OKLab components.
+/// The animation controller uses linear ``VectorArithmetic`` during interpolation.
+/// OKLab makes this arithmetic correspond to perceptually linear color transitions.
+/// In L-a-b space, `a + (b - a) * t` equals the result of ``Color/interpolated(to:progress:method:)`` with ``Color/MixingMethod/perceptual``.
+/// Thus, animation keeps the existing visual behavior.
+/// This behavior comes from Phase 6 of `ANIMATION_PLAN.md`.
 ///
-/// The getter delegates to ``Color/oklab()``; the setter
-/// reconstructs a color via ``Color/_fromOklab(_:alpha:profile:)``
-/// and gamut-maps it back to the source profile with
-/// ``Color/GamutMappingPolicy/compressPerceptual`` — the same
-/// sequence the existing `perceptual` interpolation path uses at
-/// `Color.swift:1615-1624`.
+/// The getter delegates to ``Color/oklab()``.
+/// The setter reconstructs a color through ``Color/_fromOklab(_:alpha:profile:)``.
+/// Then it maps the gamut to the source profile with ``Color/GamutMappingPolicy/compressPerceptual``.
+/// The `perceptual` interpolation path uses the same sequence at `Color.swift:1615-1624`.
 ///
-/// Profile preservation: the setter uses `self.profile` as the
-/// destination profile for both the OKLab reconstruction and the
-/// gamut map.  Cross-profile animation is caller-enforced — the
-/// setter will silently re-project an animation result through the
-/// receiver's profile, which may produce subtle hue drift for non-
-/// sRGB receivers if the `from`/`to` originated from different
-/// profiles.  In practice, the `from` and `to` of an animation
-/// always share a profile because they originate from the same
-/// `Color` literal family.
+/// The setter uses `self.profile` for the OKLab reconstruction and the gamut map.
+/// Callers must supply one profile for a cross-profile animation.
+/// The setter projects the animation result through the profile of the receiver.
+/// Different profiles for `from` and `to` can cause small hue changes for non-sRGB receivers.
+/// In practice, `from` and `to` share a profile because they come from the same `Color` literal family.
 ///
-/// Cost model: every setter call runs `Color._fromOklab(...)` followed
-/// by `.mapped(to:policy: .compressPerceptual)`, so an animation that
-/// drives this setter once per frame pays the full OKLab → sRGB →
-/// gamut-compress chain per frame.  Acceptable for Phase 3's property-
-/// slot animation (one setter call per affected identity per frame),
-/// but callers performing repeated read-modify-write cycles in a tight
-/// loop should batch: read `animatableData` once, mutate in place, set
-/// once.
+/// Each setter call runs `Color._fromOklab(...)` and then `.mapped(to:policy: .compressPerceptual)`.
+/// Thus, one setter call per frame runs the full OKLab → sRGB → gamut-compress chain each frame.
+/// Property-slot animation makes one setter call for each affected identity in each frame.
+/// For repeated read-modify-write cycles, read `animatableData` once, mutate it in place, and set it once.
 extension Color: Animatable {
   // Layout: ((l, a), (b, alpha)) — matches the getter below
   // so that linear VectorArithmetic arithmetic over the four Doubles

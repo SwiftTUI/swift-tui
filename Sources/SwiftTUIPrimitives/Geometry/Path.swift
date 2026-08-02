@@ -13,8 +13,8 @@ public enum FillRule: Equatable, Sendable {
 /// Used both for pointer hit testing (``contains(_:fillRule:)``) and, when
 /// carried by ``ShapeGeometry/path(_:_:)``, for rendering. Curves
 /// (``Element/quadCurve(to:control:)`` and ``Element/curve(to:control1:control2:)``)
-/// are flattened to polylines on demand via ``flattened(tolerance:)``; there is
-/// exactly one `Path` type so hit testing and rendering never diverge.
+/// become polylines on demand through ``flattened(tolerance:)``.
+/// One `Path` type prevents differences between hit testing and rendering.
 public struct Path: Equatable, Sendable {
   public enum Element: Equatable, Sendable {
     case move(to: Point)
@@ -227,8 +227,8 @@ public struct Path: Equatable, Sendable {
   /// Flattens the path to one polyline per subpath, subdividing curves until
   /// they are within `tolerance` (in this path's own coordinate units) of a
   /// straight segment. Explicitly-closed subpaths repeat their start point as
-  /// the final point; open subpaths do not. Callers that fill close each
-  /// subpath; callers that stroke honor open vs closed.
+  /// the final point. Open subpaths do not repeat the start point.
+  /// Fill operations close each subpath. Stroke operations keep the authored open or closed state.
   public func flattened(tolerance: Double = 0.1) -> [[Point]] {
     let tol = max(0.000_1, tolerance)
     var subpaths: [[Point]] = []

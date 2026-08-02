@@ -6,7 +6,7 @@ Erase a concrete view type at a deliberate boundary.
 
 `AnyView` stores a view whose concrete type is not known to the surrounding
 code. It is useful when a specific call site must keep heterogeneous authored
-views in one value, but it should not be the default way to compose SwiftTUI
+views in one value. Do not use it as the default way to compose SwiftTUI
 interfaces.
 
 Prefer typed composition first:
@@ -37,8 +37,8 @@ state, lifecycle registrations, focus registrations, action registrations, and
 measurement reuse. If the static payload type changes, SwiftTUI replaces the
 payload subtree and removes the old state and lifecycle registrations.
 
-Explicit `.id(...)` values inside the payload become entity identities used for
-routing a compatible runtime owner across structural moves, and they remain
+Explicit `.id(...)` values inside the payload become entity identities. They
+route a compatible runtime owner across structural moves. They also remain
 available for focus, actions, and user-directed lookup. They do not override the
 payload type boundary. An explicit ID inside `AnyView(Text(...))` will not keep
 the old state alive after the same position changes to `AnyView(VStack { ... })`.
@@ -55,19 +55,18 @@ The important differences are:
   `AnyViewPayload<ErasedStaticType>` nodes are real implementation nodes, not an
   invisible convenience.
 - SwiftTUI uses the erased static payload type as the state-preservation
-  boundary. Same static payload type preserves the payload subtree; changed
+  boundary. The same static payload type preserves the payload subtree. A changed
   static payload type replaces it.
 - SwiftTUI keeps explicit `.id(...)` values inside the payload as entity
-  identities for compatible runtime-owner routing, focus, actions, and lookup,
-  but those IDs do not keep state alive across a changed erased static payload
-  type.
+  identities for compatible runtime-owner routing, focus, actions, and lookup.
+  Those IDs do not keep state alive across a changed erased static payload type.
 - SwiftTUI's terminal renderer depends on structural reuse for incremental
   painting, measurement reuse, lifecycle cleanup, and task cancellation. Erasure
-  that may be harmless in a small SwiftUI app can be visible in SwiftTUI as
+  that can be harmless in a small SwiftUI app can be visible in SwiftTUI as
   extra repaint work or as a changed lifecycle boundary.
 - SwiftTUI treats public `AnyView` APIs more strictly than many SwiftUI
-  codebases. A reusable SwiftTUI API should prefer typed builders and generic
-  storage even when a SwiftUI sample might use `AnyView` for convenience.
+  codebases. A reusable SwiftTUI API must prefer typed builders and generic
+  storage. A SwiftUI sample can use `AnyView` for convenience.
 
 Use SwiftUI familiarity to understand the source shape, not as a promise about
 state, lifecycle, or performance behavior.
@@ -280,8 +279,8 @@ struct SwitchingCell: View {
 ```
 
 The inner `.id("cell")` remains useful for compatible routing, focus, and action
-lookup, but it does not keep `ExpandedCell` state alive after the payload changes
-to `CompactCell`. If state must survive the mode switch, own it above the erased
+lookup. It does not keep `ExpandedCell` state alive after the payload changes to
+`CompactCell`. If state must survive the mode switch, own it above the erased
 boundary and pass bindings or model references into each branch.
 
 ```swift
@@ -340,7 +339,7 @@ let rows: [AnyView] = items.map { item in
 ```
 
 This makes structural position and entity identity harder to audit and often
-moves row ownership away from the data that should drive it. Prefer:
+moves row ownership away from the data that drives it. Prefer:
 
 ```swift
 ForEach(items) { item in
@@ -349,16 +348,16 @@ ForEach(items) { item in
 ```
 
 If rows genuinely come from unrelated plugins, require stable data identity at
-the registry boundary and keep the erased value as close to that boundary as
+the registry boundary. Keep the erased value as close to that boundary as
 possible.
 
 ## Impact Checklist
 
 Before introducing `AnyView`, ask:
 
-1. Could this be a `@ViewBuilder` branch?
-2. Could this be generic `Content: View` storage?
-3. Could this return `some View` from a helper?
+1. Can this be a `@ViewBuilder` branch?
+2. Can this be generic `Content: View` storage?
+3. Can this return `some View` from a helper?
 4. Is the erased value short-lived and local to the boundary that needs it?
 5. Does state that must survive type changes live above the erased boundary?
 6. Will future maintainers understand why erasure is necessary here?

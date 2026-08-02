@@ -3,10 +3,10 @@
 /// A view that renders a user-provided drawing into a cell-space canvas sized
 /// to its frame.
 ///
-/// `Canvas` is the arbitrary-drawing escape hatch that sits alongside
-/// the `Shape` protocol — reach for it when you need to draw a
-/// sparkline, plot, hand-drawn meter, or arbitrary curve that doesn't
-/// fit the shape fill/stroke algebra. The drawing conforms to
+/// `Canvas` supplies arbitrary drawing in addition to the `Shape` protocol.
+/// Use it to draw a sparkline, plot, hand-drawn meter, or arbitrary curve.
+/// These drawings do not need to fit the shape fill and stroke model.
+/// The drawing conforms to
 /// `CanvasDrawing` and is invoked at paint time with a
 /// `CanvasContext` sized to the frame in terminal cells. The selected
 /// `CanvasGrid` controls how fractional in-cell samples pack into terminal
@@ -83,7 +83,7 @@ public struct Canvas<Drawing: CanvasDrawing>: PrimitiveView, ResolvableView {
 /// Closure-backed ``Canvas`` drawing.
 ///
 /// Use this for ad-hoc drawing code where a dedicated `CanvasDrawing` value
-/// type would be unnecessary. Equality is identity-based: copies of the same
+/// type is unnecessary. Equality is identity-based: copies of the same
 /// `CanvasClosureDrawing` compare equal, while two separately-created closure
 /// drawings compare different even if their closure bodies are textually
 /// identical. Use ``CanvasInputDrawing`` (or a value type conforming to
@@ -135,7 +135,7 @@ extension Canvas where Drawing == CanvasClosureDrawing {
   /// size in terminal cells.
   ///
   /// A convenience for SwiftUI-shaped drawing code that expects the size
-  /// alongside the context; equivalent to reading `CanvasContext.size`. Like
+  /// alongside the context. This value is equivalent to `CanvasContext.size`. Like
   /// ``init(grid:_:)-(_,(CanvasContext)->Void)``, the drawing compares by identity.
   public init(
     grid: CanvasGrid = .braille2x4,
@@ -150,10 +150,11 @@ extension Canvas where Drawing == CanvasClosureDrawing {
 
 /// Input-keyed closure-backed ``Canvas`` drawing.
 ///
-/// Stores an ad-hoc drawing closure together with an `Equatable` `input`. Two
-/// `CanvasInputDrawing` values compare equal when their inputs are equal,
-/// regardless of closure identity — so a canvas built from one dedups across
-/// re-renders while `input` is unchanged and repaints when it changes. This
+/// Stores an ad-hoc drawing closure with an `Equatable` `input`.
+/// Two `CanvasInputDrawing` values compare equal when their inputs are equal.
+/// The closure identity does not affect equality.
+/// Thus, the renderer reuses a canvas while `input` is unchanged.
+/// It paints the canvas again after `input` changes. This
 /// gives closure ergonomics without the identity-equality penalty of
 /// ``CanvasClosureDrawing``.
 public struct CanvasInputDrawing<Input: Equatable & Sendable>: CanvasDrawing {
@@ -191,8 +192,8 @@ private final class CanvasInputDrawingStorage<Input>: Sendable {
 extension Canvas {
   /// Creates a canvas from ad-hoc drawing code keyed to an `Equatable` input.
   ///
-  /// Unlike ``init(grid:_:)-(_,(CanvasContext)->Void)`` — whose drawing compares by
-  /// identity and re-rasterizes on every re-render — this form derives the
+  /// The drawing from ``init(grid:_:)-(_,(CanvasContext)->Void)`` compares by identity.
+  /// It rasterizes again for each render. This form instead derives the
   /// drawing's identity from `input`. The canvas dedups across re-renders while
   /// `input` is unchanged and repaints when it changes. Prefer it whenever the
   /// drawing is a pure function of some state value.
@@ -204,7 +205,7 @@ extension Canvas {
   /// ```
   ///
   /// - Parameters:
-  ///   - input: The value the drawing is a function of; drives equality.
+  ///   - input: The value that supplies the drawing and determines equality.
   ///   - grid: The grid used to pack in-cell samples into terminal glyphs.
   ///   - draw: Drawing code receiving the context and `input`.
   public init<Input>(
@@ -219,7 +220,7 @@ extension Canvas {
 extension Canvas where Drawing == CanvasPixelGridDrawing {
   /// Renders a dense pixel grid and applies the matching frame.
   ///
-  /// Pixels are row-major and pre-resolved to terminal colors; `nil` pixels are
+  /// Pixels are row-major and pre-resolved to terminal colors. Pixels with `nil` are
   /// transparent. The returned view is already sized to hold the grid: `(width,
   /// height)` cells in `.fullCell` mode, and `(width, mode.cellHeight(for:
   /// height))` cells in `.verticalHalfBlock` mode. Add further modifiers

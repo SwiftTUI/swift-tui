@@ -3,15 +3,15 @@ public import SwiftTUICore
 extension ActionScope where Self: View & Sendable {
   /// Declares a keyboard-shortcut command at this scope's root.
   ///
-  /// Fires only when this scope is on the current focus chain and no
-  /// shallower scope on that chain has claimed the same
-  /// `(key, modifiers)` combination (strict shallowest-wins).
+  /// Fires only if this scope is on the current focus chain.
+  /// No shallower scope on that chain can claim the same `(key, modifiers)` combination.
+  /// The shallowest scope wins.
   ///
   /// `modifiers` must be non-empty unless `key` is a function key
   /// (`.functionKey`): F-keys never produce text, so bare F-key commands
-  /// are allowed. For every other key, single-key bindings are reserved
+  /// are permitted. For every other key, single-key bindings are reserved
   /// for framework-internal dispatch (typing, arrow navigation, Tab,
-  /// Enter, Escape); modifier-less registrations are silently dropped
+  /// Enter, and Escape). The framework ignores modifier-less registrations,
   /// and the command will never fire.
   @MainActor
   public func keyCommand(

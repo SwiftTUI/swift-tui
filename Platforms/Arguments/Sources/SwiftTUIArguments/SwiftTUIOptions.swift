@@ -12,8 +12,8 @@ public import ArgumentParser
 /// Consumers using the `SwiftTUICommand` protocol get this through the
 /// required `swiftTUIOptions` property.
 ///
-/// All long flag names declared by this struct are reserved; consumers
-/// must not redeclare them in their own `ParsableArguments`.
+/// All long flag names declared by this struct are reserved.
+/// Consumers must not redeclare them in their own `ParsableArguments`.
 public struct SwiftTUIOptions: ParsableArguments, Sendable {
   // ─── Color and appearance ────────────────────────────────────────
 

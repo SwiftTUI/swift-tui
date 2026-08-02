@@ -4,10 +4,10 @@ import SwiftTUICore
 ///
 /// The frame row in `frames.tsv` is emitted at commit, but the `write(2)` that
 /// puts those bytes on the wire completes later on the presentation-writer
-/// queue. Rather than delay the frame row (which would reorder the sink
-/// contract and lose rows on teardown), write completion is a separate record
-/// keyed by the same run-loop frame ordinal, so a reducer can join the two by
-/// `frame` and derive input→write latency.
+/// queue. The sink does not delay the frame row because a delay can reorder the sink contract.
+/// A delay can also lose rows during teardown.
+/// Instead, write completion is a separate record with the same run-loop frame ordinal.
+/// A reducer can join the two records by `frame` and calculate input→write latency.
 @_spi(Runners) public struct PresentationWriteSample: Sendable {
   @_spi(Runners) public enum Outcome: String, Sendable {
     /// The submission reached `write(2)`.
@@ -47,9 +47,9 @@ import SwiftTUICore
 
 /// Sink for per-submission presentation write records.
 ///
-/// Conformers must tolerate calls from the presentation-writer queue as well
-/// as the main actor: submission and supersession are recorded on the main
-/// actor, completion on the writer queue.
+/// Conformers must accept calls from the presentation-writer queue and the main actor.
+/// The main actor records submission and supersession.
+/// The writer queue records completion.
 @_spi(Runners) public protocol PresentationWriteSink: Sendable {
   func record(_ sample: PresentationWriteSample)
 }

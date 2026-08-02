@@ -9,10 +9,10 @@ the terminal's cell aspect ratio.
 
 A Braille subpixel is `cellPixelMetrics.width / 2` pixels wide and
 `cellPixelMetrics.height / 4` pixels tall. At the conventional 8x16 cell
-these are both 4 pixels, so subpixels are square and circles "just work."
+these are both 4 pixels. Thus, subpixels are square, and circles are round.
 On terminals with different cell aspect — for example 10x16 — subpixels
-are oblong (5x4), and the rasterizer scales the x and y semi-axes
-independently in subpixel units so the emitted pixel shape is true.
+are oblong (5x4). The rasterizer scales the x-axis and y-axis independently in
+subpixel units. Thus, the emitted pixel shape has the correct proportions.
 
 Aspect correction is a no-op at the conventional 8x16 cell: the formula
 collapses to the pre-correction code, and shape output is identical.
@@ -27,4 +27,8 @@ whose cell dimensions it can read.
 
 ## See Also
 
-The rasterizer-equivalence guarantee at `.estimated` metrics, fixture regeneration policy, and the integer-division quantization caveat that determines which metrics actually exercise the aspect-correction path are covered in the `SwiftTUICore` regression suites alongside the shape rasterizer. See `CellPixelMetrics` for the full metrics type documentation.
+The `SwiftTUICore` regression suites cover the rasterizer-equivalence guarantee
+at `.estimated` metrics. They also cover fixture regeneration and
+integer-division quantization. Quantization determines which metrics exercise
+the aspect-correction path. See `CellPixelMetrics` for the complete metrics
+type documentation.

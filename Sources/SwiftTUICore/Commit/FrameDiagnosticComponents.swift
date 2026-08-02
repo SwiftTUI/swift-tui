@@ -109,14 +109,14 @@ public struct FrameDiagnosticPresentation: Equatable, Sendable {
   }
 }
 
-/// Whether a committed frame reached the incremental rasterizer, and what
-/// stopped it if not.
+/// Whether a committed frame reached the incremental rasterizer.
+/// It also identifies the reason that stopped the frame.
 ///
-/// The incremental tier was unreachable for the whole of its existence and
-/// nothing in the codebase could report that: the perf lanes checked in to
-/// prove it measured a flat zero, and finding out required hand-patching the
-/// rasterizer. This makes the path a first-class frame diagnostic so tests and
-/// the perf harness assert on it instead.
+/// The incremental tier was unreachable for its entire existence.
+/// The codebase had no diagnostic for this state.
+/// The performance lanes measured a constant zero, but they did not identify the cause.
+/// Identification of the cause required a local change to the rasterizer.
+/// This diagnostic lets tests and the performance harness identify the path directly.
 public struct RasterReuseDiagnostics: Equatable, Sendable {
   /// `fresh`, `incremental`, or `incrementalRepaired` — the last meaning the
   /// incremental surface diverged from a fresh raster and was repaired.

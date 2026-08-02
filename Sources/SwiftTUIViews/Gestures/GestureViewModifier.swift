@@ -41,8 +41,8 @@ extension View {
   /// gestures, matching SwiftUI's `simultaneousGesture(_:including:)`.
   ///
   /// Simultaneous gestures continue to receive the pointer stream when a
-  /// ``highPriorityGesture(_:including:)`` at the same identity handles it;
-  /// ordinary gestures yield to that high-priority recognizer.
+  /// ``highPriorityGesture(_:including:)`` at the same identity handles it.
+  /// Ordinary gestures yield to that high-priority recognizer.
   public func simultaneousGesture<G: Gesture>(
     _ gesture: G,
     including mask: GestureMask = .all

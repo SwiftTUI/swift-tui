@@ -1,18 +1,18 @@
 # ``SwiftTUIProfiling``
 
-Opt-in profiling and diagnostics for SwiftTUI apps: frame timing, memory occupancy, and CPU signals in any build.
+Opt-in profiling and diagnostics for SwiftTUI apps in any build.
 
 ## Overview
 
 `SwiftTUIProfiling` is a separately linkable product that turns SwiftTUI's
 in-runtime diagnostics into a usable profiling surface. Nothing in the default
-dependency graph depends on it; an app links it only when it wants profiling,
-and activation is zero-cost until explicitly enabled.
+dependency graph depends on it. An app links it only when it needs profiling.
+Activation has no cost until the app enables it.
 
-The product consumes the runtime's neutral emit contract — a per-frame sample
-plus the occupancy registry in `SwiftTUICore` — and owns the consumer-facing
-layer: record derivation, formatting, and the sinks that write or summarize the
-data. The runtime never depends on the product.
+The product consumes the runtime's neutral emit contract. This contract
+contains a per-frame sample and the occupancy registry in `SwiftTUICore`. The
+product derives and formats records. It also owns the sinks that write or
+summarize the data. The runtime never depends on this product.
 
 ### Activating
 
@@ -30,13 +30,14 @@ var body: some Scene {
 ```
 
 With no argument, `.profiling()` reads `SWIFTTUI_PROFILE`. When it is unset the
-modifier installs nothing — no sinks, no timers, the runtime registry stays
-empty, and the per-frame path stays a single branch. Pass an explicit
-``ProfileConfig`` to activate regardless of the environment.
+modifier installs no sinks or timers. The runtime registry stays empty, and
+the per-frame path stays a single branch. Pass an explicit ``ProfileConfig``
+to activate profiling independently of the environment.
 
 ### Signals
 
-Three signals are each independently opt-in, named in the config or env var:
+Three signals are independently available. Name them in the configuration or
+environment variable:
 
 - **frames** — one record per committed frame, derived from the runtime sample.
 - **memory** — periodic occupancy snapshots of long-lived stores (caches, the
@@ -45,9 +46,8 @@ Three signals are each independently opt-in, named in the config or env var:
 
 The **frames** and **memory** signals have no standalone public types — you
 reach them only by naming them in the env grammar or in a ``ProfileConfig``.
-The **cpu** signal additionally exposes a reusable sampling API (``CPUSampler``
-and friends, under **CPU sampling** below) that you can drive directly outside
-the activation path.
+The **cpu** signal also exposes a reusable sampling API. You can use
+``CPUSampler`` and its related types outside the activation path.
 
 Records are routed to sinks selected by ``ProfileConfig/SinkDescriptor`` (or the
 `tsv=`/`jsonl=`/`summary` tokens in the grammar). With no sink named, activation
@@ -75,29 +75,28 @@ emit their reduced report.
 
 ### `presents.tsv`, the frames file's sibling
 
-A frame row is emitted at commit, but on a real terminal the `write(2)` that
-puts its bytes on the wire completes later, on the presentation writer's own
-queue. Delaying the frame row to wait for it would reorder the sink contract
-and lose rows on teardown, so write completion goes to a **separate file**:
-whenever the `frames` signal is paired with a `tsv=` sink, activation also opens
-`presents.tsv` in the same directory. Its name is fixed, not derived from the
-frames file, so a reducer can find it without knowing what you called the frames
-file.
+The profiler emits a frame row at commit. On a real terminal, the related `write(2)`
+operation completes later on the presentation writer queue. Waiting for it
+reorders the sink contract and loses rows during teardown. Thus, write
+completion goes to a **separate file**. If the `frames` signal uses a `tsv=`
+sink, activation also opens `presents.tsv` in the same directory. Its fixed
+name does not depend on the frames file. Thus, a reducer can find it without
+the frames file name.
 
 | column | meaning |
 | --- | --- |
 | `frame` | run-loop frame ordinal — joins `frames.tsv` on its `frame` column |
 | `submitted_ms` | when the frame was handed to the presentation writer |
-| `written_ms` | when `write(2)` returned; `-` when superseded |
-| `write_ms` | `written_ms − submitted_ms`; `-` when superseded |
+| `written_ms` | when `write(2)` returned. `-` means superseded. |
+| `write_ms` | `written_ms − submitted_ms`. `-` means superseded. |
 | `bytes` | UTF-8 size of the submitted emission |
 | `outcome` | `written`, or `superseded` when a newer frame displaced it |
 
 The join is total: every submission that carries a frame ordinal produces
 exactly one row, whether or not it reached the terminal. Only the terminal host
 runs an asynchronous writer, so on other hosts the file is opened and stays
-empty — a synchronous host's "write latency" would be a fabricated zero, and an
-absent measurement is more useful than a fake one.
+empty. A synchronous host has no measured write latency. An absent measurement
+is more accurate than a fabricated zero.
 
 ## Topics
 

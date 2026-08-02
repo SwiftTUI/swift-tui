@@ -12,9 +12,9 @@
 
 /// Rasterization grid used by ``CanvasContext`` cell-space drawing.
 ///
-/// A canvas is sized in terminal cells. The grid determines how many logical
-/// drawing samples exist inside each terminal cell and which glyph family packs
-/// those samples back into one cell during rasterization.
+/// A canvas is sized in terminal cells.
+/// The grid sets the number of logical drawing samples in each terminal cell.
+/// It also selects the glyph family that packs those samples into one cell during rasterization.
 public struct CanvasGrid: Equatable, Hashable, Sendable {
   /// Glyph family used to pack grid samples into terminal cells.
   public enum Style: Equatable, Hashable, Sendable {

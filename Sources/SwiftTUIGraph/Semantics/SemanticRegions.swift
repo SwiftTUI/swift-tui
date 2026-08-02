@@ -1,8 +1,8 @@
 /// A focusable region extracted from the placed tree.
-/// Equality deliberately includes `package`-level bookkeeping fields (F120):
-/// these types are the frame pipeline's change-detection currency, so two
-/// externally identical values may compare `!=` when internal routing or
-/// bookkeeping differs. Public consumers must not treat `==` as
+/// Equality deliberately includes `package`-level bookkeeping fields (F120).
+/// These types carry change detection through the frame pipeline.
+/// Thus, externally identical values can compare `!=` if internal routing or bookkeeping differs.
+/// Public consumers must not treat `==` as
 /// visible-field equality.
 public struct FocusRegion: Equatable, Sendable {
   public var identity: Identity
@@ -45,21 +45,21 @@ public struct FocusRegion: Equatable, Sendable {
 }
 
 /// Scroll metadata extracted for a scrollable node.
-/// Equality deliberately includes `package`-level bookkeeping fields (F120):
-/// these types are the frame pipeline's change-detection currency, so two
-/// externally identical values may compare `!=` when internal routing or
-/// bookkeeping differs. Public consumers must not treat `==` as
+/// Equality deliberately includes `package`-level bookkeeping fields (F120).
+/// These types carry change detection through the frame pipeline.
+/// Thus, externally identical values can compare `!=` if internal routing or bookkeeping differs.
+/// Public consumers must not treat `==` as
 /// visible-field equality.
 public struct ScrollRoute: Equatable, Sendable {
   public var identity: Identity
   package var viewNodeID: ViewNodeID?
   public var viewportRect: CellRect
   public var contentBounds: CellRect
-  /// Current clamped scroll offset of this region. Defaults to `.zero`; it is
-  /// populated from the live scroll-position registry only at the web-host
-  /// presentation boundary, where it is published as scroll-extent metadata so
-  /// the browser host can implement scroll-chaining (capture the wheel only
-  /// while the region can still scroll in that direction). See
+  /// The current clamped scroll offset of this region. The default is `.zero`.
+  /// The web-host presentation boundary gets this value from the live scroll-position registry.
+  /// It publishes the value as scroll-extent metadata.
+  /// The browser host uses this metadata for scroll chaining.
+  /// It captures the wheel only while the region can scroll in that direction. See
   /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
   public var contentOffset: CellPoint
   /// Walk-parent identities recorded at each identity re-root boundary above
@@ -138,10 +138,10 @@ package struct ScrollTargetQuery: Equatable, Sendable {
 }
 
 /// Accessibility metadata extracted for assistive-technology consumers.
-/// Equality deliberately includes `package`-level bookkeeping fields (F120):
-/// these types are the frame pipeline's change-detection currency, so two
-/// externally identical values may compare `!=` when internal routing or
-/// bookkeeping differs. Public consumers must not treat `==` as
+/// Equality deliberately includes `package`-level bookkeeping fields (F120).
+/// These types carry change detection through the frame pipeline.
+/// Thus, externally identical values can compare `!=` if internal routing or bookkeeping differs.
+/// Public consumers must not treat `==` as
 /// visible-field equality.
 public struct AccessibilityNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?

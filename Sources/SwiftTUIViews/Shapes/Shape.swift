@@ -4,22 +4,22 @@
 ///
 /// Conform by implementing **either** ``path(in:)`` (SwiftUI-style — return the
 /// outline for the proposed rect) **or** ``geometry`` (one of the analytic
-/// primitive cases). The two are bridged by bidirectional defaults, so a
-/// custom shape that implements only `path(in:)` gets a `.path` ``geometry``
-/// for free, and a primitive that implements only `geometry` gets a synthesized
-/// `path(in:)`. Implement at least one; implementing neither recurses.
+/// primitive cases). Bidirectional defaults connect these functions.
+/// A custom shape that implements only `path(in:)` gets a `.path` ``geometry`` value.
+/// A primitive that implements only `geometry` gets a generated `path(in:)` value.
+/// Implement at least one. If you implement neither, the defaults recurse.
 ///
 /// ``kindName`` and ``insetAmount`` are rendering plumbing with defaults, so a
 /// conforming type normally never touches them. They are plain (defaulted)
-/// requirements rather than SPI so that types *outside* this module can
-/// conform: an `@_spi` requirement has no visible default witness across a
-/// module boundary. `insetAmount` must also dispatch dynamically through
+/// requirements rather than SPI. Thus, types *outside* this module can conform.
+/// An `@_spi` requirement has no visible default witness across a module boundary.
+/// `insetAmount` must also dispatch dynamically through
 /// ``InsetShape``, so it cannot be a non-requirement helper.
 ///
-/// `path(in:)` is evaluated against the unit rect (`0,0,1,1`) at resolve time
-/// and the resulting normalized path is scaled into the placed frame at raster
-/// time, so a custom shape is frame-relative (it stretches to fill its frame)
-/// rather than pixel-aspect-corrected the way ``Circle`` is.
+/// The runtime evaluates `path(in:)` against the unit rectangle (`0,0,1,1`) during resolve.
+/// During rasterization, it scales the normalized path into the placed frame.
+/// Thus, a custom shape is relative to its frame and stretches to fill it.
+/// The shape does not use the pixel-aspect correction that ``Circle`` uses.
 public protocol Shape: View {
   var geometry: ShapeGeometry { get }
   func path(in rect: Rect) -> Path
@@ -35,9 +35,10 @@ extension Shape {
     fatalError("\(Self.self) is a shape and does not expose a composed body.")
   }
 
-  /// Default ``geometry`` for a shape defined by ``path(in:)``: evaluate the
-  /// path once against the unit rect and carry it as normalized `.path`
-  /// geometry (filled non-zero). Analytic primitives override this.
+  /// The default ``geometry`` for a shape that defines ``path(in:)``.
+  /// It evaluates the path against the unit rectangle one time.
+  /// Then it carries the path as normalized `.path` geometry with a nonzero fill.
+  /// Analytic primitives override this behavior.
   public var geometry: ShapeGeometry {
     .path(
       BoxedPath(path(in: Rect(origin: Point(x: 0, y: 0), size: Size(width: 1, height: 1)))),

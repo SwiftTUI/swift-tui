@@ -1,13 +1,15 @@
-/// A view that cycles through a sequence of phases, applying an
-/// animation between each pair of consecutive phases.
+/// A view that cycles through a sequence of phases.
+/// It applies an animation between each pair of consecutive phases.
 ///
-/// Matches SwiftUI's `phaseAnimator` family of APIs.  Two modes:
+/// It matches the SwiftUI `phaseAnimator` family of APIs.
+/// It has two modes:
 ///
 /// ### Loop mode
 ///
-/// `init(_:content:animation:)` starts a background task that walks
-/// the phases in a loop forever, advancing after each animation
-/// completes via the ``withAnimation(_:completionCriteria:_:completion:)`` batch drain.
+/// `init(_:content:animation:)` starts a background task.
+/// The task walks the phases in a loop forever.
+/// It advances after each animation completes through the
+/// ``withAnimation(_:completionCriteria:_:completion:)`` batch drain.
 ///
 ///     PhaseAnimator([Phase.a, .b, .c]) { phase in
 ///       Text("hello").foregroundStyle(phase.color)
@@ -20,9 +22,9 @@
 /// `init(_:trigger:content:animation:)` walks through the phases
 /// exactly once whenever the external `trigger` value changes.
 /// Starting from the current phase, the animator advances one step
-/// at a time until it returns to phase 0 (the rest state).  This
-/// matches SwiftUI's trigger-driven phase animator and produces the
-/// classic "press button, bounce, return to rest" pattern:
+/// at a time until it returns to phase 0 (the rest state).
+/// This behavior matches the trigger-driven SwiftUI phase animator.
+/// It produces the classic "press button, bounce, return to rest" pattern:
 ///
 ///     @State private var tapCount = 0
 ///     PhaseAnimator([Phase.rest, .grow, .shrink], trigger: tapCount) {
@@ -31,18 +33,18 @@
 ///     }
 ///     Button("bounce") { tapCount += 1 }
 ///
-/// The initial mount is NOT treated as a trigger change — the view
-/// renders at phase 0 quietly and only reacts to subsequent changes.
+/// The initial mount is not a trigger change.
+/// The view renders at phase 0 without an animation. It reacts only to subsequent changes.
 ///
 /// ### Animation curve
 ///
 /// The `animation` closure returns the curve to use when
 /// transitioning INTO the given phase.  Returning nil snaps to that
 /// phase without animating (the content still updates but the
-/// controller doesn't enqueue an animation).
+/// controller does not add an animation to the queue).
 ///
-/// - Note: The phases array must be non-empty.  Calling
-///   `PhaseAnimator([])` is a programmer error and will trap in
+/// - Note: The phases array must not be empty. Calling
+///   `PhaseAnimator([])` is a programmer error and will stop in
 ///   debug builds.
 public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   private let phases: [Phase]

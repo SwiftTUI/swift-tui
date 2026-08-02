@@ -12,9 +12,9 @@ import `SwiftTUITerminal` for `TerminalView<Session>`, `TerminalSession`, and
 `TerminalProcessSession`.
 
 `TerminalView` participates in the normal SwiftTUI frame pipeline. It measures
-from its parent proposal, draws a foreign terminal grid through the existing
-raster path, and forwards keyboard input to the child session only while
-focused. The child program does not own a separate commit path.
+from its parent proposal and draws a foreign terminal grid through the existing
+raster path. While focused, it forwards keyboard input to the child session.
+The child program does not own a separate commit path.
 
 For the product boundary context, see <doc:Architecture> and
 <doc:Host-Integration>.
@@ -65,11 +65,12 @@ TerminalView(
 ```
 
 `keyRouting` receives the original `KeyPress` before terminal conversion.
-Returning `.handledByHost` consumes the key; `.forwardToChild` preserves the
-ordinary terminal input path. `hostFocused` should replace, rather than wrap,
-an application-owned `.focusable` and `.onKeyPress` forwarding layer.
+Returning `.handledByHost` consumes the key. `.forwardToChild` preserves the
+ordinary terminal input path. Replace an application-owned `.focusable` and
+`.onKeyPress` forwarding layer with `hostFocused`.
 
-Arguments, environment, and working directory can be supplied at construction:
+Supply arguments, the environment, and the working directory during
+construction:
 
 ```swift
 @State private var preview = TerminalProcessSession(
@@ -108,7 +109,7 @@ public protocol TerminalSession: AnyObject, Sendable {
 
 `cachedSnapshot` is synchronous so draw extraction can create the
 foreign-surface payload without awaiting an actor. Session implementations
-should refresh it as terminal output arrives.
+must refresh it as terminal output arrives.
 
 ## Metadata And Exit
 
@@ -129,11 +130,11 @@ initializer when the terminal pane owns the response locally.
 
 ## Capabilities
 
-The current package supports local spawned child processes, pty creation and resize,
-SwiftTerm-backed VT emulation, focus-gated keyboard forwarding, X10 / 1000 /
-1002 / SGR mouse mode translation, bracketed paste, OSC 52 clipboard
-forwarding, OSC 0/2 title changes, OSC 7 working-directory changes, and OSC 8
-hyperlink state.
+The current package supports local child processes, pty creation and resizing,
+and SwiftTerm-backed VT emulation. It also supports focus-gated keyboard
+forwarding and X10, 1000, 1002, and SGR mouse modes. Additional support includes
+bracketed paste, OSC 52 clipboard forwarding, OSC 0/2 title changes, OSC 7
+working-directory changes, and OSC 8 hyperlink state.
 
 `swift-tui-examples/sextant` demonstrates the surface with Miller-column
 filesystem navigation and an embedded preview command in the rightmost column.

@@ -59,8 +59,8 @@ The closure receives the original `KeyPress` before conversion to
 ``TerminalEmulatorKey``, so it can distinguish characters, navigation keys,
 and modifier combinations. Returning
 ``TerminalViewKeyDisposition/forwardToChild`` retains normal conversion and
-delivery; input the emulator cannot map remains available to other focused-key
-handlers.
+delivery. Input that the emulator cannot map remains available to other
+focused-key handlers.
 
 ## Topics
 

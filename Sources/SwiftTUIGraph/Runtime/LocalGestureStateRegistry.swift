@@ -17,9 +17,9 @@ public final class AnyGestureStateBinding {
     self._reset = reset
   }
 
-  /// Writes `value` if it matches this binding's `valueType`; silently
-  /// ignores type mismatches (defensive -- updater/recognizer type
-  /// agreement is enforced at the `.updating` call site).
+  /// If `value` matches the `valueType` of this binding, writes `value`.
+  /// If the types do not match, the function ignores `value`.
+  /// The `.updating` call site makes sure that the updater and recognizer types agree.
   public func setValueErased(_ value: Any) {
     _setValue(value)
   }

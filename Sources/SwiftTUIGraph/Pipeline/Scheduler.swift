@@ -1,4 +1,4 @@
-/// Reasons the runtime may schedule a new frame.
+/// Reasons that the runtime can schedule a new frame.
 public enum WakeCause: String, Hashable, Sendable {
   case input
   case invalidation
@@ -21,13 +21,11 @@ public struct ScheduledFrame: Equatable, Sendable {
   /// displaced before this frame drained; the runtime parks their completions
   /// so they still fire.
   package var supersededAnimationBatchIDs: [AnimationBatchID]
-  /// Total number of `request*` calls (input, invalidation, signal,
-  /// external, deadline) that the scheduler coalesced into this
-  /// frame.  Used as a cancellation-pressure proxy for the
-  /// `ASYNC_RENDER_GENERATION_SCHEDULER` Stage 3D rollout: when a
-  /// frame's `intentRequestCount > 1`, multiple distinct intents
-  /// merged into one render — meaning a hypothetical pre-start
-  /// cancellation could have superseded an in-flight tail job here.
+  /// The total number of `request*` calls that the scheduler coalesced into this frame.
+  /// These calls include input, invalidation, signal, external, and deadline requests.
+  /// The `ASYNC_RENDER_GENERATION_SCHEDULER` Stage 3D rollout uses this value as a cancellation-pressure proxy.
+  /// An `intentRequestCount > 1` value means that multiple intents merged into one render.
+  /// In this state, a hypothetical pre-start cancellation can supersede an active tail job.
   public var intentRequestCount: Int
 
   public init(
@@ -112,10 +110,10 @@ public protocol Invalidating: AnyObject {
   func requestInvalidation(of identities: Set<Identity>)
 }
 
-/// An ``Invalidating`` conformer whose `requestInvalidation` is safe to call
-/// from any executor. ``FrameScheduler`` opts in; the Observation bridge's
-/// off-main change marshal (F162) narrows its attached invalidator to this
-/// so a background mutation can wake a sleeping run loop directly.
+/// An ``Invalidating`` conformer that accepts `requestInvalidation` calls from any executor.
+/// ``FrameScheduler`` uses this protocol.
+/// The Observation bridge narrows its invalidator to this protocol for off-main changes (F162).
+/// Thus, a background mutation can directly wake a sleeping run loop.
 public protocol ThreadSafeInvalidating: Invalidating, Sendable {}
 
 package protocol WakeNotifyingFrameScheduling: AnyObject {
@@ -163,26 +161,25 @@ public struct DeadlineArmCut: Equatable, Sendable {
   }
 }
 
-/// Bounds a drain-until-quiescent frame loop against deadline livelock (the
-/// F41 reland shape, report 2026-07-07-008). The scheduler keeps every armed
-/// deadline until due, so later deadlines survive nearer ones — but on a
-/// machine whose per-frame cost meets or exceeds the animation cadence, each
-/// frame's re-arm would be due again by the drain's re-check and the loop
-/// would never quiesce. A driver captures ``deadlineArmCut`` once at pass
-/// entry and consumes with it: deadlines armed during the pass only become
-/// consumable on the next pass, so the pass's consumable set is finite and
-/// strictly shrinking. `hasPendingFrame`/`nextWakeInstant` deliberately keep
-/// the live view (withheld deadlines included) so the outer loop re-enters or
-/// schedules its wake promptly.
+/// Prevents a deadline livelock in a drain-until-quiescent frame loop (F41, report 2026-07-07-008).
+/// The scheduler keeps each armed deadline until it is due.
+/// Thus, later deadlines remain after nearer deadlines.
+/// If the frame cost reaches the animation cadence, each frame re-arm is due at the next drain evaluation.
+/// Without a limit, the loop cannot become quiescent.
+/// A driver captures ``deadlineArmCut`` one time when a pass starts.
+/// It uses this cut to consume deadlines.
+/// Deadlines armed during the pass become consumable on the next pass.
+/// Thus, the consumable set for a pass is finite and decreases after each consumption.
+/// `hasPendingFrame` and `nextWakeInstant` retain the live view, including withheld deadlines.
+/// This behavior lets the outer loop enter again or schedule its next wake promptly.
 ///
-/// Every ``FrameScheduling`` conformer must provide the cut (F95): the drain
-/// drivers consume exclusively through it, with no ungated fallback — a
-/// scheduler without cut semantics would silently revive the F41 livelock the
-/// moment a drain outlives the deadline cadence. There is deliberately **no
-/// default implementation**: forwarding to the ungated consume would be sound
-/// only for schedulers that keep no deadline set, and silently wrong for any
-/// that do; a conformer with no deadline set should forward explicitly and
-/// say why (see `PerpetualSupersessionScheduler` in the tests).
+/// Each ``FrameScheduling`` conformer must provide the cut (F95).
+/// The drain drivers consume deadlines only through this cut. They have no fallback without a gate.
+/// Without cut semantics, a drain that exceeds the deadline cadence causes the F41 livelock.
+/// This protocol has no default implementation.
+/// An ungated implementation is correct only for schedulers that keep no deadline set.
+/// A conformer with no deadline set must implement forwarding and explain the reason.
+/// See `PerpetualSupersessionScheduler` in the tests.
 public protocol DrainPassDeadlineCutting: AnyObject {
   /// The cut for one drain pass: a snapshot of the arm ordering. Deadlines
   /// armed after this read are withheld from consumes that pass this cut.
@@ -196,10 +193,9 @@ public protocol DrainPassDeadlineCutting: AnyObject {
   ) -> ScheduledFrame?
 }
 
-/// Scheduler contract used by the runtime event loop. Refines
-/// ``DrainPassDeadlineCutting`` so a scheduler that cannot bound a drain pass
-/// is unrepresentable — the type system, not a runtime cast, enforces the F41
-/// livelock fix.
+/// Scheduler contract for the runtime event loop.
+/// It refines ``DrainPassDeadlineCutting`` to require a bound for each drain pass.
+/// Thus, the type system enforces the F41 livelock correction without a runtime cast.
 public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
   func requestInput()
   func requestSignal(named name: String)
@@ -213,14 +209,13 @@ public protocol FrameScheduling: Invalidating, DrainPassDeadlineCutting {
 
 /// Coalesces invalidations, input, signals, and deadlines into frame work.
 ///
-/// `FrameScheduler` is `Sendable` and genuinely thread-safe: its coalescing
-/// state lives behind a lock so any thread may request a wake. This matters
-/// because the `Invalidating`/`FrameScheduling` contract is `public` and
-/// `nonisolated`, and at least one caller — the Observation `onChange` bridge —
-/// can fire from an off-main mutation context. The previous design left the
-/// coalescing sets lock-free and safe only "by convention" (every caller on the
-/// main actor), which raced the run loop's `consumeReadyFrame` when that
-/// convention was broken.
+/// `FrameScheduler` is `Sendable` and thread-safe.
+/// A lock protects its coalescing state, and any thread can request a wake.
+/// The `Invalidating` and `FrameScheduling` contracts are `public` and `nonisolated`.
+/// The Observation `onChange` bridge can run for an off-main mutation.
+/// The previous design had no lock for the coalescing sets.
+/// It relied on all callers to run on the main actor.
+/// An off-main caller caused a race with `consumeReadyFrame` in the run loop.
 public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, IntentRequestTallying,
   Sendable
 {

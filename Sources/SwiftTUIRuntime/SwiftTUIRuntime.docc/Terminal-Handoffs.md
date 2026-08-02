@@ -42,9 +42,9 @@ cooperatively observes task cancellation. If terminal ownership cannot be
 reclaimed, the action throws
 ``TerminalHandoffError/failedToRestoreTerminal``.
 
-An unstructured task can outlive the run loop that created it. If that terminal
-session has already shut down when the operation finishes, the action throws
-``TerminalHandoffError/unavailable`` and does not re-enter raw mode or the
+An unstructured task can outlive the run loop that created it. An operation can
+finish after its terminal session shuts down. In that case, the action throws
+``TerminalHandoffError/unavailable``. It does not re-enter raw mode or the
 alternate screen.
 
 The WASI ANSI runner currently reports ``TerminalHandoffError/unavailable``.
@@ -67,7 +67,7 @@ let openShell: @MainActor @Sendable () async throws -> Void = {
 The current action is scoped to the task running a terminal scene. Structured
 child tasks inherit it, while detached tasks and calls outside a live terminal
 session throw ``TerminalHandoffError/unavailable``. This avoids a
-process-global "current terminal" that could route one scene's operation
+process-global "current terminal" that can route one scene's operation
 through another scene's run loop.
 
 Only one handoff can run in a terminal session at a time. A concurrent request

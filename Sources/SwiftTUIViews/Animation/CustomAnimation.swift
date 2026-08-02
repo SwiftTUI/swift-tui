@@ -50,7 +50,7 @@ public protocol CustomAnimation: Hashable, Sendable {
     value: V, time: Duration, context: inout AnimationContext<V>
   ) -> V?
 
-  /// Whether this animation should merge with a previous one.
+  /// Whether this animation merges with a previous animation.
   func shouldMerge<V: VectorArithmetic>(
     previous: Animation, value: V, time: Duration,
     context: inout AnimationContext<V>

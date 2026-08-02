@@ -7,34 +7,34 @@
   ///
   /// ## Why this exists
   ///
-  /// On Darwin the OS run loop (CFRunLoop) continuously drains the main-actor
-  /// executor, so every `@MainActor` continuation keeps flowing: the SwiftTUI
-  /// run loop's own `await`, autonomous `.task` bodies resuming after a
-  /// `Task.sleep`, animation deadline wakes. In a bare JNI embedding there is no
-  /// such driver — the Android `Looper` drains the *Java* main queue, not
-  /// Swift's main-actor job queue. Swift 6.2 reified the main executor as a
-  /// `RunLoopExecutor` the program must explicitly drive; the stock Android main
-  /// executor is a `DispatchMainExecutor` whose jobs sit on libdispatch's main
-  /// queue, which nothing pumps here (calling its `run()` would block the JNI
-  /// thread forever and its `runUntil` traps). The result is that everything
-  /// time-driven freezes, while input still works only because it is
-  /// special-cased through the run loop's synchronous `directWake` bypass.
+  /// On Darwin, the OS run loop (`CFRunLoop`) continuously drains the main-actor executor.
+  /// Thus, each `@MainActor` continuation can run.
+  /// These continuations include the SwiftTUI run loop's own `await`.
+  /// They also include autonomous `.task` bodies after `Task.sleep` and animation deadline wakes.
+  /// A bare JNI embedding has no such driver.
+  /// The Android `Looper` drains the *Java* main queue, not Swift's main-actor job queue.
+  /// Swift 6.2 represents the main executor as a `RunLoopExecutor`.
+  /// The program must explicitly drive this executor.
+  /// The stock Android main executor is a `DispatchMainExecutor`.
+  /// Its jobs wait on the main queue of libdispatch, which nothing pumps here.
+  /// A call to `run()` blocks the JNI thread forever, and `runUntil` traps.
+  /// As a result, all time-driven work freezes.
+  /// Input still works through the synchronous `directWake` bypass of the run loop.
   ///
   /// ## What this does
   ///
-  /// At the first JNI bring-up (`installIfNeeded()`, before any main-actor work)
-  /// we replace the process main executor with ``HostMainExecutor`` via
-  /// `_createExecutors(factory:)`, keeping the stock Dispatch *global* executor
-  /// as the default task executor. Main-actor jobs then queue in
-  /// ``HostMainExecutor`` instead of on libdispatch's undrained main queue. The
-  /// Kotlin host calls ``drainReadyJobs()`` once per frame poll (~30 Hz) on the
-  /// Android main thread, which runs the queued jobs and returns — a bounded,
-  /// non-blocking drain rather than a thread-owning run loop.
+  /// During the first JNI setup, `installIfNeeded()` runs before all main-actor work.
+  /// It replaces the process main executor with ``HostMainExecutor`` through `_createExecutors(factory:)`.
+  /// It keeps the stock Dispatch *global* executor as the default task executor.
+  /// Main-actor jobs then enter ``HostMainExecutor`` instead of the undrained main queue of libdispatch.
+  /// The Kotlin host calls ``drainReadyJobs()`` once per frame poll (~30 Hz) on the Android main thread.
+  /// The drain runs the queued jobs and returns.
+  /// Thus, the drain is bounded and non-blocking, and it does not own the thread.
   ///
-  /// Crucially the default executor is left as Dispatch's self-driving global
-  /// pool, so `Task.sleep` timers still fire on libdispatch worker threads; only
-  /// the *hop back to `@MainActor`* was stranded, and that is exactly what the
-  /// host drain resumes.
+  /// The default executor remains the self-driving global pool of Dispatch.
+  /// Thus, `Task.sleep` timers still fire on worker threads of libdispatch.
+  /// Only the *hop back to `@MainActor`* was stranded.
+  /// The host drain resumes this hop.
   public enum AndroidMainExecutorPump {
     private static let installState = Mutex(InstallState())
 
@@ -45,12 +45,12 @@
 
     /// Installs ``HostMainExecutor`` as the process main-actor executor.
     ///
-    /// Must be called **before any main-actor work** (before the first
-    /// `Task { @MainActor … }`, `MainActor.assumeIsolated`, or read of
-    /// `MainActor.executor`) — installing a custom main executor after the
-    /// platform default has materialized is a fatal error. The Android host
-    /// calls this as the first line of `swift_tui_android_create_host`.
-    /// Idempotent; safe to call more than once.
+    /// Call this method **before all main-actor work**.
+    /// This work includes the first `Task { @MainActor … }` and `MainActor.assumeIsolated`.
+    /// It also includes the first read of `MainActor.executor`.
+    /// Installation after the platform default materializes causes a fatal error.
+    /// The Android host calls this method first in `swift_tui_android_create_host`.
+    /// Repeated calls are safe.
     public static func installIfNeeded() {
       let shouldInstall = installState.withLock { state -> Bool in
         guard !state.attempted else { return false }
@@ -76,8 +76,11 @@
     }
 
     /// Packed diagnostic snapshot for the JNI bridge log (decoded in logcat):
-    /// bit 0 = executor installed; bits 1..21 = jobs enqueued; bits 22..42 =
-    /// jobs drained; bits 43..52 = jobs pending now.
+    ///
+    /// - Bit 0: Executor installed.
+    /// - Bits 1..21: Jobs enqueued.
+    /// - Bits 22..42: Jobs drained.
+    /// - Bits 43..52: Jobs pending now.
     static func diagnostics() -> Int64 {
       let counters = HostMainExecutor.shared.counters()
       func sat(_ value: Int, _ bits: Int) -> Int64 {
@@ -91,10 +94,10 @@
     }
   }
 
-  /// The custom `ExecutorFactory` installed on Android. The main executor is the
-  /// host-driven ``HostMainExecutor``; the default (global) task executor is the
-  /// stock platform one (libdispatch's global pool) so `Task.sleep` and other
-  /// off-main work keep self-driving on background worker threads.
+  /// The custom `ExecutorFactory` installed on Android.
+  /// The main executor is the host-driven ``HostMainExecutor``.
+  /// The default (global) task executor is the stock platform executor (the global pool of libdispatch).
+  /// Thus, `Task.sleep` and other off-main work continue on background worker threads.
   private struct AndroidHostExecutorFactory: ExecutorFactory {
     static var mainExecutor: any MainExecutor { HostMainExecutor.shared }
     static var defaultExecutor: any TaskExecutor { PlatformExecutorFactory.defaultExecutor }
@@ -103,11 +106,12 @@
   /// A minimal main-actor executor whose job queue is drained by the Android
   /// host on its render tick instead of by an OS run loop.
   ///
-  /// All main-actor jobs must run on the one OS thread the host treats as
-  /// "main" (the thread `installIfNeeded()` ran on). `enqueue` may be called
-  /// cross-thread (a `.task` finishing on a libdispatch worker hops back to the
-  /// main actor), so the queue is mutex-guarded; jobs are only ever *run* from
-  /// ``drainReadyJobs()`` on the host main thread.
+  /// All main-actor jobs must run on the one OS thread that the host treats as "main".
+  /// This thread is the thread on which `installIfNeeded()` ran.
+  /// Code can call `enqueue` from another thread.
+  /// For example, a `.task` on a worker thread of libdispatch can return to the main actor.
+  /// Thus, a mutex protects the queue.
+  /// Only ``drainReadyJobs()`` runs the jobs, on the host main thread.
   final class HostMainExecutor: MainExecutor {
     static let shared = HostMainExecutor()
 

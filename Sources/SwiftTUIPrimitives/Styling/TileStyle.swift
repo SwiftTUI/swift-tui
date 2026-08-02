@@ -1,17 +1,16 @@
 /// A fill style that paints a repeated terminal-cell tile inside a shape's
 /// fill region.
 ///
-/// Use ``TileStyle`` when a shape should be filled with glyph texture instead
-/// of a flat color. Unlike ``LinearGradient`` and ``RadialGradient``, a tile
-/// style writes a non-space character into each cell the shape covers; the
-/// rasterizer handles the per-cell walk and shape masking.
+/// Use ``TileStyle`` to fill a shape with a glyph texture instead of a flat color.
+/// Unlike ``LinearGradient`` and ``RadialGradient``, a tile style writes a nonspace character into each covered cell.
+/// The rasterizer walks the cells and applies the shape mask.
 ///
-/// ``Pattern`` validates tile rows at construction time. Patterns are
+/// ``Pattern`` accepts tile rows only at construction time. Patterns are
 /// rectangular, non-empty, and restricted to single-cell glyphs, so painting
 /// never has to clip wide graphemes or reinterpret raw strings during
 /// rasterization.
 public struct TileStyle: ShapeStyle, Equatable, Sendable {
-  /// A validated terminal-cell tile pattern.
+  /// A terminal-cell tile pattern that satisfies the construction rules.
   public struct Pattern: Equatable, Sendable {
     /// The normalized tile rows.
     public let rows: [[Character]]

@@ -1,14 +1,14 @@
 import SwiftTUICore
 
-/// A focusable command menu whose expanded content floats above the
-/// surrounding layout as an overlay — opening and closing the menu
-/// does NOT reflow sibling views.
+/// A focusable command menu.
+/// Its expanded content floats above the surrounding layout as an overlay.
+/// Opening and closing the menu does not reflow sibling views.
 ///
 /// The trigger row (`Label ▾` / `Label ▴`) always renders inline at
 /// the menu's site in the layout, taking exactly one cell of height.
-/// When activated, the user-supplied `content` is hosted by a non-modal
-/// portal entry with `.menu` chrome (a compact, intrinsic-width bordered
-/// box anchored at the portal root's top-leading).
+/// When active, a nonmodal portal entry hosts the user-supplied `content`.
+/// The entry uses `.menu` chrome.
+/// This chrome is a compact bordered box with intrinsic width at the top-leading of the portal root.
 ///
 /// **v1 caveats** (tracked as future work):
 /// - Anchoring is at the presentation host's top-leading rather than

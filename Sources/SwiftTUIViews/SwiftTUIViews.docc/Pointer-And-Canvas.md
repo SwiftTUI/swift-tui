@@ -12,7 +12,7 @@ runtime can obtain it.
 
 ## Pointer Input
 
-Use gestures when the interaction has a recognisable shape:
+Use gestures when the interaction has a recognizable shape:
 
 ```swift
 Canvas(SketchDrawing(points: points))
@@ -32,7 +32,7 @@ can carry sub-cell positions.
 
 `DragGesture.Value.path` is complete for the current gesture. It retains samples
 from pointer-down through the current value and is cleared when the recognizer
-tears down. Persist path samples into app state when a stroke or route should
+tears down. Persist path samples into app state when a stroke or route must
 outlive the active gesture.
 
 For hover-only affordances, use ``View/onPointerHover(_:)``:
@@ -81,12 +81,12 @@ All three attachment modifiers honor ``GestureMask``. In particular,
 ## Coordinate Spaces And Hit Testing
 
 Local and global coordinate spaces preserve fractional values. Named spaces are
-available with ``View/coordinateSpace(name:)``; unresolved names fall back to
+available with ``View/coordinateSpace(name:)``. Unresolved names fall back to
 global coordinates so authored code keeps working while views are refactored.
 
 Use `View.contentShape(_:)` when a view's pointer target is not its full
 placed rectangle. Rectangular shapes remain cell-denominated through
-`CellRect`; path shapes use continuous `Path` values.
+`CellRect`. Path shapes use continuous `Path` values.
 
 ## Runtime Capability Display
 
@@ -98,7 +98,7 @@ adapt to runtime precision:
 - `GeometryProxy.cellPixelMetrics` describes the runtime's current cell-pixel
   estimate or reported value.
 
-These values are metadata. They should guide optional affordances, not change
+These values are metadata. Use them to guide optional affordances. Do not change
 the base layout contract.
 
 ## Canvas
@@ -116,7 +116,7 @@ Canvas { context in
 ```
 
 Closure drawings compare by identity. Use a value type conforming to
-`CanvasDrawing` when a drawing should compare structurally equal across
+`CanvasDrawing` when a drawing must compare structurally equal across
 rerenders.
 
 Dense pixel-grid helpers are still terminal-cell abstractions. Use them for

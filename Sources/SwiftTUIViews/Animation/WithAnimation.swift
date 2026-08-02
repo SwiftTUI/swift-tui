@@ -15,7 +15,7 @@ public struct AnimationCompletionCriteria: Equatable, Sendable {
   /// overshoot is still in progress.
   public static let logicallyComplete = AnimationCompletionCriteria(kind: .logicallyComplete)
 
-  /// Fires when the animation has been fully removed from the system.
+  /// Fires after the system fully removes the animation.
   public static let removed = AnimationCompletionCriteria(kind: .removed)
 }
 
@@ -36,9 +36,9 @@ enum AnimationBatchIDAllocator {
 /// Executes `body` with the specified animation applied to any state
 /// changes that occur during its execution.
 ///
-/// State writes inside `body` carry animation intent through to the next
-/// frame, where the animation controller samples from/to values and
-/// interpolates over the animation's curve.
+/// State writes inside `body` carry animation intent to the next frame.
+/// In that frame, the animation controller samples the start and end values.
+/// Then it interpolates the values over the animation curve.
 ///
 /// Passing `nil` explicitly disables animation for the scope.
 @MainActor
@@ -66,12 +66,12 @@ public func withAnimation<Result>(
   }
 }
 
-/// Executes `body` with `transaction`'s animation intent applied to any
-/// state changes that occur during its execution — the transaction-valued
-/// form of ``withAnimation(_:_:)``, matching SwiftUI's `withTransaction`.
+/// Executes `body` and applies the animation intent of `transaction` to its state changes.
+/// This function is the transaction-valued form of ``withAnimation(_:_:)``.
+/// It matches `withTransaction` in SwiftUI.
 ///
 /// A default (`.inherit`) transaction leaves the enclosing scope's intent
-/// in place; `disablesAnimations` suppresses it; a transaction carrying an
+/// in place. `disablesAnimations` suppresses it. A transaction that contains an
 /// animation scopes that animation exactly like `withAnimation`.
 @MainActor
 @discardableResult
@@ -102,39 +102,36 @@ public func withTransaction<Result>(
 /// Executes `body` with the specified animation and fires `completion`
 /// when the animation completes.
 ///
-/// A fresh `AnimationBatchID` is allocated for the scope; every state
-/// write performed inside `body` travels through the scheduler tagged
-/// with that batch ID, and the animation controller fires `completion`
-/// once every animation and every removal overlay in the batch has
-/// drained.
+/// The function creates a new `AnimationBatchID` for the scope.
+/// Each state write inside `body` goes through the scheduler with that batch ID.
+/// The animation controller fires `completion` after all animations and removal overlays in the batch drain.
 ///
 /// `completionCriteria` is carried on the registration so the
 /// controller can distinguish `.logicallyComplete` (curve returned nil)
-/// from `.removed` (removal overlay purged).  The current controller
-/// treats both as "curve returned nil for every animation in the
-/// batch"; callers using `.removed` on a non-removing state change
-/// will fire at the same time as `.logicallyComplete`.
+/// from `.removed` (removal overlay purged). The current controller treats both as
+/// "curve returned nil for every animation in the
+/// batch." For a state change that does not remove content, `.removed` fires with `.logicallyComplete`.
 ///
 /// `completion` is main-actor isolated, matching every other authored
 /// action closure on this surface (``Button``'s `action`, `.onAppear`,
 /// toolbar and key-command handlers).  The controller only ever fires it
-/// from the main actor, so the isolation costs nothing at the call site
-/// and lets the closure write view state directly — without it the
-/// closure would be `nonisolated` and every `@State` write inside would
-/// need a `MainActor.assumeIsolated` hop.
+/// from the main actor. Thus, the isolation adds no work at the call site.
+/// The closure can write view state directly.
+/// Without this isolation, the closure is `nonisolated`.
+/// Then each `@State` write requires a `MainActor.assumeIsolated` hop.
 ///
 /// The closure is wrapped in its registration-time
 /// ``ImperativeAuthoringContextSnapshot``, the same way toolbar and key
-/// handlers are.  This is what makes the paragraph above *true* rather
-/// than merely intended: the controller fires completions outside any
-/// resolve pass, and a `@State` write with no authoring context bound
-/// does not fail — `State.wrappedValue`'s setter silently falls back to
-/// `box.updateSeedValue`, updating the seed a *fresh* node would start
-/// from instead of the live slot.  Nothing invalidates and the value
+/// handlers are. This behavior makes the description above accurate.
+/// The controller fires completions outside a resolve pass.
+/// A `@State` write without a bound authoring context does not fail.
+/// The setter for `State.wrappedValue` uses `box.updateSeedValue` instead.
+/// This call updates the seed that a *fresh* node uses instead of the live slot.
+/// Nothing invalidates and the value
 /// never changes, which is indistinguishable from the write not
-/// happening.  Snapshotting stores identity rather than the `ViewNode`,
-/// so a completion that fires after its owner is gone recovers no
-/// location and is inert rather than resurrecting a dead node.
+/// happening. The snapshot stores identity instead of the `ViewNode`.
+/// If a completion fires after its owner is gone, it does not recover a location.
+/// Thus, it is inert and does not restore a dead node.
 @MainActor
 @discardableResult
 public func withAnimation<Result>(

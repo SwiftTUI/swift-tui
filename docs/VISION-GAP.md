@@ -13,10 +13,10 @@ omitted even when SwiftUI exposes a corresponding API.
 
 ## Accessibility
 
-**Shipped.** The semantic substrate, the terminal linear renderer,
-cursor-follows-focus, the Web/WASI ARIA tree, the SwiftUI-host overlay that
-pushes runtime focus to VoiceOver, and the Android host's Compose semantics
-overlay.
+**Shipped.** The semantic substrate, terminal linear renderer,
+cursor-follows-focus, and Web/WASI ARIA tree are complete. The SwiftUI-host
+overlay pushes runtime focus to VoiceOver. The Android host provides a Compose
+semantics overlay.
 
 **Not yet built.**
 
@@ -24,25 +24,23 @@ overlay.
   VoiceOver/TalkBack only. Native assistive-technology-originated focus
   traversal is not fed back into SwiftTUI's runtime focus.
 - **A WCAG-referenced conformance suite** and **automated screen-reader
-  testing.** Accessibility is verified by unit tests and guardrail scripts, not
-  by a conformance checklist.
+  testing.** Unit tests and guardrail scripts cover accessibility, but no
+  conformance checklist exists.
 
 ## Android host
 
 **Shipped.** `SwiftTUIAndroidHost` builds for `aarch64-unknown-linux-android28`
 and the `swift-tui-examples/AndroidGallery` app embeds `GalleryView()` in a
-Compose host. The frame snapshot carries styled cells, image attachment payloads,
-damage metadata, focus presentation, accessibility nodes, and announcements, and
-the host surfaces app-requested clipboard writes back across the JNI/C ABI
+Compose host. The frame snapshot carries styled cells, image payloads, damage,
+focus presentation, accessibility nodes, and announcements. The host returns
+app-requested clipboard writes through the JNI/C ABI
 (`swift_tui_android_copy_clipboard_text`). The Compose renderer paints styled
-cells and embedded images — drawing box-drawing, block, and braille glyphs
-procedurally for seamless tiling — maintains a retained bitmap and repaints only
-damaged rows when a frame's damage is contiguous, and exposes a transparent
-semantics overlay that speaks runtime announcements through TalkBack. Input
-bridges hardware keys (arrows, Home/End, Page Up/Down, Delete/Insert, and
-Ctrl/Alt modifiers), the soft keyboard for text-input focus, touch press/drag,
-wheel scroll, tap-to-open hyperlinks, and system clipboard copy and (bracketed)
-paste.
+cells and embedded images. It draws box, block, and braille glyphs with
+procedural rules for continuous tiling. The renderer keeps a retained bitmap.
+If frame damage is contiguous, it repaints only the damaged rows. A transparent
+semantics overlay sends runtime announcements to TalkBack. Input supports
+hardware keys, the soft keyboard, touch, wheel scrolling, hyperlinks, and the
+system clipboard.
 
 **Not yet built.**
 
@@ -57,9 +55,9 @@ paste.
   which run without the NDK), but emulator/device smoke is not in CI.
 - **`x86_64` Android packaging.** The framework — including the vendored
   `swift-png`/`JPEG` image path — cross-compiles for
-  `x86_64-unknown-linux-android28`; the earlier `swift-png` SIMD build blocker
+  `x86_64-unknown-linux-android28`. The earlier `swift-png` SIMD build blocker
   no longer applies (the SIMD pixel path was replaced by a scalar
-  reimplementation). `arm64-v8a` is simply the only ABI the `AndroidGallery`
+  reimplementation). `arm64-v8a` is the only ABI that the `AndroidGallery`
   example currently packages and smoke-tests.
 
 ## Terminal-program embedding
@@ -84,13 +82,14 @@ explicit work-stack paths for parts of measurement and placement.
 **Not yet built.**
 
 - **Fully iterative built-in layout.** The explicit work-stack migration is
-  partial: built-in layout still recurses on the Swift call stack, so the
-  frame-tail worker still runs with an enlarged stack rather than a bounded
-  iterative engine.
-- **`ViewGraph` decomposition.** Splitting `ViewGraph` into smaller types with
-  cleaner ownership, dependency-aware (profile-gated) body re-evaluation,
-  explicit context threading through resolve, and interning of `Identity`
-  values are all design-only — no corresponding code.
+  partial. Built-in layout still recurses on the Swift call stack. Thus, the
+  frame-tail worker uses an enlarged stack instead of a bounded iterative
+  engine.
+- **`ViewGraph` decomposition.** Several changes remain design-only, with no
+  corresponding code. They include smaller `ViewGraph` types with cleaner
+  ownership and dependency-aware (profile-gated) body re-evaluation. They also
+  include explicit context threading through resolve and interning of `Identity`
+  values.
 
 ## WASI / browser execution
 
@@ -102,42 +101,42 @@ This section records only what remains divergent from the project's intent.
 **Not yet built.**
 
 - **Per-tick frame emission under retained reuse.** When retained reuse is
-  active — through the full profile or the lean profile's partial re-enable —
-  reuse gates coalesce surface publications: task-driven ticks that change the
-  raster surface do not each produce a presented frame (observed live on 0.1.9
-  Chromium as Life emitting ~1 wire frame per ~4 generations). The default
-  lean profile without retained reuse masks this today. This is the exit
-  condition for making the full profile the WASI default and for a JSPI
-  main-thread default.
+  active, reuse gates coalesce surface publications. This occurs with the full
+  profile and the partial lean-profile option. Task-driven ticks that change
+  the raster surface do not always produce a frame. In Chromium 0.1.9, Life
+  emitted approximately one wire frame for four generations. The default lean
+  profile masks this fault because it disables retained reuse. This fault must
+  close before the full profile or JSPI main-thread mode becomes the WASI
+  default.
 - **Bounded-stack resolve as architecture.** The chunked driver is a
-  stack-lean profile mechanism, not a fully iterative engine; resolve (and
+  stack-lean profile mechanism, not a fully iterative engine. Resolve and
   built-in layout, registered under "Layout and pipeline internals") still
   recurse on the Swift call stack, so stack budgets remain a per-engine
   constraint rather than a non-issue.
 
 ## Animation, transitions, and gestures
 
-**Shipped.** Value-gated `.animation(_:value:)`, the timing-curve family
-(bezier, spring, repeat/autoreverse), `.transition(_:)` with opacity and offset
-effects, `matchedGeometryEffect`, `TapGesture`/`DragGesture` with
-`.updating`/`.onChanged`/`.onEnded`, and a `Transaction` that carries animation
-intent.
+**Shipped.** Value-gated `.animation(_:value:)` and the timing-curve family
+(bezier, spring, repeat/autoreverse) are complete. The API also includes
+`.transition(_:)` with opacity and offset effects and `matchedGeometryEffect`.
+`TapGesture`/`DragGesture` provide `.updating`/`.onChanged`/`.onEnded`. A
+`Transaction` carries animation intent.
 
 **Not yet built.** These carry the SwiftUI API shape but a narrower behavior.
-Each is noted in a source doc comment; they are registered here so the
-divergence from SwiftUI is recorded rather than silent.
+Each one appears in a source documentation comment. This register makes the
+divergence from SwiftUI explicit.
 
 - **Custom `Transition` effects.** The transition compositor interpolates only
-  opacity and offset; other modifiers applied inside a custom `Transition.body`
+  opacity and offset. Other modifiers applied inside a custom `Transition.body`
   are ignored, and there is no built-in `.scale` transition.
 - **`Gesture.updating(_:body:)` transaction.** The `inout Transaction` passed to
-  the closure is a no-op stand-in; mutations to it are discarded.
-- **`matchedGeometryEffect` size.** It interpolates position only, not size; a
+  the closure is a no-op stand-in. Mutations to it are discarded.
+- **`matchedGeometryEffect` size.** It interpolates position only, not size. A
   matched pair that changes size snaps to the destination size for the whole
   animation.
 - **`TapGesture` multi-tap timing.** Multi-tap counts have no inter-tap timeout:
   consecutive on-target taps count as a multi-tap regardless of elapsed time.
-- **`Transaction` fields.** Only animation intent is exposed; other SwiftUI
+- **`Transaction` fields.** Only animation intent is exposed. Other SwiftUI
   transaction fields are not.
 
 ## Canvas and drawing
@@ -147,7 +146,7 @@ divergence from SwiftUI is recorded rather than silent.
 drawing surface with Braille subpixel rendering.
 
 **Not yet built.** `Canvas`'s internal drawing coordinate model is still the
-legacy integer-cell interface; it has not been migrated to the fractional
+legacy integer-cell interface. It does not use the fractional
 cell-coordinate model the rest of the geometry system uses.
 
 ## Image rendering and compositing
@@ -155,17 +154,17 @@ cell-coordinate model the rest of the geometry system uses.
 **Shipped.** PNG and JPEG images render as host presentation attachments, and
 `SwiftTUIAnimatedImage` displays pre-composed frames by feeding PNG bytes
 through the same image surface. `View.blendMode(_:)` works for terminal-cell
-content such as text, fills, strokes, and borders. A still `Image(...)` with an
-active blend mode is now precomposed against its captured cell backdrop: the
-rasterizer samples the backdrop under the image's visible bounds, applies the
-active `BlendMode` in linear sRGB (with glyph-aware backdrops), and presents the
-result through the existing attachment path, so unblended images keep their fast
-native path.
+content such as text, fills, strokes, and borders. For a still `Image(...)`
+with an active blend mode, the rasterizer precomposes a
+still image that has an active blend mode. It samples the backdrop under the
+visible image bounds. Then it applies the active `BlendMode` in linear sRGB
+with glyph-aware backdrops. It presents the result through the existing
+attachment path. Unblended images keep the fast native path.
 
 **Not yet built.**
 
 - **Animated-image / GIF blending.** `AnimatedImage(...).blendMode(...)` still
-  emits unblended frames; the precomposition path covers still images only.
+  emits unblended frames. The precomposition path covers still images only.
 - **Ordered-layer compositing** of multiple overlapping blended images, and
   **native-host replay** of the precomposed variant outside the terminal image
   path.

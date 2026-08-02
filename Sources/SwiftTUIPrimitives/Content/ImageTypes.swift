@@ -127,7 +127,7 @@ public struct RasterImageCompositing: Equatable, Sendable {
   }
 }
 
-/// A raster-time image placement that the host may present natively.
+/// A raster-time image placement that the host can present natively.
 public struct RasterImageAttachment: Equatable, Sendable {
   /// The full logical destination rect in terminal cells before viewport clipping.
   public var identity: Identity

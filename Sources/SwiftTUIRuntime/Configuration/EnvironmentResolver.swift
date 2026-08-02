@@ -2,12 +2,12 @@ extension RuntimeConfiguration {
   /// Builds a `RuntimeConfiguration` from environment variables and TTY status.
   ///
   /// Delegates to `TerminalCapabilityProfile.detect(environment:isTTY:)` for vars
-  /// it already reads (`NO_COLOR`, `TERM`, `COLORTERM`, `LANG`/`LC_*`). Owns the
-  /// new vars: `SWIFTTUI_*`, `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`.
+  /// it already reads (`NO_COLOR`, `TERM`, `COLORTERM`, `LANG`/`LC_*`).
+  /// This resolver owns `SWIFTTUI_*`, `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI`.
   ///
   /// Precedence within env-var resolution:
   /// 1. `NO_COLOR` always wins over `FORCE_COLOR`
-  /// 2. `CLICOLOR=0` disables color; `CLICOLOR_FORCE` forces it
+  /// 2. `CLICOLOR=0` disables color. `CLICOLOR_FORCE` forces it.
   /// 3. `SWIFTTUI_JSON=1` wins over `SWIFTTUI_ACCESSIBLE=1`
   /// 4. Accessible/linear output implies ASCII, reduced motion, no progress, and linear output
   /// 5. `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` enables terminal cursor focus-following

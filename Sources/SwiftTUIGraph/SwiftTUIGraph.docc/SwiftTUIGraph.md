@@ -5,28 +5,27 @@ registries and semantic vocabulary that ride on it.
 
 ## Overview
 
-`SwiftTUIGraph` owns the resolved view tree and everything that decides *what
-changed*: state slots, dependency tracking, invalidation planning, reuse gates,
-checkpoints, entity routing, the scheduler, and animation intent.
+`SwiftTUIGraph` owns the resolved view tree and the mechanisms that decide *what
+changed*. These mechanisms include state slots, dependency tracking,
+invalidation planning, reuse gates, checkpoints, and entity routing. They also
+include the scheduler and animation intent.
 
 ```
 SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUIRuntime
 ```
 
-It depends on `SwiftTUIPrimitives` **only**. That constraint is deliberate and
-compiler-enforced: graph code names no render type, so reconciliation can be
-tested and reasoned about without a frame pipeline. The module is
-Foundation-free.
+It depends on `SwiftTUIPrimitives` **only**. The compiler enforces this
+constraint. Graph code names no render type. Thus, reconciliation tests do not
+require a frame pipeline. The module is Foundation-free.
 
-You rarely import this module directly — `SwiftTUICore` `@_exported`-imports it,
-so the types below are already in scope from `SwiftTUIViews` or `SwiftTUI`. This
-reference exists because parts of the graph's vocabulary surface in public
-authoring APIs: preference keys, focused values, key events, and the
-matched-geometry namespace.
+You rarely import this module directly. `SwiftTUICore` `@_exported`-imports it.
+Thus, `SwiftTUIViews` and `SwiftTUI` already provide the types below. Parts of
+the graph vocabulary occur in public authoring APIs. These parts include
+preference keys, focused values, key events, and the matched-geometry namespace.
 
-For the normative reconciliation model — dirty frontiers, cones, freshness
-stamps, the two-layer reuse door, and its soundness oracles — see
-<doc:Reuse-and-Invalidation>.
+For the normative reconciliation model, see <doc:Reuse-and-Invalidation>. It
+defines dirty frontiers, cones, freshness stamps, the two-layer reuse door,
+and its soundness oracles.
 
 ## Topics
 

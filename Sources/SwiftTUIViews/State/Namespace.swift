@@ -22,11 +22,10 @@ private enum NamespaceStorageKey: Hashable {
 /// A property wrapper that allocates a stable, opaque namespace ID
 /// scoped to the enclosing view's identity.
 ///
-/// Matches SwiftUI's `@Namespace` ergonomics: declare `@Namespace
-/// var ns` on a view, then pass `ns` into
-/// `.matchedGeometryEffect(id:in:)` to scope matched-geometry IDs
-/// so the same string key can refer to unrelated views in different
-/// parts of the hierarchy without colliding.
+/// This wrapper matches the SwiftUI `@Namespace` API.
+/// Declare `@Namespace var ns` on a view.
+/// Then pass `ns` to `.matchedGeometryEffect(id:in:)` to scope matched-geometry IDs.
+/// The same string key can then identify unrelated views without a collision.
 ///
 /// The namespace ID is stable across renders of the same view
 /// instance (re-uses `@State`-backed storage keyed by the property

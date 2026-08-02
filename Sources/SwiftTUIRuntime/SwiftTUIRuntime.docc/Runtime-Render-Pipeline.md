@@ -20,7 +20,7 @@ surface.
 
 The direct ``DefaultRenderer`` snapshot path and the interactive ``RunLoop``
 path compute the same phase work. The public one-shot path returns
-``RenderSnapshot``; package and run-loop paths keep `FrameArtifacts` as their
+``RenderSnapshot``. Package and run-loop paths keep `FrameArtifacts` as their
 internal committed bundle. The interactive path adds invalidation coalescing,
 frame-tail cancellation, completed-frame drop policy, host-facing damage
 derivation, and presentation to a concrete surface.
@@ -104,9 +104,9 @@ The renderer exposes three execution strategies over the same stage order:
 Package internals use `renderArtifacts(...)` and `renderArtifactsAsync(...)`
 when tests or runtime code intentionally inspect phase IR.
 
-The run loop calls eliding variants so animation-deadline frames that cannot
-affect the drawn surface can commit animation state without running the frame
-tail or presenting a frame.
+The run loop calls eliding variants for animation-deadline frames that cannot
+affect the drawn surface. These variants commit animation state without running
+the frame tail or presenting a frame.
 
 ## Runtime Stages
 
@@ -120,8 +120,8 @@ fusedFrameTail
 commit
 ```
 
-The executor is deliberately exhaustive: adding or reordering a stage changes the
-stage enum and each executor switch.
+The executor is exhaustive. If you add or reorder a stage, change the stage
+enum and each executor switch.
 
 ### Head
 
@@ -162,7 +162,7 @@ The fused frame tail is the performance node that normally computes:
 measure -> place -> semantics -> draw -> raster
 ```
 
-It may run inline or on a frame-tail worker, depending on renderer strategy and
+It can run inline or on a frame-tail worker, depending on renderer strategy and
 platform support. It consumes the resolved tree and retained inputs and returns
 the downstream products plus timing and reuse diagnostics.
 
@@ -174,27 +174,26 @@ reachable from the tail is an explicit-stack loop for that reason.
 
 One depth-limited operation remains on that thread and it is not a walker:
 **releasing** a phase-product tree. `ResolvedNode`, `MeasuredNode`,
-`PlacedNode`, and `DrawNode` store their children inline as `[Self]`, so the
-compiler's own value witnesses recurse once per level when a tree is destroyed
-— with no framework code in the trace. Measured on macOS/arm64, the cost is
-linear in depth: ~475 B per level for `ResolvedNode` (~1104 levels at 512 KiB)
-and ~267 B per level for `MeasuredNode`, `PlacedNode`, and `DrawNode` (~1968
-levels; the per-level cost floors at the array-storage destroy frames, so
-`DrawNode`'s smaller inline size lands in the same bracket). One authored
-`VStack` nesting level costs about three `ResolvedNode` levels. The retained
-previous-frame products hold a full `DrawNode` tree between frames, so deep
-draw trees are reachable from retained-state teardown as well as from live
-frames.
+`PlacedNode`, and `DrawNode` store their children inline as `[Self]`. Thus, the
+compiler's own value witnesses recurse once per level during tree destruction,
+with no framework code in the trace. On macOS/arm64, the cost increases linearly
+with depth. `ResolvedNode` uses approximately 475 B per level, or 1104 levels
+at 512 KiB. `MeasuredNode`, `PlacedNode`, and `DrawNode` use approximately 267
+B per level, or 1968 levels. Array-storage destruction sets the minimum
+per-level cost. Thus, the smaller `DrawNode` has the same limit. One authored
+`VStack` level uses approximately three `ResolvedNode` levels. Retained
+previous-frame products keep a complete `DrawNode` tree between frames. Thus,
+retained-state teardown and live frames can release deep draw trees.
 
-Code that drops a tree of unbounded depth on a small stack should call
-`flattenForRelease()` (see `DeeplyNestedValueTree`), which drains the subtree
-through a heap worklist and makes the release cost O(1) stack. It is opt-in:
-making it automatic would need a mutable class interposed on the child storage,
-whose reads this package's `Sendable` policy would push through a `Mutex` — an
-unacceptable cost on the engine's hottest accessor.
+If code drops an unbounded tree on a small stack, call `flattenForRelease()`.
+See `DeeplyNestedValueTree`. This function drains the subtree through a heap
+worklist. The release then uses O(1) stack space. This behavior is opt-in.
+Automatic flattening requires a mutable class on the child storage. The package
+`Sendable` policy requires a `Mutex` for reads of that class. This cost is not
+acceptable on the engine's hottest accessor.
 
-Nesting far shallower than these bounds is limited first by the resolve
-descent, which recurses per view level on the main actor; `DeferredResolveDriver`
+Nesting far below these bounds is first limited by resolve. This descent
+recurses for each view level on the main actor. `DeferredResolveDriver`
 chunks it on hosts whose stack budget is small enough to need it.
 
 ### Commit
@@ -203,9 +202,9 @@ Commit turns a completed draft into a committed frame candidate. It packages
 lifecycle events, semantic handlers, runtime registrations, transaction effects,
 retained frame-tail state, and diagnostics. A completed candidate can be:
 
-- committed as package `FrameArtifacts`;
-- dropped by completed-frame policy;
-- cancelled before its tail starts;
+- committed as package `FrameArtifacts`.
+- dropped by completed-frame policy.
+- cancelled before its tail starts.
 - elided when an animation-deadline frame has no visible drawn effect.
 
 Commit does not write terminal bytes or browser frames directly. Presentation is
@@ -227,7 +226,7 @@ The runtime stages preserve the same typed product order documented by
 | commit | `CommitPlan` | Package lifecycle, handler installation, semantic snapshot, and transaction work. |
 
 All seven products are gathered on package-only `FrameArtifacts` for inspection
-and retained reuse. Public snapshot callers get ``RenderSnapshot``; hosts should
+and retained reuse. Public snapshot callers get ``RenderSnapshot``. Hosts must
 consume committed host contracts such as ``SemanticHostFrame`` instead of
 reaching into renderer-private retained state.
 
@@ -236,41 +235,40 @@ reaching into renderer-private retained state.
 Authored `View`, `Scene`, and `App` values are main-actor APIs. Work that
 evaluates authored bodies or mutates live runtime state stays on the main actor:
 
-- resolve;
-- runtime graph, state, focus, lifecycle, and task coordination;
-- transaction and registration publication;
+- resolve.
+- runtime graph, state, focus, lifecycle, and task coordination.
+- transaction and registration publication.
 - terminal presentation commit boundaries.
 
 The frame tail is pure over already-resolved products and can run away from the
-main actor when the execution strategy supports it. That boundary is why the
-runtime stage pipeline is different from the phase-product model: the fused tail
-is a scheduling optimization over distinct products, not a different data model.
+main actor when the execution strategy supports it. That boundary separates the
+runtime stage pipeline from the phase-product model. The fused tail is a
+scheduling optimization over distinct products, not a different data model.
 
 ## Lazy Container Windowing
 
 `LazyVStack`/`LazyHStack` content backed by an indexed source (a direct
-`ForEach`) is viewport-windowed end to end when it sits under a `ScrollView`:
-the scroll layout declares a measure-time viewport, measurement realizes and
-sizes only the visible band plus overscan (every other allocation entry is
-synthesized from the first row's extent), and placement materializes rows on
-demand strictly within the visible range. Consequences hosts and tests can
-observe:
+`ForEach`) uses viewport windowing under a `ScrollView`. The scroll layout
+declares a measure-time viewport. Measurement realizes and sizes only the
+visible band plus overscan. It derives other allocation entries from the first
+row extent. Placement materializes rows only in the visible range. Hosts and
+tests can observe these results:
 
 - Rows outside the viewport are not placed: they paint nothing, mint no
   interaction regions, and are not focus-traversal targets until scrolled
-  into view — matching SwiftUI's lazy contract (offscreen lazy rows do not
-  exist yet). `scrollTo` still reaches them through the allocation snapshot's
-  estimated frames.
+  into view. This behavior matches the SwiftUI lazy contract. Offscreen lazy
+  rows do not exist yet. `scrollTo` still reaches them through the estimated
+  frames in the allocation snapshot.
 - The container's content size is an estimate that refines as real
-  measurements replace estimates when the window moves; the scroll offset
+  measurements replace estimates when the window moves. The scroll offset
   registry re-anchors on content-size change.
-- Ineligible shapes — sources spliced into multiple cells per element,
-  negotiated (`nil`) spacing, no enclosing scroll-declared viewport — fall
-  back to exhaustive realization, byte-identical to the pre-windowing
-  pipeline.
-- Frames whose live lazy sources exceed the worker-snapshot element budget
-  keep those sources live and run the frame tail on the main actor instead
-  of pre-realizing every element for worker offload.
+- Some shapes are ineligible. They include sources spliced into multiple cells
+  per element, negotiated (`nil`) spacing, and sources without an enclosing
+  scroll-declared viewport. They use exhaustive realization, byte-identical to
+  the pre-windowing pipeline.
+- Some live lazy sources exceed the worker-snapshot element budget. Their frames
+  keep those sources live and run the frame tail on the main actor. They do not
+  pre-realize every element for worker offload.
 
 ## Damage And Presentation
 
@@ -282,51 +280,49 @@ contract.
 
 ### How the reuse hint is produced
 
-`FrameTailPresentationDamageResolver` runs *after* draw extraction and derives
-damage by **diffing the previous committed draw tree against this frame's**. It
-walks both trees together, pairing children positionally and checking their
-identities, pruning wherever a subtree compares equal; where a node's own
-projection differs, or a child is inserted, removed, or re-keyed, the affected
-rects are recorded.
+`FrameTailPresentationDamageResolver` runs *after* draw extraction. It compares
+the previous committed draw tree with the current draw tree. It walks both
+trees together and pairs children by position. It compares their identities
+and prunes equal subtrees. It records affected rectangles when a node projection
+changes. It also records them after an insertion, removal, or re-keying of a child.
 
-Three properties are worth knowing, because each of them was learned the
-expensive way:
+Three properties are important:
 
 - **The diff basis is the draw tree, not the placed tree and not the
   invalidation set.** `directlyInvalidated` is the invalidation *seed* set — the
   identities whose state or observation changed. Re-resolution routinely changes
   what a node paints without that node being a seed (a sibling reading a derived
   value, an environment or preference propagation, a container relaying out
-  around changed content), so damage keyed on seed subtree extents
-  under-reports. The placed tree is not a sound basis either: draw extraction
-  reuses retained subtrees, so two frames with byte-identical placed subtrees
-  can still emit different draw commands. Rasterization is a pure function of
-  the draw tree, which makes it the only sound basis.
+  around changed content). Thus, damage from seed subtree extents omits some
+  changes. The placed tree is not a sound basis. Draw extraction reuses retained
+  subtrees. Therefore, byte-identical placed subtrees can emit different draw
+  commands. Rasterization is a pure function of the draw tree. This fact makes
+  the draw tree the only sound basis.
 - **Every changed rect carries a one-cell margin.** A terminal cell is not the
-  smallest unit this renderer paints: half-block glyphs give it sub-cell
-  resolution, and the cell carrying the half block sits *outside* the region
-  whose colour it shows. A panel's border ring takes its background from the
-  interior it encloses; a control's focus fill shows through the boundary cell
+  smallest unit this renderer paints. Half-block glyphs give it sub-cell
+  resolution. The cell that carries the half block sits *outside* the region
+  whose color it shows. A panel's border ring takes its background from the
+  interior it encloses. A control's focus fill shows through the boundary cell
   of the adjacent row. A change confined to a node's bounds can therefore
   repaint the cells immediately around them. The one-cell reach is an assumed
-  painter invariant rather than a statically checked one; its enforcement is
-  the F13 verify oracle, which re-rasters every incremental frame in DEBUG and
-  asserts on divergence, so a painter that outgrows the margin reds the suites
-  instead of shipping quietly.
+  painter invariant, not a static type rule. The F13 comparison oracle enforces
+  this invariant. It rasters every incremental frame again in DEBUG and asserts
+  on a difference. Thus, a painter that exceeds the margin fails the suites.
 - **Animation frames barrier.** Property interpolation rewrites the resolved
-  tree after invalidation is computed, and the placed animation overlay
-  decorates the current tree with state the retained baseline does not carry.
+  tree after invalidation. The placed animation overlay decorates the current
+  tree with state that the retained baseline does not carry.
   Both are conservative barriers rather than damage contributions, because an
   incomplete "damage is complete" answer is release-only corruption under
   `.trustSoundDamage`.
 
 A frame that produces no damage falls back to a fresh raster, so every relaxation
 is bounded by a conservative nil. `FrameDiagnostics.presentation.rasterReuse`
-reports which path each committed frame took and, when it barriered, why —
+reports the path for each committed frame. It also reports why a barrier
+occurred. These fields are
 `raster_path` and `raster_reuse_barriers` in the frame TSV. That reporting is
-not decoration: the whole incremental tier was unreachable from the day it
-landed until 2026-07-30, the perf lanes checked in to prove its win measured a
-flat zero, and nothing in the codebase could say so.
+necessary. Before 2026-07-30, the complete incremental tier was unreachable.
+The performance lanes that measured it reported zero. The codebase did not
+report the unreachable path.
 
 Host-facing damage is derived by ``RunLoop`` against the previous
 `RasterSurface` actually presented to the same runtime/frontend pair. This
@@ -343,10 +339,10 @@ For hosts:
 `RasterSurface` also carries package-level ordered presentation layers. Current
 terminal, WebHost/WASI, Android, and external SwiftUI host paths continue to
 consume the collapsed cell grid plus image attachments. The damage derivation
-still returns row/range damage for those hosts, but it also treats
-presentation-layer topology changes as dirty row signals so future
-ordered-layer consumers can detect authoring-order changes even when the final
-collapsed cells are stable.
+still returns row/range damage for those hosts. It also treats
+presentation-layer topology changes as dirty row signals. Future ordered-layer
+consumers can detect authoring-order changes even when the final collapsed cells
+are stable.
 
 ## Host Handoff
 
@@ -358,30 +354,28 @@ JSON and accessible output modes write command-oriented output derived from the
 current frame. Raster hosts consume either a raster presentation surface or a
 ``SemanticHostFrame``. A semantic host frame carries:
 
-- monotonic producer sequence;
-- `RasterSurface`;
-- `SemanticSnapshot`;
-- focused identity;
-- host-facing damage;
+- monotonic producer sequence.
+- `RasterSurface`.
+- `SemanticSnapshot`.
+- focused identity.
+- host-facing damage.
 - preferred layout size when available.
 
 Terminal-native, WASI/browser, localhost WebHost, host-managed Android, and the
 external SwiftUI host all sit below this committed-frame boundary. They share
-the phase order and handoff contract, but resolve reuse, selective evaluation,
-ambient binding, and stack-depth policy vary by the per-host engine profile
-documented in
+the phase order and handoff contract. Resolve reuse, selective evaluation,
+ambient binding, and stack-depth policy vary by the per-host engine profile in
 [Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
 For runtime host seams and surface roles, see <doc:Host-Integration>.
 
 Raster image attachments are still presented after cell rasterization. If an
 attachment carries blend metadata, the host path asks the shared image
-compositor for a precomposed PNG variant keyed by the image reference, visible
-rect, blend mode, backdrop signature, cell pixel size, and host fallback
-background. The compositor expands captured backgrounds and explicit foreground
-glyphs into a pixel backdrop using deterministic block, braille, and centered
-text approximations; terminal graphics protocols, WASI/WebHost/Android image
-records, and the SwiftUI host then draw that variant through their normal image
-routes.
+compositor for a precomposed PNG variant. Its key contains the image reference,
+visible rectangle, blend mode, backdrop signature, cell pixel size, and host
+fallback background. The compositor expands captured backgrounds and explicit
+foreground glyphs into a pixel backdrop. It uses deterministic block, braille,
+and centered text approximations. Terminal graphics protocols and all hosts
+then draw the variant through their normal image routes.
 
 ## Diagnostics
 
@@ -392,15 +386,15 @@ for committed frames, zero-artifact outcomes, and elisions.
 A committed sample includes:
 
 - phase timings for resolve, measure, place, semantics, draw, raster, and
-  commit;
-- worker enqueue, compute, and completion timing;
-- main-actor blocked and suspended timing;
-- render and desired generation;
-- wake causes and coalescing counts;
-- focus-sync rerenders;
-- animation-controller active and pending state;
-- queued input seen during render suspension;
-- drop eligibility and completed-frame disposition;
+  commit.
+- worker enqueue, compute, and completion timing.
+- main-actor blocked and suspended timing.
+- render and desired generation.
+- wake causes and coalescing counts.
+- focus-sync renders.
+- animation-controller active and pending state.
+- queued input seen during render suspension.
+- drop eligibility and completed-frame disposition.
 - presentation metrics and presentation duration.
 
 `SwiftTUIProfiling` turns the runtime's neutral diagnostic samples into
@@ -411,14 +405,14 @@ profiling product.
 
 - Resolve and commit stay on the main actor because they evaluate authored
   bodies, mutate runtime state, and publish user-visible effects.
-- Frame-head side effects must be staged in `FrameHeadTransaction`; aborting,
+- Stage frame-head side effects in `FrameHeadTransaction`. Aborting,
   cancelling, or dropping a frame must not leak registrations, graph changes,
   animation state, portal state, or observation state.
-- The frame tail may be scheduled as one fused runtime stage, but the phase
+- The runtime can schedule the frame tail as one fused stage, but the phase
   products remain distinct and ordered.
 - Host-facing damage is derived against the previous raster surface actually
   presented to that host.
-- Presentation layers consume committed frame contracts; they do not reach into
+- Presentation layers consume committed frame contracts. They do not reach into
   renderer-private retained state.
 
 ## See Also
