@@ -218,12 +218,19 @@ struct SceneInfo: Sendable {
       // from here on. Signal readiness before entering the accept loop.
       onReady?()
 
-      // Accept loop — poll with a timeout so we check for cancellation periodically.
+      // Accept loop. Probe with a zero timeout and sleep between probes: a
+      // blocking `poll` holds a cooperative executor worker for its whole
+      // timeout, and that pool is only as wide as the core count. Because every
+      // CLI app runs this server, a blocking probe permanently consumed one
+      // worker — invisible on a developer machine, but half the pool on a
+      // two-core CI runner, where it starved the run loop before first paint.
+      // `Task.sleep` suspends instead of blocking, so the worker stays free.
       while !Task.isCancelled {
         var pfd = pollfd(fd: serverFD, events: Int16(POLLIN), revents: 0)
-        let ready = unsafe poll(&pfd, 1, 200)  // 200 ms timeout
+        let ready = unsafe poll(&pfd, 1, 0)
         guard ready > 0 else {
-          await Task.yield()
+          // A cancelled sleep returns at once; the `while` condition exits.
+          try? await Task.sleep(nanoseconds: 20_000_000)  // 20 ms
           continue
         }
 
