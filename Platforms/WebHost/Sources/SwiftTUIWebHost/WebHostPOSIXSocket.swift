@@ -239,7 +239,7 @@ enum WebHostPOSIXSocket {
 
   private func systemPoll(
     _ descriptors: UnsafeMutablePointer<pollfd>,
-    _ count: UInt32,
+    _ count: nfds_t,
     _ timeout: Int32
   ) -> Int32 {
     unsafe Darwin.poll(descriptors, count, timeout)
@@ -271,7 +271,7 @@ enum WebHostPOSIXSocket {
 
   private func systemPoll(
     _ descriptors: UnsafeMutablePointer<pollfd>,
-    _ count: UInt32,
+    _ count: nfds_t,
     _ timeout: Int32
   ) -> Int32 {
     unsafe Glibc.poll(descriptors, count, timeout)
@@ -303,7 +303,7 @@ enum WebHostPOSIXSocket {
 
   private func systemPoll(
     _ descriptors: UnsafeMutablePointer<pollfd>,
-    _ count: UInt32,
+    _ count: nfds_t,
     _ timeout: Int32
   ) -> Int32 {
     unsafe Android.poll(descriptors, count, timeout)
@@ -335,7 +335,7 @@ enum WebHostPOSIXSocket {
 
   private func systemPoll(
     _ descriptors: UnsafeMutablePointer<pollfd>,
-    _ count: UInt32,
+    _ count: nfds_t,
     _ timeout: Int32
   ) -> Int32 {
     unsafe Musl.poll(descriptors, count, timeout)
