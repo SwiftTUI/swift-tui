@@ -77,6 +77,7 @@ package enum WebHostServerError: Error, Equatable, Sendable, CustomStringConvert
   case unsupportedPort(Int)
   case unsupportedBindAddress(String)
   case unableToDetermineListeningPort
+  case listenerSetupFailed(code: Int32)
 
   package var description: String {
     switch self {
@@ -86,6 +87,8 @@ package enum WebHostServerError: Error, Equatable, Sendable, CustomStringConvert
       return "Unsupported WebHost bind address: \(address)."
     case .unableToDetermineListeningPort:
       return "Unable to determine WebHost listening port."
+    case .listenerSetupFailed(let code):
+      return "WebHost listener setup failed (errno \(code))."
     }
   }
 }

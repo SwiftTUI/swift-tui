@@ -163,8 +163,9 @@ contains no nested Swift packages.
   (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
   creation, fd lifecycle, resize). These are macOS- and Linux-only.
 
-`SwiftTUIWebHost` owns the embedded HTTP/WebSocket server (FlyingFox) and the
-bundled browser resources. `SwiftTUIWebHostCLI` composes that host with the
+`SwiftTUIWebHost` owns the embedded in-tree HTTP/WebSocket server
+(`WebHostLoopbackServer` + `WebHostWebSocketWire`, no external networking
+dependency) and the bundled browser resources. `SwiftTUIWebHostCLI` composes that host with the
 terminal runner, and the `SwiftTUI` convenience product includes it by default.
 Use `SwiftTUICLI` directly for a terminal-only graph.
 

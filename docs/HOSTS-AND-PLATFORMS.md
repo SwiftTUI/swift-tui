@@ -20,7 +20,7 @@ flowchart TD
     runtime --> term["Terminal-native<br/>SwiftTUICLI · TerminalHost"]
     runtime --> wasi["WASI / browser<br/>SwiftTUIWASI · canvas"]
     runtime --> androidHost["Host-managed Android<br/>SwiftTUIAndroidHost · Compose canvas"]
-    runtime --> web["Localhost WebHost<br/>SwiftTUIWebHost · FlyingFox"]
+    runtime --> web["Localhost WebHost<br/>SwiftTUIWebHost · in-tree server"]
     runtime --> swiftui["Native SwiftUI host (external package)<br/>SwiftUIHost · AppKit/UIKit"]
 
     term --> termOut["Terminal text + ANSI"]
@@ -35,7 +35,7 @@ flowchart TD
 | Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI. Raster output drawn onto a canvas via the `web-surface` transport. Uses the [stack-lean resolve profile](#per-host-engine-profiles) by default. |
 | Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains `HostedSceneSession` values behind a JNI/C ABI and serializes committed frames as web-surface records (the converged wire). Draws styled cells/images plus a semantics overlay in Compose. The Swift host cross-compiles for arm64 and x86_64. The current `AndroidGallery` packages arm64 only. |
-| Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded HTTP/WebSocket server (FlyingFox) and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
+| Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded in-tree HTTP/WebSocket server and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
 | Native SwiftUI host (external package) | `SwiftUIHost` from [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) | A SwiftUI view on macOS or iOS | Retains the same runtime sessions. Presents raster, damage, focus, and accessibility through AppKit/UIKit-backed SwiftUI views. Bridges input plus clipboard writes back to the runtime. It is not a product of this package. |
 
 A binary can support more than one mode. `SwiftTUIWebHostCLI` (`WebHostCLIRunner`)

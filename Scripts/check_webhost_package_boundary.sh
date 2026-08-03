@@ -27,10 +27,17 @@ then
   fail 'Only the SwiftTUI convenience target may reference SwiftTUIWebHostCLI outside Platforms/WebHost.'
 fi
 
-if rg -n --fixed-strings 'FlyingFox' Platforms/CLI/Sources Sources \
+# FlyingFox was internalized on 2026-08-03: the loopback HTTP + WebSocket host
+# is in-tree (WebHostLoopbackServer + WebHostWebSocketWire), and no source or
+# manifest may reintroduce the external dependency.
+if rg -n --fixed-strings 'FlyingFox' Platforms Sources \
   --glob '*.swift'
 then
-  fail 'FlyingFox must only be referenced by the WebHost target.'
+  fail 'FlyingFox was internalized; no target may reference it.'
+fi
+
+if rg -n --fixed-strings 'FlyingFox' Package.swift; then
+  fail 'FlyingFox was internalized; Package.swift must not declare it.'
 fi
 
 swift_tui_target_block=$(target_block SwiftTUI)
@@ -130,8 +137,9 @@ done
 webhost_target_block=$(target_block SwiftTUIWebHost)
 
 case "$webhost_target_block" in
-  *FlyingFox*) ;;
-  *) fail 'The SwiftTUIWebHost target should be the root package target that links FlyingFox.' ;;
+  *FlyingFox*)
+    fail 'FlyingFox was internalized; the SwiftTUIWebHost target must not reference it.'
+    ;;
 esac
 
 case "$webhost_target_block" in

@@ -52,7 +52,7 @@ public enum WebHostRunner {
     try await run(
       app,
       configuration: configuration,
-      server: WebHostFlyingFoxServer(),
+      server: WebHostLoopbackServer(),
       token: WebHostToken(),
       browserOpener: SystemBrowserOpener(),
       bannerWriter: StandardWebHostBannerWriter()

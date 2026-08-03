@@ -71,10 +71,6 @@ let packageDependencies: [Package.Dependency] = [
     url: "https://github.com/migueldeicaza/SwiftTerm.git",
     from: "1.2.0"
   ),
-  .package(
-    url: "https://github.com/swhitty/FlyingFox.git",
-    from: "0.26.0"
-  ),
 ]
 
 let swiftTUIRuntimeDependencies: [Target.Dependency] = [
@@ -302,8 +298,6 @@ let package = Package(
       dependencies: [
         "SwiftTUIRuntime",
         "SwiftTUIWASISurfaceBridge",
-        .product(name: "FlyingFox", package: "FlyingFox"),
-        .product(name: "FlyingSocks", package: "FlyingFox"),
       ],
       path: "Platforms/WebHost/Sources/SwiftTUIWebHost",
       resources: [

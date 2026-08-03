@@ -148,7 +148,7 @@ func withServer(
 ) async throws {
   await webHostNetworkTestGate.enter()
   do {
-    let server = WebHostFlyingFoxServer()
+    let server = WebHostLoopbackServer()
     let session = try await server.start(
       configuration: .init(bind: "127.0.0.1", port: 0),
       token: WebHostToken(rawValue: "test-token"),

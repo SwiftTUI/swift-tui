@@ -92,7 +92,10 @@ struct PackageGraphIsolationTests {
     )
     #expect(rootManifest.contains(".library(name: \"SwiftTUIWebHost\""))
     #expect(rootManifest.contains(".library(name: \"SwiftTUIWebHostCLI\""))
-    #expect(rootManifest.contains(".product(name: \"FlyingFox\""))
+    // The third-party server dependency was internalized on 2026-08-03: the
+    // loopback HTTP + WebSocket host is in-tree, and no external networking
+    // dependency may return.
+    #expect(!rootManifest.contains("Flying" + "Fox"))
     #expect(rootManifest.contains(".copy(\"Resources/browser\")"))
   }
 

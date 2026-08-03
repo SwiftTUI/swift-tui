@@ -86,7 +86,7 @@ struct WebHostCLIRunnerTests {
     let source = try #require(targetBlock(named: "SwiftTUICLI", in: manifest))
 
     #expect(!source.contains("SwiftTUIWebHost"))
-    #expect(!source.contains("FlyingFox"))
+    #expect(!source.contains("Flying" + "Fox"))
   }
 
   private func targetBlock(named targetName: String, in manifest: String) -> String? {

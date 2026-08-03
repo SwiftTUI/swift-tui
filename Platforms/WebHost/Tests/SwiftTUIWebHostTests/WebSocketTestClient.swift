@@ -85,6 +85,59 @@ final class WebSocketTestClient {
     try writeAll(frame)
   }
 
+  /// One masked frame with explicit fin/opcode, for protocol-level tests
+  /// (fragmentation, ping, close). Payloads stay under the 126 length path.
+  func sendFrame(
+    opcode: UInt8,
+    fin: Bool,
+    payload: [UInt8]
+  ) throws {
+    guard payload.count < 126 else {
+      throw WebSocketTestClientError.unsupportedLength
+    }
+
+    let mask: [UInt8] = [0x9A, 0xBC, 0xDE, 0xF0]
+    var frame: [UInt8] = [(fin ? 0x80 : 0x00) | opcode, 0x80 | UInt8(payload.count)]
+    frame.append(contentsOf: mask)
+    for (index, byte) in payload.enumerated() {
+      frame.append(byte ^ mask[index % mask.count])
+    }
+    try writeAll(frame)
+  }
+
+  /// A masked frame header *claiming* `declaredLength` bytes of payload while
+  /// sending none — lets a test exercise the server's header-time size refusal
+  /// without shipping the oversized payload.
+  func sendFrameHeaderClaiming(
+    declaredLength: UInt64,
+    opcode: UInt8
+  ) throws {
+    var frame: [UInt8] = [0x80 | opcode, 0x80 | 127]
+    for shift in stride(from: 56, through: 0, by: -8) {
+      frame.append(UInt8(truncatingIfNeeded: declaredLength >> UInt64(shift)))
+    }
+    frame.append(contentsOf: [0x9A, 0xBC, 0xDE, 0xF0])
+    try writeAll(frame)
+  }
+
+  /// Reads one frame of any opcode. `receiveMessage()` remains the
+  /// data-frame-only strict variant existing tests use.
+  func receiveFrame() throws -> (opcode: UInt8, payload: Data) {
+    let first = try readByte()
+    let second = try readByte()
+    let opcode = first & 0x0f
+
+    var length = Int(second & 0x7f)
+    if length == 126 {
+      let bytes = try readBytes(count: 2)
+      length = (Int(bytes[0]) << 8) | Int(bytes[1])
+    } else if length == 127 {
+      throw WebSocketTestClientError.unsupportedLength
+    }
+
+    return (opcode, Data(try readBytes(count: length)))
+  }
+
   func close() {
     guard fileDescriptor >= 0 else { return }
     socketClose(fileDescriptor)
