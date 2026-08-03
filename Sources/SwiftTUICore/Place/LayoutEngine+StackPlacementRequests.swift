@@ -247,20 +247,40 @@ extension LayoutEngine {
     visibleRange: Range<Int>,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    visibleRange.compactMap { index in
+    guard !visibleRange.isEmpty else { return [] }
+
+    // Window refinement can make placement's estimated-visible range extend
+    // beyond the band measured earlier in this frame. Re-measure that visible
+    // run at its ideal main-axis size and place it cumulatively; treating each
+    // synthetic snapshot offset as an independent origin turns estimate error
+    // into visible gaps between otherwise adjacent rows.
+    var requests: [PlacementRequest] = []
+    requests.reserveCapacity(visibleRange.count)
+    var nextMainOffset = snapshot.childMainOffsets[visibleRange.lowerBound]
+
+    for index in visibleRange {
       // A nil child means an on-demand realization spliced (windowed
       // products pin 1 cell per element at measure time, so this is a
       // mid-frame source drift that cannot normally happen) — tolerate by
       // not placing the row rather than misaligning every later index.
       guard let child = childAt(index) else {
-        return nil
+        if index + 1 < snapshot.childMainOffsets.count {
+          nextMainOffset = snapshot.childMainOffsets[index + 1]
+        }
+        continue
       }
       let childSize = childSizes[index].size
+      let mainProposal: ProposedDimension =
+        if snapshot.measuredWindow?.contains(index) == false {
+          .unspecified
+        } else {
+          .finite(mainDimension(of: childSize, for: axis))
+        }
       var childMeasurement = measure(
         child,
         proposal: stackProposal(
           axis: axis,
-          main: .finite(mainDimension(of: childSize, for: axis)),
+          main: mainProposal,
           cross: crossDimension(of: measured.proposal, for: axis)
         ),
         passContext: passContext
@@ -282,20 +302,32 @@ extension LayoutEngine {
         case .vertical:
           .init(
             x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
-            y: bounds.origin.y + snapshot.childMainOffsets[index]
+            y: bounds.origin.y + nextMainOffset
           )
         case .horizontal:
           .init(
-            x: bounds.origin.x + snapshot.childMainOffsets[index],
+            x: bounds.origin.x + nextMainOffset,
             y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment]
           )
         }
 
-      return PlacementRequest(
-        resolved: child,
-        measured: childMeasurement,
-        bounds: CellRect(origin: origin, size: childMeasurement.measuredSize)
+      requests.append(
+        PlacementRequest(
+          resolved: child,
+          measured: childMeasurement,
+          bounds: CellRect(origin: origin, size: childMeasurement.measuredSize)
+        )
       )
+
+      nextMainOffset += mainDimension(of: childMeasurement.measuredSize, for: axis)
+      if index + 1 < snapshot.childMainOffsets.count {
+        nextMainOffset +=
+          snapshot.childMainOffsets[index + 1]
+          - snapshot.childMainOffsets[index]
+          - snapshot.childMainLengths[index]
+      }
     }
+
+    return requests
   }
 }

@@ -843,6 +843,61 @@ struct LayoutEngineTests {
     #expect(counter.count - measureRealizations == 5)
   }
 
+  @Test("windowed placement keeps estimated visible rows adjacent at their measured heights")
+  func windowedPlacementReflowsEstimatedVisibleRows() throws {
+    // Measurement and placement can temporarily select different row bands
+    // after a heterogeneous band's mean changes. Model that boundary directly:
+    // measure far below the top, then place the top rows from the resulting
+    // estimated allocation.
+    let engine = LayoutEngine()
+    let prefixHeights = [2, 3, 3, 2, 1, 11]
+    let rows = (0..<100).map { index in
+      leaf(
+        "row-\(index)",
+        size: .init(width: 4, height: index < prefixHeights.count ? prefixHeights[index] : 9)
+      )
+    }
+    let lazy = indexedLazyStack("lazy", axis: .vertical, children: rows)
+    let measureContext = LayoutPassContext(retainedLayout: nil)
+    measureContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 90),
+        viewportSize: .init(width: 8, height: 30)
+      )
+    )
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: measureContext
+    )
+    measureContext.popMeasureViewportHint()
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+
+    // The measured band is far below the top, so rows 0...3 carry the
+    // band's synthetic 9-row extent in the allocation snapshot.
+    #expect(snapshot.measuredWindow?.contains(0) == false)
+    #expect(snapshot.childMainLengths[0..<4] == [9, 9, 9, 9])
+
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      viewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 60)),
+        contentOffset: .zero
+      ),
+      passContext: LayoutPassContext(retainedLayout: nil)
+    )
+
+    #expect(
+      placed.children.map(\.identity) == (0..<7).map { testIdentity("row-\($0)") }
+    )
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 2, 5, 8, 10, 11, 22])
+    #expect(placed.children.map(\.bounds.size.height) == [2, 3, 3, 2, 1, 11, 9])
+  }
+
   @Test("window movement replaces estimates with real measurements (drift correction)")
   func windowMovementCorrectsEstimates() throws {
     // Rows 0..49 are 1 cell tall; rows 50..99 are 3 cells. The probe row (0)
