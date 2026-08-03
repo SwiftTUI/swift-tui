@@ -37,6 +37,15 @@ public final class FocusTracker {
     prefersNoFocus
   }
 
+  /// How many modal focus restorations are currently pending.
+  ///
+  /// Exposed for stress harnesses that assert the restoration stack drains when
+  /// modal owners are recreated. Reading the depth through a declared member
+  /// keeps a rename of the underlying storage a compile error.
+  package var modalRestorationDepth: Int {
+    modalRestorationStack.count
+  }
+
   @discardableResult
   public func updateRegions(_ regions: [FocusRegion]) -> Bool {
     let previousFocus = currentFocusIdentity

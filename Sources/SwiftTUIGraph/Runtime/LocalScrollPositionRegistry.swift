@@ -72,6 +72,15 @@ package final class LocalScrollPositionRegistry: Equatable {
 
   package init() {}
 
+  /// How many scroll routes currently hold a focus-reveal anchor.
+  ///
+  /// Exposed for stress harnesses that assert `sync` prunes anchors for routes
+  /// that are no longer live. Reading the count through a declared member keeps
+  /// a rename of the underlying storage a compile error.
+  package var revealAnchorCount: Int {
+    lastRevealAnchors.count
+  }
+
   nonisolated package static func == (
     lhs: LocalScrollPositionRegistry,
     rhs: LocalScrollPositionRegistry

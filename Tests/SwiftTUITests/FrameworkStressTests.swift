@@ -279,6 +279,11 @@ struct FrameworkStressTests {
       #expect(frame.contains("Modal body \(generation)"))
       #expect(harness.focusModalRestorationStackCount == 1)
 
+      maxRestorationStackCount = max(
+        maxRestorationStackCount,
+        harness.focusModalRestorationStackCount
+      )
+
       _ = try harness.clickText("Modal Focus \(generation)", chooseLast: true)
       frame = try harness.clickText("Replace Modal Owner", chooseLast: true)
       #expect(frame.contains("modal owner generation \(generation + 1)"))
@@ -292,7 +297,11 @@ struct FrameworkStressTests {
       #expect(harness.focusModalRestorationStackCount == 0)
     }
 
-    #expect(maxRestorationStackCount <= 1)
+    // Exact, not `<= 1`: the stack must reach one entry while a modal is open
+    // and drain back to zero. The peak is sampled inside the loop right after
+    // the modal opens — sampling only after the replace would make this a max
+    // over already-drained states, and so assert nothing.
+    #expect(maxRestorationStackCount == 1)
   }
 
   @Test("collection identity churn keeps row actions and tasks bounded")
@@ -883,7 +892,7 @@ struct FrameworkStressTests {
     defer { harness.shutdown() }
 
     #expect(harness.scrollPositionRegistrationCount == 1)
-    #expect(harness.scrollRevealAnchorCount <= 1)
+    #expect(harness.scrollRevealAnchorCount == 1)
 
     var maxScrollRegistrations = harness.scrollPositionRegistrationCount
     var maxRevealAnchors = harness.scrollRevealAnchorCount
@@ -900,11 +909,14 @@ struct FrameworkStressTests {
       maxRevealAnchors = max(maxRevealAnchors, harness.scrollRevealAnchorCount)
 
       #expect(harness.scrollPositionRegistrationCount == 1)
-      #expect(harness.scrollRevealAnchorCount <= 1)
+      #expect(harness.scrollRevealAnchorCount == 1)
     }
 
     #expect(maxScrollRegistrations == 1)
-    #expect(maxRevealAnchors <= 1)
+    // Exact, not `<= 1`: the sole live route must keep exactly one anchor. A
+    // bound alone cannot separate "pruned correctly" from "never populated",
+    // and would let a broken `scrollRevealAnchorCount` pass vacuously.
+    #expect(maxRevealAnchors == 1)
   }
 
   @Test("key press handlers stay paired and bounded under focus owner churn")
@@ -4996,12 +5008,7 @@ final class StressRuntimeHarness<Content: View> {
   }
 
   var focusModalRestorationStackCount: Int {
-    let mirror = Mirror(reflecting: runLoop.focusTracker)
-    guard let child = mirror.children.first(where: { $0.label == "modalRestorationStack" })
-    else {
-      return -1
-    }
-    return Mirror(reflecting: child.value).children.count
+    runLoop.focusTracker.modalRestorationDepth
   }
 
   var preferenceObservationRegistrationCount: Int {
@@ -5059,12 +5066,7 @@ final class StressRuntimeHarness<Content: View> {
   }
 
   var scrollRevealAnchorCount: Int {
-    let mirror = Mirror(reflecting: runLoop.localScrollPositionRegistry)
-    guard let child = mirror.children.first(where: { $0.label == "lastRevealAnchors" })
-    else {
-      return -1
-    }
-    return Mirror(reflecting: child.value).children.count
+    runLoop.localScrollPositionRegistry.revealAnchorCount
   }
 
   func shutdown() {
