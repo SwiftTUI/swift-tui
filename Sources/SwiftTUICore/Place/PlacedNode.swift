@@ -125,13 +125,19 @@ package struct LazyChildScrollEstimate: Equatable, Sendable {
 /// copy-on-write box keeps the recursive node size stable.
 package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var lazyChildScrollEstimates: [LazyChildScrollEstimate]?
+  /// The lazy allocation that produced this node's placement. Windowed
+  /// measurement retains it through the placed tree because indexed lazy
+  /// nodes intentionally do not embed their realized rows in the measured
+  /// tree and therefore may be absent from its retained index.
+  package var lazyStackAllocationSnapshot: LazyStackAllocationSnapshot?
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
   package var hostedListVisibleLayout: ListVisibleLayout?
   package var hostedTableVisibleLayout: TableVisibleLayout?
 
   package var isEmpty: Bool {
-    lazyChildScrollEstimates == nil && hostedCollectionTableColumnWidths == nil
+    lazyChildScrollEstimates == nil && lazyStackAllocationSnapshot == nil
+      && hostedCollectionTableColumnWidths == nil
       && scrollViewportRect == nil && hostedListVisibleLayout == nil
       && hostedTableVisibleLayout == nil
   }
@@ -250,6 +256,14 @@ package struct PlacedNode: Equatable, Sendable {
     set {
       var metadata = placementMetadata
       metadata.lazyChildScrollEstimates = newValue
+      placementMetadata = metadata
+    }
+  }
+  package var lazyStackAllocationSnapshot: LazyStackAllocationSnapshot? {
+    get { placementMetadata.lazyStackAllocationSnapshot }
+    set {
+      var metadata = placementMetadata
+      metadata.lazyStackAllocationSnapshot = newValue
       placementMetadata = metadata
     }
   }

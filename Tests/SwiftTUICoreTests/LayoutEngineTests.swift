@@ -898,6 +898,61 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.bounds.size.height) == [2, 3, 3, 2, 1, 11, 9])
   }
 
+  @Test("visible-range boundary changes keep common rows moving with the viewport")
+  func windowedPlacementKeepsAStableMeasuredBandAnchor() throws {
+    // Rows before the measured window are synthetic 3-cell allocations, but
+    // row 3 is really 1 cell tall. Moving the viewport from 11 to 12 drops
+    // row 3 from the visible placement run. If each run starts at its own
+    // synthetic offset, every remaining row jumps down by 2 cells while the
+    // viewport moves down by 1.
+    let engine = LayoutEngine()
+    let rows = (0..<37).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: index == 3 ? 1 : 3))
+    }
+    let lazy = indexedLazyStack("lazy", axis: .vertical, children: rows)
+    let measureContext = LayoutPassContext(retainedLayout: nil)
+    measureContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 18),
+        viewportSize: .init(width: 8, height: 48)
+      )
+    )
+    let measured = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: measureContext
+    )
+    measureContext.popMeasureViewportHint()
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+    #expect(snapshot.measuredWindow == 5..<24)
+    #expect(snapshot.childMainLengths[3] == 3)
+
+    func place(at offset: Int) -> PlacedNode {
+      engine.place(
+        lazy,
+        measured: measured,
+        in: .init(
+          origin: .init(x: 0, y: -offset),
+          size: measured.measuredSize
+        ),
+        viewportContext: .init(
+          axes: [.vertical],
+          viewportRect: .init(origin: .zero, size: .init(width: 8, height: 48)),
+          contentOffset: .init(x: 0, y: offset)
+        ),
+        passContext: LayoutPassContext(retainedLayout: nil)
+      )
+    }
+
+    let before = place(at: 11)
+    let after = place(at: 12)
+    let beforeRow = try #require(before.children.first { $0.identity == testIdentity("row-5") })
+    let afterRow = try #require(after.children.first { $0.identity == testIdentity("row-5") })
+
+    #expect(afterRow.bounds.origin.y == beforeRow.bounds.origin.y - 1)
+  }
+
   @Test("window movement replaces estimates with real measurements (drift correction)")
   func windowMovementCorrectsEstimates() throws {
     // Rows 0..49 are 1 cell tall; rows 50..99 are 3 cells. The probe row (0)
@@ -1213,6 +1268,91 @@ struct LayoutEngineTests {
     #expect(snapshot.measuredWindow == 9..<14)
     // Band realizations only — element 0 was never probed.
     #expect(counter.count - realizationsBefore == 5)
+  }
+
+  @Test("rewindowing preserves the already-scrolled prefix allocation")
+  func rewindowingPreservesAlreadyScrolledPrefixAllocation() throws {
+    // The visible band's mean is allowed to refine the unseen tail so scroll
+    // reach converges. It must not rewrite rows before the new window: doing
+    // that changes the visible window's origin and makes content jump in the
+    // opposite direction from the user's scroll input.
+    let engine = LayoutEngine()
+    let rows = (0..<40).map { index in
+      leaf("row-\(index)", size: .init(width: 4, height: index < 7 ? 1 : 5))
+    }
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: rows,
+      elementIdentities: rows.indices.map { testIdentity("derived-row-\($0)") }
+    )
+
+    let firstContext = LayoutPassContext(retainedLayout: nil)
+    firstContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .zero,
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    let firstProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: firstContext
+    )
+    firstContext.popMeasureViewportHint()
+    let firstSnapshot = try #require(firstProduct.containerAllocationSnapshot?.lazyStack)
+    #expect(firstSnapshot.measuredWindow == 0..<7)
+    #expect(firstSnapshot.estimatedRowStride == 1)
+
+    let placed = engine.place(
+      lazy,
+      measured: firstProduct,
+      in: .init(origin: .zero, size: firstProduct.measuredSize),
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: lazy,
+      measuredTree: firstProduct,
+      placedTree: placed,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: lazy.identity,
+        bounds: .init(origin: .zero, size: firstProduct.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let secondContext = LayoutPassContext(
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: .init(frame: previousFrame),
+        invalidatedIdentities: [lazy.identity]
+      )
+    )
+    secondContext.pushMeasureViewportHint(
+      .init(
+        axes: [.vertical],
+        contentOffset: .init(x: 0, y: 12),
+        viewportSize: .init(width: 8, height: 5)
+      )
+    )
+    defer { secondContext.popMeasureViewportHint() }
+
+    let secondProduct = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: secondContext
+    )
+    let secondSnapshot = try #require(secondProduct.containerAllocationSnapshot?.lazyStack)
+    let secondWindow = try #require(secondSnapshot.measuredWindow)
+
+    #expect(secondWindow == 11..<19)
+    #expect(secondSnapshot.estimatedRowStride == 5)
+    #expect(
+      Array(secondSnapshot.childMainLengths[..<secondWindow.lowerBound])
+        == Array(firstSnapshot.childMainLengths[..<secondWindow.lowerBound])
+    )
   }
 
   @Test("an exhaustive previous product seeds the stride from its exact mean")
@@ -2036,7 +2176,8 @@ private func indexedLazyStack(
   _ name: String,
   axis: Axis,
   children: [ResolvedNode],
-  realizationCounter: RealizationCounter? = nil
+  realizationCounter: RealizationCounter? = nil,
+  elementIdentities: [Identity]? = nil
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
@@ -2050,7 +2191,8 @@ private func indexedLazyStack(
     indexedChildSource: TestIndexedChildSource(
       identityRoot: testIdentity(name),
       children: children,
-      realizationCounter: realizationCounter
+      realizationCounter: realizationCounter,
+      elementIdentities: elementIdentities
     )
   )
 }
@@ -2191,15 +2333,18 @@ private struct TestIndexedChildSource: IndexedChildSource {
   let measurementSignature: IndexedChildMeasurementSignature
   private let children: [ResolvedNode]
   private let realizationCounter: RealizationCounter?
+  private let elementIdentities: [Identity]
 
   init(
     identityRoot: Identity,
     children: [ResolvedNode],
-    realizationCounter: RealizationCounter? = nil
+    realizationCounter: RealizationCounter? = nil,
+    elementIdentities: [Identity]? = nil
   ) {
     self.identityRoot = identityRoot
     self.children = children
     self.realizationCounter = realizationCounter
+    self.elementIdentities = elementIdentities ?? children.map(\.identity)
     measurementSignature = .init(elementPaths: children.map(\.identity.path))
   }
 
@@ -2213,7 +2358,7 @@ private struct TestIndexedChildSource: IndexedChildSource {
   }
 
   func elementIdentity(at index: Int) -> Identity {
-    children[index].identity
+    elementIdentities[index]
   }
 }
 

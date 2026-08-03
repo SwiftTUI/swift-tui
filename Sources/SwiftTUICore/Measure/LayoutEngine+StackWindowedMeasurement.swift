@@ -38,6 +38,7 @@ final class WindowedLazyStackMeasurementContext {
   let verticalAlignment: VerticalAlignment
   let hint: MeasureViewportHint
   let idealProposal: ProposedSize
+  let retainedSnapshot: LazyStackAllocationSnapshot?
 
   init(
     node: ResolvedNode,
@@ -48,7 +49,8 @@ final class WindowedLazyStackMeasurementContext {
     horizontalAlignment: HorizontalAlignment,
     verticalAlignment: VerticalAlignment,
     hint: MeasureViewportHint,
-    idealProposal: ProposedSize
+    idealProposal: ProposedSize,
+    retainedSnapshot: LazyStackAllocationSnapshot?
   ) {
     self.node = node
     self.originalProposal = originalProposal
@@ -59,6 +61,7 @@ final class WindowedLazyStackMeasurementContext {
     self.verticalAlignment = verticalAlignment
     self.hint = hint
     self.idealProposal = idealProposal
+    self.retainedSnapshot = retainedSnapshot
   }
 }
 
@@ -125,6 +128,11 @@ extension LayoutEngine {
     guard let spacing = spacingOverride, viewportLength > 0, count > 0 else {
       return false
     }
+    let retainedSnapshot = retainedLazyStackSnapshot(
+      for: node,
+      axis: axis,
+      passContext: passContext
+    )
 
     let context = WindowedLazyStackMeasurementContext(
       node: node,
@@ -139,7 +147,8 @@ extension LayoutEngine {
         axis: axis,
         main: .unspecified,
         cross: crossDimension(of: effectiveProposal, for: axis)
-      )
+      ),
+      retainedSnapshot: retainedSnapshot
     )
 
     // Anchor stride: the previous frame's product for this identity when one
@@ -303,14 +312,6 @@ extension LayoutEngine {
     let bandCross = windowMeasurements.reduce(0) {
       max($0, crossDimension(of: $1.measuredSize, for: axis))
     }
-    let estimatedCellSize: CellSize =
-      switch axis {
-      case .vertical:
-        CellSize(width: bandCross, height: rowExtent)
-      case .horizontal:
-        CellSize(width: rowExtent, height: bandCross)
-      }
-
     var childMainOffsets: [Int] = []
     var childMainLengths: [Int] = []
     var childIdentities: [Identity] = []
@@ -332,9 +333,29 @@ extension LayoutEngine {
         identity = windowChildren[index - window.lowerBound].identity
         size = measurement.measuredSize
       } else {
-        length = rowExtent
         identity = source?.elementIdentity(at: index) ?? node.identity
-        size = estimatedCellSize
+        // A new band's mean may refine the unseen tail, but changing an
+        // already-scrolled prefix changes the current window's origin and
+        // visibly moves content independently of the scroll offset. Carry
+        // the index-parallel prefix only after the retained source signature
+        // proves element order is unchanged. Exact extents then remain exact
+        // and earlier estimates remain spatially stable across re-windowing.
+        length =
+          if index < window.lowerBound,
+            let retainedSnapshot = context.retainedSnapshot,
+            retainedSnapshot.childMainLengths.indices.contains(index)
+          {
+            retainedSnapshot.childMainLengths[index]
+          } else {
+            rowExtent
+          }
+        size =
+          switch axis {
+          case .vertical:
+            CellSize(width: bandCross, height: length)
+          case .horizontal:
+            CellSize(width: length, height: bandCross)
+          }
       }
       childMainLengths.append(length)
       childIdentities.append(identity)
@@ -429,9 +450,11 @@ extension LayoutEngine {
     passContext: LayoutPassContext
   ) -> Int? {
     guard
-      let previous = passContext.retainedLayout?.measuredNode(for: node.identity),
-      let snapshot = previous.containerAllocationSnapshot?.lazyStack,
-      snapshot.axis == axis
+      let snapshot = retainedLazyStackSnapshot(
+        for: node,
+        axis: axis,
+        passContext: passContext
+      )
     else {
       return nil
     }
@@ -445,6 +468,52 @@ extension LayoutEngine {
       return nil
     }
     return max(1, (snapshot.contentMainLength + spacing) / count)
+  }
+
+  private func retainedLazyStackSnapshot(
+    for node: ResolvedNode,
+    axis: Axis,
+    passContext: LayoutPassContext
+  ) -> LazyStackAllocationSnapshot? {
+    let retainedLayout = passContext.retainedLayout
+    let previousMeasured: MeasuredNode?
+    let previousPlaced: PlacedNode?
+    let previousResolved: ResolvedNode?
+    if let viewNodeID = node.viewNodeID {
+      // The document's ForEach element applies an interior `.id`, so several
+      // structural products can collapse onto the same runtime identity. Use
+      // the occurrence-exact node table when the graph supplied a node ID.
+      // Indexed-source measurements are not always present in that parallel
+      // table, so retain the structural-identity fallback for their product.
+      previousMeasured =
+        retainedLayout?.previousFrameIndex?.measuredByNodeID[viewNodeID]
+        ?? retainedLayout?.measuredNode(for: node.identity)
+      previousPlaced =
+        retainedLayout?.previousFrameIndex?.placedByNodeID[viewNodeID]
+        ?? retainedLayout?.placedNode(for: node.identity)
+      previousResolved =
+        retainedLayout?.previousFrameIndex?.resolvedByNodeID[viewNodeID]
+        ?? retainedLayout?.resolvedNode(for: node.identity)
+    } else {
+      previousMeasured = retainedLayout?.measuredNode(for: node.identity)
+      previousPlaced = retainedLayout?.placedNode(for: node.identity)
+      previousResolved = retainedLayout?.resolvedNode(for: node.identity)
+    }
+    let snapshot =
+      previousMeasured?.containerAllocationSnapshot?.lazyStack
+      ?? previousPlaced?.lazyStackAllocationSnapshot
+    guard
+      let snapshot,
+      snapshot.axis == axis,
+      let previousResolved,
+      let previousSource = previousResolved.indexedChildSource,
+      let source = node.indexedChildSource,
+      previousSource.measurementSignature == source.measurementSignature,
+      snapshot.childMainLengths.count == source.count
+    else {
+      return nil
+    }
+    return snapshot
   }
 
   /// The estimated-visible index band for a lazy stack under a measure

@@ -31,6 +31,7 @@ extension LayoutEngine {
       measured: measured,
       placedChildren: children
     )
+    node.lazyStackAllocationSnapshot = measured.containerAllocationSnapshot?.lazyStack
     node.hostedCollectionTableColumnWidths =
       measured.containerAllocationSnapshot?
       .hostedCollection?.tableColumnWidths

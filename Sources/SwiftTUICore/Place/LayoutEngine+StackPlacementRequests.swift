@@ -1,3 +1,9 @@
+private struct IndexedLazyStackPlacementChild {
+  var index: Int
+  var resolved: ResolvedNode
+  var measured: MeasuredNode
+}
+
 extension LayoutEngine {
   func stackPlacementRequests(
     for resolved: ResolvedNode,
@@ -251,12 +257,13 @@ extension LayoutEngine {
 
     // Window refinement can make placement's estimated-visible range extend
     // beyond the band measured earlier in this frame. Re-measure that visible
-    // run at its ideal main-axis size and place it cumulatively; treating each
-    // synthetic snapshot offset as an independent origin turns estimate error
-    // into visible gaps between otherwise adjacent rows.
-    var requests: [PlacementRequest] = []
-    requests.reserveCapacity(visibleRange.count)
-    var nextMainOffset = snapshot.childMainOffsets[visibleRange.lowerBound]
+    // run at its ideal main-axis size. Rows remain adjacent, but the run must
+    // not anchor at its changing visible lower bound: when that boundary drops
+    // an estimated row whose real height differs, every surviving row jumps.
+    // Anchor inside the measured band when it overlaps the visible run, then
+    // reflow in both directions from that stable exact allocation.
+    var placementChildren: [IndexedLazyStackPlacementChild] = []
+    placementChildren.reserveCapacity(visibleRange.count)
 
     for index in visibleRange {
       // A nil child means an on-demand realization spliced (windowed
@@ -264,9 +271,6 @@ extension LayoutEngine {
       // mid-frame source drift that cannot normally happen) — tolerate by
       // not placing the row rather than misaligning every later index.
       guard let child = childAt(index) else {
-        if index + 1 < snapshot.childMainOffsets.count {
-          nextMainOffset = snapshot.childMainOffsets[index + 1]
-        }
         continue
       }
       let childSize = childSizes[index].size
@@ -292,40 +296,93 @@ extension LayoutEngine {
           to: mainDimension(of: childSize, for: axis)
         )
       }
-      let dimensions = viewDimensions(
-        for: child,
-        measured: childMeasurement
+      placementChildren.append(
+        IndexedLazyStackPlacementChild(
+          index: index,
+          resolved: child,
+          measured: childMeasurement
+        )
       )
+    }
+
+    guard !placementChildren.isEmpty else { return [] }
+
+    let anchorIndex: Int =
+      if let measuredWindow = snapshot.measuredWindow {
+        max(visibleRange.lowerBound, measuredWindow.lowerBound)
+          < min(visibleRange.upperBound, measuredWindow.upperBound)
+          ? max(visibleRange.lowerBound, measuredWindow.lowerBound)
+          : visibleRange.lowerBound
+      } else {
+        visibleRange.lowerBound
+      }
+    var refinedLengths: [Int: Int] = [:]
+    refinedLengths.reserveCapacity(placementChildren.count)
+    for child in placementChildren {
+      refinedLengths[child.index] = mainDimension(of: child.measured.measuredSize, for: axis)
+    }
+
+    func spacing(after index: Int) -> Int {
+      guard index + 1 < snapshot.childMainOffsets.count else { return 0 }
+      return snapshot.childMainOffsets[index + 1]
+        - snapshot.childMainOffsets[index]
+        - snapshot.childMainLengths[index]
+    }
+
+    var refinedOffsets: [Int: Int] = [
+      anchorIndex: snapshot.childMainOffsets[anchorIndex]
+    ]
+    var nextMainOffset = snapshot.childMainOffsets[anchorIndex]
+    if anchorIndex + 1 < visibleRange.upperBound {
+      for index in anchorIndex..<(visibleRange.upperBound - 1) {
+        nextMainOffset += refinedLengths[index] ?? snapshot.childMainLengths[index]
+        nextMainOffset += spacing(after: index)
+        refinedOffsets[index + 1] = nextMainOffset
+      }
+    }
+    nextMainOffset = snapshot.childMainOffsets[anchorIndex]
+    if anchorIndex > visibleRange.lowerBound {
+      for index in stride(
+        from: anchorIndex - 1,
+        through: visibleRange.lowerBound,
+        by: -1
+      ) {
+        nextMainOffset -= refinedLengths[index] ?? snapshot.childMainLengths[index]
+        nextMainOffset -= spacing(after: index)
+        refinedOffsets[index] = nextMainOffset
+      }
+    }
+
+    var requests: [PlacementRequest] = []
+    requests.reserveCapacity(placementChildren.count)
+    for child in placementChildren {
+      let dimensions = viewDimensions(
+        for: child.resolved,
+        measured: child.measured
+      )
+      let mainOffset = refinedOffsets[child.index] ?? snapshot.childMainOffsets[child.index]
 
       let origin: CellPoint =
         switch axis {
         case .vertical:
           .init(
             x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
-            y: bounds.origin.y + nextMainOffset
+            y: bounds.origin.y + mainOffset
           )
         case .horizontal:
           .init(
-            x: bounds.origin.x + nextMainOffset,
+            x: bounds.origin.x + mainOffset,
             y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment]
           )
         }
 
       requests.append(
         PlacementRequest(
-          resolved: child,
-          measured: childMeasurement,
-          bounds: CellRect(origin: origin, size: childMeasurement.measuredSize)
+          resolved: child.resolved,
+          measured: child.measured,
+          bounds: CellRect(origin: origin, size: child.measured.measuredSize)
         )
       )
-
-      nextMainOffset += mainDimension(of: childMeasurement.measuredSize, for: axis)
-      if index + 1 < snapshot.childMainOffsets.count {
-        nextMainOffset +=
-          snapshot.childMainOffsets[index + 1]
-          - snapshot.childMainOffsets[index]
-          - snapshot.childMainLengths[index]
-      }
     }
 
     return requests
