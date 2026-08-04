@@ -19,4 +19,6 @@ SwiftTUITerminalWorkspace|Platforms/Embedding/Sources/SwiftTUITerminalWorkspace/
 SwiftTUIWASI|Platforms/WASI/Sources/SwiftTUIWASI/SwiftTUIWASI.docc
 SwiftTUIWebHost|Platforms/WebHost/Sources/SwiftTUIWebHost/SwiftTUIWebHost.docc
 SwiftTUIWebHostCLI|Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.docc
+SwiftTUIAndroidHost|Platforms/Android/Sources/SwiftTUIAndroidHost/SwiftTUIAndroidHost.docc
 SwiftTUIAnimatedImage|Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc
+SwiftTUIProfiling|Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc

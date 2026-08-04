@@ -29,7 +29,7 @@ convenience overlay over `SwiftTUIRuntime.App`.
 When your app needs a narrower launch or hosting story, choose an in-package
 integration product or an externally distributed host. The canonical
 packaging boundaries live in
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+[Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
 
 ## Import Matrix
 
@@ -147,7 +147,7 @@ embedding. The external
 [`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses it
 for native SwiftUI embedding. `@swifttui/web` consumes the same authored scene
 model from a `SwiftTUIWASI` build. See
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md)
+[Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms)
 for the canonical
 distribution and engine-profile matrix.
 

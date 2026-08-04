@@ -64,21 +64,9 @@ scheduling, async tail cancellation, or host presentation.
 
 ## Code Map
 
-Use these files as entry points when tracing the implementation:
-
-| Question | Start here |
-| --- | --- |
-| How does an app become a run loop? | `Sources/SwiftTUIRuntime/Scenes/WindowSceneSelection.swift`, `Sources/SwiftTUIRuntime/Scenes/SceneSession.swift`, platform runners under `Platforms/` |
-| How does the run loop decide a frame is needed? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop.swift`, `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Rendering.swift`, `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameAcquisition.swift` |
-| What is the renderer entry point? | `Sources/SwiftTUIRuntime/SwiftTUI.swift` |
-| What executes the runtime stages? | `Sources/SwiftTUIRuntime/Rendering/RuntimeRenderPipeline.swift` |
-| Where does resolve happen? | `Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift`, `Sources/SwiftTUIViews/Foundation/ViewFoundation.swift`, `Sources/SwiftTUIGraph/Resolve/ViewGraph.swift` |
-| Where do measure, place, semantics, draw, and raster run? | `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer.swift`, `Sources/SwiftTUIRuntime/Rendering/FrameTailRenderer+InlineStages.swift` |
-| Where does commit decide effects and completed-frame disposition? | `Sources/SwiftTUIRuntime/Rendering/DefaultRenderer+CompletedFrameCandidates.swift` |
-| Where does a committed frame reach hosts? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+Presentation.swift`, `Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift` |
-| Where are frame diagnostics emitted? | `Sources/SwiftTUIRuntime/RunLoop/RunLoop+FrameDiagnostics.swift`, `Sources/SwiftTUIRuntime/Diagnostics/RuntimeFrameSample.swift`, `Sources/SwiftTUIProfiling/` |
-
-Paths are relative to the `swift-tui` package root.
+Implementation entry points are contributor-facing and mapped in the
+repository's internal `docs/CODEBASE-GUIDE.md`, which pairs this article's
+stage descriptions with the owning source files.
 
 ## Renderer Entry Points
 
@@ -319,10 +307,7 @@ A frame that produces no damage falls back to a fresh raster, so every relaxatio
 is bounded by a conservative nil. `FrameDiagnostics.presentation.rasterReuse`
 reports the path for each committed frame. It also reports why a barrier
 occurred. These fields are
-`raster_path` and `raster_reuse_barriers` in the frame TSV. That reporting is
-necessary. Before 2026-07-30, the complete incremental tier was unreachable.
-The performance lanes that measured it reported zero. The codebase did not
-report the unreachable path.
+`raster_path` and `raster_reuse_barriers` in the frame TSV.
 
 Host-facing damage is derived by ``RunLoop`` against the previous
 `RasterSurface` actually presented to the same runtime/frontend pair. This
@@ -365,7 +350,7 @@ Terminal-native, WASI/browser, localhost WebHost, host-managed Android, and the
 external SwiftUI host all sit below this committed-frame boundary. They share
 the phase order and handoff contract. Resolve reuse, selective evaluation,
 ambient binding, and stack-depth policy vary by the per-host engine profile in
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
+<doc:Hosts-And-Platforms>.
 For runtime host seams and surface roles, see <doc:Host-Integration>.
 
 Raster image attachments are still presented after cell rasterization. If an

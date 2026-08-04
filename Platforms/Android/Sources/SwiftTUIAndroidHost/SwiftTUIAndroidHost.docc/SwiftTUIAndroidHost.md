@@ -18,7 +18,7 @@ reported cell-pixel metrics. Then it requests a surface refresh.
 This Swift product is one half of the Android integration. The Compose host,
 JNI shim, AAR, and Gradle plugin ship from
 [`swift-tui-android`](https://github.com/SwiftTUI/swift-tui-android). See
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md)
+[Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms)
 for the
 canonical packaging and engine-profile boundaries.
 
@@ -65,8 +65,8 @@ Frame bytes stay cached until the client consumes a newer sequence.
 
 The Android render poll also drives the Swift main-actor executor so ready
 runtime continuations, tasks, and animation wakes make progress on the host
-main thread. Current behavior gaps are tracked in
-[Vision Gap](https://github.com/SwiftTUI/swift-tui/blob/main/docs/VISION-GAP.md#android-host).
+main thread. Current behavior gaps are contributor-facing and tracked in the
+repository's `docs/VISION-GAP.md` gap register, not here.
 
 ## Topics
 

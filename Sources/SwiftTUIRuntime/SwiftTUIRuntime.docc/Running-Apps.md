@@ -63,7 +63,7 @@ terminal/WebHost launch surface and animated GIF/image support for ordinary app
 binaries.
 
 The same authored `App` and `Scene` declarations feed every integration in the
-canonical [host matrix](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+canonical host matrix in <doc:Hosts-And-Platforms>.
 That owner
 records the execution modes, packaging boundaries, and per-host engine
 profiles. This article describes the shared runtime entry points.

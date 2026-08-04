@@ -28,6 +28,17 @@ SwiftTUI also honors the standard terminal conventions — `NO_COLOR`,
 `LANG`/`LC_*` — through ``TerminalCapabilityProfile`` and the runtime
 configuration resolver. `NO_COLOR` always wins over `FORCE_COLOR`.
 
+Beyond that family, the framework consults these standard variables:
+
+| Variable | Effect |
+| --- | --- |
+| `COLORFGBG` | Selects the light/dark terminal appearance when the terminal reports its palette this way, which changes the resolved theme. |
+| `TERM_PROGRAM` | Drives the sub-cell pointer-precision compatibility matrix (`xterm.js`, `foot`, `kitty`, `wezterm`, `iTerm.app`, …). |
+| `LC_TERMINAL` | iTerm2's terminal identifier; consulted alongside `TERM_PROGRAM` for pointer precision. |
+| `TMUX` | Suppresses pixel-mouse probing inside tmux (the kitty-keyboard probe is also skipped there). |
+| `SHELL` | The default shell for `SwiftTUITerminalWorkspace` panes; falls back to `/bin/sh`. |
+| `HOME` | The install location for `SwiftTUIArguments` completion scripts; installation fails when it is empty. |
+
 ### Output and presentation
 
 Read by `RuntimeConfiguration.detect(environment:isStdoutTTY:)` at session

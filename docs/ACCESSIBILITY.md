@@ -1,36 +1,21 @@
-# Accessibility
+# Accessibility (internal notes)
 
-SwiftTUI builds accessibility into the render pipeline rather than bolting it
-on. Every frame produces one semantic snapshot. Five different consumers
-present it. This document describes the substrate and those consumers.
+The consumer-facing accessibility documentation — the semantic modifiers,
+`AccessibilityRole`/`AccessibilityPoliteness`, `AccessibilityAnnouncer`,
+reduced motion, and output-mode detection — is the published DocC article
+[Accessibility](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
+(`SwiftTUIViews` catalog). This file holds the maintainer-facing pipeline
+wiring: how one snapshot feeds every consumer path.
 
-## The semantic substrate
+## The extraction pipeline
 
-Authored views attach semantic metadata with modifiers:
-
-- `.accessibilityRole(_:)`
-- `.accessibilityLabel(_:)`
-- `.accessibilityHint(_:)`
-- `.accessibilityHidden(_:)`
-- `.accessibilityLiveRegion(_:)`
-- `.accessibilityCursorAnchor(_:)`
-
-These all write `SemanticMetadata`. During the semantics phase of the pipeline,
-`SemanticExtractor` walks the placed tree and produces a `SemanticSnapshot`
-whose `accessibilityNodes` is a flat array of `AccessibilityNode` values.
-
-An `AccessibilityNode` carries: `identity`, `parentIdentity` (parent links are
-stored, so the array reconstructs a tree), `rect`, `role`, `label`, `hint`,
-`hidden`, `liveRegion`, and `cursorAnchor`. It deliberately does **not** bake in
-focus state. Consumers cross-reference live focus from `FocusTracker` during
+Authored `.accessibility*` modifiers write `SemanticMetadata`. During the
+semantics phase of the pipeline, `SemanticExtractor` walks the placed tree and
+produces a `SemanticSnapshot` whose `accessibilityNodes` is a flat array of
+`AccessibilityNode` values. Parent links are stored, so the array
+reconstructs a tree. The snapshot deliberately does **not** bake in focus
+state. Consumers cross-reference live focus from `FocusTracker` during
 presentation. Thus, one snapshot stays valid when focus moves.
-
-`AccessibilityRole` is an open-ended enum covering controls and structures
-(button, link, text field, toggle, slider, tab, table, heading, and many more).
-`AccessibilityPoliteness` has `.off`, `.polite`, and `.assertive`.
-`AccessibilityAnnouncer.announce(_:politeness:)` lets app code push an
-announcement to the accessibility target of the active runtime. The runtime
-ignores calls that occur outside a running runtime.
 
 ## One snapshot, five consumers
 
@@ -71,43 +56,12 @@ flowchart TD
    transparent Compose semantics overlay over the canvas so TalkBack can read
    the semantic tree rather than a single opaque image.
 
+## Known gaps
+
 The runtime-to-native-assistive-technology direction is one-way: VoiceOver- or
 TalkBack-originated focus traversal is not yet fed back into SwiftTUI's runtime
 focus. That gap, and the absence of a WCAG conformance suite, are tracked in
 [VISION-GAP.md](VISION-GAP.md).
 
-## Reduced motion
-
-`RuntimeConfiguration` resolves a motion policy that authored views can read as
-`EnvironmentValues.accessibilityReduceMotion`. Built-in animated views honor
-it: `Spinner` renders static text, `PhaseAnimator` renders only its first phase
-without cycling, and `AnimatedImage` renders its first frame.
-
-## Runtime configuration detection
-
-The output, glyph, motion, and progress policy is resolved from the environment
-and the TTY state by `RuntimeConfiguration.detect`. The precedence is fixed:
-
-```mermaid
-flowchart TD
-    start["detect(environment, isStdoutTTY)"]
-    nocolor{"NO_COLOR /<br/>CLICOLOR=0?"}
-    force{"FORCE_COLOR /<br/>CLICOLOR_FORCE?"}
-    json{"SWIFTTUI_JSON=1?"}
-    acc{"SWIFTTUI_ACCESSIBLE=1?"}
-    plain{"SWIFTTUI_PLAIN=1?"}
-    ci{"CI=true?"}
-    tty{"stdout a TTY?"}
-
-    start --> nocolor --> force --> json --> acc --> plain --> ci --> tty
-    json -->|yes| jsonOut["output = .json"]
-    acc -->|yes| accOut["output = .accessible<br/>→ ASCII glyphs, reduced motion,<br/>no progress, linear"]
-    ci -->|yes| ciOut["reduced motion + no progress"]
-    tty -->|not a TTY| ttyOut["reduced motion"]
-```
-
-- `SWIFTTUI_JSON=1` selects JSON output and wins over `SWIFTTUI_ACCESSIBLE=1`.
-- `SWIFTTUI_ACCESSIBLE=1` selects accessible output, which also forces ASCII
-  glyphs, reduced motion, no progress animation, and linear rendering.
-- `CI=true` implies both reduced motion and no progress animation.
-- A non-TTY stdout implies reduced motion but not accessible output.
+The manual screen-reader listening review protocol lives in
+`Tests/SwiftTUITests/Accessibility/README.md`.

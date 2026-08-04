@@ -9,7 +9,7 @@ across the supported execution modes. Pick the mode that matches your shipping
 target. In repo terminology, a runner owns process startup and launch routing,
 while a host owns an external presentation environment or embedding lifecycle.
 The canonical mode, packaging, and engine-profile matrix is
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+<doc:Hosts-And-Platforms>.
 
 - **Batteries-included convenience** — import `SwiftTUI` to get the default
   terminal `App.main()`, pty-backed scene management, `--web` localhost launch,
@@ -36,7 +36,7 @@ All modes flow through the same runtime invalidation path. Resize, terminal
 style, and lifecycle events are normalized into the same control-message
 contract regardless of where the host fetches them. Resolve reuse, selective
 evaluation, ambient binding, and stack-depth policy can still vary by the
-[per-host engine profile](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
+per-host engine profile in <doc:Hosts-And-Platforms>.
 
 Host-managed presentation surfaces that consume semantics receive
 ``SemanticHostFrame`` values. A semantic host frame is the atomic handoff for
@@ -53,6 +53,7 @@ These hosts do not need terminal raw-mode or byte-writing methods.
 
 ## See Also
 
+- <doc:Hosts-And-Platforms>
 - <doc:Running-Apps>
 - <doc:Architecture>
 - <doc:Runtime-Render-Pipeline>

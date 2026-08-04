@@ -18,19 +18,14 @@ its current shape.
 
 ## The one authoring story
 
-The package presents a single primary authoring story:
-
-- Write views with the SwiftUI-shaped surface on `View`.
-- Use `SwiftTUI` for one-import apps. It includes terminal launch, localhost
-  WebHost launch, and animated GIF/image support. Use `SwiftTUIRuntime` for
-  platform-neutral runtime composition with explicit host products.
-- Treat `SwiftTUICore` as pipeline and data-model infrastructure.
-
-Anything outside that shape has to justify being public. One Swift package
-provides the supported model. It exposes `SwiftTUI` for the default
-batteries-included app story and `SwiftTUIRuntime` for shared runtime
-integration. Sibling products provide narrow execution, hosting, charting, and
-terminal-program embedding.
+The package presents a single primary authoring story: write views with the
+SwiftUI-shaped surface on `View`; use `SwiftTUI` for one-import apps and
+`SwiftTUIRuntime` for platform-neutral runtime composition; treat
+`SwiftTUICore` as pipeline and data-model infrastructure. The consumer-facing
+walkthrough of this decision is the published DocC article
+[Choosing-Modules-And-Platforms.md](../Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md);
+do not restate it here. The policy: anything outside that shape has to justify
+being public.
 
 ## The canonical surface
 
@@ -55,31 +50,22 @@ The canonical public surface is the API ordinary app code uses first:
 
 Document a feature on this surface first when the surface can express it.
 
-`NavigationStack` supports both a root-only initializer and a homogeneous
-`Binding<[Route]>` path. Register route rendering with
-`.navigationDestination(for:destination:)`. Append or remove path values to
-push, pop, deep-link, or return to the root. Boolean- and item-binding
-destinations remain available for presentation-shaped routes. A visible
-destination can contribute `.navigationTitle(_:)` to an enclosing toolbar
-style. The framework intentionally exposes neither `NavigationLink` nor an
-environment dismiss command.
+The framework intentionally exposes neither `NavigationLink` nor an
+environment dismiss command. The published rationale is the "Principled
+Omissions" section of the DocC article
+[Vision.md](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md).
 
 ## Actor isolation model
 
 The authoring surface is honestly isolated. The package does not suppress the
-concurrency checker.
-
-- `View`, `Scene`, and `App` are `@MainActor` authoring protocols, and
-  `View.body` is `@ViewBuilder` and `@MainActor`.
-- Public APIs that evaluate authored `body` trees — `DefaultRenderer.render(...)`
-  and `DefaultRenderer.renderAsync(...)` — are `@MainActor`. The lower
-  `Resolver.resolve(...)` entry point is package-only.
-- Callback-bearing APIs follow the model: `Binding.init(get:set:)` takes
-  explicitly `@MainActor` closures. `.task(...)` uses actor-inheriting
-  closures. Button actions and `.onChange` callbacks stay `@MainActor`.
-- The package forbids `@unchecked Sendable` and `nonisolated(unsafe)`. Shared
-  mutable state uses explicit isolation, `Sendable` constraints, or
-  `Synchronization` primitives.
+concurrency checker, and it forbids `@unchecked Sendable` and
+`nonisolated(unsafe)`: shared mutable state uses explicit isolation,
+`Sendable` constraints, or `Synchronization` primitives. The consumer-facing
+description of the isolation model lives in the DocC article
+[Authoring-Views.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Authoring-Views.md).
+New public API must follow it: authoring protocols and `body` evaluation are
+`@MainActor`, and callback-bearing APIs declare their isolation explicitly
+rather than inheriting it accidentally.
 
 ## AnyView Policy
 
@@ -166,17 +152,18 @@ The full ActionScope/commands surface is public:
 
 ## Products
 
+The consumer-facing product matrix is the published DocC pair
+[Choosing-Modules-And-Platforms.md](../Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md)
+and
+[Hosts-And-Platforms.md](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md);
+do not restate the matrix here. The per-product policy boundaries:
+
 ### `SwiftTUI`
 
-`SwiftTUI` is the batteries-included app convenience product. It re-exports the
-combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`. An ordinary
-app writes only `import SwiftTUI`. It gets standard flags, the default terminal
-`App.main()`, `--web` localhost launch, and animated GIF/image support.
-Charting/graph views live in the external
-[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package.
-
-`SwiftTUIRuntime` is the platform-neutral runtime import for host products and
-custom launchers that do not want the convenience product.
+`SwiftTUI` stays the batteries-included convenience product: it re-exports the
+combined terminal/WebHost CLI surface and `SwiftTUIAnimatedImage`, and an
+ordinary app writes only `import SwiftTUI`. `SwiftTUIRuntime` stays the
+platform-neutral runtime import for host products and custom launchers.
 `SwiftTUICore` is target-level pipeline infrastructure, re-exported through
 `SwiftTUIRuntime` rather than published as its own product. Public host code
 uses `RenderSnapshot`, `RasterSurface`, `SemanticSnapshot`, and
@@ -205,23 +192,15 @@ The environment grammar builds them.
 
 ### Platform integration products
 
-The canonical packaging and engine-profile boundaries live in
-[HOSTS-AND-PLATFORMS.md](HOSTS-AND-PLATFORMS.md). At this package boundary:
-
-- **Runners** — `SwiftTUICLI` (`TerminalRunner`), `SwiftTUIWASI` (`WASIRunner`),
-  `SwiftTUIWebHost` (`WebHostRunner`), and `SwiftTUIWebHostCLI`
-  (`WebHostCLIRunner`).
-- **In-package host** — `SwiftTUIAndroidHost` retains runtime sessions for the
-  separately distributed Android Compose/AAR integration.
-- **External host** — `SwiftUIHost` lives in the separate
-  [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package.
-- **Embedding** — `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`, and
-  `SwiftTUIPTYPrimitives`.
-
-`SwiftTUIWebHost` owns the embedded HTTP/WebSocket server and bundled browser
-resources. `SwiftTUIWebHostCLI` composes that local server with terminal launch,
-and `SwiftTUI` includes the combined runner by default. Use `SwiftTUICLI`
-directly for a terminal-only graph.
+The canonical packaging and engine-profile boundaries live in the DocC article
+[Hosts-And-Platforms.md](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md).
+The policy at this package boundary: runners (`SwiftTUICLI`, `SwiftTUIWASI`,
+`SwiftTUIWebHost`, `SwiftTUIWebHostCLI`) and the in-package
+`SwiftTUIAndroidHost` host ship from this package; the `SwiftUIHost` host is
+wholly external in
+[`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui); embedding
+products are `SwiftTUITerminal`, `SwiftTUITerminalWorkspace`, and
+`SwiftTUIPTYPrimitives`. Showcase and example targets never become products.
 
 ## Removed From The Public Surface
 

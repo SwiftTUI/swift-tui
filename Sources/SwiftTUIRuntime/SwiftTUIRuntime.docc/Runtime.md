@@ -208,10 +208,6 @@ For the deeper keying tradeoffs, see the `State-Keying` article in the
 - Environment snapshots use immutable value-style replacement semantics
 - Style-affecting environment updates can change presentation without implying layout changes
 
-Regression tests cover nested overrides, `transformEnvironment`, wrapper
-propagation, terminal-appearance updates, and style-only changes that preserve
-text layout.
-
 ### Observation Model
 
 Observation uses the same invalidation path as `@State`. It does not use a

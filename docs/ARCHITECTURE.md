@@ -371,3 +371,33 @@ uses honest isolation or `Synchronization` primitives.
 
 For more information about these graph terms, see
 [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).
+
+## Design history: reuse and invalidation
+
+Dated coordination records that explain why the current reuse and invalidation
+contracts exist. They live in the `SwiftTUI/swift-tui-org` coordination root's
+`docs/reports/` tree (collaborator-only), so the paths below are intentionally
+not links. This history moved here from the published
+`SwiftTUIGraph` DocC article, which describes `HEAD` only.
+
+- `docs/reports/2026-06-13-swifttui-invalidation-gap-analysis.md` and
+  `docs/reports/2026-06-14-stage-0-frontier-publication-inventory.md`
+  established the value-change, dirty-frontier, and registration-publication
+  model.
+- `docs/reports/2026-06-15-reuse-trace-productization-and-cone-confirmation.md`
+  measured ancestor invalidation blanketing a descendant background and made
+  the cone vocabulary operational.
+- `docs/reports/2026-06-17-memo-stage0-killgate.md` demonstrated the shadow
+  oracle's ability to find errors.
+  `docs/reports/2026-06-17-memo-stage2-flag-gated-gate.md` established why
+  production comparison ultimately became an `Equatable`-only opt-in.
+- `docs/reports/2026-07-17-001-gallery-fuzzer-diagnostics-campaign.md`, §9.10
+  “Style-seam re-land + retained-placement identity fix (2026-07-18, session
+  5),” explains the authoring-owner override and island-bridging invalidation.
+  Section §9.11, “Final two fixes: paired-route leak and visited-spare strand
+  (2026-07-18, session 5),” records fixed-point spare adjudication. Public
+  [commit `8560d337`](https://github.com/SwiftTUI/swift-tui/commit/8560d3371b031268a7e92d95c744feef494e71ec)
+  is the corresponding combined child-repository evidence.
+- `docs/reports/2026-07-23-002-reuse-freshness-quirk-register.md`, “Residual 2
+  — closure (2026-07-25),” records the live-object stranded-listing invariant,
+  its deliberate teeth, and the resolved-vs-authored identity naming pitfall.

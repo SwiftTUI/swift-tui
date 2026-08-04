@@ -131,6 +131,7 @@ record_host_ownership_violations() {
   while IFS= read -r rhov_source_file; do
     [ -n "$rhov_source_file" ] || continue
     [ "$rhov_source_file" = "docs/HOSTS-AND-PLATFORMS.md" ] && continue
+    [ "$rhov_source_file" = "Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md" ] && continue
     rhov_source_path="$rhov_scan_root/$rhov_source_file"
 
     # Stable docs may summarize host choices, but any text presenting itself
@@ -150,7 +151,7 @@ record_host_ownership_violations() {
     fi
 
     if [ "$rhov_has_host_overview" -eq 1 ]; then
-      if rg -q 'HOSTS-AND-PLATFORMS\.md' "$rhov_source_path"; then
+      if rg -q 'HOSTS-AND-PLATFORMS\.md|Hosts-And-Platforms|hosts-and-platforms' "$rhov_source_path"; then
         :
       else
         rhov_status=$?
@@ -215,7 +216,7 @@ record_forbidden_violations() {
     1 1
   record_forbidden_pattern \
     "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file" \
-    execution-mode-count docs/HOSTS-AND-PLATFORMS.md \
+    execution-mode-count Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md \
     'four execution modes' \
     0 1
   record_forbidden_pattern \

@@ -118,5 +118,6 @@ Lowering helpers remain package-only implementation details.
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
 - <doc:Focus>
+- <doc:Accessibility>
 - <doc:Dismissal-Is-Data>
 - <doc:Shapes>

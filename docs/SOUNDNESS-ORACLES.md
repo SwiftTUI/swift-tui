@@ -180,3 +180,14 @@ test together. Otherwise, the comparator can produce a false-equal reuse
 decision. The current map
 covers the memo-content and stamp consequences that reach existing probes. It
 does not turn the absence of a payload-specific row into proof of coverage.
+
+## Implementation pitfall: stranded-listing identity spaces
+
+The stranded-listing implementation must compare **objects**, not names from
+mixed identity systems. `identityByNodeID` describes nodes in
+`resolvedIdentity` space, while `ViewNode.identity` and `parent.identity` are
+authored-space names. Comparing those maps manufactured 13–14 apparent
+co-listings on a healthy graph. `ViewGraphStrandedListingProbe.swift` instead
+tests `child.parent !== node`, the same object relation the upward staleness
+walk follows.
+

@@ -121,7 +121,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/SwiftTUI/swift-tui",
-      .upToNextMinor(from: "0.3.4")
+      .upToNextMinor(from: "0.6.3")
     )
   ],
   targets: [
@@ -143,9 +143,9 @@ let package = Package(
 | Apple package platforms | macOS 15+, iOS 18+ |
 | Terminal / WASI / Android builds | supported via the Swift open-source toolchain |
 
-`SwiftTUITerminal` / PTY embedding is macOS and Linux only. See
-[docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) for the full
-platform-by-product matrix.
+`SwiftTUITerminal` / PTY embedding is macOS and Linux only. See the
+[Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md)
+DocC article for the full platform-by-product matrix.
 
 **Standard CLI flags.** Conform your `App` to `SwiftTUICommand`. This protocol
 adds the
@@ -185,9 +185,9 @@ example and the
 ## Ship it five ways
 
 Author the app once. Select the product that matches the delivery method. The
-full
-platform-by-product matrix lives in
-[docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md).
+full platform-by-product matrix lives in the
+[Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md)
+DocC article.
 
 | Ship as | Product | Start here |
 | --- | --- | --- |
@@ -195,7 +195,7 @@ platform-by-product matrix lives in
 | Static WASI / browser bundle | `SwiftTUIWASI` → `@swifttui/web` + `@swifttui/build` | [swift-tui-web](https://github.com/SwiftTUI/swift-tui-web) |
 | Native SwiftUI surface (macOS · iOS) | `SwiftUIHost` | [swift-tui-swiftui](https://github.com/SwiftTUI/swift-tui-swiftui) |
 | Native Android surface (arm64-v8a) | `SwiftTUIAndroidHost` | [swift-tui-android](https://github.com/SwiftTUI/swift-tui-android) |
-| Custom runner / host | `SwiftTUIRuntime` + composed products | [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) |
+| Custom runner / host | `SwiftTUIRuntime` + composed products | [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md) |
 
 **Using SwiftTUI from the web.** The same `App` compiles to `wasm32-wasi` and
 streams a structured raster surface. A small browser host draws this surface
@@ -216,18 +216,24 @@ mode.
 
 ## Documentation
 
-Live API reference: <https://swifttui.sh/docs/documentation/>
+**Using SwiftTUI?** The live API reference and guides are at
+<https://swifttui.sh/docs/documentation/>. The same articles are authored as
+DocC catalogs in this repository. Start with:
 
-[docs/README.md](docs/README.md) indexes internal architecture and project
-documentation. Developer-facing guides live in DocC. Common entry points:
+- [Choosing Modules And Platforms](Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md) — which product to import.
+- [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md) — execution modes, engine profiles, and platform support.
+- [About SwiftTUI](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md) — SwiftUI faithfulness and the principled API omissions.
+- [Runtime Render Pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md) — the runtime callpath, frame pipeline, diagnostics, and host handoff.
+- [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md) — semantic modifiers, announcements, and reduced motion.
+- [Environment Variables](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Environment-Variables.md) — every `SWIFTTUI_*` variable.
 
-- [docs/VISION.md](docs/VISION.md) — what SwiftTUI is for.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules, products, layout model.
-- [SwiftTUIRuntime DocC render pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md) — the runtime callpath, frame pipeline, diagnostics, and host handoff.
-- [docs/HOSTS-AND-PLATFORMS.md](docs/HOSTS-AND-PLATFORMS.md) — execution modes and platform support.
-- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — the semantic substrate.
-- [docs/PUBLIC-API.md](docs/PUBLIC-API.md) — the public surface policy.
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — toolchains, the test gate, the release process.
+**Working on SwiftTUI?** [docs/README.md](docs/README.md) indexes the internal
+architecture and project documentation ([CODEBASE-GUIDE](docs/CODEBASE-GUIDE.md),
+[ARCHITECTURE](docs/ARCHITECTURE.md), [DEVELOPMENT](docs/DEVELOPMENT.md), the
+[public surface policy](docs/PUBLIC-API.md), and more).
+
+Questions? Join the community on
+[Discord](https://discord.gg/8j35kYDFxn).
 
 Build the combined DocC archive locally with:
 

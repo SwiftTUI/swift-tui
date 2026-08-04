@@ -139,7 +139,7 @@ the root package rather than in the `SwiftTUIRuntime` product itself.
 
 The canonical execution-mode matrix, cross-package ownership, and resolve
 engine profiles live in
-[Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+<doc:Hosts-And-Platforms>.
 For the public
 runtime seams used by executable and retained-session integrations, see
 <doc:Host-Integration>.

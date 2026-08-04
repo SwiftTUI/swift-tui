@@ -151,9 +151,9 @@ false reuse, lost dirty target, incoherent stamp, or stranded ownership claim
 even when visible output looks correct. The graph records them through
 `SoundnessProbeConfiguration` in
 `Sources/SwiftTUIGraph/Resolve/SoundnessProbeConfiguration.swift`. The
-repository's canonical enforcement, sampling, residual, and test-owner
-inventory is the
-[soundness oracle map](https://github.com/SwiftTUI/swift-tui/blob/main/docs/SOUNDNESS-ORACLES.md).
+canonical enforcement, sampling, residual, and test-owner inventory is
+contributor-facing and maintained in the repository's internal
+`docs/SOUNDNESS-ORACLES.md` map, not here.
 
 ## The reuse door
 
@@ -240,8 +240,10 @@ Engine-profile policy is part of the door, not a host call-site choice. The
 full/native profile offers both layers. The stack-lean profile disables
 memoized reuse and selective evaluation. Retained reuse is also off unless
 `SWIFTTUI_LEAN_RETAINED_REUSE=1` opts into the descent-shortening Layer-A path.
-The canonical host/profile matrix and environment switches live in
-[Hosts and platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md#per-host-engine-profiles).
+The canonical host/profile matrix and environment switches live in the
+`SwiftTUIRuntime` catalog's
+[Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms)
+article.
 
 ## Freshness stamps and servability
 
@@ -346,48 +348,7 @@ The reuse subsystem's local oracles are deliberately small:
   fresh output with the committed output. A no-reads content divergence records
   `memo-unsound-skip`. The production gate remains `Equatable`-only.
 
-The stranded-listing implementation must compare **objects**, not names from
-mixed identity systems. `identityByNodeID` describes nodes in
-`resolvedIdentity` space, while `ViewNode.identity` and `parent.identity` are
-authored-space names. Comparing those maps manufactured 13–14 apparent
-co-listings on a healthy graph. `ViewGraphStrandedListingProbe.swift` instead
-tests `child.parent !== node`, the same object relation the upward staleness
-walk follows.
-
 This section is not the inventory of every graph and runtime probe. Enforcement
 tier, sampling, release behavior, residual quarantine, source recorder, and
-owning tests belong to the canonical
-[soundness oracle map](https://github.com/SwiftTUI/swift-tui/blob/main/docs/SOUNDNESS-ORACLES.md).
-
-## Design history
-
-> Design-history references below are evidence for why the current contracts
-> exist. They are dated coordination records, not normative descriptions of
-> HEAD.
->
-> `SwiftTUI/swift-tui-org` was private at implementation time. The paths are
-> collaborator-only references and are intentionally not links. Outside readers
-> can use this article's public current-source links and the public
-> `SwiftTUI/swift-tui` commit history.
-
-- `docs/reports/2026-06-13-swifttui-invalidation-gap-analysis.md` and
-  `docs/reports/2026-06-14-stage-0-frontier-publication-inventory.md`
-  established the value-change, dirty-frontier, and registration-publication
-  model.
-- `docs/reports/2026-06-15-reuse-trace-productization-and-cone-confirmation.md`
-  measured ancestor invalidation blanketing a descendant background and made
-  the cone vocabulary operational.
-- `docs/reports/2026-06-17-memo-stage0-killgate.md` demonstrated the shadow
-  oracle's ability to find errors.
-  `docs/reports/2026-06-17-memo-stage2-flag-gated-gate.md` established why
-  production comparison ultimately became an `Equatable`-only opt-in.
-- `docs/reports/2026-07-17-001-gallery-fuzzer-diagnostics-campaign.md`, §9.10
-  “Style-seam re-land + retained-placement identity fix (2026-07-18, session
-  5),” explains the authoring-owner override and island-bridging invalidation.
-  Section §9.11, “Final two fixes: paired-route leak and visited-spare strand
-  (2026-07-18, session 5),” records fixed-point spare adjudication. Public
-  [commit `8560d337`](https://github.com/SwiftTUI/swift-tui/commit/8560d3371b031268a7e92d95c744feef494e71ec)
-  is the corresponding combined child-repository evidence.
-- `docs/reports/2026-07-23-002-reuse-freshness-quirk-register.md`, “Residual 2
-  — closure (2026-07-25),” records the live-object stranded-listing invariant,
-  its deliberate teeth, and the resolved-vs-authored identity naming pitfall.
+owning tests are contributor-facing and belong to the repository's internal
+`docs/SOUNDNESS-ORACLES.md` map.

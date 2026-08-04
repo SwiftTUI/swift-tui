@@ -27,8 +27,5 @@ whose cell dimensions it can read.
 
 ## See Also
 
-The `SwiftTUICore` regression suites cover the rasterizer-equivalence guarantee
-at `.estimated` metrics. They also cover fixture regeneration and
-integer-division quantization. Quantization determines which metrics exercise
-the aspect-correction path. See `CellPixelMetrics` for the complete metrics
-type documentation.
+See `CellPixelMetrics` for the complete metrics type documentation, including
+how `.reported` and `.estimated` metrics are sourced.

@@ -38,7 +38,7 @@ apps. Other in-package runner and host products, including
 `SwiftTUIAndroidHost`, compose with this module directly. Externally packaged
 integrations such as `SwiftUIHost` use the same runtime-facing layer. The
 canonical product, distribution, and engine-profile boundaries are documented
-in [Hosts and Platforms](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOSTS-AND-PLATFORMS.md).
+in <doc:Hosts-And-Platforms>.
 
 Pointer input policy types such as `TerminalMouseInputResolution`,
 `TerminalMouseInputTrustPolicy`, and `TerminalMouseInputCompatibilityMatrix`
@@ -73,6 +73,7 @@ are re-exported from the core pipeline layer.
 - <doc:Runtime-Render-Pipeline>
 - <doc:Runtime>
 - <doc:Vision>
+- <doc:Hosts-And-Platforms>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
 - <doc:Environment-Variables>

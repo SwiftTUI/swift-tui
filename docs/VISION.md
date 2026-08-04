@@ -50,27 +50,15 @@ makes a small number of intentional departures:
 
 ## Principled deviations
 
-- **Strictly data-driven navigation and dismissal — no `NavigationLink`, no
-  `\.dismiss`.** These two SwiftUI APIs are omitted on principle, not as gaps.
-  `NavigationLink` subverts data-driven UI: it fuses a control to a navigation
-  side effect, so navigation state stops being derivable from (and mutable
-  through) the app's data. `@Environment(\.dismiss)` is an antipattern. A view
-  cannot know the context in which it is displayed. Thus, a self-dismissal
-  command couples reusable content to an assumed presenter. Bindings to data
-  drive navigation and presentation. A push mutates the data that declares a
-  destination. Dismissal clears the binding (or item) that presents the surface.
-  Presenter-side observation
-  (for example, an `onDismiss:` callback) is compatible with this stance.
-  Child-side
-  dismissal commands are not.
-- **Structured tab declarations — no `.tabItem`.** Terminal tab chrome is
-  structured value metadata, not an arbitrary label view tree. Declare tabs
-  with `Tab(_:detail:badge:value:content:)`, which keeps the label, selection
-  value, and content in one data-driven declaration. This avoids resolving or
-  retaining label-only view trees outside the active content and gives every
-  `TabViewStyle` deterministic terminal text. Plain tagged children remain
-  supported: `Text` supplies its implicit label, while opaque content receives
-  a stable `"Tab N"` fallback. `View.tabItem(_:)` is intentionally omitted.
+The consumer-facing rationale for the deliberate API omissions — no
+`NavigationLink`, no `@Environment(\.dismiss)`, no `View.tabItem(_:)` — is
+published in the DocC article
+[About SwiftTUI](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md)
+(`SwiftTUIRuntime` catalog, "Principled Omissions"). That article is the
+single owner of the published rationale; do not restate it here. The
+engineering consequence for maintainers: navigation and presentation state
+must stay derivable from (and mutable through) app data, and tab chrome stays
+structured value metadata rather than an arbitrary label view tree.
 
 ## In scope today
 
