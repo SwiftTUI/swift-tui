@@ -33,7 +33,7 @@ import Testing
 /// `ImperativeAuthoringContextSnapshot` exists for and what toolbar and key
 /// handlers already do.
 ///
-/// Reduced from a live FIXME in `swift-tui-examples`' ThreeHostsDemo counter,
+/// Reduced from a live FIXME in `swift-tui-examples`' `counter` example,
 /// where `activeRipple = false` from a completion closure "seems to execute,
 /// but does not appear to set the state". The demo's `.background` and
 /// `ConditionalContent` shape is incidental and is omitted here.
