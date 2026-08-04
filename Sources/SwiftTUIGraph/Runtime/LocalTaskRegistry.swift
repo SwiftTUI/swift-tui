@@ -75,10 +75,41 @@ package final class LocalTaskRegistry: Equatable {
     store.values
   }
 
+  /// Merge-per-identity, deliberately not the family's replace-per-identity
+  /// contract: one identity's task registrations can be contributed by
+  /// MULTIPLE nodes. A `.task` attached to a builder conditional records on
+  /// the ambient authoring node while the branch content's own `.task`
+  /// records on the branch node — same host identity, different recording
+  /// nodes. Publication restores per node (in `Set` iteration order, after a
+  /// reset or a subtree removal), so wholesale replacement let the
+  /// last-iterated node erase its sibling's registrations for the shared
+  /// identity — and the erased task's committed `.taskStart` skipped at
+  /// commit ("no task registration at commit"; gifeditor launch flip,
+  /// 2026-08-03). Same-descriptor entries still replace, so a site's
+  /// re-registration wins; cross-node contributions union.
   package func restore(
     _ snapshot: [Identity: [TaskRegistration]],
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
-    store.restore(snapshot, ownersByIdentity: ownersByIdentity)
+    guard !snapshot.isEmpty else {
+      return
+    }
+    for (identity, restored) in snapshot {
+      var merged = store[identity] ?? []
+      for registration in restored {
+        if let index = merged.firstIndex(where: {
+          $0.descriptor.id == registration.descriptor.id
+        }) {
+          merged[index] = registration
+        } else {
+          merged.append(registration)
+        }
+      }
+      store.set(
+        merged,
+        for: identity,
+        owner: ownersByIdentity[identity] ?? .init(identity: identity)
+      )
+    }
   }
 }
