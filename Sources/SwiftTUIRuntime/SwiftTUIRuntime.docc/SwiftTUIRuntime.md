@@ -75,5 +75,6 @@ are re-exported from the core pipeline layer.
 - <doc:Vision>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
+- <doc:Environment-Variables>
 - <doc:TerminalEmbedding>
 - <doc:Terminal-Handoffs>

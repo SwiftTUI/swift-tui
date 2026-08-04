@@ -68,7 +68,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       animationOverlaySnapshot: animationOverlaySnapshot,
       // Latch the soundness probe's per-frame sampling decision here on the main
       // actor; the raster tail may run off-main, where this @MainActor state is
-      // unreadable. Off in release by default → false → policy-only behavior.
+      // unreadable. False on release's unsampled frames → policy-only behavior.
       verifyIncrementalRasterDamage: SoundnessProbeConfiguration.isSampledFrame,
       clock: draft.clock
     )

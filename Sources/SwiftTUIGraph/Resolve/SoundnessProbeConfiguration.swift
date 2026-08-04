@@ -270,7 +270,7 @@ package struct SoundnessCounterGrowth: Sendable, Equatable {
 ///
 /// When the probe is off the per-frame cost is a single `Bool` store in
 /// ``beginFrame(frameID:)`` and a single `Bool` read at each oracle call site —
-/// no allocation, no oracle work. Mirrors ``MemoReuseConfiguration``.
+/// no allocation, no oracle work. Mirrors ``MemoSkipTrace``.
 /// Process-global by design (F119): this subsystem's state is `@MainActor`
 /// statics keyed by per-`ViewGraph` frame IDs, so two live graphs in one
 /// process would interleave counters and misattribute trace lines. Note-only
@@ -284,8 +284,9 @@ package enum SoundnessProbeConfiguration {
   package static let environmentVariableName = FeatureGate.soundnessProbe.environmentVariableName
   package static let sampleEnvironmentVariableName = "SWIFTTUI_SOUNDNESS_PROBE_SAMPLE"
 
-  /// Whether the probe is active at all. Off in release by default; on under
-  /// DEBUG/tests. `SWIFTTUI_SOUNDNESS_PROBE=0` forces off, `=1` forces on.
+  /// Whether the probe is active at all. On in every configuration (F34);
+  /// release runs the oracles on sampled frames only.
+  /// `SWIFTTUI_SOUNDNESS_PROBE=0` forces off, `=1` forces on.
   package static var isEnabled: Bool = environmentDefault()
 
   /// Run the oracles on 1-in-`N` frames. Clamped to `>= 1` at read time so a

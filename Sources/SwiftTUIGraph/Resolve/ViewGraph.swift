@@ -2580,7 +2580,9 @@ package final class ViewGraph {
   /// subset), and it passes every non-dirty retained-reuse guard. Routes through
   /// the identical `snapshot()` + `recordReusedSubtree(retained:)` acceptance
   /// path as ``reusableSnapshot``, so all registration/lifecycle/island plumbing
-  /// is preserved. Gated by ``MemoReuseConfiguration``; the caller also gates on
+  /// is preserved. Gated by the `Equatable`-only view-value capture — a node
+  /// without a stashed ``ViewNode/memoViewValue`` has nothing to compare and
+  /// bails at the first guard; the caller also gates on
   /// the focus/press retained-reuse suppression scope (as for ``reusableSnapshot``).
   package func memoizedReusableSnapshot(
     for identity: Identity,

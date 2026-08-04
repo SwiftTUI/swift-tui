@@ -557,7 +557,7 @@ func resolveView<V: View>(
 
 /// Whether to stash the resolved view value for next-frame memo comparison.
 ///
-/// The production gate (``MemoReuseConfiguration``) is `Equatable`-only, so a
+/// The production gate (`ViewGraph.memoizedReusableSnapshot`) is `Equatable`-only, so a
 /// non-`Equatable` value would only make the gate run its guards before
 /// skipping. Capture solely `Equatable` values, so a non-`Equatable` node leaves
 /// `memoViewValue` nil and the gate bails at its first guard — keeping the gate

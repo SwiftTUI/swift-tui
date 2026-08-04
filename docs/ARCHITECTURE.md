@@ -266,7 +266,7 @@ these conditions are true:
   `View.equatable()` opt-in.
 
 This reuse applies only to `Equatable` views. It has no effect on views that do
-not opt in. Set `SWIFTTUI_MEMO_REUSE=0` to turn it off.
+not opt in.
 The complete ordering, input contracts, freshness-stamp algebra, suppression
 rules, and oracle boundaries are documented in
 [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).
