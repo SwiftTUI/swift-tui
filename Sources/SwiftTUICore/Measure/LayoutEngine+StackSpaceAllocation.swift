@@ -37,6 +37,19 @@ struct StackSequentialAllocationPlan {
   /// For each order position, whether it and every later member of its
   /// group are unbounded (eligible for balanced batch allocation).
   var unboundedTailFromPosition: [Bool]
+  /// For each order position, how many members from it to the group end
+  /// claim an equal deficit share. Along-axis Spacers are not claimants:
+  /// in deficit a Spacer keeps exactly its minimum length while content
+  /// children divide the rest — measure-time truncation means every cell
+  /// handed to a Spacer's share is content permanently lost to blank
+  /// space (the batch arm's deficit distribution already collapses
+  /// Spacers before content; this keeps the per-child offers consistent
+  /// with it).
+  var deficitClaimantCounts: [Int]
+  /// For each order position, the summed minimums of the along-axis
+  /// Spacers from it to the group end — the only space a deficit must
+  /// still reserve for them.
+  var spacerSuffixMinimums: [Int]
 }
 
 /// Sequential-allocation bookkeeping for one stack measure.
@@ -162,6 +175,23 @@ extension LayoutEngine {
         next == groupEndPositions[position] || unboundedTailFromPosition[next]
     }
 
+    // An along-axis Spacer (unbounded maximum) claims no deficit share;
+    // a cross-axis Spacer has a bounded maximum and stays a claimant.
+    var deficitClaimantCounts = [Int](repeating: 0, count: order.count)
+    var spacerSuffixMinimums = [Int](repeating: 0, count: order.count)
+    for position in order.indices.reversed() {
+      let childIndex = order[position]
+      let isAxisSpacer = isSpacer(children[childIndex]) && maximums[childIndex] == nil
+      let next = position + 1
+      let (nextClaimants, nextSpacerMinimums) =
+        next < groupEndPositions[position]
+        ? (deficitClaimantCounts[next], spacerSuffixMinimums[next])
+        : (0, 0)
+      deficitClaimantCounts[position] = nextClaimants + (isAxisSpacer ? 0 : 1)
+      spacerSuffixMinimums[position] =
+        nextSpacerMinimums + (isAxisSpacer ? minimums[childIndex] : 0)
+    }
+
     return StackSequentialAllocationPlan(
       order: order,
       minimums: minimums,
@@ -170,7 +200,9 @@ extension LayoutEngine {
       groupEndPositions: groupEndPositions,
       reservedLowerMinimums: reservedLowerMinimums,
       groupIdealSuffixes: groupIdealSuffixes,
-      unboundedTailFromPosition: unboundedTailFromPosition
+      unboundedTailFromPosition: unboundedTailFromPosition,
+      deficitClaimantCounts: deficitClaimantCounts,
+      spacerSuffixMinimums: spacerSuffixMinimums
     )
   }
 
@@ -276,19 +308,32 @@ extension LayoutEngine {
 
     let childIndex = plan.order[position]
     let groupCountLeft = plan.groupEndPositions[position] - position
+    let inSurplus = available >= plan.groupIdealSuffixes[position]
     // Round-half-up division: plain floor division would concentrate a
     // deficit's rounding loss on the earliest children (e.g. 4 cells
     // over 5 children offers the first child 0), while rounding keeps
     // per-step offers balanced; the response feedback absorbs any
     // cumulative drift on later children.
-    let share = (2 * available + groupCountLeft) / (2 * groupCountLeft)
+    //
+    // In deficit, along-axis Spacers are not claimants: content children
+    // divide what remains after the Spacers' minimums, so a trailing
+    // Spacer collapses instead of holding blank cells a truncating
+    // sibling permanently loses (the batch arm's deficit distribution).
+    let share: Int
+    if inSurplus {
+      share = (2 * available + groupCountLeft) / (2 * groupCountLeft)
+    } else {
+      let claimants = max(1, plan.deficitClaimantCounts[position])
+      let claimable = max(0, available - plan.spacerSuffixMinimums[position])
+      share = (2 * claimable + claimants) / (2 * claimants)
+    }
     // In surplus, no group member yields below its ideal: unlike
     // SwiftUI (where text responds larger than a lean offer), measure
     // here truncates, so an equal-division offer below a rigid child's
     // ideal would lose content only to hand the slack to a more
     // flexible sibling.
     let floorSize =
-      available >= plan.groupIdealSuffixes[position]
+      inSurplus
       ? max(plan.minimums[childIndex], plan.ideals[childIndex])
       : plan.minimums[childIndex]
     var offer = max(share, floorSize)

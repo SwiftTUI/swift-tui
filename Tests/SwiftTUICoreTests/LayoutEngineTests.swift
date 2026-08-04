@@ -891,11 +891,20 @@ struct LayoutEngineTests {
       passContext: LayoutPassContext(retainedLayout: nil)
     )
 
+    // The refined (real) heights pack the estimated-visible run down to
+    // y 31 in a 60-row viewport, so placement extends the run with rows
+    // 7–10 until the refined geometry covers the viewport (org report
+    // 2026-08-03-003: the bottom-edge blank-region defect). Rows stay
+    // adjacent at their measured heights throughout.
     #expect(
-      placed.children.map(\.identity) == (0..<7).map { testIdentity("row-\($0)") }
+      placed.children.map(\.identity) == (0..<11).map { testIdentity("row-\($0)") }
     )
-    #expect(placed.children.map(\.bounds.origin.y) == [0, 2, 5, 8, 10, 11, 22])
-    #expect(placed.children.map(\.bounds.size.height) == [2, 3, 3, 2, 1, 11, 9])
+    #expect(
+      placed.children.map(\.bounds.origin.y) == [0, 2, 5, 8, 10, 11, 22, 31, 40, 49, 58]
+    )
+    #expect(
+      placed.children.map(\.bounds.size.height) == [2, 3, 3, 2, 1, 11, 9, 9, 9, 9, 9]
+    )
   }
 
   @Test("visible-range boundary changes keep common rows moving with the viewport")
@@ -1186,6 +1195,33 @@ struct LayoutEngineTests {
     // synthesized at the refined 4, not the probe's 1.
     #expect(snapshot.contentMainLength == 31 + 93 * 4)
     #expect(snapshot.windowHint?.contentOffset == .zero)
+  }
+
+  @Test("an indexed lazy stack reports its content extent as its own-axis maximum")
+  func indexedLazyStackMaximumIsContentSized() {
+    // Regression pin (org report 2026-08-03-003 finding 1): indexed-source
+    // lazy stacks store no child measurements, so the composite maximums
+    // walk zipped their realized children against an empty array and
+    // derived a ZERO own-axis maximum. Under an enclosing stack's
+    // allocation, a row containing such a stack was then capped at its
+    // rigid sibling's extent — the one-display-line list-item clamp.
+    let engine = LayoutEngine()
+    let rows = (0..<3).map { index in
+      leaf("max-row-\(index)", size: .init(width: 8, height: 3))
+    }
+    let lazy = indexedLazyStack("max-lazy", axis: .vertical, children: rows)
+    let ideal = engine.measure(
+      lazy,
+      proposal: ProposedSize(width: .finite(8), height: .unspecified),
+      passContext: LayoutPassContext(retainedLayout: nil)
+    )
+    #expect(ideal.measuredSize.height == 9)
+    let maximum = engine.derivedMaximumMainSize(
+      for: lazy,
+      idealMeasurement: ideal,
+      axis: .vertical
+    )
+    #expect(maximum == 9, "derived maximum \(String(describing: maximum)), expected 9")
   }
 
   @Test("the previous windowed product's stride seeds the next window's anchor")

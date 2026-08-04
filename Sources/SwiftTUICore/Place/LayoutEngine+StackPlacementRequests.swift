@@ -93,6 +93,31 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
+    // The viewport's main-axis span relative to the stack's origin: the
+    // refinement/extension loop measures real row extents against this,
+    // deliberately unclamped by the snapshot's (estimated) content length —
+    // when estimates over-length the content, the estimated-visible index
+    // range under-covers the viewport and only real measures can prove
+    // more rows fit.
+    let visibleMainWindow: Range<Int>? = viewportContext.flatMap { context in
+      let axisMatches =
+        switch axis {
+        case .horizontal: context.axes.contains(.horizontal)
+        case .vertical: context.axes.contains(.vertical)
+        }
+      guard axisMatches else {
+        return nil
+      }
+      let stackStart = mainDimension(of: bounds.origin, for: axis)
+      let viewportStart = mainDimension(of: context.viewportRect.origin, for: axis)
+      let viewportLength = mainDimension(of: context.viewportRect.size, for: axis)
+      guard viewportLength > 0 else {
+        return nil
+      }
+      let lower = viewportStart - stackStart
+      return lower..<(lower + viewportLength)
+    }
+
     if let source = resolved.indexedChildSource,
       let allocation = measured.containerAllocationSnapshot,
       let snapshot = allocation.lazyStack
@@ -126,6 +151,7 @@ extension LayoutEngine {
           verticalAlignment: verticalAlignment,
           snapshot: snapshot,
           visibleRange: visibleRange,
+          visibleMainWindow: visibleMainWindow,
           passContext: passContext
         )
       }
@@ -155,6 +181,7 @@ extension LayoutEngine {
           verticalAlignment: verticalAlignment,
           snapshot: snapshot,
           visibleRange: visibleRange,
+          visibleMainWindow: visibleMainWindow,
           passContext: passContext
         )
       }
@@ -251,6 +278,7 @@ extension LayoutEngine {
     verticalAlignment: VerticalAlignment,
     snapshot: LazyStackAllocationSnapshot,
     visibleRange: Range<Int>,
+    visibleMainWindow: Range<Int>?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
     guard !visibleRange.isEmpty else { return [] }
@@ -262,16 +290,13 @@ extension LayoutEngine {
     // an estimated row whose real height differs, every surviving row jumps.
     // Anchor inside the measured band when it overlaps the visible run, then
     // reflow in both directions from that stable exact allocation.
-    var placementChildren: [IndexedLazyStackPlacementChild] = []
-    placementChildren.reserveCapacity(visibleRange.count)
-
-    for index in visibleRange {
-      // A nil child means an on-demand realization spliced (windowed
-      // products pin 1 cell per element at measure time, so this is a
-      // mid-frame source drift that cannot normally happen) — tolerate by
-      // not placing the row rather than misaligning every later index.
+    // A nil child means an on-demand realization spliced (windowed
+    // products pin 1 cell per element at measure time, so this is a
+    // mid-frame source drift that cannot normally happen) — tolerate by
+    // not placing the row rather than misaligning every later index.
+    func measuredRow(at index: Int) -> IndexedLazyStackPlacementChild? {
       guard let child = childAt(index) else {
-        continue
+        return nil
       }
       let childSize = childSizes[index].size
       let mainProposal: ProposedDimension =
@@ -296,13 +321,21 @@ extension LayoutEngine {
           to: mainDimension(of: childSize, for: axis)
         )
       }
-      placementChildren.append(
-        IndexedLazyStackPlacementChild(
-          index: index,
-          resolved: child,
-          measured: childMeasurement
-        )
+      return IndexedLazyStackPlacementChild(
+        index: index,
+        resolved: child,
+        measured: childMeasurement
       )
+    }
+
+    var placementChildren: [IndexedLazyStackPlacementChild] = []
+    placementChildren.reserveCapacity(visibleRange.count)
+
+    for index in visibleRange {
+      guard let placementChild = measuredRow(at: index) else {
+        continue
+      }
+      placementChildren.append(placementChild)
     }
 
     guard !placementChildren.isEmpty else { return [] }
@@ -350,6 +383,55 @@ extension LayoutEngine {
         nextMainOffset -= refinedLengths[index] ?? snapshot.childMainLengths[index]
         nextMainOffset -= spacing(after: index)
         refinedOffsets[index] = nextMainOffset
+      }
+    }
+
+    // The estimated-visible index range came from the snapshot's ESTIMATED
+    // geometry; the refined (real) extents just measured can pack the run
+    // shorter than those estimates, leaving viewport rows uncovered past
+    // either end of the run with nothing placed into them — the bottom-edge
+    // blank-region defect (org report 2026-08-03-003, findings 1–2). Extend
+    // the run with on-demand realization until the refined geometry covers
+    // the viewport or rows run out; extension rows measure exactly like
+    // visible-range rows, so a correctly-estimated run extends by nothing.
+    if let visibleMainWindow {
+      let childCount = min(childSizes.count, snapshot.childMainOffsets.count)
+
+      let lastIndex = placementChildren[placementChildren.count - 1].index
+      var cursor =
+        (refinedOffsets[lastIndex] ?? snapshot.childMainOffsets[lastIndex])
+        + (refinedLengths[lastIndex] ?? snapshot.childMainLengths[lastIndex])
+        + spacing(after: lastIndex)
+      var nextIndex = lastIndex + 1
+      while cursor < visibleMainWindow.upperBound, nextIndex < childCount {
+        guard let placementChild = measuredRow(at: nextIndex) else {
+          break
+        }
+        let length = mainDimension(of: placementChild.measured.measuredSize, for: axis)
+        refinedLengths[nextIndex] = length
+        refinedOffsets[nextIndex] = cursor
+        placementChildren.append(placementChild)
+        cursor += length + spacing(after: nextIndex)
+        nextIndex += 1
+      }
+
+      let firstIndex = placementChildren[0].index
+      var topCursor = refinedOffsets[firstIndex] ?? snapshot.childMainOffsets[firstIndex]
+      var previousIndex = firstIndex - 1
+      var prepended: [IndexedLazyStackPlacementChild] = []
+      while topCursor > visibleMainWindow.lowerBound, previousIndex >= 0 {
+        guard let placementChild = measuredRow(at: previousIndex) else {
+          break
+        }
+        let length = mainDimension(of: placementChild.measured.measuredSize, for: axis)
+        topCursor -= length + spacing(after: previousIndex)
+        refinedLengths[previousIndex] = length
+        refinedOffsets[previousIndex] = topCursor
+        prepended.append(placementChild)
+        previousIndex -= 1
+      }
+      if !prepended.isEmpty {
+        placementChildren = prepended.reversed() + placementChildren
       }
     }
 

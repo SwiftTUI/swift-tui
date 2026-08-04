@@ -109,6 +109,19 @@ extension LayoutEngine {
     if isFixedSize(node.layoutMetadata, on: axis) {
       return DirectMaximum(value: idealMain)
     }
+    // An indexed-source lazy stack deliberately stores no child measurements
+    // (`storedChildMeasurements`), so the composite walk below would zip its
+    // realized children against an empty measurement array and derive a ZERO
+    // own-axis maximum — capping every enclosing stack's allocation offer at
+    // the sibling extents. A list row (`HStack { marker; LazyVStack { … } }`)
+    // then maxes out at the one-cell marker and every wrapped line but the
+    // first is lost (org report 2026-08-03-003 finding 1). The container is
+    // content-sized on both axes: its measured ideal IS its maximum.
+    // Answering directly also skips realizing the entire source only for the
+    // zip to discard it.
+    if node.usesIndexedChildSource, case .lazyStack = node.layoutBehavior {
+      return DirectMaximum(value: idealMain)
+    }
 
     switch node.layoutBehavior {
     case .intrinsic:
