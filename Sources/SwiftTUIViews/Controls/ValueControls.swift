@@ -2,7 +2,7 @@ import SwiftTUICore
 
 /// Toggles a boolean binding on or off.
 public struct Toggle<Label: View>: PrimitiveView, ResolvableView {
-  public var isOn: Binding<Bool>
+  package var isOn: Binding<Bool>
   private var label: Label
   private let authoringScope: AuthoringContext?
 
@@ -116,11 +116,12 @@ extension Toggle {
 
 /// Edits a single-line string binding using terminal keyboard input.
 public struct TextField<Label: View>: PrimitiveView, ResolvableView {
-  public var text: Binding<String>
-  public var prompt: Text?
+  package var text: Binding<String>
+  package var prompt: Text?
   @State private var textInputValue = TextInputValue()
   private var label: Label
   private var showsLabel: Bool
+  private var titleAccessibilityLabel: String?
   private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
@@ -128,7 +129,12 @@ public struct TextField<Label: View>: PrimitiveView, ResolvableView {
     text: Binding<String>
   ) where Label == EmptyView {
     self.text = text
-    prompt = Text(String(title))
+    let titleText = String(title)
+    // SwiftUI treats the title as the field's label: it names the control
+    // for accessibility and doubles as the placeholder while the field is
+    // empty. Keep both roles.
+    prompt = Text(titleText)
+    titleAccessibilityLabel = titleText
     label = EmptyView()
     showsLabel = false
     authoringScope = currentAuthoringContext()
@@ -227,7 +233,7 @@ extension TextField {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .textField
-      )
+      ).merging(SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
     )
   }
 }

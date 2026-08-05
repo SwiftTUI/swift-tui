@@ -2417,7 +2417,7 @@ private struct FrameworkStressDiscoveryOwner: View {
       .id(FrameworkStressDiscoveryFixture.controlIdentity)
 
     case .scrollViewHandlersStayBounded:
-      ScrollView(.vertical, showsIndicators: true) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<10, id: \.self) { row in
             Text("Scroll Row \(generation).\(row)")
@@ -2428,7 +2428,7 @@ private struct FrameworkStressDiscoveryOwner: View {
       .frame(width: 36, height: 4, alignment: .topLeading)
 
     case .disabledScrollViewSkipsPointerHandlers:
-      ScrollView(.vertical, showsIndicators: true) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<10, id: \.self) { row in
             Text("Disabled Scroll Row \(generation).\(row)")
@@ -3493,7 +3493,7 @@ private struct FrameworkStressExpansionOwner: View {
         .onTapGesture { total += generation + 1 }
 
     case .verticalScrollViewHandlersRebind:
-      ScrollView(.vertical, showsIndicators: true) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<10, id: \.self) { row in
             Text("VScroll.\(row)")
@@ -3504,7 +3504,7 @@ private struct FrameworkStressExpansionOwner: View {
       .frame(width: 32, height: 4, alignment: .topLeading)
 
     case .horizontalScrollViewHandlersRebind:
-      ScrollView(.horizontal, showsIndicators: true) {
+      ScrollView(.horizontal) {
         HStack(spacing: 1) {
           ForEach(0..<10, id: \.self) { column in
             Text("HScroll.\(column)")
@@ -3515,7 +3515,7 @@ private struct FrameworkStressExpansionOwner: View {
       .frame(width: 32, height: 3, alignment: .topLeading)
 
     case .disabledAncestorScrollViewSkipsHandlers:
-      ScrollView(.vertical, showsIndicators: true) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<10, id: \.self) { row in
             Text("Disabled VScroll.\(row)")
@@ -4287,7 +4287,7 @@ private struct FrameworkStressAdditionalOwner: View {
 
     case .verticalScrollNestedPanelRebinds:
       Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<10, id: \.self) { row in
               Text("Additional VScroll.\(row)")
@@ -4300,7 +4300,7 @@ private struct FrameworkStressAdditionalOwner: View {
 
     case .disabledNestedScrollViewSkipsHandlers:
       Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<10, id: \.self) { row in
               Text("Disabled Additional VScroll.\(row)")
@@ -4637,7 +4637,7 @@ private struct ScrollFocusRevealPruningStressFixture: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("scroll owner generation \(generation)")
-      ScrollView(.vertical, showsIndicators: true) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           Button("Replace Scroll Owner") { generation += 1 }
           Text("Scroll Replace \(generation)")

@@ -269,6 +269,32 @@ func sliderValue<Value: AdjustableControlValue>(
   )
 }
 
+/// Derives the effective steps for a continuous (`step: nil`) slider.
+///
+/// The track step is the fine quantum pointer drags snap to — the largest
+/// power of ten no greater than 1/100 of the span, so dragged values stay
+/// near-continuous yet display with short, stable decimals. The adjustment
+/// step (arrow keys, wheel) is ten track quanta — roughly a tenth of the
+/// span, matching the keyboard feel of a continuous SwiftUI slider.
+package func continuousSliderSteps(
+  for bounds: ClosedRange<Double>
+) -> (track: Double, adjustment: Double) {
+  let span = bounds.upperBound - bounds.lowerBound
+  guard span.isFinite, span > 0 else {
+    return (track: 1, adjustment: 1)
+  }
+
+  let target = span / 100
+  var quantum = 1.0
+  while quantum > target {
+    quantum /= 10
+  }
+  while quantum * 10 <= target {
+    quantum *= 10
+  }
+  return (track: quantum, adjustment: quantum * 10)
+}
+
 func formattedControlValue<Value: AdjustableControlValue>(
   _ value: Value,
   bounds: ClosedRange<Value>?,

@@ -122,7 +122,7 @@ extension FrameworkStressStyleTransportTests {
     var parser = StyleTransportJSONParser(#"{"a":{"x":"1"},"b":null,"c":{"y":"2"}}"#)
     let object = parser.parse()?.objectValue
     #expect(object?["a"]?.objectValue?["x"]?.stringValue == "1")
-    if case .null = object?["b"] { } else { Issue.record("expected null sibling") }
+    if case .null = object?["b"] {} else { Issue.record("expected null sibling") }
     #expect(object?["c"]?.objectValue?["y"]?.stringValue == "2")
   }
 }

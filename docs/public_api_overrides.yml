@@ -481,7 +481,8 @@ classifications:
     - SwiftTUIViews.TableRow
     - SwiftTUIViews.TabViewOverflowMenuPresentation
     - SwiftTUIViews.TabViewOverflowTriggerConfiguration
-    - SwiftTUIViews.ScrollPosition
+    - SwiftTUIViews.ScrollCellOffset
+    - SwiftTUIViews.NamedCoordinateSpace
     - SwiftTUIViews.Axis
     - SwiftTUIViews.VerticalEdge
     - SwiftTUIViews.ViewSpacing
@@ -769,6 +770,10 @@ classifications:
     # Compatibility-shim types that were retired. If any of these reappears
     # in the source, the --check run fails.
     - SwiftTUI.FrameDiagnosticsLogger
+    # Renamed to ScrollCellOffset in the pre-launch SwiftUI-divergence sweep
+    # so SwiftUI's ScrollPosition name is no longer claimed by raw-offset
+    # semantics.
+    - SwiftTUIViews.ScrollPosition
     - SwiftTUIRuntime.FileOpenError
     - SwiftTUIRuntime.Standard
     - SwiftTUIViews.ErrorToastStyle
@@ -848,3 +853,33 @@ platform_exceptions: []
 # Optional human-readable notes appended in the generated baseline next to a
 # live qualified name. Keep these short — PUBLIC-API.md owns longer rationale.
 notes: {}
+
+# Symbols that carry a SwiftUI name with deliberately different semantics.
+# Orthogonal to the classification axis above. `--check` fails unless each
+# listed symbol is live AND named in the divergence register
+# (Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md), so a
+# divergent surface cannot ship unrecorded and the register cannot silently
+# rot. Add a symbol here whenever a SwiftUI-named API's behavior or signature
+# departs from SwiftUI's; write the register entry in the same change.
+swiftui_divergent:
+  - SwiftTUIViews.Binding
+  - SwiftTUIViews.Canvas
+  - SwiftTUIViews.DragGesture
+  - SwiftTUIViews.ForEach
+  - SwiftTUIViews.Image
+  - SwiftTUIViews.List
+  - SwiftTUIViews.LongPressGesture
+  - SwiftTUIViews.Picker
+  - SwiftTUIViews.ScrollView
+  - SwiftTUIViews.ScrollViewProxy
+  - SwiftTUIViews.ScrollViewReader
+  - SwiftTUIViews.Slider
+  - SwiftTUIViews.Spacer
+  - SwiftTUIViews.SpatialTapGesture
+  - SwiftTUIViews.State
+  - SwiftTUIViews.TabView
+  - SwiftTUIViews.Table
+  - SwiftTUIViews.Text
+  - SwiftTUIViews.TextField
+  - SwiftTUIViews.Transaction
+  - SwiftTUIRuntime.WindowGroup

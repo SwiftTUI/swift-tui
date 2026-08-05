@@ -60,7 +60,6 @@ final class OnEndedDecorator<V>: GestureRecognizer {
 
   func tearDown() { inner.tearDown() }
 
-
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     guard let other = replacement as? OnEndedDecorator<V>,
       inner.adoptAuthoredCallbacks(from: other.inner)
@@ -127,7 +126,6 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
   func currentValue() -> V? { inner.currentValue(as: V.self) }
 
   func tearDown() { inner.tearDown() }
-
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     guard let other = replacement as? OnChangedDecorator<V>,

@@ -1583,7 +1583,7 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting028KeyboardScrollBindingClampsAtEdge() throws {
     // Hypothesis: arrow-key scrolling may grow the bound offset beyond geometry,
     // requiring many reverse keys before the visible viewport moves.
-    let position = StressInputBox(ScrollPosition.zero)
+    let position = StressInputBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput028Root"),
       size: .init(width: 32, height: 8)
@@ -1611,12 +1611,11 @@ extension FrameworkStressInputRoutingTests {
 private struct StressInput028Fixture: View {
   static let scrollIdentity = testIdentity("StressInput028", "Scroll")
 
-  let position: StressInputBox<ScrollPosition>
+  let position: StressInputBox<ScrollCellOffset>
 
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: position.binding()
     ) {
       VStack(alignment: .leading, spacing: 0) {
@@ -1624,9 +1623,9 @@ private struct StressInput028Fixture: View {
           Text("Keyboard row \(row)")
         }
       }
-    }
-    .id(Self.scrollIdentity)
-    .frame(width: 24, height: 4, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .id(Self.scrollIdentity)
+      .frame(width: 24, height: 4, alignment: .topLeading)
   }
 }
 
@@ -1637,8 +1636,8 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting029NestedWheelChainsAtInnerBoundary() throws {
     // Hypothesis: spatial target selection may pick only the leaf scroll route;
     // when its handler reports an edge, dispatch never retries the ancestor.
-    let outer = StressInputBox(ScrollPosition.zero)
-    let inner = StressInputBox(ScrollPosition(x: 0, y: 5))
+    let outer = StressInputBox(ScrollCellOffset.zero)
+    let inner = StressInputBox(ScrollCellOffset(x: 0, y: 5))
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput029Root"),
       size: .init(width: 40, height: 10)
@@ -1656,20 +1655,18 @@ extension FrameworkStressInputRoutingTests {
 }
 
 private struct StressInput029Fixture: View {
-  let outer: StressInputBox<ScrollPosition>
-  let inner: StressInputBox<ScrollPosition>
+  let outer: StressInputBox<ScrollCellOffset>
+  let inner: StressInputBox<ScrollCellOffset>
 
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: outer.binding()
     ) {
       VStack(alignment: .leading, spacing: 0) {
         Text("Outer header")
         ScrollView(
           .vertical,
-          showsIndicators: false,
           position: inner.binding()
         ) {
           VStack(alignment: .leading, spacing: 0) {
@@ -1677,16 +1674,16 @@ private struct StressInput029Fixture: View {
               Text("Inner \(row)")
             }
           }
-        }
-        .id(testIdentity("StressInput029", "Inner"))
-        .frame(width: 24, height: 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .id(testIdentity("StressInput029", "Inner"))
+          .frame(width: 24, height: 3, alignment: .topLeading)
         ForEach(0..<10) { row in
           Text("Outer tail \(row)")
         }
       }
-    }
-    .id(testIdentity("StressInput029", "Outer"))
-    .frame(width: 28, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .id(testIdentity("StressInput029", "Outer"))
+      .frame(width: 28, height: 6, alignment: .topLeading)
   }
 }
 
@@ -1697,7 +1694,7 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting030RelocatedFocusedIdentityIsRevealedAgain() throws {
     // Hypothesis: reveal freshness keyed only by focused identity ignores a
     // geometry relocation of that still-focused identity.
-    let position = StressInputBox(ScrollPosition.zero)
+    let position = StressInputBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput030Root"),
       size: .init(width: 40, height: 9)
@@ -1721,13 +1718,12 @@ private struct StressInput030Fixture: View {
   static let focusIdentity = testIdentity("StressInput030", "Focus")
   static let scrollIdentity = testIdentity("StressInput030", "Scroll")
 
-  let position: StressInputBox<ScrollPosition>
+  let position: StressInputBox<ScrollCellOffset>
   @State private var movesLow = false
 
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: position.binding()
     ) {
       VStack(alignment: .leading, spacing: 0) {
@@ -1741,9 +1737,9 @@ private struct StressInput030Fixture: View {
           focusTarget
         }
       }
-    }
-    .id(Self.scrollIdentity)
-    .frame(width: 30, height: 5, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .id(Self.scrollIdentity)
+      .frame(width: 30, height: 5, alignment: .topLeading)
   }
 
   private var focusTarget: some View {
@@ -1764,8 +1760,8 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting031MomentumDoesNotTransferToReplacementRoute() throws {
     // Hypothesis: momentum keyed only by route Identity may mutate a newly
     // mounted binding after the original scroll owner is replaced.
-    let first = StressInputBox(ScrollPosition.zero)
-    let second = StressInputBox(ScrollPosition.zero)
+    let first = StressInputBox(ScrollCellOffset.zero)
+    let second = StressInputBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput031Root"),
       size: .init(width: 40, height: 9)
@@ -1809,8 +1805,8 @@ extension FrameworkStressInputRoutingTests {
 private struct StressInput031Fixture: View {
   static let scrollIdentity = testIdentity("StressInput031", "Scroll")
 
-  let first: StressInputBox<ScrollPosition>
-  let second: StressInputBox<ScrollPosition>
+  let first: StressInputBox<ScrollCellOffset>
+  let second: StressInputBox<ScrollCellOffset>
   @State private var targetsSecond = false
 
   var body: some View {
@@ -1818,7 +1814,6 @@ private struct StressInput031Fixture: View {
       Text(targetsSecond ? "Binding B" : "Binding A")
       ScrollView(
         .vertical,
-        showsIndicators: false,
         position: targetsSecond ? second.binding() : first.binding()
       ) {
         VStack(alignment: .leading, spacing: 0) {
@@ -1826,13 +1821,13 @@ private struct StressInput031Fixture: View {
             Text("Momentum row \(row)")
           }
         }
-      }
-      .id(Self.scrollIdentity)
-      .frame(width: 28, height: 5, alignment: .topLeading)
-      .onKeyPress(.character("r")) { _ in
-        targetsSecond = true
-        return .handled
-      }
+      }.scrollIndicators(.hidden)
+        .id(Self.scrollIdentity)
+        .frame(width: 28, height: 5, alignment: .topLeading)
+        .onKeyPress(.character("r")) { _ in
+          targetsSecond = true
+          return .handled
+        }
     }
   }
 }
@@ -1844,8 +1839,8 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting032ScrollViewRebindsCurrentPositionBinding() throws {
     // Hypothesis: restored pointer or position registrations may retain binding
     // A after the stable ScrollView is re-authored with binding B.
-    let first = StressInputBox(ScrollPosition.zero)
-    let second = StressInputBox(ScrollPosition.zero)
+    let first = StressInputBox(ScrollCellOffset.zero)
+    let second = StressInputBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput032Root"),
       size: .init(width: 40, height: 9)
@@ -1860,21 +1855,20 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.scrollPointer(at: point, deltaY: 1)
 
     #expect(first.value == .zero)
-    #expect(second.value == ScrollPosition(x: 0, y: 1))
+    #expect(second.value == ScrollCellOffset(x: 0, y: 1))
   }
 }
 
 private struct StressInput032Fixture: View {
   static let scrollIdentity = testIdentity("StressInput032", "Scroll")
 
-  let first: StressInputBox<ScrollPosition>
-  let second: StressInputBox<ScrollPosition>
+  let first: StressInputBox<ScrollCellOffset>
+  let second: StressInputBox<ScrollCellOffset>
   @State private var targetsSecond = false
 
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: targetsSecond ? second.binding() : first.binding()
     ) {
       VStack(alignment: .leading, spacing: 0) {
@@ -1882,13 +1876,13 @@ private struct StressInput032Fixture: View {
           Text("Rebind row \(row)")
         }
       }
-    }
-    .id(Self.scrollIdentity)
-    .frame(width: 28, height: 5, alignment: .topLeading)
-    .onKeyPress(.character("r")) { _ in
-      targetsSecond = true
-      return .handled
-    }
+    }.scrollIndicators(.hidden)
+      .id(Self.scrollIdentity)
+      .frame(width: 28, height: 5, alignment: .topLeading)
+      .onKeyPress(.character("r")) { _ in
+        targetsSecond = true
+        return .handled
+      }
   }
 }
 
@@ -1899,7 +1893,7 @@ extension FrameworkStressInputRoutingTests {
   func stressInputRouting033ChangingAxesDropsOldScrollHandlers() throws {
     // Hypothesis: a restored body handler from the vertical configuration may
     // coexist with the new horizontal handler at the stable route identity.
-    let position = StressInputBox(ScrollPosition.zero)
+    let position = StressInputBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput033Root"),
       size: .init(width: 42, height: 9)
@@ -1914,20 +1908,19 @@ extension FrameworkStressInputRoutingTests {
     let point = Point(x: 1, y: 1)
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     _ = try harness.scrollPointer(at: point, deltaX: 1, deltaY: 0)
-    #expect(position.value == ScrollPosition(x: 1, y: 0))
+    #expect(position.value == ScrollCellOffset(x: 1, y: 0))
   }
 }
 
 private struct StressInput033Fixture: View {
   static let scrollIdentity = testIdentity("StressInput033", "Scroll")
 
-  let position: StressInputBox<ScrollPosition>
+  let position: StressInputBox<ScrollCellOffset>
   @State private var usesHorizontalAxis = false
 
   var body: some View {
     ScrollView(
       usesHorizontalAxis ? .horizontal : .vertical,
-      showsIndicators: false,
       position: position.binding()
     ) {
       VStack(alignment: .leading, spacing: 0) {
@@ -1939,12 +1932,12 @@ private struct StressInput033Fixture: View {
           }
         }
       }
-    }
-    .id(Self.scrollIdentity)
-    .frame(width: 20, height: 5, alignment: .topLeading)
-    .onKeyPress(.character("r")) { _ in
-      usesHorizontalAxis = true
-      return .handled
-    }
+    }.scrollIndicators(.hidden)
+      .id(Self.scrollIdentity)
+      .frame(width: 20, height: 5, alignment: .topLeading)
+      .onKeyPress(.character("r")) { _ in
+        usesHorizontalAxis = true
+        return .handled
+      }
   }
 }

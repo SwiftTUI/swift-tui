@@ -127,7 +127,10 @@ struct PresentationTriggerSplitTests {
         ),
         proposal: triggerProposal
       )
-      #expect(opened.diagnostics.work.resolvedNodesReused == 0)
+      // The structural background (its `VStack`/`ForEach` spine) re-resolves;
+      // only the six unchanged `BG row` `Text` leaves are `Equatable` memo
+      // candidates and survive the ancestor invalidation.
+      #expect(opened.diagnostics.work.resolvedNodesReused == 6)
     }
   }
 

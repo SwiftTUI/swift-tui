@@ -18,9 +18,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 59 | 520 |
+| `SwiftTUIRuntime` | 59 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 280 | 1529 |
+| `SwiftTUIViews` | 281 | 1517 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 49 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 167 | 1444 |
+| `SwiftTUIPrimitives` | 167 | 1445 |
 | `SwiftTUIGraph` | 56 | 341 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -104,7 +104,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalSurfaceRenderer` — struct — 3 members
 - `TupleScene` — struct — 2 members
 - `VariadicScene` — struct — 2 members
-- `WindowGroup` — struct — 9 members
+- `WindowGroup` — struct — 8 members
 - `WindowIdentifier` — struct — 6 members
 
 ## SwiftTUIProfiling
@@ -123,7 +123,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (280)
+### Canonical surface (281)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -167,7 +167,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `BuiltinPaletteSheetPresentationModifier` — struct
 - `BuiltinPromptPresentationModifier` — struct
 - `BuiltinSheetPresentationModifier` — struct
-- `Button` — struct — 6 members
+- `Button` — struct — 4 members
 - `ButtonStyle` — protocol — 6 members
 - `ButtonStyleConfiguration` — struct — 12 members
 - `Canvas` — struct — 7 members
@@ -199,7 +199,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 1 member
 - `EnvironmentTransformModifier` — struct
-- `EnvironmentValues` — struct — 32 members
+- `EnvironmentValues` — struct — 27 members
 - `EnvironmentWritingModifier` — struct
 - `EquatableView` — struct — 2 members
 - `ExclusiveGesture` — struct — 6 members
@@ -213,7 +213,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ForEach` — struct — 5 members
 - `ForeignSurface` — struct — 2 members
 - `FrameModifier` — struct
-- `GeometryProxy` — struct — 8 members
+- `GeometryProxy` — struct — 7 members
 - `GeometryReader` — struct — 1 member
 - `Gesture` — protocol — 10 members
 - `GestureAttachmentModifier` — struct
@@ -253,7 +253,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `LazyHStack` — struct — 3 members
 - `LazyVStack` — struct — 3 members
 - `LinearGradient` — extension — 1 member
-- `Link` — struct — 4 members
+- `Link` — struct — 2 members
 - `LinkButtonStyle` — struct — 3 members
 - `List` — struct — 18 members
 - `ListStyle` — protocol — 1 member
@@ -263,6 +263,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Menu` — struct — 2 members
 - `MenuPickerStyle` — struct — 5 members
 - `ModifiedContent` — struct — 10 members
+- `NamedCoordinateSpace` — struct — 2 members
 - `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 3 members
 - `NavigationStack` — struct — 3 members
@@ -315,15 +316,15 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `RoundedRectangle` — struct — 3 members
 - `SafeAreaInsetModifier` — struct
 - `SafeAreaPaddingModifier` — struct
-- `ScrollPosition` — struct — 7 members
-- `ScrollView` — struct — 5 members
+- `ScrollCellOffset` — struct — 7 members
+- `ScrollView` — struct — 4 members
 - `ScrollViewProxy` — struct — 5 members
 - `ScrollViewReader` — struct — 1 member
 - `ScrollWheelEvent` — struct — 3 members
 - `ScrollWheelModifier` — struct
 - `ScrollWheelResult` — enum — 2 members
 - `Section` — struct — 3 members
-- `SecureField` — struct — 4 members
+- `SecureField` — struct — 2 members
 - `SegmentedPickerStyle` — struct — 4 members
 - `SemanticMetadataModifier` — struct
 - `SequenceGesture` — struct — 8 members
@@ -357,9 +358,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalHandoffAction` — struct — 5 members
 - `TerminalHandoffError` — enum — 4 members
 - `TerminationRequestModifier` — struct
-- `Text` — struct — 34 members
+- `Text` — struct — 35 members
 - `TextEditor` — struct — 2 members
-- `TextField` — struct — 4 members
+- `TextField` — struct — 2 members
 - `TextFieldStyle` — protocol — 4 members
 - `TextFieldStyleConfiguration` — struct — 13 members
 - `TextFigure` — struct — 8 members
@@ -371,7 +372,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ToastStyle` — protocol — 3 members
 - `ToastStyleConfiguration` — struct — 1 member
 - `ToastStylePresentation` — struct — 11 members
-- `Toggle` — struct — 3 members
+- `Toggle` — struct — 2 members
 - `ToolbarItemConfig` — struct — 11 members
 - `ToolbarItemContributionModifier` — struct
 - `ToolbarModifier` — struct
@@ -700,7 +701,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `RGBPrimaries` — struct — 5 members
 - `RichTextPayload` — struct — 3 members
 - `RichTextRun` — struct — 4 members
-- `ScrollIndicatorVisibility` — enum — 3 members
+- `ScrollIndicatorVisibility` — struct — 4 members
 - `SelectionTag` — struct — 3 members
 - `SemanticShapeStyle` — struct — 3 members
 - `SemanticStyleRole` — enum — 15 members

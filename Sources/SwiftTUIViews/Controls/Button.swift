@@ -10,27 +10,6 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
 
   public init(
     _ title: String,
-    role: ButtonRole? = nil
-  ) where Label == Text {
-    self.role = role
-    action = nil
-    label = Text(title)
-    authoringScope = currentAuthoringContext()
-  }
-
-  public init(
-    role: ButtonRole? = nil,
-    @ViewBuilder label: () -> Label
-  ) {
-    let authoringContext = currentAuthoringContext()
-    self.role = role
-    action = nil
-    self.label = label()
-    authoringScope = authoringContext
-  }
-
-  public init(
-    _ title: String,
     role: ButtonRole? = nil,
     action: @escaping @MainActor @Sendable () -> Void
   ) where Label == Text {
@@ -105,9 +84,13 @@ extension Button {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isFocused =
+      context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [context.identity]) == context.identity
+    let isPressed =
+      context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
+      == context.identity
     let buttonStyle = context.environmentValues.buttonStyle
 
     if context.environmentValues.isEnabled, let action {

@@ -823,13 +823,12 @@ struct TerminalGraphicsProtocolTests {
     )
 
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -842,8 +841,8 @@ struct TerminalGraphicsProtocolTests {
           .frame(width: 4, height: 4)
         Text("Tail")
       }
-    }
-    .frame(width: 4, height: 3, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 4, height: 3, alignment: .topLeading)
 
     box.position.scrollBy(y: 2)
     let artifacts = DefaultRenderer().render(

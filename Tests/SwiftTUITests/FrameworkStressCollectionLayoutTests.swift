@@ -56,14 +56,14 @@ private struct CollectionLayout001Root: View {
 
   var body: some View {
     let values = Array(0..<12)
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(values[lowerBound..<(lowerBound + 5)], id: \.self) { value in
           Text("001 row \(value)")
         }
       }
-    }
-    .frame(width: 16, height: 3, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
 
@@ -122,14 +122,14 @@ private struct CollectionLayout002Root: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(rows) { row in
           Text("002 \(row.label)")
         }
       }
-    }
-    .frame(width: 12, height: 8, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 12, height: 8, alignment: .topLeading)
   }
 }
 
@@ -185,15 +185,15 @@ private struct CollectionLayout003Root: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(rows) { row in
           Text("003 row \(row.id) h\(row.height)")
             .frame(height: row.height, alignment: .topLeading)
         }
       }
-    }
-    .frame(width: 14, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 14, height: 6, alignment: .topLeading)
   }
 }
 
@@ -238,14 +238,14 @@ private struct CollectionLayout004Root: View {
   let count: Int
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(0..<count) { value in
           Text("004 row \(value) of \(count)")
         }
       }
-    }
-    .frame(width: 15, height: 5, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 15, height: 5, alignment: .topLeading)
   }
 }
 
@@ -288,15 +288,15 @@ private struct CollectionLayout005Root: View {
   let values: [Int]
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(values, id: \.self) { value in
           Text("005 label \(value)")
           Text("005 detail \(value)")
         }
       }
-    }
-    .frame(width: 18, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
 
@@ -352,7 +352,7 @@ private struct CollectionLayout006Root: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(rows) { row in
           if row.isVisible {
@@ -360,8 +360,8 @@ private struct CollectionLayout006Root: View {
           }
         }
       }
-    }
-    .frame(width: 16, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: 6, alignment: .topLeading)
   }
 }
 
@@ -405,7 +405,7 @@ private struct CollectionLayout007Root: View {
   let alternate: Bool
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         if alternate {
           ForEach([30, 20, 10], id: \.self) { value in
@@ -418,8 +418,8 @@ private struct CollectionLayout007Root: View {
           }
         }
       }
-    }
-    .frame(width: 18, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
 
@@ -463,7 +463,7 @@ private struct CollectionLayout008Root: View {
   let values: [Int]
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         Group {
           ForEach(values, id: \.self) { value in
@@ -471,8 +471,8 @@ private struct CollectionLayout008Root: View {
           }
         }
       }
-    }
-    .frame(width: 15, height: 5, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 15, height: 5, alignment: .topLeading)
   }
 }
 
@@ -517,7 +517,7 @@ private struct CollectionLayout009Root: View {
   let inner: [Int]
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(outer, id: \.self) { outerValue in
           ForEach(inner, id: \.self) { innerValue in
@@ -525,8 +525,8 @@ private struct CollectionLayout009Root: View {
           }
         }
       }
-    }
-    .frame(width: 18, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
 
@@ -582,15 +582,15 @@ private struct CollectionLayout010Root: View {
   }
 
   var body: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
+    ScrollView(.horizontal) {
       LazyHStack(alignment: .top, spacing: 1) {
         ForEach(rows) { row in
           Text("\(row.id)")
             .frame(width: row.width, height: 2, alignment: .topLeading)
         }
       }
-    }
-    .frame(width: 16, height: 3, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
 
@@ -630,15 +630,15 @@ private struct CollectionLayout011Root: View {
   let values: [Int]
 
   var body: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
+    ScrollView(.horizontal) {
       LazyHStack(alignment: .top, spacing: 1) {
         ForEach(values, id: \.self) { value in
           Text("A\(value)")
           Text("B\(value)")
         }
       }
-    }
-    .frame(width: 20, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 20, height: 2, alignment: .topLeading)
   }
 }
 
@@ -695,15 +695,15 @@ private struct CollectionLayout012Root: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(rows) { row in
           Text("012 \(row.label) h\(row.height)")
             .frame(height: row.height, alignment: .topLeading)
         }
       }
-    }
-    .frame(width: 18, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 6, alignment: .topLeading)
   }
 }
 
@@ -746,7 +746,7 @@ private struct CollectionLayout013Root: View {
   let expanded: Bool
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach([13], id: \.self) { _ in
           if expanded {
@@ -759,8 +759,8 @@ private struct CollectionLayout013Root: View {
           }
         }
       }
-    }
-    .frame(width: 18, height: 4, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 4, alignment: .topLeading)
   }
 }
 
@@ -804,7 +804,7 @@ private struct CollectionLayout014Root: View {
   let mixed: Bool
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       if mixed {
         LazyVStack(alignment: .leading, spacing: 0) {
           Text("014 static head")
@@ -819,8 +819,8 @@ private struct CollectionLayout014Root: View {
           }
         }
       }
-    }
-    .frame(width: 18, height: 5, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 18, height: 5, alignment: .topLeading)
   }
 }
 
@@ -881,7 +881,7 @@ private struct CollectionLayout015Root: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: trailing ? .trailing : .leading, spacing: 0) {
         ForEach(rows) { row in
           Text("015 \(row.label)")
@@ -889,8 +889,8 @@ private struct CollectionLayout015Root: View {
         }
       }
       .frame(width: 20, alignment: .topLeading)
-    }
-    .frame(width: 20, height: 4, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 20, height: 4, alignment: .topLeading)
   }
 }
 
@@ -933,7 +933,7 @@ extension FrameworkStressCollectionLayoutTests {
 
 @MainActor
 private final class CollectionLayout016ScrollBox {
-  var value = ScrollPosition.zero
+  var value = ScrollCellOffset.zero
 }
 
 @MainActor
@@ -944,7 +944,6 @@ private struct CollectionLayout016Root: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { position.value },
         set: { position.value = $0 }
@@ -955,8 +954,8 @@ private struct CollectionLayout016Root: View {
           Text("016 row \(value)")
         }
       }
-    }
-    .frame(width: 16, height: 4, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: 4, alignment: .topLeading)
   }
 }
 
@@ -999,7 +998,7 @@ extension FrameworkStressCollectionLayoutTests {
 
 @MainActor
 private final class CollectionLayout017ScrollBox {
-  var value = ScrollPosition.zero
+  var value = ScrollCellOffset.zero
 }
 
 @MainActor
@@ -1010,7 +1009,6 @@ private struct CollectionLayout017Root: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { position.value },
         set: { position.value = $0 }
@@ -1021,8 +1019,8 @@ private struct CollectionLayout017Root: View {
           Text("017 row \(value)")
         }
       }
-    }
-    .frame(width: 16, height: height, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: height, alignment: .topLeading)
   }
 }
 
@@ -1066,7 +1064,7 @@ extension FrameworkStressCollectionLayoutTests {
 
 @MainActor
 private final class CollectionLayout018ScrollBox {
-  var value = ScrollPosition.zero
+  var value = ScrollCellOffset.zero
 }
 
 @MainActor
@@ -1077,7 +1075,6 @@ private struct CollectionLayout018Root: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { position.value },
         set: { position.value = $0 }
@@ -1088,8 +1085,8 @@ private struct CollectionLayout018Root: View {
           Text("018 row \(value)")
         }
       }
-    }
-    .frame(width: 16, height: 3, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 16, height: 3, alignment: .topLeading)
   }
 }
 
@@ -1134,7 +1131,7 @@ extension FrameworkStressCollectionLayoutTests {
 
 @MainActor
 private final class CollectionLayout019ScrollBox {
-  var value = ScrollPosition.zero
+  var value = ScrollCellOffset.zero
 }
 
 @MainActor
@@ -1145,7 +1142,6 @@ private struct CollectionLayout019Root: View {
   var body: some View {
     ScrollView(
       .horizontal,
-      showsIndicators: false,
       position: Binding(
         get: { position.value },
         set: { position.value = $0 }
@@ -1157,8 +1153,8 @@ private struct CollectionLayout019Root: View {
             .frame(width: 3, alignment: .leading)
         }
       }
-    }
-    .frame(width: 8, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 8, height: 2, alignment: .topLeading)
   }
 }
 

@@ -15,7 +15,7 @@ import SwiftTUICore
 /// is the cell center, so deltas stay integer and behavior is unchanged.
 struct ScrollPanAnchor: Equatable, Sendable {
   var startLocation: Point
-  var startOffset: ScrollPosition
+  var startOffset: ScrollCellOffset
 }
 
 extension LocalPointerScrollContext {
@@ -36,28 +36,38 @@ extension LocalPointerScrollContext {
 /// (`min(max(0, requested), max(0, content - viewport))`) so wheel, drag-pan,
 /// imperative scrolling, and layout all agree on the scrollable range.
 func clampedScrollOffset(
-  _ offset: ScrollPosition,
+  _ offset: ScrollCellOffset,
   in context: LocalPointerScrollContext
-) -> ScrollPosition {
-  ScrollPosition(
+) -> ScrollCellOffset {
+  ScrollCellOffset(
     x: min(max(0, offset.x), context.maxScrollX),
     y: min(max(0, offset.y), context.maxScrollY)
   )
 }
 
 extension ScrollView {
-  func effectiveIndicatorVisibility(
-    environment: ScrollIndicatorVisibility
-  ) -> ScrollIndicatorVisibility {
-    guard showsIndicators else {
-      return .hidden
+  /// The axes whose indicators may draw: the scrollable axes filtered by
+  /// the per-axis indicator-visibility environment.
+  func resolvedIndicatorAxes(
+    environment: EnvironmentValues
+  ) -> Axis.Set {
+    var resolved: Axis.Set = []
+    if axes.contains(.vertical),
+      environment.scrollIndicatorVisibility.allowsVisibleIndicators
+    {
+      resolved.insert(.vertical)
     }
-    return environment == .hidden ? .hidden : .visible
+    if axes.contains(.horizontal),
+      environment.horizontalScrollIndicatorVisibility.allowsVisibleIndicators
+    {
+      resolved.insert(.horizontal)
+    }
+    return resolved
   }
 
   func applyScrollKey(
     _ event: KeyEvent,
-    to position: inout ScrollPosition,
+    to position: inout ScrollCellOffset,
     targetAxis: ScrollIndicatorAxis?
   ) -> Bool {
     switch targetAxis {

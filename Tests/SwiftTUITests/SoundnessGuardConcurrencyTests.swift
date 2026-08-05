@@ -1,6 +1,5 @@
-import Testing
-
 @_spi(Testing) import SwiftTUITestSupport
+import Testing
 
 @Suite(.serialized)
 struct SoundnessGuardConcurrencyTests {

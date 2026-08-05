@@ -39,7 +39,8 @@ struct ViewportUnderRealizationRegressionTests {
     let output = TerminalSurfaceRenderer(
       capabilityProfile: .previewASCII
     ).render(artifacts.rasterSurface)
-    return output
+    return
+      output
       .split(whereSeparator: \.isNewline)
       .map(String.init)
   }
@@ -54,7 +55,7 @@ struct ViewportUnderRealizationRegressionTests {
       "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi "
       + "omicron pi rho sigma tau upsilon phi chi psi omega one two three four five"
     let lines = renderedLines(
-      ScrollView(position: .constant(ScrollPosition(x: 0, y: 0))) {
+      ScrollView(position: .constant(ScrollCellOffset(x: 0, y: 0))) {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<40, id: \.self) { index in
             if index == 2 {
@@ -107,7 +108,7 @@ struct ViewportUnderRealizationRegressionTests {
     let renderer = DefaultRenderer()
     for offset in [0, 0, 31, 31, 66, 66, 42, 42] {
       let lines = renderedLines(
-        ScrollView(position: .constant(ScrollPosition(x: 0, y: offset))) {
+        ScrollView(position: .constant(ScrollCellOffset(x: 0, y: offset))) {
           LazyVStack(alignment: .leading, spacing: 1) {
             ForEach(0..<80, id: \.self) { index in
               Text(blockText(index))

@@ -65,14 +65,14 @@ struct ResolveReuseAncestorInvalidationTests {
     #expect(rendered.contains("Styling"))
     #expect(!rendered.contains("Overview"))
 
-    // Memo reuse is `Equatable`-only: these are bare `Text`/`VStack` views (not
-    // `Equatable`), so nothing in this tree is a memo candidate — no descendant
-    // is reused. (Opting in via `.equatable()` / an `Equatable` boundary is
-    // covered by `EquatableBoundaryReuseTests`.)
-    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    // Memo reuse is `Equatable`-only. `Text` is `Equatable`, so the unchanged
+    // `Text("Header")` is the tree's one memo candidate and is reused. The
+    // binding-driven `Text` compares unequal across frames and must recompute —
+    // exactly one reused node proves the hazard cannot materialize.
+    #expect(updated.diagnostics.work.resolvedNodesReused == 1)
   }
 
-  @Test("non-Equatable clean descendant is not memo-reused (the gate is Equatable-only)")
+  @Test("only Equatable clean descendants are memo-reused (the gate is Equatable-only)")
   func ancestorInvalidationCleanDescendantIsNotMemoReused() {
     struct StableRoot: View {
       var body: some View {
@@ -103,14 +103,14 @@ struct ResolveReuseAncestorInvalidationTests {
       )
     }
 
-    // A bare, unchanged `Text`/`VStack` subtree under an invalidated ancestor is
-    // NOT `Equatable`, so it is not a memo candidate: it recomputes (only an
-    // `Equatable`/`.equatable()` boundary opts in).
+    // The memo gate is `Equatable`-only. The two unchanged `Text` leaves are
+    // `Equatable` memo candidates and are reused; the `VStack` is not
+    // `Equatable`, so it is not a candidate and recomputes.
     let updated = renderFrames()
     let rendered = updated.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("Stable"))
     #expect(rendered.contains("AlsoStable"))
-    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.work.resolvedNodesReused == 2)
     #expect(updated.diagnostics.work.resolvedNodesComputed > 0)
   }
 

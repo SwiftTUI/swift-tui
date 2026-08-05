@@ -10,7 +10,7 @@ struct ScrollIndicatorDraggingTests {
   @Test("ScrollView indicator drag uses fractional pointer locations")
   func scrollViewIndicatorDragUsesFractionalPointerLocations() throws {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()

@@ -308,11 +308,14 @@ struct DiagnosticsAndCacheTests {
       Text("abcdef")
     }
 
+    // Indicator visibility is per-axis: a horizontal scroll view's indicator
+    // is governed by the horizontal-axis key (`scrollIndicators(_:axes:)`
+    // writes both).
     var visibleEnvironment = EnvironmentValues()
-    visibleEnvironment.scrollIndicatorVisibility = .visible
+    visibleEnvironment.horizontalScrollIndicatorVisibility = .visible
 
     var hiddenEnvironment = EnvironmentValues()
-    hiddenEnvironment.scrollIndicatorVisibility = .hidden
+    hiddenEnvironment.horizontalScrollIndicatorVisibility = .hidden
 
     let first = renderer.render(
       view,
@@ -342,7 +345,7 @@ struct DiagnosticsAndCacheTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let box = LockedBox(ScrollPosition.zero)
+    let box = LockedBox(ScrollCellOffset.zero)
 
     func makeView() -> some View {
       ScrollView(
@@ -392,7 +395,7 @@ struct DiagnosticsAndCacheTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let box = LockedBox(ScrollPosition.zero)
+    let box = LockedBox(ScrollCellOffset.zero)
 
     func makeView() -> some View {
       ScrollView(
@@ -443,8 +446,8 @@ struct DiagnosticsAndCacheTests {
     let lazyRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let eagerBox = LockedBox(ScrollPosition.zero)
-    let lazyBox = LockedBox(ScrollPosition.zero)
+    let eagerBox = LockedBox(ScrollCellOffset.zero)
+    let lazyBox = LockedBox(ScrollCellOffset.zero)
 
     func makeEagerView() -> some View {
       ScrollView(
@@ -526,8 +529,8 @@ struct DiagnosticsAndCacheTests {
     let lazyRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let stableBox = LockedBox(ScrollPosition.zero)
-    let lazyBox = LockedBox(ScrollPosition.zero)
+    let stableBox = LockedBox(ScrollCellOffset.zero)
+    let lazyBox = LockedBox(ScrollCellOffset.zero)
 
     func makeStableView() -> some View {
       ScrollView(
@@ -884,7 +887,9 @@ struct DiagnosticsAndCacheTests {
 
     #expect(first.diagnostics.work.measuredNodesComputed > 0)
     #expect(second.diagnostics.work.resolvedNodesComputed > 0)
-    #expect(second.diagnostics.work.resolvedNodesReused == 0)
+    // The unchanged `Text("Stable")` is an `Equatable` memo candidate and is
+    // reused; the style-changed `Text` compares unequal and recomputes.
+    #expect(second.diagnostics.work.resolvedNodesReused == 1)
     #expect(second.diagnostics.work.measuredNodesComputed == 0)
     #expect(second.diagnostics.work.placedNodesComputed == 0)
     #expect(

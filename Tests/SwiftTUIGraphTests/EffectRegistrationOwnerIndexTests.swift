@@ -33,7 +33,8 @@ struct EffectRegistrationOwnerIndexTests {
       identity: testIdentity("Root", "Empty"), invalidator: nil)
 
     ViewNodeContext.withValue(lifecycleOwner) {
-      RegistrationKindDriver.record(.lifecycle, on: lifecycleOwner, identity: lifecycleOwner.identity)
+      RegistrationKindDriver.record(
+        .lifecycle, on: lifecycleOwner, identity: lifecycleOwner.identity)
     }
     ViewNodeContext.withValue(taskOwner) {
       RegistrationKindDriver.record(.task, on: taskOwner, identity: taskOwner.identity)

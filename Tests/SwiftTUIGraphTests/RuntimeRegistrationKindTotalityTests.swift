@@ -38,7 +38,8 @@ struct RuntimeRegistrationKindTotalityTests {
     let set = RuntimeRegistrationSet.scratch()
     set.restore(from: node.registeredHandlers)
 
-    let namespaces = RegistrationKindDriver.fingerprintNamespaces(set.publicationOracleFingerprint())
+    let namespaces = RegistrationKindDriver.fingerprintNamespaces(
+      set.publicationOracleFingerprint())
     #expect(namespaces == Self.expectedFingerprintNamespaces(for: kind))
     #expect(set.frameDropEligibilityBlockers() == [Self.expectedBlocker(for: kind)])
   }
@@ -94,7 +95,9 @@ struct RuntimeRegistrationKindTotalityTests {
         .filter(Self.isEffectKind)
         .flatMap(Self.expectedFingerprintNamespaces)
     )
-    #expect(RegistrationKindDriver.fingerprintNamespaces(set.publicationOracleFingerprint()) == effectNamespaces)
+    #expect(
+      RegistrationKindDriver.fingerprintNamespaces(set.publicationOracleFingerprint())
+        == effectNamespaces)
   }
 
   @Test("hasEffectRegistrations agrees with the effect-kind classification")
@@ -195,4 +198,3 @@ struct RuntimeRegistrationKindTotalityTests {
   // MARK: - Recording
 
 }
-

@@ -141,7 +141,7 @@ public enum Axis {
 }
 
 /// A scroll offset in terminal cell coordinates.
-public struct ScrollPosition: Equatable, Sendable {
+public struct ScrollCellOffset: Equatable, Sendable {
   public var x: Int
   public var y: Int
 

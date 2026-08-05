@@ -149,7 +149,7 @@ struct AnchorPreferenceSurfaceTests {
       VStack(alignment: .leading, spacing: 0) {
         Text("Board")
           .frame(width: 10, height: 1)
-          .coordinateSpace(name: "board")
+          .coordinateSpace(.named("board"))
         GeometryReader { proxy in
           let frame = proxy.frame(in: .named("board"))
           Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")
@@ -173,7 +173,7 @@ struct AnchorPreferenceSurfaceTests {
         VStack(alignment: .leading, spacing: 0) {
           Text("Board")
             .frame(width: 10, height: 1)
-            .coordinateSpace(name: "board")
+            .coordinateSpace(.named("board"))
           GeometryReader { proxy in
             let frame = proxy.frame(in: .named("board"))
             Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")
@@ -197,7 +197,7 @@ struct AnchorPreferenceSurfaceTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let position = LockedBox(ScrollPosition.zero)
+    let position = LockedBox(ScrollCellOffset.zero)
 
     func makeView() -> some View {
       ScrollView(
@@ -266,7 +266,7 @@ struct AnchorPreferenceSurfaceTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let position = LockedBox(ScrollPosition.zero)
+    let position = LockedBox(ScrollCellOffset.zero)
 
     func makeView() -> some View {
       ScrollView(
@@ -280,7 +280,7 @@ struct AnchorPreferenceSurfaceTests {
           Text("Row 0")
           Text("Row 1")
           Text("Board")
-            .coordinateSpace(name: "board")
+            .coordinateSpace(.named("board"))
           Text("Row 3")
         }
       }
@@ -356,10 +356,10 @@ struct AnchorPreferenceSurfaceTests {
       VStack(alignment: .leading, spacing: 0) {
         Text("First")
           .frame(width: 10, height: 1)
-          .coordinateSpace(name: "board")
+          .coordinateSpace(.named("board"))
         Text("Second")
           .frame(width: 10, height: 1)
-          .coordinateSpace(name: "board")
+          .coordinateSpace(.named("board"))
         GeometryReader { proxy in
           let frame = proxy.frame(in: .named("board"))
           Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")

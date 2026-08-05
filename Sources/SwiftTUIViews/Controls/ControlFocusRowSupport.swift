@@ -89,10 +89,10 @@ package func textEditorBody(
   ownerIdentity: Identity? = nil,
   caretAnchor: CellPoint? = nil,
   chrome: ControlChrome,
-  scrollPosition: Binding<ScrollPosition>,
+  scrollPosition: Binding<ScrollCellOffset>,
   focusActive: Bool = false
 ) -> some View {
-  ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
+  ScrollView(.vertical, position: scrollPosition) {
     VStack(alignment: .leading, spacing: 0) {
       TextInputContent(
         displayText: displayText,

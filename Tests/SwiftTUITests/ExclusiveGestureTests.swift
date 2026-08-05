@@ -43,7 +43,8 @@ struct ExclusiveGestureTests {
     #expect(singleCount == 0)
   }
 
-  @Test("A drag that fails the first tap fails a tap fallback too — the hand-off replays the evidence")
+  @Test(
+    "A drag that fails the first tap fails a tap fallback too — the hand-off replays the evidence")
   func dragFailsBothTapsThroughReplay() {
     var firstCount = 0
     var secondCount = 0

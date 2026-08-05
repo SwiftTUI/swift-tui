@@ -71,7 +71,7 @@ package final class ScrollMomentumController {
     /// Offset velocity in cells/second (content moves with the finger, so this is
     /// the negation of the measured pointer velocity).
     var velocity: Vector
-    /// Sub-cell offset accumulated but not yet applied. `ScrollPosition` is
+    /// Sub-cell offset accumulated but not yet applied. `ScrollCellOffset` is
     /// integer, so fractional motion is carried here until it crosses a cell —
     /// without this, sub-1-cell-per-tick velocity rounds to zero and the fling
     /// dies a frame early.

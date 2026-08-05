@@ -774,7 +774,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll016SuccessiveScrollAnchorsUseLiveGeometry() throws {
     // Hypothesis: a second command for the same target may reuse its pre-scroll
     // rect, compounding the first anchor delta instead of realigning from live geometry.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll016Root"),
       size: .init(width: 48, height: 9)
@@ -791,7 +791,7 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll016Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -800,15 +800,15 @@ private struct GestureScroll016Fixture: View {
           Button("Target to top") { _ = proxy.scrollTo("anchor-target", anchor: .top) }
           Button("Target to bottom") { _ = proxy.scrollTo("anchor-target", anchor: .bottom) }
         }
-        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+        ScrollView(.vertical, position: position.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<12) { row in
               Text("Anchor row \(row)")
                 .id(row == 8 ? "anchor-target" : "anchor-row-\(row)")
             }
           }
-        }
-        .frame(width: 28, height: 4, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 28, height: 4, alignment: .topLeading)
       }
     }
   }
@@ -821,7 +821,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll017RelocatedTargetReplacesOldScrollRect() throws {
     // Hypothesis: a stable explicit target ID may retain its old placement
     // after moving earlier in the collection, sending the next command downward.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll017Root"),
       size: .init(width: 48, height: 9)
@@ -840,7 +840,7 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll017Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
   @State private var targetRow = 9
 
   var body: some View {
@@ -852,15 +852,15 @@ private struct GestureScroll017Fixture: View {
             _ = proxy.scrollTo("moving-target", anchor: .bottom)
           }
         }
-        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+        ScrollView(.vertical, position: position.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<12) { row in
               Text("Moving target row \(row)")
                 .id(row == targetRow ? "moving-target" : "moving-row-\(row)")
             }
           }
-        }
-        .frame(width: 30, height: 4, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 30, height: 4, alignment: .topLeading)
       }
     }
   }
@@ -873,8 +873,8 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll018DuplicateTargetIDsStayReaderScoped() throws {
     // Hypothesis: global target publication may let a sibling reader command
     // select the first matching explicit ID outside the reader's identity scope.
-    let first = GestureScrollBox(ScrollPosition.zero)
-    let second = GestureScrollBox(ScrollPosition.zero)
+    let first = GestureScrollBox(ScrollCellOffset.zero)
+    let second = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll018Root"),
       size: .init(width: 52, height: 13)
@@ -891,8 +891,8 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll018Fixture: View {
-  let first: GestureScrollBox<ScrollPosition>
-  let second: GestureScrollBox<ScrollPosition>
+  let first: GestureScrollBox<ScrollCellOffset>
+  let second: GestureScrollBox<ScrollCellOffset>
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -904,7 +904,7 @@ private struct GestureScroll018Fixture: View {
 
 private struct GestureScroll018Reader: View {
   let label: String
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -912,15 +912,15 @@ private struct GestureScroll018Reader: View {
         Button("Reveal \(label) duplicate") {
           _ = proxy.scrollTo("duplicate-target", anchor: .bottom)
         }
-        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+        ScrollView(.vertical, position: position.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<10) { row in
               Text("\(label) duplicate row \(row)")
                 .id(row == 8 ? "duplicate-target" : "\(label)-row-\(row)")
             }
           }
-        }
-        .frame(width: 30, height: 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 30, height: 3, alignment: .topLeading)
       }
     }
   }
@@ -933,8 +933,8 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll019ReaderCommandWritesOnlyCurrentBinding() throws {
     // Hypothesis: ScrollViewReader may retain the registration closure for
     // binding A after a stable ScrollView is re-authored against binding B.
-    let first = GestureScrollBox(ScrollPosition.zero)
-    let second = GestureScrollBox(ScrollPosition.zero)
+    let first = GestureScrollBox(ScrollCellOffset.zero)
+    let second = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll019Root"),
       size: .init(width: 48, height: 9)
@@ -955,8 +955,8 @@ extension FrameworkStressGestureScrollTests {
 private struct GestureScroll019Fixture: View {
   static let scrollIdentity = testIdentity("GestureScroll019", "Scroll")
 
-  let first: GestureScrollBox<ScrollPosition>
-  let second: GestureScrollBox<ScrollPosition>
+  let first: GestureScrollBox<ScrollCellOffset>
+  let second: GestureScrollBox<ScrollCellOffset>
   @State private var usesSecond = false
 
   var body: some View {
@@ -968,15 +968,14 @@ private struct GestureScroll019Fixture: View {
         }
         ScrollView(
           .vertical,
-          showsIndicators: false,
           position: usesSecond ? second.binding() : first.binding()
         ) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<12) { row in Text("Reader binding row \(row)") }
           }
-        }
-        .id(Self.scrollIdentity)
-        .frame(width: 30, height: 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .id(Self.scrollIdentity)
+          .frame(width: 30, height: 3, alignment: .topLeading)
       }
     }
   }
@@ -989,8 +988,8 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll020InnerReaderEdgeCommandDoesNotMoveOuterScroll() throws {
     // Hypothesis: first-route selection may escape the inner reader scope and
     // apply an edge command to its containing ScrollView instead.
-    let outer = GestureScrollBox(ScrollPosition.zero)
-    let inner = GestureScrollBox(ScrollPosition.zero)
+    let outer = GestureScrollBox(ScrollCellOffset.zero)
+    let inner = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll020Root"),
       size: .init(width: 52, height: 10)
@@ -1007,28 +1006,28 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll020Fixture: View {
-  let outer: GestureScrollBox<ScrollPosition>
-  let inner: GestureScrollBox<ScrollPosition>
+  let outer: GestureScrollBox<ScrollCellOffset>
+  let inner: GestureScrollBox<ScrollCellOffset>
 
   var body: some View {
     ScrollViewReader { _ in
-      ScrollView(.vertical, showsIndicators: false, position: outer.binding()) {
+      ScrollView(.vertical, position: outer.binding()) {
         VStack(alignment: .leading, spacing: 0) {
           ScrollViewReader { innerProxy in
             VStack(alignment: .leading, spacing: 0) {
               Button("Inner to bottom") { _ = innerProxy.scrollTo(edge: .bottom) }
-              ScrollView(.vertical, showsIndicators: false, position: inner.binding()) {
+              ScrollView(.vertical, position: inner.binding()) {
                 VStack(alignment: .leading, spacing: 0) {
                   ForEach(0..<10) { row in Text("Inner reader row \(row)") }
                 }
-              }
-              .frame(width: 30, height: 3, alignment: .topLeading)
+              }.scrollIndicators(.hidden)
+                .frame(width: 30, height: 3, alignment: .topLeading)
             }
           }
           ForEach(0..<8) { row in Text("Outer reader tail \(row)") }
         }
-      }
-      .frame(width: 34, height: 6, alignment: .topLeading)
+      }.scrollIndicators(.hidden)
+        .frame(width: 34, height: 6, alignment: .topLeading)
     }
   }
 }
@@ -1040,7 +1039,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll021RemovedScrollTargetIsNotServedFromStaleGeometry() throws {
     // Hypothesis: the target registry may retain a removed explicit ID, then
     // either scroll to stale geometry or shadow the later restored target.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll021Root"),
       size: .init(width: 54, height: 10)
@@ -1062,7 +1061,7 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll021Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
   @State private var includesTarget = true
 
   var body: some View {
@@ -1080,7 +1079,7 @@ private struct GestureScroll021Fixture: View {
             _ = proxy.scrollTo("optional-target", anchor: .top)
           }
         }
-        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+        ScrollView(.vertical, position: position.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<12) { row in
               if row == 8, includesTarget {
@@ -1090,8 +1089,8 @@ private struct GestureScroll021Fixture: View {
               }
             }
           }
-        }
-        .frame(width: 30, height: 4, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 30, height: 4, alignment: .topLeading)
       }
     }
   }
@@ -1104,7 +1103,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll022AnchorCommandUsesResizedViewport() throws {
     // Hypothesis: target geometry may refresh while its ScrollRoute keeps the
     // previous viewport length, producing an anchor offset for the old size.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll022Root"),
       size: .init(width: 52, height: 11)
@@ -1123,7 +1122,7 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll022Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
   @State private var expanded = false
 
   var body: some View {
@@ -1135,15 +1134,15 @@ private struct GestureScroll022Fixture: View {
             _ = proxy.scrollTo("resize-target", anchor: .bottom)
           }
         }
-        ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+        ScrollView(.vertical, position: position.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<12) { row in
               Text("Viewport row \(row)")
                 .id(row == 8 ? "resize-target" : "viewport-row-\(row)")
             }
           }
-        }
-        .frame(width: 30, height: expanded ? 5 : 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 30, height: expanded ? 5 : 3, alignment: .topLeading)
       }
     }
   }
@@ -1156,7 +1155,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll023CenterAnchorUpdatesBothScrollAxes() throws {
     // Hypothesis: a two-axis route may apply only the dominant target delta or
     // overwrite one component while clamping the other.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll023Root"),
       size: .init(width: 44, height: 9)
@@ -1167,12 +1166,12 @@ extension FrameworkStressGestureScrollTests {
 
     _ = try harness.clickText("Center grid target")
 
-    #expect(position.value == ScrollPosition(x: 8, y: 6))
+    #expect(position.value == ScrollCellOffset(x: 8, y: 6))
   }
 }
 
 private struct GestureScroll023Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -1180,7 +1179,6 @@ private struct GestureScroll023Fixture: View {
         Button("Center grid target") { _ = proxy.scrollTo("grid-target", anchor: .center) }
         ScrollView(
           [.horizontal, .vertical],
-          showsIndicators: false,
           position: position.binding()
         ) {
           VStack(alignment: .leading, spacing: 0) {
@@ -1194,8 +1192,8 @@ private struct GestureScroll023Fixture: View {
               }
             }
           }
-        }
-        .frame(width: 12, height: 4, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 12, height: 4, alignment: .topLeading)
       }
     }
   }
@@ -1208,7 +1206,7 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll024NestedControlYieldsOnlyAfterScrollThreshold() throws {
     // Hypothesis: ancestor takeover may either swallow a sub-threshold control
     // activation or let the control activate after a real pan has claimed it.
-    let position = GestureScrollBox(ScrollPosition.zero)
+    let position = GestureScrollBox(ScrollCellOffset.zero)
     let activations = GestureScrollBox(0)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll024Root"),
@@ -1237,19 +1235,19 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll024Fixture: View {
-  let position: GestureScrollBox<ScrollPosition>
+  let position: GestureScrollBox<ScrollCellOffset>
   let activations: GestureScrollBox<Int>
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false, position: position.binding()) {
+    ScrollView(.vertical, position: position.binding()) {
       VStack(alignment: .leading, spacing: 0) {
         Text("Takeover prefix")
         Button("Takeover button") { activations.value += 1 }
           .frame(width: 26, height: 3, alignment: .center)
         ForEach(0..<10) { row in Text("Takeover tail \(row)") }
       }
-    }
-    .frame(width: 30, height: 5, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 30, height: 5, alignment: .topLeading)
   }
 }
 
@@ -1260,8 +1258,8 @@ extension FrameworkStressGestureScrollTests {
   func gestureScroll025NestedTakeoverPansLeafScrollView() throws {
     // Hypothesis: threshold transfer may choose the first containing route and
     // pan the outer ScrollView even while the inner route can consume the drag.
-    let outer = GestureScrollBox(ScrollPosition.zero)
-    let inner = GestureScrollBox(ScrollPosition.zero)
+    let outer = GestureScrollBox(ScrollCellOffset.zero)
+    let inner = GestureScrollBox(ScrollCellOffset.zero)
     let activations = GestureScrollBox(0)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll025Root"),
@@ -1287,23 +1285,23 @@ extension FrameworkStressGestureScrollTests {
 }
 
 private struct GestureScroll025Fixture: View {
-  let outer: GestureScrollBox<ScrollPosition>
-  let inner: GestureScrollBox<ScrollPosition>
+  let outer: GestureScrollBox<ScrollCellOffset>
+  let inner: GestureScrollBox<ScrollCellOffset>
   let activations: GestureScrollBox<Int>
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false, position: outer.binding()) {
+    ScrollView(.vertical, position: outer.binding()) {
       VStack(alignment: .leading, spacing: 0) {
-        ScrollView(.vertical, showsIndicators: false, position: inner.binding()) {
+        ScrollView(.vertical, position: inner.binding()) {
           VStack(alignment: .leading, spacing: 0) {
             Button("Nested takeover button") { activations.value += 1 }
             ForEach(0..<10) { row in Text("Nested inner row \(row)") }
           }
-        }
-        .frame(width: 34, height: 4, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 34, height: 4, alignment: .topLeading)
         ForEach(0..<10) { row in Text("Nested outer row \(row)") }
       }
-    }
-    .frame(width: 38, height: 6, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 38, height: 6, alignment: .topLeading)
   }
 }

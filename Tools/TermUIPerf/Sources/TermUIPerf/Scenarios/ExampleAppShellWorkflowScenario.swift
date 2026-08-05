@@ -209,7 +209,7 @@ private struct PerfExampleAppShellView: View {
   }
 
   private var taskList: some View {
-    ScrollView(.vertical, showsIndicators: true) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(0..<taskCount, id: \.self) { index in
           Button("task \(index)  \(index == selectedTask ? "selected" : "open")") {

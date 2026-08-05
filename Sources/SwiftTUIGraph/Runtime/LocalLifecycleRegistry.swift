@@ -374,4 +374,3 @@ package final class LocalLifecycleRegistry: Equatable {
     }
   }
 }
-

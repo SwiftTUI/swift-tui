@@ -241,10 +241,10 @@ extension View {
   }
 
   /// Names this view's placed frame so gestures can resolve locations in it.
-  public func coordinateSpace(name: some Hashable & Sendable) -> some View {
+  public func coordinateSpace(_ name: NamedCoordinateSpace) -> some View {
     modifier(
       NamedCoordinateSpaceModifier(
-        name: String(describing: name)
+        name: name.name
       )
     )
   }

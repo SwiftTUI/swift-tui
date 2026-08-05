@@ -89,7 +89,7 @@ struct CoordinateSpaceTests {
 
     let artifacts = DefaultRenderer().render(
       Text("board")
-        .coordinateSpace(name: "board"),
+        .coordinateSpace(.named("board")),
       context: ResolveContext(identity: root, environmentValues: env),
       proposal: .init(width: 20, height: 5)
     )

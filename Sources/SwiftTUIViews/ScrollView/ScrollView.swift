@@ -3,23 +3,20 @@ public import SwiftTUICore
 /// Presents scrollable content along one or both axes.
 public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   public var axes: Axis.Set
-  public var showsIndicators: Bool
-  @State private var internalPosition = ScrollPosition.zero
+  @State private var internalPosition = ScrollCellOffset.zero
   @State private var panAnchor: ScrollPanAnchor?
-  private var explicitPosition: Binding<ScrollPosition>?
+  private var explicitPosition: Binding<ScrollCellOffset>?
   private let contentAuthoringScope: CapturedSubviewScope
   private let interactionAuthoringScope: AuthoringContext?
   private var content: Content
-  public var position: Binding<ScrollPosition> {
+  public var position: Binding<ScrollCellOffset> {
     explicitPosition ?? $internalPosition
   }
   public init(
     _ axes: Axis.Set = .vertical,
-    showsIndicators: Bool = true,
     @ViewBuilder content: () -> Content
   ) {
     self.axes = axes
-    self.showsIndicators = showsIndicators
     explicitPosition = nil
     interactionAuthoringScope = currentAuthoringContext()
     contentAuthoringScope = makeCapturedSubviewScope()
@@ -27,12 +24,10 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   }
   public init(
     _ axes: Axis.Set = .vertical,
-    showsIndicators: Bool = true,
-    position: Binding<ScrollPosition>,
+    position: Binding<ScrollCellOffset>,
     @ViewBuilder content: () -> Content
   ) {
     self.axes = axes
-    self.showsIndicators = showsIndicators
     explicitPosition = position
     interactionAuthoringScope = currentAuthoringContext()
     contentAuthoringScope = makeCapturedSubviewScope()
@@ -40,8 +35,8 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      let indicatorVisibility = effectiveIndicatorVisibility(
-        environment: context.environmentValues.scrollIndicatorVisibility
+      let indicatorAxes = resolvedIndicatorAxes(
+        environment: context.environmentValues
       )
       let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
       // Target-scoped side-field read: this body compares `focusedIdentity`
@@ -62,18 +57,20 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       let isFocused = focusedIdentity == context.identity
       let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
       var focusedIndicatorAxes: AxisSet = []
-      if indicatorVisibility == .visible {
-        if isFocused {
-          // When the scroll view itself is focused, highlight all visible
-          // scroll indicators so the user sees which view owns focus.
-          focusedIndicatorAxes = axes
-        } else {
-          if focusedIdentity == verticalScrollIndicatorIdentity(for: context.identity) {
-            focusedIndicatorAxes.insert(.vertical)
-          }
-          if focusedIdentity == horizontalScrollIndicatorIdentity(for: context.identity) {
-            focusedIndicatorAxes.insert(.horizontal)
-          }
+      if isFocused {
+        // When the scroll view itself is focused, highlight all visible
+        // scroll indicators so the user sees which view owns focus.
+        focusedIndicatorAxes = indicatorAxes
+      } else {
+        if indicatorAxes.contains(.vertical),
+          focusedIdentity == verticalScrollIndicatorIdentity(for: context.identity)
+        {
+          focusedIndicatorAxes.insert(.vertical)
+        }
+        if indicatorAxes.contains(.horizontal),
+          focusedIdentity == horizontalScrollIndicatorIdentity(for: context.identity)
+        {
+          focusedIndicatorAxes.insert(.horizontal)
         }
       }
       // The scroll view container itself should not show a focus ring —
@@ -95,7 +92,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             return ScrollOffset(x: current.x, y: current.y)
           },
           applyOffset: { offset in
-            binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
+            binding.wrappedValue = ScrollCellOffset(x: offset.x, y: offset.y)
           },
           bindingSourceID: binding.bindingSourceID
         )
@@ -123,7 +120,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
                 ScrollOffset(x: next.x, y: next.y),
                 scopeIdentity: context.identity
               )
-              next = ScrollPosition(x: clamped.x, y: clamped.y)
+              next = ScrollCellOffset(x: clamped.x, y: clamped.y)
             }
             guard next != current else {
               return false
@@ -191,19 +188,19 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             ScrollViewLayout(
               axes: axes,
               position: position.wrappedValue,
-              showsIndicators: indicatorVisibility == .visible
+              indicatorAxes: indicatorAxes
             )
           ).resolvedBehavior,
           drawMetadata: .init(
-            scrollIndicatorAxes: indicatorVisibility == .visible ? axes : nil,
+            scrollIndicatorAxes: indicatorAxes.isEmpty ? nil : indicatorAxes,
             focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
             scrollIndicatorForegroundStyle: indicatorFocusStyle,
             opacity: containerChrome.opacity,
             clipsToBounds: true
           ),
           semanticMetadata: scrollViewMetadata(
-            accessibilityRole: indicatorVisibility == .visible
-              ? .scrollViewWithIndicators : .scrollView
+            accessibilityRole: indicatorAxes.isEmpty
+              ? .scrollView : .scrollViewWithIndicators
           )
         )
       ]
@@ -216,7 +213,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   /// using exactly the state the inline handler captured.
   private func makeScrollBodyPointerHandler(
     scrollAxes: Axis.Set,
-    binding: Binding<ScrollPosition>,
+    binding: Binding<ScrollCellOffset>,
     panBinding: Binding<ScrollPanAnchor?>
   ) -> @MainActor (LocalPointerEvent) -> PointerDispatchOutcome {
     return { event in
@@ -335,7 +332,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
   /// indicator's axis, using exactly the state the inline handler captured.
   private func makeIndicatorPointerHandler(
     axis: ScrollIndicatorAxis,
-    binding: Binding<ScrollPosition>
+    binding: Binding<ScrollCellOffset>
   ) -> @MainActor (LocalPointerEvent) -> PointerDispatchOutcome {
     return { event in
       switch event.kind {

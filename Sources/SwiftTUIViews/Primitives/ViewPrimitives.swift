@@ -2,7 +2,7 @@
 
 /// Displays a string of terminal text.
 public struct Text: PrimitiveView, ResolvableView {
-  package enum Storage {
+  package enum Storage: Equatable, Sendable {
     case plain(String)
     case rich(RichContent)
   }
@@ -41,6 +41,17 @@ public struct Text: PrimitiveView, ResolvableView {
       drawMetadata: DrawMetadata(),
       semanticMetadata: semanticMetadata
     )
+  }
+
+  /// Creates text that displays the given string with no localization.
+  ///
+  /// SwiftTUI text is always literal today, so this is equivalent to
+  /// ``init(_:semanticMetadata:)-(String,_)``. The spelling reserves
+  /// SwiftUI's explicit-verbatim form: callers that state the intent now
+  /// keep exactly this behavior if a key-resolving `Text(_:)` ever
+  /// arrives.
+  public init(verbatim content: String) {
+    self.init(content)
   }
 
   public init(
@@ -110,14 +121,20 @@ public struct Text: PrimitiveView, ResolvableView {
   }
 }
 
+// `Hashable` is deliberately omitted: it would require hashing the full
+// draw/semantic metadata payloads, which are `Equatable`-only today.
+extension Text: Equatable, Sendable {}
+
 extension Text {
   /// Alias for the supported text truncation modes.
   public typealias TruncationMode = TextTruncationMode
   /// Alias for the supported text wrapping strategies.
   public typealias WrappingStrategy = TextWrappingStrategy
 
-  public struct RichContent: ExpressibleByStringInterpolation, ExpressibleByStringLiteral {
-    package indirect enum Fragment {
+  public struct RichContent: ExpressibleByStringInterpolation, ExpressibleByStringLiteral,
+    Equatable, Sendable
+  {
+    package indirect enum Fragment: Equatable, Sendable {
       case literal(String)
       case text(Text)
       case link(Link)

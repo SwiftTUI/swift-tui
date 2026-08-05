@@ -87,9 +87,17 @@ extension View {
   }
 
   public func scrollIndicators(
-    _ visibility: ScrollIndicatorVisibility
+    _ visibility: ScrollIndicatorVisibility,
+    axes: Axis.Set = [.vertical, .horizontal]
   ) -> some View {
-    environment(\.scrollIndicatorVisibility, visibility)
+    transformEnvironment(\.self) { environment in
+      if axes.contains(.vertical) {
+        environment.scrollIndicatorVisibility = visibility
+      }
+      if axes.contains(.horizontal) {
+        environment.horizontalScrollIndicatorVisibility = visibility
+      }
+    }
   }
 
   public func tableHeaders(

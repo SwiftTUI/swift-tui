@@ -1845,7 +1845,7 @@ struct InteractiveRuntimeTests {
   @Test("focusing an offscreen ScrollView descendant scrolls to the minimum visible offset")
   func focusingOffscreenScrollViewDescendantScrollsToMinimumVisibleOffset() throws {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let terminalSize = CellSize(width: 20, height: 8)
@@ -1863,7 +1863,6 @@ struct InteractiveRuntimeTests {
     let view =
       ScrollView(
         .vertical,
-        showsIndicators: false,
         position: Binding(
           get: { box.position },
           set: { box.position = $0 }
@@ -1875,7 +1874,7 @@ struct InteractiveRuntimeTests {
               .id(rowIdentity(index))
           }
         }
-      }
+      }.scrollIndicators(.hidden)
       .id(scrollIdentity)
       .frame(width: 10, height: 3, alignment: .topLeading)
 
@@ -2072,7 +2071,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("A ScrollView body flick keeps gliding (momentum) after release, then settles")
   func scrollViewBodyFlickHasMomentum() throws {
-    final class Box { var position = ScrollPosition.zero }
+    final class Box { var position = ScrollCellOffset.zero }
     let terminalSize = CellSize(width: 20, height: 12)
     let rootIdentity = testIdentity("FlingFixture")
     let scrollID = testIdentity("FlingFixture", "Scroll")
@@ -2154,7 +2153,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("Reduced motion releases a pan at the drag position with no fling")
   func scrollViewFlickSuppressedUnderReducedMotion() throws {
-    final class Box { var position = ScrollPosition.zero }
+    final class Box { var position = ScrollCellOffset.zero }
     let terminalSize = CellSize(width: 20, height: 12)
     let rootIdentity = testIdentity("FlingReducedFixture")
     let scrollID = testIdentity("FlingReducedFixture", "Scroll")
@@ -2223,7 +2222,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("A fresh press during a fling stops it where it is (touch-to-stop)")
   func scrollViewFlickStoppedByPress() throws {
-    final class Box { var position = ScrollPosition.zero }
+    final class Box { var position = ScrollCellOffset.zero }
     let terminalSize = CellSize(width: 20, height: 12)
     let rootIdentity = testIdentity("FlingStopFixture")
     let scrollID = testIdentity("FlingStopFixture", "Scroll")
@@ -2350,7 +2349,7 @@ struct InteractiveRuntimeTests {
   func dragThresholdTransfersControlGestureToScroll() async throws {
     final class Box {
       var taps = 0
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let terminalSize = CellSize(width: 20, height: 8)
@@ -2423,7 +2422,7 @@ struct InteractiveRuntimeTests {
   func tapWithinThresholdActivatesControlInScroll() async throws {
     final class Box {
       var taps = 0
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let terminalSize = CellSize(width: 20, height: 8)
@@ -2482,7 +2481,7 @@ struct InteractiveRuntimeTests {
   @Test("ScrollView body pan tracks sub-cell drags with half-cell rounding")
   func scrollViewBodyPanTracksSubCellDrag() async throws {
     final class Box {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let terminalSize = CellSize(width: 20, height: 8)
@@ -2757,7 +2756,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollExternalBinding")
     let scrollIdentity = testIdentity("PointerScrollExternalBinding", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = TallExternalBindingScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -2812,7 +2811,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollWithAnimation")
     let scrollIdentity = testIdentity("PointerScrollWithAnimation", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = AnimatingTallScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -2867,7 +2866,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("GalleryShapedScroll")
     let scrollIdentity = testIdentity("GalleryShapedScroll", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = GalleryShapedAnimatingScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -2926,7 +2925,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollVisibleFrame")
     let scrollIdentity = testIdentity("PointerScrollVisibleFrame", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = TallExternalBindingScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -2982,7 +2981,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("TabHostedScrollVisibleFrame")
     let scrollIdentity = testIdentity("TabHostedScrollVisibleFrame", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = TabHostedTallExternalBindingScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -3058,7 +3057,7 @@ struct InteractiveRuntimeTests {
     let terminalSize = CellSize(width: 36, height: 10)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("SceneHostedSecondScroll", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
     let scene = WindowGroup("Scene Hosted Second Scroll") {
       TabHostedTallExternalBindingScrollFixture(
         scrollIdentity: scrollIdentity,
@@ -3145,7 +3144,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("TabHostedScrollGraphBacked")
     let scrollIdentity = testIdentity("TabHostedScrollGraphBacked", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
 
     let view = TabHostedTallExternalBindingScrollFixture(
       scrollIdentity: scrollIdentity,
@@ -3205,7 +3204,7 @@ struct InteractiveRuntimeTests {
     let terminalSize = CellSize(width: 36, height: 10)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("SceneHostedScrollVisibleFrame", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
     let scene = WindowGroup("Scene Hosted Scroll") {
       TabHostedTallExternalBindingScrollFixture(
         scrollIdentity: scrollIdentity,
@@ -3423,7 +3422,7 @@ struct InteractiveRuntimeTests {
     let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("RealInputReaderGalleryScroll", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
     let scene = WindowGroup("Real Input Gallery Scroll") {
       TabHostedGalleryShapedAnimatingScrollFixture(
         scrollIdentity: scrollIdentity,
@@ -3507,7 +3506,7 @@ struct InteractiveRuntimeTests {
     let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("InjectedInputGalleryScroll", "Scroll")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
     let scene = WindowGroup("Injected Input Gallery Scroll") {
       TabHostedGalleryShapedAnimatingScrollFixture(
         scrollIdentity: scrollIdentity,
@@ -3588,7 +3587,7 @@ struct InteractiveRuntimeTests {
     let rootIdentity = testIdentity("ExternalPointerScrollInvalidation")
     let scrollIdentity = testIdentity("ExternalPointerScrollInvalidation", "Scroll")
     let scheduler = FrameScheduler()
-    let box = LockedBox(ScrollPosition.zero)
+    let box = LockedBox(ScrollCellOffset.zero)
 
     let view =
       ScrollView(
@@ -3734,7 +3733,7 @@ struct InteractiveRuntimeTests {
   @Test("ScrollViewReader proxy actions rerender through the composed RunLoop")
   func scrollViewReaderProxyActionsRerenderThroughComposedRunLoop() throws {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -3753,7 +3752,6 @@ struct InteractiveRuntimeTests {
 
         ScrollView(
           .vertical,
-          showsIndicators: false,
           position: Binding(
             get: { box.position },
             set: { box.position = $0 }
@@ -3769,8 +3767,8 @@ struct InteractiveRuntimeTests {
               }
             }
           }
-        }
-        .frame(width: 5, height: 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 5, height: 3, alignment: .topLeading)
       }
     }
 
@@ -3848,7 +3846,7 @@ struct InteractiveRuntimeTests {
     let terminalSize = CellSize(width: 40, height: 14)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let buttonIdentity = testIdentity("ReaderStripEntryJump")
-    let positionBox = LockedBox(ScrollPosition.zero)
+    let positionBox = LockedBox(ScrollCellOffset.zero)
     let scene = WindowGroup("Reader Strip Entry") {
       TabStripEntryScrollReaderFixture(
         buttonIdentity: buttonIdentity,
@@ -4245,7 +4243,7 @@ struct InteractiveRuntimeTests {
     let rootIdentity = testIdentity("ClampedPointerScroll")
     let scrollIdentity = testIdentity("ClampedPointerScroll", "Scroll")
     let scheduler = FrameScheduler()
-    let box = LockedBox(ScrollPosition.zero)
+    let box = LockedBox(ScrollCellOffset.zero)
 
     let view =
       ScrollView(
@@ -4420,9 +4418,9 @@ struct InteractiveRuntimeTests {
   @Test("run loop collapses queued scroll bursts into a small number of rendered updates")
   func runLoopBatchesQueuedScrollBursts() async throws {
     final class ScrollPositionBox: Sendable {
-      private let storage = LockedBox(ScrollPosition.zero)
+      private let storage = LockedBox(ScrollCellOffset.zero)
 
-      var position: ScrollPosition {
+      var position: ScrollCellOffset {
         get { storage.value }
         set { storage.value = newValue }
       }
@@ -4490,9 +4488,9 @@ struct InteractiveRuntimeTests {
   @Test("run loop collapses queued scroll bursts through LazyVStack content")
   func runLoopBatchesQueuedScrollBurstsWithLazyStacks() async throws {
     final class ScrollPositionBox: Sendable {
-      private let storage = LockedBox(ScrollPosition.zero)
+      private let storage = LockedBox(ScrollCellOffset.zero)
 
-      var position: ScrollPosition {
+      var position: ScrollCellOffset {
         get { storage.value }
         set { storage.value = newValue }
       }
@@ -4565,7 +4563,7 @@ struct InteractiveRuntimeTests {
     let rootIdentity = testIdentity("LazyForEachLifecycleRuntime")
     let scrollIdentity = testIdentity("LazyForEachLifecycleRuntime", "Scroll")
     let view =
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<4) { index in
             ScrollLifecycleRuntimeProbe(
@@ -4575,7 +4573,7 @@ struct InteractiveRuntimeTests {
             )
           }
         }
-      }
+      }.scrollIndicators(.hidden)
       .id(scrollIdentity)
       .frame(width: 12, height: 2, alignment: .topLeading)
 
@@ -6142,7 +6140,7 @@ private final class MouseControlBox {
   var pickerSelection = 1
   var listSelection = 1
   var tableSelection = 1
-  var scrollPosition = ScrollPosition.zero
+  var scrollPosition = ScrollCellOffset.zero
   var text = ""
 }
 
@@ -6238,7 +6236,7 @@ private struct StatefulImplicitPointerScrollFixture: View {
 
 private struct TallExternalBindingScrollFixture: View {
   let scrollIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     ScrollView(
@@ -6261,7 +6259,7 @@ private struct TallExternalBindingScrollFixture: View {
 
 private struct AnimatingTallScrollFixture: View {
   let scrollIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     ScrollView(
@@ -6296,7 +6294,7 @@ private struct AnimatingTallScrollFixture: View {
 /// proposal-flow shape.
 private struct GalleryShapedAnimatingScrollFixture: View {
   let scrollIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     ScrollView(
@@ -6330,7 +6328,7 @@ private struct TabHostedTallExternalBindingScrollFixture: View {
   }
 
   let scrollIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     TabView(selection: .constant(TallExternalBindingTab.logs)) {
@@ -6356,7 +6354,7 @@ private struct TabStripEntryScrollReaderFixture: View {
 
   var initialTab: StripEntryTab = .info
   let buttonIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     // The tab host is a non-root child on purpose: the strip click's
@@ -6460,7 +6458,7 @@ private struct AnimationSkipScrollFocusFixture: View {
 }
 
 private struct AnimationSkipScrollFocusContent: View {
-  @State private var position = ScrollPosition.zero
+  @State private var position = ScrollCellOffset.zero
   @State private var lastCommand = "ready"
 
   var body: some View {
@@ -6502,7 +6500,6 @@ private struct AnimationSkipScrollFocusContent: View {
         .focusSection()
         ScrollView(
           .vertical,
-          showsIndicators: true,
           position: $position
         ) {
           VStack(alignment: .leading, spacing: 0) {
@@ -6537,14 +6534,14 @@ private struct TabStripEntryTabHost: View {
   typealias StripEntryTab = TabStripEntryScrollReaderFixture.StripEntryTab
 
   let buttonIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
   @State private var selection: StripEntryTab
   @State private var lastCommand = "ready"
 
   init(
     initialTab: StripEntryTab,
     buttonIdentity: Identity,
-    positionBox: LockedBox<ScrollPosition>
+    positionBox: LockedBox<ScrollCellOffset>
   ) {
     self.buttonIdentity = buttonIdentity
     self.positionBox = positionBox
@@ -6567,7 +6564,6 @@ private struct TabStripEntryTabHost: View {
 
             ScrollView(
               .vertical,
-              showsIndicators: false,
               position: Binding(
                 get: { positionBox.value },
                 set: { positionBox.value = $0 }
@@ -6578,8 +6574,8 @@ private struct TabStripEntryTabHost: View {
                   Text("Row \(index)")
                 }
               }
-            }
-            .frame(width: 8, height: 3, alignment: .topLeading)
+            }.scrollIndicators(.hidden)
+              .frame(width: 8, height: 3, alignment: .topLeading)
 
             Text(lastCommand)
           }
@@ -6743,7 +6739,7 @@ private struct TabHostedGalleryShapedAnimatingScrollFixture: View {
   }
 
   let scrollIdentity: Identity
-  let positionBox: LockedBox<ScrollPosition>
+  let positionBox: LockedBox<ScrollCellOffset>
 
   var body: some View {
     TabView(selection: .constant(GalleryAnimatingTab.animations)) {
@@ -6806,7 +6802,7 @@ private enum RegressionPhase: Equatable, Sendable {
 /// gallery's multiple-@State view shape.
 ///
 /// The earlier gallery regression fixtures passed an *external*
-/// `LockedBox<ScrollPosition>` through a `Binding`, which bypasses the
+/// `LockedBox<ScrollCellOffset>` through a `Binding`, which bypasses the
 /// internal state-slot dirtying path.  This fixture exercises the
 /// internal-state path the gallery actually uses.
 private struct InternalStateGalleryShapedFixture: View {

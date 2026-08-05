@@ -81,7 +81,7 @@ extension List {
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let showsIndicators =
-      context.environmentValues.scrollIndicatorVisibility != .hidden
+      context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let itemContext = context.child(component: .named("ListItems"))
     var resolvedContent: ResolvedItems
     if usesIndexedDataSource,

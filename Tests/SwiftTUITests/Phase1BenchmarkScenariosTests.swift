@@ -490,9 +490,9 @@ private final class TextBox: Sendable {
 }
 
 private final class ScrollBox: Sendable {
-  private let positionStorage = LockedBox(ScrollPosition.zero)
+  private let positionStorage = LockedBox(ScrollCellOffset.zero)
 
-  var position: ScrollPosition {
+  var position: ScrollCellOffset {
     get { positionStorage.value }
     set { positionStorage.value = newValue }
   }
@@ -622,7 +622,6 @@ private struct ScrollBenchmarkView: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: true,
       position: Binding(
         get: { position.position },
         set: { position.position = $0 }
@@ -650,7 +649,6 @@ private struct LazyScrollBenchmarkView: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: true,
       position: Binding(
         get: { position.position },
         set: { position.position = $0 }
@@ -678,7 +676,6 @@ private struct LazyForEachScrollBenchmarkView: View {
   var body: some View {
     ScrollView(
       .vertical,
-      showsIndicators: true,
       position: Binding(
         get: { position.position },
         set: { position.position = $0 }

@@ -49,6 +49,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Binding<[Route]>` path form ships.
 - **No `NavigationSplitView`.** *Provisional.* Out of scope for the current
   navigation surface.
+- **No localization, `Font`, or Dynamic Type axis.** *Ratified.* `Text` is
+  literal — string in, glyphs out. There is no `LocalizedStringKey`, `Locale`,
+  bundle lookup, or right-to-left mirroring; no `Font` type or `\.font`; no
+  Dynamic Type. The authoring layers are Foundation-free by policy, and a
+  terminal renders one host-owned monospace glyph grid, so none of the three
+  axes has a value the framework could honor. One forward-compatibility hedge
+  ships with this stance: `Text(verbatim:)` is an explicit-literal alias of
+  `Text(_:)`, so code that states verbatim intent today keeps exactly this
+  behavior even if a key-resolving `Text(_:)` is ever introduced. Retrofitting
+  key semantics onto `Text(_:)` without that hedge would silently change every
+  existing caller, which is why the stance is recorded rather than left
+  implicit. (The emphasis vocabulary that SwiftUI hangs off `Font` lives
+  directly on `Text` here; see the controls section.)
 
 ## App entry, scenes, and lifecycle
 
@@ -73,6 +86,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   multi-scene model. Host-specific integration allowing multi-scene
   orchestration lives in sibling products, not in the core runtime.
 - **No `ScenePhase`.** *Gap.* There is no app-lifecycle environment signal.
+- **`Scene` has no modifier surface.** *Ratified.* Not even scene-level
+  `environment(_:_:)` exists; ambient values are injected inside the scene's
+  `content`. A scene-modifier surface stays additive if a real need appears.
+- **`WindowGroup` carries an identifier and exit-key extensions.** *Ratified.*
+  `init(id:content:)` defaults the identifier, and `id` stays public because
+  it satisfies `Identifiable` for the scene machinery; other storage is not
+  public API. The exit-key-binding surface is a terminal-native extension
+  with no SwiftUI analog.
 
 ## Data flow and observation
 
@@ -129,6 +150,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   path-qualified per-instance storage, and composition no longer requires
   forwarding the `line:`/`column:` init defaults the way `Namespace`'s
   shipped workaround does.
+- **Generic bounds carry strict-concurrency narrowings.** *Ratified, as a
+  class.* Where SwiftUI's signature has a looser generic, SwiftTUI may add
+  `Sendable` or a comparison bound — `ForEach` IDs are `Hashable & Sendable`,
+  `.animation(_:value:)` requires `Equatable & Sendable`, `alignmentGuide`
+  closures are `@Sendable` — because view inputs cross the off-main frame
+  tail under strict, unsuppressed concurrency. Recorded once for the whole
+  class; individual members do not get separate entries.
+- **`Binding` is not a `Collection`.** *Gap.* The editable-collection idiom —
+  `ForEach($items)` and per-element bindings projected from a collection
+  binding — is unavailable. Adding it later is additive.
 
 ## Geometry and units
 
@@ -138,11 +169,22 @@ are omitted even when SwiftUI exposes a corresponding API.
   space (gestures, hover, `Canvas`, interpolation); `Pixel*` types carry host
   device-pixel provenance. `frame(width:height:)` takes `Int`, and
   `Shape.path(in:)` receives a `Rect`, not a `CGRect`.
-- **`ScrollPosition` shares SwiftUI's name with different semantics.** *Gap.*
-  In SwiftUI, `ScrollPosition` is an identity/edge/anchor abstraction applied
-  with `scrollPosition(_:)`. In SwiftTUI it is a raw cell offset
-  (`x`/`y: Int`) threaded through a `ScrollView(position:)` initializer that
-  SwiftUI does not have.
+- **`ScrollView(position:)` binds a raw cell offset, `ScrollCellOffset`.**
+  *Ratified.* The offset type was renamed from `ScrollPosition` in the
+  pre-launch sweep so SwiftUI's name — an identity/edge/anchor abstraction
+  applied with `scrollPosition(_:)` — is no longer claimed by different
+  semantics. The `ScrollView(position:)` initializer itself has no SwiftUI
+  counterpart.
+- **No `scrollPosition(_:)` identity abstraction.** *Gap.* SwiftUI's
+  `ScrollPosition` model (scroll to identity, edge, or anchor through a
+  bindable abstraction) is unimplemented; the name is now unclaimed and
+  available to a faithful implementation.
+- **`ScrollViewProxy.scrollTo` returns `Bool` and adds offset forms;
+  `ScrollViewReader` evaluates `content` once.** *Ratified.* The `Bool`
+  reports whether a scroll target resolved — the fail-loud preference applied
+  to imperative scrolling. Cell-offset `scrollTo` overloads have no SwiftUI
+  analog, and the reader's non-escaping content closure is evaluated once
+  rather than kept re-callable.
 - **`contentShape(_:)` is dual-denominated.** *Provisional.* Rectangular
   content shapes are cell-denominated (`CellRect`); path content shapes use
   continuous cell space.
@@ -184,6 +226,26 @@ are omitted even when SwiftUI exposes a corresponding API.
   viewport; other shapes fall back to exhaustive realization. Heterogeneous
   builder collections are eager and report a runtime issue past a few hundred
   rows.
+- **`padding()` is one cell.** *Ratified.* SwiftUI's unlabeled default is
+  platform-adaptive; the cell is the terminal's natural quantum, and the
+  literal default keeps padded layouts predictable.
+- **`border` defaults to outset placement and participates in layout.**
+  *Ratified.* SwiftUI's border is an inset overlay that never affects layout.
+  A terminal border occupies whole cells, so an overlay border eats content
+  cells; the default outset placement grows the frame instead, which is the
+  honest cell-grid reading. Inset placement remains available where SwiftUI's
+  overlay behavior is wanted.
+- **`ignoresSafeArea` takes the edge set positionally.** *Ratified.*
+  SwiftUI's first positional is `SafeAreaRegions`; terminal safe areas have a
+  single region, so the positional parameter is the edge set. The labeled
+  `edges:` spelling also compiles.
+- **`safeAreaInset` is a single `Edge`-typed overload with `spacing: Int`.**
+  *Ratified.* SwiftUI's two axis-typed overloads collapse into one; spacing
+  is whole cells and defaults to `0`.
+- **`Spacer(minLength:)` is a non-optional `Int` defaulting to `0`.**
+  *Ratified.* SwiftUI's `CGFloat?` `nil` means "system default spacing",
+  which has no terminal value; `Spacer()` reserves nothing until siblings
+  leave room.
 
 ## Collections and selection
 
@@ -222,6 +284,43 @@ are omitted even when SwiftUI exposes a corresponding API.
   graph. Consequence: tab-local state can reset on deselection, so state that
   must survive belongs above the tab seam. Preserving tab-local state across
   deselection without eager resolution is an open gap.
+- **`listRowBackground` takes a non-optional `ShapeStyle`.** *Ratified.*
+  SwiftUI takes a `View?` and accepts `nil`. Terminal row backgrounds are
+  cell paints, not arbitrary views; clearing is expressed by not applying the
+  modifier, and widening to an optional stays additive.
+
+## Controls and text
+
+- **`Slider` requires `in:`, and `Double` sliders are continuous by
+  default.** *Ratified.* SwiftUI defaults the range to `0...1`; SwiftTUI
+  requires it. `step:` defaults to `nil` on the `Double` forms — track drags
+  snap to a fine span-derived quantum and arrow keys move about a tenth of
+  the span, matching SwiftUI's continuous default for the most
+  SwiftUI-shaped call — while the `Int` forms keep `step: 1`.
+- **`scaledToFit()` / `scaledToFill()` are `Image`-only and imply
+  `resizable()`.** *Ratified.* The `View`-level versions require an
+  aspect-ratio layout pass that cell layout does not model. The `Image` forms
+  set `isResizable` because a non-resizable scaled image has no terminal
+  meaning. An image whose source cannot be resolved measures zero and
+  reports an `image.unresolvedSource` runtime issue rather than failing
+  silently.
+- **Emphasis is `Text`-scoped, with SGR extensions.** *Ratified.* `bold()`,
+  `italic()`, `underline()`, and `strikethrough()` return `Text` — there are
+  no `View`-level variants because emphasis is a glyph attribute, not an
+  environment — and the SGR set adds `faint()` and `blink()` with no SwiftUI
+  analog.
+- **`Text.cellBackground(_:)` paints the text's own cells.** *Ratified.*
+  Renamed from `backgroundStyle(_:)` in the pre-launch sweep: SwiftUI's
+  `backgroundStyle(_:)` is an environment write with different semantics,
+  and that name is no longer claimed. The paint travels with the fragment
+  when interpolated into rich content.
+- **`Text` is `Equatable` and `Sendable` but not `Hashable`.** *Gap.*
+  SwiftUI's `Text` is all three; hashing awaits `Hashable` metadata
+  payloads.
+- **`Image(fileURLString:)` names its input honestly.** *Ratified.* The
+  initializer takes a `file://` URL *string* (parsed, host form and
+  percent-encoding included); the earlier `fileURL:` label promised a URL
+  value while taking a `String`. Plain paths use `init(path:)`.
 
 ## Focus and commands
 
@@ -244,6 +343,26 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **No `onSubmit` or `submitLabel`.** *Gap.* Return inside a `TextField` is
   not a field-level submit event.
 - **No `onMoveCommand` or `onExitCommand`.** *Gap.*
+- **`onKeyPress` is reshaped end to end and is the canonical key API.**
+  *Ratified.* The closure is labeled `perform:`, matching is a
+  `KeyPressMatch` value with terminal-native statics such as `.arrowUp`, and
+  there is no `phases:` parameter. A terminal byte stream delivers complete
+  key events — there are no down/up/repeat phases to observe and no physical
+  keyboard state to match against — so SwiftUI's phase surface would be
+  unimplementable theater. The name stays because the role matches: this is
+  where key handling is authored.
+- **`\.openLinkAction` stands where SwiftUI has `\.openURL`, and environment
+  verbs return `Bool`.** *Ratified.* The rename marks the changed contract
+  (`LinkDestination` values, terminal link delivery), and `Bool` returns —
+  here and on `\.resetFocus` — report whether any handler consumed the verb,
+  the fail-loud preference applied to environment actions. No `\.openURL`
+  alias ships.
+- **Toolbar items are value metadata, hoisted by preference.** *Ratified.*
+  `toolbarItem(_:)` takes a `ToolbarItemConfig`; there is no `ToolbarItem`
+  view or `@ToolbarContentBuilder`. This is the third instance of the
+  structured-metadata stance recorded for `Tab(...)` and `Table` columns:
+  value metadata gives deterministic terminal chrome without resolving label
+  trees.
 
 ## Presentations
 
@@ -396,6 +515,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
   than `mix(with:by:)`.
 - **No `Color.primary`, `.secondary`, or `.accentColor`.** *Gap.*
+- **`background(_ style:)` fills the view bounds only.** *Ratified.* There is
+  no `ignoresSafeAreaEdges:` parameter and the fill does not bleed into safe
+  areas — the restrained-chrome default; painting beyond bounds is expressed
+  with explicit containers.
 - **No `ColorScheme` axis.** *Ratified.* Views can read `colorSchemeContrast`
   and the raw `TerminalAppearance`, but there is no light/dark `ColorScheme`
   type. A terminal reports foreground/background colors, not a scheme; the
@@ -421,6 +544,10 @@ capabilities in the vision document. The others follow the same stance:
   gradients (`BorderBlend`).
 - `ProgressView(value:total:barWidth:)` — a terminal-cell width control on an
   otherwise SwiftUI-shaped control.
+- The deliberately public environment members `\.isFocused` (with a setter,
+  for host integrations), `\.safeAreaInsets`, `\.terminalSize`,
+  `\.controlProminence`, and `\.clipboardWriteAction` — host- and
+  terminal-facing values SwiftUI keeps private or does not have.
 - The `SwiftTUIProfiling` product and the host-contract surface
   (`SceneManifest`, `HostedSceneSession`, and peers).
 

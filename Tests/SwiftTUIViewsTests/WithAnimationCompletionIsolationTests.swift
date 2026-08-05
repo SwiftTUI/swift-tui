@@ -48,7 +48,8 @@ struct WithAnimationCompletionIsolationTests {
     let sink = CapturingCompletionSink()
 
     AnimationCompletionStorage.withSink(sink) {
-      withAnimation(nil) {} completion: {
+      withAnimation(nil) {
+      } completion: {
         // A `@State`-backed value or a captured view-local reference is not
         // `Sendable`. A main-actor-isolated closure may capture it because it
         // can only ever run on the main actor.

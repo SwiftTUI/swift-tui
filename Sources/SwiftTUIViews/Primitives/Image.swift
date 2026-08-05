@@ -15,10 +15,13 @@ public struct Image: PrimitiveView, ResolvableView {
     scalingMode = .stretch
   }
 
+  /// Creates an image from a `file://` URL string. The value is parsed as
+  /// a URL (host form and percent-encoding included); for a plain
+  /// filesystem path use ``init(path:)``.
   public init(
-    fileURL: String
+    fileURLString: String
   ) {
-    source = .fileURL(fileURL)
+    source = .fileURL(fileURLString)
     isResizable = false
     scalingMode = .stretch
   }
@@ -55,7 +58,8 @@ public struct Image: PrimitiveView, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let resolvedAsset = context.imageAssetResolver?(
+    let resolver = context.imageAssetResolver
+    let resolvedAsset = resolver?(
       source,
       context.environmentValues.imageResourceRoots,
       PixelSize(
@@ -64,24 +68,52 @@ public struct Image: PrimitiveView, ResolvableView {
       )
     )
 
-    return [
-      resolveLeafNode(
-        kindName: "Image",
-        intrinsicSize: resolvedAsset?.intrinsicCellSize ?? .zero,
-        semanticMetadata: .init(
-          accessibilityRole: .image,
-          accessibilityVisualContent: .init(kind: "Image")
-        ),
-        drawPayload: .image(
-          .init(
-            source: source,
-            resolvedAsset: resolvedAsset,
-            isResizable: isResizable,
-            scalingMode: scalingMode
+    var node = resolveLeafNode(
+      kindName: "Image",
+      intrinsicSize: resolvedAsset?.intrinsicCellSize ?? .zero,
+      semanticMetadata: .init(
+        accessibilityRole: .image,
+        accessibilityVisualContent: .init(kind: "Image")
+      ),
+      drawPayload: .image(
+        .init(
+          source: source,
+          resolvedAsset: resolvedAsset,
+          isResizable: isResizable,
+          scalingMode: scalingMode
+        )
+      ),
+      in: context
+    )
+    // Fail loud: an installed resolver that cannot resolve the source means
+    // the image silently measures zero. Absence of a resolver is a
+    // renderer-configuration situation, not an authoring error.
+    if resolver != nil, resolvedAsset == nil {
+      node.preferenceValues.merge(
+        RuntimeIssuePreferenceKey.self,
+        value: [
+          RuntimeIssue(
+            severity: .warning,
+            code: "image.unresolvedSource",
+            message:
+              "Image source \(sourceDescription) did not resolve to a decodable asset; the image measures zero.",
+            identity: context.identity,
+            source: "Image"
           )
-        ),
-        in: context
+        ]
       )
-    ]
+    }
+    return [node]
+  }
+
+  private var sourceDescription: String {
+    switch source {
+    case .path(let path):
+      "path(\(path))"
+    case .fileURL(let urlString):
+      "fileURLString(\(urlString))"
+    case .data(let bytes):
+      "data(\(bytes.count) bytes)"
+    }
   }
 }

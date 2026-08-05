@@ -45,37 +45,6 @@ struct ToolbarTests {
     #expect(items.map(\.title).contains("Item B"))
   }
 
-  @Test("Builder toolbarItem variant registers its label text as the title")
-  @available(*, deprecated, message: "exercises the deprecated toolbarItem(label:icon:) overload")
-  func builderVariantRegisters() {
-    let view = Text("X").toolbarItem(action: {}) {
-      Text("Copy")
-    } icon: {
-      EmptyView()
-    }
-    let context = ResolveContext(identity: testIdentity("toolbar-root"))
-    let resolved = Resolver().resolve(AnyView(view), in: context)
-    let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
-    #expect(items.first?.title == "Copy")
-  }
-
-  @Test("Builder toolbarItem variant extracts text from composed label views")
-  @available(*, deprecated, message: "exercises the deprecated toolbarItem(label:icon:) overload")
-  func builderVariantExtractsComposedLabelText() {
-    let view = Text("X").toolbarItem(action: {}) {
-      HStack(spacing: 1) {
-        Text("Copy")
-        Text("File").foregroundStyle(.muted)
-      }
-    } icon: {
-      EmptyView()
-    }
-    let context = ResolveContext(identity: testIdentity("toolbar-root"))
-    let resolved = Resolver().resolve(AnyView(view), in: context)
-    let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
-    #expect(items.first?.title == "Copy File")
-  }
-
   @Test("Panel with toolbar absorbs toolbar items from its subtree")
   func toolbarAbsorbsItems() {
     let panel =

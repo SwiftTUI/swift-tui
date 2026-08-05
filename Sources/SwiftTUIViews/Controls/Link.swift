@@ -2,8 +2,8 @@
 
 /// Displays focusable hyperlink text.
 public struct Link: PrimitiveView, ResolvableView {
-  public var label: Text
-  public var destination: LinkDestination
+  package var label: Text
+  package var destination: LinkDestination
 
   public init(
     _ title: String,
@@ -27,6 +27,8 @@ public struct Link: PrimitiveView, ResolvableView {
     [resolvedNode(in: context)]
   }
 }
+
+extension Link: Equatable, Sendable {}
 
 extension Link {
   private func resolvedNode(

@@ -49,11 +49,17 @@ struct FocusPresentationInertSlotScopeTests {
     var scope = RetainedReuseSuppressionScope()
     scope.insertFocusPresentationMember(member)
     // Chrome outside the slot stays in the cone; the slot subtree is exempt.
-    #expect(scope.suppresses(identity: chromeChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
-    #expect(!scope.suppresses(identity: contentChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
+    #expect(
+      scope.suppresses(
+        identity: chromeChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
+    #expect(
+      !scope.suppresses(
+        identity: contentChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
     // Self and ancestor matches never consult the exemption.
-    #expect(scope.suppresses(identity: member, isFocusPresentationDescendantExempt: { _, _ in true }))
-    #expect(scope.suppresses(identity: ancestor, isFocusPresentationDescendantExempt: { _, _ in true }))
+    #expect(
+      scope.suppresses(identity: member, isFocusPresentationDescendantExempt: { _, _ in true }))
+    #expect(
+      scope.suppresses(identity: ancestor, isFocusPresentationDescendantExempt: { _, _ in true }))
   }
 
   @Test("one non-exempting matching member keeps the identity suppressed")
@@ -63,14 +69,18 @@ struct FocusPresentationInertSlotScopeTests {
     // A second member above the slot (an ancestor container) also covers the
     // content child; the exemption is member-paired, so it must not clear it.
     scope.insertFocusPresentationMember(ancestor)
-    #expect(scope.suppresses(identity: contentChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
+    #expect(
+      scope.suppresses(
+        identity: contentChild, isFocusPresentationDescendantExempt: exemptingBelowSlot))
   }
 
   @Test("cone members (animation legs) never consult the exemption")
   func coneMembersIgnoreExemption() {
     var scope = RetainedReuseSuppressionScope()
     scope.insert(member)
-    #expect(scope.suppresses(identity: contentChild, isFocusPresentationDescendantExempt: { _, _ in true }))
+    #expect(
+      scope.suppresses(
+        identity: contentChild, isFocusPresentationDescendantExempt: { _, _ in true }))
   }
 
   @Test("focus members alone make the scope non-empty (finite focus/press coverage)")
@@ -336,4 +346,3 @@ private final class InertSlotInputReader: TerminalInputReading {
     }
   }
 }
-

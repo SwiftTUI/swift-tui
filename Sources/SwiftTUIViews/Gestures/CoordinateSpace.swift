@@ -5,7 +5,7 @@ public import SwiftTUICore
 /// Terminal UI supplies `.local`, `.global`, and `.named(_:)`.
 /// `.local` has its origin at the target rectangle of the gesture.
 /// `.global` has its origin at the terminal canvas.
-/// `.named(_:)` identifies frames that ``View/coordinateSpace(name:)`` records.
+/// `.named(_:)` identifies frames that ``View/coordinateSpace(_:)`` records.
 public struct CoordinateSpace: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case local
@@ -114,5 +114,27 @@ public struct CoordinateSpace: Equatable, Sendable {
       ),
       size: terminalRect.size
     )
+  }
+}
+
+/// A named reference frame established by ``View/coordinateSpace(_:)``.
+///
+/// Construct with ``named(_:)`` and resolve gesture locations against the
+/// frame via ``CoordinateSpace/named(_:)`` using the same name.
+public struct NamedCoordinateSpace: Equatable, Sendable {
+  package let name: String
+
+  private init(name: String) {
+    self.name = name
+  }
+
+  /// Creates a named coordinate space with the given name.
+  public static func named(_ name: some Hashable & Sendable) -> NamedCoordinateSpace {
+    NamedCoordinateSpace(name: String(describing: name))
+  }
+
+  /// The equivalent gesture-resolution coordinate space.
+  public var coordinateSpace: CoordinateSpace {
+    .named(name)
   }
 }

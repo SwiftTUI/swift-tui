@@ -1089,14 +1089,14 @@ extension FrameworkStressLayoutProposalTests {
       let spacing: Int
 
       var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical) {
           LazyVStack(alignment: .leading, spacing: spacing) {
             ForEach(0..<4) { row in
               Text("V\(row)")
             }
           }
-        }
-        .frame(width: 8, height: 8, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 8, height: 8, alignment: .topLeading)
       }
     }
 
@@ -1127,14 +1127,14 @@ extension FrameworkStressLayoutProposalTests {
       let spacing: Int
 
       var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
           LazyHStack(alignment: .top, spacing: spacing) {
             ForEach(0..<5) { column in
               Text("H\(column)")
             }
           }
-        }
-        .frame(width: 14, height: 2, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 14, height: 2, alignment: .topLeading)
       }
     }
 

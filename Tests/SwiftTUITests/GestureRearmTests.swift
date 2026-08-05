@@ -1,6 +1,5 @@
-import Testing
-
 @_spi(Testing) import SwiftTUITestSupport
+import Testing
 
 @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUIRuntime

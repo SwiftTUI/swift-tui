@@ -1,8 +1,7 @@
 import Testing
 
-@testable import SwiftTUIRuntime
-
 @_spi(Testing) @testable import SwiftTUICore
+@testable import SwiftTUIRuntime
 
 /// F153 — `ImageLookupKey` hashes `.data` sources by sampling (count +
 /// head/tail bytes) instead of hashing the full payload per lookup, while

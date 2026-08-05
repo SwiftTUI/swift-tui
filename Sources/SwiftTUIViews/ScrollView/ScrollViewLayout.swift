@@ -21,8 +21,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   }
 
   var axes: Axis.Set
-  var position: ScrollPosition
-  var showsIndicators: Bool
+  var position: ScrollCellOffset
+  var indicatorAxes: Axis.Set
   func makeCache(subviews _: LayoutSubviews) {}
 
   func stackMinimumMainSize(
@@ -196,7 +196,7 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     proposal: ProposedViewSize,
     currentInsets: IndicatorInsets
   ) -> IndicatorInsets {
-    guard showsIndicators else {
+    guard !indicatorAxes.isEmpty else {
       return .init()
     }
 
@@ -212,8 +212,10 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     )
 
     return .init(
-      trailing: axes.contains(.vertical) && childSize.height > contentViewportHeight ? 1 : 0,
-      bottom: axes.contains(.horizontal) && childSize.width > contentViewportWidth ? 1 : 0
+      trailing: indicatorAxes.contains(.vertical) && childSize.height > contentViewportHeight
+        ? 1 : 0,
+      bottom: indicatorAxes.contains(.horizontal) && childSize.width > contentViewportWidth
+        ? 1 : 0
     )
   }
 
@@ -258,8 +260,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   private func contentOffset(
     childSize: LayoutSize,
     viewportSize: LayoutSize
-  ) -> ScrollPosition {
-    ScrollPosition(
+  ) -> ScrollCellOffset {
+    ScrollCellOffset(
       x: clampedOffset(
         requested: position.x,
         content: childSize.width,
@@ -298,10 +300,10 @@ extension ScrollViewLayout: MeasureViewportDeclaringLayout {
 
 extension ScrollViewLayout {
   var measurementReuseSignature: String? {
-    "ScrollViewLayout:\(axes.rawValue):\(showsIndicators)"
+    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue)"
   }
 
   var placementReuseSignature: String? {
-    "ScrollViewLayout:\(axes.rawValue):\(showsIndicators):\(position.x):\(position.y)"
+    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue):\(position.x):\(position.y)"
   }
 }

@@ -174,6 +174,14 @@ extension View {
     modifier(IgnoreSafeAreaModifier(edges: edges))
   }
 
+  /// SwiftUI's labeled spelling. Terminal safe areas have a single region,
+  /// so only the edge set participates.
+  public func ignoresSafeArea(
+    edges: Edge.Set
+  ) -> some View {
+    ignoresSafeArea(edges)
+  }
+
   public func safeAreaInset<Inset: View>(
     edge: Edge,
     alignment: Alignment = .center,

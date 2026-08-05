@@ -99,7 +99,7 @@ All three attachment modifiers honor ``GestureMask``. In particular,
 ## Coordinate Spaces And Hit Testing
 
 Local and global coordinate spaces preserve fractional values. Named spaces are
-available with ``View/coordinateSpace(name:)``. Unresolved names fall back to
+available with ``View/coordinateSpace(_:)``. Unresolved names fall back to
 global coordinates so authored code keeps working while views are refactored.
 
 Use `View.contentShape(_:)` when a view's pointer target is not its full

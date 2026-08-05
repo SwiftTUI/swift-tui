@@ -222,7 +222,22 @@ interface OverrideFile {
    * They are still validated on every platform where they appear.
    */
   platform_exceptions?: string[];
+  /**
+   * Qualified symbols that carry a SwiftUI name with deliberately different
+   * semantics. Orthogonal to the classification axis. `--check` requires each
+   * listed symbol to be live and to be named in the divergence register
+   * (`Divergences-And-Gaps.md`), so the register cannot silently rot.
+   */
+  swiftui_divergent?: string[];
 }
+
+/** Register article that every `swiftui_divergent` symbol must appear in. */
+const DIVERGENCE_REGISTER_PATH = join(
+  "Sources",
+  "SwiftTUIViews",
+  "SwiftTUIViews.docc",
+  "Divergences-And-Gaps.md",
+);
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -292,6 +307,7 @@ async function loadOverrides(path: string): Promise<{
   defaultClassification: Classification;
   notes: Map<string, string>;
   platformExceptions: Set<string>;
+  swiftuiDivergent: string[];
 }> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -301,6 +317,7 @@ async function loadOverrides(path: string): Promise<{
       defaultClassification: "pending-review",
       notes: new Map(),
       platformExceptions: new Set(),
+      swiftuiDivergent: [],
     };
   }
   const raw = await file.text();
@@ -322,6 +339,7 @@ async function loadOverrides(path: string): Promise<{
     defaultClassification: parsed.default ?? "pending-review",
     notes,
     platformExceptions: new Set(parsed.platform_exceptions ?? []),
+    swiftuiDivergent: parsed.swiftui_divergent ?? [],
   };
 }
 
@@ -425,6 +443,9 @@ function validateOverrides(
   }
   for (const key of overrides.notes.keys()) {
     validatePresentKey(key, "notes");
+  }
+  for (const key of overrides.swiftuiDivergent) {
+    validatePresentKey(key, "swiftui_divergent");
   }
 
   if (failures.length > 0) {
@@ -1003,6 +1024,33 @@ async function main(): Promise<void> {
 
   if (args.check) {
     const failures: string[] = [];
+    {
+      // Every `swiftui_divergent` symbol must be named in the divergence
+      // register, so the register stays true without manual sweeps (D64).
+      const registerPath = join(
+        dirname(dirname(resolve(args.overrides))),
+        DIVERGENCE_REGISTER_PATH,
+      );
+      const registerText = await readFileIfExists(registerPath);
+      if (registerText === undefined) {
+        failures.push(
+          `swiftui_divergent check: register article not found at ${registerPath}.`,
+        );
+      } else {
+        for (const key of overrides.swiftuiDivergent) {
+          const baseName = key.split(".").pop() ?? key;
+          // Code-voice prefix: matches `Name` and member/call forms such as
+          // `Name(minLength:)` or `Name.member`.
+          if (!registerText.includes(`\`${baseName}`)) {
+            failures.push(
+              `swiftui_divergent symbol '${key}' is not named (as \`${baseName}\`...) ` +
+                `in ${DIVERGENCE_REGISTER_PATH}. Add a register entry or drop ` +
+                "the annotation.",
+            );
+          }
+        }
+      }
+    }
     if (spiBaselineStale) {
       failures.push(
         "SPI API baseline is stale (the @_spi host contract changed). " +

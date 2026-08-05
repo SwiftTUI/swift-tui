@@ -216,7 +216,7 @@ extension FrameworkStressSafeAreaGeometryTests {
           ForEach(entries) { entry in
             Text("024 owner \(entry.id) g\(generation)")
               .frame(width: 22, height: entry.height, alignment: .topLeading)
-              .coordinateSpace(name: "duplicate-024")
+              .coordinateSpace(.named("duplicate-024"))
           }
           GeometryReader { proxy in
             let frame = proxy.frame(in: .named("duplicate-024"))
@@ -271,7 +271,7 @@ extension FrameworkStressSafeAreaGeometryTests {
         VStack(alignment: .leading, spacing: 0) {
           Text("023 owner g\(generation)")
             .frame(width: 18, height: 1)
-            .coordinateSpace(name: currentName)
+            .coordinateSpace(.named(currentName))
           GeometryReader { proxy in
             let current = proxy.frame(in: .named(currentName))
             let departed = proxy.frame(in: .named(departedName))
@@ -325,7 +325,7 @@ extension FrameworkStressSafeAreaGeometryTests {
             .frame(height: prefixHeight, alignment: .topLeading)
           Text("board")
             .frame(width: 12, height: 1, alignment: .leading)
-            .coordinateSpace(name: "board-022")
+            .coordinateSpace(.named("board-022"))
           GeometryReader { proxy in
             let frame = proxy.frame(in: .named("board-022"))
             Text(

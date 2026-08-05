@@ -1103,7 +1103,7 @@ private struct PickerScopeFixture: View {
 
 @MainActor
 private struct ScrollViewScopeFixture: View {
-  @State private var position = ScrollPosition.zero
+  @State private var position = ScrollCellOffset.zero
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {

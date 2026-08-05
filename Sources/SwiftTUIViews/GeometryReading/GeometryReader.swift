@@ -10,7 +10,7 @@ public struct GeometryProxy: Equatable, Sendable {
   package var bounds: CellRect
   package var placedFrameTable: PlacedFrameTable
 
-  public init(
+  package init(
     size: CellSize,
     safeAreaInsets: EdgeInsets = .zero,
     cellPixelMetrics: CellPixelMetrics = .estimated,

@@ -61,7 +61,9 @@ public struct WindowGroup<Content: View>: Scene {
   /// `WindowGroup` is a primitive scene.
   public typealias Body = Never
 
-  public let title: String?
+  package let title: String?
+  /// Public because it satisfies `Identifiable`, which the scene
+  /// machinery requires of every window scene.
   public let id: WindowIdentifier
 
   private let contentBuilder: ScopedBuilder<Content>

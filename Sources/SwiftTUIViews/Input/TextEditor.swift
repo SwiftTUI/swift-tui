@@ -4,7 +4,7 @@ import Synchronization
 /// A focusable multiline text editor that accepts terminal keyboard input.
 public struct TextEditor: PrimitiveView, ResolvableView {
   public var text: Binding<String>
-  @State private var scrollPosition = ScrollPosition.zero
+  @State private var scrollPosition = ScrollCellOffset.zero
   @State private var textInputValue = TextInputValue()
   @State private var measuredContentWidth = TextEditorMeasuredContentWidth()
   private let authoringScope: AuthoringContext?

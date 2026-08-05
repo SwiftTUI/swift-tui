@@ -292,7 +292,6 @@ private final class SelectiveRerenderHarness<Root: View> {
     try settle()
   }
 
-
   /// The first committed sample after `frameCount` that ran the eager
   /// focus-sync rerender.
   func rerenderSample(after frameCount: Int) -> CommittedFrameSample? {

@@ -267,7 +267,8 @@ struct PresentationOverlayCoexistenceTests {
     #expect(frame.contains("Sheet content"), "sheet must stay up; frame:\n\(frame)")
     frame = try harness.pressKey(KeyPress(.escape))
     #expect(!frame.contains("Sheet content"))
-    #expect(violations() == 0, "modal absorb: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
+    #expect(
+      violations() == 0, "modal absorb: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
 
     // The modal tip likewise: open it, verify absorption, then churn the tab
     // underneath after Escape and confirm the presentation surface recovers.
@@ -277,13 +278,15 @@ struct PresentationOverlayCoexistenceTests {
     #expect(frame.contains("tab=lab"), "modal tip must absorb the tab command; frame:\n\(frame)")
     frame = try harness.pressKey(KeyPress(.escape))
     #expect(!frame.contains("Demo tip"), "escape must dismiss the tip; frame:\n\(frame)")
-    #expect(violations() == 0, "tip absorb: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
+    #expect(
+      violations() == 0, "tip absorb: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
 
     frame = try harness.pressKey(KeyPress(.character("t"), modifiers: .ctrl))
     #expect(frame.contains("Other body"), "tab must switch once no modal is up; frame:\n\(frame)")
     frame = try harness.pressKey(KeyPress(.character("t"), modifiers: .ctrl))
     #expect(frame.contains("Lab body"), "tab must switch back; frame:\n\(frame)")
-    #expect(violations() == 0, "tab churn: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
+    #expect(
+      violations() == 0, "tab churn: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")")
 
     // The sheet must reopen and stay dismissable after all of the churn.
     frame = try harness.clickText("Open Sheet")

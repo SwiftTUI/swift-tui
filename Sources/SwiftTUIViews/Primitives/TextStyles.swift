@@ -10,9 +10,11 @@ extension Text {
     }
   }
 
-  /// Applies a background shape style to this text and to the cells occupied
-  /// by this fragment when it is interpolated into ``Text/RichContent``.
-  public func backgroundStyle<S: ShapeStyle>(_ style: S) -> Text {
+  /// Paints the cells this text occupies with a background shape style,
+  /// including the fragment's cells when it is interpolated into
+  /// ``Text/RichContent``. Named for the terminal-cell semantics — SwiftUI's
+  /// `backgroundStyle(_:)` is an environment write with different behavior.
+  public func cellBackground<S: ShapeStyle>(_ style: S) -> Text {
     mutatingDrawMetadata { metadata in
       metadata.backgroundStyle = AnyShapeStyle(style)
     }

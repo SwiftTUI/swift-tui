@@ -34,7 +34,9 @@ struct LayoutReuseAncestorInvalidationTests {
       )
     )
 
-    #expect(updated.diagnostics.work.resolvedNodesReused == 0)
+    // The two unchanged `Text` leaves are `Equatable` memo candidates and are
+    // reused at resolve; the non-`Equatable` `VStack` recomputes.
+    #expect(updated.diagnostics.work.resolvedNodesReused == 2)
     #expect(updated.diagnostics.work.measuredNodesComputed == 0)
     #expect(updated.diagnostics.work.measuredNodesReused == 3)
     #expect(updated.diagnostics.work.placedNodesComputed == 1)

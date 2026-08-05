@@ -56,6 +56,10 @@ private enum ScrollIndicatorVisibilityKey: EnvironmentKey {
   static let defaultValue = ScrollIndicatorVisibility.automatic
 }
 
+private enum HorizontalScrollIndicatorVisibilityKey: EnvironmentKey {
+  static let defaultValue = ScrollIndicatorVisibility.automatic
+}
+
 private enum TableHeaderVisibilityKey: EnvironmentKey {
   static let defaultValue = TableHeaderVisibility.automatic
 }
@@ -166,34 +170,42 @@ extension EnvironmentValues {
     set { self[ButtonBorderShapeKey.self] = newValue }
   }
 
-  public var buttonStyle: AnyButtonStyle {
+  package var buttonStyle: AnyButtonStyle {
     get { self[ButtonStyleKey.self] }
     set { self[ButtonStyleKey.self] = newValue }
   }
 
-  public var textFieldStyle: AnyTextFieldStyle {
+  package var textFieldStyle: AnyTextFieldStyle {
     get { self[TextFieldStyleKey.self] }
     set { self[TextFieldStyleKey.self] = newValue }
   }
 
-  public var pickerStyle: AnyPickerStyle {
+  package var pickerStyle: AnyPickerStyle {
     get { self[PickerStyleKey.self] }
     set { self[PickerStyleKey.self] = newValue }
   }
 
-  public var listStyle: AnyListStyle {
+  package var listStyle: AnyListStyle {
     get { self[ListStyleKey.self] }
     set { self[ListStyleKey.self] = newValue }
   }
 
-  public var tabViewStyle: AnyTabViewStyle {
+  package var tabViewStyle: AnyTabViewStyle {
     get { self[TabViewStyleKey.self] }
     set { self[TabViewStyleKey.self] = newValue }
   }
 
+  /// The indicator visibility for the vertical axis. Set both axes with
+  /// ``View/scrollIndicators(_:axes:)``.
   public var scrollIndicatorVisibility: ScrollIndicatorVisibility {
     get { self[ScrollIndicatorVisibilityKey.self] }
     set { self[ScrollIndicatorVisibilityKey.self] = newValue }
+  }
+
+  /// The indicator visibility for the horizontal axis.
+  package var horizontalScrollIndicatorVisibility: ScrollIndicatorVisibility {
+    get { self[HorizontalScrollIndicatorVisibilityKey.self] }
+    set { self[HorizontalScrollIndicatorVisibilityKey.self] = newValue }
   }
 
   public var tableHeaderVisibility: TableHeaderVisibility {

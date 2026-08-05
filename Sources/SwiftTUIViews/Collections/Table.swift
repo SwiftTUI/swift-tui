@@ -110,7 +110,7 @@ extension Table {
     let isSelectable = selectionPolicy.isSelectable
     let tableStyle = context.environmentValues.listStyle.presentation
     let showsIndicators =
-      context.environmentValues.scrollIndicatorVisibility != .hidden
+      context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let showsHeaders =
       context.environmentValues.tableHeaderVisibility != .hidden
     let resolvedColumns = columns.map(\.resolvedTableColumnPayload)

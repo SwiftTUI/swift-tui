@@ -826,13 +826,12 @@ struct SwiftUISurfaceTests {
   @Test("scroll position changes do not emit lifecycle deltas for off-screen stable identities")
   func scrollPositionChangesDoNotEmitLifecycleDeltas() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -846,8 +845,8 @@ struct SwiftUISurfaceTests {
           .onDisappear {}
           .task(id: "row-2") {}
       }
-    }
-    .frame(width: 5, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 5, height: 2, alignment: .topLeading)
 
     let renderer = DefaultRenderer()
 
@@ -1067,12 +1066,12 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("SemanticOptOut"))
     )
     let explicitlyIncludedScrollView = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         Text("Row 0")
         Text("Row 1")
-      }
-      .id(testIdentity("FocusableScroll"))
-      .focusable(),
+      }.scrollIndicators(.hidden)
+        .id(testIdentity("FocusableScroll"))
+        .focusable(),
       context: .init(identity: testIdentity("FocusableScrollRoot"))
     )
 
@@ -1090,11 +1089,11 @@ struct SwiftUISurfaceTests {
       VStack(alignment: .leading, spacing: 1) {
         Button("Action") {}
           .id(testIdentity("ActionButton"))
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical) {
           Text("Scrollable")
-        }
-        .id(testIdentity("FocusableScroll"))
-        .focusable()
+        }.scrollIndicators(.hidden)
+          .id(testIdentity("FocusableScroll"))
+          .focusable()
         Button("Skip") {}
           .id(testIdentity("SkippedButton"))
           .focusable(false)
@@ -2226,6 +2225,66 @@ struct SwiftUISurfaceTests {
     #expect(stepperBox.value == 0.3)
     #expect(keyRegistry.dispatch(identity: testIdentity("DoubleSlider"), event: .arrowRight))
     #expect(sliderBox.value == 0.55)
+  }
+
+  @Test("Double Slider without a step is continuous")
+  func doubleSliderDefaultsToContinuousAdjustment() {
+    final class SliderBox {
+      var value = 0.5
+    }
+
+    let box = SliderBox()
+    let keyRegistry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("ContinuousSlider")
+
+    let artifacts = DefaultRenderer().render(
+      Slider(
+        "Opacity",
+        value: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        ),
+        in: 0.0...1.0
+      )
+      .id(testIdentity("ContinuousSlider")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: keyRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("0.5"))
+    // The SwiftUI-shaped call is not a two-position control: arrows move a
+    // tenth of the span, not the whole range.
+    #expect(
+      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), event: .arrowRight))
+    #expect(box.value == 0.6)
+    #expect(
+      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), event: .arrowLeft))
+    #expect(box.value == 0.5)
+  }
+
+  @Test("Continuous slider steps derive from the span")
+  func continuousSliderStepsDeriveFromSpan() {
+    let unit = continuousSliderSteps(for: 0.0...1.0)
+    #expect(abs(unit.track - 0.01) < 1e-12)
+    #expect(abs(unit.adjustment - 0.1) < 1e-12)
+
+    let byte = continuousSliderSteps(for: 0.0...255.0)
+    #expect(byte.track == 1)
+    #expect(byte.adjustment == 10)
+
+    let wide = continuousSliderSteps(for: 0.0...1000.0)
+    #expect(wide.track == 10)
+    #expect(wide.adjustment == 100)
+
+    let degenerate = continuousSliderSteps(for: 1.0...1.0)
+    #expect(degenerate.track == 1)
+    #expect(degenerate.adjustment == 1)
   }
 
   @Test("Slider track uses fractional pointer locations")
@@ -3704,14 +3763,14 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView clips overflow to its viewport and reports larger semantic content bounds")
   func scrollViewClipsAndReportsContentBounds() throws {
     let artifacts = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           Text("One  ")
           Text("Two  ")
           Text("Three")
         }
-      }
-      .frame(width: 5, height: 2, alignment: .topLeading),
+      }.scrollIndicators(.hidden)
+        .frame(width: 5, height: 2, alignment: .topLeading),
       context: .init(identity: testIdentity("ScrollViewport"))
     )
 
@@ -3733,14 +3792,14 @@ struct SwiftUISurfaceTests {
       VStack(alignment: .leading, spacing: 0) {
         Text("Title")
         Divider()
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<8, id: \.self) { index in
               Text("Row \(index)")
             }
           }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         Spacer(minLength: 0)
       }
       .frame(width: 8, height: 8, alignment: .topLeading),
@@ -3794,14 +3853,14 @@ struct SwiftUISurfaceTests {
   @Test("LazyVStack clips overflow to its viewport and reports larger semantic content bounds")
   func lazyVerticalStackClipsAndReportsContentBounds() throws {
     let artifacts = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 0) {
           Text("One  ")
           Text("Two  ")
           Text("Three")
         }
-      }
-      .frame(width: 5, height: 2, alignment: .topLeading),
+      }.scrollIndicators(.hidden)
+        .frame(width: 5, height: 2, alignment: .topLeading),
       context: .init(identity: testIdentity("LazyScrollViewport"))
     )
 
@@ -3820,13 +3879,12 @@ struct SwiftUISurfaceTests {
   @Test("scroll position changes do not emit lifecycle deltas for lazy stacks")
   func lazyStackScrollPositionChangesDoNotEmitLifecycleDeltas() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -3840,8 +3898,8 @@ struct SwiftUISurfaceTests {
           .onDisappear {}
           .task(id: "row-2") {}
       }
-    }
-    .frame(width: 5, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 5, height: 2, alignment: .topLeading)
 
     let renderer = DefaultRenderer()
 
@@ -3869,7 +3927,7 @@ struct SwiftUISurfaceTests {
     environmentValues.focusedIdentity = visibleIdentity
 
     let artifacts = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 0) {
           Button("Visible") {}
             .id(visibleIdentity)
@@ -3879,8 +3937,8 @@ struct SwiftUISurfaceTests {
             .id(hiddenIdentity)
           Text("Tail")
         }
-      }
-      .frame(width: 12, height: 1, alignment: .topLeading),
+      }.scrollIndicators(.hidden)
+        .frame(width: 12, height: 1, alignment: .topLeading),
       context: .init(
         identity: testIdentity("ViewportScope"),
         environmentValues: environmentValues
@@ -3897,7 +3955,7 @@ struct SwiftUISurfaceTests {
   @Test("single-ForEach lazy stacks emit viewport lifecycle transitions as rows enter and leave")
   func lazyForEachRowsEmitViewportLifecycleTransitions() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -3906,7 +3964,6 @@ struct SwiftUISurfaceTests {
     }
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -3922,8 +3979,8 @@ struct SwiftUISurfaceTests {
           }
         }
       }
-    }
-    .frame(width: 5, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 5, height: 2, alignment: .topLeading)
 
     let renderer = DefaultRenderer()
 
@@ -3954,13 +4011,12 @@ struct SwiftUISurfaceTests {
   @Test("mixed static siblings keep LazyVStack on the stable lifecycle path")
   func lazyVStackWithMixedStaticSiblingsKeepsStableLifecycleDuringScroll() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -3976,8 +4032,8 @@ struct SwiftUISurfaceTests {
         }
         Text("End")
       }
-    }
-    .frame(width: 5, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .frame(width: 5, height: 2, alignment: .topLeading)
 
     let renderer = DefaultRenderer()
 
@@ -3997,9 +4053,9 @@ struct SwiftUISurfaceTests {
     #expect(scrolledArtifacts.commitPlan.lifecycle.isEmpty)
   }
 
-  @Test("ScrollPosition helper APIs support incremental and absolute updates")
+  @Test("ScrollCellOffset helper APIs support incremental and absolute updates")
   func scrollPositionHelpersApplyDirectionalChanges() {
-    var position = ScrollPosition.zero
+    var position = ScrollCellOffset.zero
 
     position.scrollBy(x: 2, y: 3)
     #expect(position == .init(x: 2, y: 3))
@@ -4015,7 +4071,7 @@ struct SwiftUISurfaceTests {
   @Test("ScrollViewReader scrollTo minimally reveals an identified row")
   func scrollViewReaderScrollToMinimallyRevealsIdentifiedRow() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -4042,7 +4098,6 @@ struct SwiftUISurfaceTests {
 
         ScrollView(
           .vertical,
-          showsIndicators: false,
           position: Binding(
             get: { box.position },
             set: { box.position = $0 }
@@ -4058,8 +4113,8 @@ struct SwiftUISurfaceTests {
               }
             }
           }
-        }
-        .frame(width: 5, height: 3, alignment: .topLeading)
+        }.scrollIndicators(.hidden)
+          .frame(width: 5, height: 3, alignment: .topLeading)
       }
     }
 
@@ -4076,7 +4131,7 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView home and end keys move the focused scroll view to content bounds")
   func scrollViewHomeAndEndKeysMoveFocusedScrollViewToContentBounds() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -4097,7 +4152,6 @@ struct SwiftUISurfaceTests {
     let view =
       ScrollView(
         .vertical,
-        showsIndicators: false,
         position: Binding(
           get: { box.position },
           set: { box.position = $0 }
@@ -4108,7 +4162,7 @@ struct SwiftUISurfaceTests {
             Text("Row \(index)")
           }
         }
-      }
+      }.scrollIndicators(.hidden)
       .id(scrollIdentity)
       .frame(width: 5, height: 3, alignment: .topLeading)
 
@@ -4151,7 +4205,7 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView indicator thumb scales with the visible-content ratio")
   func scrollViewIndicatorThumbScalesWithVisibleContentRatio() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -4319,7 +4373,7 @@ struct SwiftUISurfaceTests {
   @Test("overflowing ScrollView indicators are focusable and handle arrow-key scrolling")
   func scrollViewIndicatorsCanBeFocusedAndScrolledWithKeys() {
     final class ScrollBox {
-      var position = ScrollPosition.zero
+      var position = ScrollCellOffset.zero
     }
 
     let box = ScrollBox()
@@ -4367,7 +4421,7 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView is a focusable view that handles arrow-key scrolling")
   func scrollViewBindsPositionAndHandlesArrowKeys() {
     final class ScrollBox {
-      var position = ScrollPosition()
+      var position = ScrollCellOffset()
     }
 
     let box = ScrollBox()
@@ -4377,7 +4431,6 @@ struct SwiftUISurfaceTests {
 
     let view = ScrollView(
       .vertical,
-      showsIndicators: false,
       position: Binding(
         get: { box.position },
         set: { box.position = $0 }
@@ -4388,9 +4441,9 @@ struct SwiftUISurfaceTests {
         Text("Row 1")
         Text("Row 2")
       }
-    }
-    .id(testIdentity("Scrollable"))
-    .frame(width: 5, height: 2, alignment: .topLeading)
+    }.scrollIndicators(.hidden)
+      .id(testIdentity("Scrollable"))
+      .frame(width: 5, height: 2, alignment: .topLeading)
 
     let initialArtifacts = DefaultRenderer().render(
       view,
@@ -4423,16 +4476,16 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView can be opted into focus explicitly when it needs a standalone surface")
   func scrollViewCanBeOptedIntoFocusExplicitly() {
     let artifacts = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           Text("Row 0")
           Text("Row 1")
           Text("Row 2")
         }
-      }
-      .focusable()
-      .id(testIdentity("Scrollable"))
-      .frame(width: 5, height: 2, alignment: .topLeading),
+      }.scrollIndicators(.hidden)
+        .focusable()
+        .id(testIdentity("Scrollable"))
+        .frame(width: 5, height: 2, alignment: .topLeading),
       context: .init(identity: testIdentity("Root"))
     )
 
@@ -4442,13 +4495,13 @@ struct SwiftUISurfaceTests {
   @Test("ScrollView renders its editing viewport state directly from focus")
   func scrollViewRendersEditingViewportStateDirectlyFromFocus() {
     let view =
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           Text("Row 0")
           Text("Row 1")
           Text("Row 2")
         }
-      }
+      }.scrollIndicators(.hidden)
       .id(testIdentity("ActiveScroll"))
       .frame(width: 5, height: 2, alignment: .topLeading)
 
@@ -4705,7 +4758,7 @@ struct SwiftUISurfaceTests {
   @Test("inline text background styles survive rich-content rasterization")
   func inlineTextBackgroundStyleSurvivesRichContentRasterization() throws {
     let artifacts = DefaultRenderer().render(
-      Text("before \(Text("code").foregroundStyle(.yellow).backgroundStyle(.blue)) after"),
+      Text("before \(Text("code").foregroundStyle(.yellow).cellBackground(.blue)) after"),
       context: .init(identity: testIdentity("InlineCode"))
     )
 
@@ -6053,7 +6106,7 @@ struct SwiftUISurfaceTests {
         Text("Header")
           .frame(width: 8, height: 4, alignment: .topLeading)
 
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
           HStack(spacing: 0) {
             Text("A")
               .frame(width: 3, height: 1, alignment: .topLeading)
@@ -6062,7 +6115,7 @@ struct SwiftUISurfaceTests {
               .frame(width: 3, height: 1, alignment: .topLeading)
               .border(.separator, set: .single)
           }
-        }
+        }.scrollIndicators(.hidden)
       },
       context: .init(identity: testIdentity("TightHorizontalScrollBorder")),
       proposal: .init(width: 8, height: 6)

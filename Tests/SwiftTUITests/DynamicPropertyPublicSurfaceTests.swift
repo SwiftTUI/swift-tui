@@ -1,7 +1,3 @@
-import SwiftTUICore
-import SwiftTUIRuntime
-import Testing
-
 // Stage 3 acceptance fixture (plan 2026-08-04-003 §7): a third-party dynamic
 // property written against the PUBLIC authoring surface only — the wrapper
 // and view below use nothing beyond what `import SwiftTUI` re-exports (the
@@ -9,6 +5,9 @@ import Testing
 // code only; the fixture declarations stick to public API). It must behave
 // on both the one-shot renderer path and the composed terminal runtime path.
 import SwiftTUI
+import SwiftTUICore
+import SwiftTUIRuntime
+import Testing
 
 /// The example third-party wrapper: composes `@State` for storage, exposes
 /// an imperative mutator through its projection. Conforming to

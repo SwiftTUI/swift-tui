@@ -104,7 +104,7 @@ private struct StressLL002Fixture: View {
           Button("Resize Target") { generation += 1 }
           Button("Reveal Target") { _ = proxy.scrollTo("target", anchor: .center) }
         }
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(0..<7, id: \.self) { row in
               Text("prefix \(row)")
@@ -161,7 +161,7 @@ private struct StressLL003Fixture: View {
           Button("Prepend Row") { firstRow -= 1 }
           Button("Reveal Stable") { _ = proxy.scrollTo(10, anchor: .center) }
         }
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical) {
           LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(Array(firstRow...24), id: \.self) { row in
               if row == 10 {
@@ -1531,7 +1531,7 @@ private struct StressLL025Fixture: View {
           Button("Scroll Lazy Bottom") { _ = proxy.scrollTo(edge: .bottom) }
           Button("Scroll Lazy Top") { _ = proxy.scrollTo(edge: .top) }
         }
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical) {
           LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(0..<20, id: \.self) { row in
               Text("lazy lifecycle row \(row)")

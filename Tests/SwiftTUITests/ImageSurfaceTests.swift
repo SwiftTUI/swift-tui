@@ -128,7 +128,7 @@ struct ImageSurfaceTests {
     }
 
     let artifacts = DefaultRenderer().render(
-      Image(fileURL: fileURL.absoluteString)
+      Image(fileURLString: fileURL.absoluteString)
     )
     let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
 

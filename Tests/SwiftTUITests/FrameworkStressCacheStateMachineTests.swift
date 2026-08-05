@@ -295,11 +295,16 @@ extension FrameworkStressCacheStateMachineTests {
     // Hypothesis: revisiting a mode after two siblings can return the last computed truncation.
     let cache = TextLayoutCache(capacity: 4)
     let content = "abcdefghijk"
-    let head = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head))
-    let middle = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .middle))
-    let tail = cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .tail))
+    let head = cache.layout(
+      for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head))
+    let middle = cache.layout(
+      for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .middle))
+    let tail = cache.layout(
+      for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .tail))
     #expect(Set([head.lines[0].text, middle.lines[0].text, tail.lines[0].text]).count == 3)
-    #expect(cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head)) == head)
+    #expect(
+      cache.layout(for: content, options: .init(width: 5, lineLimit: 1, truncationMode: .head))
+        == head)
     #expect(cache.metrics.entries == 3)
   }
 }
@@ -403,7 +408,8 @@ extension FrameworkStressCacheStateMachineTests {
     // Hypothesis: two-phase lookup can store duplicate same-key entries or return divergent layouts.
     let cache = TextLayoutCache(capacity: 8)
     let options = TextLayoutOptions(width: 7, lineLimit: 2, truncationMode: .middle)
-    let results = await withTaskGroup(of: TextLayoutResult.self, returning: [TextLayoutResult].self) {
+    let results = await withTaskGroup(of: TextLayoutResult.self, returning: [TextLayoutResult].self)
+    {
       group in
       for _ in 0..<64 {
         group.addTask { cache.layout(for: "alpha beta gamma delta", options: options) }

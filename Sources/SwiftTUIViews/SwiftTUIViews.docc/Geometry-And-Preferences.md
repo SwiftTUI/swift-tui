@@ -40,12 +40,12 @@ struct BorderedLabel: View {
 
 ``GeometryProxy`` also exposes ``GeometryProxy/frame(in:)`` for local, global,
 and named coordinate-space frames. Named spaces come from
-``View/coordinateSpace(name:)``:
+``View/coordinateSpace(_:)``:
 
 ```swift
 VStack(alignment: .leading) {
   Text("Header")
-    .coordinateSpace(name: "header")
+    .coordinateSpace(.named("header"))
 
   GeometryReader { proxy in
     let frame = proxy.frame(in: .named("header"))
@@ -121,7 +121,7 @@ struct MarkedLabel: View {
 
 ### Align Overlay To A Named Space
 
-Use ``View/coordinateSpace(name:)`` to align an overlay to a sibling
+Use ``View/coordinateSpace(_:)`` to align an overlay to a sibling
 or ancestor region instead of the overlay's own local bounds.
 
 ```swift
@@ -131,7 +131,7 @@ struct HeaderBadge: View {
       HStack(spacing: 1) {
         Text("Name")
           .frame(width: 12, alignment: .topLeading)
-          .coordinateSpace(name: "name-column")
+          .coordinateSpace(.named("name-column"))
 
         Text("Status")
       }
@@ -170,7 +170,7 @@ struct MissingNameProbe: View {
   var body: some View {
     VStack(alignment: .leading) {
       Text("Panel")
-        .coordinateSpace(name: "details-panel")
+        .coordinateSpace(.named("details-panel"))
 
       GeometryReader { proxy in
         // Typo: this name does not match "details-panel".
@@ -227,4 +227,4 @@ realization stays on the placement side of the pipeline.
 - ``GeometryProxy``
 - ``GeometryProxy/frame(in:)``
 - ``CoordinateSpace``
-- ``View/coordinateSpace(name:)``
+- ``View/coordinateSpace(_:)``

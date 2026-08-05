@@ -139,7 +139,8 @@ struct LocalGestureRegistryTests {
     let served = registry.recognizer(for: identity)
     #expect(served === preserved)
     _ = served?.handle(
-      event: LocalPointerEvent(kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
+      event: LocalPointerEvent(
+        kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
     )
     #expect(fired.entries == ["reauthored"])
   }
@@ -168,7 +169,8 @@ struct LocalGestureRegistryTests {
     let served = registry.recognizer(for: identity)
     #expect(served === preserved)
     _ = served?.handle(
-      event: LocalPointerEvent(kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
+      event: LocalPointerEvent(
+        kind: .down(.primary), location: Point(x: 0, y: 0), targetRect: .zero)
     )
     #expect(fired.entries == ["original"])
   }

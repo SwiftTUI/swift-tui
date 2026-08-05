@@ -12,12 +12,11 @@ struct LayoutDependentContainerHardeningTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let position = LockedBox(ScrollPosition.zero)
+    let position = LockedBox(ScrollCellOffset.zero)
 
     func makeView() -> some View {
       ScrollView(
         .vertical,
-        showsIndicators: false,
         position: Binding(
           get: { position.value },
           set: { position.value = $0 }
@@ -34,8 +33,8 @@ struct LayoutDependentContainerHardeningTests {
           .frame(width: 20, height: 1, alignment: .topLeading)
           Text("tail")
         }
-      }
-      .frame(width: 20, height: 2, alignment: .topLeading)
+      }.scrollIndicators(.hidden)
+        .frame(width: 20, height: 2, alignment: .topLeading)
     }
 
     let first = renderer.render(
@@ -69,7 +68,7 @@ struct LayoutDependentContainerHardeningTests {
     var realizedRows: [Int] = []
 
     let artifacts = DefaultRenderer().render(
-      ScrollView(.vertical, showsIndicators: false) {
+      ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<4) { row in
             GeometryReader { proxy in
@@ -82,8 +81,8 @@ struct LayoutDependentContainerHardeningTests {
             .frame(width: 12, height: 1, alignment: .topLeading)
           }
         }
-      }
-      .frame(width: 12, height: 1, alignment: .topLeading),
+      }.scrollIndicators(.hidden)
+        .frame(width: 12, height: 1, alignment: .topLeading),
       context: .init(identity: testIdentity("LazyGeometryRoot")),
       proposal: .init(width: 12, height: 1)
     )

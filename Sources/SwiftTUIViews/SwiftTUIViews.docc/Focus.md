@@ -88,7 +88,7 @@ Focus identifies both the current target and the next target.
 
 The movement rules:
 
-- keyboard traversal generally follows authored order and locale-aware layout order
+- keyboard traversal generally follows authored order and layout order
 - default focus chooses the initial target when focus first enters a screen or scope
 - focus sections can enlarge the logical movement target without turning containers into controls
 
@@ -405,7 +405,7 @@ cannot guide movement through geometry that it does not occupy.
 The default keyboard model:
 
 - focus starts at the top-most control nearest the leading edge
-- pressing Tab moves focus forward in locale-aware layout order
+- pressing Tab moves focus forward in layout order
 - reaching the end wraps back to the beginning
 
 That is a useful baseline model, but authors still influence it by:

@@ -4,7 +4,7 @@ import SwiftTUICore
 public struct Slider<Label: View>: PrimitiveView, ResolvableView {
   private enum ValueStorage {
     case integer(Binding<Int>, bounds: ClosedRange<Int>, step: Int)
-    case double(Binding<Double>, bounds: ClosedRange<Double>, step: Double)
+    case double(Binding<Double>, bounds: ClosedRange<Double>, step: Double?)
   }
 
   private var valueStorage: ValueStorage
@@ -28,12 +28,12 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
     _ title: S,
     value: Binding<Double>,
     in bounds: ClosedRange<Double>,
-    step: Double = 1
+    step: Double? = nil
   ) where Label == Text {
     valueStorage = .double(
       value,
       bounds: bounds,
-      step: Double.sanitizedControlStep(step)
+      step: step.map(Double.sanitizedControlStep)
     )
     label = Text(String(title))
   }
@@ -55,13 +55,13 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
   public init(
     value: Binding<Double>,
     in bounds: ClosedRange<Double>,
-    step: Double = 1,
+    step: Double? = nil,
     @ViewBuilder label: () -> Label
   ) {
     valueStorage = .double(
       value,
       bounds: bounds,
-      step: Double.sanitizedControlStep(step)
+      step: step.map(Double.sanitizedControlStep)
     )
     self.label = label()
   }
@@ -79,17 +79,22 @@ extension Slider {
   ) -> ResolvedNode {
     switch valueStorage {
     case .integer(let binding, let bounds, let step):
-      resolvedNode(
+      return resolvedNode(
         value: binding,
         bounds: bounds,
-        step: step,
+        trackStep: step,
+        adjustmentStep: step,
         in: context
       )
     case .double(let binding, let bounds, let step):
-      resolvedNode(
+      let steps =
+        step.map { (track: $0, adjustment: $0) }
+        ?? continuousSliderSteps(for: bounds)
+      return resolvedNode(
         value: binding,
         bounds: bounds,
-        step: step,
+        trackStep: steps.track,
+        adjustmentStep: steps.adjustment,
         in: context
       )
     }
@@ -98,7 +103,8 @@ extension Slider {
   private func resolvedNode<Value: AdjustableControlValue>(
     value binding: Binding<Value>,
     bounds: ClosedRange<Value>,
-    step: Value,
+    trackStep: Value,
+    adjustmentStep: Value,
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
@@ -124,7 +130,7 @@ extension Slider {
 
     if isEnabled {
       let bounds = bounds
-      let step = step
+      let adjustmentStep = adjustmentStep
       let intake = HandlerDescriptorIntake(
         context: context,
         fallbackAuthoringScope: nil
@@ -133,7 +139,7 @@ extension Slider {
         let next = steppedControlValue(
           from: binding.wrappedValue,
           delta: 1,
-          step: step,
+          step: adjustmentStep,
           bounds: bounds
         )
         guard next != binding.wrappedValue else {
@@ -156,7 +162,7 @@ extension Slider {
         return updateBoundControlValue(
           binding,
           delta: deltaCount,
-          step: step,
+          step: adjustmentStep,
           bounds: bounds
         )
       }
@@ -166,6 +172,7 @@ extension Slider {
         for: sliderTrackIdentity(for: context.identity)
       )
 
+      let trackStep = trackStep
       intake.registerPointerHandler(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
@@ -176,7 +183,7 @@ extension Slider {
         let handled = updateBoundControlValue(
           binding,
           delta: wheelDelta,
-          step: step,
+          step: adjustmentStep,
           bounds: bounds
         )
         return handled ? .claimed : .ignored
@@ -188,7 +195,7 @@ extension Slider {
             at: event.location.location.x,
             in: event.targetRect,
             bounds: bounds,
-            step: step
+            step: trackStep
           )
           return .claimed
         case .scrolled(let deltaX, let deltaY):
@@ -199,7 +206,7 @@ extension Slider {
           let handled = updateBoundControlValue(
             binding,
             delta: wheelDelta,
-            step: step,
+            step: adjustmentStep,
             bounds: bounds
           )
           return handled ? .claimed : .ignored
@@ -213,7 +220,7 @@ extension Slider {
       controlIdentity: context.identity,
       value: currentValue,
       bounds: bounds,
-      step: step,
+      step: trackStep,
       showsFocusRail: isFocused && showsFocusEffect,
       isHighlighted: (isFocused && showsFocusEffect) || isPressed,
       isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,

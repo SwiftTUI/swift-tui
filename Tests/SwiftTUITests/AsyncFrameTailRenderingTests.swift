@@ -606,10 +606,10 @@ struct AsyncFrameTailRenderingTests {
         VStack(alignment: .leading, spacing: 0) {
           Text("First")
             .frame(width: 10, height: 1)
-            .coordinateSpace(name: "board")
+            .coordinateSpace(.named("board"))
           Text("Second")
             .frame(width: 10, height: 1)
-            .coordinateSpace(name: "board")
+            .coordinateSpace(.named("board"))
           GeometryReader { proxy in
             let missingFrame = proxy.frame(in: .named("missing-space"))
             let missingRect = proxy[missingAnchor]
@@ -1191,7 +1191,7 @@ struct AsyncFrameTailRenderingTests {
   @Test("framework-owned ScrollView layout runs on the frame-tail worker")
   func frameworkOwnedScrollViewLayoutRunsOnFrameTailWorker() async throws {
     try await assertFrameworkOwnedLayoutWorker(
-      ScrollView([.vertical], showsIndicators: true) {
+      ScrollView([.vertical]) {
         VStack(alignment: .leading, spacing: 0) {
           Text("scroll row 0")
           Text("scroll row 1")
@@ -1247,7 +1247,7 @@ struct AsyncFrameTailRenderingTests {
   @Test("lazy indexed ScrollView content snapshots before worker layout")
   func lazyIndexedScrollViewContentSnapshotsBeforeWorkerLayout() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
-      ScrollView([.vertical], showsIndicators: true) {
+      ScrollView([.vertical]) {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<12) { index in
             Text("lazy row \(index)")
@@ -1273,7 +1273,7 @@ struct AsyncFrameTailRenderingTests {
   @Test("lazy indexed child with plain custom layout keeps layout on the worker")
   func lazyIndexedChildWithPlainCustomLayoutKeepsLayoutOnWorker() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
-      ScrollView([.vertical], showsIndicators: true) {
+      ScrollView([.vertical]) {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<1) { _ in
             AsyncFrameTailCustomLayout {
@@ -3789,7 +3789,7 @@ private struct AsyncFrameHeadAbortScaffoldView: View {
 
   var body: some View {
     Panel(id: "abort-scaffold") {
-      ScrollView([.vertical], showsIndicators: true) {
+      ScrollView([.vertical]) {
         VStack(alignment: .leading, spacing: 0) {
           Button("Animated action") {
             withAnimation(nil) {
@@ -3992,9 +3992,9 @@ private struct AsyncFrameHeadDraftDropDestinationView: View {
 }
 
 private final class AsyncFrameHeadScrollPositionBox: Sendable {
-  private let storage = LockedBox(ScrollPosition.zero)
+  private let storage = LockedBox(ScrollCellOffset.zero)
 
-  var position: ScrollPosition {
+  var position: ScrollCellOffset {
     get { storage.value }
     set { storage.value = newValue }
   }
@@ -4123,7 +4123,7 @@ private struct AsyncFrameTailNestedScrollColumns: View {
           VStack(alignment: .leading, spacing: 0) {
             Text("column \(column)")
             Divider()
-            ScrollView(.vertical, showsIndicators: true) {
+            ScrollView(.vertical) {
               LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(0..<12) { row in
                   Text("row \(row)")
