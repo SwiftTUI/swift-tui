@@ -111,6 +111,7 @@ Lowering helpers remain package-only implementation details.
 
 ### Guides
 
+- <doc:SwiftUI-Divergences>
 - <doc:Authoring-Views>
 - <doc:Collections>
 - <doc:AnyView>
