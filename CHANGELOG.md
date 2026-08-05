@@ -10,6 +10,42 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **`Binding` projections and the optional-binding init family.**
+  `Binding.animation(_:)` and `Binding.transaction(_:)` return bindings
+  whose writes run inside a stored `Transaction`; the stored transaction is
+  a public `transaction` property (SwiftUI's shape) and propagates through
+  `dynamicMember` member projections. Precedence is verified against real
+  SwiftUI: an explicit ambient scope (`withAnimation`/`withTransaction`)
+  wins over the stored transaction; the stored transaction governs writes
+  made outside any explicit scope — which is how every built-in control
+  writes, so `Toggle(isOn: $flag.animation(.default))` animates with no
+  per-control changes. New initializers: `init?(_:)` (optional unwrap; nil
+  base fails construction, and a read after the base became nil traps with
+  a diagnostic — SwiftUI traps there too), `init(_:)` (optional wrap; nil
+  writes are ignored, matching SwiftUI), and `init(projectedValue:)`.
+- **`Transaction.isContinuous`.** Author-facing continuity metadata:
+  transforms installed with `.transaction(_:)` observe it on both the
+  authored channel and `withTransaction`-scoped writes. The framework
+  neither sets nor consumes it yet; it carries no animation intent, so a
+  continuity-only transaction does not defeat frame elision or the
+  controller's resolved-tree skip.
+- **Custom `TransactionKey` values.** The `EnvironmentKey` shape for
+  transactions: declare a key with a `defaultValue`, then read or write
+  `transaction[MyKey.self]`. `Value` requires `Hashable & Sendable`
+  (narrowed from SwiftUI's unconstrained associated type; recorded in the
+  divergence register). Key values ride authored transforms and scoped
+  writes, and participate in retained-reuse equivalence — a per-frame-
+  varying key value destroys retained reuse below the writer, the same
+  hazard class as an unequatable environment value.
+- **`GestureState` reset transactions.** `init(wrappedValue:resetTransaction:)`,
+  `init(initialValue:resetTransaction:)`, and the `reset:` closure variants
+  (`(Value, inout Transaction) -> Void`, receiving the value being reset).
+  The reset transaction governs the end-of-gesture seed reset exclusively —
+  verified against SwiftUI: a transaction mutated in the `updating` body
+  does not carry over to the reset, and without a reset transaction the
+  reset snaps. Resolve-time resets (recognizer teardown, subtree removal)
+  never animate.
+
 - **`DynamicProperty` — the custom-property-wrapper extension point.** The
   protocol matches SwiftUI's shape (`mutating func update()`, `@MainActor`,
   no-op default), and all nine built-in wrappers conform (`State`,
@@ -33,6 +69,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- **`Gesture.updating(_:body:)`'s `inout Transaction` is honored.** The
+  body's transaction was previously a discarded stand-in; mutations now
+  govern the during-gesture `@GestureState` write (setting
+  `transaction.animation` animates it). The transaction arrives inert on
+  every update — no preset animation, `isContinuous` not auto-set —
+  matching a SwiftUI probe (2026-08-05). The two doc warnings that
+  promised the discard are removed.
 - **The memo shadow-oracle's wrapper-storage classifier no longer drifts.**
   The diagnostic comparator now classifies property-wrapper storage by
   `DynamicProperty` conformance instead of a hard-coded five-name prefix

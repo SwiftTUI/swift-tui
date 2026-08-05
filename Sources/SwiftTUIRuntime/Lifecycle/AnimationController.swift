@@ -797,6 +797,10 @@ package final class AnimationController: Sendable {
   package func canSkipResolvedTreeProcessing(
     transactionPlan: FrameAnimationTransactionPlan
   ) -> Bool {
+    // `isContinuous` is deliberately not consulted: continuity is
+    // resolve-side metadata with no animation intent, so a
+    // continuity-only transaction cannot enqueue controller work and
+    // must not defeat the skip (plan 2026-08-04-002 §5.5).
     previousTreeRoot != nil
       && !transactionPlan.hasExplicitTransactions
       && transactionPlan.base.animationRequest.animationBoxIfAny == nil
@@ -1619,12 +1623,24 @@ package final class AnimationController: Sendable {
     let frameSegment = transactionPlan.segment(for: node.identity)
     var effectiveTransaction = node.transactionSnapshot
     if effectiveTransaction.animationRequest == .inherit {
+      // Metadata fields (`isContinuous`, custom key values) inherit with
+      // the request; the node's own resolve-stamped values win per key.
       if let frameSegment {
         effectiveTransaction.animationRequest = frameSegment.animationRequest
         effectiveTransaction.animationBatchID = frameSegment.animationBatchID
+        effectiveTransaction.isContinuous =
+          effectiveTransaction.isContinuous || frameSegment.isContinuous
+        effectiveTransaction.customValues = frameSegment.customValues.merging(
+          effectiveTransaction.customValues
+        ) { _, node in node }
       } else {
         effectiveTransaction.animationRequest = transaction.animationRequest
         effectiveTransaction.animationBatchID = transaction.animationBatchID
+        effectiveTransaction.isContinuous =
+          effectiveTransaction.isContinuous || transaction.isContinuous
+        effectiveTransaction.customValues = transaction.customValues.merging(
+          effectiveTransaction.customValues
+        ) { _, node in node }
       }
     } else if effectiveTransaction.animationBatchID == nil {
       let isFrameSegmentBoundary =

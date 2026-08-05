@@ -278,6 +278,7 @@ classifications:
     - SwiftTUIViews.AnimationState
     - SwiftTUIViews.AnyTransition
     - SwiftTUIViews.Transaction
+    - SwiftTUIViews.TransactionKey
     - SwiftTUIViews.Transition
     - SwiftTUIViews.TransitionContent
     - SwiftTUIViews.TransitionPhase
@@ -882,4 +883,5 @@ swiftui_divergent:
   - SwiftTUIViews.Text
   - SwiftTUIViews.TextField
   - SwiftTUIViews.Transaction
+  - SwiftTUIViews.TransactionKey
   - SwiftTUIRuntime.WindowGroup

@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 281 | 1517 |
+| `SwiftTUIViews` | 282 | 1532 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 49 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -123,7 +123,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (281)
+### Canonical surface (282)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -157,7 +157,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Axis` — enum — 3 members
 - `BackgroundModifier` — struct
 - `Bindable` — struct — 5 members
-- `Binding` — struct — 5 members
+- `Binding` — struct — 11 members
 - `BoolDefaultFocusModifier` — struct
 - `BooleanNavigationDestinationModifier` — struct
 - `BoolFocusBindingModifier` — struct
@@ -219,7 +219,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `GestureAttachmentModifier` — struct
 - `GestureBuilder` — enum — 1 member
 - `GestureMask` — struct — 6 members
-- `GestureState` — struct — 5 members
+- `GestureState` — struct — 9 members
 - `GestureStateBinding` — struct — 2 members
 - `GestureStateBox` — class — 6 members
 - `GestureStateGesture` — struct — 7 members
@@ -378,7 +378,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ToolbarModifier` — struct
 - `ToolbarPlacement` — enum — 2 members
 - `ToolbarStyle` — protocol — 5 members
-- `Transaction` — struct — 3 members
+- `Transaction` — struct — 5 members
+- `TransactionKey` — protocol — 2 members
 - `TransactionModifier` — struct
 - `Transition` — protocol — 4 members
 - `TransitionContent` — struct — 1 member

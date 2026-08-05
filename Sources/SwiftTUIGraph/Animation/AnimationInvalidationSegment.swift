@@ -7,15 +7,28 @@ package struct AnimationInvalidationSegment: Equatable, Sendable {
   package var identities: Set<Identity>
   package var animationRequest: AnimationRequest
   package var animationBatchID: AnimationBatchID?
+  /// Continuity metadata riding the write (see
+  /// `TransactionSnapshot.isContinuous`). Deliberately absent from
+  /// ``isExplicit``: a continuity-only transaction carries no animation
+  /// intent, so its segment is dropped at append — nothing downstream of a
+  /// plain invalidation would consume the flag.
+  package var isContinuous: Bool = false
+  /// Custom `TransactionKey` values riding the write. Like `isContinuous`,
+  /// resolve-side data deliberately absent from ``isExplicit``.
+  package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
 
   package init(
     identities: Set<Identity>,
     animationRequest: AnimationRequest,
-    animationBatchID: AnimationBatchID? = nil
+    animationBatchID: AnimationBatchID? = nil,
+    isContinuous: Bool = false,
+    customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
   ) {
     self.identities = identities
     self.animationRequest = animationRequest
     self.animationBatchID = animationBatchID
+    self.isContinuous = isContinuous
+    self.customValues = customValues
   }
 
   package var isExplicit: Bool {
@@ -161,6 +174,8 @@ package struct FrameAnimationTransactionPlan: Equatable, Sendable {
     var transaction = base
     transaction.animationRequest = segment.animationRequest
     transaction.animationBatchID = segment.animationBatchID
+    transaction.isContinuous = segment.isContinuous
+    transaction.customValues = segment.customValues
     return transaction
   }
 }

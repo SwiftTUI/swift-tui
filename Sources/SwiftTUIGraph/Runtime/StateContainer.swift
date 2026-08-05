@@ -50,7 +50,9 @@ public final class StateContainer<State: Equatable & Sendable> {
       animationAware.requestInvalidation(
         of: invalidationIdentities,
         animation: animationRequest,
-        batchID: batchID
+        batchID: batchID,
+        isContinuous: AnimationContextStorage.currentIsContinuous,
+        customValues: AnimationContextStorage.currentCustomValues
       )
     } else {
       invalidator?.requestInvalidation(of: invalidationIdentities)

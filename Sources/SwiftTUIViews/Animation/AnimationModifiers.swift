@@ -76,15 +76,42 @@ public struct Transaction: Sendable {
     }
   }
 
+  /// Whether the transaction reports a continuous or fluid update, such
+  /// as one write in a stream of during-gesture updates.
+  ///
+  /// The flag is author-facing metadata: transforms installed with
+  /// ``View/transaction(_:)`` can read it, and scoped writes carry it to
+  /// the next resolve. The framework neither sets nor consumes it yet —
+  /// SwiftUI does not auto-set it on gesture updates either (verified
+  /// 2026-08-05) — and it carries no animation intent of its own.
+  public var isContinuous: Bool = false
+
   package var request: AnimationRequest
+
+  /// Custom ``TransactionKey`` values, keyed by key-type identity.
+  /// Accessed through `transaction[MyKey.self]` (see `TransactionKey.swift`).
+  package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+
+  /// True when this transaction carries no intent at all — applying it to
+  /// a write would change nothing. `Binding` uses this to skip the
+  /// `withTransaction` wrap for default-constructed stored transactions.
+  package var isInert: Bool {
+    request == .inherit && !isContinuous && customValues.isEmpty
+  }
 
   /// Creates a default transaction with inherited animation intent.
   public init() {
     self.request = .inherit
   }
 
-  package init(request: AnimationRequest) {
+  package init(
+    request: AnimationRequest,
+    isContinuous: Bool = false,
+    customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+  ) {
     self.request = request
+    self.isContinuous = isContinuous
+    self.customValues = customValues
   }
 
   private func _animation(fromBox box: AnimationBox) -> Animation? {
@@ -160,6 +187,10 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
       return resolved
     }
 
+    // Only the request is overridden here: every other transaction field
+    // (`isContinuous`, future additions) flows through on the context copy
+    // untouched — this modifier authors animation intent, not a whole
+    // transaction (plan 2026-08-04-002 mechanics §5).
     if context.environmentValues.accessibilityReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else if let animation {
@@ -251,7 +282,14 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var transaction = Transaction(request: context.transaction.animationRequest)
+    // Every Transaction field the transform can observe must be carried
+    // IN from the context snapshot here and written BACK below, or edits
+    // to it silently do nothing (plan 2026-08-04-002 mechanics §5).
+    var transaction = Transaction(
+      request: context.transaction.animationRequest,
+      isContinuous: context.transaction.isContinuous,
+      customValues: context.transaction.customValues
+    )
     transform(&transaction)
 
     var childContext = context
@@ -260,6 +298,8 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     } else {
       childContext.transaction.animationRequest = transaction.request
     }
+    childContext.transaction.isContinuous = transaction.isContinuous
+    childContext.transaction.customValues = transaction.customValues
     // See ValueAnimationModifier: the authored edit must survive nested
     // `resolveView` frame-input refreshes below this modifier (F137).
     childContext.propagated.authoredTransactionOverride = true

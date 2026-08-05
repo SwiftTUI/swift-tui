@@ -33,6 +33,11 @@ package enum OffscreenFrameElision {
     redrawIdentities: Set<Identity>,
     drawnIdentities: Set<Identity>
   ) -> Bool {
+    // Explicitness stays keyed to animation intent: `isContinuous` alone
+    // does not make a transaction explicit. Continuity is resolve-side
+    // metadata — its segment never survives append without animation
+    // intent, so elision cannot drop a delivery that carries only the
+    // flag (plan 2026-08-04-002 §5.5).
     guard causes == [.deadline] else { return false }
     guard !hasExplicitAnimationTransactions else { return false }
     return redrawIdentities.isDisjoint(with: drawnIdentities)

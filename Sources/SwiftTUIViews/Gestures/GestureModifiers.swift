@@ -141,10 +141,9 @@ extension Gesture {
 /// A gesture that threads a value into `@GestureState` with automatic reset
 /// on gesture termination.
 ///
-/// > Warning: The `inout Transaction` parameter passed to the updater
-/// > closure is currently a no-op stand-in. The function discards changes to the transaction.
-/// > See `Gesture.updating(_:body:)` documentation
-/// > for details and tracking information.
+/// The updater's `inout Transaction` governs the during-gesture state
+/// write; the end-of-gesture reset is governed by the `GestureState`
+/// reset transaction (see `GestureState.init(wrappedValue:resetTransaction:)`).
 public struct GestureStateGesture<Child: Gesture, State>: Gesture {
   public typealias Value = Child.Value
   public typealias Body = Never
@@ -195,15 +194,12 @@ extension Gesture {
   /// Threads the gesture's value into a `@GestureState`-backed cell
   /// during the gesture, with automatic reset on gesture end.
   ///
-  /// > Warning: The `inout Transaction` parameter is currently a
-  /// > no-op stand-in. SwiftUI threads the frame's active transaction
-  /// > (from `withAnimation` or the frame scheduler) here so authors
-  /// > can inspect or mutate animation semantics. SwiftTUI does
-  /// > does not yet provide this transaction. The function discards changes to the transaction
-  /// > inside the closure.
-  ///
-  /// Full transaction threading is a future enhancement.
-  /// The function currently discards changes to the transaction inside the closure.
+  /// The `inout Transaction` starts inert on every update — no preset
+  /// animation, `isContinuous` not set (matching SwiftUI, verified
+  /// 2026-08-05). Mutations govern the gesture-state write for that
+  /// update: setting `transaction.animation` animates the during-gesture
+  /// change. The end-of-gesture seed reset is governed separately by the
+  /// `GestureState` reset transaction, when one was authored.
   public func updating<State>(
     _ state: GestureStateBinding<State>,
     body: @escaping @MainActor (Value, inout State, inout Transaction) -> Void

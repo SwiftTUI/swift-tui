@@ -7,6 +7,16 @@ public struct TransactionSnapshot: Equatable, Sendable {
   /// controller can fire a single completion closure once the whole
   /// batch has settled.
   package var animationBatchID: AnimationBatchID? = nil
+  /// Whether the transaction reports a continuous or fluid update, e.g.
+  /// one of a stream of during-gesture writes. Authored transforms and
+  /// scoped writes set it; resolve-time transforms read it. It carries no
+  /// animation intent of its own — a continuity-only transaction is not
+  /// animation-explicit (see `AnimationInvalidationSegment.isExplicit`).
+  package var isContinuous: Bool = false
+  /// Custom `TransactionKey` values, keyed by the key type's identity.
+  /// Like `isContinuous`, resolve-side data with no animation intent of
+  /// its own.
+  package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
 
   public init(debugSignature: String = "") {
     self.debugSignature = debugSignature
@@ -15,9 +25,14 @@ public struct TransactionSnapshot: Equatable, Sendable {
   /// Returns `true` when two snapshots carry equivalent resolve-time intent.
   ///
   /// Unlike `==`, this ignores debug-only fields such as `debugSignature`
-  /// that would otherwise defeat retained resolve reuse.
+  /// that would otherwise defeat retained resolve reuse. `isContinuous`
+  /// participates: a `.transaction` transform reads it at resolve, so a
+  /// reused subtree would otherwise observe a stale value. Continuity flips
+  /// are rare (gesture start and end), costing two denials per gesture.
   package func isReuseEquivalent(to other: Self) -> Bool {
     animationRequest == other.animationRequest
       && animationBatchID == other.animationBatchID
+      && isContinuous == other.isContinuous
+      && customValues == other.customValues
   }
 }

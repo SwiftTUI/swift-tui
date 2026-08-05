@@ -24,6 +24,17 @@ public struct Binding<Value> {
   /// those consumers with no distinction, preserving prior behavior.
   package var bindingSourceID: AnyID?
 
+  /// The transaction applied to writes made through this binding.
+  ///
+  /// Verified against real SwiftUI (2026-08-05): an explicit ambient scope —
+  /// a surrounding `withAnimation(_:_:)` or `withTransaction(_:_:)` — wins
+  /// over the stored transaction, including a stored `disablesAnimations`
+  /// losing to an ambient animation. The stored transaction governs only
+  /// writes made outside any explicit scope, which is exactly how every
+  /// built-in control writes (`Toggle`, `Slider`, `Stepper`, text input all
+  /// set `wrappedValue` with no animation context of their own).
+  public var transaction: Transaction = Transaction()
+
   package init(
     mainActorGet getter: @escaping @MainActor @Sendable () -> Value,
     set setter: @escaping @MainActor @Sendable (Value) -> Void
@@ -49,14 +60,117 @@ public struct Binding<Value> {
     self.setter = set
   }
 
+  /// Creates a binding from another binding's projected value.
+  ///
+  /// Enables `@Binding var value` declarations to be initialized directly
+  /// from an existing binding: `SomeView(value: $source)` forwarding into
+  /// `Binding(projectedValue:)`. The copy carries the source's stored
+  /// ``transaction``.
+  public init(projectedValue: Binding<Value>) {
+    self = projectedValue
+  }
+
+  /// Creates a binding by unwrapping an optional base, failing when the
+  /// base value is currently nil.
+  ///
+  /// Reads through the returned binding trap with a diagnostic once the
+  /// base has become nil — the same read traps in SwiftUI (verified
+  /// 2026-08-05). Author the optional check at the *reading* view, not
+  /// above it: an unwrap performed high in the tree attributes the
+  /// binding read to the high resolve and widens the invalidation cone
+  /// (see the reader-attribution note on the presentation trigger leaf).
+  @MainActor
+  public init?(_ base: Binding<Value?>) {
+    guard base.wrappedValue != nil else {
+      return nil
+    }
+    self.init(
+      mainActorGet: {
+        guard let value = base.wrappedValue else {
+          fatalError(
+            """
+            Binding<\(Value.self)> was read after its optional base became \
+            nil. An unwrapping binding (Binding.init?(_:)) is only valid \
+            while the base holds a value — re-derive it inside the view \
+            that checks the optional instead of retaining it across the \
+            value's lifetime.
+            """
+          )
+        }
+        return value
+      },
+      set: { base.wrappedValue = $0 }
+    )
+    self.transaction = base.transaction
+    self.bindingSourceID = base.bindingSourceID
+  }
+
+  /// Creates a binding that projects a non-optional base as an optional
+  /// value.
+  ///
+  /// Writing nil through the projection is ignored — the base keeps its
+  /// current value (matches SwiftUI, verified 2026-08-05).
+  @MainActor
+  public init<V>(_ base: Binding<V>) where Value == V? {
+    self.init(
+      mainActorGet: { base.wrappedValue },
+      set: { newValue in
+        guard let newValue else {
+          return
+        }
+        base.wrappedValue = newValue
+      }
+    )
+    self.transaction = base.transaction
+    self.bindingSourceID = base.bindingSourceID
+  }
+
   @MainActor
   public var wrappedValue: Value {
     get { getter() }
-    nonmutating set { setter(newValue) }
+    nonmutating set {
+      guard shouldApplyStoredTransaction else {
+        setter(newValue)
+        return
+      }
+      withTransaction(transaction) { setter(newValue) }
+    }
+  }
+
+  /// Whether this write should run inside the stored transaction: the
+  /// stored transaction must carry intent, and no explicit ambient scope
+  /// may be active — an active `withAnimation`/`withTransaction` (or a
+  /// completion batch) wins over the stored transaction (SwiftUI probe,
+  /// 2026-08-05).
+  @MainActor
+  private var shouldApplyStoredTransaction: Bool {
+    guard !transaction.isInert else {
+      return false
+    }
+    return AnimationContextStorage.currentRequest == .inherit
+      && AnimationContextStorage.currentBatchID == nil
   }
 
   public var projectedValue: Self {
     self
+  }
+
+  /// Returns a binding that applies `animation` to writes made through it.
+  ///
+  /// Passing `nil` disables animation for those writes, mirroring
+  /// ``Transaction/animation``'s nil-means-disabled contract.
+  public func animation(_ animation: Animation? = .default) -> Binding<Value> {
+    var copy = self
+    copy.transaction.animation = animation
+    return copy
+  }
+
+  /// Returns a binding that applies `transaction` to writes made through
+  /// it.
+  public func transaction(_ transaction: Transaction) -> Binding<Value> {
+    var copy = self
+    copy.transaction = transaction
+    return copy
   }
 
   /// Returns a read-only binding that ignores writes.
@@ -72,10 +186,18 @@ public struct Binding<Value> {
   public subscript<Member>(
     dynamicMember keyPath: WritableKeyPath<Value, Member>
   ) -> Binding<Member> {
-    Binding<Member>(
+    // The member projection carries the stored transaction (SwiftUI
+    // propagates it), so reading `.transaction` off a member binding stays
+    // truthful. The write path would apply it either way: the member setter
+    // funnels through this binding's `wrappedValue` setter. The source
+    // token deliberately does NOT propagate — pre-existing behavior;
+    // consumers key momentum retirement on the *whole-value* binding.
+    var projected = Binding<Member>(
       mainActorGet: { wrappedValue[keyPath: keyPath] },
       set: { wrappedValue[keyPath: keyPath] = $0 }
     )
+    projected.transaction = transaction
+    return projected
   }
 }
 

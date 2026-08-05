@@ -617,9 +617,14 @@ package final class ViewNode {
         animationAware.requestInvalidation(
           of: invalidationIdentities,
           animation: animationRequest,
-          batchID: batchID
+          batchID: batchID,
+          isContinuous: AnimationContextStorage.currentIsContinuous,
+          customValues: AnimationContextStorage.currentCustomValues
         )
       } else {
+        // A continuity-only scope takes this branch on purpose: with no
+        // animation intent the segment would be non-explicit and dropped
+        // at append, so there is nothing for the flag to ride.
         invalidator?.requestInvalidation(of: invalidationIdentities)
       }
     }

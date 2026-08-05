@@ -30,4 +30,34 @@ struct TransactionSnapshotTests {
 
     #expect(!unbatched.isReuseEquivalent(to: batched))
   }
+
+  @Test("isContinuous affects retained reuse equivalence")
+  func isContinuousAffectsReuseEquivalence() {
+    // A resolve-time reader (a `.transaction` transform) observes the flag,
+    // so serving a stale value under subtree reuse would be a correctness
+    // bug, not a performance choice. Continuity flips are rare (gesture
+    // start and end), so the reuse cost is two denials per gesture.
+    let discrete = TransactionSnapshot()
+    var continuous = TransactionSnapshot()
+    continuous.isContinuous = true
+
+    #expect(!discrete.isReuseEquivalent(to: continuous))
+  }
+
+  @Test("a frame plan's segment selection carries isContinuous")
+  func planSegmentSelectionCarriesIsContinuous() {
+    let identity = Identity(components: ["root", "leaf"])
+    var segment = AnimationInvalidationSegment(
+      identities: [identity],
+      animationRequest: .disabled
+    )
+    segment.isContinuous = true
+    let plan = FrameAnimationTransactionPlan(
+      base: TransactionSnapshot(),
+      segments: [segment]
+    )
+
+    #expect(plan.transaction(for: identity).isContinuous)
+    #expect(!plan.transaction(for: Identity(components: ["root"])).isContinuous)
+  }
 }

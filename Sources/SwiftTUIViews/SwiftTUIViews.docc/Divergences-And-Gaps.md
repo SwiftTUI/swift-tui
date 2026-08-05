@@ -115,11 +115,11 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`Binding.init(get:set:)` takes `@MainActor` closures.** *Ratified.*
   SwiftUI's accessors carry no isolation annotation. This is downstream of the
   framework itself using strict, unsuppressed concurrency.
-- **No `Binding` projections.** *Gap.* `Binding.animation(_:)`,
-  `Binding.transaction(_:)`, and `Binding.init?(_:)` (optional unwrapping) are
-  absent.
 - **Equal-value `State` writes are inert.** *Provisional.* Writing a value
-  equal to the current one does not invalidate the owner.
+  equal to the current one does not invalidate the owner. A
+  `Binding.animation(_:)` write of an unchanged value consequently animates
+  nothing — the write short-circuits before the transaction is read, which
+  matches SwiftUI's observable behavior.
 - **`DynamicProperty.update()` runs on a copy.** *Ratified.* SwiftUI mutates
   a working copy of the view value before body evaluation, so an `update()`
   mutation to a plain stored property is visible to that one body there
@@ -414,8 +414,6 @@ are omitted even when SwiftUI exposes a corresponding API.
   over a spared subtree is not retro-applied until that subtree re-resolves,
   and the mask governs gesture recognizers, not hover handlers or control
   activation.
-- **`Gesture.updating(_:body:)` receives a stand-in `Transaction`.** *Gap.*
-  The `inout Transaction` parameter is a no-op; mutations are discarded.
 - **`DragGesture.Value` and `SpatialTapGesture.Value` carry extra fields.**
   *Ratified.* Drag values add pointer provenance and the sampled `path` for
   the current gesture (with a documented lifetime); spatial tap values add a
@@ -471,8 +469,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   `VectorArithmetic` with truncate-toward-zero scaling, so a delta of one
   jumps at the end of the curve. Terminal cell coordinates are
   integer-quantized; callers needing sub-cell precision use `Double`.
-- **`Transaction` exposes only animation intent.** *Gap.* Other SwiftUI
-  transaction fields are not exposed.
+- **`Transaction` residue: `tracksVelocity` absent, completion criteria
+  inert, `TransactionKey.Value` narrowed.** *Gap / Ratified mix.*
+  `Transaction` carries animation intent, `disablesAnimations`,
+  `isContinuous`, and custom `TransactionKey` values. `tracksVelocity` is
+  not built (*Gap*). `AnimationCompletionCriteria` is accepted but the
+  controller treats `.logicallyComplete` and `.removed` identically
+  (*Gap*). `TransactionKey.Value` requires `Hashable & Sendable` where
+  SwiftUI leaves the associated type unconstrained (*Ratified* — the
+  environment-`Sendable` narrowing precedent; values cross the off-main
+  frame tail and participate in reuse comparisons). `isContinuous` is
+  author-facing metadata: the framework neither sets nor consumes it yet,
+  and a SwiftUI probe (2026-08-05) showed SwiftUI does not auto-set it on
+  drag updates either.
 - **The transition effect palette is opacity and offset.** *Gap.* Other
   modifiers inside a custom `Transition.body` are silently ignored, and there
   is no built-in `.scale` transition; `TransitionContent` is an inert probe

@@ -79,6 +79,22 @@ public func withTransaction<Result>(
   _ transaction: Transaction,
   _ body: () throws -> Result
 ) rethrows -> Result {
+  // Continuity and custom key values are scoped for every request shape
+  // so state writes inside `body` can thread them onto their invalidation
+  // segments. A metadata-only transaction (request `.inherit`) still
+  // passes the enclosing scope's animation intent through untouched.
+  try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
+    try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
+      try withTransactionRequestScope(transaction, body)
+    }
+  }
+}
+
+@MainActor
+private func withTransactionRequestScope<Result>(
+  _ transaction: Transaction,
+  _ body: () throws -> Result
+) rethrows -> Result {
   switch transaction.request {
   case .inherit:
     return try body()

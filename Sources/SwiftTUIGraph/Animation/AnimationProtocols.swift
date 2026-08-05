@@ -84,7 +84,9 @@ package protocol AnimationAwareInvalidating: Invalidating {
   func requestInvalidation(
     of identities: Set<Identity>,
     animation: AnimationRequest,
-    batchID: AnimationBatchID?
+    batchID: AnimationBatchID?,
+    isContinuous: Bool,
+    customValues: [ObjectIdentifier: AnyHashableSendable]
   )
 }
 
@@ -94,7 +96,29 @@ extension AnimationAwareInvalidating {
     of identities: Set<Identity>,
     animation: AnimationRequest
   ) {
-    requestInvalidation(of: identities, animation: animation, batchID: nil)
+    requestInvalidation(
+      of: identities,
+      animation: animation,
+      batchID: nil,
+      isContinuous: false,
+      customValues: [:]
+    )
+  }
+
+  /// Back-compat shim for call sites that do not carry the transaction
+  /// metadata fields.
+  package func requestInvalidation(
+    of identities: Set<Identity>,
+    animation: AnimationRequest,
+    batchID: AnimationBatchID?
+  ) {
+    requestInvalidation(
+      of: identities,
+      animation: animation,
+      batchID: batchID,
+      isContinuous: false,
+      customValues: [:]
+    )
   }
 }
 

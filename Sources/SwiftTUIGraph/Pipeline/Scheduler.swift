@@ -578,7 +578,9 @@ extension FrameScheduler: AnimationAwareInvalidating {
   package func requestInvalidation(
     of identities: Set<Identity>,
     animation: AnimationRequest,
-    batchID: AnimationBatchID?
+    batchID: AnimationBatchID?,
+    isContinuous: Bool,
+    customValues: [ObjectIdentifier: AnyHashableSendable]
   ) {
     coalescingLock.withLock { state in
       state.pendingCauses.insert(.invalidation)
@@ -588,7 +590,9 @@ extension FrameScheduler: AnimationAwareInvalidating {
         AnimationInvalidationSegment(
           identities: identities,
           animationRequest: animation,
-          animationBatchID: batchID
+          animationBatchID: batchID,
+          isContinuous: isContinuous,
+          customValues: customValues
         ),
         to: &state.pendingAnimationSegments
       )

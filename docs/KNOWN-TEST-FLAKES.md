@@ -487,7 +487,11 @@ no new presented frames for the whole idle window.
 **Where it surfaces.** Only the `TermUIPerf Tests` workflow's
 `ubuntu-24.04` (amd64) runners: 4/4 failures since the 2026-07-12 scheduled
 run (which ran on the pre-Charts-migration baseline, so the flip predates
-that migration). The identical suite passes on macOS arm64. It also passes in
+that migration). The identical suite passes on macOS arm64 in isolation.
+2026-08-05: one firing observed on macOS arm64 *inside a full local repo
+gate* (parallel-lane load); the same gate's previous run and an immediate
+isolated rerun both passed 4/4 — treat a single in-gate firing on a loaded
+arm64 host as this entry, not a new regression. It also passes in
 the arm64-native Linux container (`swiftly run swift test --package-path
 Tools/TermUIPerf` inside the linux-gate image), including after the 2026-07-13
 progress-gated-deadline hardening. Thus, this runner class has a genuine

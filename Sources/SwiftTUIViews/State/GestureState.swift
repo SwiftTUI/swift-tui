@@ -29,11 +29,28 @@ public final class GestureStateBox<Value> {
   private let seed: Value
   private var localValue: Value
   private var boundLocationsByOwner: [StateStorageOwner: BoundLocation] = [:]
+  /// Builds the transaction governing a genuine end-of-gesture reset from
+  /// the value being reset. Nil for the plain initializers — their resets
+  /// snap. Resolve-time resets (recognizer teardown, registry drain) never
+  /// consult it; see ``resetToSeedApplyingResetTransaction()``.
+  private let resetTransactionProvider: (@MainActor (Value) -> Transaction)?
 
   public init(seed: Value, slotOrdinal: Int) {
     self.seed = seed
     self.localValue = seed
     self.slotOrdinal = slotOrdinal
+    self.resetTransactionProvider = nil
+  }
+
+  package init(
+    seed: Value,
+    slotOrdinal: Int,
+    resetTransactionProvider: (@MainActor (Value) -> Transaction)?
+  ) {
+    self.seed = seed
+    self.localValue = seed
+    self.slotOrdinal = slotOrdinal
+    self.resetTransactionProvider = resetTransactionProvider
   }
 
   deinit {
@@ -64,10 +81,29 @@ public final class GestureStateBox<Value> {
     }
   }
 
-  /// Resets to the initial seed. Used by the recognizer on gesture end
-  /// and by the registry on subtree teardown.
+  /// Resets to the initial seed with no transaction applied. Used by
+  /// resolve-time paths — recognizer teardown on replacement and the
+  /// registry's subtree drain — which must never animate: `.gesture(_:)`
+  /// rebuilds recognizers during resolve, so a scoped reset here would
+  /// animate structural churn.
   public func resetToSeed() {
     setValue(seed)
+  }
+
+  /// Resets to the initial seed inside the authored reset transaction,
+  /// when one exists. Only the genuine end-of-gesture paths call this —
+  /// the terminal-phase and deadline resets in `UpdatingDecorator`.
+  /// SwiftUI probe (2026-08-05): the reset transaction alone governs the
+  /// reset; a body-mutated transaction does not carry over to it.
+  package func resetToSeedApplyingResetTransaction() {
+    guard let resetTransactionProvider else {
+      resetToSeed()
+      return
+    }
+    let transaction = resetTransactionProvider(currentValue())
+    withTransaction(transaction) {
+      setValue(seed)
+    }
   }
 
   fileprivate func remember(
@@ -226,6 +262,75 @@ public struct GestureState<Value> {
     box = GestureStateBox(
       seed: initialValue,
       slotOrdinal: StateSlotOrdinals.authored(line: line, column: column)
+    )
+  }
+
+  /// Creates gesture state whose end-of-gesture reset applies
+  /// `resetTransaction` — typically an animation for the snap-back.
+  /// Resolve-time resets (recognizer teardown, subtree removal) stay
+  /// un-animated regardless.
+  public init(
+    wrappedValue: Value,
+    resetTransaction: Transaction,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = GestureStateBox(
+      seed: wrappedValue,
+      slotOrdinal: StateSlotOrdinals.authored(line: line, column: column),
+      resetTransactionProvider: { _ in resetTransaction }
+    )
+  }
+
+  /// `init(wrappedValue:resetTransaction:)` under its explicit-value label.
+  public init(
+    initialValue: Value,
+    resetTransaction: Transaction,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = GestureStateBox(
+      seed: initialValue,
+      slotOrdinal: StateSlotOrdinals.authored(line: line, column: column),
+      resetTransactionProvider: { _ in resetTransaction }
+    )
+  }
+
+  /// Creates gesture state whose end-of-gesture reset consults `reset`:
+  /// the closure receives the value being reset and can mutate the
+  /// transaction that will govern the seed write.
+  public init(
+    wrappedValue: Value,
+    reset: @escaping @MainActor (Value, inout Transaction) -> Void,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = GestureStateBox(
+      seed: wrappedValue,
+      slotOrdinal: StateSlotOrdinals.authored(line: line, column: column),
+      resetTransactionProvider: { value in
+        var transaction = Transaction()
+        reset(value, &transaction)
+        return transaction
+      }
+    )
+  }
+
+  /// `init(wrappedValue:reset:)` under its explicit-value label.
+  public init(
+    initialValue: Value,
+    reset: @escaping @MainActor (Value, inout Transaction) -> Void,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = GestureStateBox(
+      seed: initialValue,
+      slotOrdinal: StateSlotOrdinals.authored(line: line, column: column),
+      resetTransactionProvider: { value in
+        var transaction = Transaction()
+        reset(value, &transaction)
+        return transaction
+      }
     )
   }
 

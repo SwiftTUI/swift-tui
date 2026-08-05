@@ -251,20 +251,28 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     if disposition == .handled,
       let value: V = inner.currentValue(as: V.self)
     {
+      // The body's transaction is real: edits govern the during-gesture
+      // write below. It arrives inert — SwiftUI hands drag updating
+      // bodies no preset animation and does not auto-set `isContinuous`
+      // (probe 2026-08-05). The end-of-gesture reset is governed solely
+      // by `GestureState`'s reset transaction, so nothing here is stored
+      // across calls.
+      var transaction = Transaction()
       let nextState = withImperativeAuthoringContext(authoringContext) { () -> S in
         var state = box.currentValue()
-        var transaction = Transaction()
         updater(value, &state, &transaction)
         return state
       }
       withImperativeAuthoringContext(authoringContext) {
-        box.setValue(nextState)
+        withTransaction(transaction) {
+          box.setValue(nextState)
+        }
       }
       didFire = true
     }
     if inner.phase.isTerminal, didFire {
       withImperativeAuthoringContext(authoringContext) {
-        box.resetToSeed()
+        box.resetToSeedApplyingResetTransaction()
       }
       didFire = false
     }
@@ -275,7 +283,7 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     let didTerminate = inner.handleDeadline(at: instant)
     if didTerminate, didFire {
       withImperativeAuthoringContext(authoringContext) {
-        box.resetToSeed()
+        box.resetToSeedApplyingResetTransaction()
       }
       didFire = false
     }
@@ -287,6 +295,9 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   func tearDown() {
     inner.tearDown()
     if didFire {
+      // Resolve-time recognizer replacement must not animate: tearDown
+      // runs whenever `.gesture(_:)` swaps recognizers during a resolve,
+      // so this reset stays outside the authored reset transaction.
       box.resetToSeed()
       didFire = false
     }

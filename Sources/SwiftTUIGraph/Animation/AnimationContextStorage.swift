@@ -11,6 +11,13 @@ package enum AnimationContextStorage {
   /// it alongside the animation request so every animation in the same
   /// batch can be resolved to a single completion closure.
   @TaskLocal package static var currentBatchID: AnimationBatchID? = nil
+  /// Continuity metadata scoped by `withTransaction` (View module).
+  /// State writes thread it onto their invalidation segment so
+  /// resolve-time transforms below the written subtree can observe it.
+  @TaskLocal package static var currentIsContinuous: Bool = false
+  /// Custom `TransactionKey` values scoped by `withTransaction` (View
+  /// module), threaded onto invalidation segments like `currentIsContinuous`.
+  @TaskLocal package static var currentCustomValues: [ObjectIdentifier: AnyHashableSendable] = [:]
 }
 
 /// Sink used by the View-layer `withAnimation` to register completion
