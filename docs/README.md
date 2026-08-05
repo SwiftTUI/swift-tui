@@ -16,7 +16,7 @@ flowchart TD
     README["README.md<br/>(this index)"]
     GUIDE["CODEBASE-GUIDE.md<br/>onboarding: map + flows"]
     VISION["VISION.md<br/>what SwiftTUI is for"]
-    GAP["VISION-GAP.md<br/>code vs. intent"]
+    GAP["Divergences-And-Gaps (DocC)<br/>divergence + gap register"]
     ARCH["ARCHITECTURE.md<br/>modules, products, layout"]
     SPLIT["REPOSITORY-SPLIT.md<br/>repository ownership"]
     PIPE["RENDER-PIPELINE.md<br/>internal DocC pointer"]
@@ -53,7 +53,7 @@ flowchart TD
 | --- | --- |
 | [CODEBASE-GUIDE.md](CODEBASE-GUIDE.md) | **Start here for new engineers.** A horizontal map (the module graph and a "where does X live?" subsystem table) plus vertical end-to-end traces (the interaction→update loop, app bootstrap & run-loop lifecycle, and host handoff). Complements the per-frame render-pipeline article rather than duplicating it. |
 | [VISION.md](VISION.md) | What SwiftTUI is for, its design principles, and what is deliberately in and out of scope. |
-| [VISION-GAP.md](VISION-GAP.md) | The concrete differences between the code at `HEAD` and the project's stated intent. The single gap register for the documentation. |
+| [Divergences and gaps](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md) | The single divergence-and-gap register (a DocC article): where the public API departs from SwiftUI and where the code at `HEAD` falls short of the API shape or the project's stated intent. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, products, the dependency graph, source layout, layout model, and a glossary. The starting point for understanding the codebase. |
 | [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md) | Repository ownership, release boundaries, and public documentation invariants. |
 | [RENDER-PIPELINE.md](RENDER-PIPELINE.md) | Internal compatibility pointer to the DocC render pipeline guides. |

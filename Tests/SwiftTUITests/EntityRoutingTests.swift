@@ -221,7 +221,7 @@ struct EntityRoutingTests {
     // distinct runtime lifetimes. `ViewGraph.nodeForIdentity` is
     // occurrence-aware: a duplicate-occurrence sibling no longer adopts or
     // evicts the primary's node, so both elements coexist as separate
-    // `ViewNode`s. See `swift-tui/docs/VISION-GAP.md` ("Duplicate explicit ids").
+    // `ViewNode`s.
     #expect(elementNodeIDs.count == 2)
   }
 

@@ -86,6 +86,6 @@ The near-term direction is stabilizing the public surface toward a `0.9.0`
 public beta and then `1.0.0`. The project does not document speculative
 roadmaps here.
 
-[VISION-GAP.md](VISION-GAP.md) tracks the current distance between this vision
-and the shipped code. It keeps future goals out of the rest of the
-documentation.
+The [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md)
+tracks the current distance between this vision and the shipped code. It keeps
+future goals out of the rest of the documentation.

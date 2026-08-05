@@ -61,7 +61,7 @@ flowchart TD
 The runtime-to-native-assistive-technology direction is one-way: VoiceOver- or
 TalkBack-originated focus traversal is not yet fed back into SwiftTUI's runtime
 focus. That gap, and the absence of a WCAG conformance suite, are tracked in
-[VISION-GAP.md](VISION-GAP.md).
+the [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 
 The manual screen-reader listening review protocol lives in
 `Tests/SwiftTUITests/Accessibility/README.md`.

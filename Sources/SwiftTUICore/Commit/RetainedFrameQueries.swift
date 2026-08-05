@@ -110,8 +110,10 @@ package struct RetainedFrameIndex: Sendable {
   /// performs a full rebuild (`init(frame:)`), so `previous` is unused except by
   /// the debug check below. Measurement shows retained-index construction is a
   /// sub-1% slice of frame time (off the critical path; `resolve_ms` dominates),
-  /// so the incremental patcher was not worth its complexity — see
-  /// `docs/VISION-GAP.md` (Structural identity). Until a real patch path lands,
+  /// so the incremental patcher was not worth its complexity — see the
+  /// divergence and gap register
+  /// (`Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md`,
+  /// "Runtime and pipeline internals"). Until a real patch path lands,
   /// the `#if DEBUG` byte-equivalence check compares two full rebuilds and is
   /// therefore inert; it is retained as the oracle scaffold that becomes
   /// meaningful the moment the patched and rebuilt indexes can differ.

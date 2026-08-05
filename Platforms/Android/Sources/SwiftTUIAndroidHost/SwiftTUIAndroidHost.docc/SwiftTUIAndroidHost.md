@@ -66,7 +66,8 @@ Frame bytes stay cached until the client consumes a newer sequence.
 The Android render poll also drives the Swift main-actor executor so ready
 runtime continuations, tasks, and animation wakes make progress on the host
 main thread. Current behavior gaps are contributor-facing and tracked in the
-repository's `docs/VISION-GAP.md` gap register, not here.
+repository's divergence and gap register
+(`Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md`), not here.
 
 ## Topics
 

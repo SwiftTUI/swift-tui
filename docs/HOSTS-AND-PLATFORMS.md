@@ -37,11 +37,11 @@ boundaries are recorded in [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md).
   does, to skip the Apple platform restriction).
 - **Android packaging state.** The current `AndroidGallery` example packages
   arm64 only, although the Swift host cross-compiles for arm64 and x86_64.
-  Android host behavior gaps are tracked in
-  [VISION-GAP.md](VISION-GAP.md#android-host).
+  Android host behavior gaps are tracked in the
+  [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - **Embedding gaps.** Sixel/Kitty graphics inside embedded panes, the Kitty
   keyboard protocol, OSC 99 notification namespacing, and process
-  reattachment after an app restart are not implemented. See
-  [VISION-GAP.md](VISION-GAP.md).
+  reattachment after an app restart are not implemented. See the
+  [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - **CI floors.** GitHub `macos-26` is the macOS CI floor. iOS CI builds
   host-compatible products but does not run tests.
