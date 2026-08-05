@@ -6,6 +6,10 @@ package enum FocusBindingRequest: Equatable, Sendable {
 
 package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible {
   case stateSlot(ordinal: Int)
+  /// A `@FocusState` bound through a discovered dynamic property: the slot
+  /// identity carries the discovery path, so two instances of one composed
+  /// wrapper register distinct focus bindings.
+  case pathQualifiedStateSlot(StateSlotIdentifier)
   case local(ObjectIdentifier)
   case legacy(String)
 
@@ -13,6 +17,8 @@ package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible 
     switch self {
     case .stateSlot(let ordinal):
       "FocusState[\(ordinal)]"
+    case .pathQualifiedStateSlot(let slot):
+      "FocusState[\(slot)]"
     case .local(let identifier):
       "FocusState.local[\(identifier)]"
     case .legacy(let bindingID):

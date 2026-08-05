@@ -1,5 +1,5 @@
 import Observation
-package import SwiftTUICore
+public import SwiftTUICore
 import Synchronization
 
 /// Declares a typed environment value.
@@ -267,6 +267,8 @@ public struct Environment<Value: Sendable> {
     return read(current)
   }
 }
+
+extension Environment: DynamicProperty {}
 
 extension EnvironmentValues {
   package var stackAxis: SwiftTUICore.Axis? {

@@ -1,4 +1,4 @@
-import SwiftTUICore
+public import SwiftTUICore
 
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value
@@ -97,6 +97,7 @@ private final class FocusStateBox<Value: Equatable> {
   private struct Storage {
     var localStorage: FocusStateStorage<Value>
     var boundLocation: FocusStateLocation<Value>?
+    var isBoundLocationPathQualified: Bool
   }
 
   private var storage: Storage
@@ -108,7 +109,8 @@ private final class FocusStateBox<Value: Equatable> {
     self.slotOrdinal = slotOrdinal
     storage = Storage(
       localStorage: .init(value: seedValue),
-      boundLocation: nil
+      boundLocation: nil,
+      isBoundLocationPathQualified: false
     )
   }
 
@@ -131,12 +133,23 @@ private final class FocusStateBox<Value: Equatable> {
     )
   }
 
-  func remember(_ location: FocusStateLocation<Value>) {
+  func remember(
+    _ location: FocusStateLocation<Value>,
+    pathQualified: Bool = false
+  ) {
     storage.boundLocation = location
+    storage.isBoundLocationPathQualified = pathQualified
   }
 
   func currentLocation() -> FocusStateLocation<Value>? {
     storage.boundLocation
+  }
+
+  func currentPathQualifiedLocation() -> FocusStateLocation<Value>? {
+    guard storage.isBoundLocationPathQualified else {
+      return nil
+    }
+    return storage.boundLocation
   }
 
   var currentOrdinal: Int {
@@ -229,6 +242,14 @@ public struct FocusState<Value: Equatable> {
 
   private func activeLocation() -> FocusStateLocation<Value>? {
     if let context = currentAuthoringContext() {
+      // A path-qualified binding made by this evaluation's update pass wins
+      // during resolve — re-making here has no ambient path and would claim
+      // (and prime) the unqualified slot (see `State.activeLocation`).
+      if ViewNodeContext.current != nil,
+        let qualified = box.currentPathQualifiedLocation()
+      {
+        return qualified
+      }
       let location = makeLocation(for: context)
       box.remember(location)
       // Materialize the backing slot (seeded from the local box) without
@@ -242,9 +263,10 @@ public struct FocusState<Value: Equatable> {
   }
 
   private func makeLocation(
-    for context: AuthoringContext
+    for context: AuthoringContext,
+    path: StateSlotPath = .root
   ) -> FocusStateLocation<Value> {
-    let ordinal = box.currentOrdinal
+    let slotIdentifier = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
     let seedSnapshot = box.currentLocalSnapshot()
 
     // Imperative contexts (a `.task` loop, an action callback) carry the
@@ -259,11 +281,25 @@ public struct FocusState<Value: Equatable> {
         stateGraphScope: context.stateGraphScope
       )
     if let viewNode = ownerNode {
+      if ViewNodeContext.current != nil {
+        // Resolve-time claim bookkeeping (see `ViewNode.recordStateSlotClaim`).
+        viewNode.recordStateSlotClaim(
+          slotIdentifier,
+          claimant: ObjectIdentifier(box)
+        )
+      }
       let bindingKey = FocusBindingKey(
         ownerNodeID: viewNode.viewNodeID,
-        suffix: .stateSlot(ordinal: ordinal)
+        suffix: path.isEmpty
+          ? .stateSlot(ordinal: slotIdentifier.ordinal)
+          : .pathQualifiedStateSlot(slotIdentifier)
       )
-      let bindingID = "\(viewNode.identity.path)#FocusState[\(ordinal)]"
+      // The unqualified spelling stays byte-identical to the legacy format;
+      // only path-qualified bindings extend it.
+      let bindingID =
+        path.isEmpty
+        ? "\(viewNode.identity.path)#FocusState[\(slotIdentifier.ordinal)]"
+        : "\(viewNode.identity.path)#FocusState[\(slotIdentifier)]"
       // Resolve the slot storage at CALL time, not capture time: a location's
       // closures outlive the body evaluation that created them (focus-binding
       // registrations are restored across selective frames), while commit-time
@@ -291,7 +327,7 @@ public struct FocusState<Value: Equatable> {
             identity: liveStorageIdentity
           ) ?? viewNode
         return liveViewNode.primedStateSlot(
-          ordinal: ordinal,
+          slotIdentifier,
           seed: FocusStateStorage(
             value: seedValue,
             hasPendingRequest: seedHasPendingRequest,
@@ -299,7 +335,7 @@ public struct FocusState<Value: Equatable> {
           )
         )
       }
-      let readKey = StateSlotKey(owner: viewNode.viewNodeID, ordinal: ordinal)
+      let readKey = StateSlotKey(owner: viewNode.viewNodeID, slot: slotIdentifier)
 
       return FocusStateLocation(
         bindingKey: bindingKey,
@@ -339,7 +375,7 @@ public struct FocusState<Value: Equatable> {
             // plus the slot's recorded value readers — not the owner's
             // whole identity cone.
             viewNode.invalidateStateSlotReadersForRuntimeChange(
-              ordinal: ordinal,
+              slotIdentifier,
               registrationScope: registrationIdentity
             )
           }
@@ -422,6 +458,28 @@ extension FocusState.Binding {
       observedRequestGeneration,
       registrationIdentity
     )
+  }
+}
+
+extension FocusState: DynamicProperty {
+  /// Binds the focus slot eagerly under the discovered-property path when
+  /// the update pass reached this wrapper through a composed dynamic
+  /// property (see `State.update()`). Top-level wrappers keep lazy binding
+  /// and their exact `FocusBindingKey`.
+  public mutating func update() {
+    let path = DynamicPropertyPathScope.current
+    guard !path.isEmpty else {
+      return
+    }
+    guard
+      ViewNodeContext.current != nil,
+      let context = currentAuthoringContext()
+    else {
+      return
+    }
+    let location = makeLocation(for: context, path: path)
+    box.remember(location, pathQualified: true)
+    location.prime()
   }
 }
 

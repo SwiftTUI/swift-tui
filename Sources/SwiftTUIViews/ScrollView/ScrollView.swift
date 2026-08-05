@@ -39,8 +39,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
-    return withAuthoringContext(dynamicPropertyScope) {
+    return withDynamicPropertyUpdateScope(self, for: context) {
       let indicatorVisibility = effectiveIndicatorVisibility(
         environment: context.environmentValues.scrollIndicatorVisibility
       )

@@ -32,6 +32,7 @@ and its soundness oracles.
 ### Reconciliation
 
 - <doc:Reuse-and-Invalidation>
+- ``DynamicProperty``
 
 ### Preferences And Anchors
 

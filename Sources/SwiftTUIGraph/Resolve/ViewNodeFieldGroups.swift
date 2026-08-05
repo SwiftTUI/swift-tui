@@ -114,7 +114,7 @@ extension ViewNode {
   /// nonisolated.
   @MainActor
   package struct PersistentState {
-    package var stateSlots: [Int: AnyStateSlot] = [:]
+    package var stateSlots: [StateSlotIdentifier: AnyStateSlot] = [:]
     package var dependencies: DependencySet = .init()
     package var lifecycleState: NodeLifecycleState = .alive
     package var registeredHandlers: NodeHandlers = .init()

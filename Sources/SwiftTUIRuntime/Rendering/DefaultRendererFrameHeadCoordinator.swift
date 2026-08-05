@@ -113,6 +113,12 @@ struct DefaultRendererFrameHeadCoordinator {
       resolveInputs: resolveInputs,
       resolved: resolvedHead.resolved
     )
+    // Merge resolve-authored graph-buffered issues (duplicate-slot-claim
+    // warnings) into the frame's issue channel; every downstream diagnostics
+    // assembly reads `layoutPassContext.runtimeIssues`.
+    for issue in viewGraph.frameRuntimeIssues {
+      frameProducts.frameTailInput.layoutPassContext.recordRuntimeIssue(issue)
+    }
     let checkpoints = preparedCheckpoints(
       for: mode,
       graphDraft: graphDraft,

@@ -17,10 +17,18 @@ private struct GestureStateLocation<Value> {
 /// A local fallback value supports tests and reads during construction.
 @MainActor
 public final class GestureStateBox<Value> {
+  /// A remembered location plus how it was bound; a path-qualified binding
+  /// (made by the dynamic-property update pass) wins over access-time
+  /// re-binding, which has no ambient path (see `StateBox.BoundLocation`).
+  private struct BoundLocation {
+    var location: GestureStateLocation<Value>
+    var isPathQualified: Bool
+  }
+
   public let slotOrdinal: Int
   private let seed: Value
   private var localValue: Value
-  private var boundLocationsByOwner: [StateStorageOwner: GestureStateLocation<Value>] = [:]
+  private var boundLocationsByOwner: [StateStorageOwner: BoundLocation] = [:]
 
   public init(seed: Value, slotOrdinal: Int) {
     self.seed = seed
@@ -64,9 +72,13 @@ public final class GestureStateBox<Value> {
 
   fileprivate func remember(
     _ location: GestureStateLocation<Value>,
-    for owner: StateStorageOwner
+    for owner: StateStorageOwner,
+    pathQualified: Bool = false
   ) {
-    boundLocationsByOwner[owner] = location
+    boundLocationsByOwner[owner] = BoundLocation(
+      location: location,
+      isPathQualified: pathQualified
+    )
     if let graphID = owner.graphScope {
       GestureStateGraphBindingRegistry.shared.remember(
         owner,
@@ -79,7 +91,16 @@ public final class GestureStateBox<Value> {
   fileprivate func rememberedLocation(
     for owner: StateStorageOwner
   ) -> GestureStateLocation<Value>? {
-    boundLocationsByOwner[owner]
+    boundLocationsByOwner[owner]?.location
+  }
+
+  fileprivate func rememberedPathQualifiedLocation(
+    for owner: StateStorageOwner
+  ) -> GestureStateLocation<Value>? {
+    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
+      return nil
+    }
+    return bound.location
   }
 
   fileprivate func currentLocation(
@@ -93,7 +114,7 @@ public final class GestureStateBox<Value> {
     else {
       return nil
     }
-    return boundLocationsByOwner[owner]
+    return boundLocationsByOwner[owner]?.location
   }
 
   private func scopedLocation() -> GestureStateLocation<Value>? {
@@ -238,6 +259,12 @@ public struct GestureState<Value> {
     }
 
     if ViewNodeContext.current != nil {
+      // A path-qualified binding made by this evaluation's update pass wins
+      // during resolve (see `State.activeLocation`).
+      if let qualified = box.rememberedPathQualifiedLocation(for: storageOwner) {
+        _ = qualified.getValue()  // triggers dependency tracking
+        return qualified
+      }
       let location = makeLocation(for: context)
       box.remember(
         location,
@@ -257,9 +284,10 @@ public struct GestureState<Value> {
   }
 
   private func makeLocation(
-    for context: AuthoringContext
+    for context: AuthoringContext,
+    path: StateSlotPath = .root
   ) -> GestureStateLocation<Value> {
-    let ordinal = box.slotOrdinal
+    let slotIdentifier = StateSlotIdentifier(ordinal: box.slotOrdinal, path: path)
     // Capture the true initial seed, not the current runtime value,
     // so resetToSeed always targets the construction-time value.
     let trueSeed = box.seedValue
@@ -271,6 +299,14 @@ public struct GestureState<Value> {
         getValue: { [weak box] in box?.currentValue() ?? trueSeed },
         setValue: { [weak box] newValue in box?.setValue(newValue) },
         resetToSeed: { [weak box] in box?.setValue(trueSeed) }
+      )
+    }
+
+    if ViewNodeContext.current != nil {
+      // Resolve-time claim bookkeeping (see `ViewNode.recordStateSlotClaim`).
+      viewNode.recordStateSlotClaim(
+        slotIdentifier,
+        claimant: ObjectIdentifier(box)
       )
     }
 
@@ -292,7 +328,7 @@ public struct GestureState<Value> {
             registeredOwner: viewNode.viewNodeID,
             identity: invalidationIdentity
           ) ?? viewNode
-        return liveViewNode.stateSlot(ordinal: ordinal, seed: trueSeed)
+        return liveViewNode.stateSlot(slotIdentifier, seed: trueSeed)
       },
       setValue: { [weak viewNode, weak box] newValue in
         guard let viewNode else {
@@ -305,7 +341,7 @@ public struct GestureState<Value> {
             identity: invalidationIdentity
           ) ?? viewNode
         liveViewNode.setStateSlot(
-          ordinal: ordinal,
+          slotIdentifier,
           value: newValue,
           invalidationIdentity: invalidationIdentity
         )
@@ -321,11 +357,37 @@ public struct GestureState<Value> {
             identity: invalidationIdentity
           ) ?? viewNode
         liveViewNode.setStateSlot(
-          ordinal: ordinal,
+          slotIdentifier,
           value: trueSeed,
           invalidationIdentity: invalidationIdentity
         )
       }
+    )
+  }
+}
+
+extension GestureState: DynamicProperty {
+  /// Binds the gesture-state slot eagerly under the discovered-property
+  /// path when the update pass reached this wrapper through a composed
+  /// dynamic property (see `State.update()`). Top-level wrappers keep lazy
+  /// binding and their exact slot identity.
+  public mutating func update() {
+    let path = DynamicPropertyPathScope.current
+    guard !path.isEmpty else {
+      return
+    }
+    guard
+      ViewNodeContext.current != nil,
+      let context = AuthoringContextStorage.current,
+      let storageOwner = stateStorageOwner(for: context)
+    else {
+      return
+    }
+    let location = makeLocation(for: context, path: path)
+    box.remember(
+      location,
+      for: storageOwner,
+      pathQualified: true
     )
   }
 }

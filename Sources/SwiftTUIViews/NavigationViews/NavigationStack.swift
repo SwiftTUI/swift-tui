@@ -38,8 +38,7 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Resolvabl
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
-    return withAuthoringContext(dynamicPropertyScope) {
+    return withDynamicPropertyUpdateScope(self, for: context) {
       [resolvedNode(in: context)]
     }
   }

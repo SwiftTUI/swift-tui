@@ -221,6 +221,18 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.workerCustomLayoutCacheUpdates.append(update) }
   }
 
+  /// Records a resolve-authored runtime issue into this frame's issue set —
+  /// the merge channel for graph-buffered issues (`ViewGraph.
+  /// frameRuntimeIssues`) that have no resolved node to ride a preference
+  /// on. Deduplicated like the layout-authored issue sites.
+  package func recordRuntimeIssue(_ issue: RuntimeIssue) {
+    state.withLock { state in
+      if !state.runtimeIssues.contains(issue) {
+        state.runtimeIssues.append(issue)
+      }
+    }
+  }
+
   package func recordPlacedFrame(
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,

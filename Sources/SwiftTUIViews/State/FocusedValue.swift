@@ -180,3 +180,7 @@ public struct FocusedValueWritingModifier<Value: Sendable>: PrimitiveViewModifie
     return [node]
   }
 }
+
+extension FocusedValue: DynamicProperty {}
+
+extension FocusedBinding: DynamicProperty {}

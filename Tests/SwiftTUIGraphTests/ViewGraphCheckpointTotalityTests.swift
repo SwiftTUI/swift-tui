@@ -77,7 +77,11 @@ struct ViewGraphCheckpointTotalityTests {
     // RC-3 `detachedHostedRootsRecordedThisFrame` — transient per-frame liveness
     // signal cleared in `beginFrame`, consumed by the finalize-barrier stale
     // sweep, carrying no state across frames (so deliberately outside the
-    // checkpoint totality contract) — and the `deferredResolveDriver` — the
+    // checkpoint totality contract) — and `frameRuntimeIssues` — the same
+    // transient per-frame class: a diagnostic buffer reset in `beginFrame`
+    // and read only by the same frame's head assembly, so a discarded
+    // draft's leftover entries are unobservable before the next frame
+    // clears them — and the `deferredResolveDriver` — the
     // chunked-resolve worklist, transient within one synchronous resolve
     // pass: its queue is empty and its depth zero at every frame boundary
     // (asserted in `beginFrame`), so no checkpoint can ever observe
@@ -101,7 +105,8 @@ struct ViewGraphCheckpointTotalityTests {
       Set(viewGraphGroupFields)
         == groupPropertyNames.union([
           "root", "nodeCheckpointImageStore", "detachedHostedRootsRecordedThisFrame",
-          "deferredResolveDriver", "debugReachabilityContextBuildCount",
+          "frameRuntimeIssues", "deferredResolveDriver",
+          "debugReachabilityContextBuildCount",
           "debugReuseCacheEvictionFlushCount",
         ])
     )

@@ -6,8 +6,12 @@ extension ViewNode {
   /// and runtime diagnostics. This file holds only the data shape.
   package struct DebugTotalStateSnapshot: Equatable {
     package struct StateSlotSnapshot: Equatable {
-      package var ordinal: Int
+      package var slot: StateSlotIdentifier
       package var storedTypeDescription: String
+
+      package var ordinal: Int {
+        slot.ordinal
+      }
     }
 
     package struct HandlerSnapshot: Equatable {

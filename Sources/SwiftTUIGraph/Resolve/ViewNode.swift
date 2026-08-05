@@ -104,7 +104,7 @@ package final class ViewNode {
     didSet { recordCheckpointMutation() }
   }
 
-  package private(set) var stateSlots: [Int: AnyStateSlot] {
+  package private(set) var stateSlots: [StateSlotIdentifier: AnyStateSlot] {
     get { persistentState.stateSlots }
     set { persistentState.stateSlots = newValue }
   }
@@ -350,6 +350,7 @@ package final class ViewNode {
       nextNavigationDestinationModifierOrdinal = 0
       nextTaskModifierOrdinal = 0
       nextValueAnimationModifierOrdinal = 0
+      stateSlotClaimantsThisEvaluation.removeAll(keepingCapacity: true)
       _ = dependencyTracker.reset()
     }
     evaluationDepth += 1
@@ -455,14 +456,27 @@ package final class ViewNode {
   package func hasStateSlot(
     ordinal: Int
   ) -> Bool {
-    stateSlots[ordinal] != nil
+    hasStateSlot(StateSlotIdentifier(ordinal: ordinal))
+  }
+
+  package func hasStateSlot(
+    _ identifier: StateSlotIdentifier
+  ) -> Bool {
+    stateSlots[identifier] != nil
   }
 
   package func stateSlot<Value>(
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
-    let readKey = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+    stateSlot(StateSlotIdentifier(ordinal: ordinal), seed: seed())
+  }
+
+  package func stateSlot<Value>(
+    _ identifier: StateSlotIdentifier,
+    seed: @autoclosure () -> Value
+  ) -> Value {
+    let readKey = StateSlotKey(owner: viewNodeID, slot: identifier)
     if let reader = ViewNodeContext.current {
       // Reader-attributed: the dependency belongs to the node actually
       // evaluating this read (which may be a descendant consuming a projected
@@ -474,7 +488,40 @@ package final class ViewNode {
       dependencyTracker.recordStateRead(readKey)
     }
 
-    return primedStateSlot(ordinal: ordinal, seed: seed())
+    return primedStateSlot(identifier, seed: seed())
+  }
+
+  /// Per-evaluation record of which storage box claimed each slot identity,
+  /// so a second distinct box claiming an already-claimed slot in one
+  /// evaluation — the silent-sharing signature of composed wrappers that
+  /// bypass the discovery pass — reports a ``RuntimeIssue`` instead of
+  /// nothing. Same-box re-claims (every re-access re-makes the location)
+  /// are the normal path and stay silent.
+  private var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: ObjectIdentifier] = [:]
+
+  package func recordStateSlotClaim(
+    _ identifier: StateSlotIdentifier,
+    claimant: ObjectIdentifier
+  ) {
+    guard let existing = stateSlotClaimantsThisEvaluation[identifier] else {
+      stateSlotClaimantsThisEvaluation[identifier] = claimant
+      return
+    }
+    guard existing != claimant else {
+      return
+    }
+    ownerGraph?.recordFrameRuntimeIssue(
+      RuntimeIssue(
+        severity: .warning,
+        code: "state.duplicateSlotClaim",
+        message:
+          "Two wrapper instances claimed one state slot \(identifier) on "
+          + "\(identity.path.isEmpty ? "$root" : identity.path) in a single evaluation; "
+          + "they silently share storage. Conform the composing wrapper to DynamicProperty "
+          + "so each instance gets path-qualified storage.",
+        identity: identity
+      )
+    )
   }
 
   /// Slot access without read attribution. Runtime plumbing that must reach
@@ -488,16 +535,32 @@ package final class ViewNode {
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
-    var slot = stateSlots[ordinal] ?? .init()
+    primedStateSlot(StateSlotIdentifier(ordinal: ordinal), seed: seed())
+  }
+
+  package func primedStateSlot<Value>(
+    _ identifier: StateSlotIdentifier,
+    seed: @autoclosure () -> Value
+  ) -> Value {
+    var slot = stateSlots[identifier] ?? .init()
     slot.initializeIfNeeded(with: seed())
-    stateSlots[ordinal] = slot
+    stateSlots[identifier] = slot
 
     guard slot.stores(Value.self) else {
-      let slotTypes = stateSlots.keys.sorted().map { index in
-        "\(index):\(stateSlots[index]?.storedTypeDescription ?? "missing")"
-      }.joined(separator: ", ")
+      let slotTypes = stateSlots.keys
+        .sorted { ($0.ordinal, $0.path.description) < ($1.ordinal, $1.path.description) }
+        .map { key in
+          "\(key):\(stateSlots[key]?.storedTypeDescription ?? "missing")"
+        }.joined(separator: ", ")
       fatalError(
-        "State slot type mismatch on node \(identity) ordinal \(ordinal). Expected \(Value.self), found \(slot.storedTypeDescription). Slots: [\(slotTypes)]"
+        """
+        State slot type mismatch on node \(identity) slot \(identifier). \
+        Expected \(Value.self), found \(slot.storedTypeDescription). \
+        Two wrappers with distinct value types are claiming one slot — for a \
+        wrapper composed inside a helper type, conform the helper to \
+        DynamicProperty so each instance gets path-qualified storage. \
+        Slots: [\(slotTypes)]
+        """
       )
     }
 
@@ -520,11 +583,25 @@ package final class ViewNode {
     invalidationIdentity: Identity? = nil,
     certifiedInvalidationIdentities: Set<Identity>? = nil
   ) {
-    var slot = stateSlots[ordinal] ?? .init()
+    setStateSlot(
+      StateSlotIdentifier(ordinal: ordinal),
+      value: value,
+      invalidationIdentity: invalidationIdentity,
+      certifiedInvalidationIdentities: certifiedInvalidationIdentities
+    )
+  }
+
+  package func setStateSlot<Value>(
+    _ identifier: StateSlotIdentifier,
+    value: Value,
+    invalidationIdentity: Identity? = nil,
+    certifiedInvalidationIdentities: Set<Identity>? = nil
+  ) {
+    var slot = stateSlots[identifier] ?? .init()
     let didChange = slot.set(value)
-    stateSlots[ordinal] = slot
+    stateSlots[identifier] = slot
     if didChange {
-      let key = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+      let key = StateSlotKey(owner: viewNodeID, slot: identifier)
       ownerGraph?.queueDirtyForStateChange(key)
       let invalidationIdentities = stateChangeInvalidationIdentities(
         for: key,
@@ -604,22 +681,35 @@ package final class ViewNode {
     ordinal: Int,
     value: Value
   ) {
-    var slot = stateSlots[ordinal] ?? .init()
+    var slot = stateSlots[StateSlotIdentifier(ordinal: ordinal)] ?? .init()
     _ = slot.set(value)
-    stateSlots[ordinal] = slot
+    stateSlots[StateSlotIdentifier(ordinal: ordinal)] = slot
   }
 
   package func stateSlotStorage(
     ordinal: Int
   ) -> AnyStateSlot? {
-    stateSlots[ordinal]
+    stateSlotStorage(StateSlotIdentifier(ordinal: ordinal))
+  }
+
+  package func stateSlotStorage(
+    _ identifier: StateSlotIdentifier
+  ) -> AnyStateSlot? {
+    stateSlots[identifier]
   }
 
   package func restoreStateSlot(
     ordinal: Int,
     slot: AnyStateSlot
   ) {
-    stateSlots[ordinal] = slot
+    stateSlots[StateSlotIdentifier(ordinal: ordinal)] = slot
+  }
+
+  package func restoreStateSlot(
+    _ identifier: StateSlotIdentifier,
+    slot: AnyStateSlot
+  ) {
+    stateSlots[identifier] = slot
   }
 
   package func resetStateSlots() {
@@ -645,16 +735,16 @@ package final class ViewNode {
   /// (the churning entity folded onto a genuinely separate content node — the
   /// deliberate transparent-chain-collapse fold), this is a full reset.
   package func resetStateSlotsSparingReadThisFrame() {
-    let readOrdinalsOwnedBySelf = Set(
+    let readSlotsOwnedBySelf = Set(
       dependencyTracker.currentDependencies.stateSlotReads.lazy
         .filter { $0.owner == self.viewNodeID }
-        .map(\.ordinal)
+        .map(\.slot)
     )
-    guard !readOrdinalsOwnedBySelf.isEmpty else {
+    guard !readSlotsOwnedBySelf.isEmpty else {
       resetStateSlots()
       return
     }
-    stateSlots = stateSlots.filter { readOrdinalsOwnedBySelf.contains($0.key) }
+    stateSlots = stateSlots.filter { readSlotsOwnedBySelf.contains($0.key) }
   }
 
   package func markDirty() {
@@ -755,7 +845,17 @@ package final class ViewNode {
     ordinal: Int,
     registrationScope: Identity?
   ) {
-    let key = StateSlotKey(owner: viewNodeID, ordinal: ordinal)
+    invalidateStateSlotReadersForRuntimeChange(
+      StateSlotIdentifier(ordinal: ordinal),
+      registrationScope: registrationScope
+    )
+  }
+
+  package func invalidateStateSlotReadersForRuntimeChange(
+    _ identifier: StateSlotIdentifier,
+    registrationScope: Identity?
+  ) {
+    let key = StateSlotKey(owner: viewNodeID, slot: identifier)
     var invalidationIdentities =
       ownerGraph?.stateDependentIdentities(for: key) ?? []
     if let registrationScope {
@@ -2007,6 +2107,10 @@ extension ViewNode {
     /// a newer frame) and same-frame re-claims are position-idempotent.
     package var exactIdentityOccurrenceTally: [Identity: [StructuralPath: Int]]
     package var exactIdentityOccurrenceTallyFrameID: UInt64
+    /// Evaluation-scoped duplicate-slot-claim scratch. Restoring a stale image
+    /// is self-healing: `beginEvaluation` resets it at outermost depth before
+    /// any post-restore re-resolve records claims.
+    package var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: ObjectIdentifier]
     /// Derived memoization (see the live property): entries are
     /// content-verified at adoption, so restoring an older image is safe —
     /// a mismatched entry misses and re-mints.
@@ -2038,6 +2142,7 @@ extension ViewNode {
       memoViewValue: memoViewValue,
       exactIdentityOccurrenceTally: exactIdentityOccurrenceTally,
       exactIdentityOccurrenceTallyFrameID: exactIdentityOccurrenceTallyFrameID,
+      stateSlotClaimantsThisEvaluation: stateSlotClaimantsThisEvaluation,
       retainedIndexedChildSourceArtifactsByRoot: retainedIndexedChildSourceArtifactsByRoot,
       checkpointMutationGeneration: checkpointMutationGeneration
     )
@@ -2063,6 +2168,7 @@ extension ViewNode {
     memoViewValue = checkpoint.memoViewValue
     exactIdentityOccurrenceTally = checkpoint.exactIdentityOccurrenceTally
     exactIdentityOccurrenceTallyFrameID = checkpoint.exactIdentityOccurrenceTallyFrameID
+    stateSlotClaimantsThisEvaluation = checkpoint.stateSlotClaimantsThisEvaluation
     retainedIndexedChildSourceArtifactsByRoot =
       checkpoint.retainedIndexedChildSourceArtifactsByRoot
   }
@@ -2080,12 +2186,15 @@ extension ViewNode {
       hasStaleIslandDescendant: reuseState.freshness.hasStaleIslandDescendant,
       hasForeignParentedChild: reuseState.freshness.hasForeignParentedChild,
       children: children.map(\.identity),
-      stateSlots: stateSlots.map { ordinal, slot in
+      stateSlots: stateSlots.map { identifier, slot in
         DebugTotalStateSnapshot.StateSlotSnapshot(
-          ordinal: ordinal,
+          slot: identifier,
           storedTypeDescription: slot.storedTypeDescription
         )
-      }.sorted { lhs, rhs in lhs.ordinal < rhs.ordinal },
+      }.sorted { lhs, rhs in
+        (lhs.slot.ordinal, lhs.slot.path.description)
+          < (rhs.slot.ordinal, rhs.slot.path.description)
+      },
       dependencies: dependencies,
       lifecycleState: lifecycleState,
       registeredHandlers: registeredHandlers.debugTotalStateSnapshot(),

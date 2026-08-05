@@ -35,8 +35,7 @@ public struct SecureField<Label: View>: PrimitiveView, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
-    return withAuthoringContext(dynamicPropertyScope) {
+    return withDynamicPropertyUpdateScope(self, for: context) {
       [resolvedNode(in: context)]
     }
   }

@@ -62,3 +62,9 @@ public struct Namespace: Sendable {
     return allocated
   }
 }
+
+/// `Namespace` keeps its shipped composition workarounds (structural-path
+/// sub-keying plus forwarded `line:`/`column:` init defaults) rather than
+/// binding through the update pass; folding it onto path-qualified slot
+/// identity is a recorded follow-up.
+extension Namespace: DynamicProperty {}

@@ -520,6 +520,9 @@ SwiftTUIGraph.DroppedPath.init(_:)
 SwiftTUIGraph.DroppedPath.init(stringLiteral:)
 SwiftTUIGraph.DroppedPath.isEmpty
 SwiftTUIGraph.DroppedPath.rawValue
+SwiftTUIGraph.DynamicProperty
+SwiftTUIGraph.DynamicProperty.update()
+SwiftTUIGraph.DynamicProperty.update()
 SwiftTUIGraph.EnvironmentSnapshot
 SwiftTUIGraph.EnvironmentSnapshot.==(_:_:)
 SwiftTUIGraph.EnvironmentSnapshot.debugSignature
@@ -3447,6 +3450,7 @@ SwiftTUIViews.FocusState.Binding.wrappedValue
 SwiftTUIViews.FocusState.init(line:column:)
 SwiftTUIViews.FocusState.init(line:column:)
 SwiftTUIViews.FocusState.projectedValue
+SwiftTUIViews.FocusState.update()
 SwiftTUIViews.FocusState.wrappedValue
 SwiftTUIViews.FocusedBinding
 SwiftTUIViews.FocusedBinding.init(_:)
@@ -3502,6 +3506,7 @@ SwiftTUIViews.GestureState
 SwiftTUIViews.GestureState.init(initialValue:line:column:)
 SwiftTUIViews.GestureState.init(wrappedValue:line:column:)
 SwiftTUIViews.GestureState.projectedValue
+SwiftTUIViews.GestureState.update()
 SwiftTUIViews.GestureState.wrappedValue
 SwiftTUIViews.GestureStateBinding
 SwiftTUIViews.GestureStateBinding.box
@@ -4061,6 +4066,7 @@ SwiftTUIViews.State
 SwiftTUIViews.State.init(initialValue:line:column:)
 SwiftTUIViews.State.init(wrappedValue:line:column:)
 SwiftTUIViews.State.projectedValue
+SwiftTUIViews.State.update()
 SwiftTUIViews.State.wrappedValue
 SwiftTUIViews.Stepper
 SwiftTUIViews.Stepper.init(_:value:in:step:)

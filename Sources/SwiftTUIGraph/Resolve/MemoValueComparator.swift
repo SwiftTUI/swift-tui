@@ -149,11 +149,14 @@ package enum MemoValueComparator {
 
     var result: MemoComparison = .equal
     for (lhsChild, rhsChild) in zip(lhsMirror.children, rhsMirror.children) {
-      // Property-wrapper storage (`@State`/`@Binding`/`@Environment` …) is
-      // exposed under a `_`-prefixed label; it is slot identity, not data, and
-      // its value is handled by the dependency gate — skip it.
+      // Property-wrapper storage (`@State`/`@Binding`/`@Environment` … and
+      // every custom `DynamicProperty`) is exposed under a `_`-prefixed
+      // label; it is slot identity, not data, and its value is handled by
+      // the dependency gate — skip it. Conformance is the classifier: a
+      // hard-coded type-name list drifted (it omitted four of the nine
+      // built-ins) and could never see third-party wrappers.
       if let label = lhsChild.label, label.hasPrefix("_"),
-        isDynamicPropertyWrapperStorage(type(of: lhsChild.value))
+        lhsChild.value is any DynamicProperty
       {
         continue
       }
@@ -216,15 +219,4 @@ package enum MemoValueComparator {
     return name == "AnyView" || name.hasPrefix("AnyView<") || name == "AnyScene"
   }
 
-  private static func isDynamicPropertyWrapperStorage(_ type: Any.Type) -> Bool {
-    // The dynamic property wrappers store their value behind a reference box and
-    // change identity every `init`; comparing them is meaningless. Detect by the
-    // wrapper type name.
-    let name = String(describing: type)
-    for wrapper in ["State<", "Binding<", "Environment<", "FocusState<", "GestureState<"]
-    where name.hasPrefix(wrapper) {
-      return true
-    }
-    return false
-  }
 }

@@ -99,6 +99,36 @@ are omitted even when SwiftUI exposes a corresponding API.
   absent.
 - **Equal-value `State` writes are inert.** *Provisional.* Writing a value
   equal to the current one does not invalidate the owner.
+- **`DynamicProperty.update()` runs on a copy.** *Ratified.* SwiftUI mutates
+  a working copy of the view value before body evaluation, so an `update()`
+  mutation to a plain stored property is visible to that one body there
+  (verified against a scratch macOS probe, 2026-08-04 — neither framework
+  persists such mutations *across* evaluations). SwiftTUI's view value is
+  immutable at body evaluation — escaping evaluator closures and memo
+  snapshots capture it — and strict memory safety rules out field-offset
+  mutation, so `update()` receives a discarded copy and the body observes
+  the pre-update value. Effects through reference-backed storage (every
+  built-in wrapper) persist in both frameworks; the authoring guidance is
+  identical: keep mutable state in composed reference-backed storage. See
+  <doc:Custom-Dynamic-Properties>.
+- **`update()` effects must stay inside the graph's dependency
+  vocabulary.** *Ratified.* A reused subtree skips body evaluation and the
+  update pass together; every wrapper-expressible dependency (state,
+  environment, focus, focused values, observation) already denies reuse
+  when it changes, so skipping is unobservable for wrappers built from
+  them. Self-managed timers or subscriptions driven from `update()` get no
+  call guarantee — no reuse gate can deny for a dependency the graph cannot
+  see. SwiftUI does not document an equivalent constraint.
+- **Dynamic-property discovery sees stored properties only.** *Ratified.*
+  Discovery reflects stored properties (as SwiftUI does); computed
+  properties never participate in the update pass. Wrappers composed inside
+  types that do **not** conform to `DynamicProperty` keep the legacy
+  declaration-site slot identity — two instances of such a helper in one
+  view silently share storage, now surfaced by the
+  `state.duplicateSlotClaim` runtime issue. Conforming wrappers get
+  path-qualified per-instance storage, and composition no longer requires
+  forwarding the `line:`/`column:` init defaults the way `Namespace`'s
+  shipped workaround does.
 
 ## Geometry and units
 

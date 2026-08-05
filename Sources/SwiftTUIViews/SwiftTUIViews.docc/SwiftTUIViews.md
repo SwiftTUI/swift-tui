@@ -76,6 +76,7 @@ Lowering helpers remain package-only implementation details.
 - ``Binding``
 - ``Bindable``
 - <doc:State-Environment-And-Focus>
+- <doc:Custom-Dynamic-Properties>
 
 ### Layout
 
@@ -118,6 +119,7 @@ Lowering helpers remain package-only implementation details.
 - <doc:Geometry-And-Preferences>
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
+- <doc:Custom-Dynamic-Properties>
 - <doc:Focus>
 - <doc:Accessibility>
 - <doc:Dismissal-Is-Data>

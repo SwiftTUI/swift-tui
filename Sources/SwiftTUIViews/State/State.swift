@@ -1,4 +1,4 @@
-import SwiftTUICore
+public import SwiftTUICore
 import Synchronization
 
 @MainActor
@@ -97,9 +97,18 @@ private struct DynamicStateLocation<Value> {
 
 @MainActor
 private final class StateBox<Value> {
+  /// A remembered location plus how it was bound: a path-qualified binding
+  /// comes from the dynamic-property update pass (refreshed before every
+  /// body evaluation) and must win over access-time re-binding, which has
+  /// no ambient path and would silently re-claim the unqualified slot.
+  private struct BoundLocation {
+    var location: DynamicStateLocation<Value>
+    var isPathQualified: Bool
+  }
+
   private let slotOrdinal: Int
   private var seedValue: Value
-  private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
+  private var boundLocationsByOwner: [StateStorageOwner: BoundLocation]
   private var retainedValuesByOwner: [StateStorageOwner: Value]
 
   init(
@@ -126,9 +135,13 @@ private final class StateBox<Value> {
 
   func remember(
     _ location: DynamicStateLocation<Value>,
-    for owner: StateStorageOwner
+    for owner: StateStorageOwner,
+    pathQualified: Bool = false
   ) {
-    boundLocationsByOwner[owner] = location
+    boundLocationsByOwner[owner] = BoundLocation(
+      location: location,
+      isPathQualified: pathQualified
+    )
     if let graphID = owner.graphScope {
       StateGraphBindingRegistry.shared.remember(
         owner,
@@ -139,7 +152,16 @@ private final class StateBox<Value> {
   }
 
   func rememberedLocation(for owner: StateStorageOwner) -> DynamicStateLocation<Value>? {
-    boundLocationsByOwner[owner]
+    boundLocationsByOwner[owner]?.location
+  }
+
+  func rememberedPathQualifiedLocation(
+    for owner: StateStorageOwner
+  ) -> DynamicStateLocation<Value>? {
+    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
+      return nil
+    }
+    return bound.location
   }
 
   func currentLocation(
@@ -153,7 +175,7 @@ private final class StateBox<Value> {
     else {
       return nil
     }
-    return boundLocationsByOwner[owner]
+    return boundLocationsByOwner[owner]?.location
   }
 
   func retainedValue(
@@ -294,6 +316,14 @@ public struct State<Value> {
     }
 
     if ViewNodeContext.current != nil {
+      // A path-qualified binding made by this evaluation's update pass wins:
+      // re-making here has no ambient path and would re-claim (and prime)
+      // the unqualified slot, resurrecting the silent-sharing collision the
+      // qualification exists to fix. The pass re-binds before every body
+      // evaluation, so the remembered location is never stale.
+      if let qualified = box.rememberedPathQualifiedLocation(for: storageOwner) {
+        return qualified
+      }
       let location = makeLocation(
         for: context,
         storageOwner: storageOwner
@@ -349,7 +379,8 @@ public struct State<Value> {
 
   private func makeLocation(
     for context: AuthoringContext,
-    storageOwner: StateStorageOwner
+    storageOwner: StateStorageOwner,
+    path: StateSlotPath = .root
   ) -> DynamicStateLocation<Value> {
     // Captured authoring snapshots keep the owner node ID but drop the
     // ViewNode reference. During a resolve pass, recover the live owner so
@@ -362,10 +393,20 @@ public struct State<Value> {
       )
 
     if let viewNode = resolvedViewNode {
+      if ViewNodeContext.current != nil {
+        // Resolve-time claim bookkeeping: a second distinct box claiming
+        // this slot identity in one evaluation is the silent-sharing
+        // signature (see `ViewNode.recordStateSlotClaim`).
+        viewNode.recordStateSlotClaim(
+          StateSlotIdentifier(ordinal: box.currentOrdinal, path: path),
+          claimant: ObjectIdentifier(box)
+        )
+      }
       return graphSlotLocation(
         viewNode: viewNode,
         storageOwner: storageOwner,
-        invalidationIdentity: context.viewIdentity
+        invalidationIdentity: context.viewIdentity,
+        path: path
       )
     }
 
@@ -418,9 +459,10 @@ public struct State<Value> {
   private func graphSlotLocation(
     viewNode: SwiftTUICore.ViewNode,
     storageOwner: StateStorageOwner,
-    invalidationIdentity: Identity
+    invalidationIdentity: Identity,
+    path: StateSlotPath = .root
   ) -> DynamicStateLocation<Value> {
-    let ordinal = box.currentOrdinal
+    let slotIdentifier = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
     // Fresh slots always seed from the authored initial value. A retained
     // per-owner value serves only the node-gone read fallback below — seeding
     // a new slot from carried mutation would resurrect state across committed
@@ -444,7 +486,7 @@ public struct State<Value> {
             identity: invalidationIdentity
           ) ?? viewNode
         return liveViewNode.stateSlot(
-          ordinal: ordinal,
+          slotIdentifier,
           seed: authoredSeed
         )
       },
@@ -464,7 +506,7 @@ public struct State<Value> {
               identity: invalidationIdentity
             ) ?? viewNode
           liveViewNode.setStateSlot(
-            ordinal: ordinal,
+            slotIdentifier,
             value: newValue,
             invalidationIdentity: invalidationIdentity
           )
@@ -492,6 +534,38 @@ public struct State<Value> {
   }
 }
 
+extension State: DynamicProperty {
+  /// Binds the graph location eagerly when the dynamic-property update pass
+  /// reached this wrapper through a discovered dynamic property (a non-root
+  /// ambient path): the claim is qualified by that path, so two instances of
+  /// one composed wrapper get distinct slots even though their authored
+  /// ordinals coincide. Top-level wrappers (root ambient path) keep their
+  /// legacy lazy access-time binding and exact slot identity.
+  public mutating func update() {
+    let path = DynamicPropertyPathScope.current
+    guard !path.isEmpty else {
+      return
+    }
+    guard
+      ViewNodeContext.current != nil,
+      let context = AuthoringContextStorage.current,
+      let storageOwner = stateStorageOwner(for: context)
+    else {
+      return
+    }
+    let location = makeLocation(
+      for: context,
+      storageOwner: storageOwner,
+      path: path
+    )
+    box.remember(
+      location,
+      for: storageOwner,
+      pathQualified: true
+    )
+  }
+}
+
 extension View {
   @MainActor
   func resolveBody(
@@ -510,6 +584,10 @@ extension View {
     // `AuthoringContext.rebasedFromOwnerNodeID` (see
     // `ModifierContentInputs.applyAuthoringContext`).
     if let authoringContext = currentAuthoringContext() {
+      // The update pass runs under the same ambient scope the body closure
+      // observes (the ambient-wins rule above): wrapper bindings made during
+      // update() and during the body must name the same owner.
+      runDynamicPropertyUpdatePass(on: self)
       let body = context.trackingObservableAccess {
         makeBody()
       }
@@ -520,6 +598,7 @@ extension View {
 
     let authoringContext = makeAuthoringContext(for: context)
     return withAuthoringContext(authoringContext) {
+      runDynamicPropertyUpdatePass(on: self)
       let body = context.trackingObservableAccess {
         makeBody()
       }

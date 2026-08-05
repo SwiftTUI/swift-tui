@@ -169,7 +169,11 @@ public struct ModifiedContent<Content, Modifier> {
 
 extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
   public var body: some View {
-    modifier.body(
+    // Composed modifiers are a body-evaluation surface of their own: the
+    // modifier value's discovered dynamic properties update here, before
+    // `modifier.body` constructs its output under the same ambient scope.
+    runDynamicPropertyUpdatePass(on: modifier)
+    return modifier.body(
       content: ViewModifierContent(
         base: content,
         authoringScope: authoringScope
@@ -188,12 +192,11 @@ extension ModifiedContent: ViewModifier where Content: ViewModifier, Modifier: V
 
 extension ModifiedContent: ResolvableView where Content: View, Modifier: PrimitiveViewModifier {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let authoringContext = dynamicPropertyAuthoringContext(for: context)
     let inputs = ModifierContentInputs(
       base: content,
       authoringScope: authoringScope
     )
-    return withAuthoringContext(authoringContext) {
+    return withDynamicPropertyUpdateScope(modifier, for: context) {
       modifier.resolve(content: inputs, in: context)
     }
   }

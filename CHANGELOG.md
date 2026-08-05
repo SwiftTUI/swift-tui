@@ -8,6 +8,39 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- **`DynamicProperty` — the custom-property-wrapper extension point.** The
+  protocol matches SwiftUI's shape (`mutating func update()`, `@MainActor`,
+  no-op default), and all nine built-in wrappers conform (`State`,
+  `Binding`, `Bindable`, `Environment`, `FocusState`, `GestureState`,
+  `Namespace`, `FocusedValue`, `FocusedBinding`). Before each body
+  evaluation — on every surface: composed bodies, framework primitives, and
+  `ViewModifier` bodies — the framework discovers a view's conforming
+  stored properties (reflect-once-per-type descriptor cache; wrapper-free
+  views pay one dictionary lookup) and runs `update()` nested-first under
+  the body's ambient authoring scope. Wrappers composed inside a discovered
+  dynamic property get **path-qualified slot identity**: two instances of
+  one composed wrapper now hold distinct `@State`/`@FocusState`/
+  `@GestureState` storage instead of silently sharing the wrapper's
+  declaration-site slot. Composition in types that do not conform keeps the
+  legacy shared-slot behavior and now reports a `state.duplicateSlotClaim`
+  runtime issue; the different-value-type collision keeps trapping, with
+  the slot's decoded source position and discovery path in the message.
+  `update()` runs on a copy — mutations to plain stored properties do not
+  persist (a recorded divergence; see the "Custom dynamic properties"
+  documentation article for the authoring contract).
+
+### Fixed
+
+- **The memo shadow-oracle's wrapper-storage classifier no longer drifts.**
+  The diagnostic comparator now classifies property-wrapper storage by
+  `DynamicProperty` conformance instead of a hard-coded five-name prefix
+  list that omitted `Namespace`, `Bindable`, `FocusedValue`, and
+  `FocusedBinding` — and would have omitted every custom wrapper.
+  Diagnostic-only: production memo reuse is `Equatable`-gated and
+  unaffected.
+
 ### Changed
 
 - **Wheel scroll over a `List` or `Table` moves the viewport instead of

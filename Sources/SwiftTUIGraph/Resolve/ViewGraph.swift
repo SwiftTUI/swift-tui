@@ -1383,7 +1383,7 @@ package final class ViewGraph {
         guard
           baselineNodes[viewNodeID] != nil,
           let slot = nodeIfExists(for: viewNodeID)?.stateSlotStorage(
-            ordinal: key.ordinal
+            key.slot
           )
         else {
           continue
@@ -1392,7 +1392,7 @@ package final class ViewGraph {
           StateMutationSlotKey(
             key: StateSlotKey(
               owner: viewNodeID,
-              ordinal: key.ordinal
+              slot: key.slot
             )
           )
         ] = slot
@@ -1401,7 +1401,7 @@ package final class ViewGraph {
       guard !capturedSlot,
         baselineNodes[key.owner] != nil,
         let slot = nodeIfExists(for: key.owner)?.stateSlotStorage(
-          ordinal: key.ordinal
+          key.slot
         )
       else {
         continue
@@ -1435,11 +1435,11 @@ package final class ViewGraph {
         // dropped here — the F63/F43 lost-write class. Counted (F93) so a
         // lost-write report starts from the alarm, not from adding logging.
         SoundnessProbeConfiguration.recordStateSlotRestorationDrop(
-          "state-slot restoration dropped: owner \(key.key.owner) ordinal \(key.key.ordinal) no longer exists"
+          "state-slot restoration dropped: owner \(key.key.owner) slot \(key.key.slot) no longer exists"
         )
         continue
       }
-      node.restoreStateSlot(ordinal: key.key.ordinal, slot: slot)
+      node.restoreStateSlot(key.key.slot, slot: slot)
       node.markDirty()
     }
     invalidatedNodeIDs.formUnion(overlay.invalidatedNodeIDs)
@@ -1724,6 +1724,20 @@ package final class ViewGraph {
     return true
   }
 
+  /// Resolve-authored runtime issues recorded against the current frame by
+  /// graph-side machinery that has no resolved node to attach a preference
+  /// to (the duplicate-slot-claim warning). Drained into the frame's
+  /// diagnostics alongside the preference-collected issues; reset at
+  /// `beginFrame`.
+  package private(set) var frameRuntimeIssues: [RuntimeIssue] = []
+
+  package func recordFrameRuntimeIssue(_ issue: RuntimeIssue) {
+    guard !frameRuntimeIssues.contains(issue) else {
+      return
+    }
+    frameRuntimeIssues.append(issue)
+  }
+
   package func beginFrame() {
     assert(
       deferredResolveDriver.isIdle,
@@ -1742,6 +1756,7 @@ package final class ViewGraph {
     // Latch this frame's reconciliation-soundness sampling decision from the
     // monotonic frame counter (no clock/RNG). Cheap when the probe is off.
     SoundnessProbeConfiguration.beginFrame(frameID: currentFrameID)
+    frameRuntimeIssues.removeAll(keepingCapacity: true)
     frameOrder.removeAll(keepingCapacity: true)
     evaluatedNodeIDsThisFrame.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)

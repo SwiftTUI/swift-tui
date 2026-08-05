@@ -1,10 +1,21 @@
 package struct StateSlotKey: Hashable, Sendable {
   package var owner: ViewNodeID
-  package var ordinal: Int
+  package var slot: StateSlotIdentifier
+
+  package init(owner: ViewNodeID, slot: StateSlotIdentifier) {
+    self.owner = owner
+    self.slot = slot
+  }
 
   package init(owner: ViewNodeID, ordinal: Int) {
-    self.owner = owner
-    self.ordinal = ordinal
+    self.init(owner: owner, slot: StateSlotIdentifier(ordinal: ordinal))
+  }
+
+  /// The slot's source-location ordinal. Diagnostics only — storage
+  /// addressing must go through ``slot`` so path-qualified identities stay
+  /// distinct.
+  package var ordinal: Int {
+    slot.ordinal
   }
 }
 

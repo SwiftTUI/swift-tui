@@ -19,8 +19,7 @@ public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView, R
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
-    return withAuthoringContext(dynamicPropertyScope) {
+    return withDynamicPropertyUpdateScope(self, for: context) {
       [resolvedNode(in: context)]
     }
   }

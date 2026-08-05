@@ -81,6 +81,8 @@ public struct Binding<Value> {
 
 extension Binding: Sendable where Value: Sendable {}
 
+extension Binding: DynamicProperty {}
+
 @dynamicMemberLookup
 @propertyWrapper
 /// A bindable projection for observable reference types.
@@ -119,6 +121,15 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
     )
   }
 }
+
+/// `Bindable` is the one built-in wrapper whose storage is a plain stored
+/// property rather than a reference box or closure pair, so its conformance
+/// is deliberately inert: there is no location to bind in ``update()``, and
+/// mutations to the stored model *reference* made during an update pass run
+/// on a copy and do not persist (the ratified copy-semantics divergence).
+/// Observable reads and writes through the model keep their existing
+/// invalidation path.
+extension Bindable: DynamicProperty {}
 
 /// The primary axis used by directional layout and scrolling APIs.
 public enum Axis {
