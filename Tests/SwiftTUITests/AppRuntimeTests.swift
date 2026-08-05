@@ -294,6 +294,45 @@ struct AppRuntimeTests {
     #expect(lastFrame.contains("Sheet body"))
   }
 
+  // Ambient-propagation contract, Stage 0 (org root
+  // docs/plans/2026-08-04-001-ambient-propagation-contract-plan.md): presented
+  // content re-applies the declaration-captured environment, so an ambient
+  // `lineLimit` written around the presenter reaches the sheet body.
+  @MainActor
+  @Test("sheet content inherits the presenter-captured ambient lineLimit")
+  func sheetContentInheritsPresenterCapturedLineLimit() async throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 40, height: 12))
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Ambient Sheet Window") {
+        AmbientLineLimitSheetWindow()
+      },
+      sessionName: "AppRuntimeTests.AmbientLineLimitSheetWindow",
+      presentationSurface: terminal,
+      inputReader: AwaitedScriptedInputReader(
+        frameSignal: terminal.frameSignal,
+        steps: [
+          .press(KeyPress(.return)),
+          .awaitCondition {
+            terminal.frames.contains { $0.contains("alpha") }
+          },
+          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        ]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+
+    let sheetFrame = try #require(
+      terminal.frames.last { $0.contains("alpha") },
+      "The sheet with the long text never appeared."
+    )
+    // The presenter wraps the whole window in `.lineLimit(1)`: the sheet body
+    // sees the captured environment, so the long text clamps to one line and
+    // its tail word never lands on a wrapped second line.
+    #expect(!sheetFrame.contains("zebrafinch"))
+  }
+
   @MainActor
   @Test("Pressing Escape dismisses an active sheet")
   func pressingEscapeDismissesActiveSheet() async throws {
@@ -1518,6 +1557,22 @@ private struct SheetPresentationWindow: View {
           }
       }
     }
+  }
+}
+
+private struct AmbientLineLimitSheetWindow: View {
+  @State private var isPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Button("Present") {
+        isPresented = true
+      }
+    }
+    .sheet("Ambient", isPresented: $isPresented) {
+      Text("alpha beta gamma delta epsilon zeta eta theta iota zebrafinch")
+    }
+    .lineLimit(1)
   }
 }
 

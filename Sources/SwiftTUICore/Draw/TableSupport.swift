@@ -85,14 +85,15 @@ package func renderTableLine(
 package func renderTableCell(
   _ content: String,
   width: Int,
-  alignment: TableCellAlignment
+  alignment: TableCellAlignment,
+  truncationMode: TextTruncationMode = .tail
 ) -> String {
   let resolvedWidth = max(1, width)
   let line = layoutText(
     for: content,
     width: resolvedWidth,
     lineLimit: 1,
-    truncationMode: .tail,
+    truncationMode: truncationMode,
     wrappingStrategy: .wordBoundary
   ).lines[0].text
   let usedWidth = layoutText(for: line, width: nil).size.width

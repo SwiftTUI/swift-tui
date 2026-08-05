@@ -118,6 +118,28 @@ public struct EnvironmentValues: Equatable, Sendable {
     _isFocused = false
   }
 
+  /// Reads a key without recording a dependency on the evaluating node.
+  ///
+  /// For framework-infrastructure reads only (the ambient text-attribute
+  /// stamping in `Text`/`Link` resolve). Correctness does not need the
+  /// attribution: a changed environment value already re-resolves the
+  /// writer's whole subtree through snapshot inequality (`ViewNode.canReuse`).
+  /// Recording these reads would instead stamp framework noise into every
+  /// text-bearing node's dependency fingerprint. If reader-precise
+  /// environment invalidation ever gains a production caller, these reads
+  /// must move back to the tracked subscript.
+  package subscript<K: EnvironmentKey>(untracked key: K.Type) -> K.Value {
+    guard let boxed = storage[ObjectIdentifier(key)] else {
+      return K.defaultValue
+    }
+    guard let typed: K.Value = boxed.value(as: K.Value.self) else {
+      preconditionFailure(
+        "Environment type mismatch for \(String(reflecting: key)). Expected \(K.Value.self), found \(boxed.valueTypeDescription)."
+      )
+    }
+    return typed
+  }
+
   public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {
     get {
       let identifier = ObjectIdentifier(key)

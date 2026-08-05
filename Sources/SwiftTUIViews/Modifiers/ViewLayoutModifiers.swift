@@ -28,16 +28,20 @@ extension View {
     )
   }
 
+  /// Limits the lines of every descendant text run, matching SwiftUI's
+  /// environment contract: the innermost write wins and `nil` clears an
+  /// inherited limit. The raw value travels in the environment; text layout
+  /// clamps non-positive limits to one line.
   public func lineLimit(_ limit: Int?) -> some View {
-    layoutMetadata(.init(lineLimit: limit.map { max(1, $0) }))
+    environment(\.lineLimit, limit)
   }
 
   public func truncationMode(_ mode: Text.TruncationMode) -> some View {
-    layoutMetadata(.init(textTruncationMode: mode))
+    environment(\.truncationMode, mode)
   }
 
   public func textWrappingStrategy(_ strategy: Text.WrappingStrategy) -> some View {
-    layoutMetadata(.init(textWrappingStrategy: strategy))
+    environment(\.textWrappingStrategy, strategy)
   }
 
   public func clipped() -> some View {

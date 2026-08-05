@@ -419,10 +419,14 @@ extension Table {
     }
   }
 
+  /// Defaults hosted cells to single-line tail truncation WITHOUT clobbering
+  /// authored or ambient values: a cell whose text stamped its own
+  /// `lineLimit`/`truncationMode` keeps them, and taller cells span their row
+  /// across multiple cells at draw time.
   private func singleLineHostedTableCell(_ source: ResolvedNode) -> ResolvedNode {
     var node = source
-    node.layoutMetadata.lineLimit = 1
-    node.layoutMetadata.textTruncationMode = .tail
+    node.layoutMetadata.lineLimit = node.layoutMetadata.lineLimit ?? 1
+    node.layoutMetadata.textTruncationMode = node.layoutMetadata.textTruncationMode ?? .tail
     node.children = node.children.map(singleLineHostedTableCell)
     return node
   }

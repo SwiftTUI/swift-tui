@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 282 | 1532 |
+| `SwiftTUIViews` | 282 | 1535 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 49 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 167 | 1445 |
+| `SwiftTUIPrimitives` | 167 | 1449 |
 | `SwiftTUIGraph` | 56 | 341 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -199,7 +199,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 1 member
 - `EnvironmentTransformModifier` — struct
-- `EnvironmentValues` — struct — 27 members
+- `EnvironmentValues` — struct — 30 members
 - `EnvironmentWritingModifier` — struct
 - `EquatableView` — struct — 2 members
 - `ExclusiveGesture` — struct — 6 members
@@ -664,7 +664,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `LinearGradient` — struct — 9 members
 - `LinkDestination` — struct — 6 members
 - `ListChromeScope` — enum — 2 members
-- `ListItemPayload` — struct — 14 members
+- `ListItemPayload` — struct — 16 members
 - `ListPayload` — struct — 13 members
 - `ListSeparatorPreferences` — struct — 3 members
 - `Matrix3x3` — struct — 16 members
@@ -717,7 +717,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `StyleEnvironmentSnapshot` — struct — 8 members
 - `TableBorderGlyphs` — struct — 18 members
 - `TableCellAlignment` — enum — 4 members
-- `TableCellPayload` — struct — 3 members
+- `TableCellPayload` — struct — 5 members
 - `TableColumnAlignment` — enum — 3 members
 - `TableColumnPayload` — struct — 5 members
 - `TableHeaderVisibility` — enum — 3 members

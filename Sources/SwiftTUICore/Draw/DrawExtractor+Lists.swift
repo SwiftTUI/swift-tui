@@ -16,6 +16,9 @@ package struct ListDisplayLine: Equatable, Sendable {
   var rowIndex: Int?
   var sectionIndex: Int?
   var itemIndex: Int?
+  /// The truncation mode for this line's flattened text, carried from the
+  /// item payload so authored/ambient modes survive the flattening.
+  package var truncationMode: TextTruncationMode
   /// Cells this line occupies. Greater than 1 when the hosted row measured
   /// taller than one cell; 1 for every chrome line and for the payload-only
   /// line model, which has no measured children to ask.
@@ -36,7 +39,8 @@ package struct ListDisplayLine: Equatable, Sendable {
     sectionIndex: Int? = nil,
     itemIndex: Int? = nil,
     height: Int = 1,
-    yOffset: Int = 0
+    yOffset: Int = 0,
+    truncationMode: TextTruncationMode = .tail
   ) {
     self.kind = kind
     self.isHeader = isHeader
@@ -45,6 +49,7 @@ package struct ListDisplayLine: Equatable, Sendable {
     self.itemIndex = itemIndex
     self.height = height
     self.yOffset = yOffset
+    self.truncationMode = truncationMode
   }
 }
 
@@ -91,8 +96,23 @@ extension DrawExtractor {
     for payload: ListPayload,
     in bounds: CellRect,
     hostsCommittedItems: Bool = false,
-    placedLayout: ListVisibleLayout? = nil
+    placedLayout: ListVisibleLayout? = nil,
+    effectiveOpacity: Double = 1
   ) -> [DrawCommand] {
+    // The ancestor opacity cascade applies at emission: line styles are baked
+    // into the (possibly placed) layout product with the payload's own chrome
+    // factor already folded in, so the inherited factor multiplies on top.
+    func fadedText(_ style: TextStyle) -> TextStyle {
+      guard effectiveOpacity != 1 else {
+        return style
+      }
+      var faded = style
+      faded.opacity = faded.opacity * effectiveOpacity
+      return faded
+    }
+    func fadedShape(_ style: AnyShapeStyle) -> AnyShapeStyle {
+      effectiveOpacity == 1 ? style : style.opacity(effectiveOpacity)
+    }
     // The placed product when there is one — that is what keeps a tall row's
     // marker and separators on the same cells as its content. The recompute
     // stays for payload-only callers, whose rows are all one cell tall.
@@ -104,10 +124,12 @@ extension DrawExtractor {
       )
     let contentBounds = layout.contentBounds
     guard contentBounds.size.width > 0, contentBounds.size.height > 0 else {
-      return listChromeCommands(for: payload, in: bounds, layout: layout)
+      return listChromeCommands(
+        for: payload, in: bounds, layout: layout, effectiveOpacity: effectiveOpacity)
     }
 
-    var commands = listChromeCommands(for: payload, in: bounds, layout: layout)
+    var commands = listChromeCommands(
+      for: payload, in: bounds, layout: layout, effectiveOpacity: effectiveOpacity)
     let lines = layout.lines
 
     for line in lines {
@@ -123,9 +145,9 @@ extension DrawExtractor {
             .text(
               bounds: lineBounds,
               content: content,
-              style: style,
+              style: fadedText(style),
               lineLimit: 1,
-              truncationMode: .tail,
+              truncationMode: line.truncationMode,
               wrappingStrategy: .wordBoundary
             )
           )
@@ -137,7 +159,7 @@ extension DrawExtractor {
               bounds: lineBounds,
               geometry: .rectangle,
               insetAmount: 0,
-              style: backgroundStyle,
+              style: fadedShape(backgroundStyle),
               mode: .full
             )
           )
@@ -159,7 +181,7 @@ extension DrawExtractor {
             .text(
               bounds: markerBounds,
               content: marker,
-              style: markerStyle,
+              style: fadedText(markerStyle),
               lineLimit: 1,
               truncationMode: .tail,
               wrappingStrategy: .wordBoundary
@@ -171,9 +193,9 @@ extension DrawExtractor {
             .text(
               bounds: textBounds,
               content: text,
-              style: textStyle,
+              style: fadedText(textStyle),
               lineLimit: 1,
-              truncationMode: .tail,
+              truncationMode: line.truncationMode,
               wrappingStrategy: .wordBoundary
             )
           )
@@ -182,7 +204,7 @@ extension DrawExtractor {
         commands.append(
           .rule(
             bounds: lineBounds,
-            style: style,
+            style: fadedShape(style),
             strokeStyle: .init(borderSet: .single),
             stackAxis: nil
           )
@@ -196,10 +218,15 @@ extension DrawExtractor {
   private func listChromeCommands(
     for payload: ListPayload,
     in bounds: CellRect,
-    layout: ListVisibleLayout
+    layout: ListVisibleLayout,
+    effectiveOpacity: Double
   ) -> [DrawCommand] {
     guard let container = payload.style.listContainer else {
       return []
+    }
+
+    func fadedShape(_ style: AnyShapeStyle) -> AnyShapeStyle {
+      effectiveOpacity == 1 ? style : style.opacity(effectiveOpacity)
     }
 
     let chromeBounds = payload.style.listChromeBounds(for: layout, in: bounds)
@@ -209,14 +236,14 @@ extension DrawExtractor {
           bounds: sectionBounds,
           geometry: container.geometry,
           insetAmount: container.insetAmount,
-          style: payload.backgroundStyle ?? .semantic(.fill),
+          style: fadedShape(payload.backgroundStyle ?? .semantic(.fill)),
           mode: container.fillMode
         ),
         .stroke(
           bounds: sectionBounds,
           geometry: container.geometry,
           insetAmount: container.insetAmount,
-          style: payload.borderStyle ?? .semantic(.separator),
+          style: fadedShape(payload.borderStyle ?? .semantic(.separator)),
           strokeStyle: container.strokeStyle,
           strokeBorder: container.strokeBorder,
           backgroundStyle: nil
@@ -228,7 +255,8 @@ extension DrawExtractor {
   func scrollIndicatorCommands(
     bounds: CellRect,
     drawMetadata: DrawMetadata,
-    children: [PlacedNode]
+    children: [PlacedNode],
+    effectiveOpacity: Double = 1
   ) -> [DrawCommand] {
     guard let axes = drawMetadata.scrollIndicatorAxes,
       let content = children.first
@@ -258,7 +286,8 @@ extension DrawExtractor {
         contentsOf: verticalScrollIndicatorCommands(
           metrics: metrics,
           offset: offsetY,
-          style: scrollIndicatorStyle(for: .vertical, drawMetadata: drawMetadata)
+          style: scrollIndicatorStyle(
+            for: .vertical, drawMetadata: drawMetadata, effectiveOpacity: effectiveOpacity)
         )
       )
     }
@@ -272,7 +301,8 @@ extension DrawExtractor {
         contentsOf: horizontalScrollIndicatorCommands(
           metrics: metrics,
           offset: offsetX,
-          style: scrollIndicatorStyle(for: .horizontal, drawMetadata: drawMetadata)
+          style: scrollIndicatorStyle(
+            for: .horizontal, drawMetadata: drawMetadata, effectiveOpacity: effectiveOpacity)
         )
       )
     }
@@ -281,14 +311,17 @@ extension DrawExtractor {
 
   private func scrollIndicatorStyle(
     for axis: ScrollIndicatorAxis,
-    drawMetadata: DrawMetadata
+    drawMetadata: DrawMetadata,
+    effectiveOpacity: Double
   ) -> TextStyle {
     let indicatorAxis: AxisSet = axis == .vertical ? .vertical : .horizontal
     let foregroundStyle =
       drawMetadata.focusedScrollIndicatorAxes?.contains(indicatorAxis) == true
       ? (drawMetadata.scrollIndicatorForegroundStyle ?? .semantic(.tint))
       : .semantic(.muted)
-    return .init(foregroundStyle: foregroundStyle, opacity: drawMetadata.opacity)
+    // The cascade product; equals `drawMetadata.opacity` with no faded
+    // ancestor.
+    return .init(foregroundStyle: foregroundStyle, opacity: effectiveOpacity)
   }
 
   private func verticalScrollIndicatorCommands(

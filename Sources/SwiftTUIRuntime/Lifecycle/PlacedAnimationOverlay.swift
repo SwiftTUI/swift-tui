@@ -128,7 +128,7 @@ private func applyPlacedOverlayModifiers(
   markTransient(&node)
 
   if let opacity = modifiers.opacity {
-    applyOpacityCascadingPlaced(&node, opacity: opacity)
+    applyOpacityAtOverlayRoot(&node, opacity: opacity)
   }
 
   let dx = modifiers.offsetX ?? 0
@@ -147,7 +147,11 @@ private func markTransient(_ node: inout PlacedNode) {
   node.children = children
 }
 
-private func applyOpacityCascadingPlaced(
+/// Applies the overlay fade at the subtree root only: draw extraction
+/// multiplies every ancestor's factor into descendant commands (the
+/// multiplicative opacity cascade), so a recursive write here would square
+/// the fade.
+private func applyOpacityAtOverlayRoot(
   _ node: inout PlacedNode,
   opacity: Double
 ) {
@@ -155,12 +159,6 @@ private func applyOpacityCascadingPlaced(
   let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
   drawMetadata.baseStyle.explicitOpacity = base * opacity
   node.drawMetadata = drawMetadata
-
-  var children = node.children
-  for i in children.indices {
-    applyOpacityCascadingPlaced(&children[i], opacity: opacity)
-  }
-  node.children = children
 }
 
 private func translateBounds(

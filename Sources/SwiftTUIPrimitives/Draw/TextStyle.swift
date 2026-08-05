@@ -154,8 +154,10 @@ public struct BaseStyle: Equatable, Sendable {
     merged.emphasis.formUnion(other.emphasis)
     merged.underlineStyle = other.underlineStyle ?? underlineStyle
     merged.strikethroughStyle = other.strikethroughStyle ?? strikethroughStyle
+    // Opacity compounds multiplicatively, matching SwiftUI: `.opacity(0.4)`
+    // followed by `.opacity(1)` stays 0.4 — an explicit reset is impossible.
     if let opacity = other.explicitOpacity {
-      merged.explicitOpacity = opacity
+      merged.explicitOpacity = (explicitOpacity ?? 1) * opacity
     }
     return merged
   }

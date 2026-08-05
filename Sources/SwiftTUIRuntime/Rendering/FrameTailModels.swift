@@ -40,6 +40,7 @@ struct FrameTailRetainedInput {
     var reusableRoots: Set<Identity> = []
     collectReusablePhaseSubtrees(
       placed,
+      inheritedOpacity: 1,
       previousFrameIndex: previousFrameIndex,
       invalidationSummary: retainedLayout.invalidationSummary,
       reusableRoots: &reusableRoots
@@ -49,12 +50,19 @@ struct FrameTailRetainedInput {
 
   private func collectReusablePhaseSubtrees(
     _ node: PlacedNode,
+    inheritedOpacity: Double,
     previousFrameIndex: RetainedFrameIndex,
     invalidationSummary: RetainedInvalidationSummary,
     reusableRoots: inout Set<Identity>
   ) {
+    // Draw extraction bakes the accumulated ancestor opacity into emitted
+    // commands, so a subtree whose own signature is unchanged still re-emits
+    // differently when an ANCESTOR fade changed. The signature covers the
+    // subtree's interior; the inherited factor at its root covers everything
+    // outside it — both must match the previous frame before reuse is sound.
     if !invalidationSummary.intersectsSubtree(at: node.identity),
       let previousPlaced = previousFrameIndex.placedNode(for: node.identity),
+      previousInheritedOpacity(for: node.identity, in: previousFrameIndex) == inheritedOpacity,
       let currentSignature = RetainedPhaseExtractionSignature.make(from: node),
       let previousSignature = RetainedPhaseExtractionSignature.make(from: previousPlaced),
       currentSignature == previousSignature
@@ -63,13 +71,32 @@ struct FrameTailRetainedInput {
       return
     }
 
+    let childInheritedOpacity =
+      inheritedOpacity * (node.drawMetadata.explicitOpacity ?? 1)
     for child in node.children {
       collectReusablePhaseSubtrees(
         child,
+        inheritedOpacity: childInheritedOpacity,
         previousFrameIndex: previousFrameIndex,
         invalidationSummary: invalidationSummary,
         reusableRoots: &reusableRoots
       )
+    }
+  }
+
+  /// The product of `.opacity` factors STRICTLY ABOVE `identity` in the
+  /// previous committed placed tree, or `nil` when the ancestor chain cannot
+  /// be established unambiguously — the caller then denies reuse, which is
+  /// always safe.
+  private func previousInheritedOpacity(
+    for identity: Identity,
+    in previousFrameIndex: RetainedFrameIndex
+  ) -> Double? {
+    guard let path = previousFrameIndex.placedPath(to: identity) else {
+      return nil
+    }
+    return path.dropLast().reduce(1) { partial, ancestor in
+      partial * (ancestor.drawMetadata.explicitOpacity ?? 1)
     }
   }
 }

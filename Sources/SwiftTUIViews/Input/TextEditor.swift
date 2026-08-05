@@ -88,6 +88,13 @@ extension TextEditor {
       scrollPosition: $scrollPosition,
       focusActive: isFocused && showsFocusEffect
     )
+    // The editor performs its own wrapping (the movement layout map at
+    // `TextInputLayoutMap` wraps at the measured content width), so ambient
+    // text-layout attributes must not reach the inner `Text` — an inherited
+    // `lineLimit` would clamp the visible text while the caret map still
+    // addresses every logical line. Matches SwiftUI, where `TextEditor`
+    // ignores an ancestor `lineLimit`.
+    .ambientTextAttributesReset()
     .background {
       // A layout-neutral probe: sized to the editor body but drawing nothing,
       // it records the placed content width (body width − horizontal chrome)

@@ -76,9 +76,13 @@ extension Text {
     pattern: Text.LineStyle.Pattern,
     color: Color? = nil
   ) -> Text {
-    mutatingDrawMetadata { metadata in
+    var copy = mutatingDrawMetadata { metadata in
       metadata.underlineStyle = isActive ? .init(pattern: pattern, color: color) : nil
     }
+    // An explicit `false` must suppress an ambient `View.underline()` too —
+    // a bare nil style would read as "unstyled, inherit".
+    copy.underlineExplicitlyCleared = !isActive
+    return copy
   }
 
   public func strikethrough(
@@ -97,9 +101,11 @@ extension Text {
     pattern: Text.LineStyle.Pattern,
     color: Color? = nil
   ) -> Text {
-    mutatingDrawMetadata { metadata in
+    var copy = mutatingDrawMetadata { metadata in
       metadata.strikethroughStyle = isActive ? .init(pattern: pattern, color: color) : nil
     }
+    copy.strikethroughExplicitlyCleared = !isActive
+    return copy
   }
 
   private func applyingEmphasis(

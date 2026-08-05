@@ -68,10 +68,27 @@ extension DrawExtractor {
     in bounds: CellRect,
     hostsCommittedItems: Bool = false,
     columnWidths: [Int]? = nil,
-    placedLayout: TableVisibleLayout? = nil
+    placedLayout: TableVisibleLayout? = nil,
+    effectiveOpacity: Double = 1
   ) -> [DrawCommand] {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return []
+    }
+
+    // The ancestor opacity cascade applies at emission: segment styles are
+    // baked into the (possibly placed) layout product with the payload's own
+    // chrome factor already folded in, so the inherited factor multiplies on
+    // top.
+    func fadedText(_ style: TextStyle) -> TextStyle {
+      guard effectiveOpacity != 1 else {
+        return style
+      }
+      var faded = style
+      faded.opacity = faded.opacity * effectiveOpacity
+      return faded
+    }
+    func fadedShape(_ style: AnyShapeStyle) -> AnyShapeStyle {
+      effectiveOpacity == 1 ? style : style.opacity(effectiveOpacity)
     }
 
     var commands: [DrawCommand] = []
@@ -81,7 +98,7 @@ extension DrawExtractor {
           bounds: bounds,
           geometry: .rectangle,
           insetAmount: 0,
-          style: backgroundStyle,
+          style: fadedShape(backgroundStyle),
           mode: .full
         )
       )
@@ -112,7 +129,7 @@ extension DrawExtractor {
             bounds: lineBounds,
             geometry: .rectangle,
             insetAmount: 0,
-            style: backgroundStyle,
+            style: fadedShape(backgroundStyle),
             mode: .full
           )
         )
@@ -167,7 +184,7 @@ extension DrawExtractor {
                 size: .init(width: visibleWidth, height: 1)
               ),
               content: segment.content,
-              style: segment.style,
+              style: fadedText(segment.style),
               lineLimit: 1,
               truncationMode: .tail,
               wrappingStrategy: .wordBoundary
@@ -582,11 +599,16 @@ extension DrawExtractor {
             isSelected: isSelected
           )
           : rowTextStyle
+        let truncationMode =
+          columnIndex < row.cells.count
+          ? row.cells[columnIndex].truncationMode ?? .tail
+          : .tail
         return TableDisplaySegment(
           content: renderTableCell(
             content,
             width: width,
-            alignment: payload.columns[columnIndex].alignment
+            alignment: payload.columns[columnIndex].alignment,
+            truncationMode: truncationMode
           ),
           style: cellStyle
         )
@@ -692,11 +714,16 @@ extension DrawExtractor {
             isSelected: isSelected
           )
           : rowTextStyle
+        let truncationMode =
+          columnIndex < row.cells.count
+          ? row.cells[columnIndex].truncationMode ?? .tail
+          : .tail
         return TableDisplaySegment(
           content: renderTableCell(
             content,
             width: width,
-            alignment: payload.columns[columnIndex].alignment
+            alignment: payload.columns[columnIndex].alignment,
+            truncationMode: truncationMode
           ),
           style: cellStyle
         )

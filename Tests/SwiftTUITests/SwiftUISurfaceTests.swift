@@ -1108,8 +1108,11 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
-    "draw metadata merge preserves inherited opacity unless a later wrapper resets it explicitly")
-  func drawMetadataOpacityMergeSupportsExplicitReset() {
+    "draw metadata merge multiplies opacity, making an explicit reset impossible")
+  func drawMetadataOpacityMergeMultiplies() {
+    // The ambient-propagation contract: same-node `.opacity` chains compound
+    // multiplicatively, matching SwiftUI — `.opacity(0.4)` followed by
+    // `.opacity(1)` stays 0.4, and a later wrapper can only fade further.
     let inherited = Resolver().resolve(
       Text("Dim")
         .drawMetadata(.init(opacity: 0.4))
@@ -1122,11 +1125,18 @@ struct SwiftUISurfaceTests {
         .drawMetadata(.init(opacity: 1)),
       in: .init(identity: testIdentity("ResetOpacity"))
     )
+    let compounded = Resolver().resolve(
+      Text("Compound")
+        .drawMetadata(.init(opacity: 0.4))
+        .drawMetadata(.init(opacity: 0.5)),
+      in: .init(identity: testIdentity("CompoundOpacity"))
+    )
 
     #expect(inherited.drawMetadata.opacity == 0.4)
     #expect(inherited.drawMetadata.explicitOpacity == 0.4)
-    #expect(reset.drawMetadata.opacity == 1)
-    #expect(reset.drawMetadata.explicitOpacity == 1)
+    #expect(reset.drawMetadata.opacity == 0.4)
+    #expect(reset.drawMetadata.explicitOpacity == 0.4)
+    #expect(abs(compounded.drawMetadata.opacity - 0.2) < 0.0001)
   }
 
   @Test("draw metadata keeps list-specific fields in a dedicated list-style payload")
@@ -5729,8 +5739,10 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Styled"))
     )
 
+    // Text stamps the effective ambient attributes at resolve time, so the
+    // unwritten truncation mode records its default rather than staying nil.
     #expect(artifacts.resolvedTree.layoutMetadata.lineLimit == 1)
-    #expect(artifacts.resolvedTree.layoutMetadata.textTruncationMode == nil)
+    #expect(artifacts.resolvedTree.layoutMetadata.textTruncationMode == .tail)
     #expect(artifacts.resolvedTree.layoutMetadata.textWrappingStrategy == .wordBoundary)
 
     guard let firstCommand = artifacts.drawTree.commands.first else {

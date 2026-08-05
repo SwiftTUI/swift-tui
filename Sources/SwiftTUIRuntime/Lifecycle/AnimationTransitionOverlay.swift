@@ -75,12 +75,15 @@ enum AnimationTransitionOverlay {
     node.setChildrenPreservingDerivedState(children)
   }
 
-  /// Applies transition modifiers recursively to every node in the subtree.
+  /// Applies transition modifiers to the overlay subtree root.
   ///
-  /// Opacity cascades because rasterization reads per-node opacity and text
-  /// leaves need to see it. Offset applies only at the subtree root, either by
-  /// rewriting an intrinsic root, composing with an existing offset, or wrapping
-  /// non-offset layout in a stable private offset node.
+  /// Opacity applies at the root only: draw extraction multiplies every
+  /// ancestor's factor into descendant commands (the multiplicative opacity
+  /// cascade), so a root write fades the whole overlay subtree exactly once —
+  /// a recursive write here would square the fade. Offset applies only at the
+  /// subtree root, either by rewriting an intrinsic root, composing with an
+  /// existing offset, or wrapping non-offset layout in a stable private
+  /// offset node.
   private static func applyTransitionModifiersRecursively(
     _ modifiers: TransitionModifiers,
     to node: inout ResolvedNode
@@ -91,16 +94,6 @@ enum AnimationTransitionOverlay {
       drawMetadata.baseStyle.explicitOpacity = base * opacity
       node.drawMetadata = drawMetadata
     }
-
-    var children = node.children
-    for i in children.indices {
-      var child = children[i]
-      var childMods = TransitionModifiers.identity
-      childMods.opacity = modifiers.opacity
-      applyTransitionModifiersRecursively(childMods, to: &child)
-      children[i] = child
-    }
-    node.setChildrenPreservingDerivedState(children)
 
     let offsetX = modifiers.offsetX ?? 0
     let offsetY = modifiers.offsetY ?? 0

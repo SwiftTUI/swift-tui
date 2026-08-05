@@ -121,14 +121,17 @@ struct FrameworkStressPrimitiveNormalizationTests {
     #expect(merged.emphasis == TextStyle.TextEmphasis([.bold, .italic]))
   }
 
-  @Test("stress primitive normalization 011 explicit opacity overrides while absence preserves")
-  func primitiveNormalization011ExplicitOpacityOverridesWhileAbsencePreserves() {
+  @Test("stress primitive normalization 011 explicit opacity multiplies while absence preserves")
+  func primitiveNormalization011ExplicitOpacityMultipliesWhileAbsencePreserves() {
+    // The ambient-propagation contract: opacity compounds multiplicatively
+    // through the merge, matching SwiftUI — a later explicit value can only
+    // fade further, never reset.
     let base = TextStyle(opacity: 0.25)
     let preserved = base.merging(TextStyle(emphasis: .faint))
-    let overridden = preserved.merging(TextStyle(opacity: 0.75))
+    let compounded = preserved.merging(TextStyle(opacity: 0.75))
 
     #expect(preserved.explicitOpacity == 0.25)
-    #expect(overridden.explicitOpacity == 0.75)
+    #expect(compounded.explicitOpacity == 0.25 * 0.75)
   }
 
   @Test("stress primitive normalization 012 merging unions every emphasis bit")

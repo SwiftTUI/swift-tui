@@ -29,6 +29,14 @@ public struct ListItemPayload: Equatable, Sendable {
   public var rowBackgroundStyle: AnyShapeStyle?
   public var rowSeparators: ListSeparatorPreferences
   public var sectionSeparators: ListSeparatorPreferences
+  /// The authored line limit carried from the flattened content, or `nil`
+  /// for the single-line default. The windowed visible-layout math assumes
+  /// single-line flattened items, so values above 1 are clamped at the
+  /// payload-build site with a reported runtime issue.
+  public var lineLimit: Int?
+  /// The authored truncation mode carried from the flattened content, or
+  /// `nil` for the `.tail` default.
+  public var truncationMode: TextTruncationMode?
 
   public init(
     kind: Kind,
@@ -37,7 +45,9 @@ public struct ListItemPayload: Equatable, Sendable {
     rowForegroundStyle: AnyShapeStyle? = nil,
     rowBackgroundStyle: AnyShapeStyle? = nil,
     rowSeparators: ListSeparatorPreferences = .init(),
-    sectionSeparators: ListSeparatorPreferences = .init()
+    sectionSeparators: ListSeparatorPreferences = .init(),
+    lineLimit: Int? = nil,
+    truncationMode: TextTruncationMode? = nil
   ) {
     self.kind = kind
     self.text = text
@@ -46,6 +56,8 @@ public struct ListItemPayload: Equatable, Sendable {
     self.rowBackgroundStyle = rowBackgroundStyle
     self.rowSeparators = rowSeparators
     self.sectionSeparators = sectionSeparators
+    self.lineLimit = lineLimit
+    self.truncationMode = truncationMode
   }
 }
 

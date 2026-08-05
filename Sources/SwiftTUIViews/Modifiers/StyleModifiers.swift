@@ -264,15 +264,17 @@ extension View {
     )
   }
 
+  /// Underlines every descendant text run, matching SwiftUI's ambient
+  /// propagation: an environment write that descendant `Text` stamps where
+  /// its own value styling is unset. A directly-styled descendant —
+  /// including an explicit `Text.underline(false)` clear — wins over the
+  /// inherited style; `underline(false)` at the `View` level clears an
+  /// inherited underline for the subtree.
   public func underline(
     _ isActive: Bool = true,
     color: Color? = nil
   ) -> some View {
-    drawMetadata(
-      .init(
-        underlineStyle: isActive ? .init(color: color) : nil
-      )
-    )
+    environment(\.underlineStyle, isActive ? .init(color: color) : nil)
   }
 
   public func underline(
@@ -280,22 +282,14 @@ extension View {
     pattern: Text.LineStyle.Pattern,
     color: Color? = nil
   ) -> some View {
-    drawMetadata(
-      .init(
-        underlineStyle: isActive ? .init(pattern: pattern, color: color) : nil
-      )
-    )
+    environment(\.underlineStyle, isActive ? .init(pattern: pattern, color: color) : nil)
   }
 
   public func strikethrough(
     _ isActive: Bool = true,
     color: Color? = nil
   ) -> some View {
-    drawMetadata(
-      .init(
-        strikethroughStyle: isActive ? .init(color: color) : nil
-      )
-    )
+    environment(\.strikethroughStyle, isActive ? .init(color: color) : nil)
   }
 
   public func strikethrough(
@@ -303,11 +297,7 @@ extension View {
     pattern: Text.LineStyle.Pattern,
     color: Color? = nil
   ) -> some View {
-    drawMetadata(
-      .init(
-        strikethroughStyle: isActive ? .init(pattern: pattern, color: color) : nil
-      )
-    )
+    environment(\.strikethroughStyle, isActive ? .init(pattern: pattern, color: color) : nil)
   }
 
   public func listRowSeparator(

@@ -332,10 +332,33 @@ func resolvedHostedListRow(
   )
 }
 
+/// The effective text-layout attributes of the first text run inside a
+/// flattened row/cell/header subtree — the stamped leaf metadata that the
+/// flattening to `String` + `TextStyle` would otherwise destroy.
+func flattenedTextLayoutAttributes(
+  from node: ResolvedNode
+) -> (lineLimit: Int?, truncationMode: TextTruncationMode?) {
+  var stack = [node]
+  while let current = stack.popLast() {
+    switch current.drawPayload {
+    case .text, .richText:
+      return (
+        current.layoutMetadata.lineLimit,
+        current.layoutMetadata.textTruncationMode
+      )
+    default:
+      break
+    }
+    stack.append(contentsOf: current.children.reversed())
+  }
+  return (nil, nil)
+}
+
 func listItemPayload(
   from row: ResolvedListRow
 ) -> ListItemPayload {
-  .init(
+  let textAttributes = flattenedTextLayoutAttributes(from: row.labelNode)
+  return .init(
     kind: .row,
     text: resolvedNodeLabelText(from: row.labelNode),
     style: listItemTextStyle(from: row.drawMetadata),
@@ -344,7 +367,9 @@ func listItemPayload(
     rowSeparators: .init(
       top: row.drawMetadata.listStyle?.rowSeparatorTopVisibility,
       bottom: row.drawMetadata.listStyle?.rowSeparatorBottomVisibility
-    )
+    ),
+    lineLimit: textAttributes.lineLimit,
+    truncationMode: textAttributes.truncationMode
   )
 }
 
@@ -366,9 +391,12 @@ func tableRowCellPayloads(
       usesRowAsSingleCell
       ? cellNode.drawMetadata
       : node.drawMetadata.merging(cellNode.drawMetadata)
+    let textAttributes = flattenedTextLayoutAttributes(from: cellNode)
     return .init(
       text: trimmedText,
-      style: listItemTextStyle(from: styleMetadata)
+      style: listItemTextStyle(from: styleMetadata),
+      lineLimit: textAttributes.lineLimit,
+      truncationMode: textAttributes.truncationMode
     )
   }
 }

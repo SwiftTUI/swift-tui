@@ -33,9 +33,18 @@ public struct TextFigure: PrimitiveView, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [
+    // Ambient decorations reach banner output like any other text run (the
+    // ambient text-LAYOUT attributes deliberately do not — figlet output is
+    // preformatted). The figure has no per-value styling surface, so the
+    // stamp is unconditional where the environment carries a value.
+    var stampedDrawMetadata = DrawMetadata()
+    let decorations = ambientTextDecorations(in: context)
+    stampedDrawMetadata.underlineStyle = decorations.underline
+    stampedDrawMetadata.strikethroughStyle = decorations.strikethrough
+    return [
       resolveLeafNode(
         kindName: "TextFigure",
+        drawMetadata: stampedDrawMetadata,
         drawPayload: .textFigure(
           .init(
             content: content,

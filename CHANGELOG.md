@@ -8,6 +8,43 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed — behavior-breaking
+
+- **Ambient propagation for `lineLimit`, `truncationMode`, `.opacity`,
+  `underline`, and `strikethrough`.** The `View` modifiers stop being
+  node-local no-ops on containers and adopt SwiftUI's ambient contract.
+  `lineLimit(_:)`/`truncationMode(_:)`/`textWrappingStrategy(_:)` are now
+  environment writes (public `\.lineLimit` and `\.truncationMode` readers
+  included): `VStack { … }.lineLimit(1)` clamps every descendant text, the
+  innermost write wins, and `.lineLimit(nil)` clears an inherited limit —
+  previously a silent no-op. The raw authored value rides the environment;
+  text layout clamps non-positive limits to one line (verified against
+  macOS SwiftUI). `View.underline()`/`.strikethrough()` propagate the same
+  way, with a directly-styled `Text` — including an explicit
+  `.underline(false)` — winning over the inherited style. `TextEditor`
+  ignores ambient text-layout attributes, matching SwiftUI. Layouts that
+  relied on the container no-ops will change.
+- **`.opacity` is a multiplicative draw cascade.** Every emitted draw
+  command now carries the product of the `.opacity` factors on its ancestor
+  chain including the node's own: `container.opacity(0.3)` fades the whole
+  subtree, nested fades multiply (0.4 × 0.5 = 0.2), and the explicit-reset
+  pattern (`.opacity(0.4)` … `.opacity(1)`) yields 0.4 instead of 1.0 —
+  the same-node metadata merge multiplies instead of replacing. Shape
+  fills, strokes, rules, borders, canvas foregrounds, and list/table chrome
+  now honor the factor too (a `.opacity` directly on a shape leaf was
+  previously dropped). Image attachments still cannot carry the factor —
+  recorded as a register gap. Retained draw reuse verifies the inherited
+  factor before serving a cached subtree, so an ancestor-only fade repaints
+  descendants correctly.
+- **List/Table rows honor authored text attributes.** Authored or ambient
+  `lineLimit`/`truncationMode` now reach hosted rows and table cells
+  (`Table`'s hosted cells default to single-line tail truncation instead of
+  clobbering authored values), and the flattened payload boundary carries
+  the attributes (`ListItemPayload`/`TableCellPayload` gain
+  `lineLimit`/`truncationMode`). The default row limit remains 1. Flattened
+  section chrome honors truncation but clamps limits above one with a
+  `collection.unsupportedSectionChromeLineLimit` runtime issue.
+
 ### Added
 
 - **`Binding` projections and the optional-binding init family.**

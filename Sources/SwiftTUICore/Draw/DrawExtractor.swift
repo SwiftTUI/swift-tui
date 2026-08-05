@@ -53,12 +53,14 @@ private enum ExtractionStep {
   case descend(
     node: PlacedNode,
     inheritedBorderMask: BorderMask?,
-    isInBackgroundSubtree: Bool
+    isInBackgroundSubtree: Bool,
+    inheritedOpacity: Double
   )
   case assemble(
     node: PlacedNode,
     inheritedBorderMask: BorderMask?,
     isInBackgroundSubtree: Bool,
+    inheritedOpacity: Double,
     children: [PlacedNode]
   )
 }
@@ -72,7 +74,8 @@ extension DrawExtractor {
       .descend(
         node: root,
         inheritedBorderMask: nil,
-        isInBackgroundSubtree: false
+        isInBackgroundSubtree: false,
+        inheritedOpacity: 1
       )
     ]
     steps.reserveCapacity(root.subtreeNodeCount * 2)
@@ -82,7 +85,12 @@ extension DrawExtractor {
 
     while let step = steps.popLast() {
       switch step {
-      case .descend(let node, let inheritedBorderMask, let isInBackgroundSubtree):
+      case .descend(
+        let node, let inheritedBorderMask, let isInBackgroundSubtree, let inheritedOpacity
+      ):
+        // The reuse proof already verified the inherited opacity at this
+        // subtree root matches the previous frame's, so reusing under a
+        // steady ancestor fade is sound (see `collectReusablePhaseSubtrees`).
         if inheritedBorderMask == nil,
           !isInBackgroundSubtree,
           input?.proof.canReuseSubtree(rootedAt: node.identity) == true,
@@ -103,10 +111,15 @@ extension DrawExtractor {
             node: node,
             inheritedBorderMask: inheritedBorderMask,
             isInBackgroundSubtree: isInBackgroundSubtree,
+            inheritedOpacity: inheritedOpacity,
             children: children
           )
         )
 
+        // Children inherit the node's effective factor: the product of every
+        // ancestor `.opacity` including this node's own.
+        let childInheritedOpacity =
+          inheritedOpacity * (node.drawMetadata.explicitOpacity ?? 1)
         for index in children.indices.reversed() {
           steps.append(
             .descend(
@@ -121,7 +134,8 @@ extension DrawExtractor {
                 forChildAt: index,
                 kind: node.kind,
                 inheritedValue: isInBackgroundSubtree
-              )
+              ),
+              inheritedOpacity: childInheritedOpacity
             )
           )
         }
@@ -129,6 +143,7 @@ extension DrawExtractor {
         let node,
         let inheritedBorderMask,
         let isInBackgroundSubtree,
+        let inheritedOpacity,
         let children
       ):
         let childCount = children.count
@@ -148,7 +163,8 @@ extension DrawExtractor {
             children: children,
             childNodes: childNodes,
             inheritedBorderMask: inheritedBorderMask,
-            isInBackgroundSubtree: isInBackgroundSubtree
+            isInBackgroundSubtree: isInBackgroundSubtree,
+            inheritedOpacity: inheritedOpacity
           )
         )
       }
@@ -162,7 +178,8 @@ extension DrawExtractor {
     children: [PlacedNode],
     childNodes: [DrawNode],
     inheritedBorderMask: BorderMask?,
-    isInBackgroundSubtree: Bool
+    isInBackgroundSubtree: Bool,
+    inheritedOpacity: Double
   ) -> DrawNode {
     let projection = drawPhaseProjection(from: placed)
     let identity = projection.identity
@@ -172,6 +189,17 @@ extension DrawExtractor {
     let drawMetadata = projection.drawMetadata
     let drawEffects = projection.drawEffects
     let drawPayload = projection.drawPayload
+    // The multiplicative cascade: every command this node emits carries the
+    // product of the ancestor chain's `.opacity` factors including its own.
+    // An unfaded tree (`effectiveOpacity == 1`) emits byte-identical commands
+    // to the uncascaded output. Text styles always carried the node's own
+    // factor, so they take `effectiveOpacity` directly; shape styles carried
+    // no factor at all (`.opacity` on a shape leaf was silently dropped) and
+    // gain it through the multiplicative `AnyShapeStyle.opacity` wrap.
+    let effectiveOpacity = inheritedOpacity * (drawMetadata.explicitOpacity ?? 1)
+    func faded(_ style: AnyShapeStyle) -> AnyShapeStyle {
+      effectiveOpacity == 1 ? style : style.opacity(effectiveOpacity)
+    }
     var commands: [DrawCommand] = []
     let drawsRule: Bool
 
@@ -196,7 +224,7 @@ extension DrawExtractor {
         }
       let maskedBackgroundFill = maskedBackgroundFillCommand(
         bounds: bounds,
-        style: backgroundStyle,
+        style: faded(backgroundStyle),
         defaultMode: defaultFillMode,
         inheritedBorderMask: inheritedBorderMask
       )
@@ -219,7 +247,7 @@ extension DrawExtractor {
         .text(
           bounds: bounds,
           content: content,
-          style: textStyle(from: drawMetadata),
+          style: textStyle(from: drawMetadata, effectiveOpacity: effectiveOpacity),
           lineLimit: layoutMetadata.lineLimit,
           truncationMode: layoutMetadata.textTruncationMode ?? .tail,
           wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
@@ -235,14 +263,14 @@ extension DrawExtractor {
         .styledPreformattedText(
           bounds: bounds,
           lines: renderedFigure.styledLines,
-          style: textStyle(from: drawMetadata)
+          style: textStyle(from: drawMetadata, effectiveOpacity: effectiveOpacity)
         )
       )
     case .richText(let payload):
       commands.append(
         .richText(
           bounds: bounds,
-          payload: payload,
+          payload: fadedRichTextPayload(payload, effectiveOpacity: effectiveOpacity),
           lineLimit: layoutMetadata.lineLimit,
           truncationMode: layoutMetadata.textTruncationMode ?? .tail,
           wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
@@ -262,7 +290,8 @@ extension DrawExtractor {
           for: payload,
           in: bounds,
           hostsCommittedItems: projection.hostedCollectionContainer?.kind == .list,
-          placedLayout: projection.hostedListVisibleLayout
+          placedLayout: projection.hostedListVisibleLayout,
+          effectiveOpacity: effectiveOpacity
         )
       )
     case .table(let payload):
@@ -272,7 +301,8 @@ extension DrawExtractor {
           in: bounds,
           hostsCommittedItems: projection.hostedCollectionContainer?.kind == .table,
           columnWidths: projection.hostedTableColumnWidths,
-          placedLayout: projection.hostedTableVisibleLayout
+          placedLayout: projection.hostedTableVisibleLayout,
+          effectiveOpacity: effectiveOpacity
         )
       )
     case .shape(let payload):
@@ -283,7 +313,7 @@ extension DrawExtractor {
             bounds: bounds,
             geometry: payload.geometry,
             insetAmount: payload.insetAmount,
-            style: style ?? drawMetadata.foregroundStyle ?? .semantic(.foreground),
+            style: faded(style ?? drawMetadata.foregroundStyle ?? .semantic(.foreground)),
             mode: mode
           )
         )
@@ -293,13 +323,18 @@ extension DrawExtractor {
             bounds: bounds,
             geometry: payload.geometry,
             insetAmount: payload.insetAmount,
-            style: style
-              ?? drawMetadata.borderShapeStyle
-              ?? drawMetadata.foregroundStyle
-              ?? .semantic(strokeBorder ? .separator : .foreground),
+            style: faded(
+              style
+                ?? drawMetadata.borderShapeStyle
+                ?? drawMetadata.foregroundStyle
+                ?? .semantic(strokeBorder ? .separator : .foreground)
+            ),
             strokeStyle: strokeStyle,
             strokeBorder: strokeBorder,
-            backgroundStyle: backgroundStyle
+            backgroundStyle: fadedBorderBackground(
+              backgroundStyle,
+              effectiveOpacity: effectiveOpacity
+            )
           )
         )
       }
@@ -307,19 +342,24 @@ extension DrawExtractor {
       commands.append(
         .rule(
           bounds: bounds,
-          style: drawMetadata.borderShapeStyle
-            ?? drawMetadata.foregroundStyle
-            ?? .semantic(.separator),
+          style: faded(
+            drawMetadata.borderShapeStyle
+              ?? drawMetadata.foregroundStyle
+              ?? .semantic(.separator)
+          ),
           strokeStyle: strokeStyle ?? drawMetadata.borderStrokeStyle ?? .init(),
           stackAxis: drawMetadata.leafStackAxis
         )
       )
     case .canvas(let payload):
+      // The canvas default foreground fades; colors the drawing sets
+      // explicitly cannot (they resolve inside the canvas context) — see the
+      // divergence register.
       commands.append(
         .canvas(
           bounds: bounds,
           payload: payload,
-          foregroundStyle: drawMetadata.foregroundStyle ?? .semantic(.foreground)
+          foregroundStyle: faded(drawMetadata.foregroundStyle ?? .semantic(.foreground))
         )
       )
     case .foreignSurface(let payload):
@@ -335,7 +375,8 @@ extension DrawExtractor {
       contentsOf: scrollIndicatorCommands(
         bounds: bounds,
         drawMetadata: drawMetadata,
-        children: children
+        children: children,
+        effectiveOpacity: effectiveOpacity
       )
     )
 
@@ -345,7 +386,7 @@ extension DrawExtractor {
           bounds: bounds,
           geometry: .rectangle,
           insetAmount: 0,
-          style: borderShapeStyle,
+          style: faded(borderShapeStyle),
           strokeStyle: drawMetadata.borderStrokeStyle ?? .init(),
           strokeBorder: true,
           backgroundStyle: nil
@@ -370,12 +411,37 @@ extension DrawExtractor {
       let blendPhase,
       let sides
     ) = projection.layoutBehavior {
+      // Default-styled (nil) foreground sides fall back to the theme
+      // foreground at raster time; when fading, substitute that exact color
+      // so the faded border matches the unfaded default hue. A nil
+      // background side means "no background paint" and stays nil.
+      let fadedForeground: BorderEdgeStyle?
+      let fadedBlend: BorderBlend?
+      if effectiveOpacity == 1 {
+        fadedForeground = foreground
+        fadedBlend = blend
+      } else {
+        let themeForeground = AnyShapeStyle.color(environmentSnapshot.style.theme.foreground)
+        var edge = foreground ?? .init()
+        edge.top = (edge.top ?? themeForeground).opacity(effectiveOpacity)
+        edge.right = (edge.right ?? themeForeground).opacity(effectiveOpacity)
+        edge.bottom = (edge.bottom ?? themeForeground).opacity(effectiveOpacity)
+        edge.left = (edge.left ?? themeForeground).opacity(effectiveOpacity)
+        fadedForeground = edge
+        fadedBlend = blend.map { blend in
+          var faded = blend
+          faded.stops = faded.stops.map { stop in
+            .init(color: stop.color.opacity(effectiveOpacity), location: stop.location)
+          }
+          return faded
+        }
+      }
       let borderCommand: DrawCommand = .border(
         bounds: bounds,
         set: set,
-        foreground: foreground,
-        background: background,
-        blend: blend,
+        foreground: fadedForeground,
+        background: fadedBorderBackground(background, effectiveOpacity: effectiveOpacity),
+        blend: fadedBlend,
         blendPhase: blendPhase,
         sides: sides
       )
@@ -632,7 +698,8 @@ extension DrawExtractor {
 // state, while still allowing environment/theme-driven semantic roles to flow
 // through the pipeline in a deterministic order.
 private func textStyle(
-  from metadata: DrawMetadata
+  from metadata: DrawMetadata,
+  effectiveOpacity: Double
 ) -> TextStyle {
   TextStyle(
     foregroundStyle: metadata.foregroundStyle,
@@ -640,6 +707,43 @@ private func textStyle(
     emphasis: metadata.emphasis,
     underlineStyle: metadata.underlineStyle,
     strikethroughStyle: metadata.strikethroughStyle,
-    opacity: metadata.opacity
+    // The cascade product. With no faded ancestor this equals the node's own
+    // `metadata.opacity`, keeping unfaded commands byte-identical.
+    opacity: effectiveOpacity
   )
+}
+
+/// Multiplies the cascade factor into every rich-text run. Run styles carry
+/// the authoring-time `Text`-value styling (their `opacity` never includes
+/// node-level draw metadata), so the node's effective factor applies once.
+private func fadedRichTextPayload(
+  _ payload: RichTextPayload,
+  effectiveOpacity: Double
+) -> RichTextPayload {
+  guard effectiveOpacity != 1 else {
+    return payload
+  }
+  var faded = payload
+  faded.runs = faded.runs.map { run in
+    var run = run
+    run.style.opacity = run.style.opacity * effectiveOpacity
+    return run
+  }
+  return faded
+}
+
+/// Fades the non-nil sides of a border background. A nil side means "no
+/// background paint" and must stay nil.
+func fadedBorderBackground(
+  _ style: BorderBackgroundStyle?,
+  effectiveOpacity: Double
+) -> BorderBackgroundStyle? {
+  guard effectiveOpacity != 1, var faded = style else {
+    return style
+  }
+  faded.top = faded.top?.opacity(effectiveOpacity)
+  faded.right = faded.right?.opacity(effectiveOpacity)
+  faded.bottom = faded.bottom?.opacity(effectiveOpacity)
+  faded.left = faded.left?.opacity(effectiveOpacity)
+  return faded
 }

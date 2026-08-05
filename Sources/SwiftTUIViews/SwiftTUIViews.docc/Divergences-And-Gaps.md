@@ -288,6 +288,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   SwiftUI takes a `View?` and accepts `nil`. Terminal row backgrounds are
   cell paints, not arbitrary views; clearing is expressed by not applying the
   modifier, and widening to an optional stays additive.
+- **List rows and table cells default to one line; authored limits are
+  honored.** *Ratified.* The single-line default is terminal-native — it is
+  load-bearing for the windowed visible-layout math. What no longer happens
+  is destruction or clobbering of authored values: an authored or ambient
+  `lineLimit`/`truncationMode` reaches hosted rows and cells (rows grow to
+  their measured height, and the payload boundary carries the attributes for
+  flattened text). Flattened section chrome (headers/footers) honors the
+  truncation mode but renders one line; an authored limit above one there
+  reports a `collection.unsupportedSectionChromeLineLimit` runtime issue and
+  clamps. Variable-height *flattened* lines remain a *Gap*.
 
 ## Controls and text
 
@@ -304,11 +314,27 @@ are omitted even when SwiftUI exposes a corresponding API.
   meaning. An image whose source cannot be resolved measures zero and
   reports an `image.unresolvedSource` runtime issue rather than failing
   silently.
-- **Emphasis is `Text`-scoped, with SGR extensions.** *Ratified.* `bold()`,
-  `italic()`, `underline()`, and `strikethrough()` return `Text` — there are
-  no `View`-level variants because emphasis is a glyph attribute, not an
-  environment — and the SGR set adds `faint()` and `blink()` with no SwiftUI
-  analog.
+- **Emphasis is `Text`-scoped, with SGR extensions; decorations propagate
+  ambiently.** *Ratified.* `bold()` and `italic()` return `Text` — glyph
+  attributes with no `View`-level variants — and the SGR set adds `faint()`
+  and `blink()` with no SwiftUI analog. `underline()` and `strikethrough()`
+  exist at both levels, matching SwiftUI: the `View` forms are environment
+  writes that every descendant text run stamps where its own value styling
+  is unset, and a directly-styled `Text` — including an explicit
+  `.underline(false)` clear — wins over the inherited style (verified
+  against macOS SwiftUI, 2026-08-05).
+- **`lineLimit`/`truncationMode`/`textWrappingStrategy` are environment
+  values with SwiftUI's replacement semantics.** *Ratified (parity).* The
+  `View` modifiers write public `\.lineLimit`/`\.truncationMode` (and the
+  SwiftTUI-only `\.textWrappingStrategy`): the innermost write wins,
+  `lineLimit(nil)` clears an inherited limit, and the raw authored value
+  rides the environment while text layout clamps non-positive limits to one
+  line — each verified against macOS SwiftUI. Text-run leaves (`Text`,
+  `Link`) stamp the effective values into node metadata at resolve time
+  because the fused frame tail cannot read the environment. `TextEditor`
+  opts its body out (its movement map wraps at the measured content width,
+  and SwiftUI's `TextEditor` ignores an ancestor limit too);
+  `TextFigure` ignores all three (preformatted banner output).
 - **`Text.cellBackground(_:)` paints the text's own cells.** *Ratified.*
   Renamed from `backgroundStyle(_:)` in the pre-launch sweep: SwiftUI's
   `backgroundStyle(_:)` is an environment write with different semantics,
@@ -533,6 +559,17 @@ are omitted even when SwiftUI exposes a corresponding API.
   type. A terminal reports foreground/background colors, not a scheme; the
   appearance surface exposes what the host actually knows, and semantic roles
   absorb the light/dark decision in the theme.
+- **`.opacity` cascades multiplicatively at draw extraction.** *Ratified
+  (parity).* The effective opacity of every emitted draw command is the
+  product of the `.opacity` factors on its ancestor chain including the
+  node's own — `container.opacity(0.3)` fades the whole subtree, nested
+  fades multiply, and an explicit `.opacity(1)` reset is impossible,
+  matching SwiftUI. Same-node modifier chains compound through the metadata
+  merge. Retained draw reuse verifies the inherited factor before serving a
+  cached subtree, and animated fades write the overlay root only (the
+  cascade reaches descendants at extraction). A `Canvas` fades its default
+  foreground but not colors the drawing resolves internally — a residual
+  *Gap* shared with the image path below.
 
 ## Surface extensions with no SwiftUI analog
 
@@ -668,6 +705,11 @@ path, while unblended images keep the fast native path.
   overlapping blended images do not composite as ordered layers, and the
   precomposed variant is not replayed on native hosts outside the terminal
   image path.
+- **Images do not honor the opacity cascade.** *Gap.* Image attachments
+  carry no view-level alpha channel, so `.opacity` on or above an `Image`
+  fades the surrounding cell content but not the attachment itself. Honoring
+  the factor needs an alpha input on the attachment/compositing path rather
+  than a faked cell-level approximation.
 
 ## Where divergences are recorded
 

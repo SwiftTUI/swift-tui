@@ -14,6 +14,13 @@ public struct Text: PrimitiveView, ResolvableView {
   }
   package var _boxedDrawMetadata: Boxed<DrawMetadata>
   public var semanticMetadata: SemanticMetadata
+  /// True after an explicit `.underline(false)` on this text value. A `nil`
+  /// `underlineStyle` alone cannot distinguish "never styled" (inherit the
+  /// ambient underline) from "explicitly cleared" (suppress it) — and the
+  /// explicit clear must win over the environment, matching SwiftUI.
+  package var underlineExplicitlyCleared = false
+  /// The strikethrough counterpart of ``underlineExplicitlyCleared``.
+  package var strikethroughExplicitlyCleared = false
 
   public var content: String {
     switch storage {
@@ -104,14 +111,26 @@ public struct Text: PrimitiveView, ResolvableView {
           )
         )
       }
+    // Ambient decorations stamp only where this text's own value styling is
+    // unset — node-over-environment precedence, with an explicit
+    // `.underline(false)`/`.strikethrough(false)` clear winning over the
+    // inherited style.
+    var stampedDrawMetadata = drawMetadata
+    let decorations = ambientTextDecorations(in: context)
+    if stampedDrawMetadata.underlineStyle == nil, !underlineExplicitlyCleared {
+      stampedDrawMetadata.underlineStyle = decorations.underline
+    }
+    if stampedDrawMetadata.strikethroughStyle == nil, !strikethroughExplicitlyCleared {
+      stampedDrawMetadata.strikethroughStyle = decorations.strikethrough
+    }
     let node = ResolvedNode(
       identity: context.identity,
       kind: .view("Text"),
       typeDiscriminator: ObjectIdentifier(Text.self),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      layoutMetadata: .init(),
-      drawMetadata: drawMetadata,
+      layoutMetadata: ambientTextLayoutMetadata(in: context),
+      drawMetadata: stampedDrawMetadata,
       semanticMetadata: semanticMetadata,
       drawPayload: drawPayload
     )

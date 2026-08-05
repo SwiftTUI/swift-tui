@@ -3066,11 +3066,15 @@ struct AnimationControllerRemovalTests {
         "the padding wrapper should still contain the original leaf"
       )
 
-      // Opacity should cascade to the leaf so the text actually fades.
+      // The fade is written at the injected subtree's ROOT only: draw
+      // extraction multiplies ancestor factors into every descendant command
+      // (the multiplicative opacity cascade), so a recursive metadata write
+      // would square the fade. The leaf's own metadata stays untouched.
+      #expect(injectedPadding.drawMetadata.baseStyle.explicitOpacity != nil)
       if let reinjectedLeaf = injectedPadding.children.first(
         where: { $0.identity == leafIdentity }
       ) {
-        #expect(reinjectedLeaf.drawMetadata.baseStyle.explicitOpacity != nil)
+        #expect(reinjectedLeaf.drawMetadata.baseStyle.explicitOpacity == nil)
       }
     }
   }

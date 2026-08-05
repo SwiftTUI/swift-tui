@@ -596,7 +596,8 @@ extension CollectionStylePresentation {
       isHeader: false,
       rowIndex: rowIndex,
       sectionIndex: usesSectionChrome ? 0 : nil,
-      itemIndex: rowIndex
+      itemIndex: rowIndex,
+      truncationMode: item.truncationMode ?? .tail
     )
   }
 
@@ -663,7 +664,8 @@ extension CollectionStylePresentation {
             kind: .text(item.text, styleOverride),
             isHeader: true,
             rowIndex: nil,
-            itemIndex: index
+            itemIndex: index,
+            truncationMode: item.truncationMode ?? .tail
           )
         )
       case .footer:
@@ -677,7 +679,8 @@ extension CollectionStylePresentation {
             kind: .text(item.text, styleOverride),
             isHeader: true,
             rowIndex: nil,
-            itemIndex: index
+            itemIndex: index,
+            truncationMode: item.truncationMode ?? .tail
           )
         )
       case .row:
@@ -716,7 +719,8 @@ extension CollectionStylePresentation {
             ),
             isHeader: false,
             rowIndex: rowIndex,
-            itemIndex: index
+            itemIndex: index,
+            truncationMode: item.truncationMode ?? .tail
           )
         )
 

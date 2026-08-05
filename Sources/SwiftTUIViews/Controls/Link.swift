@@ -45,6 +45,7 @@ extension Link {
       kind: .view("Link"),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
+      layoutMetadata: ambientTextLayoutMetadata(in: context),
       drawMetadata: .init(),
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
@@ -69,10 +70,22 @@ package func resolvedRichTextPayload(
     context: context,
     rootIdentity: context.identity
   )
+  // Rich-text rasterization reads per-run styles, never node metadata, so
+  // the ambient decorations seed the run inheritance chain here — value-level
+  // styling still overrides through the run merge, and a top-level explicit
+  // clear suppresses the seed.
+  let decorations = ambientTextDecorations(in: context)
+  var inheritedStyle = TextStyle()
+  if !text.underlineExplicitlyCleared {
+    inheritedStyle.underlineStyle = decorations.underline
+  }
+  if !text.strikethroughExplicitlyCleared {
+    inheritedStyle.strikethroughStyle = decorations.strikethrough
+  }
   let payload = RichTextPayload(
     runs: builder.runs(
       for: text,
-      inheritedStyle: .init()
+      inheritedStyle: inheritedStyle
     )
   )
   builder.registerInlineLinkActions()

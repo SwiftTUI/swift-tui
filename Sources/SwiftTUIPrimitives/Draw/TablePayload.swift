@@ -29,13 +29,25 @@ public struct TableColumnPayload: Equatable, Sendable {
 public struct TableCellPayload: Equatable, Sendable {
   public var text: String
   public var style: TextStyle
+  /// The authored line limit carried from the flattened cell content, or
+  /// `nil` for the single-line default. The flattened cell renderer is
+  /// single-line, so values above 1 are clamped at the payload-build site;
+  /// hosted cells honor the authored value through their committed children.
+  public var lineLimit: Int?
+  /// The authored truncation mode carried from the flattened cell content,
+  /// or `nil` for the `.tail` default.
+  public var truncationMode: TextTruncationMode?
 
   public init(
     text: String,
-    style: TextStyle = .init()
+    style: TextStyle = .init(),
+    lineLimit: Int? = nil,
+    truncationMode: TextTruncationMode? = nil
   ) {
     self.text = text
     self.style = style
+    self.lineLimit = lineLimit
+    self.truncationMode = truncationMode
   }
 }
 
