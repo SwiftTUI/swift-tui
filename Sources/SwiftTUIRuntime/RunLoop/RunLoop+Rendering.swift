@@ -19,6 +19,17 @@ extension RunLoop {
     defer {
       endTerminalRenderPass()
     }
+    // Committed `withAnimation` completions queue during the pass and fire
+    // after each frame's lifecycle dispatch (`applyAcquiredFrame`); the
+    // pass-end drain is the backstop for paths that throw before it.
+    renderer.internalAnimationController.beginDeferringCommittedCompletionDispatch()
+    defer {
+      let completions =
+        renderer.internalAnimationController.endDeferringCommittedCompletionDispatch()
+      for completion in completions {
+        completion()
+      }
+    }
 
     observationBridge.attachInvalidator(scheduler)
     registerLiveFocusedValuesProvider()
@@ -236,6 +247,12 @@ extension RunLoop {
         currentTaskRegistry: localTaskRegistry
       )
     )
+    // AFTER the lifecycle dispatch, so a completion's state writes get their
+    // own resolve before any same-frame `onChange` can read them (the stuck-
+    // ripple absorbing state), and BEFORE `flushPostActionInvalidations` so
+    // the writes' invalidations flow into this frame's flush as they did
+    // when completions fired at commit.
+    fireDeferredAnimationCompletions()
     updateFocusPresentation(focusPresentation)
     // Record the committed focus so the next frame's reuse-safety gate can
     // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
@@ -335,6 +352,18 @@ extension RunLoop {
     defer {
       endTerminalRenderPass()
     }
+    // Committed `withAnimation` completions queue during the pass and fire
+    // after each frame's lifecycle dispatch (`applyAcquiredFrame`) or at the
+    // elided/skipped branches; the pass-end drain is the backstop for paths
+    // that throw before those sites.
+    renderer.internalAnimationController.beginDeferringCommittedCompletionDispatch()
+    defer {
+      let completions =
+        renderer.internalAnimationController.endDeferringCommittedCompletionDispatch()
+      for completion in completions {
+        completion()
+      }
+    }
 
     observationBridge.attachInvalidator(scheduler)
     registerLiveFocusedValuesProvider()
@@ -421,21 +450,28 @@ extension RunLoop {
           // Nothing was presented, so the inputs this acquisition took over
           // are still unanswered — hand them back to whichever frame does
           // present, exactly like the lifecycle carry-forward above.
+          //
+          // Earlier convergence passes of this frame DID commit, and their
+          // deferred completions must not outlive the frame they rode with.
+          fireDeferredAnimationCompletions()
           restorePendingAnsweredInputs(answeredInputs)
           requestNextAnimationFrameAfterSkippedFrameIfNeeded(at: frameInstant)
           continue frameLoop
         case .elided:
           // Off-screen elision fired: `commitElidedFrame` (inside the gate
-          // closure) already fired deferred completions and published the
-          // advanced animation state to live, but no tail ran and nothing
-          // was presented. Keep the animation loop alive by rescheduling the
-          // next deadline from the now-live tick result, carry lifecycle
-          // forward (no tail consumed it), record the diagnostic, advance the
-          // frame counter, and abandon the rest of this frame.
+          // closure) already published the advanced animation state to live
+          // and queued its deferred completions, but no tail ran and nothing
+          // was presented. Fire the queued completions here (an elided frame
+          // dispatches no lifecycle plan, so there is nothing to order them
+          // after), keep the animation loop alive by rescheduling the next
+          // deadline from the now-live tick result, carry lifecycle forward
+          // (no tail consumed it), record the diagnostic, advance the frame
+          // counter, and abandon the rest of this frame.
           //
           // An elided frame presents nothing, so — like a skipped one — its
           // answered inputs stay unanswered and carry forward. Reporting them
           // here would claim a latency for pixels that never appeared.
+          fireDeferredAnimationCompletions()
           restorePendingAnsweredInputs(answeredInputs)
           appendLifecycleCarryForward(
             convergence.lifecycleCarryForward,

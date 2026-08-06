@@ -71,6 +71,20 @@ extension RunLoop {
     postActionInvalidationIdentities.removeAll(keepingCapacity: true)
   }
 
+  /// Fires `withAnimation` completions the frame drivers' deferral scope
+  /// queued at commit. Called AFTER a committed frame's lifecycle dispatch
+  /// (and at the elided/skipped branches), so a completion's state writes get
+  /// their own resolve before any same-frame `onChange` can read them — the
+  /// completion/`onChange` same-frame race behind the counter demo's stuck
+  /// ripple. See `AnimationController.beginDeferringCommittedCompletionDispatch`.
+  func fireDeferredAnimationCompletions() {
+    let completions =
+      renderer.internalAnimationController.takeDeferredCommittedCompletions()
+    for completion in completions {
+      completion()
+    }
+  }
+
   /// The scheduler's coalesced invalidation identities right now — used to tell
   /// whether a just-dispatched action requested an invalidation of its own.
   func schedulerPendingInvalidations() -> Set<Identity> {

@@ -35,6 +35,80 @@ package final class AnimationController: Sendable {
   /// mid-flight and the draft's pre-reset state must not be republished.
   fileprivate private(set) var resetEpoch = 0
 
+  /// Committed-frame completion dispatch deferral (frame-driver scope).
+  ///
+  /// A `withAnimation` completion that comes due during a frame fires at that
+  /// frame's commit — but the SAME commit also dispatches the frame's planned
+  /// lifecycle actions (`onChange`), and no resolve runs between the two. A
+  /// completion's state write was therefore observable to a same-frame
+  /// `onChange` before any body re-evaluation saw it: the counter demo's
+  /// stuck ripple (completion lowers a guard flag, `onChange` re-raises it,
+  /// the flag commits "unchanged", the guarded branch never unmounts — an
+  /// absorbing state). SwiftUI is immune because each completion's write and
+  /// the re-evaluation it causes commit as one unit before the next event
+  /// unit runs.
+  ///
+  /// While a frame driver holds this scope, committed completions queue here
+  /// instead of firing inline; the driver fires them AFTER the frame's
+  /// lifecycle dispatch, so the completion's writes get their own resolve
+  /// before any later lifecycle action can read them. Outside the scope
+  /// (bare renders — no lifecycle dispatch exists there) firing stays
+  /// inline. ``reset()`` leaves the queue untouched: a queued completion's
+  /// batch already completed, and the SwiftUI-shaped guarantee — every
+  /// `withAnimation` completion eventually fires — is the driver's to honor
+  /// at its next drain site.
+  private var isDeferringCommittedCompletionDispatch = false
+  private var deferredCommittedCompletions: [@MainActor @Sendable () -> Void] = []
+
+  /// Opens the frame-driver deferral scope. Non-reentrant: the two run-loop
+  /// frame drivers are mutually exclusive via the terminal render pass.
+  package func beginDeferringCommittedCompletionDispatch() {
+    precondition(
+      !isDeferringCommittedCompletionDispatch,
+      "committed-completion deferral scopes cannot be nested"
+    )
+    isDeferringCommittedCompletionDispatch = true
+  }
+
+  /// Closes the deferral scope and returns any still-queued completions —
+  /// the caller must invoke them (the pass-end backstop for paths that throw
+  /// before a mid-pass drain site).
+  package func endDeferringCommittedCompletionDispatch()
+    -> [@MainActor @Sendable () -> Void]
+  {
+    isDeferringCommittedCompletionDispatch = false
+    return takeDeferredCommittedCompletions()
+  }
+
+  /// Drains the queue without closing the scope (the mid-pass drain sites:
+  /// after a committed frame's lifecycle dispatch, and the elided/skipped
+  /// frame branches).
+  package func takeDeferredCommittedCompletions()
+    -> [@MainActor @Sendable () -> Void]
+  {
+    guard !deferredCommittedCompletions.isEmpty else {
+      return []
+    }
+    let completions = deferredCommittedCompletions
+    deferredCommittedCompletions.removeAll(keepingCapacity: true)
+    return completions
+  }
+
+  fileprivate func dispatchOrDeferCommittedCompletions(
+    _ completions: [@MainActor @Sendable () -> Void]
+  ) {
+    guard !completions.isEmpty else {
+      return
+    }
+    if isDeferringCommittedCompletionDispatch {
+      deferredCommittedCompletions.append(contentsOf: completions)
+    } else {
+      for completion in completions {
+        completion()
+      }
+    }
+  }
+
   // Computed accessors forwarding to the clustered sub-structs.  These keep the
   // per-tick animation logic below reading and writing the original field names
   // with identical value semantics, while the checkpoint/restore/reset triplet
@@ -212,9 +286,7 @@ package final class AnimationController: Sendable {
 
   package func commitFrameHeadTransaction(_ checkpoint: Checkpoint) {
     let completions = finishFrameHeadTransaction(checkpoint)
-    for completion in completions {
-      completion()
-    }
+    dispatchOrDeferCommittedCompletions(completions)
   }
 
   fileprivate func finishFrameHeadTransaction(
@@ -2243,9 +2315,7 @@ package final class AnimationFrameDraft {
       from: controller,
       preservingConcurrentRegistrationsSince: transactionCheckpoint
     )
-    for completion in completions {
-      completion()
-    }
+    liveController.dispatchOrDeferCommittedCompletions(completions)
   }
 
   package func discard() {
