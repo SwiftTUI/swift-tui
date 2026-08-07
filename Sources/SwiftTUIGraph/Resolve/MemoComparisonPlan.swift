@@ -10,50 +10,14 @@
 ///
 /// ## Runtime reflection bindings
 ///
-/// The stdlib's `@_spi(Reflection) _forEachField` is unavailable when the Swift
-/// module is built from its public swiftinterface (the Xcode SDK case), so the
-/// plan builder binds the runtime entry points that back both `_forEachField`
-/// and `Mirror` directly. They are exported by the Swift runtime on every
-/// platform this framework targets (macOS/Linux/WASI/Android); the fixture
-/// tests in `MemoComparisonPlanTests` pin their behavior per toolchain bump.
-/// Reflection metadata must stay enabled (it is the default everywhere).
+/// The plan builder walks fields via ``RuntimeFieldReflection`` — the
+/// package-shared bindings to the runtime entry points backing `_forEachField`
+/// and `Mirror` (see that file for the availability story).
 ///
 /// Soundness stance: a plan may report *changed* for equal values (padding
 /// bytes, unplannable shapes — a missed skip), but must never report *equal*
 /// for observably different values. The sampled `MemoSkipTrace` shadow oracle
 /// (`unsoundContentNoReads` must stay 0) alarms on any false-equal.
-
-private typealias FieldNameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
-
-@unsafe private struct FieldReflectionMetadata {
-  let name: UnsafePointer<CChar>? = nil
-  let freeFunc: FieldNameFreeFunc? = nil
-  let isStrong: Bool = false
-  let isVar: Bool = false
-}
-
-@_silgen_name("swift_reflectionMirror_recursiveCount")
-private func runtimeFieldCount(_: Any.Type) -> Int
-
-@_silgen_name("swift_reflectionMirror_recursiveChildMetadata")
-private func runtimeChildMetadata(
-  _: Any.Type,
-  index: Int,
-  fieldMetadata: UnsafeMutablePointer<FieldReflectionMetadata>
-) -> Any.Type
-
-@_silgen_name("swift_reflectionMirror_recursiveChildOffset")
-private func runtimeChildOffset(_: Any.Type, index: Int) -> Int
-
-@_silgen_name("swift_getMetadataKind")
-private func runtimeMetadataKind(_: Any.Type) -> UInt
-
-/// `swift_getMetadataKind` values this file dispatches on (from the runtime's
-/// `MetadataKind.def`; pinned by `MemoComparisonPlanTests`).
-private enum RuntimeMetadataKind {
-  static let structure: UInt = 512
-  static let tuple: UInt = 769
-}
 
 /// Compares one stored field of two values of the same concrete type, given
 /// the two value base pointers. All types are bound at plan-build time; the
@@ -182,7 +146,9 @@ package enum MemoComparisonPlanCache {
     // classes compare by identity at the *field* tier only — a class-typed
     // view value stays unplannable, mirroring the diagnostic comparator's
     // scope.
-    guard runtimeMetadataKind(type) == RuntimeMetadataKind.structure else {
+    guard
+      RuntimeFieldReflection.metadataKind(of: type) == RuntimeFieldReflection.structureKind
+    else {
       return nil
     }
     guard depth < maximumFieldPlanDepth else {
@@ -190,19 +156,12 @@ package enum MemoComparisonPlanCache {
     }
     var comparators: [MemoFieldComparator] = unsafe []
     var witnessesAllValues = true
-    let fieldCount = runtimeFieldCount(type)
+    let fieldCount = RuntimeFieldReflection.fieldCount(of: type)
     for index in 0..<fieldCount {
-      var metadata = unsafe FieldReflectionMetadata()
-      let fieldType = unsafe runtimeChildMetadata(
-        type,
-        index: index,
-        fieldMetadata: &metadata
-      )
-      let fieldName = unsafe metadata.name.map { unsafe String(cString: $0) } ?? ""
-      unsafe metadata.freeFunc?(metadata.name)
+      let info = RuntimeFieldReflection.fieldInfo(of: type, at: index)
       // Weak/unowned storage: loading through a plain typed pointer would
       // bypass the reference's ownership semantics — refuse the whole type.
-      guard unsafe metadata.isStrong else {
+      guard info.isStrong else {
         return nil
       }
       // Property-wrapper storage (`_`-prefixed `DynamicProperty` field) is
@@ -210,14 +169,13 @@ package enum MemoComparisonPlanCache {
       // gate's dependency guards (`hasNoMemoUncoveredDependencies` and the
       // environment-snapshot compare), exactly as the diagnostic comparator
       // skips them.
-      if fieldName.hasPrefix("_"), fieldType is any DynamicProperty.Type {
+      if info.name.hasPrefix("_"), info.fieldType is any DynamicProperty.Type {
         continue
       }
-      let offset = runtimeChildOffset(type, index: index)
       guard
         let field = unsafe buildFieldComparator(
-          for: fieldType,
-          atOffset: offset,
+          for: info.fieldType,
+          atOffset: info.offset,
           depth: depth
         )
       else {
@@ -261,7 +219,9 @@ package enum MemoComparisonPlanCache {
     // the field's offset (its reference-identity taint propagates). Any other
     // shape (closures, existentials, non-POD enums/tuples, erasing wrappers)
     // makes the whole type unplannable.
-    guard runtimeMetadataKind(fieldType) == RuntimeMetadataKind.structure,
+    guard
+      RuntimeFieldReflection.metadataKind(of: fieldType)
+        == RuntimeFieldReflection.structureKind,
       !MemoValueComparator.isErasingWrapper(fieldType)
     else {
       return nil
@@ -316,29 +276,24 @@ package enum MemoComparisonPlanCache {
     guard isPODType(type) else {
       return false
     }
-    let fieldCount = runtimeFieldCount(type)
+    let fieldCount = RuntimeFieldReflection.fieldCount(of: type)
     if fieldCount == 0 {
       return true
     }
-    let kind = runtimeMetadataKind(type)
+    let kind = RuntimeFieldReflection.metadataKind(of: type)
     guard
-      kind == RuntimeMetadataKind.structure || kind == RuntimeMetadataKind.tuple
+      kind == RuntimeFieldReflection.structureKind
+        || kind == RuntimeFieldReflection.tupleKind
     else {
       return false
     }
     var covered = 0
     for index in 0..<fieldCount {
-      var metadata = unsafe FieldReflectionMetadata()
-      let fieldType = unsafe runtimeChildMetadata(
-        type,
-        index: index,
-        fieldMetadata: &metadata
-      )
-      unsafe metadata.freeFunc?(metadata.name)
+      let (fieldType, offset) = RuntimeFieldReflection.fieldTypeAndOffset(of: type, at: index)
       // Declaration order is offset order for Swift structs and tuples; a
       // toolchain that reorders fails this check and falls back to the field
       // tier — conservative, never unsound.
-      guard runtimeChildOffset(type, index: index) == covered,
+      guard offset == covered,
         isExactlyByteComparable(fieldType)
       else {
         return false
