@@ -14,7 +14,6 @@ public protocol PreferenceKey {
 
 private protocol PreferenceValueBox: Sendable {
   var keyDebugName: String { get }
-  var snapshotValue: String { get }
   var valueTypeDescription: String { get }
   var reuseValue: TypedReuseValue { get }
 
@@ -36,10 +35,6 @@ private struct TypedPreferenceValueBox<Key: PreferenceKey>: PreferenceValueBox {
 
   var keyDebugName: String {
     String(reflecting: Key.self)
-  }
-
-  var snapshotValue: String {
-    reuseValue.debugValue
   }
 
   var valueTypeDescription: String {
@@ -73,13 +68,9 @@ private struct TypedPreferenceValueBox<Key: PreferenceKey>: PreferenceValueBox {
 /// A typed container of reduced preference values for a resolved subtree.
 package struct PreferenceValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any PreferenceValueBox]
-  /// Reflected values retained for diagnostics only. Reuse equality is driven
-  /// by the typed boxes in `storage`.
-  private var debugValues: [String: String]
 
   package init() {
     storage = [:]
-    debugValues = [:]
   }
 
   package subscript<K: PreferenceKey>(key: K.Type) -> K.Value {
@@ -97,9 +88,7 @@ package struct PreferenceValues: Equatable, Sendable {
     }
     set {
       let identifier = ObjectIdentifier(key)
-      let box = TypedPreferenceValueBox<K>(base: newValue)
-      storage[identifier] = box
-      debugValues[box.keyDebugName] = box.snapshotValue
+      storage[identifier] = TypedPreferenceValueBox<K>(base: newValue)
     }
   }
 
@@ -156,10 +145,8 @@ package struct PreferenceValues: Equatable, Sendable {
           )
         }
         storage[identifier] = reducedBox
-        debugValues[reducedBox.keyDebugName] = reducedBox.snapshotValue
       } else {
         storage[identifier] = nextBox
-        debugValues[nextBox.keyDebugName] = nextBox.snapshotValue
       }
     }
   }

@@ -9,16 +9,14 @@ public protocol EnvironmentKey {
 }
 
 private final class EnvironmentValueBox: Sendable {
-  let keyDebugName: String
+  /// Stored as a metatype so a write never formats a reflected name; the
+  /// snapshot's `values` projection reflects it on demand.
+  let keyType: Any.Type
   let reuseValue: TypedReuseValue
 
   init<Key: EnvironmentKey>(key: Key.Type, base: Key.Value) {
-    keyDebugName = String(reflecting: key)
+    keyType = key
     reuseValue = TypedReuseValue(base)
-  }
-
-  var snapshotValue: String {
-    reuseValue.debugValue
   }
 
   var valueTypeDescription: String {
@@ -96,9 +94,6 @@ package enum EnvironmentValuesStorage {
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: EnvironmentValueBox]
-  /// Reflected values retained for snapshot diagnostics only. Change
-  /// detection is driven by the typed boxes in `storage`.
-  private var debugValues: [String: String]
   package var _focusedIdentity: Identity?
   package var _pressedIdentity: Identity?
   /// Side-field like `_focusedIdentity`: the per-node focus-cone bake
@@ -112,7 +107,6 @@ public struct EnvironmentValues: Equatable, Sendable {
   /// Creates an empty environment container.
   public init() {
     storage = [:]
-    debugValues = [:]
     _focusedIdentity = nil
     _pressedIdentity = nil
     _isFocused = false
@@ -161,9 +155,7 @@ public struct EnvironmentValues: Equatable, Sendable {
     }
     set {
       let identifier = ObjectIdentifier(key)
-      let box = EnvironmentValueBox(key: key, base: newValue)
-      storage[identifier] = box
-      debugValues[box.keyDebugName] = box.snapshotValue
+      storage[identifier] = EnvironmentValueBox(key: key, base: newValue)
     }
   }
 
@@ -173,14 +165,10 @@ public struct EnvironmentValues: Equatable, Sendable {
     to snapshot: EnvironmentSnapshot,
     reuseStyle: Bool = false
   ) -> EnvironmentSnapshot {
-    var mergedValues = snapshot.values
-    if !debugValues.isEmpty {
-      mergedValues.merge(debugValues) { _, new in new }
-    }
     var mergedTypedValues = snapshot.typedValues
     for (identifier, box) in storage {
       mergedTypedValues[identifier] = EnvironmentSnapshotValue(
-        keyDebugName: box.keyDebugName,
+        keyType: box.keyType,
         reuseValue: box.reuseValue
       )
     }
@@ -206,15 +194,15 @@ public struct EnvironmentValues: Equatable, Sendable {
     }
     return EnvironmentSnapshot(
       debugSignature: snapshot.debugSignature,
-      values: mergedValues,
+      untypedValues: snapshot.untypedValues,
       typedValues: mergedTypedValues,
       style: style
     )
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    // Change detection compares the boxed typed values. `debugValues` is a
-    // debug projection only; it is deliberately not equality currency.
+    // Change detection compares the boxed typed values. The reflected `values`
+    // projection is derived on demand and is deliberately not equality currency.
     guard lhs.storage.count == rhs.storage.count else {
       return false
     }

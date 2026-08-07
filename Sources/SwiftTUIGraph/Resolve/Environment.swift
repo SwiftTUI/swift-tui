@@ -63,16 +63,22 @@ private func typedEquatableValuesAreEqual<Value>(
 ///
 /// `debugValue` deliberately is not equality input. It preserves the old
 /// reflected representation for tree descriptions and denial diagnostics while
-/// equality opens the original type and uses its declared semantics.
+/// equality opens the original type and uses its declared semantics. Both
+/// reflected strings are computed on demand: reflection must never run on the
+/// per-write environment/preference hot path, only when diagnostics ask.
 package struct TypedReuseValue: Sendable {
-  package let debugValue: String
-  package let valueTypeDescription: String
   private let storage: TypedReuseValueStorage
 
   package init<Value: Sendable>(_ value: Value) {
-    debugValue = String(reflecting: value)
-    valueTypeDescription = String(reflecting: Value.self)
     storage = TypedReuseValueStorage(value)
+  }
+
+  package var debugValue: String {
+    storage.debugValue
+  }
+
+  package var valueTypeDescription: String {
+    storage.valueTypeDescription
   }
 
   package func isEqual(to other: Self) -> Bool {
@@ -89,11 +95,13 @@ package struct TypedReuseValue: Sendable {
 
 private final class TypedReuseValueStorage: Sendable {
   private let valueType: ObjectIdentifier
+  private let declaredValueType: Any.Type
   private let valueOperation: @Sendable () -> any Sendable
   private let comparator: @Sendable (TypedReuseValueStorage) -> Bool
 
   init<Value: Sendable>(_ value: Value) {
     valueType = ObjectIdentifier(Value.self)
+    declaredValueType = Value.self
     valueOperation = { value }
     comparator = { other in
       guard other.valueType == ObjectIdentifier(Value.self),
@@ -103,6 +111,14 @@ private final class TypedReuseValueStorage: Sendable {
       }
       return typedValuesAreEqualForReuse(value, right)
     }
+  }
+
+  var debugValue: String {
+    String(reflecting: valueOperation())
+  }
+
+  var valueTypeDescription: String {
+    String(reflecting: declaredValueType)
   }
 
   func isEqual(to other: TypedReuseValueStorage) -> Bool {
@@ -115,15 +131,21 @@ private final class TypedReuseValueStorage: Sendable {
 }
 
 package struct EnvironmentSnapshotValue: Sendable {
-  package let keyDebugName: String
+  private let keyType: Any.Type
   package let reuseValue: TypedReuseValue
 
   package init(
-    keyDebugName: String,
+    keyType: Any.Type,
     reuseValue: TypedReuseValue
   ) {
-    self.keyDebugName = keyDebugName
+    self.keyType = keyType
     self.reuseValue = reuseValue
+  }
+
+  /// Reflected on demand; the per-write environment path stores only the key
+  /// metatype and never formats it.
+  package var keyDebugName: String {
+    String(reflecting: keyType)
   }
 
   package func isEqual(to other: Self) -> Bool {
@@ -133,22 +155,22 @@ package struct EnvironmentSnapshotValue: Sendable {
 
 private final class EnvironmentSnapshotStorage: Sendable {
   let debugSignature: String
-  let values: [String: String]
   let typedValues: [ObjectIdentifier: EnvironmentSnapshotValue]
+  /// Entries with no typed counterpart (public `init(values:)` and the public
+  /// `values` setter). Typed writes never touch this dictionary, so building a
+  /// snapshot does no per-write partitioning work.
   let untypedValues: [String: String]
   let style: StyleEnvironmentSnapshot
 
   init(
     debugSignature: String,
-    values: [String: String],
+    untypedValues: [String: String],
     typedValues: [ObjectIdentifier: EnvironmentSnapshotValue],
     style: StyleEnvironmentSnapshot
   ) {
     self.debugSignature = debugSignature
-    self.values = values
+    self.untypedValues = untypedValues
     self.typedValues = typedValues
-    let typedDebugNames = Set(typedValues.values.map(\.keyDebugName))
-    untypedValues = values.filter { !typedDebugNames.contains($0.key) }
     self.style = style
   }
 }
@@ -162,15 +184,24 @@ public struct EnvironmentSnapshot: Sendable {
     set {
       storage = .init(
         debugSignature: newValue,
-        values: storage.values,
+        untypedValues: storage.untypedValues,
         typedValues: storage.typedValues,
         style: storage.style
       )
     }
   }
 
+  /// The public debug projection: untyped entries plus each typed entry under
+  /// its reflected key name. Derived on demand — reading it reflects; writing
+  /// a snapshot never does.
   public var values: [String: String] {
-    get { storage.values }
+    get {
+      var projection = storage.untypedValues
+      for value in storage.typedValues.values {
+        projection[value.keyDebugName] = value.reuseValue.debugValue
+      }
+      return projection
+    }
     set {
       // `values` is the public debug projection. Preserve typed currency only
       // for entries whose projection still matches; directly overwriting a
@@ -178,9 +209,10 @@ public struct EnvironmentSnapshot: Sendable {
       let retainedTypedValues = storage.typedValues.filter { _, value in
         newValue[value.keyDebugName] == value.reuseValue.debugValue
       }
+      let retainedDebugNames = Set(retainedTypedValues.values.map(\.keyDebugName))
       storage = .init(
         debugSignature: storage.debugSignature,
-        values: newValue,
+        untypedValues: newValue.filter { !retainedDebugNames.contains($0.key) },
         typedValues: retainedTypedValues,
         style: storage.style
       )
@@ -192,7 +224,7 @@ public struct EnvironmentSnapshot: Sendable {
     set {
       storage = .init(
         debugSignature: storage.debugSignature,
-        values: storage.values,
+        untypedValues: storage.untypedValues,
         typedValues: storage.typedValues,
         style: newValue
       )
@@ -206,7 +238,7 @@ public struct EnvironmentSnapshot: Sendable {
   ) {
     storage = .init(
       debugSignature: debugSignature,
-      values: values,
+      untypedValues: values,
       typedValues: [:],
       style: style
     )
@@ -214,13 +246,13 @@ public struct EnvironmentSnapshot: Sendable {
 
   package init(
     debugSignature: String = "",
-    values: [String: String] = [:],
+    untypedValues: [String: String] = [:],
     typedValues: [ObjectIdentifier: EnvironmentSnapshotValue],
     style: StyleEnvironmentSnapshot = .init()
   ) {
     storage = .init(
       debugSignature: debugSignature,
-      values: values,
+      untypedValues: untypedValues,
       typedValues: typedValues,
       style: style
     )
@@ -228,6 +260,10 @@ public struct EnvironmentSnapshot: Sendable {
 
   package var typedValues: [ObjectIdentifier: EnvironmentSnapshotValue] {
     storage.typedValues
+  }
+
+  package var untypedValues: [String: String] {
+    storage.untypedValues
   }
 
   package func differingValueDebugNames(from other: Self) -> [String] {

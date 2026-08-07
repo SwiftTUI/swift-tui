@@ -807,11 +807,18 @@ struct OffscreenFrameElisionRuntimeTests {
       // schedule elapses and the completion fires. The injection stamps every
       // frame with MonotonicInstant.now(), so the curve returns nil once the
       // 80 ms duration has passed; the carrier tick is off-screen-only, so it
-      // elides instead of presenting. Bounded by an iteration cap — never a
-      // wall-clock sleep — so a hung completion fails the test fast.
+      // elides instead of presenting. Bounded by elapsed real time — the same
+      // currency the animation schedule consumes; a bare tick cap encodes an
+      // assumption about per-tick cost that faster frames invalidate (400
+      // ticks ran under 80 ms after the environment-write reflection removal).
+      // The tick cap stays as a wedge backstop; never a wall-clock sleep, so a
+      // hung completion still fails the test fast.
       var ticks = 0
-      let maxTicks = 400
-      while completion.count == 0 && ticks < maxTicks {
+      let maxTicks = 100_000
+      let tickDeadline = MonotonicInstant.now().advanced(by: .seconds(2))
+      while completion.count == 0 && ticks < maxTicks
+        && MonotonicInstant.now() < tickDeadline
+      {
         scheduler.requestDeadline(.now())
         _ = try await runLoop.renderPendingFramesAsync(
           renderedFrames: &renderedFrames,
