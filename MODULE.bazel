@@ -1,6 +1,0 @@
-module(
-    name = "swift_tui",
-    version = "0.7.1",
-)
-
-bazel_dep(name = "rules_shell", version = "0.6.1")
