@@ -64,22 +64,16 @@ struct FrameworkStressViewportLifecyclePlanningTests {
   @Test("stress viewport lifecycle 003 duplicate task start is emitted once")
   func viewportLifecycle003DuplicateTaskStartIsEmittedOnce() {
     let task = lifecycleTask("load")
-    let stableCancels: [LifecycleEvent] = []
-    let structuralCancels: [LifecycleEvent] = []
     var starts: [LifecycleEvent] = []
 
     appendLifecycleStart(
       task,
       identity: testIdentity("Leaf"),
-      stableCancels: stableCancels,
-      structuralCancels: structuralCancels,
       starts: &starts
     )
     appendLifecycleStart(
       task,
       identity: testIdentity("Leaf"),
-      stableCancels: stableCancels,
-      structuralCancels: structuralCancels,
       starts: &starts
     )
 
@@ -105,13 +99,48 @@ struct FrameworkStressViewportLifecyclePlanningTests {
     appendLifecycleStart(
       task,
       identity: identity,
-      stableCancels: stableCancels,
-      structuralCancels: structuralCancels,
       starts: &starts
     )
 
     #expect(stableCancels.map(\.operation) == [.taskCancel(task)])
     #expect(starts.map(\.operation) == [.taskStart(task)])
+  }
+
+  /// The counter-demo RippleLayer double start (2026-08-06): a host node
+  /// whose committed root aliases a branch node's identity emits the same
+  /// task start the branch node's appearing arm already emitted, differing
+  /// only in `viewNodeID` (the identity index re-aliases mid-frame). The
+  /// start arm merges per (identity, descriptor) and keeps the latest
+  /// non-nil node key — one dispatch per mount, keyed where cancels will
+  /// look.
+  @Test("stress viewport lifecycle 026 cross-node duplicate start merges to latest node key")
+  func viewportLifecycle026CrossNodeDuplicateStartMergesToLatestNodeKey() {
+    let task = lifecycleTask("load")
+    var starts: [LifecycleEvent] = []
+    let identity = testIdentity("Leaf")
+
+    appendLifecycleStart(
+      task,
+      viewNodeID: ViewNodeID(rawValue: 1),
+      identity: identity,
+      starts: &starts
+    )
+    appendLifecycleStart(
+      task,
+      viewNodeID: ViewNodeID(rawValue: 2),
+      identity: identity,
+      starts: &starts
+    )
+    appendLifecycleStart(
+      task,
+      viewNodeID: nil,
+      identity: identity,
+      starts: &starts
+    )
+
+    #expect(starts.count == 1)
+    #expect(starts.first?.viewNodeID == ViewNodeID(rawValue: 2))
+    #expect(starts.first?.operation == .taskStart(task))
   }
 
   @Test("stress viewport lifecycle 005 equal task operations keep distinct node owners")
@@ -584,16 +613,12 @@ private func appendLifecycleStart(
   _ task: TaskDescriptor,
   viewNodeID: ViewNodeID? = nil,
   identity: Identity,
-  stableCancels: [LifecycleEvent],
-  structuralCancels: [LifecycleEvent],
   starts: inout [LifecycleEvent]
 ) {
   ViewGraphLifecycleEventCollector.appendTaskStartEvent(
     viewNodeID: viewNodeID,
     identity: identity,
     task: task,
-    stableTaskCancelEvents: stableCancels,
-    structuralTaskCancelEvents: structuralCancels,
     stableTaskStartEvents: &starts
   )
 }

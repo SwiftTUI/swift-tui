@@ -3774,8 +3774,6 @@ package final class ViewGraph {
       viewNodeID: viewNodeID(for: identity),
       identity: identity,
       task: task,
-      stableTaskCancelEvents: stableTaskCancelEvents,
-      structuralTaskCancelEvents: structuralTaskCancelEvents,
       stableTaskStartEvents: &stableTaskStartEvents
     )
   }

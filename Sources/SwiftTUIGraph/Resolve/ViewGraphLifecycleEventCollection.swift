@@ -31,30 +31,41 @@ enum ViewGraphLifecycleEventCollector {
     }
   }
 
+  /// One start per (identity, descriptor) per frame plan. Two nodes emit the
+  /// same task start when a host node's committed root aliases a descendant
+  /// branch node's identity (`.background { if flag { Pane() } }`: the branch
+  /// node's structural appearing arm fires while the host's stable diff also
+  /// sees the task appear). The two events differ only in `viewNodeID` — the
+  /// identity index re-aliases from the branch node to the host during the
+  /// host's apply — so whole-event dedupe missed them, the commit plan
+  /// carried both, and the second dispatch restarted the one-shot task 0-1ms
+  /// after its first run (counter-demo RippleLayer, 2026-08-06; SwiftUI
+  /// starts it once). Merge instead of append: keep one entry and refresh
+  /// its node key to the latest non-nil claimant, which matches the
+  /// end-of-frame index state that subsequent cancels resolve against. The
+  /// cancel arm keeps whole-event identity: its double dispatch is what
+  /// reaches a run keyed to either aliased node.
   static func appendTaskStartEvent(
     viewNodeID: ViewNodeID?,
     identity: Identity,
     task: TaskDescriptor,
-    stableTaskCancelEvents: [LifecycleEvent],
-    structuralTaskCancelEvents: [LifecycleEvent],
     stableTaskStartEvents: inout [LifecycleEvent]
   ) {
-    let event = LifecycleEvent(
-      viewNodeID: viewNodeID,
-      identity: identity,
-      operation: .taskStart(task)
-    )
-    guard
-      !taskLifecycleEventExists(
-        event,
-        stableTaskCancelEvents: stableTaskCancelEvents,
-        structuralTaskCancelEvents: structuralTaskCancelEvents,
-        stableTaskStartEvents: stableTaskStartEvents
-      )
-    else {
+    if let existingIndex = stableTaskStartEvents.firstIndex(where: {
+      $0.identity == identity && $0.operation == .taskStart(task)
+    }) {
+      if let viewNodeID {
+        stableTaskStartEvents[existingIndex].viewNodeID = viewNodeID
+      }
       return
     }
-    stableTaskStartEvents.append(event)
+    stableTaskStartEvents.append(
+      LifecycleEvent(
+        viewNodeID: viewNodeID,
+        identity: identity,
+        operation: .taskStart(task)
+      )
+    )
   }
 
   static func nodeEmitsOwnLifecycleEvents(
