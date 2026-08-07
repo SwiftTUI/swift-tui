@@ -295,6 +295,41 @@ struct FrameworkStressMeasurementCacheTests {
     }
   }
 
+  /// `prune` used to rebuild its dictionary and re-sum `entryCount` on every
+  /// call, which meant a no-departure prune silently *repaired* any drift in
+  /// the incrementally maintained count. The no-departure fast path removes
+  /// that repair, so the increment/decrement bookkeeping has to be
+  /// self-consistent on its own — this pins it across the operations that
+  /// touch the count (stores, per-node LRU eviction, and lookups) with no node
+  /// ever departing.
+  @Test("stress measurement cache 016b entry count survives no-departure prunes")
+  func measurementCache016bEntryCountSurvivesNoDeparturePrunes() {
+    let cache = MeasurementCache()
+    let first = measurementCacheNode("016b-first", id: 240)
+    let second = measurementCacheNode("016b-second", id: 241)
+    let live: Set<ViewNodeID> = [first.viewNodeID!, second.viewNodeID!]
+
+    // More proposals than the per-node variant cap, so stores drive LRU
+    // eviction (the `-= 1` arm) as well as insertion (the `+= 1` arm).
+    for proposal in measurementCacheFiniteWidthProposals(1...8) {
+      for node in [first, second] {
+        measurementCacheStore(cache, node: node, proposal: proposal)
+      }
+      _ = cache.lookup(resolved: first, proposal: proposal)
+      // Every prune here retires nothing, so each one must be a no-op.
+      cache.prune(keeping: live)
+    }
+
+    let countAfterNoDeparturePrunes = cache.count
+    // A prune that *does* retire a node still rebuilds and re-sums, so the
+    // count it produces is independently derived. The survivor's share of the
+    // pre-prune count must match it — if the incremental bookkeeping had
+    // drifted, these two would disagree.
+    cache.prune(keeping: [first.viewNodeID!])
+    #expect(cache.count == countAfterNoDeparturePrunes / 2)
+    #expect(cache.count > 0)
+  }
+
   @Test("stress measurement cache 017 prune leaves activity counters unchanged")
   func measurementCache017PruneLeavesActivityCountersUnchanged() {
     let cache = MeasurementCache()

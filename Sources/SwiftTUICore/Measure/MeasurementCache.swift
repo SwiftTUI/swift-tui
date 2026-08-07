@@ -149,6 +149,19 @@ package final class MeasurementCache: Sendable {
     keeping viewNodeIDs: Set<ViewNodeID>
   ) {
     storage.withLock { storage in
+      // Departure is the exception, not the rule: most committed frames retire
+      // no nodes at all, and for those the rebuild below is pure waste — a
+      // fresh dictionary, a re-hash of every surviving key, and a full
+      // `entryCount` re-sum, every frame, to reproduce the state already held.
+      // Detecting "nothing departed" is a single allocation-free scan that
+      // short-circuits on the first departed key, so the steady state pays a
+      // walk instead of a rebuild and the pruning frames are unchanged.
+      let hasDepartedNode = storage.entriesByNodeID.keys.contains { viewNodeID in
+        !viewNodeIDs.contains(viewNodeID)
+      }
+      guard hasDepartedNode else {
+        return
+      }
       let retained = storage.entriesByNodeID.filter { viewNodeIDs.contains($0.key) }
       storage.entriesByNodeID = retained
       storage.entryCount = retained.reduce(0) { $0 + $1.value.entries.count }
