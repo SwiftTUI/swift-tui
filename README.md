@@ -9,12 +9,14 @@
 
 > Run the live demo and read the API reference at **<https://swifttui.sh>**.
 
-Author your `App` once with the SwiftUI shapes you already know — `View`,
-`Scene`, `@State`, `@FocusState`, `VStack`, `ProgressView`, custom `Layout`.
-Ship that same view tree in five forms. Choose a terminal executable, a static
-WASI bundle, a localhost WebHost, a native SwiftUI surface, or a native Android
-surface. There is no rewrite per target. Both browser paths paint to the DOM with a real
-accessibility tree, not a terminal emulator.
+SwiftTUI borrows the declarative model SwiftUI has proven at platform scale —
+the interface is a function of state — and aims it at terminal cells. Declare
+views with `View`, `Scene`, `@State`, `@FocusState`, `VStack`, `ProgressView`,
+and custom `Layout` types; the framework owns layout, focus, redraw, and the
+terminal itself. Terminal first, not terminal only: the same view tree also
+ships as a static WASI bundle, a localhost WebHost, a native SwiftUI surface,
+or a native Android surface, with no rewrite per target. Both browser paths
+paint to the DOM with a real accessibility tree, not a terminal emulator.
 
 No global constraint solver, no virtual DOM, no `curses`. Every view is lowered
 through a strict, inspectable pipeline — resolve → measure → place → semantics →
@@ -41,12 +43,22 @@ snapshot-testable.
 
 ## Why SwiftTUI
 
-- **Your SwiftUI knowledge ports unchanged.** Stacks, frames, `@State`,
-  `@Environment`, `ProgressView`, `LabeledContent`, custom `Layout` types, and
-  view modifiers behave as they do in SwiftUI. There is no second API to learn.
-- **Frames are a pure function of the view tree and a size proposal.** The same
-  input always produces the same cells, which makes snapshot tests trivial and
-  regressions cheap to catch.
+- **State in, screen out.** No draw loop, no buffer diffing, no repaint
+  bookkeeping. Views are a pure function of your app's state: change a value
+  and the runtime recomputes layout and rewrites exactly the cells that
+  changed.
+- **Real components, real focus.** Buttons, text fields, pickers, sliders,
+  scroll views, and charts, with a focus engine, tab traversal, keyboard
+  chords, tap · drag · hover gestures, and animation built in. You compose
+  behavior instead of hand-routing key events to widgets.
+- **The terminal, negotiated for you.** Truecolor, Kitty and Sixel images,
+  OSC 8 hyperlinks, and mouse reporting are probed per session and degrade
+  gracefully — one binary is correct in kitty, a bare SSH session, or CI. You
+  write views, never escape codes.
+- **One compiled binary.** Swift 6 compiles your interface into a single fast
+  executable with checked concurrency. Frames are a pure function of the view
+  tree and a size proposal — the same input always produces the same cells —
+  and tests render them as integer-cell rasters, no TTY required.
 - **Accessibility ships with the frame.** A semantic substrate under every frame
   drives a linear accessible output path. It also drives `--no-color` /
   `--ascii` fallbacks and reduce-motion behavior. See
@@ -58,8 +70,9 @@ snapshot-testable.
 
 ## Quick start
 
-Author a view and an `@main` `App`. Use the same shapes that you use for
-SwiftUI:
+SwiftTUI apps are plain SwiftPM packages: any Swift 6.3+ toolchain builds and
+runs them from the command line, on macOS or Linux — no Xcode project, no
+simulator, no app store. Author a view and an `@main` `App`:
 
 ```swift
 import SwiftTUI
@@ -184,7 +197,8 @@ example and the
 
 ## Ship it five ways
 
-Author the app once. Select the product that matches the delivery method. The
+Terminal first, not terminal only. Author the app once and select the product
+that matches the delivery method. The
 full platform-by-product matrix lives in the
 [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md)
 DocC article.
@@ -198,9 +212,9 @@ DocC article.
 | Custom runner / host | `SwiftTUIRuntime` + composed products | [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md) |
 
 **Using SwiftTUI from the web.** The same `App` compiles to `wasm32-wasi` and
-streams a structured raster surface. A small browser host draws this surface
-into a `<canvas>`. This path does not use a terminal emulator. It requires no
-application rewrite. The two npm packages
+streams a structured raster surface. A small browser host paints this surface
+to the DOM and mounts a real accessibility tree. This path does not use a
+terminal emulator. It requires no application rewrite. The two npm packages
 [`@swifttui/web`](https://www.npmjs.com/package/@swifttui/web) and
 [`@swifttui/build`](https://www.npmjs.com/package/@swifttui/build) own that path.
 [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) documents it, and
