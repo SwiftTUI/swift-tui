@@ -40,6 +40,7 @@ extension ViewGraph {
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
     package var environmentDependents: [ObjectDependencySnapshot]
     package var observableDependents: [ObjectDependencySnapshot]
+    package var environmentKeyWriters: [ObjectDependencySnapshot]
     package var currentFrameID: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
@@ -47,6 +48,13 @@ extension ViewGraph {
     package var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint?
     package var committedRuntimeRegistrationTargetIdentity: RuntimeRegistrationTargetIdentity?
     package var pendingRuntimeRegistrationRefreshRoots: Set<Identity>
+    /// Reader-scoped environment drift, projected to comparable text: each
+    /// owing boundary's node ID against the sorted reflected names of the keys
+    /// it owes. `EnvironmentSnapshotValue` carries a type-erased comparator
+    /// rather than `Equatable` conformance, so the flat snapshot mirrors the
+    /// *shape* of the map — which is what a checkpoint round-trip must
+    /// preserve — rather than the boxed values.
+    package var environmentDriftByBoundary: [ViewNodeID: [String]]
 
     package var invalidatedIdentities: Set<Identity> {
       identities(for: invalidatedNodeIDs)

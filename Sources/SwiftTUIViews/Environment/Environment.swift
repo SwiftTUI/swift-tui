@@ -19,6 +19,18 @@ private final class EnvironmentValueBox: Sendable {
     reuseValue = TypedReuseValue(base)
   }
 
+  /// Rebuilds a box from the graph's type-erased snapshot currency.
+  ///
+  /// `EnvironmentSnapshotValue` stores exactly this box's payload — the key
+  /// metatype and the typed reuse value — because `EnvironmentValues.applying`
+  /// mints it from one. That symmetry is what lets the reader-scoped
+  /// environment repair travel back across the module seam without a key
+  /// generic, an existential open, or any reflection.
+  init(keyType: Any.Type, reuseValue: TypedReuseValue) {
+    self.keyType = keyType
+    self.reuseValue = reuseValue
+  }
+
   var valueTypeDescription: String {
     reuseValue.valueTypeDescription
   }
@@ -119,9 +131,14 @@ public struct EnvironmentValues: Equatable, Sendable {
   /// attribution: a changed environment value already re-resolves the
   /// writer's whole subtree through snapshot inequality (`ViewNode.canReuse`).
   /// Recording these reads would instead stamp framework noise into every
-  /// text-bearing node's dependency fingerprint. If reader-precise
-  /// environment invalidation ever gains a production caller, these reads
-  /// must move back to the tracked subscript.
+  /// text-bearing node's dependency fingerprint.
+  ///
+  /// The reader-scoped reuse toleration — the first consumer of reader-precise
+  /// environment attribution — stays sound over these unattributed reads
+  /// because it tolerates *only* keys declared outside this framework
+  /// (`EnvironmentKeyReuseClassification`), and every key read here is
+  /// framework-declared. Any new untracked read of a key declared outside
+  /// these modules would break that argument: use the tracked subscript.
   package subscript<K: EnvironmentKey>(untracked key: K.Type) -> K.Value {
     guard let boxed = storage[ObjectIdentifier(key)] else {
       return K.defaultValue
@@ -155,8 +172,51 @@ public struct EnvironmentValues: Equatable, Sendable {
     }
     set {
       let identifier = ObjectIdentifier(key)
+      // Write attribution for the reader-scoped reuse toleration. This
+      // subscript is the *complete* funnel for user-declared keys — an
+      // extension cannot add stored properties, so every authored
+      // `.environment` / `.transformEnvironment` write lands here — and the
+      // toleration needs completeness in exactly this direction: recording a
+      // write that is not an authored subtree write only causes extra
+      // denials, while missing one would let a subtree be served under a key
+      // its own interior writer controls. Framework-declared keys are skipped:
+      // they never enter the toleration (see
+      // `EnvironmentKeyReuseClassification`), so recording them would be pure
+      // cost on the hottest write path in the resolver (`\.stackAxis`, written
+      // by every stack, every frame).
+      // Classify BEFORE the isolation hop: the classification needs the key
+      // metatype, and metatypes are not `Sendable`, so capturing one in the
+      // main-actor closure is a `sending` violation. Only the
+      // `ObjectIdentifier` crosses — the same shape the getter above uses.
+      if EnvironmentKeyReuseClassification.isReaderAttributedOnly(key) {
+        MainActor.assumeIsolated {
+          ViewNodeContext.current?.recordEnvironmentWrite(identifier)
+        }
+      }
       storage[identifier] = EnvironmentValueBox(key: key, base: newValue)
     }
+  }
+
+  /// Returns a copy with the reader-scoped environment drift folded in.
+  ///
+  /// This is the re-entry half of the toleration: an evaluator closure
+  /// captured inside a subtree that was served over a changed-but-unread key
+  /// still holds that key's prior value, and a body that *newly* reads the key
+  /// on re-run must see the current one. The write goes in unattributed on
+  /// purpose — it is a repair of an ancestor's authored write, not a write by
+  /// the re-entering node, and recording it would index the re-entering node
+  /// as a writer of a key it never authored.
+  package func applyingEnvironmentDrift(
+    _ drift: [ObjectIdentifier: EnvironmentSnapshotValue]
+  ) -> Self {
+    var copy = self
+    for (identifier, value) in drift {
+      copy.storage[identifier] = EnvironmentValueBox(
+        keyType: value.environmentKeyType,
+        reuseValue: value.reuseValue
+      )
+    }
+    return copy
   }
 
   // Widened from `fileprivate` to `package` so `ResolveContext` (moved to

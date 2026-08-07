@@ -481,10 +481,37 @@ public struct ResolveContext: Equatable, Sendable {
   /// Returns this context refreshed with current-frame resolve inputs.
   @MainActor
   package func applyingCurrentFrameResolveInputs() -> Self {
-    guard let inputs = effectiveFrameResolveInputs else {
-      return self
-    }
     var refreshed = self
+    // Reader-scoped environment repair. A dirty-frontier re-run invokes an
+    // evaluator closure whose captured context predates the frames on which
+    // an ancestor's `.environment` write changed and a reuse door served this
+    // subtree anyway (it read no such key at the time). A body that *newly*
+    // reads one of those keys now — a conditional read, invisible to the
+    // reader index that authorized the serve — must observe the current
+    // value. Applied ahead of the frame-input refresh so it holds even on the
+    // paths that have no renderer-supplied inputs, and ahead of
+    // `contextualEnvironmentValues` so the focus bake sees repaired values.
+    //
+    // This is re-entry-only by construction, never a stale write onto a fresh
+    // descent: `ViewGraph.beginEvaluation` clears drift at and below every
+    // node it evaluates, and any fresh descent reaching a drifted boundary
+    // passes through an ancestor's evaluation first.
+    if let viewGraph, viewGraph.hasEnvironmentDrift {
+      let drift = viewGraph.environmentDrift(for: identity)
+      if !drift.isEmpty {
+        refreshed.environmentValues = refreshed.environmentValues.applyingEnvironmentDrift(drift)
+        // Tolerated keys are never style keys (a style difference is
+        // non-typed divergence and denies the serve outright), so the heavy
+        // style fields are reused rather than rebuilt.
+        refreshed.environment = refreshed.environmentValues.applying(
+          to: refreshed.environment,
+          reuseStyle: true
+        )
+      }
+    }
+    guard let inputs = refreshed.effectiveFrameResolveInputs else {
+      return refreshed
+    }
     refreshed.invalidatedIdentities = inputs.invalidatedIdentities
     refreshed.invalidationSummary = inputs.invalidationSummary
     // Focus/press refresh keeps re-run evaluator closures — whose captured

@@ -114,11 +114,14 @@ extension ViewGraph {
   }
 
   /// Reverse-dependency edges from state slots, environment keys, and
-  /// observable objects to the view nodes that read them.
+  /// observable objects to the view nodes that read them — plus the writer
+  /// edges for reader-attributed-only environment keys (authored
+  /// `.environment` sites), consumed by the reader-scoped reuse toleration.
   package struct DependencyIndex {
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] = [:]
     package var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
     package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
+    package var environmentKeyWriters: [ObjectIdentifier: Set<ViewNodeID>] = [:]
   }
 
   /// Frame counter, the live-node working set, the resolved-node reuse cache,
@@ -162,6 +165,15 @@ extension ViewGraph {
     // restore rolls the queued roots back alongside the node records they
     // describe.
     package var pendingRuntimeRegistrationRefreshRoots: Set<Identity> = []
+    // Environment values owed to the subtrees that the reader-scoped
+    // toleration served over a changed-but-unobservable key, keyed by the
+    // boundary node that served them. Persists across frames (like
+    // `changeObservationValues`) until a genuine re-resolve repays it, and is
+    // checkpointed with the group so a discarded frame's tolerated serve does
+    // not leave a repair pointing at a value that frame never committed.
+    // See ViewGraphEnvironmentToleration.swift.
+    package var environmentDriftByBoundary:
+      [ViewNodeID: [ObjectIdentifier: EnvironmentSnapshotValue]] = [:]
   }
 
   /// One `onChange` previous-value entry: the latest written value, the pass

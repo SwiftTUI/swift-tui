@@ -142,6 +142,12 @@ package struct EnvironmentSnapshotValue: Sendable {
     self.reuseValue = reuseValue
   }
 
+  /// The `EnvironmentKey` metatype this value was written under — the
+  /// classification and rebuild currency for reader-scoped environment reuse.
+  package var environmentKeyType: Any.Type {
+    keyType
+  }
+
   /// Reflected on demand; the per-write environment path stores only the key
   /// metatype and never formats it.
   package var keyDebugName: String {
@@ -264,6 +270,43 @@ public struct EnvironmentSnapshot: Sendable {
 
   package var untypedValues: [String: String] {
     storage.untypedValues
+  }
+
+  /// The typed-key-level difference between two snapshots, for the
+  /// reader-scoped reuse toleration (`ViewGraph.memoizedReusableSnapshot`).
+  ///
+  /// `changedTypedKeys` names keys present on BOTH sides whose values compare
+  /// unequal. Any other divergence — a key present on only one side, an
+  /// untyped-value difference, a style difference, or a signature difference —
+  /// sets `hasNonTypedDivergence`, which callers treat as an unconditional
+  /// denial (those classes are not reader-attributed).
+  package struct TypedDiff {
+    package var changedTypedKeys: Set<ObjectIdentifier> = []
+    package var hasNonTypedDivergence = false
+  }
+
+  package func typedDiff(from other: Self) -> TypedDiff {
+    var diff = TypedDiff()
+    if debugSignature != other.debugSignature
+      || storage.untypedValues != other.storage.untypedValues
+      || style != other.style
+    {
+      diff.hasNonTypedDivergence = true
+      return diff
+    }
+    let keys = Set(storage.typedValues.keys).union(other.storage.typedValues.keys)
+    for key in keys {
+      guard let left = storage.typedValues[key],
+        let right = other.storage.typedValues[key]
+      else {
+        diff.hasNonTypedDivergence = true
+        return diff
+      }
+      if !left.isEqual(to: right) {
+        diff.changedTypedKeys.insert(key)
+      }
+    }
+    return diff
   }
 
   package func differingValueDebugNames(from other: Self) -> [String] {

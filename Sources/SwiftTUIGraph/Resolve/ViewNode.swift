@@ -794,6 +794,13 @@ package final class ViewNode {
     dependencyTracker.recordEnvironmentRead(key)
   }
 
+  package func recordEnvironmentWrite(
+    _ key: ObjectIdentifier
+  ) {
+    recordDependencyTrackerMutation()
+    dependencyTracker.recordEnvironmentWrite(key)
+  }
+
   package func recordObservableRead(
     _ key: ObjectIdentifier
   ) {
@@ -1238,10 +1245,22 @@ package final class ViewNode {
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot
   ) -> Bool {
+    canMemoReuseIgnoringEnvironment(transaction: transaction)
+      && committed.environmentSnapshot == environment
+  }
+
+  /// ``canMemoReuse(environment:transaction:)`` without its whole-snapshot
+  /// environment equality conjunct, for the reader-scoped toleration: that
+  /// path replaces plain equality with a *classified* verdict over the typed
+  /// diff, and must not pay for — or be vetoed by — the equality it is
+  /// deliberately relaxing. Every other conjunct is unchanged and still
+  /// required.
+  package func canMemoReuseIgnoringEnvironment(
+    transaction: TransactionSnapshot
+  ) -> Bool {
     wasPresentAtFrameStart
       && reuseState.freshness.canServeMemo
       && committed.supportsRetainedReuse
-      && committed.environmentSnapshot == environment
       && committed.transactionSnapshot.isReuseEquivalent(to: transaction)
   }
 

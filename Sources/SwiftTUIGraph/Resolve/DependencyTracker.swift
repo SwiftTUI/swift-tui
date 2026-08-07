@@ -16,6 +16,10 @@ package final class DependencyTracker {
     currentDependencies.observableReads.insert(id)
   }
 
+  package func recordEnvironmentWrite(_ key: ObjectIdentifier) {
+    currentDependencies.environmentWrites.insert(key)
+  }
+
   package func recordFocusComparisonTargets(_ targets: Set<Identity>) {
     currentDependencies.focusComparisonTargets.formUnion(targets)
   }

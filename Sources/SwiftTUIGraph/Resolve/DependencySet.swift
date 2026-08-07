@@ -42,16 +42,28 @@ package struct DependencySet: Equatable {
   /// affected only when the moved identity is among these targets. Empty for
   /// broad-sentinel readers.
   package var focusComparisonTargets: Set<Identity>
+  /// Reader-attributed-only environment keys this node WROTE during its last
+  /// resolve (an authored `.environment`/`.transformEnvironment` below which
+  /// the key's value is writer-controlled, not inherited). Consumed by the
+  /// reader-scoped environment reuse toleration: a tolerated diff must deny
+  /// when a changed key has a writer inside the candidate subtree — an
+  /// interior write makes the subtree's stored values independent of the
+  /// boundary's change, including the undetectable case where the written
+  /// constant equals the boundary's prior value. Framework keys are never
+  /// recorded (they never enter the toleration).
+  package var environmentWrites: Set<ObjectIdentifier>
 
   package init(
     stateSlotReads: Set<StateSlotKey> = [],
     environmentReads: Set<ObjectIdentifier> = [],
     observableReads: Set<ObjectIdentifier> = [],
-    focusComparisonTargets: Set<Identity> = []
+    focusComparisonTargets: Set<Identity> = [],
+    environmentWrites: Set<ObjectIdentifier> = []
   ) {
     self.stateSlotReads = stateSlotReads
     self.environmentReads = environmentReads
     self.observableReads = observableReads
     self.focusComparisonTargets = focusComparisonTargets
+    self.environmentWrites = environmentWrites
   }
 }

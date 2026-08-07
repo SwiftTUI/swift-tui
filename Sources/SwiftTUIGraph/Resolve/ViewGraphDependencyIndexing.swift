@@ -6,21 +6,24 @@ package enum ViewGraphDependencyIndex {
     current: DependencySet,
     stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
     environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     remove(
       viewNodeID: viewNodeID,
       dependencies: previous,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents
+      observableDependents: &observableDependents,
+      environmentKeyWriters: &environmentKeyWriters
     )
     insert(
       viewNodeID: viewNodeID,
       dependencies: current,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents
+      observableDependents: &observableDependents,
+      environmentKeyWriters: &environmentKeyWriters
     )
   }
 
@@ -29,7 +32,8 @@ package enum ViewGraphDependencyIndex {
     dependencies: DependencySet,
     stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
     environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     remove(
       viewNodeID,
@@ -45,6 +49,11 @@ package enum ViewGraphDependencyIndex {
       viewNodeID,
       from: dependencies.observableReads,
       in: &observableDependents
+    )
+    remove(
+      viewNodeID,
+      from: dependencies.environmentWrites,
+      in: &environmentKeyWriters
     )
   }
 
@@ -68,14 +77,22 @@ package enum ViewGraphDependencyIndex {
     changedKeys.reduce(into: Set<ViewNodeID>()) { partial, key in
       partial.formUnion(
         (environmentDependents[key] ?? []).filter { viewNodeID in
-          guard let identity = identityByNodeID[viewNodeID] else {
-            return false
-          }
-          return roots.contains { root in
-            identity == root || identity.isDescendant(of: root)
-          }
+          isScoped(viewNodeID, within: roots, identityByNodeID: identityByNodeID)
         }
       )
+    }
+  }
+
+  private static func isScoped(
+    _ viewNodeID: ViewNodeID,
+    within roots: Set<Identity>,
+    identityByNodeID: [ViewNodeID: Identity]
+  ) -> Bool {
+    guard let identity = identityByNodeID[viewNodeID] else {
+      return false
+    }
+    return roots.contains { root in
+      identity == root || identity.isDescendant(of: root)
     }
   }
 
@@ -84,7 +101,8 @@ package enum ViewGraphDependencyIndex {
     dependencies: DependencySet,
     stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
     environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>]
+    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
+    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
   ) {
     insert(
       viewNodeID,
@@ -100,6 +118,11 @@ package enum ViewGraphDependencyIndex {
       viewNodeID,
       into: dependencies.observableReads,
       in: &observableDependents
+    )
+    insert(
+      viewNodeID,
+      into: dependencies.environmentWrites,
+      in: &environmentKeyWriters
     )
   }
 

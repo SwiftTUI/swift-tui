@@ -343,13 +343,20 @@ package final class ViewGraph {
     get { dependencyIndex.stateSlotDependents }
     set { dependencyIndex.stateSlotDependents = newValue }
   }
-  private var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] {
+  // Reader/writer edges are internal rather than file-private: the
+  // reader-scoped environment toleration reads both from
+  // `ViewGraphEnvironmentToleration.swift`.
+  var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] {
     get { dependencyIndex.environmentDependents }
     set { dependencyIndex.environmentDependents = newValue }
   }
   private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] {
     get { dependencyIndex.observableDependents }
     set { dependencyIndex.observableDependents = newValue }
+  }
+  var environmentKeyWriters: [ObjectIdentifier: Set<ViewNodeID>] {
+    get { dependencyIndex.environmentKeyWriters }
+    set { dependencyIndex.environmentKeyWriters = newValue }
   }
 
   var currentFrameID: UInt64 {
@@ -379,6 +386,12 @@ package final class ViewGraph {
   private var pendingRuntimeRegistrationRefreshRoots: Set<Identity> {
     get { frameCommit.pendingRuntimeRegistrationRefreshRoots }
     set { frameCommit.pendingRuntimeRegistrationRefreshRoots = newValue }
+  }
+  // Internal rather than file-private: the reader-scoped environment
+  // toleration owns this map from ViewGraphEnvironmentToleration.swift.
+  var environmentDriftByBoundary: [ViewNodeID: [ObjectIdentifier: EnvironmentSnapshotValue]] {
+    get { frameCommit.environmentDriftByBoundary }
+    set { frameCommit.environmentDriftByBoundary = newValue }
   }
   /// F29: derived cache behind ``makeCheckpoint()`` — one live image per node,
   /// refreshed by generation compare, handed out as an O(1) COW copy. Meta-state
@@ -709,6 +722,7 @@ package final class ViewGraph {
       stateSlotDependents: stateSlotDependents,
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
       observableDependents: debugObjectDependencySnapshot(observableDependents),
+      environmentKeyWriters: debugObjectDependencySnapshot(environmentKeyWriters),
       currentFrameID: currentFrameID,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
@@ -718,7 +732,10 @@ package final class ViewGraph {
       committedRuntimeRegistrationFingerprint: committedRuntimeRegistrationFingerprint,
       committedRuntimeRegistrationTargetIdentity:
         committedRuntimeRegistrationTargetIdentity,
-      pendingRuntimeRegistrationRefreshRoots: pendingRuntimeRegistrationRefreshRoots
+      pendingRuntimeRegistrationRefreshRoots: pendingRuntimeRegistrationRefreshRoots,
+      environmentDriftByBoundary: environmentDriftByBoundary.mapValues { drift in
+        drift.values.map(\.keyDebugName).sorted()
+      }
     )
   }
 
@@ -1788,6 +1805,13 @@ package final class ViewGraph {
     // is actually recomputed this frame, so the transition-collection prune can
     // tell a re-evaluated dropped declaration from an untouched reused one.
     evaluatedNodeIDsThisFrame.insert(node.viewNodeID)
+    // A genuine re-resolve repays every environment drift owed at or below
+    // this node: the descent about to run rebuilds each context below it from
+    // current values. This is also what keeps drift a *re-entry-only* repair —
+    // a fresh descent to a drifted boundary always passes through an
+    // ancestor's evaluation first, so the drift is gone before the boundary's
+    // own (now current) context is built. Free unless something is owing.
+    clearEnvironmentDriftAtAndBelow(node)
     node.beginEvaluation(
       frameID: currentFrameID,
       invalidator: invalidator,
@@ -2642,13 +2666,18 @@ package final class ViewGraph {
       // A self-invalidated node must re-run; only nodes reached under a re-run
       // ancestor are memoization candidates.
       !invalidatedIdentities.contains(identity),
-      node.canMemoReuse(environment: environment, transaction: transaction),
+      // Environment is deliberately absent here and settled last, by
+      // `environmentReuseVerdict` below: whole-snapshot equality is only one
+      // of its outcomes.
+      node.canMemoReuseIgnoringEnvironment(transaction: transaction),
       // The reuse-safe dependency subset: no `@State`/`@Observable` reads, and no
       // `@Environment` read of a key excluded from the snapshot (focus/press).
-      // Snapshot-covered environment reads are already verified by
-      // `canMemoReuse`'s `environmentSnapshot ==`, so layout containers qualify —
-      // the boundaries where whole-subtree reuse pays. State-value, observable,
-      // and focus/press equality are deferred / enforced elsewhere.
+      // Snapshot-covered environment reads are verified by the environment
+      // verdict — either the whole snapshot compares equal, or every key that
+      // differs is one no node in this subtree (this node included) reads —
+      // so layout containers qualify: the boundaries where whole-subtree reuse
+      // pays. State-value, observable, and focus/press equality are deferred /
+      // enforced elsewhere.
       node.hasNoMemoUncoveredDependencies(uncoveredEnvironmentKeys: uncoveredEnvironmentKeys)
     else {
       return nil
@@ -2679,6 +2708,23 @@ package final class ViewGraph {
     // re-run it saves (the 06-17 A/B), so it stays diagnostic-only.
     guard MemoValueComparator.compareForReuse(priorViewValue, viewValue) == .equal else {
       return nil
+    }
+    // Environment settles last. Every conjunct above is a field test or a
+    // bounded identity scan; the toleration's reader/writer scans walk index
+    // entries, so deferring them to here means they run only for a node that
+    // is otherwise ready to serve — and only when whole-snapshot equality has
+    // already failed, which is exactly the population this narrowing exists
+    // to rescue.
+    switch environmentReuseVerdict(node: node, environment: environment) {
+    case .denied:
+      return nil
+    case .equal:
+      break
+    case .tolerated(let changedKeys):
+      // The serve is about to strand this subtree's captured evaluator
+      // contexts on the prior values. Record what it owes before handing the
+      // snapshot back.
+      recordEnvironmentDrift(at: node, keys: changedKeys, from: environment)
     }
     let snapshot = node.snapshot()
     recordReusedSubtree(
@@ -4132,7 +4178,8 @@ package final class ViewGraph {
       current: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents
+      observableDependents: &observableDependents,
+      environmentKeyWriters: &environmentKeyWriters
     )
   }
 
@@ -4144,7 +4191,8 @@ package final class ViewGraph {
       dependencies: node.dependencies,
       stateSlotDependents: &stateSlotDependents,
       environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents
+      observableDependents: &observableDependents,
+      environmentKeyWriters: &environmentKeyWriters
     )
   }
 

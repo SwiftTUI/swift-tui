@@ -281,30 +281,40 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let environmentShared = ObjectIdentifier(GraphPlanningEnvironmentKeyA.self)
     let observableOld = ObjectIdentifier(GraphPlanningObservableA.self)
     let observableNew = ObjectIdentifier(GraphPlanningObservableB.self)
+    let writtenOld = ObjectIdentifier(GraphPlanningEnvironmentKeyB.self)
     var stateIndex = [stateA: Set([nodeID])]
     var environmentIndex = [environmentShared: Set([nodeID])]
     var observableIndex = [observableOld: Set([nodeID])]
+    var environmentWriterIndex = [writtenOld: Set([nodeID])]
 
     ViewGraphDependencyIndex.reindex(
       viewNodeID: nodeID,
       previous: .init(
         stateSlotReads: [stateA],
         environmentReads: [environmentShared],
-        observableReads: [observableOld]
+        observableReads: [observableOld],
+        environmentWrites: [writtenOld]
       ),
       current: .init(
         stateSlotReads: [stateB],
         environmentReads: [environmentShared],
-        observableReads: [observableNew]
+        observableReads: [observableNew],
+        environmentWrites: []
       ),
       stateSlotDependents: &stateIndex,
       environmentDependents: &environmentIndex,
-      observableDependents: &observableIndex
+      observableDependents: &observableIndex,
+      environmentKeyWriters: &environmentWriterIndex
     )
 
     #expect(stateIndex == [stateB: [nodeID]])
     #expect(environmentIndex == [environmentShared: [nodeID]])
     #expect(observableIndex == [observableNew: [nodeID]])
+    // A node that stopped writing a key must drop out of the writer index
+    // entirely. A retained edge would make the reader-scoped environment
+    // toleration deny that key's subtree forever — a silent, permanent reuse
+    // loss with no correctness symptom to catch it.
+    #expect(environmentWriterIndex.isEmpty)
   }
 
   @Test("stress graph planning 018 entity move clears old reverse binding")

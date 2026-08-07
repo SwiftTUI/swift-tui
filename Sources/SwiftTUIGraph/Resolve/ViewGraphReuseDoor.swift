@@ -100,6 +100,17 @@ extension ViewGraph {
     inputs: ReuseDecisionInputs,
     viewValue: @autoclosure () -> Any
   ) -> ReuseDecision? {
+    // A boundary that once served over a tolerated environment change may have
+    // come back into agreement with its committed snapshot (the key reverted).
+    // Its recorded drift is now the stale value, not the fresh one — repay it
+    // here rather than in the memo gate, because the value-blind layer below
+    // can serve an equal-environment node without the memo gate ever running.
+    // Free unless some boundary is actually owing.
+    repayEnvironmentDriftIfEnvironmentMatches(
+      inputs.identity,
+      environment: inputs.environment
+    )
+
     // Layer A — value-blind retained reuse. Lean engines opt back in via
     // `leanRetainedReuse`; a churned cone or a suppression scope stands the
     // layer down for this identity.
