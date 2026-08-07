@@ -31,9 +31,28 @@ The Swift encoder currently emits four record types:
 | `frameDiagnostic` | A JSON object containing the format plus its header and fields. |
 
 The input parser accepts terminal bytes mixed with RS-prefixed `resize`,
-`style`, `caps`, `resync`, `key`, `mouse`, and `paste` control records. It
-buffers a partial control record until newline. Malformed or unknown controls
-are dropped. They are not terminal input.
+`style`, `caps`, `resync`, `pointer`, `key`, `mouse`, and `paste` control
+records. It buffers a partial control record until newline. Malformed or
+unknown controls are dropped. They are not terminal input.
+
+`pointer` is the only control record whose payload is `key=value` tokens
+rather than positional fields:
+
+```text
+0x1E "pointer:" <key> "=" <value> [":" <key> "=" <value> …] "\n"
+```
+
+`panning` is the only key today. `panning=1` declares that the client's
+native interaction paradigm scrolls by dragging content directly, which is
+true of touch devices and coarse-pointer browsers and false of desktop
+pointers. Absence of the record means the desktop paradigm, so a page bundle
+that predates it behaves exactly as before. Unrecognized keys are skipped and
+a record carrying only unrecognized keys is dropped, so a later key can be
+added without changing this record's arity.
+
+Unlike `caps`, this record is live on every ingress including the in-process
+WASI transport: it describes the browsing device rather than the decoder, and
+a device can change paradigm mid-session without reconnecting.
 
 `surface` has three record shapes:
 

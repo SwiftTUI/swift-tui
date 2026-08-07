@@ -1271,6 +1271,52 @@ struct WebSurfaceTransportTests {
         == .subCell(source: .webPixels, metrics: .estimated))
   }
 
+  @Test("parser decodes the pointer paradigm declaration")
+  func parserDecodesPointerCapabilities() {
+    var parser = WebSurfaceInputParser()
+    let parsed = parser.feed(
+      bytes(
+        "\u{001E}pointer:panning=1\n"
+          + "\u{001E}pointer:panning=0\n"
+          // Unknown keys are skipped, so a later key can join the record
+          // without changing its arity; `panning` is still read beside one.
+          + "\u{001E}pointer:hovering=1:panning=1\n"
+      )
+    )
+
+    #expect(
+      parsed.controlMessages == [
+        .pointerCapabilities(supportsScrollPanning: true),
+        .pointerCapabilities(supportsScrollPanning: false),
+        .pointerCapabilities(supportsScrollPanning: true),
+      ]
+    )
+    #expect(parsed.events.isEmpty)
+  }
+
+  @Test("the pointer declaration survives a resize and reaches the surface")
+  func pointerCapabilitiesSurviveResize() {
+    let host = WebSurfaceTransport(
+      surfaceSize: .init(width: 4, height: 2),
+      renderStyle: .init(appearance: .fallback)
+    )
+    // Absence of the record means the desktop paradigm: a page bundle that
+    // predates it must not start panning.
+    #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+
+    host.updatePointerCapabilities(supportsScrollPanning: true)
+    #expect(host.pointerInputCapabilities.supportsScrollPanning)
+
+    // A resize recomputes precision from fresh cell metrics; it must not
+    // discard the paradigm the page declared earlier.
+    host.updateSurfaceSize(.init(width: 8, height: 4), cellPixelSize: .init(width: 9, height: 18))
+    #expect(host.pointerInputCapabilities.supportsScrollPanning)
+    #expect(host.pointerInputCapabilities.supportsSubCellLocation)
+
+    host.updatePointerCapabilities(supportsScrollPanning: false)
+    #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+  }
+
   @Test("parser ignores malformed web-surface commands")
   func parserIgnoresMalformedCommands() {
     var parser = WebSurfaceInputParser()
@@ -1280,6 +1326,10 @@ struct WebSurfaceTransportTests {
           + "\u{001E}key:unknown:0\n"
           + "\u{001E}paste:%ZZ\n"
           + "\u{001E}mouse:down:1:2:none:0:0:0\n"
+          // No recognized key, so no declaration and no state change — not a
+          // silent `panning=false`.
+          + "\u{001E}pointer:hovering=1\n"
+          + "\u{001E}pointer\n"
       )
     )
 

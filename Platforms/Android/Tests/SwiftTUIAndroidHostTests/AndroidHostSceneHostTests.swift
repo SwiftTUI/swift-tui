@@ -9,6 +9,10 @@ import Testing
 func android_host_scene_host_resizes_surface_and_pointer_capabilities() throws {
   let host = try AndroidHostSceneHost(app: AndroidHostTestApp())
 
+  // Touch is Android's scrolling paradigm, so the declaration is live from
+  // construction — not only after the first layout reports cell metrics.
+  #expect(host.surface.pointerInputCapabilities.supportsScrollPanning)
+
   host.resize(
     columns: 120,
     rows: 40,
@@ -23,6 +27,7 @@ func android_host_scene_host_resizes_surface_and_pointer_capabilities() throws {
   #expect(host.surface.pointerInputCapabilities.supportsSubCellLocation)
   #expect(host.surface.pointerInputCapabilities.supportsHover)
   #expect(host.surface.pointerInputCapabilities.supportsPreciseScroll)
+  #expect(host.surface.pointerInputCapabilities.supportsScrollPanning)
 }
 
 @MainActor

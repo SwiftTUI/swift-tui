@@ -116,6 +116,37 @@ full-frame bytes. The canonical field/ingress manifest is
 are maintained in the repository's internal `docs/HOST-WIRE-CONTRACT.md`, not
 here.
 
+### Pointer Paradigm
+
+`PresentationSurfaceMetricsProvider` also carries `PointerInputCapabilities`,
+which ``RunLoop`` copies verbatim into `EnvironmentValues` on every frame. Most
+of it describes the input device (coordinate precision, hover, precise scroll).
+`supportsScrollPanning` instead names the host's **interaction paradigm**:
+whether a pointer drag on scrollable content pans it directly, so the content
+follows the pointer.
+
+It is off unless a host asks for it, because the default paradigm is the
+desktop one — a press-drag is a click-drag, and scrolling belongs to the wheel,
+the scroll indicators, and the keyboard. Declaring it turns on two behaviors
+together: the scroll body claims the `.down`/`.dragged`/`.up` stream to pan,
+and a drag that begins on an inner control is handed to the enclosing scroll
+view once it crosses the takeover threshold, cancelling that control. Neither
+is right where a mouse is the pointing device.
+
+| Host | Pans by dragging | Why |
+| --- | --- | --- |
+| Terminal-native | No | A terminal mouse drag is a click-drag or a selection. |
+| Native SwiftUI host (macOS) | No | Desktop pointer. |
+| Native SwiftUI host (iOS) | Yes | Touch. |
+| Host-managed Android | Yes | Touch. |
+| WASI / browser, Localhost WebHost | Reported by the page | One bundle serves both paradigms, so the page declares what it sees through the `pointer:` control record (see the repository's internal `docs/HOST-WIRE-CONTRACT.md`). Absent record means desktop. |
+
+Wheel scrolling, scroll indicator drags, and keyboard scrolling are unaffected
+by the declaration and work on every host. Authored views can override the
+declaration for a subtree with
+`.environment(\.pointerInputCapabilities, …)`, but the host is the right place
+to answer this question.
+
 ### Shared Raster Damage Contract
 
 All raster frontends consume the same damage contract: `RasterSurface` plus

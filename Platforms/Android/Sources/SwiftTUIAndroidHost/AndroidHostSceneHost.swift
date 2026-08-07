@@ -400,6 +400,10 @@ public final class AndroidHostSceneHost {
         return true
       }
     )
+    surface.updateSurfaceCapabilities(
+      cellPixelSize: nil,
+      pointerInputCapabilities: Self.pointerInputCapabilities(metrics: nil)
+    )
     let session = try HostedSceneSession(
       for: app,
       sceneID: selectedSceneID,
@@ -600,13 +604,27 @@ public final class AndroidHostSceneHost {
     surface.updateSurfaceSize(size)
     surface.updateSurfaceCapabilities(
       cellPixelSize: cellPixelSize,
-      pointerInputCapabilities: PointerInputCapabilities(
-        precision: .subCell(source: .nativePixels, metrics: metrics),
-        supportsHover: true,
-        supportsPreciseScroll: true
-      )
+      pointerInputCapabilities: Self.pointerInputCapabilities(metrics: metrics)
     )
     session.requestSurfaceRefresh()
+  }
+
+  /// The Android host's pointer declaration.
+  ///
+  /// `supportsScrollPanning` is on because touch *is* Android's scrolling
+  /// paradigm: content follows the finger, and a drag that starts on a control
+  /// becomes a scroll once it travels far enough. Published at construction as
+  /// well as on resize so the first frame already pans — the surface would
+  /// otherwise start at `.cellOnly` (desktop paradigm) until the first layout.
+  private static func pointerInputCapabilities(
+    metrics: CellPixelMetrics?
+  ) -> PointerInputCapabilities {
+    PointerInputCapabilities(
+      precision: metrics.map { .subCell(source: .nativePixels, metrics: $0) } ?? .cell,
+      supportsHover: true,
+      supportsPreciseScroll: true,
+      supportsScrollPanning: true
+    )
   }
 
   @MainActor

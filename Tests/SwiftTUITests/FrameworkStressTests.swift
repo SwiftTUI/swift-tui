@@ -4923,9 +4923,16 @@ final class StressRuntimeHarness<Content: View> {
   init(
     rootIdentity: Identity,
     size: CellSize,
+    // Drag-to-pan and the scroll-takeover threshold are host-declared (see
+    // `PointerInputCapabilities.supportsScrollPanning`), so a scenario that
+    // exercises either has to say it is running on a touch-style host.
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
     @ViewBuilder content: @escaping () -> Content
   ) throws {
-    let terminal = StressRecordingHost(surfaceSize: size)
+    let terminal = StressRecordingHost(
+      surfaceSize: size,
+      pointerInputCapabilities: pointerInputCapabilities
+    )
     let scheduler = FrameScheduler()
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = SwiftTUIRuntime.RunLoop(
@@ -5199,11 +5206,18 @@ private final class StressRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  /// Defaults to the terminal paradigm; direct-manipulation scenarios pass a
+  /// touch-style declaration so the scroll body claims drags at all.
+  let pointerInputCapabilities: PointerInputCapabilities
   private(set) var frames: [String] = []
   private var lastPresentedSurface: RasterSurface?
 
-  init(surfaceSize: CellSize) {
+  init(
+    surfaceSize: CellSize,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly
+  ) {
     self.surfaceSize = surfaceSize
+    self.pointerInputCapabilities = pointerInputCapabilities
   }
 
   func enableRawMode() throws {}

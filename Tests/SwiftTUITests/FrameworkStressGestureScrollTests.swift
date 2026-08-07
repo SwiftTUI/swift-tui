@@ -1210,7 +1210,10 @@ extension FrameworkStressGestureScrollTests {
     let activations = GestureScrollBox(0)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll024Root"),
-      size: .init(width: 48, height: 9)
+      size: .init(width: 48, height: 9),
+      // Takeover exists only where dragging pans, so this scenario is a
+      // touch-host one; a terminal host would keep the button's gesture.
+      pointerInputCapabilities: PointerInputCapabilities(supportsScrollPanning: true)
     ) {
       GestureScroll024Fixture(position: position, activations: activations)
     }
@@ -1263,7 +1266,10 @@ extension FrameworkStressGestureScrollTests {
     let activations = GestureScrollBox(0)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("GestureScroll025Root"),
-      size: .init(width: 52, height: 10)
+      size: .init(width: 52, height: 10),
+      // Same as 024: nested-route ownership is a takeover question, and
+      // takeover only runs on a host that pans by dragging.
+      pointerInputCapabilities: PointerInputCapabilities(supportsScrollPanning: true)
     ) {
       GestureScroll025Fixture(outer: outer, inner: inner, activations: activations)
     }

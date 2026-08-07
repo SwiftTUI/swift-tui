@@ -722,6 +722,10 @@ function encodeCapabilitiesControlMessage() {
   return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true}
 `);
 }
+function encodePointerCapabilitiesControlMessage(supportsScrollPanning) {
+  return textEncoder.encode(`${recordPrefix}pointer:panning=${supportsScrollPanning ? 1 : 0}
+`);
+}
 function encodeResyncControlMessage(request) {
   const payload = request.scope === "keyframe" ? { scope: "keyframe" } : {
     scope: "images",
@@ -1119,6 +1123,9 @@ class BrowserWASIBridge {
     this.environment.SWIFTTUI_RENDER_STYLE = encodeWebHostTerminalRenderStyleBase64(style);
     this.stdin.write(encodeRenderStyleControlMessage(style));
   }
+  updatePointerCapabilities(supportsScrollPanning) {
+    this.stdin.write(encodePointerCapabilitiesControlMessage(supportsScrollPanning));
+  }
   sendInput(chunk) {
     this.stdin.write(chunk);
   }
@@ -1205,6 +1212,9 @@ class WebSocketSceneBridge {
   }
   updateRenderStyle(style) {
     this.sendInput(encodeRenderStyleControlMessage(style));
+  }
+  updatePointerCapabilities(supportsScrollPanning) {
+    this.sendInput(encodePointerCapabilitiesControlMessage(supportsScrollPanning));
   }
   sendInput(chunk) {
     if (this.disposed) {
@@ -3240,6 +3250,19 @@ function legacyWheelMode(captureWheelInput) {
   }
   return captureWheelInput ? "capture" : "passive";
 }
+function coarsePointerQuery() {
+  if (typeof globalThis.matchMedia !== "function") {
+    return;
+  }
+  try {
+    return globalThis.matchMedia("(pointer: coarse)");
+  } catch {
+    return;
+  }
+}
+function coarsePrimaryPointer() {
+  return coarsePointerQuery()?.matches ?? false;
+}
 
 class WebHostSceneRuntime {
   descriptor;
@@ -3275,6 +3298,8 @@ class WebHostSceneRuntime {
   documentVisible = true;
   runtimeSuspended = false;
   suspendWhenHidden;
+  lastSentPointerCapabilities = false;
+  detachPointerParadigmObserver;
   constructor(options) {
     this.descriptor = options.descriptor;
     this.currentStyle = normalizeWebHostTerminalStyle(options.style);
@@ -3334,6 +3359,8 @@ class WebHostSceneRuntime {
       writeError: (text) => this.writeOutput(text)
     });
     this.applyStyle(this.currentStyle);
+    this.installPointerParadigmObserver();
+    this.sendPointerCapabilitiesIfChanged(coarsePrimaryPointer());
     this.measureCells();
     this.resizeToMount();
     this.draw();
@@ -3409,8 +3436,29 @@ class WebHostSceneRuntime {
   }
   dispose() {
     this.detachInputHandlers?.();
+    this.detachPointerParadigmObserver?.();
     this.resizeObserver?.disconnect();
     this.element.remove();
+  }
+  sendPointerCapabilitiesIfChanged(supportsScrollPanning) {
+    if (this.lastSentPointerCapabilities === supportsScrollPanning) {
+      return;
+    }
+    this.lastSentPointerCapabilities = supportsScrollPanning;
+    this.bridge?.updatePointerCapabilities?.(supportsScrollPanning);
+  }
+  installPointerParadigmObserver() {
+    const query = coarsePointerQuery();
+    if (!query?.addEventListener) {
+      return;
+    }
+    const handleChange = (event) => {
+      this.sendPointerCapabilitiesIfChanged(event.matches);
+    };
+    query.addEventListener("change", handleChange);
+    this.detachPointerParadigmObserver = () => {
+      query.removeEventListener?.("change", handleChange);
+    };
   }
   presentSurface(frame, recoveredImagePayloadIds) {
     const previousFrame = this.currentFrame;
@@ -3512,6 +3560,9 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerDown = (event) => {
+      if (event.pointerType === "touch" || event.pointerType === "mouse") {
+        this.sendPointerCapabilitiesIfChanged(event.pointerType === "touch");
+      }
       if (this.allowsNativeTextSelection(event)) {
         return;
       }

@@ -32,7 +32,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 167 | 1449 |
+| `SwiftTUIPrimitives` | 167 | 1450 |
 | `SwiftTUIGraph` | 56 | 341 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -679,7 +679,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PixelPoint` — struct — 4 members
 - `PixelSize` — struct — 4 members
 - `Point` — struct — 8 members
-- `PointerInputCapabilities` — struct — 6 members
+- `PointerInputCapabilities` — struct — 7 members
 - `PointerLocation` — struct — 6 members
 - `PointerPrecision` — enum — 3 members
 - `PointerPrecisionPolicy` — enum — 4 members

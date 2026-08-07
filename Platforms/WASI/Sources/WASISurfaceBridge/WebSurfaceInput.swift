@@ -59,6 +59,15 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
 package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(CellSize, cellPixelSize: PixelSize?)
   case style(TerminalRenderStyle)
+  /// A pointer-paradigm declaration (`pointer:panning=1`), sent by the page
+  /// when it resolves the pointer type and again whenever it changes — a
+  /// tablet docked to a mouse switches paradigm without reloading.
+  ///
+  /// Unlike `caps:` this *is* live on the in-process transport: it describes
+  /// the browsing device, which the WASI environment cannot see and which can
+  /// change mid-session. Absence means the desktop paradigm (no panning),
+  /// which is what a page bundle predating the record produces.
+  case pointerCapabilities(supportsScrollPanning: Bool)
   /// A host capability declaration (`caps:{json}`), sent once by the
   /// WebSocket client after open. Absence means ``HostWireCapabilities``
   /// defaults — today's bytes. See `HostWireSchema.capabilityMappings`.

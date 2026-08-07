@@ -38,6 +38,13 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       let indicatorAxes = resolvedIndicatorAxes(
         environment: context.environmentValues
       )
+      // Direct-manipulation panning is the host's call, not the view's: only a
+      // host whose native paradigm is touch declares it (see
+      // ``PointerInputCapabilities/supportsScrollPanning``). On terminals and
+      // desktop pointer hosts the body leaves the press stream alone, so a
+      // click-drag over scroll content stays a click-drag.
+      let allowsPanning = context.environmentValues.pointerInputCapabilities
+        .supportsScrollPanning
       let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
       // Target-scoped side-field read: this body compares `focusedIdentity`
       // exclusively against the scroll view itself and its two synthetic
@@ -141,6 +148,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           routeID: rootRouteID,
           handler: makeScrollBodyPointerHandler(
             scrollAxes: axes,
+            allowsPanning: allowsPanning,
             binding: binding,
             panBinding: $panAnchor
           )
@@ -200,7 +208,8 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           ),
           semanticMetadata: scrollViewMetadata(
             accessibilityRole: indicatorAxes.isEmpty
-              ? .scrollView : .scrollViewWithIndicators
+              ? .scrollView : .scrollViewWithIndicators,
+            capturesPointerOnPress: allowsPanning
           )
         )
       ]
@@ -209,10 +218,13 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
 
   /// Builds the pointer handler for the scroll body's primary route.
   ///
-  /// Handles wheel scrolling and direct-manipulation panning (down/dragged/up)
-  /// using exactly the state the inline handler captured.
+  /// Always handles wheel scrolling. Handles direct-manipulation panning
+  /// (down/dragged/up) only when the host declares
+  /// ``PointerInputCapabilities/supportsScrollPanning``; otherwise the press
+  /// stream is left entirely to whatever the pointer is actually over.
   private func makeScrollBodyPointerHandler(
     scrollAxes: Axis.Set,
+    allowsPanning: Bool,
     binding: Binding<ScrollCellOffset>,
     panBinding: Binding<ScrollPanAnchor?>
   ) -> @MainActor (LocalPointerEvent) -> PointerDispatchOutcome {
@@ -246,15 +258,20 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         binding.wrappedValue = next
         return .claimed
 
-      // Direct-manipulation panning: a touch/pointer drag that starts on the
-      // scroll view's own content (not on an inner control) pans the content
-      // so it follows the finger. This is the same gesture path iOS and
-      // Android already forward as `.dragged`, so panning lights up on every
-      // host once the body captures the drag stream. The body only claims
-      // the press while content actually overflows, so non-scrollable drags
-      // still bubble to a parent scroll view or gesture.
+      // Direct-manipulation panning: a touch drag that starts on the scroll
+      // view's own content (not on an inner control) pans the content so it
+      // follows the finger. iOS, Android, and coarse-pointer browsers forward
+      // exactly this gesture path as `.dragged`, so panning lights up on those
+      // hosts once the body captures the drag stream. The body only claims the
+      // press while content actually overflows, so non-scrollable drags still
+      // bubble to a parent scroll view or gesture.
+      //
+      // Hosts whose native paradigm is a desktop pointer never reach these
+      // branches: `allowsPanning` is false, the press stream is ignored, and
+      // the semantic metadata drops `captureOnPress` so the run loop does not
+      // capture the body either.
       case .down(.primary):
-        guard let ctx = event.scrollContext else {
+        guard allowsPanning, let ctx = event.scrollContext else {
           return .ignored
         }
         // Only claim a press that landed directly on the scroll body, not
@@ -282,7 +299,10 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         return .claimed
 
       case .dragged(.primary):
-        guard let anchor = panBinding.wrappedValue else {
+        // A capability flip mid-gesture (a browser switching from touch to
+        // mouse) must not leave a live anchor panning; the `.up` below still
+        // clears it unconditionally so the anchor cannot get stuck.
+        guard allowsPanning, let anchor = panBinding.wrappedValue else {
           return .ignored
         }
         let current = binding.wrappedValue

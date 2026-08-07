@@ -162,18 +162,26 @@ package func focusableControlMetadata(
   )
 }
 
+/// Semantics for a scroll view container.
+///
+/// `capturesPointerOnPress` mirrors the host's
+/// ``PointerInputCapabilities/supportsScrollPanning`` declaration. When it is
+/// on, the pointer is captured on press so a drag that begins on scroll
+/// content routes its whole `.dragged`/`.up` stream to the scroll view for
+/// direct-manipulation panning (the body handler still only claims the
+/// `.down` while content overflows, so non-scrollable presses bubble). When
+/// the host does not pan by dragging, the body must not capture at all — a
+/// captured press over scroll content would swallow the interaction stream
+/// nothing is going to use.
 package func scrollViewMetadata(
-  accessibilityRole: AccessibilityRole
+  accessibilityRole: AccessibilityRole,
+  capturesPointerOnPress: Bool
 ) -> SemanticMetadata {
   .init(
     isFocusable: true,
     focusInteractions: .edit,
     participatesInPointerHitTesting: true,
-    // Capture the pointer on press so a drag that begins on scroll content
-    // routes its whole `.dragged`/`.up` stream to the scroll view for
-    // direct-manipulation panning. The body handler only claims the `.down`
-    // while the content overflows, so non-scrollable presses still bubble.
-    captureOnPress: true,
+    captureOnPress: capturesPointerOnPress,
     scrollRole: .scrollView,
     accessibilityRole: accessibilityRole
   )

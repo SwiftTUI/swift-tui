@@ -298,6 +298,10 @@ struct HostWireConformanceWebSocketChannelRunner {
         transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
       case .style(let style):
         transport.updateStyle(style)
+      case .pointerCapabilities(let supportsScrollPanning):
+        transport.updatePointerCapabilities(
+          supportsScrollPanning: supportsScrollPanning
+        )
       case .capabilities(let capabilities):
         await channel.applyCapabilities(
           token: token,

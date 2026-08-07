@@ -20,7 +20,13 @@ extension RunLoop {
     at location: PointerLocation,
     timestamp: MonotonicInstant
   ) -> Bool {
-    guard pointerInteraction.capturedRouteID == nil,
+    // Takeover is half of direct-manipulation panning and is gated with it.
+    // Cancelling a control mid-press because the pointer moved is only ever
+    // right where dragging pans — on a desktop pointer host the same motion is
+    // an ordinary click-drag, and the scroll view would refuse the handed-off
+    // `.down` anyway, so the control would be cancelled for nothing.
+    guard presentationSurface.pointerInputCapabilities.supportsScrollPanning,
+      pointerInteraction.capturedRouteID == nil,
       pointerInteraction.armedRouteID != nil,
       let dragStartLocation = pointerInteraction.dragStartLocation
     else {

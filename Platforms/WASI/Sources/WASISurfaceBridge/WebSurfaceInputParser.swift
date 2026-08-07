@@ -91,6 +91,9 @@ package struct WebSurfaceInputParser {
     if let capabilities = parseCapsCommand(text) {
       return ([], [capabilities])
     }
+    if let pointerCapabilities = parsePointerCommand(text) {
+      return ([], [pointerCapabilities])
+    }
     if let resync = parseResyncCommand(text) {
       return ([], [resync])
     }
@@ -165,6 +168,30 @@ package struct WebSurfaceInputParser {
       return nil
     }
     return .capabilities(capabilities)
+  }
+
+  /// Parses `pointer:<key>=<value>[:<key>=<value>…]`.
+  ///
+  /// Key/value tokens rather than positional fields so the page can add a
+  /// pointer fact later without changing this record's arity: an unrecognized
+  /// key is skipped, and a record carrying only unrecognized keys is dropped
+  /// entirely (no message, no state change). `panning` is the only key today.
+  private func parsePointerCommand(
+    _ text: String
+  ) -> WebSurfaceInputControlMessage? {
+    let components = splitCommand(text)
+    guard components.count >= 2, components[0] == "pointer" else {
+      return nil
+    }
+
+    for token in components.dropFirst() {
+      let field = token.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+      guard field.count == 2, field[0] == "panning" else {
+        continue
+      }
+      return .pointerCapabilities(supportsScrollPanning: field[1] == "1")
+    }
+    return nil
   }
 
   private func parseResyncCommand(

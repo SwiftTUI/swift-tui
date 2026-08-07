@@ -186,6 +186,15 @@ public enum WASIRunner {
         case .style(let style):
           host.updateStyle(style)
           signalReader.send("SIGWINCH")
+        case .pointerCapabilities(let supportsScrollPanning):
+          // Live on this transport, unlike `caps:` below: the pointer
+          // paradigm is a property of the browsing device, not of the WASI
+          // environment, and a device can switch paradigm mid-session. The
+          // SIGWINCH re-resolves so views see the new declaration.
+          host.updatePointerCapabilities(
+            supportsScrollPanning: supportsScrollPanning
+          )
+          signalReader.send("SIGWINCH")
         case .capabilities:
           // The WASI ingress is environment-owned (resolved above at
           // transport construction); a stray caps record on stdin is not a

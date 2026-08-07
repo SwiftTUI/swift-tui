@@ -2022,7 +2022,10 @@ struct InteractiveRuntimeTests {
   @Test("ScrollView body drag pans the content so it follows the pointer")
   func scrollViewBodyDragPansContent() async throws {
     let terminalSize = CellSize(width: 20, height: 8)
-    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize },
+      pointerInputCapabilities: panningPointerCapabilities
+    )
     let rootIdentity = testIdentity("BodyPanFixture")
     let view =
       ScrollView(.vertical) {
@@ -2304,7 +2307,10 @@ struct InteractiveRuntimeTests {
   @Test("ScrollView body tap without movement does not scroll")
   func scrollViewBodyTapWithoutMovementDoesNotScroll() async throws {
     let terminalSize = CellSize(width: 20, height: 8)
-    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize },
+      pointerInputCapabilities: panningPointerCapabilities
+    )
     let rootIdentity = testIdentity("BodyPanTapFixture")
     let view =
       ScrollView(.vertical) {
@@ -2402,7 +2408,10 @@ struct InteractiveRuntimeTests {
     // loop coalesces the drag burst, so this single stroke must both cross the
     // threshold and carry the pan.)
     let dragResult = try await runTerminalInputHarness(
-      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      terminal: RecordingTerminalHost(
+        surfaceSizeProvider: { terminalSize },
+        pointerInputCapabilities: panningPointerCapabilities
+      ),
       events: [
         .mouse(.init(kind: .down(.primary), location: press)),
         .mouse(.init(kind: .dragged(.primary), location: top)),
@@ -2463,7 +2472,10 @@ struct InteractiveRuntimeTests {
 
     // A press and release on the button with no movement activates it.
     let tapResult = try await runTerminalInputHarness(
-      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      terminal: RecordingTerminalHost(
+        surfaceSizeProvider: { terminalSize },
+        pointerInputCapabilities: panningPointerCapabilities
+      ),
       events: [
         .mouse(.init(kind: .down(.primary), location: press)),
         .mouse(.init(kind: .up(.primary), location: press)),
@@ -2524,7 +2536,10 @@ struct InteractiveRuntimeTests {
     // so the content does not scroll yet (the old cell-floor logic would have
     // jumped a full row at the cell boundary).
     let smallDrag = try await runTerminalInputHarness(
-      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      terminal: RecordingTerminalHost(
+        surfaceSizeProvider: { terminalSize },
+        pointerInputCapabilities: panningPointerCapabilities
+      ),
       events: [
         .mouse(.init(kind: .down(.primary), location: subCell(x: baseX, y: startY))),
         .mouse(.init(kind: .dragged(.primary), location: subCell(x: baseX, y: startY - 0.4))),
@@ -2540,7 +2555,10 @@ struct InteractiveRuntimeTests {
     // Drag up by 0.6 cells from the top: rounds to 1, scrolling one row.
     box.position = .zero
     let bigDrag = try await runTerminalInputHarness(
-      terminal: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+      terminal: RecordingTerminalHost(
+        surfaceSizeProvider: { terminalSize },
+        pointerInputCapabilities: panningPointerCapabilities
+      ),
       events: [
         .mouse(.init(kind: .down(.primary), location: subCell(x: baseX, y: startY))),
         .mouse(.init(kind: .dragged(.primary), location: subCell(x: baseX, y: startY - 0.6))),
@@ -4688,6 +4706,11 @@ private final class RecordingTerminalHost: PresentationSurface {
   }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
+  /// Defaults to the terminal paradigm (`.cellOnly`, so no drag-to-pan).
+  /// Direct-manipulation tests pass a touch-style declaration explicitly —
+  /// panning is a host opt-in, and the run loop reads it from here rather
+  /// than from the harness's seed environment.
+  let pointerInputCapabilities: PointerInputCapabilities
   private(set) var frames: [String] = []
   private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
   private(set) var presentedSurfaceSizes: [CellSize] = []
@@ -4703,11 +4726,13 @@ private final class RecordingTerminalHost: PresentationSurface {
     surfaceSizeProvider: @escaping () -> CellSize = { InteractiveDemoLayout.frameSize },
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
     presentObserver: (() -> Void)? = nil
   ) {
     self.surfaceSizeProvider = surfaceSizeProvider
     self.capabilityProfile = capabilityProfile
     self.appearance = appearance
+    self.pointerInputCapabilities = pointerInputCapabilities
     self.presentObserver = presentObserver
   }
 
@@ -5902,6 +5927,14 @@ private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
   }
 }
 
+/// A touch-style host declaration for direct-manipulation tests: identical to
+/// `.cellOnly` except that it opts into drag-to-pan, the way Android, iOS, and
+/// coarse-pointer browsers do. Terminal hosts deliberately do not, so a pan
+/// test that forgot to pass this would exercise the desktop paradigm instead.
+private let panningPointerCapabilities = PointerInputCapabilities(
+  supportsScrollPanning: true
+)
+
 /// Builds and mounts a `RunLoop` for momentum tests, wiring its frame-readiness
 /// clock to `clock` so deadline-driven decay frames can be stepped determinist-
 /// ically. Returns the live run loop; the caller injects pointer events via
@@ -5912,6 +5945,7 @@ private func mountedMomentumRunLoop<V: View>(
   terminalSize: CellSize,
   rootIdentity: Identity,
   motion: RuntimeConfiguration.MotionMode = .normal,
+  pointerInputCapabilities: PointerInputCapabilities = panningPointerCapabilities,
   clock: VirtualFrameClock,
   viewBuilder: @escaping () -> V
 ) throws -> SwiftTUIRuntime.RunLoop<Int, V> {
@@ -5920,7 +5954,10 @@ private func mountedMomentumRunLoop<V: View>(
 
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    presentationSurface: RecordingTerminalHost(surfaceSizeProvider: { terminalSize }),
+    presentationSurface: RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize },
+      pointerInputCapabilities: pointerInputCapabilities
+    ),
     terminalInputReader: ScriptedTerminalInputReader(events: []),
     signalReader: EmptySignalReader(),
     scheduler: FrameScheduler(),

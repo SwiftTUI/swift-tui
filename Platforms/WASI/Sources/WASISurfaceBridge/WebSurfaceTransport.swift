@@ -12,6 +12,11 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
     var encodingState: WebSurfaceFrameEncodingState
+    /// The page's last `pointer:panning=` declaration. Held separately from
+    /// `pointerInputCapabilities` because the two are refreshed by different
+    /// events — a resize recomputes precision from fresh cell metrics and must
+    /// not discard a paradigm the page declared earlier.
+    var supportsScrollPanning: Bool
   }
 
   private let state: Mutex<State>
@@ -53,8 +58,12 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
         surfaceSize: surfaceSize,
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
-        pointerInputCapabilities: Self.pointerInputCapabilities(for: nil),
-        encodingState: wireCapabilities.negotiatedEncodingState()
+        pointerInputCapabilities: Self.pointerInputCapabilities(
+          for: nil,
+          supportsScrollPanning: false
+        ),
+        encodingState: wireCapabilities.negotiatedEncodingState(),
+        supportsScrollPanning: false
       )
     )
   }
@@ -87,13 +96,33 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
       state.surfaceSize = surfaceSize
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
       state.pointerInputCapabilities = Self.pointerInputCapabilities(
-        for: cellPixelSize
+        for: cellPixelSize,
+        supportsScrollPanning: state.supportsScrollPanning
+      )
+    }
+  }
+
+  /// Applies the page's `pointer:` paradigm declaration.
+  ///
+  /// A browser serves both paradigms from one build, so this cannot be
+  /// resolved from the WASI environment the way the wire capabilities are: the
+  /// page reports what it sees (a coarse pointer, a touch-first device) and
+  /// may report it again when that changes.
+  package func updatePointerCapabilities(
+    supportsScrollPanning: Bool
+  ) {
+    state.withLock { state in
+      state.supportsScrollPanning = supportsScrollPanning
+      state.pointerInputCapabilities = Self.pointerInputCapabilities(
+        for: state.graphicsCapabilities.cellPixelSize,
+        supportsScrollPanning: supportsScrollPanning
       )
     }
   }
 
   private static func pointerInputCapabilities(
-    for cellPixelSize: PixelSize?
+    for cellPixelSize: PixelSize?,
+    supportsScrollPanning: Bool
   ) -> PointerInputCapabilities {
     let metrics =
       if let cellPixelSize {
@@ -107,7 +136,8 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
       }
     return PointerInputCapabilities(
       precision: .subCell(source: .webPixels, metrics: metrics),
-      supportsHover: true
+      supportsHover: true,
+      supportsScrollPanning: supportsScrollPanning
     )
   }
 

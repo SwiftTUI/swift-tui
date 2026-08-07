@@ -41,6 +41,10 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     /// session deliberately drops everything sent before the declaration, so
     /// without this the reconnecting client would stay blank.
     var lastPresentedFrame: RetainedFrame?
+    /// The client's last `pointer:panning=` declaration, kept apart from
+    /// `pointerInputCapabilities` so a resize (which recomputes precision from
+    /// fresh cell metrics) cannot discard it.
+    var supportsScrollPanning = false
   }
 
   private enum RetainedFrame: Sendable {
@@ -181,7 +185,29 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     state.withLock { state in
       state.surfaceSize = surfaceSize
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
-      state.pointerInputCapabilities = Self.pointerInputCapabilities(for: cellPixelSize)
+      state.pointerInputCapabilities = Self.pointerInputCapabilities(
+        for: cellPixelSize,
+        supportsScrollPanning: state.supportsScrollPanning
+      )
+    }
+  }
+
+  /// Applies the client's `pointer:` paradigm declaration.
+  ///
+  /// Held apart from the wire capabilities on purpose: `caps:` describes what
+  /// the *decoder* accepts and is a once-per-connection epoch marker, whereas
+  /// this describes what the *device* is and may be re-declared at any time
+  /// (a tablet docked to a mouse). See
+  /// ``PointerInputCapabilities/supportsScrollPanning``.
+  package func updatePointerCapabilities(
+    supportsScrollPanning: Bool
+  ) {
+    state.withLock { state in
+      state.supportsScrollPanning = supportsScrollPanning
+      state.pointerInputCapabilities = Self.pointerInputCapabilities(
+        for: state.graphicsCapabilities.cellPixelSize,
+        supportsScrollPanning: supportsScrollPanning
+      )
     }
   }
 
@@ -259,10 +285,11 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
   }
 
   private static func pointerInputCapabilities(
-    for cellPixelSize: PixelSize?
+    for cellPixelSize: PixelSize?,
+    supportsScrollPanning: Bool
   ) -> PointerInputCapabilities {
     guard let cellPixelSize else {
-      return .cellOnly
+      return PointerInputCapabilities(supportsScrollPanning: supportsScrollPanning)
     }
     return PointerInputCapabilities(
       precision: .subCell(
@@ -273,7 +300,8 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
           source: .reported
         )
       ),
-      supportsHover: true
+      supportsHover: true,
+      supportsScrollPanning: supportsScrollPanning
     )
   }
 

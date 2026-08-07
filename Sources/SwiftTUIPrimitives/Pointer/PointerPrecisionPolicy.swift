@@ -237,15 +237,36 @@ public struct PointerInputCapabilities: Equatable, Sendable {
   public var supportsSubCellLocation: Bool { precision.isSubCell }
   public var supportsHover: Bool
   public var supportsPreciseScroll: Bool
+  /// Whether a pointer drag on scrollable content pans it directly, so the
+  /// content follows the pointer (touch-style direct manipulation).
+  ///
+  /// This is a statement about the host's *native interaction paradigm*, not
+  /// about what its input device can physically emit. Touch surfaces —
+  /// Android, iOS, and coarse-pointer browsers — pan by dragging the content
+  /// itself, so they declare it. Terminals and desktop pointer hosts do not:
+  /// there a press-drag is a click-drag, and scrolling belongs to the wheel,
+  /// the scroll indicators, and the keyboard. Declaring it on a desktop host
+  /// makes every press over overflowing content a potential scroll gesture,
+  /// which is exactly what a mouse user does not expect.
+  ///
+  /// Off by default, so a host that says nothing gets the desktop paradigm.
+  /// Two behaviors turn on together with it: the scroll body claims the
+  /// `.down`/`.dragged`/`.up` stream to pan, and a drag that begins on an
+  /// inner control is handed to the enclosing scroll view once it crosses the
+  /// takeover threshold (cancelling that control). Wheel scrolling, scroll
+  /// indicator drags, and keyboard scrolling are unaffected either way.
+  public var supportsScrollPanning: Bool
 
   public init(
     precision: PointerPrecision = .cell,
     supportsHover: Bool = false,
-    supportsPreciseScroll: Bool = false
+    supportsPreciseScroll: Bool = false,
+    supportsScrollPanning: Bool = false
   ) {
     self.precision = precision
     self.supportsHover = supportsHover
     self.supportsPreciseScroll = supportsPreciseScroll
+    self.supportsScrollPanning = supportsScrollPanning
   }
 
   /// Conservative default for terminal SGR 1006 and tests that do not opt in.
