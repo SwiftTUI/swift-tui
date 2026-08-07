@@ -312,7 +312,7 @@ package struct Rasterizer: Sendable {
     let surface = RasterSurface(
       size: surfaceSize,
       cells: cells,
-      imageAttachments: imageAttachments,
+      imageAttachments: canonicallyOrderedImageAttachments(imageAttachments, draw: draw),
       presentationLayers: presentationRecorder.layers.sorted { lhs, rhs in
         lhs.order < rhs.order
       }
@@ -344,6 +344,81 @@ package struct Rasterizer: Sendable {
       nil,
       .incremental
     )
+  }
+
+  /// Restores fresh-raster paint order for an incrementally merged attachment
+  /// array.
+  ///
+  /// The incremental path keeps retained attachments (outside the dirty rows)
+  /// at the front of the array and appends repainted ones behind them, so a
+  /// repainted attachment that paints *before* a retained one in the draw tree
+  /// would otherwise land *after* it. Attachment order is presentation z-order
+  /// for overlapping images, and the F13 verification oracle compares it
+  /// against a fresh raster order-sensitively.
+  ///
+  /// Compositing groups do not disturb this order: a group flattens its
+  /// collected attachments into the destination array at the group's own walk
+  /// position, which is exactly where a plain depth-first walk would emit
+  /// them. Clipping only removes attachments, so ranking by an unclipped walk
+  /// preserves the relative order of every attachment that survives.
+  private func canonicallyOrderedImageAttachments(
+    _ attachments: [RasterImageAttachment],
+    draw: DrawNode
+  ) -> [RasterImageAttachment] {
+    guard attachments.count > 1 else {
+      return attachments
+    }
+
+    enum Frame {
+      case visit(DrawNode)
+      case post([DrawCommand])
+    }
+
+    var ranksByIdentity: [Identity: [Int]] = [:]
+    var nextRank = 0
+    func recordImageCommands(_ commands: [DrawCommand]) {
+      for command in commands {
+        guard case .image(_, let identity, _) = command else {
+          continue
+        }
+        ranksByIdentity[identity, default: []].append(nextRank)
+        nextRank += 1
+      }
+    }
+
+    var stack: [Frame] = [.visit(draw)]
+    while let frame = stack.popLast() {
+      switch frame {
+      case .post(let commands):
+        recordImageCommands(commands)
+      case .visit(let node):
+        recordImageCommands(node.commands)
+        if !node.postCommands.isEmpty {
+          stack.append(.post(node.postCommands))
+        }
+        for child in node.children.reversed() {
+          stack.append(.visit(child))
+        }
+      }
+    }
+
+    var consumedRanks: [Identity: Int] = [:]
+    let ranked = attachments.enumerated().map { index, attachment in
+      let occurrence = consumedRanks[attachment.identity, default: 0]
+      consumedRanks[attachment.identity] = occurrence + 1
+      let ranks = ranksByIdentity[attachment.identity] ?? []
+      // An attachment whose identity no longer appears in the draw tree keeps
+      // its relative position at the end of the array; the verification
+      // oracle stays responsible for flagging it as incomplete damage.
+      let rank = occurrence < ranks.count ? ranks[occurrence] : Int.max
+      return (rank: rank, index: index, attachment: attachment)
+    }
+    return
+      ranked
+      .sorted { lhs, rhs in
+        lhs.rank == rhs.rank ? lhs.index < rhs.index : lhs.rank < rhs.rank
+      }
+      .map(\.attachment)
   }
 
   private func freshRasterizationIfIncrementalMismatch(

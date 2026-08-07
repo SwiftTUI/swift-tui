@@ -943,6 +943,74 @@ struct RasterizerTests {
       ])
   }
 
+  @Test("incremental raster keeps fresh paint order when an earlier attachment repaints")
+  func incrementalRasterKeepsFreshPaintOrderWhenEarlierAttachmentRepaints() throws {
+    let rasterizer = Rasterizer()
+    let rootBounds = CellRect(origin: .zero, size: .init(width: 4, height: 6))
+    let topIdentity = testIdentity("top-image")
+    let bottomIdentity = testIdentity("bottom-image")
+    let topBounds = CellRect(origin: .zero, size: .init(width: 4, height: 2))
+    let bottomBounds = CellRect(origin: .init(x: 0, y: 4), size: .init(width: 4, height: 2))
+
+    func drawTree(
+      topSource: String
+    ) -> DrawNode {
+      DrawNode(
+        identity: testIdentity("root"),
+        bounds: rootBounds,
+        children: [
+          DrawNode(
+            identity: topIdentity,
+            bounds: topBounds,
+            commands: [
+              .image(
+                bounds: topBounds,
+                identity: topIdentity,
+                payload: .init(source: .path(topSource))
+              )
+            ]
+          ),
+          DrawNode(
+            identity: bottomIdentity,
+            bounds: bottomBounds,
+            commands: [
+              .image(
+                bounds: bottomBounds,
+                identity: bottomIdentity,
+                payload: .init(source: .path("bottom.png"))
+              )
+            ]
+          ),
+        ]
+      )
+    }
+
+    let previousSurface = rasterizer.rasterize(drawTree(topSource: "top-frame-a.png"))
+    #expect(previousSurface.imageAttachments.map(\.identity) == [topIdentity, bottomIdentity])
+    let previousBottom = try #require(previousSurface.imageAttachments.last)
+
+    // The top image repaints (an animated frame advanced) while the bottom
+    // image's rows stay clean, so the bottom attachment is retained from the
+    // previous surface. The merged array must still match fresh-raster paint
+    // order: attachment order is presentation z-order for overlapping images,
+    // and the F13 oracle compares it against a fresh raster order-sensitively.
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      drawTree(topSource: "top-frame-b.png"),
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [
+        .init(row: 0, columnRanges: [0..<4]),
+        .init(row: 1, columnRanges: [0..<4]),
+      ])
+    )
+
+    #expect(result.incrementalMismatch == nil)
+    #expect(result.path == .incremental)
+    #expect(result.surface.imageAttachments.map(\.identity) == [topIdentity, bottomIdentity])
+    #expect(result.surface.imageAttachments.first?.source == .path("top-frame-b.png"))
+    #expect(result.surface.imageAttachments.last == previousBottom)
+  }
+
   @Test("incremental raster reuse refines row damage to actual changed spans")
   func incrementalRasterReuseRefinesDamageToActualChangedSpans() {
     let rasterizer = Rasterizer()

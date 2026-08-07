@@ -38,6 +38,7 @@ SwiftTUIRuntime.EnvFrameTraceSink.fromEnvironment()
 SwiftTUIRuntime.EnvFrameTraceSink.record(_:)
 SwiftTUIRuntime.FrameDiagnosticSink
 SwiftTUIRuntime.FrameDiagnosticSink.record(_:)
+SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:frameDelivery:frameHistoryLimit:onFrame:onClipboardWrite:)
 SwiftTUIRuntime.HostedRasterSurface.init(surfaceSize:appearance:theme:capabilityProfile:frameDelivery:onFrame:onClipboardWrite:)
 SwiftTUIRuntime.HostedRasterSurface.waitForFrame(matching:)
 SwiftTUIRuntime.HostedRasterSurface.waitForFrames(matching:)

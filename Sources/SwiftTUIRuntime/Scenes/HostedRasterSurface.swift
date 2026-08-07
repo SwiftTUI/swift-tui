@@ -12,7 +12,16 @@ public final class HostedRasterSurface:
   PresentationSurfaceMetricsProvider, RasterPresentationSurface,
   ClipboardWritingPresentationSurface, Sendable
 {
-  private static let frameHistoryLimit = 256
+  /// Production hosts consume frames through `onFrame`; the retained frame
+  /// history exists so the `@_spi(Runners)` frame waiters can match frames
+  /// delivered before a waiter attached. Deep history is a test/tooling
+  /// concern: a live host retaining hundreds of raster + semantics frames at
+  /// animation cadence reads as a steadily growing footprint (each retained
+  /// frame pins its own copies of every repainted row), so the default keeps
+  /// a small window and suites that assert on the deep rolling window opt in
+  /// through the `frameHistoryLimit` initializer parameter.
+  private static let defaultFrameHistoryLimit = 32
+  private let frameHistoryLimit: Int
   private let state: Mutex<HostedRasterSurfaceState>
   private let frameHandler: @Sendable (SemanticHostFrame) -> Void
   private let clipboardWriter: (@MainActor @Sendable (String) -> Bool)?
@@ -59,7 +68,7 @@ public final class HostedRasterSurface:
   }
 
   @_spi(Runners)
-  public init(
+  public convenience init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme? = nil,
@@ -68,6 +77,34 @@ public final class HostedRasterSurface:
     onFrame: @escaping @MainActor @Sendable (SemanticHostFrame) -> Void,
     onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
   ) {
+    self.init(
+      surfaceSize: surfaceSize,
+      appearance: appearance,
+      theme: theme,
+      capabilityProfile: capabilityProfile,
+      frameDelivery: frameDelivery,
+      frameHistoryLimit: Self.defaultFrameHistoryLimit,
+      onFrame: onFrame,
+      onClipboardWrite: onClipboardWrite
+    )
+  }
+
+  /// Designated initializer. `frameHistoryLimit` bounds the retained frame
+  /// history the `@_spi(Runners)` waiters can scan; production hosts keep the
+  /// small default window (see `defaultFrameHistoryLimit`), while stress
+  /// suites that assert on the deep rolling window pass an explicit limit.
+  @_spi(Runners)
+  public init(
+    surfaceSize: CellSize,
+    appearance: TerminalAppearance,
+    theme: Theme? = nil,
+    capabilityProfile: TerminalCapabilityProfile = .trueColor,
+    frameDelivery: HostedRasterSurfaceFrameDelivery,
+    frameHistoryLimit: Int,
+    onFrame: @escaping @MainActor @Sendable (SemanticHostFrame) -> Void,
+    onClipboardWrite: (@MainActor @Sendable (String) -> Bool)? = nil
+  ) {
+    self.frameHistoryLimit = max(1, frameHistoryLimit)
     self.capabilityProfile = capabilityProfile
     switch frameDelivery {
     case .asynchronousMainActor:
@@ -241,8 +278,8 @@ public final class HostedRasterSurface:
         state.nextFrameSequence = frame.sequence &+ 1
       }
       state.frames.append(frame)
-      if state.frames.count > Self.frameHistoryLimit {
-        state.frames.removeFirst(state.frames.count - Self.frameHistoryLimit)
+      if state.frames.count > frameHistoryLimit {
+        state.frames.removeFirst(state.frames.count - frameHistoryLimit)
       }
 
       var frameContinuations: [CheckedContinuation<SemanticHostFrame, Never>] = []

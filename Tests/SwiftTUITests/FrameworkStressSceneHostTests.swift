@@ -435,11 +435,14 @@ extension FrameworkStressSceneHostTests {
   @Test("stress scene host 011 frame history retains exactly the newest bounded window")
   func sceneHost011FrameHistoryRetainsExactlyNewestBoundedWindow() async throws {
     // Hypothesis: repeated truncation can remove too many frames, preserve an
-    // evicted prefix, or drift beyond the documented 256-frame history bound.
+    // evicted prefix, or drift beyond the requested 256-frame history bound
+    // (deep history is opt-in via the designated initializer; production
+    // constructions keep the small default window).
     let surface = HostedRasterSurface(
       surfaceSize: .init(width: 8, height: 1),
       appearance: .fallback,
       frameDelivery: .assumedMainActor,
+      frameHistoryLimit: 256,
       onFrame: { _ in }
     )
 
@@ -473,6 +476,7 @@ extension FrameworkStressSceneHostTests {
       surfaceSize: .init(width: 8, height: 1),
       appearance: .fallback,
       frameDelivery: .assumedMainActor,
+      frameHistoryLimit: 256,
       onFrame: { _ in }
     )
 
@@ -513,6 +517,7 @@ extension FrameworkStressSceneHostTests {
       surfaceSize: .init(width: 20, height: 4),
       appearance: .fallback,
       frameDelivery: .assumedMainActor,
+      frameHistoryLimit: 256,
       onFrame: { _ in }
     )
     var firstSequences: [UInt64] = []
@@ -744,6 +749,7 @@ extension FrameworkStressSceneHostTests {
       surfaceSize: .init(width: 24, height: 5),
       appearance: .fallback,
       frameDelivery: .assumedMainActor,
+      frameHistoryLimit: 256,
       onFrame: { _ in }
     )
 
