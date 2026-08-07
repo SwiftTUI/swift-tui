@@ -134,6 +134,7 @@ extension ViewGraph {
         environment: inputs.environment,
         transaction: inputs.transaction,
         invalidatedIdentities: inputs.invalidatedIdentities,
+        allowsEmptyInvalidation: inputs.allowsEmptyInvalidation,
         uncoveredEnvironmentKeys: inputs.uncoveredEnvironmentKeys,
         invalidator: inputs.invalidator
       )

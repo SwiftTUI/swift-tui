@@ -1010,16 +1010,21 @@ package final class ViewNode {
   }
 
   package func applyRetainedSnapshot(
-    _ snapshot: ResolvedNode
+    _ snapshot: ResolvedNode,
+    viaMemoExemption: Bool = false
   ) {
     // The reuse gate cleared all three freshness verdicts earlier this frame;
     // the refresh below restores only the first. If either of the other two
     // flipped in between, this write-back would leave a node stamped fresh
     // while still carrying a denial — no wrong serve, since the queries AND
-    // the stamps, but a state reachable only by that interleaving.
+    // the stamps, but a state reachable only by that interleaving. A serve
+    // through the memoized gate checks the memo variant instead: its
+    // foreign-parented exemption is a designed serve, not an interleaving.
     #if DEBUG
       assert(
-        reuseState.freshness.admitsRetainedWriteBack,
+        viaMemoExemption
+          ? reuseState.freshness.admitsMemoWriteBack
+          : reuseState.freshness.admitsRetainedWriteBack,
         """
         retained write-back onto a node whose freshness verdict flipped since \
         the gate: \(reuseState.freshness.retainedWriteBackDenialReason ?? "-") \
@@ -1030,7 +1035,9 @@ package final class ViewNode {
       // Release: the same read-only check, only on sampled frames when the
       // soundness probe is opted in. Off by default → a single Bool read.
       if SoundnessProbeConfiguration.isSampledFrame,
-        let denial = reuseState.freshness.retainedWriteBackDenialReason
+        let denial = viaMemoExemption
+          ? reuseState.freshness.memoWriteBackDenialReason
+          : reuseState.freshness.retainedWriteBackDenialReason
       {
         SoundnessProbeConfiguration.recordStampCoherenceViolation(
           "retained write-back with \(denial) node=\(viewNodeID) identity=\(identity.path)"

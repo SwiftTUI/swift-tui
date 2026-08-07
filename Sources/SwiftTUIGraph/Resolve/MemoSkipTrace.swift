@@ -68,6 +68,14 @@ package enum MemoSkipTrace {
   package private(set) static var blockedClosure = 0
   package private(set) static var blockedAnyView = 0
   package private(set) static var blockedExistential = 0
+  /// Stage-0 plan-tier split of the computed population: which
+  /// ``MemoComparisonPlan`` tier the production gate would use for each
+  /// recomputed node's view type. Answers "what does each tier buy" before
+  /// and after capture widening.
+  package private(set) static var planEquatable = 0
+  package private(set) static var planPOD = 0
+  package private(set) static var planFields = 0
+  package private(set) static var planNone = 0
   /// Adoption-trap counter: a view the author conformed to `Equatable` (opted
   /// into memoization) that is value-equal and passes the non-dirty reuse guards
   /// but is DENIED by the production gate because it reads `@State`/`@Observable`
@@ -131,6 +139,16 @@ package enum MemoSkipTrace {
     )
   }
 
+  package static func recordPlanTier(_ tier: MemoPlanTier) {
+    guard shouldObserve else { return }
+    switch tier {
+    case .equatable: planEquatable += 1
+    case .pod: planPOD += 1
+    case .fields: planFields += 1
+    case .unplannable: planNone += 1
+    }
+  }
+
   package static func recordBlocked(_ reason: MemoBlockReason) {
     guard shouldObserve else { return }
     switch reason {
@@ -155,6 +173,10 @@ package enum MemoSkipTrace {
     blockedClosure = 0
     blockedAnyView = 0
     blockedExistential = 0
+    planEquatable = 0
+    planPOD = 0
+    planFields = 0
+    planNone = 0
     inertEquatableBoundary = 0
     unsoundFieldCounts.removeAll(keepingCapacity: true)
   }
@@ -175,6 +197,8 @@ package enum MemoSkipTrace {
       line += " blocked=\(blockedTotal)"
       line += " (closure=\(blockedClosure) anyview=\(blockedAnyView)"
       line += " existential=\(blockedExistential))"
+      line += " plan=(equatable=\(planEquatable) pod=\(planPOD)"
+      line += " fields=\(planFields) none=\(planNone))"
       line += " inert_equatable=\(inertEquatableBoundary)"
       if !unsoundFieldCounts.isEmpty {
         line += " | unsound-fields:"

@@ -127,11 +127,27 @@ package struct CommittedFreshness: Equatable {
     !hasStaleIslandDescendant && !hasForeignParentedChild
   }
 
+  /// Write-back admissibility for a serve made through the memoized gate:
+  /// mirrors ``canServeMemo``'s foreign-parented exemption. The memo gate's
+  /// view-value equality independently proves the served subtree, so landing
+  /// its write-back on a foreign-parented node produces the representable
+  /// `fresh ∧ hasForeignParentedChild` state the service queries already
+  /// handle (value-blind keeps denying; memo keeps its exemption).
+  package var admitsMemoWriteBack: Bool {
+    !hasStaleIslandDescendant
+  }
+
   /// Diagnostic mirror of ``admitsRetainedWriteBack``: the first denying
   /// verdict, or `nil` when a retained write-back is admissible.
   package var retainedWriteBackDenialReason: String? {
     if hasStaleIslandDescendant { return "stale-island-descendant" }
     if hasForeignParentedChild { return "foreign-parented-child" }
+    return nil
+  }
+
+  /// Diagnostic mirror of ``admitsMemoWriteBack``.
+  package var memoWriteBackDenialReason: String? {
+    if hasStaleIslandDescendant { return "stale-island-descendant" }
     return nil
   }
 

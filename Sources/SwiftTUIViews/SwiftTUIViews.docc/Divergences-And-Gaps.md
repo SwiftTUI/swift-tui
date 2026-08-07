@@ -519,10 +519,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   The wrapper exists with SwiftUI semantics, but
   `matchedGeometryEffect(id:in:)` also accepts `.default` — one global
   namespace — where SwiftUI requires a `Namespace.ID`.
-- **Memoized body reuse is an `Equatable`-only opt-in.** *Gap.* SwiftUI's
-  engine compares view inputs structurally and implicitly; SwiftTUI reuses
-  memoized bodies only for views that are `Equatable` (directly or via
-  `.equatable()`).
+- **Memoized body reuse compares view inputs implicitly, with a narrower
+  reach than SwiftUI's.** *Gap (narrowed).* The memo gate compares any view
+  value whose type has a comparison plan — `Equatable` conformance, a
+  whole-value byte compare for packed POD types, or a per-field plan built
+  once per type from runtime field metadata. Types the planner cannot prove
+  comparable (stored closures — `Button` actions and builder-closure storage —
+  `AnyView`, opaque existentials, non-POD non-`Equatable` enums) still
+  recompute conservatively, a ceiling SwiftUI shares for closures. The
+  sampled memo shadow oracle validates every served tier; `.equatable()`
+  remains the explicit opt-in for types with custom equality semantics.
 - **Reduced motion changes rendering, not just timing.** *Ratified.* Under
   reduced motion, `Spinner` renders static text, `PhaseAnimator` renders only
   its first phase, and `AnimatedImage` renders its first frame; `CI=true` and

@@ -22,9 +22,15 @@
 /// guarantees this for `Equatable` values. Do not give the reflective path a
 /// production reuse caller, and do not let the two diverge on `Equatable` values.
 ///
-/// Foundation-free (`Mirror` is `Swift.Mirror`) and `unsafe`-free by design — no
-/// POD/`memcmp` path. See
-/// `docs/plans/2026-06-17-002-memoized-body-reevaluation-proposal.md`.
+/// A third path — ``compareForReuse(_:_:)`` in `MemoComparisonPlan.swift` —
+/// widens the production gate beyond `Equatable` via per-type plans built once
+/// (POD byte compare, field plans). Its tiers are equal-or-stricter than the
+/// reflective diagnostic (padding may false-*unequal*; never false-equal), and
+/// its `Equatable` tier routes through the same ``openEquatable`` trampoline,
+/// so the agree-on-`.equal` invariant extends to it. The historical A/B
+/// evidence stands: per-compare `Mirror` reflection stays diagnostic-only.
+/// See `docs/plans/2026-06-17-002-memoized-body-reevaluation-proposal.md` and
+/// the org plan `docs/plans/2026-08-07-001-implicit-structural-memoization-plan.md`.
 package enum MemoComparison: Equatable {
   case equal
   case changed
@@ -115,7 +121,7 @@ package enum MemoValueComparator {
 
     // `AnyView` and other erasing wrappers expose a payload the comparator
     // cannot open — treat as blocked (the escape-hatch population).
-    if isAnyView(type(of: lhs)) {
+    if isErasingWrapper(type(of: lhs)) {
       return .blocked(.anyView)
     }
 
@@ -210,13 +216,6 @@ package enum MemoValueComparator {
       }
     }
     return result
-  }
-
-  private static func isAnyView(_ type: Any.Type) -> Bool {
-    // Type-name probe for erased wrappers: AnyView and AnyScene erase their
-    // payloads. Matching by name avoids importing SwiftTUIViews into core.
-    let name = String(describing: type)
-    return name == "AnyView" || name.hasPrefix("AnyView<") || name == "AnyScene"
   }
 
 }

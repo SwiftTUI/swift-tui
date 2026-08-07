@@ -2318,7 +2318,8 @@ package final class ViewGraph {
   package func recordReusedSubtree(
     _ subtree: ResolvedNode,
     invalidator: (any Invalidating)?,
-    retained: Bool = false
+    retained: Bool = false,
+    memoExemption: Bool = false
   ) {
     let node = nodeForResolvedNode(subtree)
     node.prepareForFrame(currentFrameID)
@@ -2343,7 +2344,7 @@ package final class ViewGraph {
       // A retained snapshot already carries the unchanged descendants' runtime
       // node IDs. Commit it directly so runtime-ID stamping stays O(1) at the
       // retained root instead of walking the whole subtree again.
-      node.applyRetainedSnapshot(subtree)
+      node.applyRetainedSnapshot(subtree, viaMemoExemption: memoExemption)
       replaceCommittedValueAnchors(in: node.committed)
     } else {
       // Non-retained recursion: production resolve never reaches this branch
@@ -2605,10 +2606,28 @@ package final class ViewGraph {
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot,
     invalidatedIdentities: Set<Identity>,
+    allowsEmptyInvalidation: Bool = false,
     uncoveredEnvironmentKeys: Set<ObjectIdentifier>,
     invalidator: (any Invalidating)?
   ) -> ResolvedNode? {
     guard let node = nodeIfExists(for: identity) else {
+      return nil
+    }
+    // An empty invalidation set on a frame that still resolves means the
+    // recompute was forced for a reason OUTSIDE invalidation tracking (a bare
+    // re-render). A value-witnessing comparison still serves there — equality
+    // of the actual input bytes proves the body's output unchanged (the
+    // historical `Equatable`-tier behavior). A reference-identity plan does
+    // NOT: it witnesses only the reference, and the referenced contents are
+    // exactly the out-of-band channel a forced re-render exists to refresh —
+    // deny those, unless the caller certifies the recompute reason is fully
+    // named by a finite suppression scope.
+    guard
+      !invalidatedIdentities.isEmpty || allowsEmptyInvalidation
+        || MemoComparisonPlanCache.mayServeUnderUncertifiedEmptyInvalidation(
+          type(of: viewValue)
+        )
+    else {
       return nil
     }
     // No prior view value (first resolve, or feature was off last frame) ⇒
@@ -2634,19 +2653,39 @@ package final class ViewGraph {
     else {
       return nil
     }
-    // `Equatable`-only: a non-`Equatable` value (every framework container) is
-    // skipped rather than reflected over — the reflective path costs more than
-    // the body re-run it saves on trees without a high author boundary. Author
-    // opt-in (a view conforming to `Equatable`, or wrapped in `EquatableView`) is
-    // what makes a node a memo candidate.
-    guard MemoValueComparator.compareEquatable(priorViewValue, viewValue) == .equal else {
+    // The memo layer exists precisely for nodes whose invalidated ANCESTOR
+    // re-ran, so an ancestor-side invalidation match is expected and exempt —
+    // but an invalidation INSIDE the served subtree is not: a descendant
+    // reader re-runs through its own identity (`@Observable` mutation, focus
+    // flip, `@State` write), and serving its ancestor wholesale would replay
+    // the stale committed child. This is the descendant arm of Layer A's
+    // conflict scan; the `Equatable`-only gate rode without it because
+    // opt-in boundaries are author-audited read-free, and the plan-widened
+    // capture is not.
+    let resolvedIdentity = node.resolvedIdentity
+    let containsInvalidatedDescendant = invalidatedIdentities.contains { invalidated in
+      invalidated.isDescendant(of: identity)
+        || (resolvedIdentity != identity && invalidated.isDescendant(of: resolvedIdentity))
+    }
+    guard !containsInvalidatedDescendant,
+      !memoSubtreeInvalidationIntersects(node, invalidatedIdentities: invalidatedIdentities)
+    else {
+      return nil
+    }
+    // Plan-dispatched value compare: `Equatable` values keep their own `==`,
+    // planned types (POD / field plans, built once per type at capture time)
+    // compare without reflection, and an unplannable value is skipped rather
+    // than reflected over — the reflective path costs more than the body
+    // re-run it saves (the 06-17 A/B), so it stays diagnostic-only.
+    guard MemoValueComparator.compareForReuse(priorViewValue, viewValue) == .equal else {
       return nil
     }
     let snapshot = node.snapshot()
     recordReusedSubtree(
       snapshot,
       invalidator: invalidator,
-      retained: true
+      retained: true,
+      memoExemption: true
     )
     return snapshot
   }
@@ -3789,6 +3828,41 @@ package final class ViewGraph {
   // set small). Per the remediation plan's methodology, size it with the
   // `TermUIPerf compare --gate` budget before adding that complexity, rather than
   // optimizing by eye.
+  /// Descendant-only sibling of ``structuralInvalidationIntersects`` for the
+  /// memo layer: reports an invalidation at or structurally *below* the
+  /// candidate (bridging island seams), while deliberately ignoring the
+  /// ancestor direction the memo exemption is for. Unmappable invalidated
+  /// identities remap to their nearest live ancestor; one landing at or below
+  /// the candidate — or with no live ancestor at all, leaving the changed
+  /// region unbounded — denies (mirrors Layer A's 8ace32a5 stance).
+  private func memoSubtreeInvalidationIntersects(
+    _ node: ViewNode,
+    invalidatedIdentities: Set<Identity>
+  ) -> Bool {
+    for invalidatedIdentity in invalidatedIdentities {
+      guard let invalidatedNode = nodeIfExists(for: invalidatedIdentity) else {
+        guard
+          let ancestorNodeID = nearestLiveAncestorNodeID(for: invalidatedIdentity),
+          let ancestorNode = nodesByNodeID[ancestorNodeID]
+        else {
+          return true
+        }
+        if ancestorNode === node
+          || ancestorNode.isDescendantBridgingIslandSeams(of: node)
+        {
+          return true
+        }
+        continue
+      }
+      if invalidatedNode === node
+        || invalidatedNode.isDescendantBridgingIslandSeams(of: node)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
   private func structuralInvalidationIntersects(
     _ node: ViewNode,
     invalidatedIdentities: Set<Identity>

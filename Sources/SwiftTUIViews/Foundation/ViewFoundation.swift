@@ -557,19 +557,20 @@ func resolveView<V: View>(
 
 /// Whether to stash the resolved view value for next-frame memo comparison.
 ///
-/// The production gate (`ViewGraph.memoizedReusableSnapshot`) is `Equatable`-only, so a
-/// non-`Equatable` value would only make the gate run its guards before
-/// skipping. Capture solely `Equatable` values, so a non-`Equatable` node leaves
-/// `memoViewValue` nil and the gate bails at its first guard — keeping the gate
-/// near-free on trees that do not opt into memoization.
+/// The production gate (`ViewGraph.memoizedReusableSnapshot`) compares through
+/// a per-type ``MemoComparisonPlan`` (`Equatable` / POD byte compare / field
+/// plan). Capture only types with a plan, so an unplannable node leaves
+/// `memoViewValue` nil and the gate bails at its first guard — keeping the
+/// gate near-free on trees the memo layer cannot serve. The plan is built and
+/// cached here (the cold, once-per-type site); the gate path is lookup-only.
 ///
 /// The memo shadow oracle (``MemoSkipTrace``) measures the *full* reflective
 /// addressable population on sampled frames, so it captures every value,
-/// `Equatable` or not.
+/// planned or not.
 @MainActor
 func shouldCaptureMemoViewValue<V: View>(_ view: V) -> Bool {
   if MemoSkipTrace.shouldObserve { return true }
-  return view is any Equatable
+  return MemoComparisonPlanCache.hasPlan(for: V.self)
 }
 
 /// Token carrying the prior committed output of a recomputed node that the memo
@@ -595,11 +596,23 @@ func beginMemoObservation<V: View>(
 ) -> MemoComputationObservation? {
   guard MemoSkipTrace.shouldObserve, let graphNode else { return nil }
   MemoSkipTrace.recordComputed()
+  MemoSkipTrace.recordPlanTier(MemoComparisonPlanCache.diagnosticTier(for: V.self))
   // A self-invalidated node must re-run; only nodes reached under a re-run
   // ancestor are memoization candidates.
   guard !context.effectiveInvalidatedIdentities.contains(context.identity),
     let prior = graphNode.memoViewValue
   else { return nil }
+  // Mirror the production gate's uncertified-empty-invalidation rule: a
+  // reference-identity plan is refused service on a forced re-render (the
+  // referenced contents are the out-of-band channel such frames refresh), so
+  // the node is not a would-skip candidate — observing it would raise the
+  // alarm on a serve the gate would never make.
+  if context.effectiveInvalidatedIdentities.isEmpty,
+    !context.effectiveFiniteSuppressionScopeNamesForcedEvaluation,
+    !MemoComparisonPlanCache.mayServeUnderUncertifiedEmptyInvalidation(V.self)
+  {
+    return nil
+  }
   switch MemoValueComparator.compare(prior, view) {
   case .blocked(let reason):
     MemoSkipTrace.recordBlocked(reason)

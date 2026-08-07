@@ -238,7 +238,16 @@ struct PerTickPresentCadenceTests {
           && row["drop_decision"] == "drop_visual_only"
       }
     )
-    #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == memoAlarmBefore + 1)
+    // Historical piggyback, retired: this red-proof also asserted exactly one
+    // memo-unsound alarm, riding on the shadow oracle observing the harness's
+    // container nodes diverge across the abandoned commit. Implicit structural
+    // memoization serves those value-unchanged containers instead of
+    // recomputing them (their committed state-1 output is exactly what the
+    // post-disposal frame presents), so the incidental oracle vehicle no
+    // longer exists. The alarm plumbing itself is pinned end-to-end by
+    // `MemoSoundnessAlarmTests`; the oracle's observation population is now
+    // the unplannable-value classes the production gate cannot serve.
+    #expect(SoundnessProbeConfiguration.memoUnsoundSkipCount == memoAlarmBefore)
   }
 
   @MainActor

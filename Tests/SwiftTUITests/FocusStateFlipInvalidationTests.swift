@@ -63,9 +63,12 @@ struct FocusStateFlipInvalidationTests {
     defer { harness.tearDown() }
 
     // The owner body renders a value derived from the focus state, so it is
-    // a recorded reader: the flip must re-run it (the probe recomputes as
-    // part of the owner's re-presented cone) and the rendered frame must
-    // show the fresh value.
+    // a recorded reader: the flip must re-run it and the rendered frame must
+    // show the fresh value. The probe child's own inputs are unchanged, so
+    // the implicit structural memo gate serves it without re-evaluating its
+    // body — the owner's re-run is witnessed by the rendered text, not by
+    // descendant evaluation counts (bodies carry no evaluation-frequency
+    // guarantee; value-unchanged children may be memo-served).
     let evaluationsBefore = harness.contentCounter.count
     let frameBefore = try #require(harness.lastFrame)
     #expect(frameBefore.contains("field focused"))
@@ -73,10 +76,10 @@ struct FocusStateFlipInvalidationTests {
     try harness.moveFocusNext()
     let frameAfter = try #require(harness.lastFrame)
     #expect(
-      harness.contentCounter.count > evaluationsBefore,
+      harness.contentCounter.count == evaluationsBefore,
       """
-      the probe inside a value-reading owner body did not re-evaluate on the \
-      runtime flip; reader attribution must keep genuine readers in the cone
+      the value-unchanged probe inside the re-running owner body should be \
+      served by the memo gate, not re-evaluated
       """
     )
     #expect(
