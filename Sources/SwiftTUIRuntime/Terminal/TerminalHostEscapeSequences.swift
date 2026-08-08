@@ -105,15 +105,26 @@ enum TerminalHostEscapeSequences {
     return reset
   }
 
+  /// Minimum incremental row-batch count that gets a synchronized-output wrap.
+  ///
+  /// A single row batch is one cursor move plus one rendered run — the
+  /// terminal applies it atomically enough that a refresh cannot show a torn
+  /// intermediate. From two row batches up (the shape of a scroll repaint),
+  /// the terminal can paint between the per-row cursor moves and a refresh
+  /// can catch the band half-moved — exactly the tearing CSI ?2026 exists to
+  /// hide. The wrap also gives frame-delimiting consumers (the org PTY rig's
+  /// `--mode sync`) a begin/end marker per multi-row frame.
+  static let incrementalSynchronizedOutputRowBatchThreshold = 2
+
   static func wrappedSynchronizedOutput(
     _ output: String,
-    strategy: TerminalPresentationPlan.Strategy,
+    plan: TerminalPresentationPlan,
     capabilityProfile: TerminalCapabilityProfile
   ) -> String {
     guard
       usesSynchronizedOutput(
         for: output,
-        strategy: strategy,
+        plan: plan,
         capabilityProfile: capabilityProfile
       )
     else {
@@ -127,11 +138,17 @@ enum TerminalHostEscapeSequences {
 
   static func usesSynchronizedOutput(
     for output: String,
-    strategy: TerminalPresentationPlan.Strategy,
+    plan: TerminalPresentationPlan,
     capabilityProfile: TerminalCapabilityProfile
   ) -> Bool {
-    !output.isEmpty
-      && strategy == .fullRepaint
-      && capabilityProfile.supportsSynchronizedOutput
+    guard !output.isEmpty, capabilityProfile.supportsSynchronizedOutput else {
+      return false
+    }
+    switch plan.strategy {
+    case .fullRepaint:
+      return true
+    case .incremental:
+      return plan.rowBatches.count >= incrementalSynchronizedOutputRowBatchThreshold
+    }
   }
 }

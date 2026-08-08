@@ -389,9 +389,12 @@ struct TerminalHostPresentationBatchingTests {
   // Expectation history: recovery after a drop used to be a full repaint, and
   // this test pinned its synchronized-output wrapping
   // ("\u{001B}[?2026h\u{001B}[2J…"). Recovery is now an ordinary incremental
-  // diff, which — per the standing emission policy — is never wrapped; the
-  // synchronized wrap remains pinned for genuine full repaints by
-  // "terminal host wraps full repaints in synchronized output when supported".
+  // diff. Since R2.1, incremental frames wrap only from
+  // `incrementalSynchronizedOutputRowBatchThreshold` row batches up; this
+  // recovery touches a single row, so it stays unwrapped. The wrap is pinned
+  // for full repaints by "terminal host wraps full repaints in synchronized
+  // output when supported" and for multi-row incremental frames by
+  // "multi-row incremental presentations are wrapped in synchronized output".
   @Test("drop recovery diffs stay incremental under synchronized-output terminals")
   func dropRecoveryDiffsStayIncrementalUnderSynchronizedOutputTerminals() async throws {
     let controller = BlockingPresentationWriteController(isTTY: true)

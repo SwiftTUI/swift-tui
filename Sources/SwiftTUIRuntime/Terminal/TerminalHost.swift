@@ -453,12 +453,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       presentationSession.residentKittyImageData = residentKittyImageData
       let usedSynchronizedOutput = TerminalHostEscapeSequences.usesSynchronizedOutput(
         for: emission.output,
-        strategy: plan.strategy,
+        plan: plan,
         capabilityProfile: capabilityProfile
       )
       let bufferedOutput = TerminalHostEscapeSequences.wrappedSynchronizedOutput(
         emission.output,
-        strategy: plan.strategy,
+        plan: plan,
         capabilityProfile: capabilityProfile
       )
 

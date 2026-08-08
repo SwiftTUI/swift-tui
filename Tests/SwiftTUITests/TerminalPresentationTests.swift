@@ -1276,6 +1276,152 @@ struct TerminalPresentationTests {
     #expect(metrics.bytesWritten == incrementalWrites.joined().utf8.count)
   }
 
+  @Test("multi-row incremental presentations are wrapped in synchronized output")
+  func multiRowIncrementalPresentationsAreWrappedInSynchronizedOutput() throws {
+    let controller = PresentationMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: Self.synchronizedOutputProfile
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 3),
+        lines: ["alpha", "bravo", "charlie"]
+      ))
+    try host.drainPendingPresentation()
+
+    let writesBeforeUpdate = controller.writes.count
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 3),
+        lines: ["alpXa", "bravo", "chaXlie"]
+      ))
+    try host.drainPendingPresentation()
+    let incrementalOutput = controller.writes.dropFirst(writesBeforeUpdate).joined()
+
+    #expect(metrics.strategy == .incremental)
+    #expect(metrics.linesTouched == 2)
+    #expect(metrics.usedSynchronizedOutput)
+    #expect(incrementalOutput.hasPrefix("\u{001B}[?2026h"))
+    #expect(incrementalOutput.hasSuffix("\u{001B}[?2026l"))
+    #expect(metrics.bytesWritten == incrementalOutput.utf8.count)
+  }
+
+  @Test("a single-batch incremental presentation is not wrapped in synchronized output")
+  func singleBatchIncrementalPresentationIsNotWrapped() throws {
+    let controller = PresentationMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: Self.synchronizedOutputProfile
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 2),
+        lines: ["alpha", "same"]
+      ))
+    try host.drainPendingPresentation()
+
+    let writesBeforeUpdate = controller.writes.count
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 2),
+        lines: ["alpXa", "same"]
+      ))
+    try host.drainPendingPresentation()
+    let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+
+    #expect(metrics.strategy == .incremental)
+    #expect(!metrics.usedSynchronizedOutput)
+    #expect(incrementalWrites == ["\u{001B}[1;4HX"])
+  }
+
+  @Test("incremental synchronized-output wrapping requires the capability")
+  func incrementalSynchronizedOutputWrappingRequiresCapability() throws {
+    let controller = PresentationMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 3),
+        lines: ["alpha", "bravo", "charlie"]
+      ))
+    try host.drainPendingPresentation()
+
+    let writesBeforeUpdate = controller.writes.count
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 3),
+        lines: ["alpXa", "bravo", "chaXlie"]
+      ))
+    try host.drainPendingPresentation()
+    let incrementalOutput = controller.writes.dropFirst(writesBeforeUpdate).joined()
+
+    #expect(metrics.strategy == .incremental)
+    #expect(!metrics.usedSynchronizedOutput)
+    #expect(!incrementalOutput.contains("\u{001B}[?2026"))
+  }
+
+  @Test("synchronized-output gating keys on the plan's row-batch count")
+  func synchronizedOutputGatingKeysOnRowBatchCount() {
+    let profile = Self.synchronizedOutputProfile
+    let singleBatch = TerminalPresentationPlan.incremental(
+      rowBatches: [
+        .init(row: 0, anchorColumn: 0, renderedBatch: "X", spanUpdates: [])
+      ],
+      graphicsReplay: .none,
+      surfaceSize: .init(width: 8, height: 2)
+    )
+    let multiBatch = TerminalPresentationPlan.incremental(
+      rowBatches: [
+        .init(row: 0, anchorColumn: 0, renderedBatch: "X", spanUpdates: []),
+        .init(row: 1, anchorColumn: 0, renderedBatch: "Y", spanUpdates: []),
+      ],
+      graphicsReplay: .none,
+      surfaceSize: .init(width: 8, height: 2)
+    )
+
+    #expect(
+      !TerminalHostEscapeSequences.usesSynchronizedOutput(
+        for: "X", plan: singleBatch, capabilityProfile: profile
+      ))
+    #expect(
+      TerminalHostEscapeSequences.usesSynchronizedOutput(
+        for: "XY", plan: multiBatch, capabilityProfile: profile
+      ))
+    #expect(
+      TerminalHostEscapeSequences.usesSynchronizedOutput(
+        for: "full",
+        plan: .fullRepaint(surfaceSize: .init(width: 8, height: 2)),
+        capabilityProfile: profile
+      ))
+    // Empty output never wraps: there is nothing a refresh could tear.
+    #expect(
+      !TerminalHostEscapeSequences.usesSynchronizedOutput(
+        for: "", plan: multiBatch, capabilityProfile: profile
+      ))
+  }
+
+  private static let synchronizedOutputProfile = TerminalCapabilityProfile(
+    glyphLevel: .unicode,
+    colorLevel: .none,
+    emitsStyleEscapeSequences: false,
+    supportsSynchronizedOutput: true
+  )
+
   @Test("POSIX terminal controller retries writes after nonblocking backpressure")
   func posixTerminalControllerRetriesWritesAfterBackpressure() throws {
     var descriptors: [Int32] = [0, 0]
