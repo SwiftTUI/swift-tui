@@ -28,6 +28,26 @@ public struct SummaryComparison: Equatable, Sendable {
   public var layoutDependentMainActorFallbackCountDelta: Int
 }
 
+/// A comparison the tool refuses to make rather than silently mis-certify.
+public enum PerfCompareError: Error, Equatable, CustomStringConvertible {
+  /// One side ran the emission-visible lane (`SWIFTTUI_PERF_EMISSION=1`) and
+  /// the other did not. The lane runs the real planner + emission builder
+  /// in-process, so the two sides measure different pipelines and any delta
+  /// between them is the lane, not the code under test.
+  case mixedEmissionLane(base: Bool, candidate: Bool)
+
+  public var description: String {
+    switch self {
+    case .mixedEmissionLane(let base, let candidate):
+      return
+        "cannot compare across emission lanes (base emission_lane=\(base), "
+        + "candidate emission_lane=\(candidate)). The emission-visible lane "
+        + "adds real planner+emission cost; rerun both sides with the same "
+        + "SWIFTTUI_PERF_EMISSION setting."
+    }
+  }
+}
+
 public enum CompareCommand {
   public static func compare(_ config: PerfCompareConfig) throws -> SummaryComparison {
     try compare(
@@ -42,7 +62,22 @@ public enum CompareCommand {
   ) throws -> SummaryComparison {
     let base = try loadSummary(from: baseRunDirectory)
     let candidate = try loadSummary(from: candidateRunDirectory)
+    try requireMatchingEmissionLanes(
+      base: base.emissionLane,
+      candidate: candidate.emissionLane
+    )
     return compare(base: base, candidate: candidate)
+  }
+
+  /// Refuses a lane-on vs lane-off comparison. Called by every compare entry
+  /// point that loads recorded artifacts (summary and aggregate paths).
+  public static func requireMatchingEmissionLanes(
+    base: Bool,
+    candidate: Bool
+  ) throws {
+    guard base == candidate else {
+      throw PerfCompareError.mixedEmissionLane(base: base, candidate: candidate)
+    }
   }
 
   public static func compare(base: PerfSummary, candidate: PerfSummary) -> SummaryComparison {

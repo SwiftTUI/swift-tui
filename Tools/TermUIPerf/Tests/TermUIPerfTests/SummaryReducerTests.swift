@@ -260,6 +260,33 @@ struct SummaryReducerTests {
     #expect(cpuTSV.contains("1.000000\t0.250000\t0.750000\t1.000000\t0.500000\t200.000000"))
   }
 
+  @Test("the emission-lane flag propagates metadata -> summary -> aggregate")
+  func emissionLaneFlagPropagates() {
+    var laneMetadata = metadata()
+    laneMetadata.emissionLane = true
+
+    let summary = SummaryReducer.reduce(
+      metadata: laneMetadata,
+      events: [],
+      cpuSamples: [],
+      frames: []
+    )
+    #expect(summary.emissionLane)
+
+    let aggregate = AggregateReducer.reduce([summary])
+    #expect(aggregate.emissionLane)
+    #expect(AggregateReducer.format(aggregate).contains("[emission lane]"))
+
+    let laneOff = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [],
+      cpuSamples: [],
+      frames: []
+    )
+    #expect(!laneOff.emissionLane)
+    #expect(!AggregateReducer.format(AggregateReducer.reduce([laneOff])).contains("emission lane"))
+  }
+
   private func metadata() -> PerfRunMetadata {
     PerfRunMetadata(
       gitSHA: "abc123",

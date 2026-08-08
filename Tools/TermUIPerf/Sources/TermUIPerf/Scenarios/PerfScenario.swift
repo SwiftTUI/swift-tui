@@ -430,6 +430,21 @@ public enum PerfScenarioRunner {
       size: terminalSize,
       pointerInputCapabilities: pointerInputCapabilities
     )
+    // Lane ON (SWIFTTUI_PERF_EMISSION=1): present through the real terminal
+    // planner + emission builder with a byte-counting sink, recording each
+    // frame back into `terminalHost` so the drivers' presented-frame log is
+    // identical in shape. Lane OFF keeps the semantic-host perf path.
+    let emissionLane = PerfEmissionLane.isEnabled
+    let presentationSurface: any PresentationSurface =
+      emissionLane
+      ? TerminalEmissionSimulationHost(
+        surfaceSize: CellSize(width: terminalSize.columns, height: terminalSize.rows),
+        pointerInputCapabilities: pointerInputCapabilities,
+        onPresent: { surface, metrics in
+          terminalHost.recordFrame(surface: surface, metrics: metrics)
+        }
+      )
+      : terminalHost
     let inputReader = PerfScriptedInputReader()
     let signalReader = InProcessSignalReader()
     let framesURL = runDirectory.appendingPathComponent("frames.tsv")
@@ -449,7 +464,7 @@ public enum PerfScenarioRunner {
     )
     let focusTracker = FocusTracker(invalidationIdentities: [selection.rootIdentity])
     let resources = SceneSessionResources(
-      presentationSurface: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: inputReader,
       signalReader: signalReader,
       frameSink: framesSink
@@ -507,6 +522,7 @@ public enum PerfScenarioRunner {
       scenario: scenario.name,
       iterationCount: options.iterations,
       configuration: options.configuration,
+      emissionLane: emissionLane,
       swiftVersion: swiftVersion(),
       osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
       hardwareModel: hardwareModel(),

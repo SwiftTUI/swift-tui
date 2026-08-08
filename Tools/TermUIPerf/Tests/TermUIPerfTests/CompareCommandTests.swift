@@ -16,6 +16,17 @@ struct CompareCommandTests {
     #expect(isApproximately(comparison.totalCPUSecondsDelta, -0.2))
   }
 
+  @Test("compare refuses mixed emission lanes")
+  func compareRefusesMixedEmissionLanes() {
+    #expect(throws: PerfCompareError.mixedEmissionLane(base: false, candidate: true)) {
+      try CompareCommand.requireMatchingEmissionLanes(base: false, candidate: true)
+    }
+    #expect(throws: Never.self) {
+      try CompareCommand.requireMatchingEmissionLanes(base: true, candidate: true)
+      try CompareCommand.requireMatchingEmissionLanes(base: false, candidate: false)
+    }
+  }
+
   @Test("compare classifies latency win with CPU cost")
   func compareClassifiesLatencyWinWithCPUCost() {
     let comparison = CompareCommand.compare(

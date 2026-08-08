@@ -22,6 +22,11 @@ public struct PerfRunMetadata: Codable, Equatable, Sendable {
   public var scenario: String
   public var iterationCount: Int
   public var configuration: String
+  /// Whether the run presented through the emission-visible lane
+  /// (`SWIFTTUI_PERF_EMISSION=1`), which runs the real terminal planner and
+  /// emission builder in-process. Lane-on and lane-off runs measure different
+  /// pipelines, so `compare` refuses to mix them.
+  public var emissionLane: Bool
   public var swiftVersion: String
   public var osVersion: String
   public var hardwareModel: String?
@@ -37,6 +42,7 @@ public struct PerfRunMetadata: Codable, Equatable, Sendable {
     scenario: PerfScenarioName,
     iterationCount: Int,
     configuration: String,
+    emissionLane: Bool = false,
     swiftVersion: String,
     osVersion: String,
     hardwareModel: String? = nil,
@@ -53,6 +59,7 @@ public struct PerfRunMetadata: Codable, Equatable, Sendable {
     self.scenario = scenario.rawValue
     self.iterationCount = iterationCount
     self.configuration = configuration
+    self.emissionLane = emissionLane
     self.swiftVersion = swiftVersion
     self.osVersion = osVersion
     self.hardwareModel = hardwareModel
@@ -70,6 +77,7 @@ public struct PerfRunMetadata: Codable, Equatable, Sendable {
     case scenario
     case iterationCount = "iteration_count"
     case configuration
+    case emissionLane = "emission_lane"
     case swiftVersion = "swift_version"
     case osVersion = "os_version"
     case hardwareModel = "hardware_model"
@@ -77,6 +85,27 @@ public struct PerfRunMetadata: Codable, Equatable, Sendable {
     case terminalSize = "terminal_size"
     case startedAt = "started_at"
     case endedAt = "ended_at"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    harnessVersion = try container.decode(Int.self, forKey: .harnessVersion)
+    gitSHA = try container.decode(String.self, forKey: .gitSHA)
+    dirty = try container.decode(Bool.self, forKey: .dirty)
+    renderMode = try container.decode(String.self, forKey: .renderMode)
+    scenario = try container.decode(String.self, forKey: .scenario)
+    iterationCount = try container.decode(Int.self, forKey: .iterationCount)
+    configuration = try container.decode(String.self, forKey: .configuration)
+    // decodeIfPresent: a run recorded before the lane existed is a valid
+    // (lane-off) artifact.
+    emissionLane = try container.decodeIfPresent(Bool.self, forKey: .emissionLane) ?? false
+    swiftVersion = try container.decode(String.self, forKey: .swiftVersion)
+    osVersion = try container.decode(String.self, forKey: .osVersion)
+    hardwareModel = try container.decodeIfPresent(String.self, forKey: .hardwareModel)
+    processorCount = try container.decodeIfPresent(Int.self, forKey: .processorCount)
+    terminalSize = try container.decode(PerfTerminalSize.self, forKey: .terminalSize)
+    startedAt = try container.decode(String.self, forKey: .startedAt)
+    endedAt = try container.decodeIfPresent(String.self, forKey: .endedAt)
   }
 }
 

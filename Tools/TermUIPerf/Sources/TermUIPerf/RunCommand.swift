@@ -32,6 +32,20 @@ public enum RunCommand {
       throw PerfParseError.unknownScenario(config.scenario.rawValue)
     }
 
+    if PerfEmissionLane.isEnabled {
+      // Stderr, not stdout: run output (run directories, aggregates) is
+      // consumed by scripts. The fixed profile is documented here so a saved
+      // log records what the bytes were counted under.
+      FileHandle.standardError.write(
+        Data(
+          ("emission lane armed (\(PerfEmissionLane.environmentVariableName)=1): "
+            + "presenting through the real terminal planner+emission builder. "
+            + "Fixed profile: unicode glyphs, truecolor styling, hyperlinks on, "
+            + "synchronized output ON, kitty graphics OFF, CSI-K lowering ON. "
+            + "Compare lane-on runs only against lane-on runs.\n").utf8
+        )
+      )
+    }
     let artifactRoot = URL(fileURLWithPath: config.artifactsRoot, isDirectory: true)
     if config.aaCheck {
       return try await runAACheck(config, scenario: scenario, artifactRoot: artifactRoot)

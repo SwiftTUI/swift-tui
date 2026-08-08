@@ -54,6 +54,10 @@ private func run(arguments: [String]) async throws {
     if config.gateEnabled {
       let base = try CompareCommand.loadAggregate(from: config.baseRunDirectory)
       let candidate = try CompareCommand.loadAggregate(from: config.candidateRunDirectory)
+      try CompareCommand.requireMatchingEmissionLanes(
+        base: base.emissionLane,
+        candidate: candidate.emissionLane
+      )
       // Either side may carry the envelope; the candidate's is preferred
       // because it was recorded on the code under test.
       let envelope =

@@ -10,6 +10,30 @@ public struct PerfPresentedFrame {
   public var metrics: TerminalPresentationMetrics
 }
 
+/// The emission-visible perf lane (R2.4a), armed by `SWIFTTUI_PERF_EMISSION=1`.
+///
+/// Lane ON swaps the scenario's presentation surface from the semantic-host
+/// perf path — where the terminal planner and emission builder never run and
+/// `present_bytes` is structurally 0 — to `TerminalEmissionSimulationHost`,
+/// which runs the REAL planner + emission builder against a byte-counting
+/// sink under a fixed capability profile (unicode/truecolor, synchronized
+/// output ON, kitty graphics OFF, CSI-K lowering ON; see
+/// `TerminalEmissionSimulationHost.laneCapabilityProfile`).
+///
+/// The lane ADDS planner/emission cost to `present_ms`/`total_ms` and is
+/// recorded in `run.json`, `summary.json`, and the aggregate, so `compare`
+/// refuses a lane-on vs lane-off comparison instead of certifying one.
+public enum PerfEmissionLane {
+  public static let environmentVariableName = "SWIFTTUI_PERF_EMISSION"
+
+  public static var isEnabled: Bool {
+    guard let raw = environmentValue(environmentVariableName) else {
+      return false
+    }
+    return !raw.isEmpty && raw != "0"
+  }
+}
+
 public final class PerfTerminalHost: PresentationSurface {
   public let surfaceSize: CellSize
   public let capabilityProfile: TerminalCapabilityProfile
@@ -48,6 +72,17 @@ public final class PerfTerminalHost: PresentationSurface {
         damage: nil
       )
     )
+  }
+
+  /// Records a frame presented by an external surface (the emission lane's
+  /// simulation host) with the metrics that surface computed, keeping this
+  /// host the single presented-frame log the drivers and readers consume.
+  @discardableResult
+  public func recordFrame(
+    surface: RasterSurface,
+    metrics: TerminalPresentationMetrics
+  ) -> TerminalPresentationMetrics {
+    recordPresentedFrame(surface: surface, metrics: metrics)
   }
 
   @discardableResult

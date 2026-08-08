@@ -30,6 +30,7 @@ public enum SummaryReducer {
     return PerfSummary(
       scenario: metadata.scenario,
       renderMode: metadata.renderMode,
+      emissionLane: metadata.emissionLane,
       iterationCount: metadata.iterationCount,
       committedFrameCount: committedFrameCount,
       diagnosticFrameCount: diagnosticFrameCount,
