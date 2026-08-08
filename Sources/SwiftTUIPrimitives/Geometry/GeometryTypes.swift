@@ -1,3 +1,5 @@
+import Synchronization
+
 /// Horizontal and vertical spacing preferences for a view.
 public struct Spacing: Equatable, Sendable {
   public var horizontal: Int?
@@ -573,13 +575,53 @@ public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConver
     _ kind: StaticString,
     index: Int
   ) -> Self {
-    .init(rawValue: "\(String(describing: kind))[\(index)]")
+    interned(
+      kindRawValue: String(describing: kind),
+      index: index
+    )
   }
 
   public var description: String {
     rawValue
   }
 }
+
+extension IdentityComponent {
+  /// Interns the `kind[index]` identity components that containers mint for
+  /// every indexed child on every resolve. The composed strings are a small,
+  /// heavily repeated vocabulary (a handful of kinds × dense indices), so
+  /// interning replaces a per-child-per-frame interpolation and allocation
+  /// with a dictionary hit. Interned components are byte-identical to the
+  /// interpolated form — this is a cache, never a second identity space.
+  ///
+  /// Memory is bounded by the largest index seen per kind (the same growth
+  /// contract as the lazy path's `ForEachSourceIdentityArtifacts`), and each
+  /// entry is a short string.
+  package static func interned(
+    kindRawValue: String,
+    index: Int
+  ) -> IdentityComponent {
+    guard index >= 0 else {
+      return IdentityComponent(rawValue: "\(kindRawValue)[\(index)]")
+    }
+    return internedComponentsByKind.withLock { cache in
+      if let components = cache[kindRawValue], index < components.count {
+        return components[index]
+      }
+      var components = cache[kindRawValue] ?? []
+      components.reserveCapacity(index + 1)
+      while components.count <= index {
+        components.append(
+          IdentityComponent(rawValue: "\(kindRawValue)[\(components.count)]")
+        )
+      }
+      cache[kindRawValue] = components
+      return components[index]
+    }
+  }
+}
+
+private let internedComponentsByKind = Mutex<[String: [IdentityComponent]]>([:])
 
 public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
   public let components: [String]

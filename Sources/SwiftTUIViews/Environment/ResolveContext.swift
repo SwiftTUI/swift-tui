@@ -344,8 +344,9 @@ public struct ResolveContext: Equatable, Sendable {
 
   package func indexedChild(kind: IdentityComponent, index: Int) -> Self {
     child(
-      component: .init(
-        rawValue: "\(kind.rawValue)[\(index)]"
+      component: .interned(
+        kindRawValue: kind.rawValue,
+        index: index
       )
     )
   }

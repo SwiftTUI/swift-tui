@@ -17,7 +17,10 @@ package struct DeclaredPayloadTraversalContext: Sendable {
     index: Int
   ) -> Self {
     child(
-      component: .init(rawValue: "\(kind.rawValue)[\(index)]")
+      component: .interned(
+        kindRawValue: kind.rawValue,
+        index: index
+      )
     )
   }
 
