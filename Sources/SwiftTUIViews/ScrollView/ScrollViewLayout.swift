@@ -12,10 +12,13 @@ import SwiftTUICore
 // `ScrollView` view. Widened from `private` to file-internal: `ScrollView`
 // constructs `ScrollViewLayout` in its `resolve` method, so the type and its
 // memberwise initializer must be visible across the two files. The nested
-// `IndicatorInsets` stays `private` — nothing outside this layout uses it.
+// `IndicatorInsets` is file-internal too (it was `private` until the R1.3
+// inset seed): a `private` stored property would demote the memberwise
+// initializer below what `ScrollView.swift` needs. Nothing outside this
+// layout reads it.
 
 struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
-  private struct IndicatorInsets: Equatable {
+  struct IndicatorInsets: Equatable {
     var trailing: Int = 0
     var bottom: Int = 0
   }
@@ -23,6 +26,13 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   var axes: Axis.Set
   var position: ScrollCellOffset
   var indicatorAxes: Axis.Set
+  /// The previous frame's converged indicator insets, derived from the
+  /// retained container measurement (scroll-latency R1.3). Optimization seed
+  /// only: `measuredContent` verifies it with a real measurement and falls
+  /// back to the cold-start loop when it does not confirm. `nil` (the
+  /// default, so `ScrollView`'s memberwise construction is unchanged) means
+  /// cold start.
+  var indicatorInsetSeed: IndicatorInsets? = nil
   func makeCache(subviews _: LayoutSubviews) {}
 
   func stackMinimumMainSize(
@@ -136,6 +146,32 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     for proposal: ProposedViewSize,
     subview: LayoutSubview
   ) -> (childSize: LayoutSize, indicatorInsets: IndicatorInsets) {
+    // Seeded fast path (scroll-latency R1.3): start from the previous frame's
+    // converged insets and verify them with ONE measurement. A confirmed seed
+    // collapses the steady scroll state (indicators shown) to a single
+    // content measure instead of the loop's two; a refuted seed falls through
+    // to the cold-start loop UNCHANGED, so a wrong or stale seed costs one
+    // extra measurement and cannot change what the loop computes from
+    // scratch. Knife-edge content whose overflow flips when the indicator
+    // column is reserved is bistable under the loop's own iteration order;
+    // a confirmed seed keeps the previous frame's stable state instead of
+    // re-deciding it, which is the hysteresis a scrollbar gutter wants —
+    // without it the indicator could flicker frame to frame.
+    if let seed = indicatorInsetSeed, seed != IndicatorInsets() {
+      let childSize = subview.sizeThatFits(
+        contentProposal(for: proposal, indicatorInsets: seed),
+        measureViewport: measureViewportHint(for: proposal, indicatorInsets: seed)
+      )
+      let confirmedInsets = requiredIndicatorInsets(
+        for: childSize,
+        proposal: proposal,
+        currentInsets: seed
+      )
+      if confirmedInsets == seed {
+        return (childSize, seed)
+      }
+    }
+
     var indicatorInsets = IndicatorInsets()
     var childSize = LayoutSize.zero
 
@@ -295,6 +331,33 @@ extension ScrollViewLayout: MeasureViewportDeclaringLayout {
   /// uninset viewport makes the estimated window at most one row generous.
   func declaredMeasureViewport(for proposal: ProposedViewSize) -> MeasureViewportHint? {
     measureViewportHint(for: proposal, indicatorInsets: .init())
+  }
+}
+
+extension ScrollViewLayout: RetainedMeasurementSeedableLayout {
+  /// Derives the indicator-inset seed from the retained (previous-frame)
+  /// content measurement — arithmetically, with no measurement of its own.
+  /// In the steady scroll state the retained child size IS this frame's
+  /// child size, so the solved fixed point is this frame's converged insets;
+  /// a stale size yields at worst a wrong seed, which the verification
+  /// measure in `measuredContent` refutes.
+  mutating func applyRetainedMeasurementSeed(
+    previousProposal: ProposedViewSize,
+    previousChildSize: LayoutSize
+  ) {
+    var insets = IndicatorInsets()
+    for _ in 0..<3 {
+      let next = requiredIndicatorInsets(
+        for: previousChildSize,
+        proposal: previousProposal,
+        currentInsets: insets
+      )
+      if next == insets {
+        break
+      }
+      insets = next
+    }
+    indicatorInsetSeed = insets
   }
 }
 

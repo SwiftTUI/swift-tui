@@ -222,6 +222,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       proposal: proposal,
       subviews: subviews
     )
+    let layout = seededLayout(for: node, proposal: proposal, passContext: passContext)
     let size = layout.sizeThatFits(
       proposal: proposal,
       subviews: subviews,
@@ -260,6 +261,11 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       for: node,
       proposal: measured.proposal,
       subviews: subviews
+    )
+    let layout = seededLayout(
+      for: node,
+      proposal: measured.proposal,
+      passContext: passContext
     )
     layout.placeSubviews(
       in: bounds,
@@ -319,6 +325,31 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         passContext: passContext
       )
     }
+  }
+
+  /// Seeds a seedable layout from the retained (previous-frame) measured
+  /// product of this container, keyed by identity and gated on an identical
+  /// proposal (scroll-latency R1.3). A wrong or stale retained product is
+  /// safe by contract: the layout verifies whatever it derives from the seed
+  /// against fresh measurement. Non-seedable layouts pass through untouched.
+  private func seededLayout(
+    for node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> L {
+    guard var seedable = layout as? any RetainedMeasurementSeedableLayout,
+      let previousMeasured = passContext?.retainedLayout?.measuredNode(for: node.identity),
+      previousMeasured.proposal == proposal,
+      previousMeasured.childMeasurements.count == 1
+    else {
+      return layout
+    }
+    seedable.applyRetainedMeasurementSeed(
+      previousProposal: previousMeasured.proposal,
+      previousChildSize: previousMeasured.childMeasurements[0].measuredSize
+    )
+    // The existential still boxes an `L` value; unboxing back cannot fail.
+    return seedable as! L
   }
 
   private func layoutSubviews(
