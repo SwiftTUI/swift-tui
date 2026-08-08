@@ -63,6 +63,7 @@ extension ViewGraph {
     // difference, or a signature difference: none of these are
     // reader-attributed, so none can be argued away by a reader set.
     guard !diff.hasNonTypedDivergence else {
+      EnvironmentTolerationCensus.recordNonTypedDenial()
       return .denied
     }
     // `typedDiff` mirrors `==` input for input, so an empty changed set here
@@ -75,25 +76,29 @@ extension ViewGraph {
       guard let keyType = environment.typedValues[key]?.environmentKeyType,
         EnvironmentKeyReuseClassification.isReaderAttributedOnly(keyType)
       else {
+        EnvironmentTolerationCensus.recordFrameworkKeyDenial()
         return .denied
       }
     }
     // Readers first: a subtree that reads a changed key is the common denial
     // and the cheaper of the two scans to hit.
-    guard
-      !subtreeContainsIndexedNode(
-        of: node,
-        keys: diff.changedTypedKeys,
-        index: environmentDependents
-      ),
-      !subtreeContainsIndexedNode(
-        of: node,
-        keys: diff.changedTypedKeys,
-        index: environmentKeyWriters
-      )
-    else {
+    if subtreeContainsIndexedNode(
+      of: node,
+      keys: diff.changedTypedKeys,
+      index: environmentDependents
+    ) {
+      EnvironmentTolerationCensus.recordReaderDenial(cone: node.committed.subtreeNodeCount)
       return .denied
     }
+    if subtreeContainsIndexedNode(
+      of: node,
+      keys: diff.changedTypedKeys,
+      index: environmentKeyWriters
+    ) {
+      EnvironmentTolerationCensus.recordWriterDenial()
+      return .denied
+    }
+    EnvironmentTolerationCensus.recordTolerated(cone: node.committed.subtreeNodeCount)
     return .tolerated(diff.changedTypedKeys)
   }
 
@@ -265,5 +270,94 @@ extension ViewGraph {
       return
     }
     environmentDriftByBoundary.removeValue(forKey: node.viewNodeID)
+  }
+}
+
+// MARK: - Census
+
+/// Counts why the environment verdict landed where it did, so the value of a
+/// further stage can be sized from real trees instead of argued from a plan.
+///
+/// The population that matters for reader-scoped re-entry (plan
+/// 2026-08-07-002 Stage 3) is `readerDenials`: boundaries that would have been
+/// served but for a reader of a changed key somewhere inside. A stage that
+/// serves those and re-runs exactly the readers is only worth its risk if that
+/// count is materially non-zero on real trees.
+///
+/// DEBUG-only and off unless `SWIFTTUI_ENV_TOLERATION_CENSUS` is set; the
+/// counters are plain statics on the main actor, like the reuse trace's.
+@MainActor
+package enum EnvironmentTolerationCensus {
+  #if DEBUG
+    // `FeatureFlags.environmentValue` is the Foundation-free `getenv` funnel;
+    // this layer must not import Foundation.
+    package static var isEnabled: Bool =
+      FeatureFlags.environmentValue(named: "SWIFTTUI_ENV_TOLERATION_CENSUS") != nil
+    package static var tolerated = 0
+    package static var readerDenials = 0
+    package static var writerDenials = 0
+    package static var frameworkKeyDenials = 0
+    package static var nonTypedDenials = 0
+    /// Committed subtree nodes behind each verdict — frequency alone cannot
+    /// size a stage, since one denial at a high boundary re-descends far more
+    /// than many denials at leaves.
+    package static var toleratedConeNodes = 0
+    package static var readerDeniedConeNodes = 0
+  #endif
+
+  static func recordTolerated(cone: Int) {
+    #if DEBUG
+      if isEnabled {
+        tolerated += 1
+        toleratedConeNodes += cone
+      }
+    #endif
+  }
+
+  static func recordReaderDenial(cone: Int) {
+    #if DEBUG
+      if isEnabled {
+        readerDenials += 1
+        readerDeniedConeNodes += cone
+      }
+    #endif
+  }
+
+  static func recordWriterDenial() {
+    #if DEBUG
+      if isEnabled { writerDenials += 1 }
+    #endif
+  }
+
+  static func recordFrameworkKeyDenial() {
+    #if DEBUG
+      if isEnabled { frameworkKeyDenials += 1 }
+    #endif
+  }
+
+  static func recordNonTypedDenial() {
+    #if DEBUG
+      if isEnabled { nonTypedDenials += 1 }
+    #endif
+  }
+
+  /// One-line census summary, or `nil` when disabled or nothing was recorded.
+  package static var summary: String? {
+    #if DEBUG
+      guard isEnabled,
+        tolerated + readerDenials + writerDenials + frameworkKeyDenials + nonTypedDenials > 0
+      else {
+        return nil
+      }
+      return """
+        [ENV-TOLERATION] tolerated=\(tolerated) reader-denied=\(readerDenials) \
+        writer-denied=\(writerDenials) framework-key-denied=\(frameworkKeyDenials) \
+        non-typed-denied=\(nonTypedDenials) \
+        tolerated-cone-nodes=\(toleratedConeNodes) \
+        reader-denied-cone-nodes=\(readerDeniedConeNodes)
+        """
+    #else
+      return nil
+    #endif
   }
 }
