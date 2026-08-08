@@ -114,7 +114,7 @@ extension RunLoop {
   /// invalidation frame renders the moved offset — one full pipeline per
   /// tick either way. (A wheel `.scrolled` never schedules an input frame at
   /// all — `shouldScheduleFrame` is false for it — so the wheel path has no
-  /// analogous second frame; its binding write and spine invalidation
+  /// analogous second frame; its binding write and route invalidation
   /// coalesce into one scheduled frame by construction.)
   func advanceScrollMomentumIfNeeded(for scheduledFrame: ScheduledFrame) {
     guard scrollMomentum.hasActiveMomentum else {

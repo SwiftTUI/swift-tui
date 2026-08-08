@@ -3674,10 +3674,11 @@ struct InteractiveRuntimeTests {
       scheduler.consumeReadyFrame(at: .now())
     )
     #expect(scheduledFrame.causes.contains(.invalidation))
-    // The spine climb stops at the root without inserting it: the route
-    // identity alone is enough (ancestors re-derive through
-    // has-invalidated-descendant denial), and root membership would force a
-    // fresh re-raster for a root-adjacent scroll view (scroll-latency R1.2).
+    // The wheel dispatch invalidates the route identity alone — no ancestor
+    // spine (scroll-latency R1.2 dropped the root; R1.6 dropped the climb
+    // entirely). Ancestors re-derive through has-invalidated-descendant
+    // denial, and root membership would force a fresh re-raster for a
+    // root-adjacent scroll view.
     #expect(scheduledFrame.invalidatedIdentities == [scrollIdentity])
   }
 

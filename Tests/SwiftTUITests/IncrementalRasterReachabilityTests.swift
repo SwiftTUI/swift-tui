@@ -136,6 +136,83 @@ struct IncrementalRasterReachabilityTests {
     #expect(scrollRecord.damageRowCount != nil)
     #expect(scrollRecord.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
   }
+
+  @Test("a wheel notch on a deeply nested scroll view invalidates the route alone")
+  func nestedScrollViewWheelNotchInvalidatesRouteOnly() throws {
+    // Characterization for scroll-latency R1.6 (plan 2026-08-08-001): the wheel
+    // dispatch invalidates ONLY the resolved scroll route — no lexical ancestor
+    // spine. Ancestors already re-derive at the layout tiers through
+    // has-invalidated-descendant and affects-indexed-source-within denial, so
+    // spine membership added no soundness; it only re-ran the spine containers'
+    // bodies at the resolve tier and defeated pointer-fast equivalence above
+    // the route. Every other scroll entry path (keyboard, momentum registry
+    // scrollBy, scrollTo/reveal, indicator drag) already invalidates through
+    // the binding write alone — route-only.
+    //
+    // The under-invalidation oracle is the F13 verify policy: DEBUG repairs
+    // incomplete damage and stamps the frame `incrementalRepaired`, so the
+    // "no repair" assertion fails if route-only invalidation ever
+    // under-damages this nested shape.
+    let rootIdentity = testIdentity("IncrementalRasterReachability", "NestedScrollRoot")
+    let sink = RecordingFrameDiagnosticSink()
+    let terminal = IncrementalRasterRecordingHost(
+      surfaceSize: .init(width: 40, height: 10)
+    )
+    let scheduler = FrameScheduler()
+    let runLoop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: IncrementalRasterEmptyKeyReader(),
+      signalReader: IncrementalRasterEmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: .init(width: 40, height: 10),
+      viewBuilder: { _, _ in NestedSpineScrollProbeView() }
+    )
+    runLoop.frameSink = sink
+
+    var renderedFrames = 0
+    scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(terminal.frames.last?.contains("row 0") == true)
+
+    let point = try #require(
+      terminal.centerOfText("row 1"),
+      "could not find 'row 1' in frame:\n\(terminal.frames.last ?? "")"
+    )
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(
+          InputEvent.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: point))
+        )
+      ) == nil
+    )
+
+    // Route-only: exactly one pending identity (the resolved scroll route;
+    // the binding write's reader-attributed invalidation targets the same
+    // identity), never the root. The pre-R1.6 spine climb inserted every
+    // lexical ancestor below the root, so this nested fixture pinned >= 3.
+    let pending = scheduler.pendingInvalidatedIdentities
+    #expect(
+      pending.count == 1,
+      "wheel invalidation set was \(pending.map(\.path).sorted())"
+    )
+    #expect(!pending.contains(rootIdentity))
+
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    // The notch must actually have scrolled the nested viewport.
+    #expect(terminal.frames.last?.contains("row 0") == false)
+
+    let scrollRecord = try #require(sink.records.last)
+    #expect(
+      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue,
+      "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
+    )
+    #expect(scrollRecord.damageRowCount != nil)
+    #expect(scrollRecord.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+  }
 }
 
 // MARK: - Fixtures
@@ -148,6 +225,27 @@ private struct IncrementalRasterProbeView: View {
       Button("bump") { count += 1 }
       Text("count \(count)")
       Text("static row")
+    }
+  }
+}
+
+/// A deep-spine app shape: real lexical containers sit between the root and
+/// the scroll view, so the route identity has non-root structural ancestors —
+/// the shape whose wheel invalidation set the pre-R1.6 spine climb widened.
+private struct NestedSpineScrollProbeView: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("chrome")
+      VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<24) { row in
+              Text("row \(row)")
+            }
+          }
+        }
+      }
+      .padding(1)
     }
   }
 }

@@ -459,29 +459,33 @@ extension RunLoop {
     }
   }
 
+  /// The invalidation a consumed pointer scroll requests: the route identity
+  /// alone (scroll-latency R1.6, plan 2026-08-08-001).
+  ///
+  /// The dispatch-side request is the scheduling backstop for scroll bindings
+  /// whose writes are not state-tracked (a `Binding(get:set:)` over external
+  /// storage): `.scrolled` never schedules an input frame
+  /// (``shouldScheduleFrame(for:)``), so without this request nothing would
+  /// render the moved offset. For tracked bindings it coalesces with the
+  /// write's own reader-attributed invalidation of the same identity.
+  ///
+  /// No ancestor spine. The historical climb inserted every lexical ancestor
+  /// below the root, but ancestor membership added no soundness: every
+  /// layout-tier reuse gate already treats the route's ancestors
+  /// conservatively (has-invalidated-descendant and
+  /// affects-indexed-source-within denial), and the damage resolver diffs
+  /// draw trees, not the seed set. Membership only re-ran the spine
+  /// containers' bodies at the resolve tier (dirty=5 vs dirty=1 per notch at
+  /// the 10k vehicle) and defeated pointer-fast equivalence above the route
+  /// (removal measured −2.9% pipeline p50, gate-real). Route-only also
+  /// matches every other scroll entry path — keyboard handlers, momentum
+  /// registry `scrollBy`, `scrollTo`/reveal, and indicator drags all
+  /// invalidate through the binding write alone — and stops minting ghost
+  /// lexical ancestors that own no nodes.
   private func scrollPointerInvalidationIdentities(
     for identity: Identity
   ) -> Set<Identity> {
-    var identities: Set<Identity> = [identity]
-    var parent = identity.parent
-    while let current = parent {
-      guard !current.components.isEmpty else {
-        break
-      }
-      if current == rootIdentity {
-        // Never promote the climb to the root: ancestors of the seed already
-        // re-derive through has-invalidated-descendant conflict denial, so
-        // root membership adds no layout work — it only trips the
-        // `root_invalidated` raster-reuse barrier and disables selective
-        // evaluation, forcing a full fresh re-raster for every notch on a
-        // root-adjacent scroll view. A seed that IS the root stays in the
-        // set: that genuinely invalidates the root.
-        break
-      }
-      identities.insert(current)
-      parent = current.parent
-    }
-    return identities
+    [identity]
   }
 
 }
