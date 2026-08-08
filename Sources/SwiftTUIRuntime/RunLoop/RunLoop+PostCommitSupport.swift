@@ -26,6 +26,7 @@ extension RunLoop {
   func presentCommittedFrameWithDiagnosticsTiming(
     _ artifacts: FrameArtifacts,
     damage: PresentationDamage?,
+    translationCandidate: ScrollTranslationCandidate? = nil,
     hasFrameSink: Bool,
     frameOrdinal: Int
   ) throws -> CommittedFramePresentationResult {
@@ -43,11 +44,16 @@ extension RunLoop {
     // Publish the ordinal for the dynamic extent of the present so a host that
     // submits to an asynchronous writer can stamp the submission with it —
     // that stamp is the join key between `frames.tsv` and `presents.tsv`.
+    // The scroll-translation candidate rides the same channel: a terminal
+    // host consumes it (behind the presentation trust latch) without every
+    // presentation-surface conformer growing a parameter for it.
     let metrics = try PresentingFrameOrdinal.$current.withValue(frameOrdinal) {
-      try presentCommittedFrame(
-        artifacts,
-        damage: damage
-      )
+      try PresentingScrollTranslation.$current.withValue(translationCandidate) {
+        try presentCommittedFrame(
+          artifacts,
+          damage: damage
+        )
+      }
     }
     let duration: Duration =
       if let presentStart, let presentClock {

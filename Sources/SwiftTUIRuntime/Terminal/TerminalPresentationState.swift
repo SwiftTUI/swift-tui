@@ -390,5 +390,19 @@ import Synchronization
     ) -> PresentationDamage? {
       requestedDamageTrustsBaseline ? damage : nil
     }
+
+    /// Resolves a run-loop scroll-translation candidate against the trust
+    /// latch. The candidate claims "this surface is the previous *presented*
+    /// surface shifted by dy" — but after a writer drop the previously
+    /// presented surface never reached the terminal and the written baseline
+    /// rolled back, so the claim is unsound for exactly the one recovery
+    /// frame the latch already flags for the damage hint. Must be read at
+    /// plan time, BEFORE the latch re-arms, like
+    /// ``presentationDamage(requested:)``.
+    func presentationTranslationCandidate(
+      requested candidate: ScrollTranslationCandidate?
+    ) -> ScrollTranslationCandidate? {
+      requestedDamageTrustsBaseline ? candidate : nil
+    }
   }
 #endif

@@ -64,3 +64,15 @@ import SwiftTUICore
 package enum PresentingFrameOrdinal {
   @TaskLocal package static var current: Int?
 }
+
+/// The scroll-translation candidate for the frame currently being presented
+/// (R2.2), published by the frame driver for the dynamic extent of the
+/// present call — the same channel as ``PresentingFrameOrdinal``, and for the
+/// same reason: the presentation-surface protocols stay untouched while the
+/// terminal host reads the frame-scoped value it needs. Consumers MUST
+/// resolve it through
+/// `TerminalPresentationSession.presentationTranslationCandidate(requested:)`
+/// before the trust latch re-arms, exactly like the damage hint.
+package enum PresentingScrollTranslation {
+  @TaskLocal package static var current: ScrollTranslationCandidate?
+}

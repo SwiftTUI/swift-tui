@@ -135,6 +135,11 @@ public struct FrameDiagnosticRecord: Sendable {
   public var presentationGraphicsAttachmentsReplayed: Int
   public var presentationEditOperationLowering: String
   public var presentationEditOperationCount: Int
+  /// The frame's scroll-translation candidate (R2.2), when its scroll ledger
+  /// described a pure single-route vertical shift against the previously
+  /// presented frame. Rendered into the `translation_candidate` column as
+  /// `dy=<dy>@rows<minY>..<maxY>` (rows half-open); `-` when absent.
+  package var translationCandidate: ScrollTranslationCandidate?
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
   /// Whether this frame was elided (skipped) because all drawn identities

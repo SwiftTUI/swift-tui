@@ -187,6 +187,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "present_graphics_attachments",
     "present_edit_op",
     "present_edit_ops",
+    "translation_candidate",
     "cache_hit",
     "total_ms",
     "elided",
@@ -401,6 +402,7 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.presentationGraphicsAttachmentsReplayed),
       record.presentationEditOperationLowering,
       String(record.presentationEditOperationCount),
+      formatTranslationCandidate(record.translationCandidate),
       cacheHit,
       totalMs,
       record.elided ? "1" : "0",
@@ -413,6 +415,18 @@ package enum FrameDiagnosticsTSVFormatting {
       elidedAnimationCommitMs,
       elidedCommitMs,
     ]
+  }
+
+  /// `dy=<dy>@rows<minY>..<maxY>` (rows half-open, surface coordinates), or
+  /// `-` when the frame produced no candidate. The candidate-free path costs
+  /// one nil check and a constant string — no per-frame allocation.
+  private static func formatTranslationCandidate(
+    _ candidate: ScrollTranslationCandidate?
+  ) -> String {
+    guard let candidate else {
+      return "-"
+    }
+    return "dy=\(candidate.dy)@rows\(candidate.band.origin.y)..\(candidate.band.maxY)"
   }
 
   private static func formatMs(_ duration: Duration?) -> String {

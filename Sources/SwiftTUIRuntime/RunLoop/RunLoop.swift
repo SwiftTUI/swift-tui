@@ -135,6 +135,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// and the latency columns stay empty.
   package let schedulerIntentTally: (any IntentRequestTallying)?
   package var previousPresentedRasterSurface: RasterSurface?
+  /// Scroll state of the previously *presented* frame — the baseline the
+  /// scroll-translation candidate (R2.2) diffs against. `nil` until a frame
+  /// with scroll routes presents, and cleared again by a route-free frame.
+  package var previousPresentedScrollLedger: ScrollTranslationFrameLedger?
   package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
   package var reportedRuntimeIssues: Set<RuntimeIssue> = []
   package var lastSeenSoundnessViolationCounts = SoundnessViolationCounts()

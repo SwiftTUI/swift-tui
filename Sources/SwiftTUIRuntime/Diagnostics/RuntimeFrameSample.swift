@@ -89,6 +89,10 @@ import SwiftTUICore
   /// Rows realized and list layouts derived during this frame, when the
   /// collection probes are armed. Both `nil` in an unarmed release run.
   package var collectionProbes: CollectionProbeSample
+  /// The frame's scroll-translation candidate (R2.2), when the presented
+  /// frame's scroll ledger described a pure single-route vertical shift
+  /// against the previously presented frame. `nil` otherwise.
+  package var translationCandidate: ScrollTranslationCandidate?
 
   package init(
     frameNumber: Int,
@@ -113,7 +117,8 @@ import SwiftTUICore
     collectionProbes: CollectionProbeSample = .init(
       realizedRows: nil,
       listLayoutDerivations: nil
-    )
+    ),
+    translationCandidate: ScrollTranslationCandidate? = nil
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
@@ -135,6 +140,7 @@ import SwiftTUICore
     self.answeredInputs = answeredInputs
     self.commitInstant = commitInstant
     self.collectionProbes = collectionProbes
+    self.translationCandidate = translationCandidate
   }
 }
 

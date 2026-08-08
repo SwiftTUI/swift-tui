@@ -233,13 +233,19 @@ extension RunLoop {
     let focusPresentation = artifacts.semanticSnapshot.focusPresentation(
       for: focusTracker.currentFocusIdentity
     )
+    let scrollTranslation = scrollTranslation(
+      for: artifacts,
+      frameOrdinal: renderedFrames + 1
+    )
     let presentationResult = try presentCommittedFrameWithDiagnosticsTiming(
       artifacts,
       damage: presentationDamage(for: artifacts, convergence: convergence),
+      translationCandidate: scrollTranslation.candidate,
       hasFrameSink: hasFrameSink,
       frameOrdinal: renderedFrames + 1
     )
     recordPresentedRasterSurface(artifacts.rasterSurface)
+    previousPresentedScrollLedger = scrollTranslation.ledger
     reportRuntimeIssues(
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
@@ -310,6 +316,7 @@ extension RunLoop {
       presentationMetrics: presentationResult.metrics,
       presentationDuration: presentationResult.duration,
       answeredInputs: answeredInputs,
+      translationCandidate: scrollTranslation.candidate,
       renderedFrames: renderedFrames
     )
 

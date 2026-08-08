@@ -18,6 +18,7 @@ extension RunLoop {
     presentationMetrics: PresentationMetrics,
     presentationDuration: Duration,
     answeredInputs: AnsweredInputs?,
+    translationCandidate: ScrollTranslationCandidate?,
     renderedFrames: Int
   ) {
     guard let frameSink else {
@@ -64,7 +65,8 @@ extension RunLoop {
       presentationDuration: presentationDuration,
       answeredInputs: answeredInputs,
       commitInstant: commitInstant,
-      collectionProbes: collectionProbes
+      collectionProbes: collectionProbes,
+      translationCandidate: translationCandidate
     )
     frameSink.record(.committed(sample))
   }

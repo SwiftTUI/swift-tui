@@ -416,6 +416,13 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         graphicsCapabilities: graphicsCapabilities,
         fallbackBackground: appearance.backgroundColor
       )
+      // The frame's scroll-translation candidate (R2.2), resolved through the
+      // same one-shot trust latch as the damage hint and at the same point —
+      // before the latch re-arms below. Nothing consumes it yet; the
+      // scroll-region planner (R2.3) reads exactly this value.
+      _ = presentationSession.presentationTranslationCandidate(
+        requested: PresentingScrollTranslation.current
+      )
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile,
         graphicsCapabilities: graphicsCapabilities,

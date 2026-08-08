@@ -138,6 +138,7 @@ package enum FrameRecordDerivation {
     }
     record.realizedRowCount = sample.collectionProbes.realizedRows
     record.listLayoutDerivationCount = sample.collectionProbes.listLayoutDerivations
+    record.translationCandidate = sample.translationCandidate
     // Published for every committed frame, not just the ones answering input:
     // the presents join is keyed on frame ordinal, and a momentum frame's write
     // latency is as real as a notch frame's.
