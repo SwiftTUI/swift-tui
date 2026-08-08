@@ -199,18 +199,28 @@ package final class ObservationBridge: Equatable {
         return
       }
 
-      let staleIdentities = records.filter { identity, record in
+      // Collect stale keys in a plain array rather than `filter` — the
+      // dictionary filter materializes a full `[Identity: Record]` copy on
+      // every call, and this runs once per committed frame in the common
+      // nothing-departed case where the array stays empty.
+      var staleIdentities: [Identity] = []
+      for (identity, record) in records {
+        let isStale: Bool
         if let liveNodeIDs {
-          guard let viewNodeID = record.viewNodeID else {
-            return true
+          if let viewNodeID = record.viewNodeID {
+            isStale = !liveNodeIDs.contains(viewNodeID)
+          } else {
+            isStale = true
           }
-          return !liveNodeIDs.contains(viewNodeID)
+        } else if let identities {
+          isStale = !identities.contains(identity)
+        } else {
+          isStale = true
         }
-        if let identities {
-          return !identities.contains(identity)
+        if isStale {
+          staleIdentities.append(identity)
         }
-        return true
-      }.map(\.key)
+      }
       for identity in staleIdentities {
         records.removeValue(forKey: identity)
       }
