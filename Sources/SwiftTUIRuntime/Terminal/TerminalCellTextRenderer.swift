@@ -4,6 +4,13 @@ struct TerminalCellTextRenderer {
   struct RenderState {
     fileprivate var activeStyle: ResolvedTextStyle?
     fileprivate var activeHyperlink: String?
+    /// The raw (pre-terminal-resolution) style of the last transition. Runs
+    /// of same-styled cells early-out on this compare, so the terminal
+    /// re-resolution (per-color mixing against the terminal backdrop) prices
+    /// per transition rather than per cell. Reset wherever `activeStyle`
+    /// resets, or a post-reset cell with the same raw style would skip its
+    /// re-emission.
+    fileprivate var activeRawStyle: ResolvedTextStyle?
 
     init() {}
   }
@@ -33,7 +40,7 @@ struct TerminalCellTextRenderer {
         state: &state,
         into: &result
       )
-      result += renderedCharacter(for: cell)
+      appendRenderedCharacter(for: cell, into: &result)
       renderedWidth += max(1, cell.spanWidth)
     }
 
@@ -51,6 +58,7 @@ struct TerminalCellTextRenderer {
     if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
       result += "\u{001B}[0m"
       state.activeStyle = nil
+      state.activeRawStyle = nil
     }
   }
 
@@ -69,6 +77,15 @@ struct TerminalCellTextRenderer {
     state: inout RenderState,
     into result: inout String
   ) {
+    // A run of same-styled cells is the common shape of a span; the raw
+    // compare early-outs before `styleResolvedForTerminal` re-derives the
+    // terminal style. Equal raw inputs resolve to equal terminal styles (the
+    // resolution is a pure function of the style and the fixed backdrop), so
+    // this skips exactly the calls that could not have emitted anything.
+    if style == state.activeRawStyle, hyperlink == state.activeHyperlink {
+      return
+    }
+
     let terminalStyle = style.map(styleResolvedForTerminal)
 
     if hyperlink != state.activeHyperlink {
@@ -93,6 +110,7 @@ struct TerminalCellTextRenderer {
       }
       state.activeStyle = terminalStyle
     }
+    state.activeRawStyle = style
   }
 
   private func styleResolvedForTerminal(
@@ -144,17 +162,22 @@ struct TerminalCellTextRenderer {
     return backdrop.mixed(with: opaqueSource, amount: color.alpha).withAlpha(1)
   }
 
-  private func renderedCharacter(
-    for cell: RasterCell
-  ) -> String {
+  /// Appends the cell's rendered character directly, so the common
+  /// full-glyph path appends a `Character` without materializing a
+  /// per-cell `String`.
+  private func appendRenderedCharacter(
+    for cell: RasterCell,
+    into result: inout String
+  ) {
     let sanitizedCharacter = sanitizedTerminalCharacter(cell.character)
     if capabilityProfile.glyphLevel == .ascii {
-      return degradedASCIIText(
+      result += degradedASCIIText(
         character: sanitizedCharacter,
         spanWidth: max(1, cell.spanWidth)
       )
+      return
     }
-    return String(sanitizedCharacter)
+    result.append(sanitizedCharacter)
   }
 
   private func cell(
