@@ -200,6 +200,57 @@ struct ScrollMomentumControllerTests {
     #expect(result.totalY >= 2)  // crossed at least a couple of cells via residual
   }
 
+  @Test("Stepping cadence does not change the trajectory (33 ms vs 16 ms grids)")
+  func steppingCadenceIsTrajectoryInvariant() {
+    // The decay integrator is the exact exponential integral (R1.5), so any
+    // partition of the same interval telescopes to the same displacement; and
+    // with the toward-zero residual carry, the emitted cell total after any
+    // step is exactly the truncated exact displacement at that instant. Two
+    // grids that meet at a common instant must therefore agree there EXACTLY
+    // — this is what makes the run loop's adaptive 16/33 ms re-arm free to
+    // switch cadence mid-fling without changing where the fling goes.
+    func makeController() -> ScrollMomentumController {
+      let controller = ScrollMomentumController(
+        configuration: .init(
+          decelerationRetentionPerSecond: 0.082,
+          minimumVelocity: 0.001,  // keep both grids alive across the window
+          maximumVelocity: 1000.0
+        )
+      )
+      #expect(
+        controller.begin(
+          identity: testIdentity("Scroll"),
+          offsetVelocity: Vector(dx: 0, dy: 60),
+          canScrollX: false,
+          canScrollY: true,
+          now: instant(0)
+        )
+      )
+      return controller
+    }
+
+    // 16 ms and 33 ms grids meet at LCM(16, 33) = 528 ms, then every 528 ms
+    // after; compare the emitted totals at each meeting point.
+    for meetingPoint in [528, 1056] {
+      let coarse = makeController()
+      var coarseTotal = 0
+      for tick in stride(from: 33, through: meetingPoint, by: 33) {
+        for step in coarse.step(to: instant(tick)) {
+          coarseTotal += step.deltaY
+        }
+      }
+      let fine = makeController()
+      var fineTotal = 0
+      for tick in stride(from: 16, through: meetingPoint, by: 16) {
+        for step in fine.step(to: instant(tick)) {
+          fineTotal += step.deltaY
+        }
+      }
+      #expect(coarseTotal == fineTotal)
+      #expect(coarseTotal > 0)
+    }
+  }
+
   @Test("cancel and cancel(forDescendant:) stop the right routes")
   func cancellation() {
     let outer = testIdentity("Outer")

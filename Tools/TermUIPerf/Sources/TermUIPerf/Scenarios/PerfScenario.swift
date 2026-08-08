@@ -416,6 +416,7 @@ public enum PerfScenarioRunner {
   public static func runWindow<Content: View>(
     scenario: any PerfScenario,
     options: PerfScenarioRunOptions,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
     @ViewBuilder content: @escaping @MainActor () -> Content,
     drive: @escaping @MainActor (PerfScenarioDriver) async throws -> [PerfEventRecord]
   ) async throws -> PerfScenarioRunResult {
@@ -425,7 +426,10 @@ public enum PerfScenarioRunner {
       artifactRoot: options.artifactRoot
     )
     let terminalSize = options.terminalSize ?? scenario.defaultTerminalSize
-    let terminalHost = PerfTerminalHost(size: terminalSize)
+    let terminalHost = PerfTerminalHost(
+      size: terminalSize,
+      pointerInputCapabilities: pointerInputCapabilities
+    )
     let inputReader = PerfScriptedInputReader()
     let signalReader = InProcessSignalReader()
     let framesURL = runDirectory.appendingPathComponent("frames.tsv")

@@ -28,3 +28,21 @@ package func powDouble(
     fatalError("powDouble is unavailable on this platform.")
   #endif
 }
+
+package func logDouble(
+  _ value: Double
+) -> Double {
+  #if canImport(Darwin)
+    Darwin.log(value)
+  #elseif canImport(Glibc)
+    Glibc.log(value)
+  #elseif canImport(Android)
+    Android.log(value)
+  #elseif canImport(WASILibc)
+    WASILibc.log(value)
+  #elseif canImport(ucrt)
+    ucrt.log(value)
+  #else
+    fatalError("logDouble is unavailable on this platform.")
+  #endif
+}

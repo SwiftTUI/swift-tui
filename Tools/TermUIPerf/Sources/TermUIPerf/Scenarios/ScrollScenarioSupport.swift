@@ -71,6 +71,42 @@ struct PerfScrollListView: View {
   }
 }
 
+/// The fling vehicle: the uniform collection hosted by a `ScrollView` BODY.
+///
+/// `List` cannot carry this scenario — direct-manipulation panning and the
+/// release-fling are scroll-BODY behaviors (the body's pointer handler claims
+/// the `.down`/`.dragged`/`.up` stream; `List`'s handler only answers
+/// `.scrolled`), so a drag over a `List` never captures a pan and the release
+/// never seeds momentum. The run that exposed this recorded ZERO deadline
+/// frames: the scenario had silently measured an ignored drag since the host
+/// capability gate landed. Same row content and `srow` markers as
+/// `PerfScrollListView`, so the driver's anchors are unchanged.
+struct PerfScrollFlingView: View {
+  let rowCount: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Scroll fling workload")
+        .foregroundStyle(.tint)
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<rowCount, id: \.self) { index in
+            HStack(spacing: 1) {
+              Text("srow \(index)")
+              Spacer(minLength: 1)
+              Text("meta \(index % 97)")
+                .foregroundStyle(.separator)
+            }
+          }
+        }
+      }
+      .frame(height: 24)
+      .border(.separator)
+    }
+    .padding(1)
+  }
+}
+
 /// The heterogeneous-document shape: the mrkdwn silhouette.
 ///
 /// Blocks vary from 1 to 12 rows and change kind on a fixed cycle, so no two

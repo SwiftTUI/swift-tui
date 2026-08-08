@@ -86,10 +86,14 @@ package final class ScrollMomentumController {
   }
 
   private let configuration: Configuration
+  /// `ln(decelerationRetentionPerSecond)`, precomputed for the exact decay
+  /// integral in ``step(to:)``. Negative for a decaying retention in (0, 1).
+  private let logRetention: Double
   private var active: [Identity: Momentum] = [:]
 
   package init(configuration: Configuration = .default) {
     self.configuration = configuration
+    logRetention = logDouble(configuration.decelerationRetentionPerSecond)
   }
 
   /// Whether any route currently has live momentum.
@@ -196,10 +200,18 @@ package final class ScrollMomentumController {
         continue
       }
 
-      // Forward-Euler displacement using the pre-decay velocity, then decay.
-      momentum.residual.dx += momentum.velocity.dx * seconds
-      momentum.residual.dy += momentum.velocity.dy * seconds
+      // Exact exponential-decay integral over the interval (scroll-latency
+      // R1.5): with v(t) = v · r^t, displacement over `s` seconds is
+      // v · (r^s − 1) / ln r. Any partition of an interval telescopes to the
+      // same displacement, so the run loop's adaptive tick cadence (16 ms vs
+      // 33 ms re-arms) cannot change a fling's trajectory — only how often it
+      // is sampled into whole cells. (The previous forward-Euler step used
+      // the pre-decay velocity across the whole interval, which glided ~4%
+      // farther at 33 ms than at 16 ms for the default retention.)
       let decay = powDouble(configuration.decelerationRetentionPerSecond, seconds)
+      let travelSeconds = travelSeconds(decay: decay, seconds: seconds)
+      momentum.residual.dx += momentum.velocity.dx * travelSeconds
+      momentum.residual.dy += momentum.velocity.dy * travelSeconds
       momentum.velocity.dx *= decay
       momentum.velocity.dy *= decay
       momentum.lastTick = now
@@ -218,6 +230,17 @@ package final class ScrollMomentumController {
       }
     }
     return ticks
+  }
+
+  /// The effective seconds of travel at the interval-start velocity that
+  /// produce the exact decay integral: `(r^s − 1) / ln r`. Falls back to the
+  /// raw interval for a non-decaying or degenerate retention (`ln r` zero or
+  /// non-finite), which reproduces the plain `v · s` step exactly.
+  private func travelSeconds(decay: Double, seconds: Double) -> Double {
+    guard logRetention.isFinite, logRetention != 0 else {
+      return seconds
+    }
+    return (decay - 1) / logRetention
   }
 
   private func isAlive(_ velocity: Vector) -> Bool {

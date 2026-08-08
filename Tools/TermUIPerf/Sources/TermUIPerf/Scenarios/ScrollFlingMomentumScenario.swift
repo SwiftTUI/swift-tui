@@ -20,18 +20,32 @@ public struct ScrollFlingMomentumScenario: PerfScenario {
 
   private static let flingCells = 16
   private static let flingSamples = 8
+  /// Smaller than the wheel family's 10k default on purpose: a fling's
+  /// decay frames are pure pipeline cost, and this scenario's question is the
+  /// smoothness ceiling when that cost FITS the tick cadence. At 10k rows the
+  /// ScrollView-body shape's windowed measure alone (~12 ms release on the
+  /// reference machine) exceeds the fast-tick budget, so the adaptive arm
+  /// correctly refuses to accelerate and the scenario would only ever measure
+  /// the guard. `SWIFTTUI_PERF_LAZY_LIST_ROWS` still overrides for exactly
+  /// that heavier-regime check.
+  private static let defaultRowCount = 500
 
   public init() {}
 
   @MainActor
   public func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult {
-    let rowCount = ScrollScenarioContent.rowCount()
+    let rowCount = ScrollScenarioContent.rowCount(default: Self.defaultRowCount)
     let flingDuration = Self.resolvedFlingDuration()
+    // The fling only exists on a host whose paradigm is direct-manipulation
+    // panning: without `supportsScrollPanning` the scroll body never claims
+    // the press, no pan is captured, and the release seeds no momentum —
+    // the scenario then measures an ignored drag (zero deadline frames).
     return try await PerfScenarioRunner.runWindow(
       scenario: self,
-      options: options
+      options: options,
+      pointerInputCapabilities: .init(supportsScrollPanning: true)
     ) {
-      PerfScrollListView(rowCount: rowCount)
+      PerfScrollFlingView(rowCount: rowCount)
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "srow 0", timeout: .seconds(120))
       // Start low in the viewport so the upward flick has room to travel.

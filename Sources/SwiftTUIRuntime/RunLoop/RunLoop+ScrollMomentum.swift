@@ -3,6 +3,18 @@ import SwiftTUICore
 extension RunLoop {
   /// Tick cadence for scroll momentum, matching the animation controller's 33 ms
   /// frame interval so a fling decays in step with how animations advance.
+  ///
+  /// A measured 16 ms adaptive arm (scroll-latency R1.5, plan 2026-08-08-001)
+  /// was refuted at the vehicle: the committed presentation cadence of a fling
+  /// is already ~16 ms effective in the high-velocity window (each tick's
+  /// registry write is followed by the `@State`-echo invalidation frame — two
+  /// committed frames per 33 ms tick), and past that window the integer-cell
+  /// crossing rate of the decaying velocity (12.5 ms/cell at the 80 cells/s
+  /// seed cap) is the binding smoothness ceiling, not the tick interval. The
+  /// 16 ms arm measured +6% fling CPU, +36% scheduler ticks, identical
+  /// committed-frame count, and no interval-metric improvement — a formal
+  /// gate FAIL. `ScrollMomentumController.step(to:)` integrates the exact
+  /// decay, so a future cadence change stays trajectory-invariant.
   private var scrollMomentumFrameInterval: Duration { .milliseconds(33) }
 
   /// Records a captured scroll-pan sample for release-velocity estimation.
@@ -94,12 +106,16 @@ extension RunLoop {
   ///
   /// Sits beside `drainGestureDeadlinesIfNeeded(for:)` — both are pre-render,
   /// deadline-driven mutations. The 33 ms cadence is paced by the scheduler
-  /// deadline, never by the `@State`-write invalidation each `scrollBy` queues:
-  /// momentum advances only on a `.deadline` frame, so the one cheap follow-up
-  /// invalidation frame (which re-renders the identical offset and is elided /
-  /// damage-free) does not re-advance the physics and cannot busy-loop. This is
-  /// the same shape as the wheel `.scrolled` double-invalidation already in the
-  /// pointer path.
+  /// deadline, never by the `@State`-write invalidation each `scrollBy`
+  /// queues: momentum advances only on a `.deadline` frame, so the follow-up
+  /// invalidation frame does not re-advance the physics and cannot busy-loop.
+  /// In practice the deadline frame itself elides (its registry write lands
+  /// as a pending invalidation for the NEXT frame) and that follow-up
+  /// invalidation frame renders the moved offset — one full pipeline per
+  /// tick either way. (A wheel `.scrolled` never schedules an input frame at
+  /// all — `shouldScheduleFrame` is false for it — so the wheel path has no
+  /// analogous second frame; its binding write and spine invalidation
+  /// coalesce into one scheduled frame by construction.)
   func advanceScrollMomentumIfNeeded(for scheduledFrame: ScheduledFrame) {
     guard scrollMomentum.hasActiveMomentum else {
       return
@@ -130,6 +146,10 @@ extension RunLoop {
     guard scrollMomentum.hasActiveMomentum else {
       return
     }
+    // Deadlines armed here during a drain pass are withheld by the pass's
+    // `DeadlineArmCut` and consumed by the next pass, so the re-arm cannot
+    // recreate the F41 drain livelock — the consumable set of one pass stays
+    // finite.
     scheduler.requestDeadline(now.advanced(by: scrollMomentumFrameInterval))
   }
 }
