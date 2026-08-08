@@ -126,17 +126,20 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
     identityRoot: Identity,
     scope: StructuralPath,
     ids: [ID],
-    entityIdentities: [EntityIdentity],
-    signature: IndexedChildMeasurementSignature
+    entityIdentities: [EntityIdentity]
   ) {
     self.identityRoot = identityRoot
     self.scope = scope
     self.ids = ids
     self.entityIdentities = entityIdentities
-    self.signature = signature
     elementIdentities = zip(ids, entityIdentities).map { id, entityIdentity in
       identityRoot.explicitID(id, occurrence: entityIdentity.occurrence)
     }
+    // Derived from the element identities just built, so a fresh mint runs
+    // the `explicitID` reflect-and-escape once per element, not twice.
+    signature = IndexedChildMeasurementSignature(
+      elementPaths: elementIdentities.lazy.map(\.path)
+    )
     selectionTags = ids.map { SelectionTag(value: $0, includeOptional: true) }
     // First occurrence wins: a duplicated id is already a diagnostic elsewhere,
     // and the earliest row is the one selection semantics resolve to.
@@ -152,6 +155,58 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
       && self.scope == scope
       && self.ids == ids
   }
+}
+
+/// The identity artifacts a ForEach resolve adopts (or mints) for its source:
+/// the entity identities plus the per-element explicit identities, both pure
+/// functions of (ids, identity root, entity scope).
+package struct ForEachAdoptedIdentityArtifacts {
+  package let entityIdentities: [EntityIdentity]
+  package let elementIdentities: [Identity]
+}
+
+/// Adopts the retained identity artifacts for a ForEach source resolving
+/// under `identityRoot` on the node currently under evaluation, minting and
+/// retaining them when absent or stale.
+///
+/// The eager `ForEach.resolveElements` path shares the lazy containers'
+/// cache through this seam: a re-resolve over unchanged data skips the
+/// per-element `EntityIdentity` mints (a `String(reflecting:)` each) and the
+/// `explicitID` reflect-and-escape identity builds, which the eager fork
+/// otherwise pays for every element on every resolve of its host.
+@MainActor
+package func adoptedForEachIdentityArtifacts<ID: Hashable & Sendable>(
+  ids: [ID],
+  identityRoot: Identity
+) -> ForEachAdoptedIdentityArtifacts {
+  let scope = forEachEntityScope(identityRoot: identityRoot)
+  let host = ViewNodeContext.current
+  if let retained = host?.retainedIndexedChildSourceArtifacts(
+    forIdentityRoot: identityRoot
+  ) as? ForEachSourceIdentityArtifacts<ID>,
+    retained.matches(ids: ids, identityRoot: identityRoot, scope: scope)
+  {
+    IndexedChildSourceArtifactsProbe.recordAdoption()
+    return .init(
+      entityIdentities: retained.entityIdentities,
+      elementIdentities: retained.elementIdentities
+    )
+  }
+  IndexedChildSourceArtifactsProbe.recordFreshMint()
+  let artifacts = ForEachSourceIdentityArtifacts(
+    identityRoot: identityRoot,
+    scope: scope,
+    ids: ids,
+    entityIdentities: makeEntityIdentities(ids: ids, scope: scope)
+  )
+  host?.retainIndexedChildSourceArtifacts(
+    artifacts,
+    forIdentityRoot: identityRoot
+  )
+  return .init(
+    entityIdentities: artifacts.entityIdentities,
+    elementIdentities: artifacts.elementIdentities
+  )
 }
 
 @MainActor
@@ -209,22 +264,14 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       identityArtifacts = retained
     } else {
       IndexedChildSourceArtifactsProbe.recordFreshMint()
-      entityIdentities = makeEntityIdentities(ids: ids, scope: scope)
-      measurementSignatureStorage = IndexedChildMeasurementSignature(
-        elementPaths: zip(ids, entityIdentities).lazy.map { id, entityIdentity in
-          childContext.identity.explicitID(
-            id,
-            occurrence: entityIdentity.occurrence
-          ).path
-        }
-      )
       let artifacts = ForEachSourceIdentityArtifacts(
         identityRoot: childContext.identity,
         scope: scope,
         ids: ids,
-        entityIdentities: entityIdentities,
-        signature: measurementSignatureStorage
+        entityIdentities: makeEntityIdentities(ids: ids, scope: scope)
       )
+      entityIdentities = artifacts.entityIdentities
+      measurementSignatureStorage = artifacts.signature
       identityArtifacts = artifacts
       host?.retainIndexedChildSourceArtifacts(
         artifacts,
@@ -263,6 +310,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
           offset: index,
           occurrence: entityIdentities[index].occurrence,
           entityIdentity: entityIdentities[index],
+          elementIdentity: identityArtifacts.elementIdentities[index],
           in: childContext,
           authoringScope: authoringScope,
           suppressStructuralLifecycle: true
@@ -351,6 +399,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         offset: index,
         occurrence: entityIdentities[index].occurrence,
         entityIdentity: entityIdentities[index],
+        elementIdentity: identityArtifacts.elementIdentities[index],
         in: childContext,
         authoringScope: authoringScope,
         suppressStructuralLifecycle: true

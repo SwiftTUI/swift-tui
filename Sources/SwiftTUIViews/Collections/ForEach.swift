@@ -22,11 +22,22 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+    // Adopt the retained identity artifacts the lazy containers already
+    // cache, so an eager re-resolve over unchanged data reuses the
+    // per-element identities instead of re-reflecting them.
+    let ids = data.map { $0[keyPath: id] }
+    let artifacts = adoptedForEachIdentityArtifacts(
+      ids: ids,
+      identityRoot: context.identity
+    )
     let iterations = makeForEachIterations(
       data: data,
       id: id,
       in: context,
-      authoringScope: dynamicPropertyScope
+      authoringScope: dynamicPropertyScope,
+      ids: ids,
+      entityIdentities: artifacts.entityIdentities,
+      elementIdentities: artifacts.elementIdentities
     )
     for iteration in iterations {
       // Eager realization: counted on the same probe as the indexed-source
@@ -155,11 +166,19 @@ extension ForEach: DeclaredChildrenView {
       index: nextIndex
     )
     nextIndex += 1
+    let ids = data.map { $0[keyPath: id] }
+    let artifacts = adoptedForEachIdentityArtifacts(
+      ids: ids,
+      identityRoot: childContext.identity
+    )
     let iterations = makeForEachIterations(
       data: data,
       id: id,
       in: childContext,
-      authoringScope: currentAuthoringContext() ?? authoringScope
+      authoringScope: currentAuthoringContext() ?? authoringScope,
+      ids: ids,
+      entityIdentities: artifacts.entityIdentities,
+      elementIdentities: artifacts.elementIdentities
     )
 
     for iteration in iterations {

@@ -92,18 +92,28 @@ package func makeForEachIterations<Data, ID>(
   id: KeyPath<Data.Element, ID>,
   in context: ResolveContext,
   authoringScope: AuthoringContext?,
+  ids precomputedIDs: [ID]? = nil,
   entityIdentities suppliedEntityIdentities: [EntityIdentity]? = nil,
+  elementIdentities suppliedElementIdentities: [Identity]? = nil,
   suppressStructuralLifecycle: Bool = false
 ) -> [ForEachIteration<Data.Element>]
 where Data: RandomAccessCollection, ID: Hashable & Sendable {
-  let ids = data.map { $0[keyPath: id] }
-  let occurrences = makeForEachOccurrences(ids: ids)
+  let ids = precomputedIDs ?? data.map { $0[keyPath: id] }
   if let suppliedEntityIdentities {
     precondition(
       suppliedEntityIdentities.count == ids.count,
       "ForEach iteration identities must be total over the source collection."
     )
   }
+  if let suppliedElementIdentities {
+    precondition(
+      suppliedElementIdentities.count == ids.count,
+      "ForEach element identities must be total over the source collection."
+    )
+  }
+  // Adopted entity identities already carry their occurrences, so the
+  // per-frame occurrence recount runs only for un-adopted sources.
+  let occurrences = suppliedEntityIdentities == nil ? makeForEachOccurrences(ids: ids) : nil
 
   var iterations: [ForEachIteration<Data.Element>] = []
   iterations.reserveCapacity(ids.count)
@@ -114,8 +124,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable {
         element: element,
         id: ids[offset],
         offset: offset,
-        occurrence: occurrences[offset],
+        occurrence: suppliedEntityIdentities?[offset].occurrence ?? occurrences![offset],
         entityIdentity: suppliedEntityIdentities?[offset],
+        elementIdentity: suppliedElementIdentities?[offset],
         in: context,
         authoringScope: authoringScope,
         suppressStructuralLifecycle: suppressStructuralLifecycle
@@ -133,6 +144,7 @@ package func makeForEachIteration<Element, ID>(
   offset: Int,
   occurrence: Int,
   entityIdentity suppliedEntityIdentity: EntityIdentity? = nil,
+  elementIdentity suppliedElementIdentity: Identity? = nil,
   in context: ResolveContext,
   authoringScope: AuthoringContext?,
   suppressStructuralLifecycle: Bool = false
@@ -153,11 +165,15 @@ where ID: Hashable & Sendable {
     kind: .init(rawValue: "ForEachElement"),
     index: offset
   )
+  // A supplied element identity comes from the retained artifacts, which
+  // mint through this exact `explicitID` call — adoption skips the
+  // `String(reflecting:)` plus per-character escape it performs per element.
   var elementContext = structuralElementContext.replacingIdentity(
-    with: context.identity.explicitID(
-      id,
-      occurrence: entityIdentity.occurrence
-    )
+    with: suppliedElementIdentity
+      ?? context.identity.explicitID(
+        id,
+        occurrence: entityIdentity.occurrence
+      )
   )
   if suppressStructuralLifecycle {
     elementContext = elementContext.suppressingStructuralLifecycle()
