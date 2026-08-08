@@ -92,19 +92,40 @@ package enum ViewGraphRuntimeRegistrationRestorer {
     // recency semantics observe.
     var work: [ResolvedNode] = [resolved]
     while let current = work.popLast() {
-      var nodeIDs = nodeIDsByStructuralPath[current.structuralPath] ?? []
-      if let viewNodeID = current.viewNodeID {
-        nodeIDs.insert(viewNodeID)
-      }
+      // Nearly every resolved node maps to zero or one graph node, so the
+      // walk resolves that case without materializing the union set, the
+      // compactMap array, or the sort — three allocations per node of the
+      // reused subtree that only the aliased multi-node case (style bodies,
+      // branch nodes sharing a structural path) actually needs.
+      let pathNodeIDs = nodeIDsByStructuralPath[current.structuralPath]
+      let ownNodeID = current.viewNodeID
+      let ownIsIndexed = ownNodeID.map { pathNodeIDs?.contains($0) ?? false } ?? true
+      let candidateCount = (pathNodeIDs?.count ?? 0) + (ownIsIndexed ? 0 : 1)
 
-      let nodes = nodeIDs.compactMap { nodesByNodeID[$0] }
-      for node in nodes.sorted(by: canonicalNodeOrder) {
-        guard restoredNodeIDs.insert(node.viewNodeID).inserted else {
-          continue
+      if candidateCount == 1 {
+        let onlyNodeID = pathNodeIDs?.first ?? ownNodeID
+        if let onlyNodeID,
+          let node = nodesByNodeID[onlyNodeID],
+          restoredNodeIDs.insert(onlyNodeID).inserted
+        {
+          node.restoreOwnRuntimeRegistrations(
+            into: registrations
+          )
         }
-        node.restoreOwnRuntimeRegistrations(
-          into: registrations
-        )
+      } else if candidateCount > 1 {
+        var nodeIDs = pathNodeIDs ?? []
+        if let ownNodeID {
+          nodeIDs.insert(ownNodeID)
+        }
+        let nodes = nodeIDs.compactMap { nodesByNodeID[$0] }
+        for node in nodes.sorted(by: canonicalNodeOrder) {
+          guard restoredNodeIDs.insert(node.viewNodeID).inserted else {
+            continue
+          }
+          node.restoreOwnRuntimeRegistrations(
+            into: registrations
+          )
+        }
       }
 
       work.append(contentsOf: current.children.reversed())
