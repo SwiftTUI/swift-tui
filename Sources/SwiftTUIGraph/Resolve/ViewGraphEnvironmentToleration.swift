@@ -76,7 +76,9 @@ extension ViewGraph {
       guard let keyType = environment.typedValues[key]?.environmentKeyType,
         EnvironmentKeyReuseClassification.isReaderAttributedOnly(keyType)
       else {
-        EnvironmentTolerationCensus.recordFrameworkKeyDenial()
+        EnvironmentTolerationCensus.recordFrameworkKeyDenial(
+          key: environment.typedValues[key]?.keyDebugName
+        )
         return .denied
       }
     }
@@ -303,6 +305,7 @@ package enum EnvironmentTolerationCensus {
     /// than many denials at leaves.
     package static var toleratedConeNodes = 0
     package static var readerDeniedConeNodes = 0
+    package static var frameworkKeyDenialsByKey: [String: Int] = [:]
   #endif
 
   static func recordTolerated(cone: Int) {
@@ -329,9 +332,15 @@ package enum EnvironmentTolerationCensus {
     #endif
   }
 
-  static func recordFrameworkKeyDenial() {
+  static func recordFrameworkKeyDenial(key: String?) {
     #if DEBUG
-      if isEnabled { frameworkKeyDenials += 1 }
+      if isEnabled {
+        frameworkKeyDenials += 1
+        // Which framework keys actually drive the denials decides whether
+        // attribution is a narrow fix or a sweep across every framework read
+        // path. Reflecting the name here is fine: census-only, off by default.
+        frameworkKeyDenialsByKey[key ?? "<unknown>", default: 0] += 1
+      }
     #endif
   }
 
@@ -340,6 +349,20 @@ package enum EnvironmentTolerationCensus {
       if isEnabled { nonTypedDenials += 1 }
     #endif
   }
+
+  #if DEBUG
+    /// Framework keys ranked by how many denials each caused.
+    private static var frameworkKeyBreakdown: String {
+      guard !frameworkKeyDenialsByKey.isEmpty else {
+        return ""
+      }
+      let ranked = frameworkKeyDenialsByKey
+        .sorted { ($0.value, $1.key) > ($1.value, $0.key) }
+        .map { "\($0.key)=\($0.value)" }
+        .joined(separator: " ")
+      return " | framework-keys: " + ranked
+    }
+  #endif
 
   /// One-line census summary, or `nil` when disabled or nothing was recorded.
   package static var summary: String? {
@@ -354,7 +377,7 @@ package enum EnvironmentTolerationCensus {
         writer-denied=\(writerDenials) framework-key-denied=\(frameworkKeyDenials) \
         non-typed-denied=\(nonTypedDenials) \
         tolerated-cone-nodes=\(toleratedConeNodes) \
-        reader-denied-cone-nodes=\(readerDeniedConeNodes)
+        reader-denied-cone-nodes=\(readerDeniedConeNodes)\(frameworkKeyBreakdown)
         """
     #else
       return nil
