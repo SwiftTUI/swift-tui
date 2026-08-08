@@ -12,8 +12,11 @@ import Testing
 /// The fixture key is declared in the *test* module on purpose — that is what
 /// makes it reader-attributed-only. Keys declared inside the framework are also
 /// read *without* attribution (style extraction, the `[untracked:]` text
-/// attributes), so the classification excludes them wholesale and the
-/// toleration must never fire for them.
+/// attributes), so the classification excludes them by default and the
+/// toleration must never fire for them. The individually *certified* framework
+/// keys (button style, the scroll-indicator visibility pair) are the
+/// exception — every consumer reads them through the tracked subscript at
+/// resolve — and they are pinned in their own section below.
 private enum ReaderScopedThemeKey: EnvironmentKey {
   static let defaultValue = "base"
 }
@@ -57,6 +60,20 @@ private struct ConditionalReader: View {
       ThemeReader()
     } else {
       Text("theme:unread")
+    }
+  }
+}
+
+/// A button style whose body stamps a recognizable tag, so a rendered frame
+/// shows *which* style resolved a button — the observable a stale serve would
+/// corrupt.
+private struct TaggedButtonStyle: ButtonStyle {
+  let tag: String
+
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    HStack(spacing: 0) {
+      Text("style[\(tag)]")
+      configuration.label
     }
   }
 }
@@ -221,9 +238,11 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(!toleratedBoundary(in: renderer))
   }
 
-  /// Framework-declared keys are consumed without read attribution, so no
-  /// reader-set argument holds for them and the toleration must never fire.
-  @Test("a framework-declared key change is never tolerated")
+  /// Uncertified framework-declared keys are consumed without read
+  /// attribution — `lineLimit` is read through `[untracked:]` by the text
+  /// pipeline — so no reader-set argument holds for them and the toleration
+  /// must never fire.
+  @Test("an uncertified framework-declared key change is never tolerated")
   func frameworkKeyChangeIsNeverTolerated() {
     let renderer = makeRenderer()
 
@@ -325,5 +344,188 @@ struct ReaderScopedEnvironmentReuseTests {
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("theme:dark"))
     #expect(!rendered.contains("theme:base"))
+  }
+
+  // MARK: - Certified framework keys
+
+  /// `ButtonStyleKey` is certified: its only consumer is `Button`'s resolve,
+  /// a tracked read. A style change above a button-free subtree is therefore
+  /// exactly the reader-scoped win — the subtree is served, not re-descended.
+  @Test("a button-style change over a button-free subtree is tolerated")
+  func buttonStyleChangeOverButtonFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let tag: String
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .buttonStyle(TaggedButtonStyle(tag: tag))
+      }
+    }
+
+    _ = renderer.render(
+      Root(tag: "a", dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(tag: "b", dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("boundary"))
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+    #expect(frame.diagnostics.work.resolvedNodesReused > 1)
+  }
+
+  /// The soundness half of the certification: a subtree that *contains* a
+  /// button reads the key at the button's resolve, so the door must deny and
+  /// the button must visibly restyle.
+  @Test("a button-style change with a button in the subtree is denied and restyles")
+  func buttonStyleChangeWithButtonInSubtreeRestyles() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let tag: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Button("press") {})
+        }
+        .buttonStyle(TaggedButtonStyle(tag: tag))
+      }
+    }
+
+    _ = renderer.render(
+      Root(tag: "a"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(tag: "b"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("style[b]"))
+    #expect(!rendered.contains("style[a]"))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  /// The scroll-indicator pair travels together: `scrollIndicators(_:axes:)`
+  /// writes both axis keys by default, so the diff carries both and the serve
+  /// requires both to be certified.
+  @Test("a scroll-indicator visibility change over a scroll-free subtree is tolerated")
+  func scrollIndicatorVisibilityChangeOverScrollFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let visibility: ScrollIndicatorVisibility
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .scrollIndicators(visibility)
+      }
+    }
+
+    _ = renderer.render(
+      Root(visibility: .visible, dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(visibility: .hidden, dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("boundary"))
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  /// A scroll view inside the boundary reads the vertical indicator key at
+  /// its resolve, so the visibility flip must re-descend the subtree.
+  @Test("a scroll-indicator visibility change with a scroll view in the subtree is denied")
+  func scrollIndicatorVisibilityChangeWithScrollViewIsDenied() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let visibility: ScrollIndicatorVisibility
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: ScrollView { Text("inner") })
+        }
+        .scrollIndicators(visibility)
+      }
+    }
+
+    _ = renderer.render(
+      Root(visibility: .visible),
+      context: .init(identity: rootIdentity)
+    )
+    _ = renderer.render(
+      Root(visibility: .hidden),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  /// Certified keys must also enter the writer index: an interior
+  /// `.scrollIndicators` write decouples the subtree from the boundary's
+  /// change, and only the setter's write attribution can see that.
+  @Test("an interior writer of a certified framework key denies the serve")
+  func interiorCertifiedKeyWriterDeniesTheServe() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let visibility: ScrollIndicatorVisibility
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(
+            content: Text("inner")
+              .scrollIndicators(.hidden)
+          )
+        }
+        .scrollIndicators(visibility)
+      }
+    }
+
+    _ = renderer.render(
+      Root(visibility: .visible),
+      context: .init(identity: rootIdentity)
+    )
+    _ = renderer.render(
+      Root(visibility: .hidden),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(!toleratedBoundary(in: renderer))
   }
 }

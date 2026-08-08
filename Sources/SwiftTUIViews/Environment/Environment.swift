@@ -135,10 +135,12 @@ public struct EnvironmentValues: Equatable, Sendable {
   ///
   /// The reader-scoped reuse toleration — the first consumer of reader-precise
   /// environment attribution — stays sound over these unattributed reads
-  /// because it tolerates *only* keys declared outside this framework
+  /// because it tolerates only keys declared outside this framework plus the
+  /// individually certified framework keys
   /// (`EnvironmentKeyReuseClassification`), and every key read here is
-  /// framework-declared. Any new untracked read of a key declared outside
-  /// these modules would break that argument: use the tracked subscript.
+  /// framework-declared and uncertified. Any new untracked read of a key
+  /// declared outside these modules — or of a certified key — would break
+  /// that argument: use the tracked subscript.
   package subscript<K: EnvironmentKey>(untracked key: K.Type) -> K.Value {
     guard let boxed = storage[ObjectIdentifier(key)] else {
       return K.defaultValue
@@ -179,11 +181,13 @@ public struct EnvironmentValues: Equatable, Sendable {
       // toleration needs completeness in exactly this direction: recording a
       // write that is not an authored subtree write only causes extra
       // denials, while missing one would let a subtree be served under a key
-      // its own interior writer controls. Framework-declared keys are skipped:
-      // they never enter the toleration (see
+      // its own interior writer controls. Uncertified framework-declared keys
+      // are skipped: they never enter the toleration (see
       // `EnvironmentKeyReuseClassification`), so recording them would be pure
       // cost on the hottest write path in the resolver (`\.stackAxis`, written
-      // by every stack, every frame).
+      // by every stack, every frame). Certified framework keys record like
+      // user keys — the toleration's interior-writer denial needs them
+      // indexed.
       // Classify BEFORE the isolation hop: the classification needs the key
       // metatype, and metatypes are not `Sendable`, so capturing one in the
       // main-actor closure is a `sending` violation. Only the

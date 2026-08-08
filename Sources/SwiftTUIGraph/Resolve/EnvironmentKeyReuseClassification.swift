@@ -8,10 +8,12 @@ import Synchronization
 /// are reachable only through attributed surfaces (`@Environment` and
 /// composed wrappers → `DependencyTracker.recordEnvironmentRead`), so an
 /// empty reader set genuinely proves the subtree's output cannot depend on
-/// the change. Keys DECLARED inside this framework are excluded wholesale:
+/// the change. Keys DECLARED inside this framework are excluded by default:
 /// framework resolve/draw code also consumes them without attribution (the
 /// `EnvironmentValues[untracked:]` text-attribute reads, style extraction,
-/// layout-axis reads), so no reader-set argument holds for them.
+/// layout-axis reads), so no reader-set argument holds for them — except the
+/// individually certified keys in ``certifiedFrameworkKeyNames``, whose every
+/// consumer reads through the tracked subscript during node evaluation.
 ///
 /// The classification is name-based (the declaring module prefix of the
 /// reflected key type), computed once per key type and cached — the same
@@ -44,6 +46,32 @@ package enum EnvironmentKeyReuseClassification {
     "SwiftTUI.",
   ]
 
+  /// Framework-declared keys individually certified as reader-attributed.
+  ///
+  /// Certification is a per-key soundness claim: every production consumer of
+  /// the key's value reads it through the tracked typed subscript while a
+  /// node is being evaluated, so the value reaches committed output only from
+  /// attributed reads. The claim is *verified by measurement* — the memo
+  /// shadow oracle across the full test corpus — never by enumerating read
+  /// sites alone: the `FocusedValuesKey` attempt showed a value can leave the
+  /// environment through a consumer (the preference collection path) that no
+  /// read-site audit surfaces. Keys with `[untracked:]` reads (the
+  /// text-attribute set) are structurally ineligible.
+  ///
+  /// Certifying a key also puts its authored writes into the writer index
+  /// (the setter consults this classification), which the interior-writer
+  /// denial requires.
+  private static let certifiedFrameworkKeyNames: Set<String> = [
+    // Read only by `Button`'s resolve (tracked); the style body it selects
+    // is resolved output, and the draw phase never consults the key.
+    "ButtonStyleKey",
+    // Read only by `ScrollView`/`List`/`Table` resolve (tracked); the draw
+    // phase consumes the resolved `drawMetadata.scrollIndicatorAxes` stamp,
+    // never the environment.
+    "ScrollIndicatorVisibilityKey",
+    "HorizontalScrollIndicatorVisibilityKey",
+  ]
+
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {
     let key = ObjectIdentifier(keyType)
     return classificationsByKey.withLock { classifications in
@@ -51,12 +79,29 @@ package enum EnvironmentKeyReuseClassification {
         return cached
       }
       let reflectedName = String(reflecting: keyType)
-      let classification = !frameworkModulePrefixes.contains { prefix in
+      let isFrameworkDeclared = frameworkModulePrefixes.contains { prefix in
         reflectedName.hasPrefix(prefix)
       }
+      let classification =
+        !isFrameworkDeclared
+        || certifiedFrameworkKeyNames.contains(lastNameComponent(of: reflectedName))
       classifications[key] = classification
       return classification
     }
+  }
+
+  /// The final dot-separated component of a reflected type name. Private key
+  /// enums reflect with an opaque discriminator between the module and the
+  /// type name (`Module.(unknown context at $…).Key`), so certification
+  /// matches the trailing component rather than a full path. The framework
+  /// prefix check has already accepted the name when this runs, so the space
+  /// being matched is the framework's own — a user key that happens to share
+  /// a certified trailing name never reaches this comparison.
+  private static func lastNameComponent(of reflectedName: String) -> String {
+    guard let lastDot = reflectedName.lastIndex(of: ".") else {
+      return reflectedName
+    }
+    return String(reflectedName[reflectedName.index(after: lastDot)...])
   }
 
   /// Test seam: drops the cached classifications.

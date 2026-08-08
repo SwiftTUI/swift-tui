@@ -14,11 +14,14 @@
 //  1. **Attribution is complete for the tolerated keys.** Outside this
 //     framework's own modules an environment value is reachable only through
 //     attributed surfaces (`@Environment` and the wrappers composed on it),
-//     each of which records a read. Framework-declared keys are excluded
-//     wholesale by `EnvironmentKeyReuseClassification` because framework
+//     each of which records a read. Framework-declared keys are excluded by
+//     default in `EnvironmentKeyReuseClassification` because framework
 //     resolve/draw code also reads them *without* attribution
 //     (`EnvironmentValues[untracked:]`, style extraction, stack-axis reads),
-//     so no reader-set argument holds for them.
+//     so no reader-set argument holds for them. The exception is the
+//     individually certified keys, for which the same completeness claim as
+//     for user keys has been established by measurement (the memo shadow
+//     oracle), not by read-site audit.
 //  2. **The subtree contains no interior writer of a changed key.** An
 //     interior `.environment(K, …)` makes its subtree's value for `K`
 //     authored rather than inherited, which decouples it from the boundary's
