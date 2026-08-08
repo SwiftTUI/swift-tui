@@ -1,3 +1,33 @@
+/// One border edge's glyph pattern, decomposed once per border operation.
+///
+/// The per-glyph `BorderSet` cycle accessors rebuild `Array(edge)` on every
+/// call — and the horizontal edges re-derive each glyph's cell width — so a
+/// fixed 1–2 glyph pattern otherwise costs O(perimeter) array allocations
+/// and Unicode-property walks per border per frame.
+private struct BorderEdgeGlyphCycle {
+  private let glyphs: [Character]
+  private let widths: [Int]
+
+  init(_ edge: String) {
+    let glyphs = Array(edge)
+    self.glyphs = glyphs
+    widths = glyphs.map { max(1, cellWidth(of: $0)) }
+  }
+
+  func glyph(at index: Int) -> Character? {
+    guard index >= 0, !glyphs.isEmpty else {
+      return nil
+    }
+    return glyphs[index % glyphs.count]
+  }
+
+  /// Display width for the glyph at `index`, already clamped to ≥1. Only
+  /// meaningful at indices where ``glyph(at:)`` returned non-nil.
+  func width(at index: Int) -> Int {
+    widths[index % widths.count]
+  }
+}
+
 extension Rasterizer {
   /// Paints a layout-reserved border into the cells that
   /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
@@ -105,16 +135,17 @@ extension Rasterizer {
     // Per-row cull (D70). The top and bottom edges each occupy one fixed row,
     // so a single membership test replaces the whole glyph walk.
     if topWidth > 0, dirtyRows?.contains(outer.origin.y) ?? true {
+      let cycle = BorderEdgeGlyphCycle(set.top)
       let y = outer.origin.y
       let startX = outer.origin.x + leftWidth
       let endX = outer.origin.x + outer.size.width - rightWidth
       var x = startX
       var glyphIndex = 0
       while x < endX {
-        guard let character = set.topGlyph(at: glyphIndex) else {
+        guard let character = cycle.glyph(at: glyphIndex) else {
           break
         }
-        let glyphWidth = max(1, cellWidth(of: character))
+        let glyphWidth = cycle.width(at: glyphIndex)
         guard x + glyphWidth <= endX else {
           break
         }
@@ -150,16 +181,17 @@ extension Rasterizer {
     if bottomWidth > 0,
       dirtyRows?.contains(outer.origin.y + outer.size.height - 1) ?? true
     {
+      let cycle = BorderEdgeGlyphCycle(set.bottom)
       let y = outer.origin.y + outer.size.height - 1
       let startX = outer.origin.x + leftWidth
       let endX = outer.origin.x + outer.size.width - rightWidth
       var x = startX
       var glyphIndex = 0
       while x < endX {
-        guard let character = set.bottomGlyph(at: glyphIndex) else {
+        guard let character = cycle.glyph(at: glyphIndex) else {
           break
         }
-        let glyphWidth = max(1, cellWidth(of: character))
+        let glyphWidth = cycle.width(at: glyphIndex)
         guard x + glyphWidth <= endX else {
           break
         }
@@ -193,6 +225,7 @@ extension Rasterizer {
     }
 
     if leftWidth > 0 {
+      let cycle = BorderEdgeGlyphCycle(set.left)
       let x = outer.origin.x
       let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
       let bottomExclusive =
@@ -202,7 +235,7 @@ extension Rasterizer {
       var y = topExclusive
       var glyphIndex = 0
       while y < bottomExclusive {
-        guard let character = set.leftGlyph(at: glyphIndex) else {
+        guard let character = cycle.glyph(at: glyphIndex) else {
           break
         }
         // Per-row cull (D70). The skip wraps only the work: `y` and
@@ -243,6 +276,7 @@ extension Rasterizer {
     }
 
     if rightWidth > 0 {
+      let cycle = BorderEdgeGlyphCycle(set.right)
       let x = outer.origin.x + outer.size.width - rightWidth
       let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
       let bottomExclusive =
@@ -252,7 +286,7 @@ extension Rasterizer {
       var y = topExclusive
       var glyphIndex = 0
       while y < bottomExclusive {
-        guard let character = set.rightGlyph(at: glyphIndex) else {
+        guard let character = cycle.glyph(at: glyphIndex) else {
           break
         }
         // Per-row cull (D70) — same advance-then-skip shape as the left edge.
