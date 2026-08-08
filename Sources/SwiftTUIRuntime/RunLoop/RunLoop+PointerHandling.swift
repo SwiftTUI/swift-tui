@@ -468,7 +468,14 @@ extension RunLoop {
       guard !current.components.isEmpty else {
         break
       }
-      if current == rootIdentity, identities.count > 1 {
+      if current == rootIdentity {
+        // Never promote the climb to the root: ancestors of the seed already
+        // re-derive through has-invalidated-descendant conflict denial, so
+        // root membership adds no layout work — it only trips the
+        // `root_invalidated` raster-reuse barrier and disables selective
+        // evaluation, forcing a full fresh re-raster for every notch on a
+        // root-adjacent scroll view. A seed that IS the root stays in the
+        // set: that genuinely invalidates the root.
         break
       }
       identities.insert(current)

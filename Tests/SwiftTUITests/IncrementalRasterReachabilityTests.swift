@@ -77,6 +77,65 @@ struct IncrementalRasterReachabilityTests {
     // silently repairs the surface, so the wrong damage only ships in release.
     #expect(!paths.contains(Rasterizer.RasterPath.incrementalRepaired.rawValue))
   }
+
+  @Test("a wheel notch on a root-adjacent scroll view rasterizes incrementally")
+  func rootAdjacentScrollViewWheelNotchRasterizesIncrementally() throws {
+    // Characterization for scroll-latency R1.2 (plan 2026-08-08-001): when the
+    // ScrollView is the root view's direct child, the wheel path's ancestor
+    // spine climb used to insert `rootIdentity` into the invalidation set
+    // (the `identities.count > 1` root guard never fired on the first
+    // iteration), tripping the `root_invalidated` raster-reuse barrier — a
+    // shallow app took a full fresh re-raster on every notch.
+    let rootIdentity = testIdentity("IncrementalRasterReachability", "ScrollRoot")
+    let sink = RecordingFrameDiagnosticSink()
+    let terminal = IncrementalRasterRecordingHost(
+      surfaceSize: .init(width: 40, height: 8)
+    )
+    let scheduler = FrameScheduler()
+    let runLoop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: IncrementalRasterEmptyKeyReader(),
+      signalReader: IncrementalRasterEmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: .init(width: 40, height: 8),
+      viewBuilder: { _, _ in RootAdjacentScrollProbeView() }
+    )
+    runLoop.frameSink = sink
+
+    var renderedFrames = 0
+    scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(terminal.frames.last?.contains("row 0") == true)
+
+    let point = try #require(
+      terminal.centerOfText("row 1"),
+      "could not find 'row 1' in frame:\n\(terminal.frames.last ?? "")"
+    )
+    #expect(
+      runLoop.handle(
+        RuntimeEvent.input(
+          InputEvent.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: point))
+        )
+      ) == nil
+    )
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    // The notch must actually have scrolled: the top row leaves the viewport.
+    #expect(terminal.frames.last?.contains("row 0") == false)
+
+    let scrollRecord = try #require(sink.records.last)
+    #expect(
+      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue,
+      "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
+    )
+    #expect(!scrollRecord.rasterReuseBarriers.contains("root_invalidated"))
+    // Bounded damage, and no F13 repair (see the sibling test's rationale).
+    #expect(scrollRecord.damageRowCount != nil)
+    #expect(scrollRecord.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+  }
 }
 
 // MARK: - Fixtures
@@ -89,6 +148,24 @@ private struct IncrementalRasterProbeView: View {
       Button("bump") { count += 1 }
       Text("count \(count)")
       Text("static row")
+    }
+  }
+}
+
+/// A shallow real app shape: the scroll view resolves as the root node's
+/// direct child, so the wheel route's spine climb reaches `rootIdentity` on
+/// its first step.
+private struct RootAdjacentScrollProbeView: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("title")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<24) { row in
+            Text("row \(row)")
+          }
+        }
+      }
     }
   }
 }
