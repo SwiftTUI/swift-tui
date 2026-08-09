@@ -29,18 +29,26 @@ import SwiftTUICore
   /// written baseline immediately, no frame can drop, and the trust latch
   /// never trips — which matches the run loop's previously-presented damage
   /// baseline exactly, keeping the hinted diffs honest.
-  @_spi(Runners) public final class TerminalEmissionSimulationHost: PresentationSurface,
+  @_spi(Runners)
+  public final class TerminalEmissionSimulationHost: PresentationSurface,
     DamageAwarePresentationSurface
   {
     /// The lane's fixed profile — see the type comment for the rationale.
-    public static let laneCapabilityProfile = TerminalCapabilityProfile(
-      glyphLevel: .unicode,
-      colorLevel: .trueColor,
-      emitsStyleEscapeSequences: true,
-      supportsHyperlinks: true,
-      supportsMouseReporting: true,
-      supportsSynchronizedOutput: true
-    )
+    /// Scroll regions are ON (deterministically, not via detection) so the
+    /// lane exercises the verified scroll-region emission (R2.3) exactly as
+    /// a real VT100-descendant terminal would.
+    public static let laneCapabilityProfile: TerminalCapabilityProfile = {
+      var profile = TerminalCapabilityProfile(
+        glyphLevel: .unicode,
+        colorLevel: .trueColor,
+        emitsStyleEscapeSequences: true,
+        supportsHyperlinks: true,
+        supportsMouseReporting: true,
+        supportsSynchronizedOutput: true
+      )
+      profile.supportsScrollRegions = true
+      return profile
+    }()
 
     public let surfaceSize: CellSize
     public let capabilityProfile: TerminalCapabilityProfile
@@ -57,6 +65,10 @@ import SwiftTUICore
 
     private var presentationSession = TerminalPresentationSession()
     private let imageRenderer = TerminalImageRenderer(repository: sharedImageAssetRepository)
+    /// Same kill-switch latch as `TerminalHost` (`SWIFTTUI_SCROLL_REGION=0`)
+    /// so a lane run can A/B the emission off without a rebuild.
+    private let scrollRegionEmissionEnabled =
+      FeatureGate.scrollRegionEmission.initialIsEnabled()
 
     public init(
       surfaceSize: CellSize,
@@ -95,6 +107,13 @@ import SwiftTUICore
         graphicsCapabilities: graphicsCapabilities,
         fallbackBackground: appearance.backgroundColor
       )
+      // Mirrors TerminalHost.present exactly: the candidate resolves through
+      // the trust latch BEFORE the latch re-arms. The synchronous sink means
+      // the latch never actually trips here, but the lane must keep the real
+      // consumer's ordering or its bytes stop being representative.
+      let translationCandidate = presentationSession.presentationTranslationCandidate(
+        requested: PresentingScrollTranslation.current
+      )
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile,
         graphicsCapabilities: graphicsCapabilities,
@@ -102,7 +121,8 @@ import SwiftTUICore
       ).plan(
         previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
-        damage: presentationSession.presentationDamage(requested: damage)
+        damage: presentationSession.presentationDamage(requested: damage),
+        translationCandidate: scrollRegionEmissionEnabled ? translationCandidate : nil
       )
       presentationSession.requestedDamageTrustsBaseline = true
 

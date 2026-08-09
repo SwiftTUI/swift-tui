@@ -34,6 +34,37 @@ enum TerminalHostEscapeSequences {
   static let pushKittyKeyboardEnhancements = "\u{001B}[>1u"
   static let popKittyKeyboardEnhancements = "\u{001B}[<u"
 
+  /// DECSTBM — set the vertical scroll region to rows `top...bottom`,
+  /// 1-based inclusive. Side effect on a conforming terminal: the cursor
+  /// homes, which is why the emission re-homes explicitly after the region
+  /// ops instead of trusting terminal variance.
+  static func setScrollRegion(
+    top: Int,
+    bottom: Int
+  ) -> String {
+    "\u{001B}[\(max(1, top));\(max(1, bottom))r"
+  }
+
+  /// DECSTBM reset — the scroll region becomes the full screen.
+  static let resetScrollRegion = "\u{001B}[r"
+
+  /// SU — scroll the active region UP by `rows`: content moves toward the
+  /// top, blank rows appear at the region bottom. With a DECSTBM region set,
+  /// only rows inside the region move.
+  static func scrollUp(
+    _ rows: Int
+  ) -> String {
+    "\u{001B}[\(max(1, rows))S"
+  }
+
+  /// SD — scroll the active region DOWN by `rows`: content moves toward the
+  /// bottom, blank rows appear at the region top.
+  static func scrollDown(
+    _ rows: Int
+  ) -> String {
+    "\u{001B}[\(max(1, rows))T"
+  }
+
   static func cursor(
     to point: CellPoint
   ) -> String {
@@ -148,7 +179,12 @@ enum TerminalHostEscapeSequences {
     case .fullRepaint:
       return true
     case .incremental:
-      return plan.rowBatches.count >= incrementalSynchronizedOutputRowBatchThreshold
+      // A scroll-region frame always wraps: the region ops move a whole band
+      // of rows and any refresh between the SU/SD and the exposed-row
+      // repaints would show the band torn — the exact artifact CSI ?2026
+      // exists to hide.
+      return plan.scrollRegion != nil
+        || plan.rowBatches.count >= incrementalSynchronizedOutputRowBatchThreshold
     }
   }
 }

@@ -135,6 +135,11 @@ public struct FrameDiagnosticRecord: Sendable {
   public var presentationGraphicsAttachmentsReplayed: Int
   public var presentationEditOperationLowering: String
   public var presentationEditOperationCount: Int
+  /// How many scroll-region translations (DECSTBM + SU/SD + reset, R2.3)
+  /// the frame's emission carried — the `present_scroll_region` column.
+  /// `package` (set post-init, defaulting 0) so the public record surface
+  /// stays frozen.
+  package var presentationScrollRegionOperationCount = 0
   /// The frame's scroll-translation candidate (R2.2), when its scroll ledger
   /// described a pure single-route vertical shift against the previously
   /// presented frame. Rendered into the `translation_candidate` column as

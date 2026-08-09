@@ -28,6 +28,12 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
   public var graphicsAttachmentsReplayed: Int
   public var editOperationLowering: EditOperationLowering
   public var editOperationCount: Int
+  /// How many scroll-region translations (DECSTBM + SU/SD + reset) the
+  /// frame's emission carried — 0 for every non-translated frame. Kept
+  /// `package` (set post-init by the emission builder) so the public metrics
+  /// surface stays frozen; `frames.tsv` reports it as
+  /// `present_scroll_region`.
+  package var scrollRegionOperationCount = 0
 
   public init(
     bytesWritten: Int = 0,

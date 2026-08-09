@@ -118,6 +118,9 @@ import SwiftTUICore
       transmittedKittyImages: inout Set<UInt32>,
       referencedImageIDs: inout Set<UInt32>
     ) {
+      if let scrollRegion = plan.scrollRegion {
+        appendScrollRegionOperation(scrollRegion, to: &emission)
+      }
       for rowBatch in plan.rowBatches {
         let rowOutput = incrementalRowOutput(
           for: rowBatch,
@@ -138,6 +141,31 @@ import SwiftTUICore
         transmittedKittyImages: &transmittedKittyImages,
         referencedImageIDs: &referencedImageIDs
       )
+    }
+
+    /// The verified translation prefix (R2.3): scope a DECSTBM region to the
+    /// band, scroll it by the delta, drop the region, and re-home the
+    /// cursor. Region ops leave the cursor position emulator-defined, and
+    /// every subsequent row batch emits an absolute CUP anyway — the re-home
+    /// just pins the state deterministically for the byte-stream pins.
+    private func appendScrollRegionOperation(
+      _ scrollRegion: TerminalPresentationPlan.ScrollRegionOperation,
+      to emission: inout TerminalPresentationEmission
+    ) {
+      emission.append(
+        TerminalHostEscapeSequences.setScrollRegion(
+          top: scrollRegion.topRow + 1,
+          bottom: scrollRegion.bottomRow + 1
+        )
+      )
+      if scrollRegion.delta < 0 {
+        emission.append(TerminalHostEscapeSequences.scrollUp(-scrollRegion.delta))
+      } else {
+        emission.append(TerminalHostEscapeSequences.scrollDown(scrollRegion.delta))
+      }
+      emission.append(TerminalHostEscapeSequences.resetScrollRegion)
+      emission.append(TerminalHostEscapeSequences.cursor(to: .zero))
+      emission.recordScrollRegionOperation()
     }
 
     private func incrementalRowOutput(

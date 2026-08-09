@@ -35,6 +35,7 @@ import Synchronization
     var graphicsAttachmentsReplayed = 0
     var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
     var editOperationCount = 0
+    var scrollRegionOperationCount = 0
 
     mutating func append(_ output: String) {
       self.output.append(output)
@@ -53,12 +54,16 @@ import Synchronization
       editOperationCount += 1
     }
 
+    mutating func recordScrollRegionOperation() {
+      scrollRegionOperationCount += 1
+    }
+
     func metrics(
       for plan: TerminalPresentationPlan,
       output: String,
       usedSynchronizedOutput: Bool
     ) -> TerminalPresentationMetrics {
-      TerminalPresentationMetrics(
+      var metrics = TerminalPresentationMetrics(
         bytesWritten: output.utf8.count,
         linesTouched: plan.linesTouched,
         cellsChanged: plan.cellsChanged,
@@ -71,6 +76,8 @@ import Synchronization
         editOperationLowering: editOperationLowering,
         editOperationCount: editOperationCount
       )
+      metrics.scrollRegionOperationCount = scrollRegionOperationCount
+      return metrics
     }
   }
 

@@ -306,6 +306,10 @@ import Synchronization
   private var cells: [[Character]]
   private var cursor = CellPoint.zero
   private var pendingBytes: [UInt8] = []
+  /// DECSTBM vertical scroll region, 0-based inclusive rows. SU/SD move only
+  /// the rows inside it; CSI r resets it to the full screen.
+  private var scrollRegionTop = 0
+  private var scrollRegionBottom: Int
 
   @_spi(Testing) public init(size: CellSize) {
     self.size = size
@@ -313,6 +317,7 @@ import Synchronization
       repeating: Array(repeating: " ", count: max(1, size.width)),
       count: max(1, size.height)
     )
+    scrollRegionBottom = max(0, size.height - 1)
   }
 
   /// The current visible rows with trailing spaces removed.
@@ -465,10 +470,56 @@ import Synchronization
       cursor.y = min(max(0, size.height - 1), cursor.y + max(1, values.first ?? 1))
     case 0x47:  // G
       cursor.x = min(max(0, size.width - 1), max(1, values.first ?? 1) - 1)
+    case 0x72:  // r — DECSTBM set/reset scroll region
+      guard !privateMode else {
+        return
+      }
+      let top = max(1, values.first ?? 1) - 1
+      let bottom = max(1, values.dropFirst().first ?? size.height) - 1
+      guard top < bottom else {
+        return
+      }
+      scrollRegionTop = min(max(0, size.height - 1), top)
+      scrollRegionBottom = min(max(0, size.height - 1), bottom)
+      // DECSTBM homes the cursor on a conforming terminal.
+      cursor = .zero
+    case 0x53:  // S — SU: region content moves up, blanks at region bottom
+      guard !privateMode else {
+        return
+      }
+      scrollRegion(up: max(1, values.first ?? 1))
+    case 0x54:  // T — SD: region content moves down, blanks at region top
+      guard !privateMode else {
+        return
+      }
+      scrollRegion(up: -max(1, values.first ?? 1))
     case 0x6D, 0x68, 0x6C:  // m, h, l
       return
     default:
       return
+    }
+  }
+
+  private mutating func scrollRegion(up rows: Int) {
+    let top = min(scrollRegionTop, max(0, cells.count - 1))
+    let bottom = min(scrollRegionBottom, max(0, cells.count - 1))
+    guard rows != 0, top <= bottom else {
+      return
+    }
+    let blankRow = [Character](repeating: " ", count: max(1, size.width))
+    let magnitude = min(abs(rows), bottom - top + 1)
+    if rows > 0 {
+      // SU: row r takes row r + magnitude; vacated rows at the bottom blank.
+      for row in top...bottom {
+        let source = row + magnitude
+        cells[row] = source <= bottom ? cells[source] : blankRow
+      }
+    } else {
+      // SD: row r takes row r - magnitude; vacated rows at the top blank.
+      for row in stride(from: bottom, through: top, by: -1) {
+        let source = row - magnitude
+        cells[row] = source >= top ? cells[source] : blankRow
+      }
     }
   }
 

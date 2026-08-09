@@ -20,6 +20,15 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   public var supportsHyperlinks: Bool
   public var supportsMouseReporting: Bool
   public var supportsSynchronizedOutput: Bool
+  /// Whether the terminal honors DECSTBM scroll regions with SU/SD (CSI r,
+  /// CSI S, CSI T) — the vocabulary the verified scroll-region emission
+  /// (R2.3) uses to translate a full-width band instead of repainting it.
+  ///
+  /// VT100-core, so detection defaults it **on** for any non-dumb TTY. Kept
+  /// `package` (not public API): the explicit public initializer leaves it
+  /// `false`, which keeps hand-built profiles — previews, fixtures, protocol
+  /// stubs — byte-stable unless they opt in.
+  package var supportsScrollRegions = false
 
   /// Creates a terminal capability profile explicitly.
   public init(
@@ -122,7 +131,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       colorLevel = .ansi16
     }
 
-    return Self(
+    var profile = Self(
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,
       emitsStyleEscapeSequences: colorLevel != .none,
@@ -130,6 +139,12 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       supportsMouseReporting: supportsMouseReporting(term: term),
       supportsSynchronizedOutput: supportsSynchronizedOutput(term: term)
     )
+    // DECSTBM/SU/SD are VT100-core: default on for any non-dumb TTY (this
+    // branch), independent of the rich-feature term list. The
+    // `SWIFTTUI_SCROLL_REGION=0` kill switch remains for misbehaving
+    // emulators.
+    profile.supportsScrollRegions = true
+    return profile
   }
 
   private static func supportsHyperlinks(

@@ -16,6 +16,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_RASTER_TRUST_SOUND_DAMAGE",
         "SWIFTTUI_PRESENTED_PROGRESS_GUARD",
         "SWIFTTUI_COLLECTION_PROBES",
+        "SWIFTTUI_SCROLL_REGION",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -50,6 +51,14 @@ struct FeatureGateRegistryTests {
     // F34: release builds run the oracles on sampled frames by default so the
     // reconciliation-seam bug class stays observable outside DEBUG.
     #expect(FeatureGate.soundnessProbe.defaultIsEnabled)
+  }
+
+  @Test("scroll-region emission defaults on as a kill switch")
+  func scrollRegionEmissionDefaultsOn() {
+    // R2.3: DECSTBM/SU/SD are VT100-core and every emission is
+    // verification-backed, so the gate is a kill switch
+    // (`SWIFTTUI_SCROLL_REGION=0`), not an opt-in.
+    #expect(FeatureGate.scrollRegionEmission.defaultIsEnabled)
   }
 
   @Test("configuration enums route their enrollment through the registry")

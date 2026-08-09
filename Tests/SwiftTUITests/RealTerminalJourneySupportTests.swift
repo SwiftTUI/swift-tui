@@ -23,6 +23,32 @@ struct RealTerminalJourneySupportTests {
     #expect(screen.renderedText == "\n  Hi🙂\n")
   }
 
+  @Test("ANSI visible screen models DECSTBM scroll regions with SU and SD")
+  func ansiVisibleScreenModelsScrollRegions() {
+    // Rows: A/B/C/D on a 4-row screen. Region rows 2..3 (1-based CSI 2;3r).
+    var screen = ANSIVisibleScreen(size: CellSize(width: 4, height: 4))
+    screen.feed(Array("\u{001B}[1;1HA\u{001B}[2;1HB\u{001B}[3;1HC\u{001B}[4;1HD".utf8))
+    #expect(screen.renderedText == "A\nB\nC\nD")
+
+    // SU inside the region: B/C slide up to B←C with a blank at the region
+    // bottom; A and D (outside the region) must not move.
+    screen.feed(Array("\u{001B}[2;3r\u{001B}[1S".utf8))
+    #expect(screen.renderedText == "A\nC\n\nD")
+
+    // SD scrolls the region back down: blank at the region top.
+    screen.feed(Array("\u{001B}[1T".utf8))
+    #expect(screen.renderedText == "A\n\nC\nD")
+
+    // DECSTBM homes the cursor: the next glyph lands at the origin.
+    screen.feed(Array("\u{001B}[r".utf8))
+    screen.feed(Array("X".utf8))
+    #expect(screen.renderedText == "X\n\nC\nD")
+
+    // With the region reset, SU moves the full screen.
+    screen.feed(Array("\u{001B}[1S".utf8))
+    #expect(screen.renderedText == "\nC\nD\n")
+  }
+
   @Test("visible-screen wait rejects an already-expired deadline")
   func visibleScreenWaitRejectsExpiredDeadline() async throws {
     let pty = try RealTerminalPTYPair.open(size: CellSize(width: 12, height: 3))

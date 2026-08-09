@@ -82,6 +82,13 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     }
     var capabilityProbe = TerminalHostCapabilityProbeState()
     private var presentationSession = TerminalPresentationSession()
+    /// Process-level kill switch for the verified scroll-region emission
+    /// (`SWIFTTUI_SCROLL_REGION=0`, default on). Latched once per host: the
+    /// per-present cost is a stored-Bool read, and the capability itself is
+    /// still gated per-terminal by
+    /// `capabilityProfile.supportsScrollRegions` inside the planner.
+    private let scrollRegionEmissionEnabled =
+      FeatureGate.scrollRegionEmission.initialIsEnabled()
 
     /// Suspends the live terminal input reader while the capability probes
     /// read the shared input descriptor, so the reader's dispatch source
@@ -418,9 +425,11 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       )
       // The frame's scroll-translation candidate (R2.2), resolved through the
       // same one-shot trust latch as the damage hint and at the same point —
-      // before the latch re-arms below. Nothing consumes it yet; the
-      // scroll-region planner (R2.3) reads exactly this value.
-      _ = presentationSession.presentationTranslationCandidate(
+      // before the latch re-arms below. The planner verifies it cell-for-cell
+      // against the written baseline before any scroll-region bytes exist
+      // (R2.3); the latch alone already discards it on the recovery frame
+      // after a writer drop.
+      let translationCandidate = presentationSession.presentationTranslationCandidate(
         requested: PresentingScrollTranslation.current
       )
       let plan = TerminalPresentationPlanner(
@@ -430,7 +439,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       ).plan(
         previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
-        damage: presentationSession.presentationDamage(requested: damage)
+        damage: presentationSession.presentationDamage(requested: damage),
+        translationCandidate: scrollRegionEmissionEnabled ? translationCandidate : nil
       )
       presentationSession.requestedDamageTrustsBaseline = true
 

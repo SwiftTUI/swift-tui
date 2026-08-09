@@ -24,17 +24,17 @@ struct TerminalPresentationTests {
       isTTY: true
     )
 
-    #expect(
-      profile
-        == .init(
-          glyphLevel: .unicode,
-          colorLevel: .trueColor,
-          emitsStyleEscapeSequences: true,
-          supportsHyperlinks: true,
-          supportsMouseReporting: true,
-          supportsSynchronizedOutput: true
-        )
+    var expected = TerminalCapabilityProfile(
+      glyphLevel: .unicode,
+      colorLevel: .trueColor,
+      emitsStyleEscapeSequences: true,
+      supportsHyperlinks: true,
+      supportsMouseReporting: true,
+      supportsSynchronizedOutput: true
     )
+    // DECSTBM/SU/SD are VT100-core: any non-dumb TTY detects them on.
+    expected.supportsScrollRegions = true
+    #expect(profile == expected)
   }
 
   @Test("capability detection disables styling for no-color and non-tty outputs")
@@ -55,17 +55,17 @@ struct TerminalPresentationTests {
       isTTY: false
     )
 
-    #expect(
-      noColorProfile
-        == .init(
-          glyphLevel: .unicode,
-          colorLevel: .none,
-          emitsStyleEscapeSequences: false,
-          supportsHyperlinks: true,
-          supportsMouseReporting: true,
-          supportsSynchronizedOutput: true
-        )
+    var expectedNoColor = TerminalCapabilityProfile(
+      glyphLevel: .unicode,
+      colorLevel: .none,
+      emitsStyleEscapeSequences: false,
+      supportsHyperlinks: true,
+      supportsMouseReporting: true,
+      supportsSynchronizedOutput: true
     )
+    // NO_COLOR silences styling, not the VT100-core scroll vocabulary.
+    expectedNoColor.supportsScrollRegions = true
+    #expect(noColorProfile == expectedNoColor)
     #expect(
       redirectedProfile
         == .init(
@@ -74,6 +74,40 @@ struct TerminalPresentationTests {
           emitsStyleEscapeSequences: false
         )
     )
+  }
+
+  @Test("capability detection enables scroll regions for any non-dumb tty")
+  func capabilityDetectionTracksScrollRegionSupport() {
+    let supported = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "vt100",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let dumb = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "dumb",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let redirected = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "xterm-256color",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: false
+    )
+
+    // DECSTBM/SU/SD predate every entry in the rich-feature term list —
+    // even a bare vt100 TERM gets them; only dumb/non-tty outputs do not.
+    #expect(supported.supportsScrollRegions)
+    #expect(!dumb.supportsScrollRegions)
+    #expect(!redirected.supportsScrollRegions)
+    // Hand-built profiles stay opted out unless a caller flips the package
+    // field — preview fixtures must not grow region bytes.
+    #expect(!TerminalCapabilityProfile.previewUnicode.supportsScrollRegions)
   }
 
   @Test("capability detection enables mouse reporting only for supported tty terminals")

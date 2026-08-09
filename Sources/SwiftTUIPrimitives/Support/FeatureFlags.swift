@@ -18,6 +18,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case rasterTrustSoundDamage
   case presentedProgressGuard
   case collectionProbes
+  case scrollRegionEmission
 
   package var environmentVariableName: String {
     switch self {
@@ -33,6 +34,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_PRESENTED_PROGRESS_GUARD"
     case .collectionProbes:
       "SWIFTTUI_COLLECTION_PROBES"
+    case .scrollRegionEmission:
+      "SWIFTTUI_SCROLL_REGION"
     }
   }
 
@@ -76,6 +79,14 @@ package enum FeatureGate: CaseIterable, Sendable {
       #else
         false
       #endif
+    case .scrollRegionEmission:
+      // Kill switch, not an opt-in: scroll-region emission (R2.3) is
+      // verification-backed — every emitted translation is proven
+      // cell-for-cell against the written baseline before any bytes go out —
+      // and DECSTBM/SU/SD are VT100-core, so the capability defaults on for
+      // real terminals. `SWIFTTUI_SCROLL_REGION=0` disables the emission
+      // wholesale if a terminal misbehaves.
+      true
     }
   }
 
