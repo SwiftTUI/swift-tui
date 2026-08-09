@@ -172,12 +172,17 @@ package struct CommittedScrollRouteTable: Equatable, Sendable {
   /// `current`, before surface clamping.
   ///
   /// Mirrors ``ScrollTranslationFrameLedger``'s production rules on committed
-  /// products; any other difference declines conservatively:
+  /// products, relaxed for carried nested routes (R3.2d); any other
+  /// difference declines conservatively:
   /// - the route sets are identical and free of duplicate identities,
-  /// - exactly one route's state changed, with its viewport rect unchanged,
-  /// - the moved route shares at least one content anchor with its previous
-  ///   state, and every shared anchor moved by the same purely-vertical,
-  ///   non-zero delta smaller than the viewport height.
+  /// - exactly one route is a *primary mover*: viewport rect unchanged, at
+  ///   least one shared content anchor, every shared anchor moved by the
+  ///   same purely-vertical, non-zero delta smaller than the viewport height,
+  /// - every other changed route is *carried* by the primary's shift: its
+  ///   viewport rect translated by exactly `dy` and its anchors translated
+  ///   by exactly `dy` too — a nested scrollable riding inside the moving
+  ///   band with its own offset unchanged. The R3.2b draw-walk (or R2.3's
+  ///   cell verification) remains the soundness backstop for its content.
   ///
   /// A momentum `@State`-echo frame (anchors unmoved) yields equal states and
   /// therefore no candidate. A route whose cell *content* changed at fixed
@@ -195,7 +200,7 @@ package struct CommittedScrollRouteTable: Equatable, Sendable {
       return nil
     }
 
-    var moved: (identity: Identity, previous: RouteState, current: RouteState)?
+    var changed: [(identity: Identity, previous: RouteState, current: RouteState)] = []
     for (identity, currentState) in current.routes {
       guard let previousState = previous.routes[identity] else {
         // Same count with a missing key: the route set changed structurally.
@@ -204,22 +209,61 @@ package struct CommittedScrollRouteTable: Equatable, Sendable {
       guard previousState != currentState else {
         continue
       }
-      guard moved == nil else {
-        // Two routes moved in one frame — no single-band translation.
-        return nil
-      }
-      moved = (identity, previousState, currentState)
+      changed.append((identity, previousState, currentState))
     }
-
-    guard let moved,
-      moved.previous.viewportRect == moved.current.viewportRect
-    else {
+    guard !changed.isEmpty else {
       return nil
     }
 
+    var primary: (identity: Identity, band: CellRect, dy: Int)?
+    var secondaries: [(previous: RouteState, current: RouteState)] = []
+    for (identity, previousState, currentState) in changed {
+      if previousState.viewportRect == currentState.viewportRect,
+        let delta = Self.uniformAnchorDelta(from: previousState, to: currentState),
+        delta.x == 0,
+        delta.y != 0,
+        abs(delta.y) < currentState.viewportRect.size.height
+      {
+        guard primary == nil else {
+          // Two independent movers in one frame — no single-band translation.
+          return nil
+        }
+        primary = (identity, currentState.viewportRect, delta.y)
+      } else {
+        secondaries.append((previousState, currentState))
+      }
+    }
+    guard let primary else {
+      return nil
+    }
+    for secondary in secondaries {
+      guard
+        secondary.current.viewportRect
+          == secondary.previous.viewportRect.offsetBy(dy: primary.dy),
+        let delta = Self.uniformAnchorDelta(from: secondary.previous, to: secondary.current),
+        delta.x == 0,
+        delta.y == primary.dy
+      else {
+        return nil
+      }
+    }
+
+    return CommittedScrollTranslation(
+      routeIdentity: primary.identity,
+      band: primary.band,
+      dy: primary.dy
+    )
+  }
+
+  /// The single delta every shared content anchor moved by, or `nil` when no
+  /// anchor is shared or the anchors disagree (not a rigid translation).
+  private static func uniformAnchorDelta(
+    from previous: RouteState,
+    to current: RouteState
+  ) -> CellPoint? {
     var delta: CellPoint?
-    for (key, currentPoint) in moved.current.contentAnchors {
-      guard let previousPoint = moved.previous.contentAnchors[key] else {
+    for (key, currentPoint) in current.contentAnchors {
+      guard let previousPoint = previous.contentAnchors[key] else {
         continue
       }
       let anchorDelta = CellPoint(
@@ -228,26 +272,13 @@ package struct CommittedScrollRouteTable: Equatable, Sendable {
       )
       if let delta {
         guard delta == anchorDelta else {
-          // Anchors disagree about the shift: not a rigid translation.
           return nil
         }
       } else {
         delta = anchorDelta
       }
     }
-    guard let delta,
-      delta.x == 0,
-      delta.y != 0,
-      abs(delta.y) < moved.current.viewportRect.size.height
-    else {
-      return nil
-    }
-
-    return CommittedScrollTranslation(
-      routeIdentity: moved.identity,
-      band: moved.current.viewportRect,
-      dy: delta.y
-    )
+    return delta
   }
 
   /// The keyed content anchors of one scroll-route node.

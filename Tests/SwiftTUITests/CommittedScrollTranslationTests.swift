@@ -344,6 +344,105 @@ struct CommittedScrollTranslationTests {
     #expect(Self.tsvField("translation_committed", of: record) == "agree")
   }
 
+  // MARK: - Nested-secondary tolerance (R3.2d)
+
+  /// An outer vertical route whose content carries a nested horizontal
+  /// route: scrolling the outer by `outerOffset` translates the inner
+  /// route's viewport and content wholesale; the inner's own offset is
+  /// `innerOffset`.
+  private static func nestedRouteTree(
+    outerOffset: Int,
+    innerOffset: Int
+  ) -> PlacedNode {
+    let innerViewport = CellRect(
+      origin: CellPoint(x: 2, y: 8 - outerOffset),
+      size: CellSize(width: 40, height: 3)
+    )
+    let innerContent = PlacedNode(
+      identity: testIdentity("Fixture", "Inner", "Content"),
+      bounds: CellRect(
+        origin: CellPoint(x: innerViewport.origin.x - innerOffset, y: innerViewport.origin.y),
+        size: CellSize(width: 120, height: 3)
+      )
+    )
+    let inner = PlacedNode(
+      identity: testIdentity("Fixture", "Inner"),
+      bounds: innerViewport,
+      children: [innerContent],
+      semanticMetadata: SemanticMetadata(scrollRole: .scrollView)
+    )
+    let content = PlacedNode(
+      identity: Self.contentA,
+      bounds: CellRect(
+        origin: CellPoint(x: 2, y: 3 - outerOffset),
+        size: CellSize(width: 40, height: 40)
+      ),
+      children: [inner]
+    )
+    let route = PlacedNode(
+      identity: Self.routeA,
+      bounds: Self.viewport,
+      children: [content],
+      semanticMetadata: SemanticMetadata(scrollRole: .scrollView)
+    )
+    return PlacedNode(
+      identity: testIdentity("Fixture", "Root"),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 80, height: 24)),
+      children: [route]
+    )
+  }
+
+  @Test("a carried nested route no longer vetoes the outer candidate")
+  func carriedNestedRouteToleratedByCandidate() {
+    let candidate = CommittedScrollRouteTable.candidate(
+      advancing: Self.table(Self.nestedRouteTree(outerOffset: 4, innerOffset: 6)),
+      to: Self.table(Self.nestedRouteTree(outerOffset: 5, innerOffset: 6))
+    )
+    #expect(
+      candidate
+        == CommittedScrollTranslation(
+          routeIdentity: Self.routeA,
+          band: Self.viewport,
+          dy: -1
+        )
+    )
+  }
+
+  @Test("a nested route that scrolled its own axis still vetoes")
+  func nestedRouteWithOwnScrollStillVetoes() {
+    // The inner offset changed in the same frame the outer moved: the inner
+    // content no longer translates rigidly with the band.
+    #expect(
+      CommittedScrollRouteTable.candidate(
+        advancing: Self.table(Self.nestedRouteTree(outerOffset: 4, innerOffset: 6)),
+        to: Self.table(Self.nestedRouteTree(outerOffset: 5, innerOffset: 9))
+      ) == nil
+    )
+  }
+
+  @Test("a nested notch over a document commits the outer candidate the ledger cannot")
+  func nestedDocumentNotchCommitsOuterCandidate() throws {
+    let harness = try CommittedTranslationHarness(
+      fixture: .nestedHorizontalDocument,
+      terminalSize: CellSize(width: 30, height: 14)
+    )
+    harness.scroll(deltaY: 1)
+    try harness.render()
+    let notchFrame = try #require(harness.sink.committedSamples.last)
+
+    let committed = try #require(
+      notchFrame.committedTranslation,
+      "the carried nested route must not veto the committed candidate"
+    )
+    #expect(committed.dy == -1)
+    // The present-time ledger still declines (the nested viewport rect
+    // changed), so this shape is exactly the committed_only class the
+    // relaxation exists for.
+    #expect(notchFrame.translationCandidate == nil)
+    let record = FrameRecordDerivation.record(from: .committed(notchFrame))
+    #expect(Self.tsvField("translation_committed", of: record)?.hasPrefix("committed_only") == true)
+  }
+
   @Test("a List wheel notch serves the band when the blit gate is armed")
   func listNotchBlitEngagement() throws {
     // A band tall enough that interior rows survive the exposure/edge
@@ -395,6 +494,7 @@ private final class CommittedTranslationHarness {
   enum Fixture {
     case plainScrollView
     case list
+    case nestedHorizontalDocument
   }
 
   let sink = RecordingCommittedTranslationSink()
@@ -446,6 +546,27 @@ private final class CommittedTranslationHarness {
             .frame(
               width: terminalSize.width - 4,
               height: terminalSize.height - 1,
+              alignment: .topLeading
+            )
+          )
+        case .nestedHorizontalDocument:
+          AnyView(
+            ScrollView {
+              VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<4) { index in
+                  Text("para \(index)")
+                }
+                ScrollView(.horizontal) {
+                  Text("wide code block line that overflows the viewport")
+                }
+                ForEach(4..<40) { index in
+                  Text("para \(index)")
+                }
+              }
+            }
+            .frame(
+              width: terminalSize.width - 4,
+              height: terminalSize.height - 2,
               alignment: .topLeading
             )
           )
