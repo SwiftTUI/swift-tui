@@ -136,7 +136,7 @@ struct PerfScrollDocumentView: View {
   }
 
   @ViewBuilder
-  private func block(_ index: Int) -> some View {
+  func block(_ index: Int) -> some View {
     // A deterministic marker on every block's first row, so the driver can
     // settle on a block having become visible without depending on wrapping.
     let marker = "sblk \(index)"

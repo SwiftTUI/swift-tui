@@ -111,4 +111,15 @@ indirect enum MeasurementWorkItem {
     reusedProbeMeasurement: MeasuredNode?,
     scheduledChildCount: Int
   )
+  /// Hintless ideal-round estimate for indexed lazy stacks (scroll-latency
+  /// R4-C): the element-0 probe's finish assembles the stride x count
+  /// estimate product instead of scheduling the exhaustive arm.
+  case finishLazyStackIdealEstimate(
+    ResolvedNode,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    axis: Axis,
+    spacing: Int,
+    count: Int
+  )
 }

@@ -341,6 +341,26 @@ extension LayoutEngine {
             windowMeasurements: windowMeasurements
           )
         )
+      case .finishLazyStackIdealEstimate(
+        let node,
+        let originalProposal,
+        let effectiveProposal,
+        let axis,
+        let spacing,
+        let count
+      ):
+        let probeMeasurement = popMeasurement(from: &results)
+        results.append(
+          finishLazyStackIdealEstimate(
+            node,
+            originalProposal: originalProposal,
+            effectiveProposal: effectiveProposal,
+            axis: axis,
+            spacing: spacing,
+            count: count,
+            probeMeasurement: probeMeasurement
+          )
+        )
       }
     }
 
@@ -450,6 +470,20 @@ extension LayoutEngine {
           effectiveProposal: effectiveProposal,
           passContext: passContext,
           work: &work
+        )
+      {
+        return
+      }
+      // Hintless ideal round of an indexed lazy stack (R4-C): serve the
+      // offering estimate instead of realizing every element.
+      if case .lazyStack = node.layoutBehavior,
+        scheduleLazyStackIdealEstimate(
+          for: node,
+          originalProposal: proposal,
+          effectiveProposal: effectiveProposal,
+          passContext: passContext,
+          work: &work,
+          results: &results
         )
       {
         return

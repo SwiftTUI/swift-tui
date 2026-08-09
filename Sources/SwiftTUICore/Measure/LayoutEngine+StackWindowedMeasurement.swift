@@ -21,6 +21,14 @@
 // caught by the async frame-tail suite). The probe, the band, and the
 // product assembly are three work-stack phases instead.
 
+/// Process-latched R4-C ideal-estimate gate (`SWIFTTUI_LAZY_IDEAL_ESTIMATE`,
+/// kill switch, default on). A bare enum with a `static let`: measurement
+/// runs on the frame-tail worker as well as the main actor, and the lazy
+/// static initialization is the thread-safe latch.
+enum LazyStackIdealEstimateGate {
+  static let isEnabled = FeatureGate.lazyStackIdealEstimate.initialIsEnabled()
+}
+
 /// Everything the deferred windowed-lazy-stack phases need to run at the
 /// work-stack top level. One context type serves both the probe finish (which
 /// derives the window) and the band finish (which assembles the product).
@@ -403,6 +411,180 @@ extension LayoutEngine {
         selectedChildIndex: nil,
         lazyStack: snapshot
       )
+    )
+  }
+
+  /// Hintless ideal-round estimate for indexed lazy stacks (scroll-latency
+  /// R4-C, app-tier finding 1 of report 2026-08-01-001).
+  ///
+  /// An enclosing stack's ideal round proposes an UNSPECIFIED main dimension.
+  /// A scroll layout maps an unspecified scrolling axis to "no measure
+  /// viewport", so no hint exists and the exhaustive arm realized and
+  /// ideal-measured every element — every frame, because per-notch
+  /// invalidation of offset-reading descendants denies the retained product.
+  /// The chrome `VStack { header; ScrollView { LazyVStack } }` shape held
+  /// seconds of real-app notch latency behind exactly this round.
+  ///
+  /// The ideal result is an *offering* estimate for the enclosing allocator
+  /// (the flexible scroll pane absorbs leftover in surplus and compresses
+  /// proportionally in deficit); the product that PLACES comes from the
+  /// subsequent finite-round measure, which windows under the scroll hint.
+  /// So the ideal is served as an estimate:
+  /// - **Retained arm** (steady state, zero realizations): the previous
+  ///   frame's allocation snapshot — content length is the sum of
+  ///   exact-as-of-last-frame element lengths — valid while the source
+  ///   signature and count still match.
+  /// - **Cold arm** (first frame, `count >= lazyStackIdealEstimateMinimumCount`
+  ///   only): a single element-0 probe, content = count x extent +
+  ///   (count-1) x spacing. Below the threshold the exhaustive round stays:
+  ///   its cost is negligible there, and small heterogeneous collections
+  ///   granted their unbounded ideal (`.fixedSize()`, nested unbounded
+  ///   containers) keep exact cold sizing.
+  ///
+  /// Estimate products carry no child measurements and no allocation
+  /// snapshot, and are never stored in the cross-frame measurement cache.
+  /// Ineligible: any in-scope measure-viewport hint (a claimed hint means
+  /// this measure is part of a windowed band — exhaustive semantics stay),
+  /// spliced elements, negotiated (`nil`) spacing.
+  ///
+  /// Returns `true` when the estimate was served or scheduled; `false` falls
+  /// through to the exhaustive arm.
+  func scheduleLazyStackIdealEstimate(
+    for node: ResolvedNode,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    passContext: LayoutPassContext?,
+    work: inout [MeasurementWorkItem],
+    results: inout [MeasuredNode]
+  ) -> Bool {
+    guard LazyStackIdealEstimateGate.isEnabled,
+      case .lazyStack(let axis, .some(let spacing), _, _) = node.layoutBehavior,
+      let source = node.indexedChildSource,
+      case .unspecified = mainDimension(of: effectiveProposal, for: axis)
+    else {
+      return false
+    }
+    // Hintless — or vacuous: a scroll layout measured at an unspecified
+    // scrolling axis still pushes a hint whose viewport length on that axis
+    // is 0 ("unknown — do not window"). Such a hint carries no window for
+    // this axis, so the stack was headed for the exhaustive arm regardless
+    // of who claimed it; the estimate serves instead. A hint with a real
+    // length stays with the windowed path's claim semantics (a claimed
+    // in-scope hint means this measure is part of a windowed band).
+    if let hint = passContext?.currentMeasureViewportHint,
+      mainDimension(of: hint.viewportSize, for: axis) > 0
+    {
+      return false
+    }
+    let count = source.count
+    guard count > 0 else {
+      return false
+    }
+
+    if let passContext,
+      let snapshot = retainedLazyStackSnapshot(for: node, axis: axis, passContext: passContext)
+    {
+      results.append(
+        lazyStackIdealEstimateProduct(
+          for: node,
+          originalProposal: originalProposal,
+          effectiveProposal: effectiveProposal,
+          axis: axis,
+          contentMainLength: snapshot.contentMainLength,
+          crossLength: max(0, snapshot.crossLeading + snapshot.crossTrailing)
+        )
+      )
+      return true
+    }
+
+    guard count >= Self.lazyStackIdealEstimateMinimumCount else {
+      return false
+    }
+    let probeElements = source.childElements(at: 0)
+    guard probeElements.count == 1 else {
+      return false
+    }
+    work.append(
+      .finishLazyStackIdealEstimate(
+        node,
+        originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal,
+        axis: axis,
+        spacing: spacing,
+        count: count
+      )
+    )
+    work.append(
+      .measure(
+        probeElements[0],
+        stackProposal(
+          axis: axis,
+          main: .unspecified,
+          cross: crossDimension(of: effectiveProposal, for: axis)
+        )
+      )
+    )
+    return true
+  }
+
+  /// Cold-arm threshold: below this element count the exhaustive ideal round
+  /// stays (negligible cost, exact unbounded-ideal sizing for small
+  /// collections); at or above it the element-0 stride estimate serves.
+  static let lazyStackIdealEstimateMinimumCount = 64
+
+  /// The cold arm's finish: assemble the stride x count estimate from the
+  /// element-0 probe measurement.
+  func finishLazyStackIdealEstimate(
+    _ node: ResolvedNode,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    axis: Axis,
+    spacing: Int,
+    count: Int,
+    probeMeasurement: MeasuredNode
+  ) -> MeasuredNode {
+    let extent = max(1, mainDimension(of: probeMeasurement.measuredSize, for: axis))
+    let contentMainLength = count * extent + max(0, count - 1) * spacing
+    return lazyStackIdealEstimateProduct(
+      for: node,
+      originalProposal: originalProposal,
+      effectiveProposal: effectiveProposal,
+      axis: axis,
+      contentMainLength: contentMainLength,
+      crossLength: crossDimension(of: probeMeasurement.measuredSize, for: axis)
+    )
+  }
+
+  /// The estimate product: size only — no child measurements (the indexed
+  /// lazy-stack maximums walk answers from the measured ideal directly), no
+  /// allocation snapshot (this product never places; the finite round's
+  /// windowed product carries the placing snapshot), no cross-frame cache
+  /// store (an estimate must never be served as an exact measurement).
+  private func lazyStackIdealEstimateProduct(
+    for node: ResolvedNode,
+    originalProposal: ProposedSize,
+    effectiveProposal: ProposedSize,
+    axis: Axis,
+    contentMainLength: Int,
+    crossLength: Int
+  ) -> MeasuredNode {
+    let rawSize: CellSize =
+      switch axis {
+      case .vertical:
+        CellSize(width: crossLength, height: contentMainLength)
+      case .horizontal:
+        CellSize(width: contentMainLength, height: crossLength)
+      }
+    return MeasuredNode(
+      viewNodeID: node.viewNodeID,
+      identity: node.identity,
+      proposal: originalProposal,
+      measuredSize: clampedSize(
+        rawSize,
+        proposal: clampingProposal(for: node, effectiveProposal: effectiveProposal)
+      ),
+      childMeasurements: [],
+      containerAllocationSnapshot: nil
     )
   }
 

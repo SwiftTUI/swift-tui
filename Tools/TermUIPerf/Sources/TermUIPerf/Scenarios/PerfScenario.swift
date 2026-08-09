@@ -181,6 +181,7 @@ public enum PerfScenarioRegistry {
       ScrollFlingMomentumScenario(),
       ScrollJumpScenario(),
       ScrollDocumentMixedScenario(),
+      ScrollDocumentChromeScenario(),
     ] + additionalScenarios
   }
 

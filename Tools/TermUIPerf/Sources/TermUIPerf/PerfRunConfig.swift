@@ -113,6 +113,7 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case scrollFlingMomentum = "scroll-fling-momentum"
   case scrollJump = "scroll-jump"
   case scrollDocumentMixed = "scroll-document-mixed"
+  case scrollDocumentChrome = "scroll-document-chrome"
 
   public static var allNames: [String] {
     allCases.map(\.rawValue).sorted()

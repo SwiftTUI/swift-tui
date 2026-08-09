@@ -19,6 +19,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case presentedProgressGuard
   case collectionProbes
   case collectionResolveReuse
+  case lazyStackIdealEstimate
   case scrollRegionEmission
   case scrollBlit
 
@@ -38,6 +39,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_COLLECTION_PROBES"
     case .collectionResolveReuse:
       "SWIFTTUI_COLLECTION_RESOLVE_REUSE"
+    case .lazyStackIdealEstimate:
+      "SWIFTTUI_LAZY_IDEAL_ESTIMATE"
     case .scrollRegionEmission:
       "SWIFTTUI_SCROLL_REGION"
     case .scrollBlit:
@@ -94,6 +97,20 @@ package enum FeatureGate: CaseIterable, Sendable {
       // lifetime + selection-compat key), so a stale entry can only miss,
       // never corrupt. `SWIFTTUI_COLLECTION_RESOLVE_REUSE=0` restores the
       // element-wise O(N)-per-resolve paths wholesale (and is the A/B lever).
+      true
+    case .lazyStackIdealEstimate:
+      // Kill switch, not an opt-in (scroll-latency R4-C): an enclosing stack's
+      // ideal round proposes an unspecified main dimension, which a scroll
+      // layout maps to "no measure viewport" — so before this gate the ideal
+      // round of an indexed lazy stack realized and measured EVERY element,
+      // every frame, defeating scroll windowing behind any chrome stack (the
+      // 2026-08-01 app-tier finding 1: 300/300 realized where the windowed
+      // round realizes <=60). The estimate serves the ideal from the retained
+      // allocation snapshot (exact-as-of-last-frame lengths) or, cold and
+      // above a count threshold, from an element-0 probe (stride x count) —
+      // the same estimate currency windowed measurement already synthesizes
+      // out-of-window entries from. `SWIFTTUI_LAZY_IDEAL_ESTIMATE=0` restores
+      // the exhaustive ideal round wholesale (and is the A/B lever).
       true
     case .scrollRegionEmission:
       // Kill switch, not an opt-in: scroll-region emission (R2.3) is
