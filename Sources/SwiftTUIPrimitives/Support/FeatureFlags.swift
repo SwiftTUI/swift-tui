@@ -91,11 +91,15 @@ package enum FeatureGate: CaseIterable, Sendable {
       // wholesale if a terminal misbehaves.
       true
     case .scrollBlit:
-      // Scroll-latency R3.2b: the raster-tier translation blit. Serving is
-      // prove-before-serve (draw-walk verified, F13-oracled), so like the
-      // scroll-region emission this is a kill switch once certified; it
-      // starts default-off until the A/B and oracle lanes land the evidence.
-      false
+      // Kill switch, not an opt-in (scroll-latency R3.2b): the translation
+      // blit is prove-before-serve — every served row is draw-walk verified,
+      // flank-verified, and constructed as a row-buffer identity the planner
+      // re-proves — and the F13 oracle sits on top unchanged. Certified by
+      // the R3.2 A/B (notch raster_ms 1.50 -> 0.45, pipeline p50 -1.1 ms,
+      // zero oracle repairs across every armed lane and a 1000-frame
+      // full-verify release probe). `SWIFTTUI_SCROLL_BLIT=0` disables the
+      // blit (and with it the planner's identity fast path) wholesale.
+      true
     }
   }
 
