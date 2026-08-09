@@ -137,7 +137,19 @@ extension RunLoop {
         // Clamped to no movement (content edge) or the registration is gone
         // (tab switch / content removal): this route is finished.
         scrollMomentum.cancel(tick.identity)
+        continue
       }
+      // Scheduling backstop for untracked positions (scroll-latency R4-D).
+      // The registry write lands through the authored binding; a plain
+      // `Binding(get:set:)` over external storage writes no state slot and
+      // schedules nothing — on the wheel path the dispatch-side invalidation
+      // (R1.6) is that binding's only frame scheduler, and momentum ticks
+      // have no dispatch. Without this request the physics advance while the
+      // presented pixels freeze at the release frame. Route identity only,
+      // mirroring the wheel path; for tracked (`@State`) bindings it
+      // coalesces with the write's own invalidation of the same identity
+      // into the same pending set, adding no frame.
+      scheduler.requestInvalidation(of: [tick.identity])
     }
     rearmScrollMomentumDeadline(from: now)
   }
