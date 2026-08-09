@@ -374,7 +374,7 @@ loaded runner exercises it.
 
 ---
 
-### 10. `HostWireConformanceTests` — S3b detached-backlog discarded-chunk ORDER is scheduling-dependent
+### 10. `HostWireConformanceTests` — S3b detached-backlog observation interval closes before its tasks run — FIXED 2026-08-09
 
 **Signature.** `Run SwiftTUIAndroidHost tests` fails with exactly one issue:
 
@@ -385,18 +385,88 @@ conformance-websocket-detached-backlog.jsonl:step 15: exact observation mismatch
   expected: "HmNhcHM6eyJhY2NlcHRzRGVsdGE="
 ```
 
-Note what the two values are: the "actual" at index `[0]` is the value the
-corpus expects at index `[2]`. This is a **reordering**, not corrupted
-content — every chunk is present, in the wrong order.
+A second signature belongs to the same defect — same test, same step, a
+different axis reached first (the comparator walks an unordered dictionary, so
+which axis reports is itself arbitrary):
 
-**Mechanism.** `WebHostSceneChannel.discardedInboundChunks` is a plain array
-appended to from two different points: ingress (`receive`, reason
-`stale-at-ingress`) and consumption (reason `stale-at-consumption`). The
-corpus pins one exact interleaving of those two producers. When the
-consumption-side append lands after the ingress-side ones, the array order
-changes. This order is a scheduling outcome, not a semantic outcome. The
-exact-observation comparison then fails. The expectation is order-fragile by
-construction. Nothing about the *bytes* is wrong.
+```
+  at .acceptedClientInputs[0]     actual: <absent>   expected: "key:character:N:0\n"
+  at .deliveredRecords[1]         actual: <absent>   expected: {baselineGen,epoch,gen,kind,raw}
+```
+
+**Original mechanism note — wrong, kept for the record.** This entry read the
+first signature as a *reordering* of `discardedInboundChunks`, on the grounds
+that `actual[0]` is the value the corpus expects at `[2]`. It is not. Those two
+chunks are byte-identical (`\x1ecaps:{"acceptsDeltaFrames":true}\n`), and the
+value actually appearing at `[0]` is a **third** occurrence of those bytes: the
+runner's own bootstrap capability declaration from `init`, leaking out of setup
+into the fixture's observation interval. Nothing was ever reordered.
+
+**Mechanism (corrected 2026-08-09, FIXED).** Not a channel defect at all — a
+harness one, and none of it is in `WebHostSceneChannel.discardedInboundChunks`.
+The adapter's observation interval could close before a task it depended on had
+been scheduled even once, so that task's events landed in the *next* interval or
+nowhere. Four hops were at risk; every one was guarded by a *turn* budget, or by
+nothing:
+
+| hop | old guard | failure |
+| --- | --- | --- |
+| client yield → channel `receive` | `deliverToChannel`, 8192 turns — but two yields skipped it entirely (`init` bootstrap, `enqueueCapsForCurrentClient`) | bootstrap caps leak → `discardedInboundChunks[0]` |
+| channel `yieldInbound` → gate pump | `take()`, 8192 turns | drain no-ops; whole bootstrap leaks (observed `pumped=0`) |
+| reader → `InputEvent` stream → recorder task | none; `settle()`'s "activity stable for 2 turns" | `acceptedClientInputs[0]: <absent>` |
+| channel output yield → delivery task | none; same `settle()` guess | `deliveredRecords[1]: <absent>` |
+
+The root error is treating a turn budget as a bound. `Task.yield()` re-enqueues
+the current task **without releasing its thread**, so on an oversubscribed
+cooperative pool 8192 turns expire in milliseconds while the awaited task never
+runs. Instrumentation caught exactly that: `yielded=2 pumped=0` — the channel
+had yielded both bootstrap events and the gate's pump task had not executed
+once.
+
+**Resolution.** No wait in these adapters polls anything any more — each one
+suspends on a signal the producer fires, per
+[test synchronisation policy](#why-the-gate-is-otherwise-deterministic):
+
+- **Hop 1** — `WebHostSceneChannel.waitForProcessedInboundCallbacks(atLeast:)`,
+  an actor-hosted continuation resumed by `receive` itself, replaces the polled
+  `processedInboundCallbackCount()`. `shutdown()` resumes stranded waiters.
+  Every client-side yield now goes through `deliverToChannel`, so at most one
+  client message is in flight and the drain's target is settled.
+- **Hop 2** — the gate's `enqueue` fires a `ConditionSignal`; `take()` awaits
+  "an event is queued, or the pump has reached the channel's yield count".
+- **Hop 3** — no wait at all: the reader's `InputEvent` sink is created *and
+  finished* inside a single drain, so iterating it yields exactly the buffered
+  events and terminates. Complete by construction.
+- **Hop 4** — `WebHostSceneChannel` gained `yieldedOutputRecordCount()`, the
+  output-direction twin of `yieldedInboundEventCount()`; the adapter's delivery
+  recorder fires a `ConditionSignal` and `settle()` awaits that count.
+
+A first attempt bounded each wait in *time* (spin, then 1 ms sleeps) instead.
+That worked — 0 / 80 and 0 / 48 — but `Scripts/check_test_sync_policies.sh`
+correctly rejected it: a sleep-poll is still a clock, just a slower one. The
+signal form has no bound at all, which is the point. A wedged producer now hangs
+the step and is reported as a wedge, rather than being silently misread as
+"nothing was produced".
+
+**Verified 2026-08-09** in the arm64 Linux container (18 cores), against the
+prebuilt test binary so no rebuild perturbs the load:
+
+| tree | condition | rate |
+| --- | --- | --- |
+| before | sequential, 8 hogs | 1 / 12 fail |
+| after hop 1 fixed only | sequential, 12 hogs | 3 / 40 fail |
+| after hops 1–3 fixed | sequential, 12 hogs | 3–6 / 60 fail |
+| **after (all four hops, signal-driven)** | **sequential, 12 hogs** | **0 / 60** |
+| **after (all four hops, signal-driven)** | **interleaved, 12 hogs, 6 concurrent × 8 rounds** | **0 / 48** |
+
+Each run carried a 300 s `timeout` so an unbounded waiter that wedged would be
+counted as a failure rather than silently inflating the wall clock. None fired.
+
+The interleaved condition is the one the 2026-07-31 table below measured at
+40 / 40 fail. Each partial fix only moved the failure to the next unguarded
+hop, which is why the intermediate rows matter: the axis that reports is
+arbitrary, so a lower rate on one axis is not progress unless every hop is
+closed.
 
 **Load-sensitive, and pre-existing.** Measured 2026-07-31 in the arm64 Linux
 container, `--filter HostWireConformanceTests`:
@@ -413,21 +483,15 @@ noise across two differently-loaded sessions, not a signal. A full head-mode
 container gate on an otherwise idle machine passes this lane, which is why the
 entry had gone unrecorded.
 
-**How to identify this flake.** The mismatch path is
-`.discardedInboundChunks[N]` and every expected byte string appears somewhere
-in the actual array. If a chunk's *content* differs, or a chunk is missing
-entirely, it is not this entry. Run the filter against a
-pre-change tree under the same load — the rates above were obtained exactly
-that way.
-
-**How to investigate / candidate hardening.** Make the expectation
-order-insensitive for entries that cannot be causally ordered. Compare
-`discardedInboundChunks` as a multiset keyed by `(token, bytes, reason)`. As an
-alternative, give the runner a deterministic drain point. Then consumption-side
-discards always append before the next ingress batch. The first is a fixture change
-and cheap. The second is the real fix and belongs with whoever owns the
-delivery-coupled wire epochs work. Do not "fix" it by re-recording the corpus
-against one lucky interleaving — that pins the flake instead of removing it.
+**If this fires again.** Treat it as a real regression, not this entry. The
+corpus was deliberately *not* weakened: making the expectation order-insensitive
+(a multiset keyed by `(token, bytes, reason)`) was rejected, because on the
+corrected mechanism it would have hidden the defect rather than removed it — the
+bytes were never out of order, an interval boundary was in the wrong place. Do
+not re-record the corpus against one lucky interleaving either. The lesson
+generalizes past this suite: **a turn budget is not a bound**. Any wait spelled
+`for _ in 0..<N { await Task.yield() }` is a busy-wait with a random timeout;
+wait on a condition, bounded by time.
 
 ### 11. `FrameworkStressGestureScrollTests` — stress gesture scroll 024 nested-control pan overshoots on Linux CI (resolved 2026-08-01)
 

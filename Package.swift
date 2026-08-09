@@ -604,6 +604,7 @@ let package = Package(
         "SwiftTUIRuntime",
         "SwiftTUIWASISurfaceBridge",
         "SwiftTUIWebHost",
+        "SwiftTUITestSupport",
       ],
       path: "Platforms/Android/Tests/SwiftTUIAndroidHostTests",
       swiftSettings: swiftSettings()

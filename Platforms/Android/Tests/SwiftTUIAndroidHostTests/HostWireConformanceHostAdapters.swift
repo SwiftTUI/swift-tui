@@ -1,5 +1,6 @@
 import Foundation
 @_spi(Runners) import SwiftTUIRuntime
+@_spi(Testing) import SwiftTUITestSupport
 import SwiftTUIWASISurfaceBridge
 import Synchronization
 import Testing
@@ -270,11 +271,17 @@ struct HostWireConformanceWebSocketChannelRunner {
   private let state: State
   private var clients: [Int: AsyncStream<WebHostSocketMessage>.Continuation] = [:]
   private var outputTasks: [Task<Void, Never>] = []
-  private var inputContinuation: AsyncStream<InputEvent>.Continuation?
-  private var inputTask: Task<Void, Never>?
   private var pendingCapsSends: Int?
 
-  private init() async {
+  /// The capability declaration every client in this harness opens with.
+  ///
+  /// Byte-identical to the fixture's own caps chunk, which is exactly why the
+  /// bootstrap send below must not be allowed to leak past `init`: a stray
+  /// bootstrap event is indistinguishable, by content, from a fixture one.
+  private static let capsRecordBytes = Array(
+    "\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)
+
+  private init() async throws {
     let channel = WebHostSceneChannel()
     let state = State()
     let transport = WebSocketSurfaceTransport(
@@ -312,19 +319,11 @@ struct HostWireConformanceWebSocketChannelRunner {
         transport.requestResync(request)
       }
     }
-    var continuation: AsyncStream<InputEvent>.Continuation?
-    let events = AsyncStream<InputEvent> { continuation = $0 }
-    inputContinuation = continuation
-    inputTask = Task { [state] in
-      for await event in events {
-        state.recordAcceptedInput(event)
-      }
-    }
     // The runner starts active on token 1 with its initial capability
     // declaration already processed, an empty backlog, and empty observation
     // logs — the fixture's first `closeClient` therefore names a live token 1.
     await attach(token: 1)
-    clients[1]?.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+    try await sendToCurrentClient(Self.capsRecordBytes, context: "runner bootstrap")
     await drainReader()
     _ = await channel.consumeObservations()
     state.reset()
@@ -340,7 +339,7 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard let fixture = corpus.fixtures[entry.file] else {
         throw HostWireConformanceError.invalid("\(entry.file): missing parsed fixture")
       }
-      var runner = await Self()
+      var runner = try await Self()
       defer { runner.stop() }
       _ = try await runner.interpret(fixture, comparesExpectations: true)
       executed.append(entry.scenario)
@@ -351,14 +350,12 @@ struct HostWireConformanceWebSocketChannelRunner {
   static func observeInactiveFixture(
     _ fixture: HostWireConformanceFixture
   ) async throws -> [HostWireConformanceJSON] {
-    var runner = await Self()
+    var runner = try await Self()
     defer { runner.stop() }
     return try await runner.interpret(fixture, comparesExpectations: false)
   }
 
   private mutating func stop() {
-    inputTask?.cancel()
-    inputContinuation?.finish()
     gate.stop()
     for task in outputTasks { task.cancel() }
     for continuation in clients.values { continuation.finish() }
@@ -387,7 +384,7 @@ struct HostWireConformanceWebSocketChannelRunner {
           let next = remaining - 1
           pendingCapsSends = next == 0 ? nil : next
           if next == 0 {
-            try enqueueCapsForCurrentClient(context: context)
+            try await sendToCurrentClient(Self.capsRecordBytes, context: context)
           }
         }
       case .reconnect(let capsAfter):
@@ -398,7 +395,7 @@ struct HostWireConformanceWebSocketChannelRunner {
         await attach(token: token)
         pendingCapsSends = capsAfter == 0 ? nil : capsAfter
         if capsAfter == 0 {
-          try enqueueCapsForCurrentClient(context: context)
+          try await sendToCurrentClient(Self.capsRecordBytes, context: context)
         }
       case .expect(let expected):
         await settle()
@@ -437,7 +434,7 @@ struct HostWireConformanceWebSocketChannelRunner {
       }
       // Routed through the real receive path: only the channel decides whether
       // this close detaches or is an ignored stale callback.
-      try await deliverToChannel { client.yield(.normalClose) }
+      await deliverToChannel { client.yield(.normalClose) }
     case "clientChunk":
       let token = try requiredInteger(object, "token", context: context)
       guard let client = clients[token], let encoded = object["bytesBase64"] else {
@@ -447,7 +444,7 @@ struct HostWireConformanceWebSocketChannelRunner {
       guard let bytes = Data(base64Encoded: base64).map(Array.init) else {
         throw HostWireConformanceError.invalid("\(context): malformed bytesBase64")
       }
-      try await deliverToChannel { client.yield(.data(bytes)) }
+      await deliverToChannel { client.yield(.data(bytes)) }
     case "drainInput":
       await drainReader()
     default:
@@ -457,23 +454,18 @@ struct HostWireConformanceWebSocketChannelRunner {
 
   /// Performs a client-side yield and returns once the channel has handled it.
   ///
-  /// Condition-based, not yield-count-based: the message crosses a real receive
-  /// task, and a fixed turn budget makes the fixture pass or fail on machine
-  /// load rather than on behavior.
+  /// Signal-based, not turn-based: the message crosses a real receive task, and
+  /// a turn budget makes the fixture pass or fail on machine load rather than on
+  /// behavior. Because every client yield in this runner waits here, at most one
+  /// client message is ever in flight — which is what lets `drainReader` know it
+  /// has seen everything the fixture produced.
   private func deliverToChannel(
     _ yieldMessage: () -> Void
-  ) async throws {
+  ) async {
     let before = await channel.processedInboundCallbackCount()
     yieldMessage()
-    for _ in 0..<8_192 {
-      if await channel.processedInboundCallbackCount() > before {
-        await settle()
-        return
-      }
-      await Task.yield()
-    }
-    throw HostWireConformanceError.invalid(
-      "channel never handled a delivered client message")
+    await channel.waitForProcessedInboundCallbacks(atLeast: before + 1)
+    await settle()
   }
 
   private func nextToken() async -> Int {
@@ -499,39 +491,59 @@ struct HostWireConformanceWebSocketChannelRunner {
     await settle()
   }
 
-  private func enqueueCapsForCurrentClient(
+  /// Sends bytes on the newest client and returns once the channel has handled
+  /// them.
+  ///
+  /// Every client-side yield in this runner goes through here or through
+  /// `apply`'s `deliverToChannel` calls, so at most one client message is ever
+  /// in flight. That is what makes `drainReader`'s termination exact: an event
+  /// the channel has not yielded yet is invisible to `GatedInboundSource.take`,
+  /// so a message still queued in a receive task ends the drain early and its
+  /// events land in the *next* observation interval.
+  private func sendToCurrentClient(
+    _ bytes: [UInt8],
     context: String
-  ) throws {
-    guard let token = clients.keys.max(), clients[token] != nil else {
-      throw HostWireConformanceError.invalid("\(context): caps scheduler has no current client")
+  ) async throws {
+    guard let token = clients.keys.max(), let client = clients[token] else {
+      throw HostWireConformanceError.invalid("\(context): no current client")
     }
-    clients[token]?.yield(
-      .data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+    await deliverToChannel { client.yield(.data(bytes)) }
   }
 
-  /// Advances the real reader over every queued tagged event to quiescence.
+  /// Advances the real reader over every queued tagged event to quiescence,
+  /// then records the input events that drain produced.
+  ///
+  /// The sink is created *and finished* inside one drain on purpose. A
+  /// long-lived stream drained by a background task left an unconditioned hop
+  /// between "the reader yielded an input" and "the adapter observed it": under
+  /// load the observation interval closed first and the input went missing
+  /// (`acceptedClientInputs[0]: <absent>`). Finishing the continuation here
+  /// makes the loop below terminate on the buffered elements, so the accepted
+  /// inputs are complete by construction rather than by turn budget.
   private func drainReader() async {
-    guard let inputContinuation else { return }
+    var continuation: AsyncStream<InputEvent>.Continuation?
+    let events = AsyncStream<InputEvent> { continuation = $0 }
+    guard let continuation else { return }
     while let event = await gate.take() {
-      await reader.process(event, yielding: inputContinuation)
+      await reader.process(event, yielding: continuation)
       await settle()
     }
+    continuation.finish()
+    for await event in events {
+      state.recordAcceptedInput(event)
+    }
   }
 
+  /// Waits until the adapter's delivery task has observed every data record the
+  /// channel has yielded.
+  ///
+  /// Replaces a "the activity counter looked stable for two turns" guess. That
+  /// guess reported an empty interval whenever the delivery task had simply not
+  /// been scheduled yet, which is how a delivered record went missing from the
+  /// observation (`deliveredRecords[1]: <absent>`) under load.
   private func settle() async {
-    var previous = state.activityCount()
-    var stableTurns = 0
-    for _ in 0..<32 {
-      await Task.yield()
-      let current = state.activityCount()
-      if current == previous {
-        stableTurns += 1
-        if stableTurns == 2 { return }
-      } else {
-        previous = current
-        stableTurns = 0
-      }
-    }
+    await state.waitForDeliveredRecords(
+      atLeast: await channel.yieldedOutputRecordCount())
   }
 
   private func requiredInteger(
@@ -612,6 +624,7 @@ struct HostWireConformanceWebSocketChannelRunner {
     private let channel: WebHostSceneChannel
     private let storage = Mutex(Storage())
     private let pumpTask = Mutex<Task<Void, Never>?>(nil)
+    private let arrivals = ConditionSignal()
 
     init(channel: WebHostSceneChannel) {
       self.channel = channel
@@ -645,6 +658,8 @@ struct HostWireConformanceWebSocketChannelRunner {
         storage.queued.append(event)
         storage.pumpedEvents += 1
       }
+      // Outside the lock the predicate itself takes, per `ConditionSignal`.
+      arrivals.notify()
     }
 
     /// The next buffered event, waiting while the channel has yielded one this
@@ -658,17 +673,17 @@ struct HostWireConformanceWebSocketChannelRunner {
       if let queued = dequeue() {
         return queued
       }
-      for _ in 0..<8_192 {
-        let pumped = storage.withLock(\.pumpedEvents)
-        guard await channel.yieldedInboundEventCount() > pumped else {
-          return nil
-        }
-        await Task.yield()
-        if let queued = dequeue() {
-          return queued
-        }
+      // Every producer has already been waited on by `deliverToChannel`, so the
+      // channel's yield count is a *settled* target rather than a moving one:
+      // once the pump has caught up to it, an empty queue really does mean the
+      // drain is complete. Resumed by `enqueue`, never by a clock — a turn
+      // budget here expired while the pump task had not run once, which silently
+      // ended the drain and spilled its events into the next interval.
+      let target = await channel.yieldedInboundEventCount()
+      await arrivals.wait { [self] in
+        storage.withLock { !$0.queued.isEmpty || $0.pumpedEvents >= target }
       }
-      return nil
+      return dequeue()
     }
 
     private func dequeue() -> WebHostInboundEvent? {
@@ -710,22 +725,34 @@ struct HostWireConformanceWebSocketChannelRunner {
 
   private final class State: Sendable {
     private struct Storage {
-      var activityCount = 0
+      /// Monotonic across `consume()`, unlike `delivered`: it is compared
+      /// against the channel's equally monotonic yield gauge.
+      var deliveredTotal: UInt64 = 0
       var delivered: [String] = []
       var acceptedInputs: [String] = []
     }
 
     private let storage = Mutex(Storage())
+    private let deliveries = ConditionSignal()
 
-    func activityCount() -> Int {
-      storage.withLock(\.activityCount)
+    /// Suspends until the delivery task has recorded `target` data records.
+    ///
+    /// The channel's yield gauge is the target, so this closes the last hop of
+    /// the seam: a record the channel has yielded is never reported as absent
+    /// merely because the task carrying it has not been scheduled yet.
+    func waitForDeliveredRecords(atLeast target: UInt64) async {
+      await deliveries.wait { [self] in
+        storage.withLock(\.deliveredTotal) >= target
+      }
     }
 
     func recordDelivered(_ raw: String) {
       storage.withLock {
         $0.delivered.append(raw)
-        $0.activityCount += 1
+        $0.deliveredTotal += 1
       }
+      // Outside the lock the predicate itself takes, per `ConditionSignal`.
+      deliveries.notify()
     }
 
     /// Records an accepted input event as the wire record it must have come
@@ -735,7 +762,6 @@ struct HostWireConformanceWebSocketChannelRunner {
     func recordAcceptedInput(_ event: InputEvent) {
       storage.withLock {
         $0.acceptedInputs.append(Self.record(for: event))
-        $0.activityCount += 1
       }
     }
 

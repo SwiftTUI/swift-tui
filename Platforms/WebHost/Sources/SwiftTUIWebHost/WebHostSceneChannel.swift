@@ -112,6 +112,9 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   private var receiveTasks: [Task<Void, Never>] = []
   private var processedInboundCallbacks: UInt64 = 0
   private var yieldedInboundEvents: UInt64 = 0
+  private var yieldedOutputRecords: UInt64 = 0
+  private var inboundCallbackWaiters:
+    [(target: UInt64, continuation: CheckedContinuation<Void, Never>)] = []
 
   private var suppressedSurfaceRecords: [[UInt8]] = []
   private var discardedInboundChunks: [WebHostDiscardedInboundChunk] = []
@@ -143,10 +146,42 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   ///
   /// A deterministic synchronization point for tests: a client message travels
   /// a real receive task, so "has it been handled yet" cannot be answered by a
-  /// fixed number of task yields — under load that budget is a coin flip. This
-  /// gauge is the condition to wait on instead.
+  /// fixed number of task yields — under load that budget is a coin flip. Read
+  /// this to capture a baseline, then await `waitForProcessedInboundCallbacks`.
   package func processedInboundCallbackCount() -> UInt64 {
     processedInboundCallbacks
+  }
+
+  /// Suspends until this channel has handled at least `target` client messages.
+  ///
+  /// The signal half of the gauge above, and the reason no caller has to poll:
+  /// a waiter is resumed by `receive` itself. Polling would be worse than slow,
+  /// it would be wrong — `Task.yield()` re-enqueues the waiter without freeing
+  /// its thread, so a turn budget can expire while the receive task has not run
+  /// once, and the caller would conclude "not handled" about a live message.
+  ///
+  /// `shutdown()` resumes every outstanding waiter: after it, no further
+  /// callback can arrive, so suspending on one would strand the caller.
+  package func waitForProcessedInboundCallbacks(
+    atLeast target: UInt64
+  ) async {
+    guard processedInboundCallbacks < target, phase != .terminal else {
+      return
+    }
+    await withCheckedContinuation { continuation in
+      inboundCallbackWaiters.append((target: target, continuation: continuation))
+    }
+  }
+
+  private func resumeMaturedInboundCallbackWaiters() {
+    guard !inboundCallbackWaiters.isEmpty else {
+      return
+    }
+    let matured = inboundCallbackWaiters.filter { processedInboundCallbacks >= $0.target }
+    inboundCallbackWaiters.removeAll { processedInboundCallbacks >= $0.target }
+    for waiter in matured {
+      waiter.continuation.resume()
+    }
   }
 
   /// Monotonic count of tagged events yielded onto the scene input stream.
@@ -157,6 +192,21 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   /// guessing from a turn budget.
   package func yieldedInboundEventCount() -> UInt64 {
     yieldedInboundEvents
+  }
+
+  /// Monotonic count of data records yielded onto a client's output stream.
+  ///
+  /// The output-direction twin of `yieldedInboundEventCount()`. A consumer that
+  /// records deliveries on its own task cannot otherwise distinguish "nothing
+  /// was delivered" from "the delivery has not been picked up yet", and a turn
+  /// budget is not a bound on that: `Task.yield()` re-enqueues without freeing
+  /// the thread, so thousands of turns can pass in milliseconds while the
+  /// consuming task never runs. This gauge is the condition to wait on instead.
+  ///
+  /// Counts data records only. Close messages are transport framing, and
+  /// suppressed or detached-dropped surface records are never yielded at all.
+  package func yieldedOutputRecordCount() -> UInt64 {
+    yieldedOutputRecords
   }
 
   package func recordDiscardedInboundChunk(
@@ -188,10 +238,22 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
         suppressedSurfaceRecords.append(bytes)
         return
       }
-      outputContinuation?.yield(.data(bytes))
+      yieldOutput(bytes)
     case .active:
-      outputContinuation?.yield(.data(bytes))
+      yieldOutput(bytes)
     }
+  }
+
+  /// The one place a data record reaches a client, so the delivery gauge cannot
+  /// drift from what was actually yielded.
+  private func yieldOutput(
+    _ bytes: [UInt8]
+  ) {
+    guard let outputContinuation else {
+      return
+    }
+    yieldedOutputRecords += 1
+    outputContinuation.yield(.data(bytes))
   }
 
   package func attach(
@@ -216,7 +278,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       outputContinuation = continuation
       yieldInbound(.connectionOpened(token: token))
       for bytes in detachedNonSurfaceBacklog {
-        continuation.yield(.data(bytes))
+        yieldOutput(bytes)
       }
       detachedNonSurfaceBacklog.removeAll(keepingCapacity: true)
 
@@ -297,6 +359,11 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     yieldInbound(.shutdown)
     inboundContinuation.finish()
     sceneInputFinished = true
+    let stranded = inboundCallbackWaiters
+    inboundCallbackWaiters.removeAll()
+    for waiter in stranded {
+      waiter.continuation.resume()
+    }
   }
 
   package func consumeObservations() -> WebHostChannelObservations {
@@ -326,6 +393,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     token: UInt64
   ) {
     processedInboundCallbacks += 1
+    defer { resumeMaturedInboundCallbackWaiters() }
     guard phase != .terminal else {
       if case .data(let bytes) = message {
         discardedInboundChunks.append(
