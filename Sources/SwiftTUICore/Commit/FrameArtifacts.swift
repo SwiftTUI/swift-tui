@@ -52,6 +52,16 @@ package struct FrameArtifacts: Equatable, Sendable {
   package var drawnIdentities: Set<Identity>
   package var commitPlan: CommitPlan
   package var diagnostics: FrameDiagnostics
+  /// Committed scroll-route table extracted from ``placedTree`` in the frame
+  /// tail (scroll-latency R3.2a). Retained as the next frame's baseline for
+  /// tail-time translation candidates. Derived product: excluded from `==`
+  /// like ``diagnostics``.
+  package var committedScrollRoutes: CommittedScrollRouteTable?
+  /// The frame's committed-products translation candidate, when the committed
+  /// route tables of this frame and the previous committed frame describe a
+  /// pure single-route vertical translation. Derived product: excluded from
+  /// `==` like ``diagnostics``.
+  package var committedScrollTranslation: CommittedScrollTranslation?
 
   /// Creates a full frame artifact bundle.
   package init(
@@ -74,6 +84,8 @@ package struct FrameArtifacts: Equatable, Sendable {
     drawnIdentities = []
     self.commitPlan = commitPlan
     self.diagnostics = diagnostics
+    committedScrollRoutes = nil
+    committedScrollTranslation = nil
   }
 
   package init(
@@ -98,6 +110,8 @@ package struct FrameArtifacts: Equatable, Sendable {
     self.drawnIdentities = drawnIdentities
     self.commitPlan = commitPlan
     self.diagnostics = diagnostics
+    committedScrollRoutes = nil
+    committedScrollTranslation = nil
   }
 }
 

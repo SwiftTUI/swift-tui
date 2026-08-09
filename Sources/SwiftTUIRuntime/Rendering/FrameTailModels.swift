@@ -14,6 +14,11 @@ struct FrameTailRetainedInput {
   /// Previous committed effective phase products that are safe to reuse only
   /// when the current frame can prove the effective placed tree is identical.
   var previousPhaseProducts: RetainedFrameTailPhaseProducts?
+  /// Previous committed frame's scroll-route table — the baseline the
+  /// tail-time committed-translation candidate diffs against (R3.2a).
+  /// Advances with ``previousRasterSurface`` so the claim and the surface it
+  /// is about always come from the same committed frame.
+  var previousScrollRouteTable: CommittedScrollRouteTable? = nil
 
   package func phaseExtractionProof(
     for proposal: ProposedSize,
@@ -222,6 +227,13 @@ struct FrameTailOutput {
   /// coordinator records it on the soundness probe — the tail itself may run
   /// off-main.
   var incrementalMismatch: Rasterizer.IncrementalRasterMismatch?
+  /// This frame's committed scroll-route table, extracted from the effective
+  /// placed tree (R3.2a). Stored with the committed frame as the next tail's
+  /// translation baseline.
+  var committedScrollRoutes: CommittedScrollRouteTable?
+  /// The tail-time committed-products translation candidate, clamped to the
+  /// rasterized surface (R3.2a). Diagnostics-only in this slice.
+  var committedScrollTranslation: CommittedScrollTranslation?
   var diagnostics: FrameTailDiagnostics
   var workerCompletedAt: ContinuousClock.Instant?
 }

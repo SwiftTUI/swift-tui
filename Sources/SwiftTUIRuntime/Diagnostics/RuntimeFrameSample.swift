@@ -93,6 +93,9 @@ import SwiftTUICore
   /// frame's scroll ledger described a pure single-route vertical shift
   /// against the previously presented frame. `nil` otherwise.
   package var translationCandidate: ScrollTranslationCandidate?
+  /// The frame's committed-products translation candidate (R3.2a), produced
+  /// in the frame tail from committed placed products. `nil` otherwise.
+  package var committedTranslation: CommittedScrollTranslation?
 
   package init(
     frameNumber: Int,
@@ -118,7 +121,8 @@ import SwiftTUICore
       realizedRows: nil,
       listLayoutDerivations: nil
     ),
-    translationCandidate: ScrollTranslationCandidate? = nil
+    translationCandidate: ScrollTranslationCandidate? = nil,
+    committedTranslation: CommittedScrollTranslation? = nil
   ) {
     self.frameNumber = frameNumber
     self.scheduledFrame = scheduledFrame
@@ -141,6 +145,7 @@ import SwiftTUICore
     self.commitInstant = commitInstant
     self.collectionProbes = collectionProbes
     self.translationCandidate = translationCandidate
+    self.committedTranslation = committedTranslation
   }
 }
 

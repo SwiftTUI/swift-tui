@@ -163,7 +163,7 @@ enum CommittedFrameArtifactBuilder {
         runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
       )
     )
-    return FrameArtifacts(
+    var artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
       placedTree: tail.placed,
@@ -175,6 +175,9 @@ enum CommittedFrameArtifactBuilder {
       commitPlan: commit,
       diagnostics: diagnostics
     )
+    artifacts.committedScrollRoutes = tail.committedScrollRoutes
+    artifacts.committedScrollTranslation = tail.committedScrollTranslation
+    return artifacts
   }
 
   @MainActor

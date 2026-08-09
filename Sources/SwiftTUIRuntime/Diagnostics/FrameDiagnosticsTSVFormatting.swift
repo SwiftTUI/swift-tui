@@ -189,6 +189,7 @@ package enum FrameDiagnosticsTSVFormatting {
     "present_edit_ops",
     "present_scroll_region",
     "translation_candidate",
+    "translation_committed",
     "cache_hit",
     "total_ms",
     "elided",
@@ -405,6 +406,10 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.presentationEditOperationCount),
       String(record.presentationScrollRegionOperationCount),
       formatTranslationCandidate(record.translationCandidate),
+      formatCommittedTranslation(
+        record.committedTranslation,
+        presentTime: record.translationCandidate
+      ),
       cacheHit,
       totalMs,
       record.elided ? "1" : "0",
@@ -429,6 +434,34 @@ package enum FrameDiagnosticsTSVFormatting {
       return "-"
     }
     return "dy=\(candidate.dy)@rows\(candidate.band.origin.y)..\(candidate.band.maxY)"
+  }
+
+  /// The committed-products candidate rendered as an agreement verdict
+  /// against the present-time candidate (R3.2a): the column exists to
+  /// measure how often the two currencies coincide, so the verdict — not the
+  /// raw value — is the primary rendering. Disagreeing rows carry the
+  /// committed value so the divergence class can be attributed offline.
+  private static func formatCommittedTranslation(
+    _ committed: CommittedScrollTranslation?,
+    presentTime: ScrollTranslationCandidate?
+  ) -> String {
+    switch (committed, presentTime) {
+    case (nil, nil):
+      return "-"
+    case (nil, .some):
+      return "present_only"
+    case (.some(let committed), nil):
+      return "committed_only:\(formatted(committed))"
+    case (.some(let committed), .some(let presentTime)):
+      if committed.band == presentTime.band, committed.dy == presentTime.dy {
+        return "agree"
+      }
+      return "differ:\(formatted(committed))"
+    }
+  }
+
+  private static func formatted(_ committed: CommittedScrollTranslation) -> String {
+    "dy=\(committed.dy)@rows\(committed.band.origin.y)..\(committed.band.maxY)"
   }
 
   private static func formatMs(_ duration: Duration?) -> String {

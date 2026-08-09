@@ -92,6 +92,17 @@ struct FrameTailInlineStageRenderer: Sendable {
       animationRedrawIdentities: input.animationRedrawIdentities,
       animationOverlaySnapshot: animationOverlaySnapshot
     )
+    // R3.2a: the tail-time committed-translation currency. Extracted from the
+    // effective placed tree (the one the raster below is a function of) and
+    // diffed against the previous committed frame's table — both ends of the
+    // diff share provenance with the surfaces being compared, which is what
+    // the present-time R2.2 candidate cannot guarantee (live registry offsets
+    // can run ahead of pixels in async mode).
+    let committedScrollRoutes = CommittedScrollRouteTable(placedRoot: placed)
+    let committedScrollTranslation = CommittedScrollRouteTable.candidate(
+      advancing: input.retained.previousScrollRouteTable,
+      to: committedScrollRoutes
+    )
     let raster = rasterizeDrawTree(
       input,
       draw: draw.draw,
@@ -123,6 +134,10 @@ struct FrameTailInlineStageRenderer: Sendable {
       drawnIdentities: raster.drawnIdentities,
       presentationDamage: raster.presentationDamage,
       incrementalMismatch: raster.incrementalMismatch,
+      committedScrollRoutes: committedScrollRoutes,
+      committedScrollTranslation: committedScrollTranslation?.clamped(
+        toSurface: raster.surface.size
+      ),
       diagnostics: diagnostics,
       workerCompletedAt: nil
     )

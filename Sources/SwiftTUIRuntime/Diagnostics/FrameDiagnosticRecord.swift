@@ -145,6 +145,13 @@ public struct FrameDiagnosticRecord: Sendable {
   /// presented frame. Rendered into the `translation_candidate` column as
   /// `dy=<dy>@rows<minY>..<maxY>` (rows half-open); `-` when absent.
   package var translationCandidate: ScrollTranslationCandidate?
+  /// The frame's committed-products translation candidate (R3.2a), produced
+  /// in the frame tail from committed placed trees. Rendered into the
+  /// `translation_committed` column as an agreement verdict against
+  /// ``translationCandidate`` — `agree`, `present_only`,
+  /// `committed_only:dy=…@rows…`, `differ:dy=…@rows…` — or `-` when both are
+  /// absent.
+  package var committedTranslation: CommittedScrollTranslation?
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
   /// Whether this frame was elided (skipped) because all drawn identities

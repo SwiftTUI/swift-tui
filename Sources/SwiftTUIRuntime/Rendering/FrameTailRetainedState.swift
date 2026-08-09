@@ -26,6 +26,7 @@ final class FrameTailRetainedState: Sendable {
     var previousRasterSurface: RasterSurface?
     var previousSurfaceTopology: SurfaceTopologySignature?
     var previousPhaseProducts: RetainedFrameTailPhaseProducts?
+    var previousScrollRouteTable: CommittedScrollRouteTable?
   }
 
   private let state = Mutex(State())
@@ -69,7 +70,8 @@ final class FrameTailRetainedState: Sendable {
         ),
         previousRasterSurface: state.previousRasterSurface,
         previousSurfaceTopology: state.previousSurfaceTopology,
-        previousPhaseProducts: state.previousPhaseProducts
+        previousPhaseProducts: state.previousPhaseProducts,
+        previousScrollRouteTable: state.previousScrollRouteTable
       )
     }
   }
@@ -116,6 +118,10 @@ final class FrameTailRetainedState: Sendable {
       state.previousSurfaceTopology = SurfaceTopologySignature(
         placedRoot: artifacts.placedTree
       )
+      // Advances with the raster surface above: the next tail's translation
+      // baseline must describe exactly the committed frame whose surface it
+      // will translate (R3.2a provenance rule).
+      state.previousScrollRouteTable = artifacts.committedScrollRoutes
       state.previousPhaseProducts =
         if effectiveMatchesBaseline {
           RetainedFrameTailPhaseProducts(

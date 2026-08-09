@@ -139,6 +139,7 @@ package enum FrameRecordDerivation {
     record.realizedRowCount = sample.collectionProbes.realizedRows
     record.listLayoutDerivationCount = sample.collectionProbes.listLayoutDerivations
     record.translationCandidate = sample.translationCandidate
+    record.committedTranslation = sample.committedTranslation
     record.presentationScrollRegionOperationCount =
       sample.presentationMetrics.scrollRegionOperationCount
     // Published for every committed frame, not just the ones answering input:

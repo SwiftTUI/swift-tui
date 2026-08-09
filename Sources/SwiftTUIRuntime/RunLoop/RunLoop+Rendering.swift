@@ -317,6 +317,7 @@ extension RunLoop {
       presentationDuration: presentationResult.duration,
       answeredInputs: answeredInputs,
       translationCandidate: scrollTranslation.candidate,
+      committedTranslation: artifacts.committedScrollTranslation,
       renderedFrames: renderedFrames
     )
 
