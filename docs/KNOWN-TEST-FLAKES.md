@@ -48,6 +48,13 @@ details above. Re-run the test. If it does not reproduce deterministically, it i
 the flake. A real fix needs a forced-repro harness (widen the race window via
 injected delays) — see issue #12 for the investigation and suspect seams.
 
+**Registry re-measured 2026-08-09.** `Scripts/repeat_async_flake_registry.sh
+--iterations 5 --load-workers 8`, in the pinned arm64 container, gives 5 / 5
+pass for all three watched candidates (`InteractiveRuntimeTests`' toast
+auto-dismiss, `AsyncFrameTailRenderingTests`, `RenderDiffTests`). The toast
+trigger named above did not fire. That is a negative result on one runner class,
+not an all-clear — but re-measure before attributing a failure here.
+
 **Repro instrument (2026-05-30).** A production-default-`nil` worker seam,
 `FrameTailRenderHooks.beforeOverlayApply` (`FrameTailModels.swift`), fires on the
 frame-tail worker immediately before the off-main overlay write. A test can park
