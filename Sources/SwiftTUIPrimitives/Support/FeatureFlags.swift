@@ -18,6 +18,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case rasterTrustSoundDamage
   case presentedProgressGuard
   case collectionProbes
+  case collectionResolveReuse
   case scrollRegionEmission
   case scrollBlit
 
@@ -35,6 +36,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_PRESENTED_PROGRESS_GUARD"
     case .collectionProbes:
       "SWIFTTUI_COLLECTION_PROBES"
+    case .collectionResolveReuse:
+      "SWIFTTUI_COLLECTION_RESOLVE_REUSE"
     case .scrollRegionEmission:
       "SWIFTTUI_SCROLL_REGION"
     case .scrollBlit:
@@ -82,6 +85,16 @@ package enum FeatureGate: CaseIterable, Sendable {
       #else
         false
       #endif
+    case .collectionResolveReuse:
+      // Kill switch, not an opt-in (scroll-latency R4-A): the hosted-collection
+      // resolve reuses — the integer-range id-space witness that verifies
+      // retained identity artifacts in O(1), and the retained row-selection
+      // snapshot — are content-verified against exactly the inputs that
+      // determine them (ids witness + identity root + entity scope; artifacts
+      // lifetime + selection-compat key), so a stale entry can only miss,
+      // never corrupt. `SWIFTTUI_COLLECTION_RESOLVE_REUSE=0` restores the
+      // element-wise O(N)-per-resolve paths wholesale (and is the A/B lever).
+      true
     case .scrollRegionEmission:
       // Kill switch, not an opt-in: scroll-region emission (R2.3) is
       // verification-backed — every emitted translation is proven

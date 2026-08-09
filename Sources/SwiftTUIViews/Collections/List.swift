@@ -59,10 +59,7 @@ public struct List<SelectionValue: Hashable & Sendable, Content: View>: Primitiv
 }
 
 extension List {
-  private struct RowSelection: Sendable {
-    var tag: SelectionTag?
-    var identity: Identity
-  }
+  private typealias RowSelection = HostedCollectionRowSelection
 
   private struct ResolvedItems {
     var items: [ListItemPayload] = []
@@ -426,19 +423,41 @@ extension List {
     // No `items` array: every entry would be the same empty stub, so the
     // payload carries `virtualRowCount` instead (register item D18). `rows`
     // still materializes — the key handlers index it by row and hand its tags
-    // to the selection policy, which takes an ordered array.
-    result.rows.reserveCapacity(source.count)
-    for index in 0..<source.count {
-      let candidateTag = source.elementSelectionTag(at: index)
-      let compatibleTag = candidateTag.flatMap { tag in
-        selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
-      }
-      result.rows.append(
-        .init(
-          tag: compatibleTag,
-          identity: source.elementIdentity(at: index)
+    // to the selection policy, which takes an ordered array — but the
+    // snapshot is served from the source's retained identity artifacts when
+    // nothing that determines it changed (R4-A): the artifacts already
+    // re-mint on any ids change, and the key carries the only other inputs
+    // the build reads (selectability + the selection value type the tags
+    // must cast to). Rebuilding it per resolve was an O(dataset) term on the
+    // per-notch scroll path.
+    let selectionPolicy = self.selectionPolicy
+    let buildRows: () -> [RowSelection] = {
+      var rows: [RowSelection] = []
+      rows.reserveCapacity(source.count)
+      for index in 0..<source.count {
+        let candidateTag = source.elementSelectionTag(at: index)
+        let compatibleTag = candidateTag.flatMap { tag in
+          selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
+        }
+        rows.append(
+          .init(
+            tag: compatibleTag,
+            identity: source.elementIdentity(at: index)
+          )
         )
+      }
+      return rows
+    }
+    if let cachingSource = source as? any RowSelectionCachingIndexedChildSource {
+      result.rows = cachingSource.retainedRowSelections(
+        key: HostedRowSelectionCacheKey(
+          isSelectable: selectionPolicy.isSelectable,
+          selectionValueType: ObjectIdentifier(SelectionValue.self)
+        ),
+        build: buildRows
       )
+    } else {
+      result.rows = buildRows()
     }
 
     let policy = selectionPolicy

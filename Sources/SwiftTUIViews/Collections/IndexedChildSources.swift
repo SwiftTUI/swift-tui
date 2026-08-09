@@ -18,10 +18,29 @@ package protocol IndexedChildSourceView {
 package enum IndexedChildSourceArtifactsProbe {
   package private(set) static var adoptionCount = 0
   package private(set) static var freshMintCount = 0
+  /// Adoptions that verified through the integer-range id-space witness
+  /// (R4-A) — the O(1) fast path that skips both the per-element ids
+  /// materialization and the element-wise `==` verify.
+  package private(set) static var rangeWitnessAdoptionCount = 0
+  /// Hosted-collection row-selection snapshots served from the retained
+  /// artifacts instead of the O(dataset) per-resolve rebuild (R4-A).
+  package private(set) static var rowSelectionReuseCount = 0
 
   package static func recordAdoption() {
     #if DEBUG
       adoptionCount += 1
+    #endif
+  }
+
+  package static func recordRangeWitnessAdoption() {
+    #if DEBUG
+      rangeWitnessAdoptionCount += 1
+    #endif
+  }
+
+  package static func recordRowSelectionReuse() {
+    #if DEBUG
+      rowSelectionReuseCount += 1
     #endif
   }
 
@@ -35,8 +54,96 @@ package enum IndexedChildSourceArtifactsProbe {
     #if DEBUG
       adoptionCount = 0
       freshMintCount = 0
+      rangeWitnessAdoptionCount = 0
+      rowSelectionReuseCount = 0
     #endif
   }
+}
+
+/// Process-latched R4-A resolve-reuse gate (`SWIFTTUI_COLLECTION_RESOLVE_REUSE`,
+/// kill switch, default on). Latched once outside the generic source class —
+/// generic types cannot host static stored state.
+@MainActor
+package enum HostedCollectionResolveReuse {
+  package static let isEnabled = FeatureGate.collectionResolveReuse.initialIsEnabled()
+}
+
+/// O(1)-verifiable id-space witness for integer-range-shaped sources (R4-A):
+/// `Range<Int>` / `ClosedRange<Int>` data identified by `\.self` fully
+/// determines the materialized ids array — consecutive integers from
+/// `lowerBound` — so (lowerBound, count) IS the ids array's value. Retained
+/// identity artifacts carrying an equal witness verify with two `Int`
+/// compares instead of an O(N) keypath map plus element-wise `==` per
+/// container resolve (the `List` route body's per-notch ids floor).
+package struct IntegerRangeIDWitness: Equatable, Sendable {
+  package let lowerBound: Int
+  package let count: Int
+
+  package init(lowerBound: Int, count: Int) {
+    self.lowerBound = lowerBound
+    self.count = count
+  }
+}
+
+/// The witness for `data` identified by `id`, or `nil` when the source shape
+/// cannot prove its ids by bounds. The keypath must be the *identity* keypath
+/// — `\Int.hashValue` is also `KeyPath<Int, Int>` and must not match.
+package func integerRangeIDWitness<Data: RandomAccessCollection, ID: Hashable & Sendable>(
+  data: Data,
+  id: KeyPath<Data.Element, ID>
+) -> IntegerRangeIDWitness? {
+  guard let identityPath = id as? KeyPath<Int, Int>, identityPath == \Int.self else {
+    return nil
+  }
+  if let range = data as? Range<Int> {
+    return IntegerRangeIDWitness(lowerBound: range.lowerBound, count: range.count)
+  }
+  if let closedRange = data as? ClosedRange<Int> {
+    return IntegerRangeIDWitness(lowerBound: closedRange.lowerBound, count: closedRange.count)
+  }
+  return nil
+}
+
+/// One row of the hosted collection's realization-free selection snapshot:
+/// the policy-compatible selection tag (nil for non-selectable rows) plus the
+/// element's derived identity. `List` materializes one per element on every
+/// resolve; the R4-A cache retains the snapshot on the source's identity
+/// artifacts instead (see ``RowSelectionCachingIndexedChildSource``).
+package struct HostedCollectionRowSelection: Sendable {
+  package var tag: SelectionTag?
+  package var identity: Identity
+
+  package init(tag: SelectionTag?, identity: Identity) {
+    self.tag = tag
+    self.identity = identity
+  }
+}
+
+/// The inputs, besides the retained artifacts themselves, that determine a
+/// hosted collection's row-selection snapshot: whether the container's policy
+/// selects at all, and the selection value type the tags must cast to. Equal
+/// ids already imply equal retained tags and identities (the premise the F145
+/// adoption verify stands on), so (artifacts, key) fully determine the rows.
+package struct HostedRowSelectionCacheKey: Equatable, Sendable {
+  package let isSelectable: Bool
+  package let selectionValueType: ObjectIdentifier
+
+  package init(isSelectable: Bool, selectionValueType: ObjectIdentifier) {
+    self.isSelectable = isSelectable
+    self.selectionValueType = selectionValueType
+  }
+}
+
+/// Sources that retain the hosted collection's row-selection snapshot across
+/// container resolves (R4-A). The snapshot is rebuilt through `build` whenever
+/// the compat key changes; artifacts re-mint on any ids change, so a retained
+/// snapshot can never outlive the id set it was derived from.
+@MainActor
+package protocol RowSelectionCachingIndexedChildSource {
+  func retainedRowSelections(
+    key: HostedRowSelectionCacheKey,
+    build: () -> [HostedCollectionRowSelection]
+  ) -> [HostedCollectionRowSelection]
 }
 
 /// Instrumentation (the F118 probe pattern): counts how many distinct
@@ -121,17 +228,30 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
   let indexByID: [ID: Int]
   var tableColumns: [TableColumnPayload]?
   var tableColumnWidths: [Int] = []
+  /// The integer-range id-space witness these artifacts were verified over,
+  /// when the minting (or a later element-wise-verified adopting) resolve
+  /// proved one (R4-A). Non-nil means `ids == Array(range)` for the witness's
+  /// range, so a resolve holding an equal witness adopts in O(1).
+  var integerRangeIDWitness: IntegerRangeIDWitness?
+  /// The retained hosted-collection row-selection snapshot and the compat key
+  /// it was built under (R4-A). Pure derived memoization: rebuilt through the
+  /// container's builder on any key change, and it dies with the artifacts on
+  /// any ids change.
+  var rowSelectionsKey: HostedRowSelectionCacheKey?
+  var rowSelections: [HostedCollectionRowSelection] = []
 
   init(
     identityRoot: Identity,
     scope: StructuralPath,
     ids: [ID],
-    entityIdentities: [EntityIdentity]
+    entityIdentities: [EntityIdentity],
+    integerRangeIDWitness: IntegerRangeIDWitness? = nil
   ) {
     self.identityRoot = identityRoot
     self.scope = scope
     self.ids = ids
     self.entityIdentities = entityIdentities
+    self.integerRangeIDWitness = integerRangeIDWitness
     elementIdentities = zip(ids, entityIdentities).map { id, entityIdentity in
       identityRoot.explicitID(id, occurrence: entityIdentity.occurrence)
     }
@@ -154,6 +274,19 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
     self.identityRoot == identityRoot
       && self.scope == scope
       && self.ids == ids
+  }
+
+  /// O(1) verify against a range-shaped resolve (R4-A): sound because both
+  /// sides' witnesses each fully determine their ids arrays, so equal
+  /// witnesses imply the element-wise `matches(ids:)` would have succeeded.
+  func matches(
+    integerRangeIDWitness witness: IntegerRangeIDWitness,
+    identityRoot: Identity,
+    scope: StructuralPath
+  ) -> Bool {
+    integerRangeIDWitness == witness
+      && self.identityRoot == identityRoot
+      && self.scope == scope
   }
 }
 
@@ -250,15 +383,48 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     identityRootStorage = childContext.identity
     countStorage = data.count
 
+    let scope = forEachEntityScope(identityRoot: childContext.identity)
+    let retained =
+      host?.retainedIndexedChildSourceArtifacts(
+        forIdentityRoot: childContext.identity
+      ) as? ForEachSourceIdentityArtifacts<ID>
+    let witness =
+      HostedCollectionResolveReuse.isEnabled
+      ? integerRangeIDWitness(data: data, id: id) : nil
+
+    if let retained, let witness,
+      retained.matches(
+        integerRangeIDWitness: witness,
+        identityRoot: childContext.identity,
+        scope: scope
+      )
+    {
+      // R4-A fast path: the witness proves the retained ids array equal to
+      // this resolve's WITHOUT materializing it — the O(N) keypath map and
+      // the element-wise `==` verify both vanish from the per-resolve cost.
+      IndexedChildSourceArtifactsProbe.recordAdoption()
+      IndexedChildSourceArtifactsProbe.recordRangeWitnessAdoption()
+      ids = retained.ids
+      entityIdentities = retained.entityIdentities
+      measurementSignatureStorage = retained.signature
+      identityArtifacts = retained
+      return
+    }
+
     let ids = data.map { $0[keyPath: id] }
     self.ids = ids
-    let scope = forEachEntityScope(identityRoot: childContext.identity)
-    if let retained = host?.retainedIndexedChildSourceArtifacts(
-      forIdentityRoot: childContext.identity
-    ) as? ForEachSourceIdentityArtifacts<ID>,
+    if let retained,
       retained.matches(ids: ids, identityRoot: childContext.identity, scope: scope)
     {
       IndexedChildSourceArtifactsProbe.recordAdoption()
+      // Stamp the witness onto artifacts that predate it (an eager-path mint
+      // carries none): the element-wise verify just proved `ids` equal to the
+      // retained array, and the witness was derived from this resolve's data,
+      // so the two certify each other. Subsequent range-shaped resolves adopt
+      // in O(1).
+      if retained.integerRangeIDWitness == nil, let witness {
+        retained.integerRangeIDWitness = witness
+      }
       entityIdentities = retained.entityIdentities
       measurementSignatureStorage = retained.signature
       identityArtifacts = retained
@@ -268,7 +434,8 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
         identityRoot: childContext.identity,
         scope: scope,
         ids: ids,
-        entityIdentities: makeEntityIdentities(ids: ids, scope: scope)
+        entityIdentities: makeEntityIdentities(ids: ids, scope: scope),
+        integerRangeIDWitness: witness
       )
       entityIdentities = artifacts.entityIdentities
       measurementSignatureStorage = artifacts.signature
@@ -412,6 +579,25 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       elementsCache[index] = flattened
       return flattened
     }
+  }
+}
+
+extension ForEachIndexedChildSource: RowSelectionCachingIndexedChildSource {
+  package func retainedRowSelections(
+    key: HostedRowSelectionCacheKey,
+    build: () -> [HostedCollectionRowSelection]
+  ) -> [HostedCollectionRowSelection] {
+    guard HostedCollectionResolveReuse.isEnabled else {
+      return build()
+    }
+    if identityArtifacts.rowSelectionsKey == key {
+      IndexedChildSourceArtifactsProbe.recordRowSelectionReuse()
+      return identityArtifacts.rowSelections
+    }
+    let rows = build()
+    identityArtifacts.rowSelectionsKey = key
+    identityArtifacts.rowSelections = rows
+    return rows
   }
 }
 
