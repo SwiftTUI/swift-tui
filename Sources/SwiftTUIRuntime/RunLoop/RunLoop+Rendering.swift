@@ -240,7 +240,11 @@ extension RunLoop {
     let presentationResult = try presentCommittedFrameWithDiagnosticsTiming(
       artifacts,
       damage: presentationDamage(for: artifacts, convergence: convergence),
-      translationCandidate: scrollTranslation.candidate,
+      translationCandidate: presentationScrollTranslationCandidate(
+        committed: artifacts.committedScrollTranslation,
+        presentTime: scrollTranslation.candidate,
+        frameOrdinal: renderedFrames + 1
+      ),
       hasFrameSink: hasFrameSink,
       frameOrdinal: renderedFrames + 1
     )

@@ -335,6 +335,29 @@ struct TerminalPresentationPlanner {
       return nil
     }
 
+    // R3.2c: row-buffer identity verification. When the raster tier served
+    // this frame through the translation blit (R3.2b), every served band
+    // row's buffer IS the previous surface's `row − dy` buffer — and for
+    // image-free frames `preparedSurface` is the identity function (G10,
+    // pinned by `TerminalPreparedSurfaceIdentityTests`), so the same buffers
+    // reach this planner's written baseline. Row identity therefore proves
+    // the translation claim in O(band height) pointer compares. Rows without
+    // identity provenance — repainted rows, the first frame after a barrier,
+    // dropped-frame recovery, image frames — keep the full-width cell
+    // verification below, wholesale.
+    var identityRows: Set<Int> = []
+    for row in band.origin.y..<band.maxY {
+      let sourceRow = row - dy
+      guard sourceRow >= band.origin.y, sourceRow < band.maxY,
+        row < currentSurface.cells.count,
+        sourceRow < previousSurface.cells.count,
+        Self.rowsShareStorage(currentSurface.cells[row], previousSurface.cells[sourceRow])
+      else {
+        continue
+      }
+      identityRows.insert(row)
+    }
+
     // The translated verification diffs every band row full-width, which
     // costs real planner time (~0.5 ms on an 80×32 band of styled cells).
     // When the damage hint says the plain diff would repaint only a sliver
@@ -344,7 +367,12 @@ struct TerminalPresentationPlanner {
     // when the hinted in-band repaint reaches
     // ``scrollRegionHintAttemptShare`` of the band; with no hint the plain
     // path would full-diff every row anyway, so the verify adds nothing.
-    if let damage {
+    //
+    // Identity-verified frames skip this pre-gate outright (R3.2c): the
+    // pre-gate exists only because the verify costs ~0.5 ms, and identity
+    // rows are proven for free — which readmits the notch/fling
+    // scroll-region emissions R2.3 deliberately forfeited.
+    if identityRows.isEmpty, let damage {
       let hintedBandCells = hintedCellCount(
         damage: damage,
         bandRows: band.origin.y..<band.maxY,
@@ -394,6 +422,12 @@ struct TerminalPresentationPlanner {
       let sourceRow = row - dy
       let currentRow = row < currentSurface.cells.count ? currentSurface.cells[row] : []
       let isExposedRow = !bandRows.contains(sourceRow)
+      if !isExposedRow, identityRows.contains(row) {
+        // Proven translated by row-buffer identity: after SU/SD the terminal
+        // already shows exactly this row's cells. No diff, no batch, no
+        // mismatch contribution.
+        continue
+      }
       // After SU/SD the terminal's row `row` holds the previously written
       // row `row - dy` when that source stayed inside the region, and blank
       // cells when the scroll vacated it — diff against exactly that.
@@ -457,6 +491,28 @@ struct TerminalPresentationPlanner {
         delta: dy
       )
     )
+  }
+
+  /// Whether two rows share their element storage — the R3.2c identity
+  /// currency. Same buffer means same cells with no compare; the blit
+  /// (R3.2b) *constructs* this identity by moving row buffers, and CoW
+  /// breaks it exactly where content was repainted. Equal-count empty rows
+  /// are trivially identical.
+  private static func rowsShareStorage(
+    _ currentRow: [RasterCell],
+    _ previousRow: [RasterCell]
+  ) -> Bool {
+    guard currentRow.count == previousRow.count else {
+      return false
+    }
+    guard !currentRow.isEmpty else {
+      return true
+    }
+    return unsafe currentRow.withUnsafeBufferPointer { current in
+      unsafe previousRow.withUnsafeBufferPointer { previous in
+        unsafe current.baseAddress == previous.baseAddress
+      }
+    }
   }
 
   /// Cells the damage hint would let the plain incremental diff repaint

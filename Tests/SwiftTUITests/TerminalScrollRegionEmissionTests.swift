@@ -425,6 +425,82 @@ struct TerminalScrollRegionEmissionTests {
     )
   }
 
+  // MARK: - R3.2c row-buffer identity verification
+
+  /// A blit-shaped current surface: band rows share storage with the
+  /// previous surface's dy-shifted rows — exactly what the R3.2b raster
+  /// blit produces — with the exposed row freshly painted.
+  private static func identityScrolledSurface(
+    exposedRowText: String
+  ) -> RasterSurface {
+    let fresh = surface(
+      bandRows: ["item 11", "item 12", "item 13", "item 14", exposedRowText]
+    )
+    var cells = previousSurface.cells
+    for row in 2..<6 {
+      cells[row] = previousSurface.cells[row + 1]
+    }
+    cells[6] = fresh.cells[6]
+    return RasterSurface(size: surfaceSize, cells: cells)
+  }
+
+  @Test("row-buffer identity readmits the narrow-hint shape the pre-gate forfeits")
+  func identityReadmitsNarrowHintShape() throws {
+    let current = Self.identityScrolledSurface(exposedRowText: "item 15")
+    // One hinted exposed row is far below the 15 % attempt share: without
+    // identity provenance this shape stays on the plain diff (R2.3's
+    // deliberate forfeit). Identity rows are proven for free, so the region
+    // is attempted and emitted.
+    let narrowHint = PresentationDamage(textRows: [.init(row: 6, columnRanges: [0..<7])])
+    let plan = Self.plan(
+      current: current,
+      damage: narrowHint,
+      candidate: Self.candidate(dy: -1)
+    )
+    let region = try #require(plan.scrollRegion)
+    #expect(region.delta == -1)
+    // Identity rows emit no repaint batches; only the exposed row does.
+    #expect(Set(plan.rowBatches.map(\.row)).isDisjoint(with: [2, 3, 4, 5]))
+    Self.expectRoundTrip(current: current, plan: plan)
+  }
+
+  @Test("without identity provenance the narrow-hint pre-gate still declines")
+  func identityFreeNarrowHintStaysPreGated() {
+    let current = Self.surface(
+      bandRows: ["item 11", "item 12", "item 13", "item 14", "item 15"]
+    )
+    let narrowHint = PresentationDamage(textRows: [.init(row: 6, columnRanges: [0..<7])])
+    let plan = Self.plan(
+      current: current,
+      damage: narrowHint,
+      candidate: Self.candidate(dy: -1)
+    )
+    #expect(plan.scrollRegion == nil, "identity-free frames keep today's pre-gate wholesale")
+  }
+
+  @Test("a repainted row inside an identity band still verifies and repaints")
+  func identityBandRepaintedRowStillRepaints() throws {
+    // Row 4 was repainted by the blit's mismatch path (fresh buffer, changed
+    // content — a selection highlight): identity proves rows 2, 3, 5; row 4
+    // falls back to the cell diff and emits its repaint.
+    var current = Self.identityScrolledSurface(exposedRowText: "item 15")
+    let selected = Self.surface(
+      bandRows: ["item 11", "item 12", "> selected 13", "item 14", "item 15"]
+    )
+    current.cells[4] = selected.cells[4]
+    let plan = Self.plan(
+      current: current,
+      damage: PresentationDamage(dirtyRows: [4, 6]),
+      candidate: Self.candidate(dy: -1)
+    )
+    let region = try #require(plan.scrollRegion)
+    #expect(region.delta == -1)
+    let batchRows = Set(plan.rowBatches.map(\.row))
+    #expect(batchRows.contains(4), "the repainted row must emit")
+    #expect(batchRows.isDisjoint(with: [2, 3, 5]), "identity rows emit nothing")
+    Self.expectRoundTrip(current: current, plan: plan)
+  }
+
   // MARK: - End-to-end (run loop → latch → planner → emission)
 
   @Test("a wheel notch over a live scroll view emits one scroll-region translation")

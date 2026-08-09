@@ -112,6 +112,32 @@ package struct ScrollTranslationFrameLedger: Equatable {
 }
 
 extension RunLoop {
+  /// The candidate handed to the present path (R3.2c): the tail-time
+  /// committed-products claim when the frame produced one — by provenance it
+  /// describes the pixels the frame actually shows, where the present-time
+  /// ledger can run ahead of them in async mode — falling back to the
+  /// present-time R2.2 candidate otherwise. On the ~0.5 % async-skew frames
+  /// where the two disagree, the committed claim is the one the planner's
+  /// verification (cell or row-identity) can actually prove against the
+  /// written baseline. `frames.tsv` keeps recording both currencies
+  /// unchanged (`translation_candidate`, `translation_committed`).
+  func presentationScrollTranslationCandidate(
+    committed: CommittedScrollTranslation?,
+    presentTime: ScrollTranslationCandidate?,
+    frameOrdinal: Int
+  ) -> ScrollTranslationCandidate? {
+    guard let committed else {
+      return presentTime
+    }
+    return ScrollTranslationCandidate(
+      band: committed.band,
+      dy: committed.dy,
+      // The committed claim's baseline is the previous committed frame; the
+      // ordinal is diagnostic-only (no consumer acts on it).
+      baselineFrameOrdinal: frameOrdinal - 1
+    )
+  }
+
   /// Produces this frame's scroll-translation candidate (R2.2) plus the
   /// ledger to retain once the frame is presented.
   ///
