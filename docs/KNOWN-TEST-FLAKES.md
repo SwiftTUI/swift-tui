@@ -656,8 +656,17 @@ the gate's `--skip` set):
 
 Serialization costs nothing: 265 s serialized against 272 s parallel over 3150
 tests, because the lane is main-actor-bound and its parallelism was overhead.
-The gate therefore serializes this lane. **That is mitigation and not a fix** —
-1 / 6 is not 0.
+The gate therefore serializes this lane. **That is mitigation and not a fix.**
+Pooling every serialized run since — lane-only batches plus full container gate
+runs — the residual is **2 stalls in 13**, about 15%. A gate run still fails
+roughly one time in seven, and it fails here.
+
+**The stall point is suspiciously repeatable.** Across runs it lands in a narrow
+window, ~7100-7200 lines and ~290 s in, whether the lane runs parallel or
+serialized. That consistency is the strongest untested lead: it suggests a
+threshold (live task or continuation bookkeeping) rather than a race between a
+particular pair of tests, and it is *not* explained by the suites near the
+stall, which all pass in isolation.
 
 **Hypotheses tested and falsified.** Recorded so they are not re-run:
 
