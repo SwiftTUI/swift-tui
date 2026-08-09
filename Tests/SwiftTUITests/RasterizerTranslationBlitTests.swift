@@ -155,7 +155,7 @@ struct RasterizerTranslationBlitTests {
   }
 
   private static func rowBufferAddress(_ row: [RasterCell]) -> UInt {
-    unsafe row.withUnsafeBufferPointer { unsafe UInt(bitPattern: $0.baseAddress) }
+    unsafe row.withUnsafeBufferPointer { UInt(bitPattern: $0.baseAddress) }
   }
 
   // MARK: - Plan production

@@ -17,6 +17,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_PRESENTED_PROGRESS_GUARD",
         "SWIFTTUI_COLLECTION_PROBES",
         "SWIFTTUI_SCROLL_REGION",
+        "SWIFTTUI_SCROLL_BLIT",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -59,6 +60,15 @@ struct FeatureGateRegistryTests {
     // verification-backed, so the gate is a kill switch
     // (`SWIFTTUI_SCROLL_REGION=0`), not an opt-in.
     #expect(FeatureGate.scrollRegionEmission.defaultIsEnabled)
+  }
+
+  @Test("the scroll translation blit defaults on as a kill switch")
+  func scrollBlitDefaultsOn() {
+    // R3.2: every served row is draw-walk verified, flank-verified, and
+    // re-proven by the planner's row-buffer identity, with the F13 oracle
+    // unchanged on top — so like the scroll-region emission the gate is a
+    // kill switch (`SWIFTTUI_SCROLL_BLIT=0`), not an opt-in.
+    #expect(FeatureGate.scrollBlit.defaultIsEnabled)
   }
 
   @Test("configuration enums route their enrollment through the registry")
