@@ -19,6 +19,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case presentedProgressGuard
   case collectionProbes
   case scrollRegionEmission
+  case scrollBlit
 
   package var environmentVariableName: String {
     switch self {
@@ -36,6 +37,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_COLLECTION_PROBES"
     case .scrollRegionEmission:
       "SWIFTTUI_SCROLL_REGION"
+    case .scrollBlit:
+      "SWIFTTUI_SCROLL_BLIT"
     }
   }
 
@@ -87,6 +90,12 @@ package enum FeatureGate: CaseIterable, Sendable {
       // real terminals. `SWIFTTUI_SCROLL_REGION=0` disables the emission
       // wholesale if a terminal misbehaves.
       true
+    case .scrollBlit:
+      // Scroll-latency R3.2b: the raster-tier translation blit. Serving is
+      // prove-before-serve (draw-walk verified, F13-oracled), so like the
+      // scroll-region emission this is a kill switch once certified; it
+      // starts default-off until the A/B and oracle lanes land the evidence.
+      false
     }
   }
 

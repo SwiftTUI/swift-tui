@@ -127,8 +127,11 @@ struct IncrementalRasterReachabilityTests {
     #expect(terminal.frames.last?.contains("row 0") == false)
 
     let scrollRecord = try #require(sink.records.last)
+    // The R3.2b translation blit, when armed, reports the incremental path
+    // with served band rows; both are the incremental tier this pin guards.
     #expect(
-      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue,
+      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue
+        || scrollRecord.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
       "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
     )
     #expect(!scrollRecord.rasterReuseBarriers.contains("root_invalidated"))
@@ -206,8 +209,11 @@ struct IncrementalRasterReachabilityTests {
     #expect(terminal.frames.last?.contains("row 0") == false)
 
     let scrollRecord = try #require(sink.records.last)
+    // The R3.2b translation blit, when armed, reports the incremental path
+    // with served band rows; both are the incremental tier this pin guards.
     #expect(
-      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue,
+      scrollRecord.rasterPath == Rasterizer.RasterPath.incremental.rawValue
+        || scrollRecord.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
       "scroll frame path was \(scrollRecord.rasterPath), barriers \(scrollRecord.rasterReuseBarriers)"
     )
     #expect(scrollRecord.damageRowCount != nil)

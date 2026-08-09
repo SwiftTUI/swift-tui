@@ -114,7 +114,11 @@ public enum SummaryReducer {
       realizedRowsPerMovingFrame: emission.realizedRowsPerMovingFrame,
       listLayoutDerivationsPerMovingFrame: emission.listLayoutDerivationsPerMovingFrame,
       supersededPresentCount: emission.supersededPresentCount,
-      incrementalRasterFrameCount: frames.count { $0.rasterPath == "incremental" },
+      incrementalRasterFrameCount: frames.count {
+        // The R3.2b translation blit is the incremental path plus served
+        // band rows; both count as incremental frames for the reuse metric.
+        $0.rasterPath == "incremental" || $0.rasterPath == "incrementalTranslated"
+      },
       repairedIncrementalRasterFrameCount: frames.count {
         $0.rasterPath == "incrementalRepaired"
       },

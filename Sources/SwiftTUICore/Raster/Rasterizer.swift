@@ -28,6 +28,9 @@ package struct Rasterizer: Sendable {
     /// Reused the previous surface's clean rows and repainted only the damaged
     /// ones.
     case incremental
+    /// The incremental path additionally served verified scroll-band rows by
+    /// moving the previous surface's row buffers (R3.2b translation blit).
+    case incrementalTranslated
     /// Took the incremental path, then the F13 verification oracle caught a
     /// divergence and repaired it with a fresh raster.
     case incrementalRepaired
@@ -185,7 +188,8 @@ package struct Rasterizer: Sendable {
     minimumSize: CellSize,
     previousSurface: RasterSurface?,
     damage: PresentationDamage?,
-    verifyIncrementalRasterDamage: Bool = false
+    verifyIncrementalRasterDamage: Bool = false,
+    translation: RasterTranslationPlan? = nil
   ) -> RasterizationResult {
     let surfaceSize = rasterSurfaceSize(for: draw, minimumSize: minimumSize)
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
@@ -205,7 +209,8 @@ package struct Rasterizer: Sendable {
         surfaceSize: surfaceSize,
         previousSurface: previousSurface,
         soundDamage: soundDamage,
-        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
+        translation: translation
       )
     }
 
@@ -268,11 +273,44 @@ package struct Rasterizer: Sendable {
     surfaceSize: CellSize,
     previousSurface: RasterSurface,
     soundDamage: SoundRasterDamage,
-    verifyIncrementalRasterDamage: Bool = false
+    verifyIncrementalRasterDamage: Bool = false,
+    translation: RasterTranslationPlan? = nil
   ) -> RasterizationResult {
-    let damage = soundDamage.presentationDamage
-    let dirtyRows = soundDamage.dirtyRows
+    var damage = soundDamage.presentationDamage
+    var dirtyRows = soundDamage.dirtyRows
     var cells = previousSurface.cells
+    // R3.2b: serve the verified band rows by moving the previous surface's
+    // row buffers before the ordinary damage-restricted repaint. The blit
+    // constructs row-buffer identity at the translated rows and removes them
+    // from the dirty set; a declined blit leaves this path byte-identical to
+    // the plain incremental raster.
+    var translatedRows: [Int] = []
+    if let translation {
+      translatedRows = applyTranslationBlit(
+        translation,
+        previousSurface: previousSurface,
+        surfaceSize: surfaceSize,
+        cells: &cells
+      )
+      if !translatedRows.isEmpty {
+        dirtyRows.subtract(translatedRows)
+        damage = PresentationDamage(
+          textRows: damage.textRows.filter { !translatedRows.contains($0.row) },
+          graphicsInvalidation: damage.graphicsInvalidation,
+          requiresFullTextRepaint: damage.requiresFullTextRepaint,
+          requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay
+        )
+        guard !dirtyRows.isEmpty else {
+          // The scroll always exposes at least one repaint row; an empty
+          // dirty set here means the plan and the damage disagree about the
+          // frame — decline the whole incremental path conservatively.
+          return rasterizeFreshCollectingVisibleIdentities(
+            draw,
+            surfaceSize: surfaceSize
+          )
+        }
+      }
+    }
     var imageAttachments = previousSurface.imageAttachments.filter { attachment in
       !visibleBounds(attachment.visibleBounds, intersectsAnyOf: dirtyRows)
     }
@@ -333,17 +371,133 @@ package struct Rasterizer: Sendable {
       }
     }
 
+    var artifactDamage = refinedPresentationDamage(
+      from: damage,
+      previousSurface: previousSurface,
+      currentSurface: surface
+    )
+    if !translatedRows.isEmpty {
+      // Translated rows changed on screen (their buffers moved), so the
+      // artifact damage must carry them — but as unrefined full rows: cell-
+      // diffing them against the previous surface would pay the O(band cells)
+      // compare the blit exists to remove.
+      artifactDamage = PresentationDamage(
+        textRows: artifactDamage.textRows + translatedRows.map { .init(row: $0) },
+        graphicsInvalidation: artifactDamage.graphicsInvalidation,
+        requiresFullTextRepaint: artifactDamage.requiresFullTextRepaint,
+        requiresFullGraphicsReplay: artifactDamage.requiresFullGraphicsReplay
+      )
+    }
     return (
       surface,
       visibleIdentities,
-      refinedPresentationDamage(
-        from: damage,
-        previousSurface: previousSurface,
-        currentSurface: surface
-      ),
+      artifactDamage,
       nil,
-      .incremental
+      translatedRows.isEmpty ? .incremental : .incrementalTranslated
     )
+  }
+
+  /// Applies a verified translation blit: moves the previous surface's row
+  /// buffers by `dy` at every band row the plan proved translatable, after
+  /// re-validating the plan against this raster's actual geometry and
+  /// verifying the flanking columns row-invariant. Returns the rows served
+  /// (empty when the blit declines — the caller then runs the plain
+  /// incremental raster unchanged).
+  ///
+  /// Reads always come from `previousSurface.cells` (an independent value
+  /// referencing the shared row buffers), so move order cannot alias.
+  /// Retained presentation layers on served rows keep their previous bounds;
+  /// only non-compositing-significant cell fragments can remain there (the
+  /// plan never serves effect-carrying or image content), and those carry no
+  /// host-visible information beyond the cell grid.
+  private func applyTranslationBlit(
+    _ translation: RasterTranslationPlan,
+    previousSurface: RasterSurface,
+    surfaceSize: CellSize,
+    cells: inout [[RasterCell]]
+  ) -> [Int] {
+    guard previousSurface.size == surfaceSize,
+      previousSurface.imageAttachments.isEmpty,
+      translation.dy != 0,
+      translation.band.origin.y >= 0,
+      translation.band.maxY <= surfaceSize.height,
+      translation.band.maxY <= previousSurface.cells.count,
+      translation.band.maxY <= cells.count
+    else {
+      return []
+    }
+    // Compositing-significant retained layers cannot ride a moved band: the
+    // sidecar's bounds would describe the pre-scroll position.
+    let bandRowSet = Set(translation.bandRows)
+    for layer in previousSurface.presentationLayers
+    where !layer.effects.isEmpty || isImageLayer(layer) {
+      if visibleBounds(layer.bounds, intersectsAnyOf: bandRowSet) {
+        return []
+      }
+    }
+
+    let translatedRows = translation.translatedRows
+    guard !translatedRows.isEmpty else {
+      return []
+    }
+
+    // Flank verification: the blit moves whole row buffers, so the columns
+    // outside the band must be row-invariant between each served row and its
+    // source — the same argument that lets R2.3's full-width verification
+    // admit partial-width bands. Rows whose flanks differ are demoted to the
+    // repaint path, never mis-served.
+    let bandColumns = translation.band.columns
+    var servedRows: [Int] = []
+    servedRows.reserveCapacity(translatedRows.count)
+    for row in translatedRows {
+      let sourceRow = row - translation.dy
+      guard bandRowSet.contains(sourceRow) else {
+        continue
+      }
+      if flankCellsMatch(
+        previousSurface.cells[row],
+        previousSurface.cells[sourceRow],
+        excludingColumns: bandColumns,
+        surfaceWidth: surfaceSize.width
+      ) {
+        servedRows.append(row)
+      }
+    }
+    for row in servedRows {
+      cells[row] = previousSurface.cells[row - translation.dy]
+    }
+    return servedRows
+  }
+
+  private func isImageLayer(_ layer: RasterPresentationLayer) -> Bool {
+    if case .image = layer.content {
+      return true
+    }
+    return false
+  }
+
+  private func flankCellsMatch(
+    _ row: [RasterCell],
+    _ sourceRow: [RasterCell],
+    excludingColumns bandColumns: Range<Int>,
+    surfaceWidth: Int
+  ) -> Bool {
+    func cell(_ cells: [RasterCell], _ column: Int) -> RasterCell {
+      column < cells.count ? cells[column] : .empty
+    }
+    for column in 0..<max(0, min(surfaceWidth, bandColumns.lowerBound)) {
+      guard cell(row, column) == cell(sourceRow, column) else {
+        return false
+      }
+    }
+    if bandColumns.upperBound < surfaceWidth {
+      for column in bandColumns.upperBound..<surfaceWidth {
+        guard cell(row, column) == cell(sourceRow, column) else {
+          return false
+        }
+      }
+    }
+    return true
   }
 
   /// Restores fresh-raster paint order for an incrementally merged attachment

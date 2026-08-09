@@ -2,6 +2,10 @@ import SwiftTUICore
 import SwiftTUIViews
 
 struct FrameTailInlineStageRenderer: Sendable {
+  /// R3.2b gate: the raster-tier translation blit (`SWIFTTUI_SCROLL_BLIT`).
+  /// Read once — the gates latch their first read by design.
+  private static let scrollBlitEnabled = FeatureGate.scrollBlit.initialIsEnabled()
+
   var layoutEngine: LayoutEngine
   var semanticExtractor: SemanticExtractor
   var drawExtractor: DrawExtractor
@@ -103,11 +107,32 @@ struct FrameTailInlineStageRenderer: Sendable {
       advancing: input.retained.previousScrollRouteTable,
       to: committedScrollRoutes
     )
+    // R3.2b: the translation blit rides the incremental path only — the
+    // resolver's barriers (animation, topology change, duplicate identities)
+    // already produced `damage == nil` for every frame whose committed
+    // products cannot back a translation claim.
+    let translationPlan: RasterTranslationPlan? =
+      if Self.scrollBlitEnabled,
+        rasterReusePlan.damage != nil,
+        let committedScrollTranslation,
+        let previousSurface = input.retained.previousRasterSurface,
+        let previousDraw = input.retained.previousPhaseProducts?.draw
+      {
+        FrameTailPresentationDamageResolver.translationPlan(
+          candidate: committedScrollTranslation,
+          surfaceSize: previousSurface.size,
+          previousDraw: previousDraw,
+          currentDraw: draw.draw
+        )
+      } else {
+        nil
+      }
     let raster = rasterizeDrawTree(
       input,
       draw: draw.draw,
       rasterReuseDamage: rasterReusePlan.damage,
       verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
+      translation: translationPlan,
       clock: clock,
       beforeRaster: beforeRaster
     )
@@ -191,6 +216,7 @@ struct FrameTailInlineStageRenderer: Sendable {
     draw: DrawNode,
     rasterReuseDamage: PresentationDamage?,
     verifyIncrementalRasterDamage: Bool,
+    translation: RasterTranslationPlan? = nil,
     clock: ContinuousClock?,
     beforeRaster: (@Sendable () -> Void)?
   ) -> FrameTailRasterOutput {
@@ -202,7 +228,8 @@ struct FrameTailInlineStageRenderer: Sendable {
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
         previousSurface: previousSurface,
         damage: rasterReuseDamage,
-        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage
+        verifyIncrementalRasterDamage: verifyIncrementalRasterDamage,
+        translation: translation
       )
     }
     let finalPresentationDamage =

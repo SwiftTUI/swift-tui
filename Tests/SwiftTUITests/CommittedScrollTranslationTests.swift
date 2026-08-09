@@ -344,6 +344,37 @@ struct CommittedScrollTranslationTests {
     #expect(Self.tsvField("translation_committed", of: record) == "agree")
   }
 
+  @Test("a List wheel notch serves the band when the blit gate is armed")
+  func listNotchBlitEngagement() throws {
+    // A band tall enough that interior rows survive the exposure/edge
+    // repaints — a tiny band legitimately declines the plan (nothing left
+    // to serve), which is not what this pin is about.
+    let harness = try CommittedTranslationHarness(
+      fixture: .list,
+      terminalSize: CellSize(width: 30, height: 24)
+    )
+    harness.scroll(deltaY: 1)
+    try harness.render()
+    harness.scroll(deltaY: 1)
+    try harness.render()
+    let notchFrame = try #require(harness.sink.committedSamples.last)
+    let record = FrameRecordDerivation.record(from: .committed(notchFrame))
+    if FeatureGate.scrollBlit.initialIsEnabled() {
+      // The armed lane (SWIFTTUI_SCROLL_BLIT=1) must actually serve a hosted
+      // List's band — the container chrome (row-invariant section box) must
+      // not veto the plan. This is the engagement pin that catches the blit
+      // going dormant on the collection shape the program's headline
+      // scenario measures.
+      #expect(
+        record.rasterPath == Rasterizer.RasterPath.incrementalTranslated.rawValue,
+        "armed blit must serve the List band; barriers: \(record.rasterReuseBarriers)"
+      )
+    } else {
+      #expect(record.rasterPath == Rasterizer.RasterPath.incremental.rawValue)
+    }
+    #expect(record.rasterPath != Rasterizer.RasterPath.incrementalRepaired.rawValue)
+  }
+
   /// The rendered value of one column, located by header name rather than by
   /// index, so an inserted column cannot silently shift the assertion.
   private static func tsvField(_ name: String, of record: FrameDiagnosticRecord) -> String? {
@@ -368,11 +399,15 @@ private final class CommittedTranslationHarness {
 
   let sink = RecordingCommittedTranslationSink()
   let rootIdentity = testIdentity("CommittedTranslationFixture")
-  let terminalSize = CellSize(width: 24, height: 10)
+  let terminalSize: CellSize
   let runLoop: RunLoop<Int, AnyView>
   private var renderedFrames = 0
 
-  init(fixture: Fixture = .plainScrollView) throws {
+  init(
+    fixture: Fixture = .plainScrollView,
+    terminalSize: CellSize = CellSize(width: 24, height: 10)
+  ) throws {
+    self.terminalSize = terminalSize
     var environmentValues = EnvironmentValues()
     environmentValues.terminalSize = terminalSize
     let rootIdentity = rootIdentity
@@ -405,10 +440,14 @@ private final class CommittedTranslationHarness {
           )
         case .list:
           AnyView(
-            List(0..<40, id: \.self) { index in
+            List(0..<60, id: \.self) { index in
               Text("row \(index)")
             }
-            .frame(width: 20, height: 9, alignment: .topLeading)
+            .frame(
+              width: terminalSize.width - 4,
+              height: terminalSize.height - 1,
+              alignment: .topLeading
+            )
           )
         }
       }
