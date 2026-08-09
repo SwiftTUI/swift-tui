@@ -366,6 +366,13 @@ either.
 `TIMEOUT:` line for this specific step. If the step exits on a signal, or a
 named test actually fails, it is not this entry.
 
+**The lane also has a real stall, found by this fix.** Bounding silence turned
+the ambiguous "timed out after 1200s" into "produced no output for 1200s" — and
+that is literally true: the lane stops emitting for twenty minutes. This entry's
+premise that the lane was merely slow was wrong. The stall is tracked separately
+as [entry 14](#14-run-swiftui-runtime-tests--whole-lane-stall-every-thread-idle--open-mitigated-by-serialization);
+what follows fixed only the watchdog's decision rule.
+
 **Resolution (2026-08-09, FIXED).** Neither candidate above was taken: splitting
 the lane and raising its budget both leave a wall clock deciding whether a lane
 is alive, so both would have moved the cliff rather than removed it. The
@@ -607,6 +614,80 @@ another static seam audit.
 
 **Do not** attribute an unrelated failure in this suite to this entry: it has
 fired exactly once, and everything else about the suite is deterministic.
+
+---
+
+### 14. `Run SwiftTUI runtime tests` — whole-lane stall, every thread idle — OPEN, mitigated by serialization
+
+**Signature.** The lane stops emitting entirely, mid-suite, roughly 290 s in
+(~7100 lines). No test fails. Since entry 9's watchdog fix this is reported as
+`TIMEOUT … (produced no output for Ns)`; before it, the same event was reported
+as a wall-clock timeout and misread as a slow lane.
+
+**What the process looks like.** Attach with `lldb -p <xctest pid>` (the
+toolchain ships it; the container needs `--cap-add=SYS_PTRACE`):
+
+- 49 threads, **all idle**: one in `dispatch_main`'s `sigsuspend`, two in the
+  dispatch manager's `epoll_pwait`, the remaining 46 parked in
+  `_dispatch_semaphore_wait_slow` — the dispatch worker pool's *no work
+  available* state.
+- **Not one Swift frame on any stack.** Nothing is running, nothing is blocked
+  inside our code. Suspended Swift tasks have no stack, so a lost wakeup looks
+  exactly like this.
+- ~11 tests are "started" with no completion. They span unrelated suites — a DCS
+  parser test, an input-modifier test, a Braille fixture test, a stress test.
+  They share no lock, no fixture, and no resource except the main-actor
+  executor.
+
+**Measured rates** (arm64 Linux container, otherwise idle host, full lane with
+the gate's `--skip` set):
+
+| configuration | hangs |
+| --- | --- |
+| parallel (swift-testing default) | 3 / 4 |
+| `--parallel --num-workers 1` | 1 / 6 |
+
+Serialization costs nothing: 265 s serialized against 272 s parallel over 3150
+tests, because the lane is main-actor-bound and its parallelism was overhead.
+The gate therefore serializes this lane. **That is mitigation and not a fix** —
+1 / 6 is not 0.
+
+**Hypotheses tested and falsified.** Recorded so they are not re-run:
+
+1. *Main-actor spinner starvation.* 17 fixture tasks were
+   `while !Task.isCancelled { await Task.yield() }`, which spins the main actor
+   (`.task` is `@_inheritActorContext`; view bodies are `@MainActor`). Real
+   defect, fixed (`suspendUntilCancelled()`), **but not this one**: the lldb
+   capture shows idle threads, and a spinner shows a running one.
+2. *Cross-suite parallelism.* Falsified — it hangs under
+   `--parallel --num-workers 1` too.
+3. *A guarded-suite interaction.* Falsified — `FrameworkStressTests` alone is
+   0 / 3 and all 57 `FrameworkStress` suites together are 0 / 2.
+4. *`SoundnessCounterScopeGate` (the process-global mutex over all 43 guarded
+   suites).* Bypassing it gave 0 / 4 against the 3 / 4 baseline, which looked
+   decisive — but a control that merely *instrumented* the same path with file
+   I/O also gave 0 / 4, and the stuck tests turn out **not to be in guarded
+   suites at all**. The gate is exonerated; both results were timing artefacts.
+   Any perturbation of this region hides the stall, which is itself the most
+   useful fact here: bisecting by editing code will mislead.
+
+**Where that leaves it.** Unrelated main-actor tests suspended, an idle
+executor, and no Swift frames point below this repository — at main-queue
+wakeup on Linux after `dispatch_main()` — rather than at any lock we own. The
+next step is *not* another code bisect. It is to capture the suspended task
+graph (Swift task dumps / `SWIFT_DEBUG_...` task inspection) at the stall, or to
+retest under a newer toolchain, and to compare against a build with
+`--disable-testing-library swift-testing`-style isolation of the runner.
+
+**How to identify this flake.** Whole-lane silence with no failing test, and an
+lldb attach showing every thread idle with no Swift frames. If any thread is
+inside Swift code, or a named test fails, it is not this entry.
+
+**Reproduction recipe.** In the pinned container, run the lane directly (the
+gate harness is not required) and poll the log for a stall:
+`swiftly run swift test --filter SwiftTUITests` plus the gate's five `--skip`
+flags, killing when the log stops growing for ~120 s. Expect roughly 3 stalls in
+4 parallel attempts, each about 5 minutes in.
 
 ---
 

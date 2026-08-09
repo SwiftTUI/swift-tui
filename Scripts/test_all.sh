@@ -392,8 +392,15 @@ run_swift() {
   swiftly run swift "$@"
 }
 
+# The broad runtime lane runs serialized. It is main-actor-bound, so its
+# parallelism bought nothing measurable — 265 s serialized against 272 s
+# parallel over 3150 tests — while measurably costing reliability: the lane
+# wedges (every thread idle, no Swift frame anywhere) in 3 of 4 parallel runs
+# against 1 of 6 serialized. This is MITIGATION, not a fix; the root cause is
+# open and recorded as KNOWN-TEST-FLAKES.md entry 14.
 run_swift_runtime_tests_without_isolated_async_suites() {
   run_swift test "$@" \
+    --parallel --num-workers 1 \
     --skip AsyncLifecycleGenerationTests \
     --skip AsyncFrameTailRenderingTests \
     --skip TaskReadsUnbodiedStateTests \
