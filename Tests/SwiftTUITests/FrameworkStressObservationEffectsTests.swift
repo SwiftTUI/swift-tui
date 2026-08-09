@@ -1,5 +1,5 @@
 import Observation
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -1616,9 +1616,7 @@ private struct ObservationEffects028View: View {
       Button("Toggle Task Priority 028") { generation += 1 }
       Text("028 generation \(generation)")
         .task(priority: generation.isMultiple(of: 2) ? .high : .low) {
-          while !Task.isCancelled {
-            await Task.yield()
-          }
+          await suspendUntilCancelled()
         }
     }
   }

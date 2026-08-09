@@ -363,7 +363,7 @@ run_swift() {
   # them deliberately (e.g. to bisect a load-sensitive flake such as the
   # run-loop SIGSEGV in docs/KNOWN-TEST-FLAKES.md):
   #   SWIFTTUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
-  #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--num-workers 1) so a
+  #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--parallel --num-workers 1) so a
   #     timing-dependent interleaving is reproducible/bisectable rather than
   #     racing across parallel workers.
   if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
@@ -380,7 +380,12 @@ run_swift() {
       set -- "$@" --skip "$SWIFTTUI_SWIFT_TEST_SKIP_REGEX"
     fi
     if [ -n "${SWIFTTUI_SWIFT_TEST_SERIALIZED:-}" ]; then
-      set -- "$@" --num-workers 1
+      # Both flags, in full: SwiftPM rejects `--num-workers` without
+      # `--parallel`, so the previous one-flag spelling failed argument
+      # validation in about a second and never serialized anything. The same
+      # mistake made the release-soundness soak inert for four days
+      # (KNOWN-TEST-FLAKES.md entry 1, "soak integrity note").
+      set -- "$@" --parallel --num-workers 1
     fi
   fi
 

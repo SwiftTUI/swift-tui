@@ -1,4 +1,5 @@
 import SwiftTUICore
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -639,9 +640,7 @@ struct LifecycleCoordinatorSkipTests {
         // Parks cancellation-responsively, without timers (the test-sync
         // ratchet forbids new sleeps), so the started task stays observable
         // via activeTaskCount until shutdown() cancels it.
-        while !Task.isCancelled {
-          await Task.yield()
-        }
+        await suspendUntilCancelled()
       }
     )
     let plan = CommitPlan(

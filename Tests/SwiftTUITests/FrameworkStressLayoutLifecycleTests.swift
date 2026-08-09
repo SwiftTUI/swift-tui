@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -821,9 +821,7 @@ private struct StressLL013Fixture: View {
       VStack(alignment: .leading, spacing: 0) {
         Text("root model \(probe.count)")
           .task(id: "hidden-root-task") {
-            while !Task.isCancelled {
-              await Task.yield()
-            }
+            await suspendUntilCancelled()
           }
         Button("Push Hidden Root") { isPresented = true }
       }
@@ -1293,9 +1291,7 @@ private struct StressLL021Sheet: View {
           VStack(alignment: .leading, spacing: 0) {
             Text("nested sheet detail")
               .task(id: "nested-sheet-detail-task") {
-                while !Task.isCancelled {
-                  await Task.yield()
-                }
+                await suspendUntilCancelled()
               }
             Button("Dismiss Sheet From Detail") { isPresented = false }
           }
@@ -1476,9 +1472,7 @@ private struct StressLL024Fixture: View {
       if isVisible {
         Text("self removing branch")
           .task(id: "self-removing-task") {
-            while !Task.isCancelled {
-              await Task.yield()
-            }
+            await suspendUntilCancelled()
           }
           .onAppear {
             probe.events.append("appear")
@@ -1543,9 +1537,7 @@ private struct StressLL025Fixture: View {
                   if row == 0 { probe.events.append("row0 disappear") }
                 }
                 .task(id: row) {
-                  while !Task.isCancelled {
-                    await Task.yield()
-                  }
+                  await suspendUntilCancelled()
                 }
             }
           }

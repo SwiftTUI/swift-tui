@@ -1,3 +1,4 @@
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -266,9 +267,7 @@ private struct StackedFirstSheetBody: View {
       Button("Open Sheet B") { showsSheetB.wrappedValue = true }
     }
     .task(id: "stacked-sheet-a-task") {
-      while !Task.isCancelled {
-        await Task.yield()
-      }
+      await suspendUntilCancelled()
     }
   }
 }

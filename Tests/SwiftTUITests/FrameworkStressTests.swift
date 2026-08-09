@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -1498,9 +1498,7 @@ private struct TaskCancellationStressPane: View {
             height: proxy.size.height
           )
         ) {
-          while !Task.isCancelled {
-            await Task.yield()
-          }
+          await suspendUntilCancelled()
         }
     }
   }
@@ -1726,9 +1724,7 @@ private struct CollectionIdentityChurnRow: View {
       .onAppear {}
       .onDisappear {}
       .task(id: CollectionIdentityChurnTaskID(rowID: id)) {
-        while !Task.isCancelled {
-          await Task.yield()
-        }
+        await suspendUntilCancelled()
       }
   }
 }
@@ -3627,9 +3623,7 @@ private struct FrameworkStressExpansionOwner: View {
     case .taskIDRebinds:
       Text("Task Expansion Owner")
         .task(id: FrameworkStressExpansionTaskID(generation: generation)) {
-          while !Task.isCancelled {
-            await Task.yield()
-          }
+          await suspendUntilCancelled()
         }
     }
   }
@@ -4343,9 +4337,7 @@ private struct FrameworkStressAdditionalOwner: View {
       Panel(id: FrameworkStressAdditionalFixture.scopeIdentity) {
         Text("Additional Task Owner")
           .task(id: FrameworkStressAdditionalTaskID(generation: generation)) {
-            while !Task.isCancelled {
-              await Task.yield()
-            }
+            await suspendUntilCancelled()
           }
       }
 
@@ -4894,14 +4886,10 @@ private struct MultipleTaskModifierStressFixture: View {
       Text("multi-task generation \(generation)")
         .id("multi-task-\(generation % 7)")
         .task(id: MultipleTaskModifierStressID(slot: "first", generation: generation)) {
-          while !Task.isCancelled {
-            await Task.yield()
-          }
+          await suspendUntilCancelled()
         }
         .task(id: MultipleTaskModifierStressID(slot: "second", generation: generation)) {
-          while !Task.isCancelled {
-            await Task.yield()
-          }
+          await suspendUntilCancelled()
         }
     }
     .frame(width: 54, height: 8, alignment: .topLeading)

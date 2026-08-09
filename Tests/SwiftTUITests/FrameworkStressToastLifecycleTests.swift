@@ -1248,9 +1248,7 @@ private struct ToastLifecycle024Content: View {
     Text("task toast cycle \(cycle)")
       .task {
         probe.taskStarts += 1
-        while !Task.isCancelled {
-          await Task.yield()
-        }
+        await suspendUntilCancelled()
         probe.taskCancellations += 1
       }
   }

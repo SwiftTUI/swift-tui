@@ -88,9 +88,7 @@ private struct GeometryTaskProbe: View {
                 // Stay alive while the tab is active; exit only on cancellation.
                 // (In a synchronous test the body never runs — the count is
                 // driven by the task registry, not by body completion.)
-                while !Task.isCancelled {
-                  await Task.yield()
-                }
+                await suspendUntilCancelled()
               }
           }
         }

@@ -1,4 +1,4 @@
-import SwiftTUITestSupport
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -319,7 +319,7 @@ extension FrameworkStressCancellationStateMachineTests {
     let stream = makeTaskBackedAsyncStream {
       (continuation: AsyncStream<Int>.Continuation) in
       continuation.yield(1)
-      while !Task.isCancelled { await Task.yield() }
+      await suspendUntilCancelled()
       counter.increment()
     }
     let consumer = Task {

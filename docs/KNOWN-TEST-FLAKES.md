@@ -53,8 +53,9 @@ injected delays) — see issue #12 for the investigation and suspect seams.
 frame-tail worker immediately before the off-main overlay write. A test can park
 the worker inside that window and race a concurrent main-actor read. Wired +
 ordering-guarded by `Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift`. To
-serialize a repro run, set `SWIFTTUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--num-workers
-1`). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
+serialize a repro run, set `SWIFTTUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--parallel
+--num-workers 1`; it emitted only the bare `--num-workers 1` until 2026-08-09, which
+SwiftPM rejects outright, so the seam had never serialized anything). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
 semantics (worker copies-on-write its own box. The shared `_BoxStorage` is
 `Mutex`-guarded with atomic refcount).
 
@@ -558,6 +559,54 @@ cadence-suite hang bound. The visible-screen test pre-seeds its PTY before it
 arms the wait (entry-6/11 fixes cover the momentum class).
 A suite that still exceeds the five-minute bound on this runner class is a
 real wedge, not this entry.
+
+---
+
+### 13. `SwiftTUIWASISurfaceBridgeTests` — one-off `SIGBUS` at `pc = 0x1` — OPEN, not reproduced
+
+**Signature.** The gate step `Run SwiftTUIWASISurfaceBridge tests` dies on
+signal 7 during `bun run test:all` on arm64 Linux:
+
+```
+*** Program crashed: Bus error at 0x0000000000000001 ***
+Thread 0 crashed:
+  0  0x0000000000000001
+```
+
+`pc` and `lr` both hold `0x1` and `fp` is `0` — a jump to address 1, i.e.
+control-flow corruption. It is **not** an index or precondition trap: those
+raise `SIGTRAP` on arm64 Linux, not `SIGBUS`.
+
+**Crash site, decoded from the register dump.** Do not re-derive this. `x0`
+points at a stack slot holding `0x2a` followed by the Swift small-string
+`render "` / `tick"`, and `x5`/`x6` hold the small string `incremental`. Those
+are the arguments of
+`WebSurfaceTransportTests.frameDiagnosticRecord(frameNumber: 42, causeSummary:
+"render \"tick\"")`, whose `presentationStrategy` is `"incremental"` — so the
+process was in or near the test `encoder emits frame diagnostics as typed
+records`.
+
+**Not reproduced (2026-08-09).** In the pinned arm64 container on an 18-core
+host: 69/69 clean on macOS and Linux; 0/40 sequential under 12 CPU hogs; 0/60
+interleaved (6 concurrent processes × 10 rounds) under 16 hogs; green again in a
+targeted lane re-run. The gate's own extra environment
+(`SWIFTTUI_SOUNDNESS_PROBE_TRACE`) only emits on recorded violations, which this
+suite does not trigger, so it is not the missing ingredient.
+
+**How to identify this flake.** Signal 7 with `pc = lr = 0x1` in this suite. A
+crash in this suite with an attributable Swift runtime message, or on a
+different signal, is not this entry.
+
+**Relationship to entry 1.** Same class — an unattributable memory-corruption
+crash that is load-sensitive and does not reproduce on demand — but a **new
+site**: entry 1 names run-loop-building suites, and this suite builds no run
+loop. Entry 1's re-open criteria apply: a raw `SIGSEGV`/`SIGBUS` is evidence of
+non-race heap corruption, and the pursuit is dynamic (allocator guards:
+`MALLOC_CHECK_=3` / `MALLOC_PERTURB_` on Linux, `libgmalloc` on macOS), not
+another static seam audit.
+
+**Do not** attribute an unrelated failure in this suite to this entry: it has
+fired exactly once, and everything else about the suite is deterministic.
 
 ---
 

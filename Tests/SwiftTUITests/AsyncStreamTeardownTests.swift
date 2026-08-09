@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUIRuntime
@@ -35,9 +36,7 @@ struct AsyncStreamTeardownTests {
     let stream = makeTaskBackedAsyncStream { (continuation: AsyncStream<Int>.Continuation) in
       continuation.yield(1)
       await probe.recordYield()
-      while !Task.isCancelled {
-        await Task.yield()
-      }
+      await suspendUntilCancelled()
       await probe.recordCancellation()
     }
 
