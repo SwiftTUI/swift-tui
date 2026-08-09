@@ -70,10 +70,22 @@ refuses a package that uses unsafe flags as a versioned dependency outright.
 Never make the compiler option unconditional. Add it to a gate lane instead.
 
 The repo gate also has a command-level watchdog around every sub-suite. By
-default, `SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS=1200`. Set it to `0` only for local
-diagnosis when you intentionally want an unbounded run. On timeout, the runner
-prints the captured sub-suite log and exits immediately so later suites do not
-keep spending CI minutes.
+default, `SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS=1200`. That bounds **silence, not
+total runtime**: the watchdog fires when a sub-suite has produced no output for
+that long. A fixed wall-clock cap could not tell a lane that parked from one
+merely running slower under contention, and killed both — the failure mode
+recorded as [KNOWN-TEST-FLAKES.md](KNOWN-TEST-FLAKES.md) entry 9. Set it to `0`
+only for local diagnosis when you intentionally want an unbounded run.
+`SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS` (default: 4× the idle bound, `0`
+disables) is the backstop for the one case silence cannot catch, a sub-suite
+that livelocks while still printing. On timeout, the runner prints the captured
+sub-suite log and exits immediately so later suites do not keep spending CI
+minutes.
+
+`Scripts/check_step_watchdog.sh` is the watchdog's self-test: it drives the real
+`run_logged_command` with synthetic slow, silent, and chatty-livelock steps, so
+the behaviour is verified deterministically in seconds rather than only on a
+loaded runner.
 
 ### Test targets
 

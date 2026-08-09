@@ -336,7 +336,7 @@ prefer iterative teardown for deep `DrawNode` arrays. This approach already
 fixed deep construction paths in the WASI depth-capped chunked resolve and in
 the iterative runtime-registration restore walks from `6431a966`.
 
-### 9. `Run SwiftTUI runtime tests` — lane exceeds the 1200 s per-step gate cap under parallel load
+### 9. `Run SwiftTUI runtime tests` — lane exceeds the 1200 s per-step gate cap under parallel load — FIXED 2026-08-09
 
 **Signature.** The gate step `Run SwiftTUI runtime tests` is killed by the
 `Scripts/test_all.sh` watchdog: `TIMEOUT: command timed out after 1200s.
@@ -365,12 +365,36 @@ either.
 `TIMEOUT:` line for this specific step. If the step exits on a signal, or a
 named test actually fails, it is not this entry.
 
-**How to investigate / candidate hardening.** Split the runtime lane (it is
-the only step whose test count is an order of magnitude above its
-neighbours), or raise this step's budget specifically via
-`SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS` on the loaded lanes. A fix cannot be
-tested on an idle developer machine. The 5× local margin means only a
-loaded runner exercises it.
+**Resolution (2026-08-09, FIXED).** Neither candidate above was taken: splitting
+the lane and raising its budget both leave a wall clock deciding whether a lane
+is alive, so both would have moved the cliff rather than removed it. The
+watchdog now bounds **silence** instead
+(`Scripts/lib/step_watchdog.sh`): it samples the step's log and fires only when
+nothing has been written for `SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS`. A lane
+running 5× slower under contention keeps emitting per-test output and survives;
+a parked lane emits nothing and still dies — sooner than before, because it no
+longer has to burn the full cap first. `SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS`
+(default 4× the idle bound) is the backstop for a step that livelocks while
+still printing. Every existing caller keeps working: the env var's name and
+default are unchanged, only its meaning is stricter about what "stuck" means.
+
+**Second defect, found by the new self-test.** `kill_process_tree` was
+recursive, and POSIX `sh` has no locals — each recursive call overwrote its
+caller's `pid`, so the outermost `send_signal` named the *deepest descendant*
+and the root of any tree with children was signalled never. A single-chain tree
+(`swiftly` → `swift-test` → `xctest`) still had its leaf killed, which is why
+the abort usually appeared to work; a step that respawns children, or a
+multi-branch tree, survived the kill entirely and left `run_logged_command`
+blocked in `wait` forever. The function is now iterative, signals the root first
+so a supervisor cannot spawn a replacement mid-kill, and reaps descendants after.
+
+**Regression cover.** `Scripts/check_step_watchdog.sh` (gate step *Self-test step
+watchdog*) drives the real `run_logged_command` with synthetic slow, parked,
+silent, and chatty-livelock steps under sub-second bounds — the whole file runs
+in ~20 s. It was written before the fix and failed on both defects, and reverting
+either one turns it red again. This entry's original note that "a fix cannot be
+tested on an idle developer machine" was wrong: the *lane* cannot be, but the
+watchdog's decision rule can, and that is where the flake lived.
 
 ---
 

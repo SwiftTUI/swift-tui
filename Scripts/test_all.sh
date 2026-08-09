@@ -6,8 +6,20 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 runner_name=${SWIFTTUI_TEST_RUNNER_NAME:-test-all}
+# The per-step watchdog measures *silence*, not wall clock. A fixed wall-clock
+# cap cannot tell a lane that parked from one that is merely running 5x slower
+# under contention, so it kills both — which is how the largest lane
+# (`Run SwiftTUI runtime tests`, ~221 s solo) turned red on loaded runners while
+# passing everywhere else. Silence separates the two: a live lane keeps emitting
+# per-test output, a parked one emits nothing. See KNOWN-TEST-FLAKES.md entry 9.
 step_timeout_seconds=${SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS:-1200}
 step_timeout_kill_grace_seconds=${SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
+# Backstop for the one case silence cannot catch: a step that livelocks *while*
+# printing. Defaults to 4x the idle bound; 0 disables it.
+step_absolute_timeout_seconds=${SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS:-$((step_timeout_seconds * 4))}
+# How often the watchdog samples the step's log size. Sampling every tick would
+# stat a multi-megabyte log five times a second for no added resolution.
+step_output_probe_ticks=${SWIFTTUI_TEST_STEP_OUTPUT_PROBE_TICKS:-25}
 soundness_trace_root=$repo_root/.build/soundness-trace
 soundness_quarantine_file=$repo_root/Scripts/soundness_quarantine.txt
 soundness_trace_invocation_index=0
@@ -185,6 +197,7 @@ Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
   - stable-doc source-path guardrails
   - explicit layout work-stack guardrails
+  - per-step watchdog self-test
   - frame-tail tree-walker recursion guardrails (plus their self-test)
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
@@ -218,7 +231,12 @@ since-changed symbol. --clean trades a from-scratch rebuild for a run that
 cannot be tripped by that staleness.
 
 Each step is bounded by SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS, defaulting to 1200
-seconds. Set it to 0 to disable the per-step watchdog for local diagnosis.
+seconds. This bounds SILENCE, not total runtime: the watchdog fires when a step
+has produced no output for that long, so a lane running slowly under contention
+is not killed like one that parked, while a genuinely wedged lane still dies.
+Set it to 0 to disable the per-step watchdog for local diagnosis.
+SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS (default: 4x the idle bound, 0 to
+disable) is the backstop for a step that livelocks while still printing.
 After a timeout, the runner sends SIGTERM to the step's process tree, waits
 SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS seconds, then sends SIGKILL before
 printing the captured log and failing the gate.
@@ -246,209 +264,7 @@ record_result() {
     >>"$results_file"
 }
 
-read_step_exit_code() {
-  status_file=$1
-
-  if [ -f "$status_file" ]; then
-    cat "$status_file"
-  else
-    echo 1
-  fi
-}
-
-is_non_negative_integer() {
-  case "$1" in
-  "" | *[!0-9]*)
-    return 1
-    ;;
-  *)
-    return 0
-    ;;
-  esac
-}
-
-validate_timeout_configuration() {
-  if ! is_non_negative_integer "$step_timeout_seconds"; then
-    >&2 echo "SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS must be a non-negative integer."
-    exit 1
-  fi
-
-  if ! is_non_negative_integer "$step_timeout_kill_grace_seconds"; then
-    >&2 echo "SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS must be a non-negative integer."
-    exit 1
-  fi
-}
-
-process_children() {
-  pid=$1
-
-  if command -v pgrep >/dev/null 2>&1; then
-    pgrep -P "$pid" 2>/dev/null || true
-    return
-  fi
-
-  ps -e -o pid= -o ppid= 2>/dev/null | awk -v parent="$pid" '$2 == parent { print $1 }'
-}
-
-send_signal() {
-  signal=$1
-  pid=$2
-
-  case "$signal" in
-  TERM)
-    kill -TERM "$pid" 2>/dev/null || true
-    ;;
-  KILL)
-    kill -KILL "$pid" 2>/dev/null || true
-    ;;
-  esac
-}
-
-kill_process_tree() {
-  pid=$1
-  signal=$2
-
-  for child in $(process_children "$pid"); do
-    kill_process_tree "$child" "$signal"
-  done
-
-  send_signal "$signal" "$pid"
-}
-
-descendant_pids() {
-  pid=$1
-
-  for child in $(process_children "$pid"); do
-    printf '%s\n' "$child"
-    descendant_pids "$child"
-  done
-}
-
-# Pre-kill hang diagnostics (SWIFTTUI_HANG_DIAGNOSTICS=1): when the step watchdog
-# fires, capture per-thread kernel wait channels and full thread backtraces of
-# the test-runner processes BEFORE terminating them, so a wedged step leaves
-# evidence of WHAT it was blocked on instead of just "timed out". Linux-only
-# by construction (wchan/gdb); inert unless explicitly enabled.
-dump_hang_diagnostics() {
-  root_pid=$1
-
-  [ "${SWIFTTUI_HANG_DIAGNOSTICS:-0}" = "1" ] || return 0
-
-  pid_list=$root_pid
-  for pid in $(descendant_pids "$root_pid"); do
-    pid_list="$pid_list,$pid"
-  done
-
-  >&2 echo "HANG-DIAGNOSTICS: capturing state of process tree rooted at $root_pid"
-  >&2 ps -o pid,stat,pcpu,etimes,comm -p "$pid_list" 2>/dev/null || true
-
-  gdb_command=""
-  if command -v gdb >/dev/null 2>&1; then
-    gdb_command="gdb"
-    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-      # ptrace of a non-child needs privilege when yama/ptrace_scope=1.
-      gdb_command="sudo -n gdb"
-    fi
-  fi
-
-  dumped=0
-  for pid in $root_pid $(descendant_pids "$root_pid"); do
-    comm=$(cat "/proc/$pid/comm" 2>/dev/null || echo '?')
-    case "$comm" in
-    *swift* | *xctest* | *Packag*) ;;
-    *) continue ;;
-    esac
-
-    thread_count=$(ls "/proc/$pid/task" 2>/dev/null | wc -l)
-    >&2 echo "HANG-DIAGNOSTICS: pid $pid ($comm) threads=$thread_count"
-    >&2 echo "--- per-thread state/wchan: pid $pid ---"
-    >&2 ps -L -o tid,stat,pcpu,wchan:32,comm -p "$pid" 2>/dev/null || true
-
-    if [ "$dumped" -lt 3 ] && [ -n "$gdb_command" ]; then
-      >&2 echo "--- gdb thread backtraces: pid $pid ($comm) ---"
-      $gdb_command --batch -p "$pid" \
-        -ex "set pagination off" \
-        -ex "set print thread-events off" \
-        -ex "thread apply all bt 24" 2>&1 |
-        sed 's/^/[gdb] /' >&2 || true
-      dumped=$((dumped + 1))
-    fi
-  done
-}
-
-run_logged_command() {
-  log_file=$1
-  status_file=$2
-  timeout_file=$3
-  watchdog_cancel_file=$timeout_file.cancel
-  shift 3
-
-  rm -f "$status_file" "$timeout_file" "$watchdog_cancel_file"
-
-  (
-    set +e
-
-    if [ "$step_timeout_seconds" -eq 0 ]; then
-      "$@"
-      command_status=$?
-      printf '%s\n' "$command_status" >"$status_file"
-      exit 0
-    fi
-
-    "$@" &
-    command_pid=$!
-
-    (
-      elapsed_ticks=0
-      timeout_ticks=$((step_timeout_seconds * 5))
-      while [ "$elapsed_ticks" -lt "$timeout_ticks" ]; do
-        if [ -f "$watchdog_cancel_file" ]; then
-          exit 0
-        fi
-        sleep 0.2
-        elapsed_ticks=$((elapsed_ticks + 1))
-      done
-
-      if [ -f "$watchdog_cancel_file" ]; then
-        exit 0
-      fi
-
-      if kill -0 "$command_pid" 2>/dev/null; then
-        detail="timed out after ${step_timeout_seconds}s"
-        printf '%s\n' "$detail" >"$timeout_file"
-        printf '%s\n' 124 >"$status_file"
-        >&2 echo "TIMEOUT: command $detail; terminating process tree rooted at pid $command_pid."
-        dump_hang_diagnostics "$command_pid"
-        kill_process_tree "$command_pid" TERM
-        sleep "$step_timeout_kill_grace_seconds"
-        if kill -0 "$command_pid" 2>/dev/null; then
-          >&2 echo "TIMEOUT: command still running after ${step_timeout_kill_grace_seconds}s; sending SIGKILL."
-          kill_process_tree "$command_pid" KILL
-        fi
-      fi
-    ) &
-    watchdog_pid=$!
-
-    wait "$command_pid"
-    command_status=$?
-    if [ -f "$timeout_file" ]; then
-      wait "$watchdog_pid" 2>/dev/null || true
-    else
-      printf '%s\n' cancel >"$watchdog_cancel_file"
-      wait "$watchdog_pid" 2>/dev/null || true
-    fi
-    rm -f "$watchdog_cancel_file"
-
-    if [ ! -f "$status_file" ]; then
-      printf '%s\n' "$command_status" >"$status_file"
-    fi
-
-    exit 0
-  ) 2>&1 | tee "$log_file"
-
-  command_status=$(read_step_exit_code "$status_file")
-  [ "$command_status" -eq 0 ]
-}
+. "$repo_root/Scripts/lib/step_watchdog.sh"
 
 swift_command_text() {
   if [ "$is_linux" -eq 1 ]; then
@@ -877,6 +693,12 @@ run_step \
   "$repo_root" \
   "Scripts/check_layout_work_stack_guardrails.sh" \
   Scripts/check_layout_work_stack_guardrails.sh
+
+run_step \
+  "Self-test step watchdog" \
+  "$repo_root" \
+  "Scripts/check_step_watchdog.sh" \
+  Scripts/check_step_watchdog.sh
 
 run_step \
   "Run tree-walker recursion guardrails" \
