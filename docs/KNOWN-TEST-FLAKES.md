@@ -382,7 +382,7 @@ named test actually fails, it is not this entry.
 the ambiguous "timed out after 1200s" into "produced no output for 1200s" — and
 that is literally true: the lane stops emitting for twenty minutes. This entry's
 premise that the lane was merely slow was wrong. The stall is tracked separately
-as [entry 14](#14-run-swiftui-runtime-tests--whole-lane-stall-every-thread-idle--open-mitigated-by-serialization);
+as [entry 14](#14-run-swiftui-runtime-tests--whole-lane-stall-every-thread-idle--open-below-the-repo-trigger-seam-hardened-2026-08-10);
 what follows fixed only the watchdog's decision rule.
 
 **Resolution (2026-08-09, FIXED).** Neither candidate above was taken: splitting
@@ -629,7 +629,7 @@ fired exactly once, and everything else about the suite is deterministic.
 
 ---
 
-### 14. `Run SwiftTUI runtime tests` — whole-lane stall, every thread idle — OPEN, mitigated by serialization
+### 14. `Run SwiftTUI runtime tests` — whole-lane stall, every thread idle — OPEN below the repo; trigger seam hardened 2026-08-10
 
 **Signature.** The lane stops emitting entirely, mid-suite, roughly 290 s in
 (~7100 lines). No test fails. Since entry 9's watchdog fix this is reported as
@@ -701,8 +701,14 @@ only ~5–10% wall clock (~290 s serialized against ~272 s parallel; the
   evidence of the previous one (2026-08-10).
   `InjectedTerminalInputReaderTests` "injected input reader parses
   terminal-pixel mouse coordinates when configured" failed 1/8 the same day
-  (asserted before its collected event array was complete) and is recorded
-  here as a candidate of the same class, unfixed.
+  (asserted before its collected event array was complete) and was recorded
+  here as a candidate of the same class. **Fixed 2026-08-10 (later):** the
+  race was in stream attachment, not assertion order — the test spawned its
+  consumer task and created `inputEvents()` inside it, so `finish()` on the
+  test thread could land between the setup drain's out-of-lock yields and
+  truncate the stream. All four tests in the suite now create the stream
+  synchronously before spawning the consumer, the shape the suite's
+  manual-flush test already used.
 
 **Serialization is mitigation of the *diagnosis*, not of the rate, and not a
 fix**; the root cause is narrowed below, and the entry stays open until it is
@@ -813,6 +819,89 @@ never against local non-reproduction, since any perturbation hides the stall.
 Keep the lane on `--no-parallel` for the single-test stall signature and the
 asserted execution shape — not for the rate, which serialization does not
 change.
+
+**Seam hardening (2026-08-10, later): the prescribed redesign was executed.**
+No task is cancelled anywhere on the frame-tail seam any more.
+`renderFrameTailLayoutStage`'s queued-cancellation path no longer races two
+task-group children and `cancelAll()`s the loser while separately cancelling
+the freshly spawned layout task. The per-frame race this closes is now
+legible in the code: `markStarted` runs on the layout worker thread, so the
+token transition resumed *both* group children's continuations from that
+thread — enqueuing their resume jobs onto the main actor — while the main
+actor, woken by whichever child won `group.next()`, called `cancelAll()` on
+the other. A cancel concurrent with a resume-enqueue, once per frame in
+every animating fixture: exactly the captured CANCELLED+ENQUEUED signature.
+The redesign, using both verified facts above:
+
+- The signal wait runs **inline** on the frame tail (no second task exists
+  at all) and is retired by a **queue-exit release** instead of by
+  cancellation: `FrameTailJobCancellationToken` conforms to a new
+  `PendingFrameWaitReleasing` protocol (SwiftTUIGraph), fired on any exit
+  from the queued state, and `FrameScheduler.waitForPendingFrame(at:releasedBy:)`
+  registers the release waker in the same continuation registry a frame
+  request resumes through. The scheduler's timeout task is deliberately
+  left to expire on its own rather than gaining a new cancel site.
+- Both `layoutTask.cancel()` calls are deleted on the verified redundancy:
+  `cancelBeforeStart()`'s token transition makes the queued job bail at
+  worker entry, and the abandoned task drains on its own.
+
+Regression cover: `FrameTailQueueExitReleaseTests` pins the release at
+three levels — token queue-exit observers, the scheduler wait returning on
+release with no pending frame, and a seam-level test whose signal closure
+parks until the release fires. That last test deadlocks under the
+pre-hardening design (the group's loser child sat in a cancel-blind
+continuation and the group could not exit after `cancelAll()`), so it is
+the standing tripwire against reintroducing a task-cancellation wait here.
+
+**Measured result — the hardening does NOT change the stall rate, and the
+new captures are the most valuable data yet.** Judged against the focused
+repro as prescribed: **9 stalls in 58 valid treatment runs (~16%)** across
+two batches (1/11, then 8/47 in a clean batch) vs **1/12 (~8%)** at
+baseline — no reduction, and possibly an increase, which the 12-run
+baseline is too thin to resolve. What the batches bought instead:
+
+- **Every one of the 9 stalls parked at the identical place** — mid-write
+  of the *pass* line for `InteractiveRuntimeTests` "reverse focus from a
+  tab-hosted scroll view does not take the animation reuse skip", 166 log
+  lines every time, ~15 s in. The stall fires at that test's completion,
+  deterministically placed, roughly one run in six.
+- **The frozen task in the first captured treatment stall is inside
+  swift-testing, not swift-tui** (`entry14-fix-ab/run-11.{stall,live}-tasks.txt`
+  plus seven more captures under `entry14-fix-ab2/` in the overlay work
+  volume): flagged **`asyncLet CANCELLED statusRecordLocked ENQUEUED
+  RUNNING`**, spine entirely `libTesting.so` frames over
+  `swift_task_startOnMainActor`; other captures show the familiar
+  `CANCELLED + statusRecordLocked` futures and `statusRecordLocked +
+  escalated` tasks. swift-tui's sources contain **zero `async let`s**, and
+  after this hardening its frame tail cancels **no** tasks — that firing
+  had no swift-tui cancellation code in the picture at all. With the named
+  repo-side trigger removed, ordinary test-framework machinery trips the
+  same runtime race under the same workload.
+
+**Mitigation shipped with this entry (2026-08-10): that one test is
+disabled on Linux** (`.disabled(if: runningOnLinux, …)`, comment beside the
+test points back here). The 9/9 serialized stalls all parked at its
+completion, so skipping it on Linux is expected to quiet the serialized
+lane; it stays live on macOS, where the stall has never fired. This trades
+one test's Linux coverage for the lane's availability and is a
+*quarantine*, not a fix — re-enable it when a toolchain clears entry 14.
+
+**Where that leaves the hardening:** keep it — it deletes a real
+per-frame cancel-during-enqueue window, simplifies the seam (no task group,
+no unstructured cancels), and is pinned by tests — but do not credit it
+with the rate. The operative next steps are unchanged in direction and
+sharper in evidence: retest on a newer toolchain, and report upstream with
+a SwiftTUI-free reproduction. The org root now carries that rig
+(`tools/entry14-lost-wakeup-repro` in the coordination repo): a
+zero-dependency package that executes both observed trigger shapes — the
+group-children `cancelAll()` race and the async-let
+cancel-during-resume-enqueue — against the same lock-guarded continuation
+registry shape, with a plain-thread watchdog and taskdump-attach support.
+Exposure elsewhere in this repo (event-pump teardown, input-reader flush
+timers, the scheduler's pre-existing timeout-task cancel) runs at teardown
+or timer cadence; after the swift-testing capture, chasing those without a
+toolchain fix would repeat the SoundnessCounterScopeGate mistake — any
+perturbation hides the stall, and the race does not need our code to fire.
 
 **How to identify this flake.** Whole-lane silence with no failing test, and an
 lldb attach showing every thread idle with no Swift frames. If any thread is

@@ -2,7 +2,12 @@ import SwiftTUICore
 import SwiftTUIViews
 
 struct FrameTailCancellationStrategy: Sendable {
-  var awaitQueuedCancellationSignal: @MainActor @Sendable () async -> Void
+  /// Awaits the host's queued-cancellation signal. Implementations must
+  /// return when the passed release trips (the queued job left the queue),
+  /// not only when their own signal fires: the coordinator awaits this
+  /// inline and never cancels a task to abandon it (entry 14).
+  var awaitQueuedCancellationSignal:
+    @MainActor @Sendable (any PendingFrameWaitReleasing) async -> Void
   var shouldCancelQueued: @MainActor @Sendable () async -> Bool
 }
 
@@ -145,33 +150,24 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
         )
       }
 
-      @MainActor
-      func waitForQueuedCancellationSignal() async -> FrameTailJobState {
-        await cancellation.awaitQueuedCancellationSignal()
-        if !Task.isCancelled,
-          await cancellation.shouldCancelQueued(),
-          cancellationToken.cancelBeforeStart()
-        {
-          layoutTask.cancel()
-          return .cancelledBeforeStart
-        }
-        return await cancellationToken.waitUntilLeavesQueue()
+      // No task is ever cancelled on this seam (entry 14): a cancel landing
+      // concurrently with a task's first schedule or resume-enqueue can lose
+      // the wakeup inside the concurrency runtime, freezing the main actor
+      // with every thread idle. The signal wait runs inline and is released
+      // by the token's queue exit instead of by `group.cancelAll()`, and a
+      // cancelled-before-start layout job bails at worker entry
+      // (`markStarted` returns false), so `layoutTask` needs no cancel
+      // either — it drains on its own.
+      await cancellation.awaitQueuedCancellationSignal(cancellationToken)
+      if !Task.isCancelled,
+        await cancellation.shouldCancelQueued(),
+        cancellationToken.cancelBeforeStart()
+      {
+        return .cancelledBeforeStart
       }
 
-      let queueExitState = await withTaskGroup(of: FrameTailJobState.self) { group in
-        group.addTask {
-          await cancellationToken.waitUntilLeavesQueue()
-        }
-        group.addTask {
-          await waitForQueuedCancellationSignal()
-        }
-        let state = await group.next() ?? cancellationToken.currentState
-        group.cancelAll()
-        return state
-      }
-
+      let queueExitState = await cancellationToken.waitUntilLeavesQueue()
       if queueExitState == .cancelledBeforeStart {
-        layoutTask.cancel()
         return .cancelledBeforeStart
       }
 

@@ -338,7 +338,8 @@ public struct DefaultRenderer {
       },
     redundantHandlerInstallationsAreVisualOnly:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false },
-    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
+    awaitQueuedCancellationSignal:
+      @escaping @MainActor @Sendable (any PendingFrameWaitReleasing) async -> Void = { _ in },
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
     switch await renderCancellableExecution(
@@ -384,7 +385,8 @@ public struct DefaultRenderer {
       },
     redundantHandlerInstallationsAreVisualOnly:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false },
-    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void = {},
+    awaitQueuedCancellationSignal:
+      @escaping @MainActor @Sendable (any PendingFrameWaitReleasing) async -> Void = { _ in },
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderExecutionResult {
     await renderCancellableExecution(
@@ -417,7 +419,8 @@ public struct DefaultRenderer {
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker>,
     redundantHandlerInstallationsAreVisualOnly:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Bool,
-    awaitQueuedCancellationSignal: @escaping @MainActor @Sendable () async -> Void,
+    awaitQueuedCancellationSignal:
+      @escaping @MainActor @Sendable (any PendingFrameWaitReleasing) async -> Void,
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderExecutionResult {
     let renderer = self

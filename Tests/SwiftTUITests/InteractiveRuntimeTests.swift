@@ -17,6 +17,12 @@ private enum FocusedTitleKey: FocusedValueKey {
   typealias Value = String
 }
 
+#if os(Linux)
+  private let runningOnLinux = true
+#else
+  private let runningOnLinux = false
+#endif
+
 @MainActor
 @Suite
 struct InteractiveRuntimeTests {
@@ -4086,8 +4092,22 @@ struct InteractiveRuntimeTests {
   /// reverse focus traversal from the scroll indicator reached animation
   /// injection with a changed `TabBody.viewNodeID` despite that empty set.
   /// The debug premise assertion then trapped before the frame could commit.
+  ///
+  /// Disabled on Linux: the serialized runtime lane freezes at this test's
+  /// completion in ~20% of container runs — every thread idle, the frozen
+  /// task mid-cancellation inside swift-testing with its status-record lock
+  /// held. That is the `libswift_Concurrency` cancellation/enqueue race of
+  /// KNOWN-TEST-FLAKES.md entry 14, not a defect in this test or the code it
+  /// covers; the test stays live on macOS. Re-enable when the toolchain
+  /// clears entry 14 (repro rig: org root `tools/entry14-lost-wakeup-repro`).
   @MainActor
-  @Test("reverse focus from a tab-hosted scroll view does not take the animation reuse skip")
+  @Test(
+    "reverse focus from a tab-hosted scroll view does not take the animation reuse skip",
+    .disabled(
+      if: runningOnLinux,
+      "KNOWN-TEST-FLAKES entry 14: completion freezes the serialized Linux lane"
+    )
+  )
   func reverseFocusFromTabHostedScrollViewDoesNotTakeAnimationReuseSkip() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })

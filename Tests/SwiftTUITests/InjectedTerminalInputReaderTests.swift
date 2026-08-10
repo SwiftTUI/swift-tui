@@ -16,9 +16,14 @@ struct InjectedTerminalInputReaderTests {
       }
     )
 
+    // Create the stream before spawning the consumer: `inputEvents()`
+    // installs the continuation synchronously, so `send`/`finish` below can
+    // never race the setup drain's yields against `finish()` truncating the
+    // stream (KNOWN-TEST-FLAKES entry 14's serialized runs exposed this).
+    let eventStream = inputReader.inputEvents()
     let eventsTask = Task {
       var events: [InputEvent] = []
-      for await event in inputReader.inputEvents() {
+      for await event in eventStream {
         events.append(event)
       }
       return events
@@ -44,9 +49,14 @@ struct InjectedTerminalInputReaderTests {
       }
     )
 
+    // Create the stream before spawning the consumer: `inputEvents()`
+    // installs the continuation synchronously, so `send`/`finish` below can
+    // never race the setup drain's yields against `finish()` truncating the
+    // stream (KNOWN-TEST-FLAKES entry 14's serialized runs exposed this).
+    let eventStream = inputReader.inputEvents()
     let eventsTask = Task {
       var events: [InputEvent] = []
-      for await event in inputReader.inputEvents() {
+      for await event in eventStream {
         events.append(event)
       }
       return events
@@ -91,9 +101,14 @@ struct InjectedTerminalInputReaderTests {
   func injectedReaderFlushesPointerBurstsBeforeLaterKeyInput() async {
     let inputReader = InjectedTerminalInputReader()
 
+    // Create the stream before spawning the consumer: `inputEvents()`
+    // installs the continuation synchronously, so `send`/`finish` below can
+    // never race the setup drain's yields against `finish()` truncating the
+    // stream (KNOWN-TEST-FLAKES entry 14's serialized runs exposed this).
+    let eventStream = inputReader.inputEvents()
     let eventsTask = Task {
       var events: [InputEvent] = []
-      for await event in inputReader.inputEvents() {
+      for await event in eventStream {
         events.append(event)
       }
       return events
@@ -186,9 +201,14 @@ struct InjectedTerminalInputReaderTests {
       mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
     )
 
+    // Create the stream before spawning the consumer: `inputEvents()`
+    // installs the continuation synchronously, so `send`/`finish` below can
+    // never race the setup drain's yields against `finish()` truncating the
+    // stream (KNOWN-TEST-FLAKES entry 14's serialized runs exposed this).
+    let eventStream = inputReader.inputEvents()
     let eventsTask = Task {
       var events: [InputEvent] = []
-      for await event in inputReader.inputEvents() {
+      for await event in eventStream {
         events.append(event)
       }
       return events

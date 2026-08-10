@@ -179,8 +179,11 @@ extension RunLoop {
       redundantHandlerInstallationsAreVisualOnly: { artifacts in
         self.completedFrameHasStableInteractionRouting(artifacts: artifacts)
       },
-      awaitQueuedCancellationSignal: {
-        await self.awaitQueuedTailCancellationSignalForMode(at: frameInstant)
+      awaitQueuedCancellationSignal: { release in
+        await self.awaitQueuedTailCancellationSignalForMode(
+          at: frameInstant,
+          releasedBy: release
+        )
       },
       shouldCancelQueued: {
         await self.shouldCancelQueuedTailForMode(at: frameInstant)
@@ -219,7 +222,8 @@ extension RunLoop {
   }
 
   private func awaitQueuedTailCancellationSignalForMode(
-    at frameInstant: MonotonicInstant
+    at frameInstant: MonotonicInstant,
+    releasedBy release: any PendingFrameWaitReleasing
   ) async {
     guard renderMode != .asyncNoCancel else {
       return
@@ -238,8 +242,9 @@ extension RunLoop {
     // Deliberately the wall clock, unlike the gate above: this is real-time
     // waiting for a frame that does not exist yet, not a decision about the
     // frame in hand. Virtualizing it would suspend forever under a frozen
-    // clock.
-    await pendingFrameAwaiter.waitForPendingFrame(at: .now())
+    // clock. The release retires the wait when the queued tail leaves the
+    // queue, so no pending frame needs to arrive for this to return.
+    await pendingFrameAwaiter.waitForPendingFrame(at: .now(), releasedBy: release)
   }
 
 }

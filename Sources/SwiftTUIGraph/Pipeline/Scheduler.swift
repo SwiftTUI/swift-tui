@@ -124,8 +124,35 @@ package protocol CancelledFrameIntentReplaying: AnyObject {
   func replayCancelledFrameIntent(_ frame: ScheduledFrame)
 }
 
+/// Releases a `waitForPendingFrame` wait early, without cancelling the
+/// waiting task.
+///
+/// The frame tail's queued-cancellation wait used to be abandoned via task
+/// cancellation, and a cancel that lands concurrently with a task's first
+/// schedule or resume-enqueue can lose the wakeup inside the concurrency
+/// runtime (`docs/KNOWN-TEST-FLAKES.md` entry 14). A release latch wakes the
+/// waiter through the same continuation registry as a frame request instead,
+/// so the wait can be retired with no task cancellation anywhere on the seam.
+package protocol PendingFrameWaitReleasing: AnyObject, Sendable {
+  /// True once the wait no longer needs to hold; checked between waits.
+  var isReleased: Bool { get }
+
+  /// Registers a waker fired exactly once when the release trips. Fires
+  /// inline, on the registering thread, when already released.
+  func onRelease(_ waker: @escaping @Sendable () -> Void)
+}
+
 package protocol PendingFrameAwaiting: AnyObject {
-  func waitForPendingFrame(at now: MonotonicInstant) async
+  func waitForPendingFrame(
+    at now: MonotonicInstant,
+    releasedBy release: (any PendingFrameWaitReleasing)?
+  ) async
+}
+
+extension PendingFrameAwaiting {
+  package func waitForPendingFrame(at now: MonotonicInstant) async {
+    await waitForPendingFrame(at: now, releasedBy: nil)
+  }
 }
 
 /// Reads the scheduler's coalesced `request*` tally without consuming a frame.
@@ -473,6 +500,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
 
   private func waitForNextFrameRequest(
     timeout: Duration? = nil,
+    releasedBy release: (any PendingFrameWaitReleasing)? = nil,
     unlessFramePending framePending: () -> Bool = { false }
   ) async {
     let waiterIDLock = OSAllocatedUnfairLock<UInt64?>(uncheckedState: nil)
@@ -501,6 +529,19 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
             continuation?.resume()
           }
           timeoutTaskLock.withLockUnchecked { $0 = timeoutTask }
+        }
+        // The release waker resumes through the same registry as a frame
+        // request, so a released waiter needs no task cancellation. The
+        // timeout task is deliberately left to expire on its own: it finds
+        // the waiter gone and no-ops, and this seam must not add a cancel
+        // that could land concurrently with an enqueue (entry 14).
+        if let release {
+          release.onRelease {
+            let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
+              state.waiters.removeValue(forKey: waiterID)
+            }
+            continuation?.resume()
+          }
         }
         if framePending() || Task.isCancelled {
           let continuation = pendingFrameRequestWaitersLock.withLockUnchecked { state in
@@ -546,9 +587,12 @@ extension FrameScheduler {
 }
 
 extension FrameScheduler: PendingFrameAwaiting {
-  package func waitForPendingFrame(at now: MonotonicInstant = .now()) async {
+  package func waitForPendingFrame(
+    at now: MonotonicInstant = .now(),
+    releasedBy release: (any PendingFrameWaitReleasing)? = nil
+  ) async {
     var currentInstant = now
-    while !Task.isCancelled {
+    while !Task.isCancelled, release?.isReleased != true {
       if hasPendingFrame(at: currentInstant) {
         return
       }
@@ -556,7 +600,7 @@ extension FrameScheduler: PendingFrameAwaiting {
       if let nextWake = nextWakeInstant(after: currentInstant) {
         let sleepDuration = currentInstant.duration(to: nextWake)
         if sleepDuration > .zero {
-          await waitForNextFrameRequest(timeout: sleepDuration) {
+          await waitForNextFrameRequest(timeout: sleepDuration, releasedBy: release) {
             hasPendingFrame(at: .now())
           }
         } else {
@@ -566,7 +610,7 @@ extension FrameScheduler: PendingFrameAwaiting {
         continue
       }
 
-      await waitForNextFrameRequest {
+      await waitForNextFrameRequest(releasedBy: release) {
         hasPendingFrame(at: .now())
       }
       currentInstant = .now()

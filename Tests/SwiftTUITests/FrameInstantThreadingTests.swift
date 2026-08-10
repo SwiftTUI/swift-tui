@@ -102,8 +102,10 @@ struct FrameInstantWallClockGuardTests {
   /// `waitForPendingFrame` blocks for a frame that does not exist yet, so it
   /// is about the real world rather than about the frame in hand — under a
   /// frozen `frameClock` it would suspend forever. Keyed to the call, not to
-  /// the file, so the rest of `RunLoop+FrameAcquisition` stays guarded.
-  private static let allowedRealTimeWait = "waitForPendingFrame(at: .now())"
+  /// the file, so the rest of `RunLoop+FrameAcquisition` stays guarded. The
+  /// key is a prefix so the call may carry trailing arguments (the entry-14
+  /// `releasedBy:` release) without laundering any other `.now()` read.
+  private static let allowedRealTimeWait = "waitForPendingFrame(at: .now()"
 
   @Test("frame-path files read the wall clock only to default an absent instant")
   func frameScopedFilesDoNotSampleTheWallClock() throws {

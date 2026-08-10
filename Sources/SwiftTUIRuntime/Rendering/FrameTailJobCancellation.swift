@@ -24,6 +24,7 @@ final class FrameTailJobCancellationToken: Sendable {
     var jobState: FrameTailJobState = .queued
     var nextWaiterID: UInt64 = 0
     var waiters: [UInt64: CheckedContinuation<FrameTailJobState, Never>] = [:]
+    var queueExitObservers: [@Sendable () -> Void] = []
   }
 
   private let state = Mutex(State())
@@ -106,21 +107,27 @@ final class FrameTailJobCancellationToken: Sendable {
   private func transitionQueued(
     to newState: FrameTailJobState
   ) -> Bool {
-    let waiters = state.withLock { state -> [CheckedContinuation<FrameTailJobState, Never>]? in
+    let resumptions = state.withLock {
+      state -> ([CheckedContinuation<FrameTailJobState, Never>], [@Sendable () -> Void])? in
       guard state.jobState == .queued else {
         return nil
       }
       state.jobState = newState
       let waiters = Array(state.waiters.values)
       state.waiters.removeAll(keepingCapacity: true)
-      return waiters
+      let observers = state.queueExitObservers
+      state.queueExitObservers.removeAll(keepingCapacity: true)
+      return (waiters, observers)
     }
 
-    guard let waiters else {
+    guard let (waiters, observers) = resumptions else {
       return false
     }
     for waiter in waiters {
       waiter.resume(returning: newState)
+    }
+    for observer in observers {
+      observer()
     }
     return true
   }
@@ -130,6 +137,29 @@ final class FrameTailJobCancellationToken: Sendable {
   ) -> CheckedContinuation<FrameTailJobState, Never>? {
     state.withLock { state in
       state.waiters.removeValue(forKey: id)
+    }
+  }
+}
+
+/// The token doubles as the release latch for the queued-cancellation
+/// signal wait: that wait holds only while the job sits in the queue, so any
+/// queue exit — worker start or cancel-before-start — retires it without
+/// cancelling the waiting task (`docs/KNOWN-TEST-FLAKES.md` entry 14).
+extension FrameTailJobCancellationToken: PendingFrameWaitReleasing {
+  var isReleased: Bool {
+    currentState != .queued
+  }
+
+  func onRelease(_ waker: @escaping @Sendable () -> Void) {
+    let fireInline = state.withLock { state -> Bool in
+      guard state.jobState == .queued else {
+        return true
+      }
+      state.queueExitObservers.append(waker)
+      return false
+    }
+    if fireInline {
+      waker()
     }
   }
 }
