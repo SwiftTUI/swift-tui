@@ -87,6 +87,15 @@ minutes.
 the behaviour is verified deterministically in seconds rather than only on a
 loaded runner.
 
+The broad runtime lane runs `--no-parallel` — the only spelling that
+serializes swift-testing — and the gate then **asserts** that shape:
+`Scripts/check_serialized_execution.sh` parses the lane's own log and fails
+if the peak in-flight test count says the lane actually ran parallel. Two
+earlier serialization spellings were inert while their steps stayed green
+([KNOWN-TEST-FLAKES.md](KNOWN-TEST-FLAKES.md) entry 14), so the execution
+shape is measured, not assumed. The script's `--self-test` runs in the gate
+next to the watchdog's.
+
 ### Test targets
 
 ```mermaid

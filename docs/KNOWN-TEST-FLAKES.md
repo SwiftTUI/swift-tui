@@ -60,9 +60,11 @@ not an all-clear — but re-measure before attributing a failure here.
 frame-tail worker immediately before the off-main overlay write. A test can park
 the worker inside that window and race a concurrent main-actor read. Wired +
 ordering-guarded by `Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift`. To
-serialize a repro run, set `SWIFTTUI_SWIFT_TEST_SERIALIZED=1` (gate seam → `--parallel
---num-workers 1`; it emitted only the bare `--num-workers 1` until 2026-08-09, which
-SwiftPM rejects outright, so the seam had never serialized anything). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
+serialize a repro run, set `SWIFTTUI_SWIFT_TEST_SERIALIZED=1` (gate seam →
+`--no-parallel` since 2026-08-10; the seam's two earlier spellings were both
+inert — bare `--num-workers 1` failed SwiftPM argument validation until
+2026-08-09, and the repaired `--parallel --num-workers 1` pair validated but
+does not serialize swift-testing at all; see entry 14). The `Boxed` copy-on-write path the seam brackets was judged *safe* under value
 semantics (worker copies-on-write its own box. The shared `_BoxStorage` is
 `Mutex`-guarded with atomic refcount).
 
@@ -179,17 +181,20 @@ three historical crash sites no longer exist. F11 **deleted outright**
 `SendableLayoutWorkerProxy` and the `LayoutProxyBox` corruptor candidate
 (2026-07-06). The strongest suspect surface is gone by construction.
 
-**Soak integrity note (2026-07-07).** The lane's flaky-trio step was
-**inert from 2026-07-03 to 2026-07-07**. SwiftPM rejects `--num-workers`
-without `--parallel`, so the script stopped after 130 ms. The
-`continue-on-error` step still reported green. The statement "the soak has been
-quiet" therefore had no value for that window. The command now uses
-`--parallel --num-workers 1`. The
-serialized flaky-trio soak is genuinely running from 2026-07-08 onward, and
-the dormancy evidence above deliberately does not lean on the inert window.
-Lesson: a signal-only (`continue-on-error`) step needs its own liveness
-test — an instant argument-error failure is indistinguishable from a quiet pass
-at the workflow-status level.
+**Soak integrity note (2026-07-07; amended 2026-08-10).** The lane's
+flaky-trio step was **inert from 2026-07-03 to 2026-07-07**. SwiftPM rejects
+`--num-workers` without `--parallel`, so the script stopped after 130 ms. The
+`continue-on-error` step still reported green. The statement "the soak has
+been quiet" therefore had no value for that window. The 2026-07-07 repair
+switched to `--parallel --num-workers 1` — which was inert in a *second* way:
+it validates, and the suites still ran, but swift-testing kept its in-process
+parallelism, so the soak was never serialized (entry 14's measurement). From
+2026-08-10 the command uses `--no-parallel`, the only spelling that
+serializes. The tests themselves did run from 2026-07-08 onward, so the
+dormancy evidence stands as *load* evidence, not as *serialized-run* evidence.
+Lesson, now twice-earned: a signal-only (`continue-on-error`) step needs its
+own liveness test, and a flag that claims to change execution shape needs the
+shape asserted (`Scripts/check_serialized_execution.sh`), not assumed.
 
 **Forced-repro retired (2026-07-07).** The parked-worker `beforeOverlayApply`
 repro stays unlanded *by decision*, not backlog: its weaker target (the `Boxed`
@@ -646,27 +651,71 @@ toolchain ships it; the container needs `--cap-add=SYS_PTRACE`):
   They share no lock, no fixture, and no resource except the main-actor
   executor.
 
+**Correction (2026-08-10): the first shipped mitigation was inert.** The lane
+was switched to `--parallel --num-workers 1` on the theory that one worker is
+a serial run. It is not: `--num-workers` bounds XCTest worker processes, and
+swift-testing keeps its own in-process concurrency. Measured peak concurrent
+tests in flight on this lane: **1645** with the flag pair, **1525** with no
+flag, **3** with `--no-parallel`. Both arms of the original 3/4-vs-1/6
+comparison were therefore parallel, and the difference was sampling noise —
+as was the "serialization costs nothing (265 s vs 272 s)" claim, which
+compared parallel to parallel. Only `--no-parallel` serializes; its measured
+cost on an idle host is ~5–10% wall clock (below).
+
 **Measured rates** (arm64 Linux container, otherwise idle host, full lane with
 the gate's `--skip` set):
 
-| configuration | hangs |
+| configuration | stalls |
 | --- | --- |
-| parallel (swift-testing default) | 3 / 4 |
-| `--parallel --num-workers 1` | 1 / 6 |
+| parallel (swift-testing default — including the inert `--parallel --num-workers 1` era, pooled) | 5 / 17 |
+| `--no-parallel` (true serialization, 10-run batch, 2026-08-10) | 2 / 10 |
 
-Serialization costs nothing: 265 s serialized against 272 s parallel over 3150
-tests, because the lane is main-actor-bound and its parallelism was overhead.
-The gate therefore serializes this lane. **That is mitigation and not a fix.**
-Pooling every serialized run since — lane-only batches plus full container gate
-runs — the residual is **2 stalls in 13**, about 15%. A gate run still fails
-roughly one time in seven, and it fails here.
+**Serialization does not reduce the stall rate** — 2/10 serialized is
+statistically indistinguishable from the pooled parallel 5/17, and falsifies
+the expectation that removing cross-test concurrency removes the race (each
+test's own run loop still exercises the frame-tail's internal concurrency;
+see the captures below). What serialization *does* buy, at a measured cost of
+only ~5–10% wall clock (~290 s serialized against ~272 s parallel; the
+"20–40%" from the first in-flight measurement was load-skewed):
 
-**The stall point is suspiciously repeatable.** Across runs it lands in a narrow
-window, ~7100-7200 lines and ~290 s in, whether the lane runs parallel or
-serialized. That consistency is the strongest untested lead: it suggests a
-threshold (live task or continuation bookkeeping) rather than a race between a
-particular pair of tests, and it is *not* explained by the suites near the
-stall, which all pass in isolation.
+- **A single-test stall signature.** Exactly one test is in flight when the
+  lane freezes, instead of ~113 — both serial stalls parked in the same
+  `InteractiveRuntimeTests` pointer-scroll cluster at the same lane offset
+  (~4,500 lines: "gallery-shaped ScrollView … advances on pointer scroll" and
+  "handled pointer scrolling updates ScrollView internal state before
+  follow-up input"). That converts the stall from unbisectable to cheaply
+  reproducible.
+- **A truthful lane.** The gate's serialization claim is now real, and a
+  follow-up gate step (`Scripts/check_serialized_execution.sh`, self-tested
+  like the watchdog) parses the lane's own log and fails if the peak
+  in-flight test count says the lane actually ran parallel — a serialization
+  switch has been inert twice while its step stayed green, so the execution
+  shape is asserted, not assumed.
+- **Deterministic exposure of interleaving-dependent tests.** Two gesture
+  tests ("a named drag wrapper captures and receives the full pointer path",
+  "a drag off and back onto a control cancels it only when the host pans")
+  failed in every completed serialized run: their unpaced input scripts
+  relied on the scheduler to deliver each pointer movement in its own batch,
+  and under serialization the run loop's intended pointer coalescing folds
+  them deterministically. Both now gate each scripted event on observed
+  evidence of the previous one (2026-08-10).
+  `InjectedTerminalInputReaderTests` "injected input reader parses
+  terminal-pixel mouse coordinates when configured" failed 1/8 the same day
+  (asserted before its collected event array was complete) and is recorded
+  here as a candidate of the same class, unfixed.
+
+**Serialization is mitigation of the *diagnosis*, not of the rate, and not a
+fix**; the root cause is narrowed below, and the entry stays open until it is
+fixed or the toolchain is cleared.
+
+**The stall point is suspiciously repeatable.** Parallel runs land in a
+narrow window (~7100-7200 lines, ~290 s in); the two serialized lane stalls
+both landed at ~4,500 lines in the `InteractiveRuntimeTests` pointer-scroll
+cluster. The old corollary "the suites near the stall all pass in isolation"
+is now **false**: `InteractiveRuntimeTests` alone, serialized, stalls 1/12
+(see the reproduction recipe). The consistency still suggests state that
+accumulates across an animating suite — but the accumulation fits inside one
+suite, not just the full lane.
 
 **Hypotheses tested and falsified.** Recorded so they are not re-run:
 
@@ -675,8 +724,12 @@ stall, which all pass in isolation.
    (`.task` is `@_inheritActorContext`; view bodies are `@MainActor`). Real
    defect, fixed (`suspendUntilCancelled()`), **but not this one**: the lldb
    capture shows idle threads, and a spinner shows a running one.
-2. *Cross-suite parallelism.* Falsified — it hangs under
-   `--parallel --num-workers 1` too.
+2. *Cross-suite parallelism.* Recorded as falsified on inert evidence (the
+   `--parallel --num-workers 1` arm was still parallel), then genuinely
+   tested and **confirmed falsified** on 2026-08-10: the lane stalls 2/10
+   under true `--no-parallel`. Cross-test parallelism is not required — a
+   single test's own run-loop concurrency (the frame-tail machinery) is
+   enough to lose the race.
 3. *A guarded-suite interaction.* Falsified — `FrameworkStressTests` alone is
    0 / 3 and all 57 `FrameworkStress` suites together are 0 / 2.
 4. *`SoundnessCounterScopeGate` (the process-global mutex over all 43 guarded
@@ -687,23 +740,97 @@ stall, which all pass in isolation.
    Any perturbation of this region hides the stall, which is itself the most
    useful fact here: bisecting by editing code will mislead.
 
-**Where that leaves it.** Unrelated main-actor tests suspended, an idle
-executor, and no Swift frames point below this repository — at main-queue
-wakeup on Linux after `dispatch_main()` — rather than at any lock we own. The
-next step is *not* another code bisect. It is to capture the suspended task
-graph (Swift task dumps / `SWIFT_DEBUG_...` task inspection) at the stall, or to
-retest under a newer toolchain, and to compare against a build with
-`--disable-testing-library swift-testing`-style isolation of the runner.
+**Task-graph capture (2026-08-10).** The prescribed next step — capture the
+suspended task graph instead of bisecting — was executed against a live stall
+(a parallel short-half run left frozen for ~8 hours; log dead mid-write at
+23:48, 113 test cases started-but-unfinished). `swift-inspect dump-concurrency`
+is not wired up on Linux in 6.3.3, but `libswiftRemoteMirror` exports the
+pieces, so a small scanner (`taskdump`) found every AsyncTask heap object by
+scanning writable memory for the runtime's exported
+`_swift_concurrency_debug_asyncTaskMetadata` pointer and validated each with
+`swift_reflection_asyncTaskInfo`. The binary is preserved at
+`entry14-tools/taskdump` in the coordination overlay work volume. Findings:
+
+- 41 threads all idle (1 `sigsuspend`, 1 `epoll_pwait`, 39 `futex_wait`), no
+  Swift frame anywhere — the known signature.
+- The dispatch **main queue is empty** (`dq_items_head`/`dq_items_tail` both
+  NULL, read raw at `_dispatch_main_q`) and all 11 **root queues are empty**.
+  The backed-up main-actor work was never enqueued into dispatch at all.
+- 2,290 task objects; the live graph is the swift-testing runner's spine of
+  nested group children (`id=1 → 8364 → … → 9556 → 11219`) plus the stuck
+  tests' tasks.
+- An anomalous cluster of live group-child tasks: four **CANCELLED + ENQUEUED
+  + suspended** (their jobs are recorded as enqueued but exist in no queue),
+  two **CANCELLED + statusRecordLocked + ENQUEUED + "RUNNING" + escalated**
+  (frozen mid-cancellation with the status-record lock left held), and three
+  **ENQUEUED/"RUNNING"** with no thread running anything. `escalated` on Linux
+  — where priority escalation is unsupported — is itself anomalous.
+- Exact frame symbolication (via the mapped binary's inode under
+  `/proc/<pid>/map_files`): the spine's leaf task is
+  `InteractiveRuntimeTests.navigationPushAfterStripClickTabEntryLeavesNoStrand`
+  (in the unfinished census), suspended in
+  `SwiftTUITestSupport.ConditionSignal.wait(until:)`, started through
+  `swift_task_startOnMainActor`. One "RUNNING"-with-no-thread task's `runJob`
+  resumes in `DefaultRendererFrameTailCoordinator.renderFrameTailLayoutStage`'s
+  **cancellation-strategy** continuation.
+
+A second and third capture came from the 2026-08-10 `--no-parallel`
+measurement batch (runs 2 and 4, auto-captured at the stall by the
+measurement loop; artifacts under `entry14-measure/` in the coordination
+overlay work volume):
+
+- Same thread signature, exactly **one** test in flight each time, both in
+  the `InteractiveRuntimeTests` pointer-scroll cluster.
+- A live group-child task flagged **ENQUEUED** whose `runJob` sits at
+  `swift_continuation_resume+0x344` — a continuation was resumed, its job was
+  flagged enqueued, and the job exists in no queue. The lost wakeup, caught
+  directly.
+- A live future frozen with **statusRecordLocked + escalated** at priority 25
+  — a priority-escalation path (nominally unsupported on Linux) that took the
+  status-record lock and never released it.
+
+**Where that leaves it.** The mechanism is a **cancellation/enqueue race in
+the Swift concurrency runtime**: a task cancelled concurrently with being
+scheduled ends up flagged ENQUEUED while its job is in no queue, and two such
+cancellations froze mid-flight holding their status-record locks. Everything
+awaiting those tasks — and everything behind the main actor — then waits
+forever, with every thread idle. The *mechanism* is below this repository
+(libswift_Concurrency), but the *triggering seam* is ours: the frame-tail
+cancellation strategy cancelling sibling jobs concurrently with their start.
+Next steps, in order: retest on a newer toolchain (search upstream
+swiftlang/swift for cancellation-vs-enqueue and status-record-lock fixes after
+6.3.3); harden the repo-side seam — `renderFrameTailLayoutStage`'s
+queued-cancellation path races two group children and then `group.cancelAll()`s
+the loser while separately cancelling the freshly spawned `layoutTask`, so
+every frame tail opens a cancel-during-first-schedule window. Two facts
+verified by reading for that redesign: `layoutTask.cancel()` is redundant on
+the cancel-before-start path — `cancelBeforeStart()`'s token transition
+already makes the queued job bail at entry (`markStarted` returns false) —
+and the group's only irreplaceable role is releasing the loser child, which a
+signal-or-queue-exit wait can do without task cancellation. Judge any such
+change against the focused repro below (~50 runs per arm in ~15 minutes),
+never against local non-reproduction, since any perturbation hides the stall.
+Keep the lane on `--no-parallel` for the single-test stall signature and the
+asserted execution shape — not for the rate, which serialization does not
+change.
 
 **How to identify this flake.** Whole-lane silence with no failing test, and an
 lldb attach showing every thread idle with no Swift frames. If any thread is
-inside Swift code, or a named test fails, it is not this entry.
+inside Swift code, or a named test fails, it is not this entry. A `taskdump`
+capture showing CANCELLED+ENQUEUED tasks with empty dispatch queues is
+confirmation.
 
-**Reproduction recipe.** In the pinned container, run the lane directly (the
-gate harness is not required) and poll the log for a stall:
-`swiftly run swift test --filter SwiftTUITests` plus the gate's five `--skip`
-flags, killing when the log stops growing for ~120 s. Expect roughly 3 stalls in
-4 parallel attempts, each about 5 minutes in.
+**Reproduction recipe (focused — use this one).** In the pinned container:
+`swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
+--no-parallel`, looped, killing a run when its log stops growing for ~120 s.
+The suite runs in ~15 s and **stalls in isolation** (first measured batch:
+1 stall in 12 runs, identical task-graph signature, stuck at an animating
+fixture). This makes a fix A/B statistically cheap — about fifty runs per arm
+in ~15 minutes. The full-lane recipe (the gate's five `--skip` flags, with or
+without `--no-parallel`; 2/10 serialized, 5/17 parallel pooled) remains as
+the confirmation tier. On a stall, capture with
+`entry14-tools/taskdump <xctest-pid>` (needs `--cap-add=SYS_PTRACE` or a
+`--privileged` exec) before killing the tree.
 
 ---
 
