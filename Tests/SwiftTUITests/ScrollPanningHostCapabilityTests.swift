@@ -115,7 +115,7 @@ struct ScrollPanningHostCapabilityTests {
     @MainActor func makeView() -> some View {
       ScrollView(
         .vertical,
-        position: Binding(get: { box.position }, set: { box.position = $0 })
+        position: Binding(get: { box.position }, set: { box.recordPosition($0) })
       ) {
         VStack(alignment: .leading, spacing: 0) {
           // Headers push the button down so an upward drag has both threshold
@@ -155,6 +155,23 @@ struct ScrollPanningHostCapabilityTests {
     // release over the button. The release lands on the control either way, so
     // the only thing that decides the outcome is whether the drag was allowed
     // to steal the gesture.
+    //
+    // On a panning host the away-drag and the return-drag must be OBSERVED as
+    // separate movements — the run loop's pointer coalescing would otherwise
+    // fold them into a net-zero movement and no takeover ever happens
+    // (deterministically so on a serialized lane). Each of those events is
+    // gated on scroll evidence of the previous one: the away-drag pans
+    // (`position.y > 0`), the return-drag writes the position again. The
+    // non-panning arm needs no gates precisely because nothing observable
+    // happens between its events — and a coalesced net-zero wobble is exactly
+    // the ordinary click that arm asserts survives.
+    let panningGates: [Int: @Sendable () async -> Void] =
+      hostSupportsPanning
+      ? [
+        2: { await box.changed.wait(until: { box.position.y > 0 }) },
+        3: { await box.changed.wait(until: { box.positionSets >= 2 }) },
+      ]
+      : [:]
     let result = try await runHarness(
       hostSupportsPanning: hostSupportsPanning,
       rootIdentity: rootIdentity,
@@ -164,6 +181,7 @@ struct ScrollPanningHostCapabilityTests {
         .mouse(.init(kind: .dragged(.primary), location: press)),
         .mouse(.init(kind: .up(.primary), location: press)),
       ],
+      gates: panningGates,
       viewBuilder: makeView
     )
 
@@ -212,8 +230,19 @@ struct ScrollPanningHostCapabilityTests {
 
   @MainActor
   private final class OffsetBox {
+    let changed = MainActorConditionSignal()
     var position = ScrollCellOffset.zero
+    var positionSets = 0
     var taps = 0
+
+    /// Binding target that also records the write and wakes gated waiters, so
+    /// an input script can pace itself on scroll evidence instead of racing
+    /// the run loop's pointer coalescing.
+    func recordPosition(_ newPosition: ScrollCellOffset) {
+      position = newPosition
+      positionSets += 1
+      changed.notify()
+    }
   }
 
   @MainActor
@@ -241,6 +270,7 @@ struct ScrollPanningHostCapabilityTests {
     hostSupportsPanning: Bool,
     rootIdentity: Identity,
     events: [InputEvent],
+    gates: [Int: @Sendable () async -> Void] = [:],
     viewBuilder: @escaping () -> V
   ) async throws -> RunLoopResult<Int> {
     var environmentValues = EnvironmentValues()
@@ -255,7 +285,7 @@ struct ScrollPanningHostCapabilityTests {
         surfaceSize: Self.terminalSize,
         supportsScrollPanning: hostSupportsPanning
       ),
-      terminalInputReader: ScriptedInputReader(events: events),
+      terminalInputReader: ScriptedInputReader(events: events, gates: gates),
       signalReader: SilentSignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -365,17 +395,35 @@ private final class PanningCapabilityHost: PresentationSurface {
 
 private final class ScriptedInputReader: TerminalInputReading {
   private let scriptedEvents: [InputEvent]
+  private let gates: [Int: @Sendable () async -> Void]
 
-  init(events: [InputEvent]) {
+  /// `gates[i]` is awaited before event `i` is yielded. The run loop
+  /// deliberately coalesces same-batch pointer drags into one movement sample
+  /// (`RunLoop.drainPendingEvents`), so a script whose meaning depends on each
+  /// movement being observed separately gates the next event on evidence that
+  /// the previous one was dispatched — a condition wait, never a sleep.
+  init(events: [InputEvent], gates: [Int: @Sendable () async -> Void] = [:]) {
     scriptedEvents = events
+    self.gates = gates
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
-      for event in scriptedEvents {
-        continuation.yield(event)
+      let events = scriptedEvents
+      let gates = self.gates
+      let task = Task {
+        for (index, event) in events.enumerated() {
+          if let gate = gates[index] {
+            await gate()
+          }
+          continuation.yield(event)
+        }
+        continuation.finish()
       }
-      continuation.finish()
+
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
     }
   }
 }

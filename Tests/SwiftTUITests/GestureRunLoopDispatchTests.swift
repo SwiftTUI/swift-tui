@@ -709,6 +709,7 @@ struct GestureRunLoopDispatchTests {
   @Test("a named drag wrapper captures and receives the full pointer path")
   func namedDragWrapperCapturesFullPointerPath() async throws {
     @MainActor final class Box {
+      let changed = MainActorConditionSignal()
       var changedValues: [DragGesture.Value] = []
       var endedValue: DragGesture.Value?
     }
@@ -720,7 +721,10 @@ struct GestureRunLoopDispatchTests {
       .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
       .gesture(
         NamedDragWrapper(
-          onChanged: { box.changedValues.append($0) },
+          onChanged: {
+            box.changedValues.append($0)
+            box.changed.notify()
+          },
           onEnded: { box.endedValue = $0 }
         )
       )
@@ -744,6 +748,12 @@ struct GestureRunLoopDispatchTests {
     let start = centerPoint(of: region.rect)
     let firstDrag = Point(x: start.x + 2, y: start.y)
     let lastDrag = Point(x: start.x + 4, y: start.y)
+    // Each movement is gated on the previous one having been observed:
+    // without the gates, the run loop's pointer coalescing can fold both
+    // dragged events into one movement sample (deterministically so on a
+    // serialized lane, where the script's tight yield loop outruns the
+    // consumer), and the full pointer path this test exists to assert is
+    // never delivered as separate samples.
     let result = try await runHarness(
       host: RecordingGestureTerminalHost(size: terminalSize),
       terminalSize: terminalSize,
@@ -751,8 +761,14 @@ struct GestureRunLoopDispatchTests {
       schedule: [
         .init(event: .mouse(.init(kind: .down(.primary), location: start))),
         .init(event: .mouse(.init(kind: .dragged(.primary), location: firstDrag))),
-        .init(event: .mouse(.init(kind: .dragged(.primary), location: lastDrag))),
-        .init(event: .mouse(.init(kind: .up(.primary), location: lastDrag))),
+        .init(
+          event: .mouse(.init(kind: .dragged(.primary), location: lastDrag)),
+          gate: { await box.changed.wait(until: { box.changedValues.count >= 1 }) }
+        ),
+        .init(
+          event: .mouse(.init(kind: .up(.primary), location: lastDrag)),
+          gate: { await box.changed.wait(until: { box.changedValues.count >= 2 }) }
+        ),
       ],
       viewBuilder: { view }
     )
@@ -1000,9 +1016,16 @@ private func runHarness<V: View>(
 
 private struct ScheduledGestureInputEvent {
   let event: InputEvent
+  /// Awaited before the event is yielded. The run loop deliberately coalesces
+  /// same-batch pointer drags into one movement sample
+  /// (`RunLoop.drainPendingEvents`), so a script that must observe each
+  /// movement individually gates each event on evidence that the previous one
+  /// was dispatched — a condition wait, never a sleep or a yield count.
+  let gate: (@Sendable () async -> Void)?
 
-  init(event: InputEvent) {
+  init(event: InputEvent, gate: (@Sendable () async -> Void)? = nil) {
     self.event = event
+    self.gate = gate
   }
 }
 
@@ -1025,6 +1048,9 @@ private final class ScriptedGestureInput: TerminalInputReading {
       let schedule = self.schedule
       let task = Task {
         for item in schedule {
+          if let gate = item.gate {
+            await gate()
+          }
           continuation.yield(item.event)
         }
         continuation.finish()
