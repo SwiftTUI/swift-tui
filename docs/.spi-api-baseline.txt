@@ -234,6 +234,7 @@ SwiftTUITestSupport.StageClock
 SwiftTUITestSupport.StageClock.currentStage()
 SwiftTUITestSupport.StageClock.waitForStage(atLeast:)
 SwiftTUITestSupport.renderLinearAccessibilityOutput(_:)
+SwiftTUITestSupport.suspendUntilCancelled()
 SwiftTUITestSupport.waitForANSIVisibleScreen(on:screen:deadline:condition:)
 SwiftTUITestSupport.withStageBudget(_:within:on:_:)
 SwiftTUITestSupport.writeAllBytes(_:to:)
