@@ -198,6 +198,7 @@ Runs the exhaustive checked-in repo verification surface:
   - stable-doc source-path guardrails
   - explicit layout work-stack guardrails
   - per-step watchdog self-test
+  - serialized-execution check for the runtime lane (plus its self-test)
   - frame-tail tree-walker recursion guardrails (plus their self-test)
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
@@ -363,7 +364,7 @@ run_swift() {
   # them deliberately (e.g. to bisect a load-sensitive flake such as the
   # run-loop SIGSEGV in docs/KNOWN-TEST-FLAKES.md):
   #   SWIFTTUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
-  #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--parallel --num-workers 1) so a
+  #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--no-parallel) so a
   #     timing-dependent interleaving is reproducible/bisectable rather than
   #     racing across parallel workers.
   if [ "$#" -gt 0 ] && [ "$1" = "test" ]; then
@@ -380,27 +381,38 @@ run_swift() {
       set -- "$@" --skip "$SWIFTTUI_SWIFT_TEST_SKIP_REGEX"
     fi
     if [ -n "${SWIFTTUI_SWIFT_TEST_SERIALIZED:-}" ]; then
-      # Both flags, in full: SwiftPM rejects `--num-workers` without
-      # `--parallel`, so the previous one-flag spelling failed argument
-      # validation in about a second and never serialized anything. The same
-      # mistake made the release-soundness soak inert for four days
-      # (KNOWN-TEST-FLAKES.md entry 1, "soak integrity note").
-      set -- "$@" --parallel --num-workers 1
+      # `--no-parallel` is the ONLY spelling that serializes swift-testing.
+      # Two prior spellings were inert, each in a different way:
+      #   * bare `--num-workers 1` — SwiftPM rejects it without `--parallel`,
+      #     so the step died on argument validation in about a second (made
+      #     the release-soundness soak inert for four days; KNOWN-TEST-FLAKES.md
+      #     entry 1, "soak integrity note").
+      #   * `--parallel --num-workers 1` — validates, and does not serialize:
+      #     `--num-workers` bounds XCTest worker processes, while swift-testing
+      #     keeps its own in-process concurrency (measured peak 1645 tests in
+      #     flight with the pair vs 3 with `--no-parallel`; entry 14).
+      # `swift test --help` advertising no-parallel as the default is wrong in
+      # practice: the empirical default is parallel.
+      set -- "$@" --no-parallel
     fi
   fi
 
   swiftly run swift "$@"
 }
 
-# The broad runtime lane runs serialized. It is main-actor-bound, so its
-# parallelism bought nothing measurable — 265 s serialized against 272 s
-# parallel over 3150 tests — while measurably costing reliability: the lane
-# wedges (every thread idle, no Swift frame anywhere) in 3 of 4 parallel runs
-# against 1 of 6 serialized. This is MITIGATION, not a fix; the root cause is
-# open and recorded as KNOWN-TEST-FLAKES.md entry 14.
+# The broad runtime lane runs serialized — `--no-parallel`, the only spelling
+# that actually serializes swift-testing (see the SWIFTTUI_SWIFT_TEST_SERIALIZED
+# comment above; the `--parallel --num-workers 1` pair this lane shipped with
+# first was measured at peak 1645 tests in flight, i.e. still parallel).
+# Serialization does NOT change the lane's stall rate (2/10 serialized vs
+# 5/17 parallel pooled — the wedge needs only a single test's internal
+# run-loop concurrency). What it buys, for ~5-10% wall clock: a single-test
+# stall signature at a consistent lane offset instead of ~113 in-flight
+# tests, and an execution shape the following gate step can assert. The
+# root cause is open and recorded as KNOWN-TEST-FLAKES.md entry 14.
 run_swift_runtime_tests_without_isolated_async_suites() {
   run_swift test "$@" \
-    --parallel --num-workers 1 \
+    --no-parallel \
     --skip AsyncLifecycleGenerationTests \
     --skip AsyncFrameTailRenderingTests \
     --skip TaskReadsUnbodiedStateTests \
@@ -713,6 +725,12 @@ run_step \
   Scripts/check_step_watchdog.sh
 
 run_step \
+  "Self-test serialized-execution check" \
+  "$repo_root" \
+  "Scripts/check_serialized_execution.sh --self-test" \
+  Scripts/check_serialized_execution.sh --self-test
+
+run_step \
   "Run tree-walker recursion guardrails" \
   "$repo_root" \
   "Scripts/check_tree_walker_recursion.sh" \
@@ -797,8 +815,19 @@ run_function_step \
 
 run_function_step \
   "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
+  "$(swift_command_text test --filter SwiftTUITests --no-parallel --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
   run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
+
+# The lane above claims `--no-parallel`. Verify the claim against the lane's
+# own log rather than trusting the flag: two earlier serialization spellings
+# were inert while their steps stayed green (KNOWN-TEST-FLAKES.md entry 14).
+runtime_lane_log=$log_root/step-$step_index.log
+
+run_step \
+  "Check runtime lane executed serially" \
+  "$repo_root" \
+  "Scripts/check_serialized_execution.sh <runtime-lane-log>" \
+  Scripts/check_serialized_execution.sh "$runtime_lane_log"
 
 run_function_step \
   "Run SwiftTUIAnimatedImage tests" \

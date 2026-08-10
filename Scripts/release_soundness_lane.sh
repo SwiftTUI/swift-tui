@@ -89,12 +89,15 @@ case "$mode" in
     # freed memory. Inert on macOS (glibc-only), active on the Linux soak.
     MALLOC_CHECK_=3 && export MALLOC_CHECK_
     MALLOC_PERTURB_=165 && export MALLOC_PERTURB_
-    # `--num-workers` requires `--parallel` (SwiftPM rejects it bare — this
-    # arm was dying on that arg error 130 ms in from 2026-07-03 to
-    # 2026-07-07 while the continue-on-error step reported green; one
-    # parallel worker = the intended serialized run).
+    # `--no-parallel` is the only spelling that serializes swift-testing.
+    # Two prior spellings were inert: bare `--num-workers 1` failed SwiftPM
+    # argument validation, so this arm died 130 ms in from 2026-07-03 to
+    # 2026-07-07 while the continue-on-error step reported green; the repaired
+    # `--parallel --num-workers 1` pair validated but bounds only XCTest
+    # worker processes — swift-testing kept its own in-process concurrency
+    # (measured peak 1645 tests in flight; KNOWN-TEST-FLAKES.md entry 14).
     for suite in $FLAKY_SUITES $ISOLATED_ASYNC_SUITES; do
-      release_test --filter "SwiftTUITests.$suite" --parallel --num-workers 1
+      release_test --filter "SwiftTUITests.$suite" --no-parallel
     done
     ;;
   --race-checks)
@@ -111,7 +114,7 @@ case "$mode" in
     # shellcheck disable=SC2086
     release_test --filter SwiftTUITests $skip_args
     for suite in $TRACE_SUPPRESSION_SUITES; do
-      release_test --filter "SwiftTUITests.$suite" --parallel --num-workers 1
+      release_test --filter "SwiftTUITests.$suite" --no-parallel
     done
     ;;
   *)
