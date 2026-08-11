@@ -2107,7 +2107,7 @@ class CanvasSurfacePainter {
       }
     } else {
       context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
-      context.fillRect(0, 0, metrics.columns * metrics.cellWidth, metrics.rows * metrics.cellHeight);
+      context.fillRect(0, 0, canvas.width / scale, canvas.height / scale);
     }
     if (!frame) {
       return;
@@ -3289,6 +3289,8 @@ class WebHostSceneRuntime {
   rows = 24;
   cellWidth = 8;
   cellHeight = 18;
+  surfaceCSSWidth;
+  surfaceCSSHeight;
   activePointerButton = "primary";
   hasCapturedPointer = false;
   onOpenHyperlink;
@@ -3501,6 +3503,11 @@ class WebHostSceneRuntime {
   }
   applyStyle(style) {
     applyWebHostTerminalStyle(this.element, style);
+    this.element.style.boxSizing = "border-box";
+    this.element.style.width = "100%";
+    this.element.style.height = "100%";
+    this.element.style.minWidth = "0";
+    this.element.style.minHeight = "0";
     this.element.style.padding = "0.75rem";
     this.element.style.borderRadius = "16px";
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
@@ -3508,11 +3515,15 @@ class WebHostSceneRuntime {
     this.element.style.gap = "0.5rem";
     this.element.style.gridTemplateRows = "auto 1fr";
     this.terminalMount.style.position = "relative";
+    this.terminalMount.style.boxSizing = "border-box";
+    this.terminalMount.style.width = "100%";
+    this.terminalMount.style.height = "100%";
+    this.terminalMount.style.minWidth = "0";
+    this.terminalMount.style.minHeight = "0";
     this.terminalMount.style.overflow = "hidden";
-    this.terminalMount.style.overscrollBehavior = "contain";
+    this.terminalMount.style.overscrollBehavior = this.wheelMode === "capture" ? "contain" : "auto";
     this.terminalMount.style.outline = "none";
     this.terminalMount.style.background = webTUITerminalBackgroundColor(this.currentStyle);
-    this.terminalMount.style.minHeight = `${this.cellHeight * 8}px`;
     if (this.canvas) {
       this.canvas.style.display = "block";
       this.canvas.style.width = "100%";
@@ -3645,6 +3656,8 @@ class WebHostSceneRuntime {
     const rect = this.terminalMount.getBoundingClientRect?.();
     const width = rect?.width && rect.width > 0 ? rect.width : this.columns * this.cellWidth;
     const height = rect?.height && rect.height > 0 ? rect.height : this.rows * this.cellHeight;
+    this.surfaceCSSWidth = width;
+    this.surfaceCSSHeight = height;
     const nextColumns = Math.max(1, Math.floor(width / this.cellWidth));
     const nextRows = Math.max(1, Math.floor(height / this.cellHeight));
     this.columns = nextColumns;
@@ -3666,26 +3679,28 @@ class WebHostSceneRuntime {
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
   resizeSurface() {
-    const cssWidth = Math.max(1, this.columns * this.cellWidth);
-    const cssHeight = Math.max(1, this.rows * this.cellHeight);
+    const gridCSSWidth = Math.max(1, this.columns * this.cellWidth);
+    const gridCSSHeight = Math.max(1, this.rows * this.cellHeight);
     if (this.domSurfaceRoot) {
       const last = this.lastDomSurfaceSize;
-      if (last && last.width === cssWidth && last.height === cssHeight) {
+      if (last && last.width === gridCSSWidth && last.height === gridCSSHeight) {
         return false;
       }
-      this.lastDomSurfaceSize = { width: cssWidth, height: cssHeight };
-      this.domSurfaceRoot.style.width = `${cssWidth}px`;
-      this.domSurfaceRoot.style.height = `${cssHeight}px`;
+      this.lastDomSurfaceSize = { width: gridCSSWidth, height: gridCSSHeight };
+      this.domSurfaceRoot.style.width = `${gridCSSWidth}px`;
+      this.domSurfaceRoot.style.height = `${gridCSSHeight}px`;
       return true;
     }
     if (!this.canvas) {
       return false;
     }
     const scale = globalThis.window?.devicePixelRatio || 1;
+    const cssWidth = Math.max(1, this.surfaceCSSWidth ?? gridCSSWidth);
+    const cssHeight = Math.max(1, this.surfaceCSSHeight ?? gridCSSHeight);
     const width = Math.ceil(cssWidth * scale);
     const height = Math.ceil(cssHeight * scale);
-    const styleWidth = `${cssWidth}px`;
-    const styleHeight = `${cssHeight}px`;
+    const styleWidth = "100%";
+    const styleHeight = "100%";
     if (this.canvas.width === width && this.canvas.height === height && this.canvas.style.width === styleWidth && this.canvas.style.height === styleHeight) {
       return false;
     }
@@ -3802,6 +3817,12 @@ class InternalWebHostAppController {
     this.selectedSceneId = options.initialSceneId && options.manifest.scenes.some((scene) => scene.id === options.initialSceneId) ? options.initialSceneId : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ?? options.manifest.defaultSceneId;
     this.sceneRoot = (options.createElement ?? defaultCreateElement)("div");
     this.sceneRoot.className = "webhost-scene-root";
+    this.sceneRoot.style.boxSizing = "border-box";
+    this.sceneRoot.style.width = "100%";
+    this.sceneRoot.style.height = "100%";
+    this.sceneRoot.style.minWidth = "0";
+    this.sceneRoot.style.minHeight = "0";
+    this.sceneRoot.style.overflow = "hidden";
     this.mount.replaceChildren(this.sceneRoot);
     this.applyHostFrameStyle();
   }
@@ -3914,7 +3935,12 @@ class InternalWebHostAppController {
   }
   applyHostFrameStyle() {
     this.mount.style.background = "linear-gradient(180deg, #0f172a 0%, #111827 100%)";
-    this.mount.style.minHeight = "100%";
+    this.mount.style.boxSizing = "border-box";
+    this.mount.style.width = "100%";
+    this.mount.style.height = "100%";
+    this.mount.style.minWidth = "0";
+    this.mount.style.minHeight = "0";
+    this.mount.style.overflow = "hidden";
     this.mount.style.display = "block";
     this.mount.style.padding = "1rem";
   }
