@@ -124,6 +124,12 @@ package final class LayoutPassContext: Sendable {
   }()
 
   package let purpose: LayoutPassPurpose
+  /// The renderer-owned persistent author-cache store (plan 2026-08-11-004
+  /// Stage 2), or `nil` for scratch passes (the shadow oracle, the
+  /// size-stability pre-pass) and when `SWIFTTUI_PERSISTENT_LAYOUT_CACHE=0`
+  /// disables persistence: a nil store means custom layouts fall back to
+  /// per-pass `makeCache`, the pre-Stage-2 behavior.
+  package let customLayoutCacheStore: CustomLayoutCacheStore?
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
   /// A previous-frame session consulted ONLY by the custom-layout
@@ -145,6 +151,7 @@ package final class LayoutPassContext: Sendable {
 
   package init(
     purpose: LayoutPassPurpose = .main,
+    customLayoutCacheStore: CustomLayoutCacheStore? = nil,
     retainedLayout: RetainedLayoutSession? = nil,
     invalidatedIdentities: Set<Identity> = [],
     scrollViewportContext: ScrollViewportContext? = nil,
@@ -153,6 +160,7 @@ package final class LayoutPassContext: Sendable {
     seededLayoutRealizations: [LayoutDependentContentRealization]? = nil
   ) {
     self.purpose = purpose
+    self.customLayoutCacheStore = customLayoutCacheStore
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
     self.measurementSeedSession = measurementSeedSession

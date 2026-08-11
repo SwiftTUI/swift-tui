@@ -21,6 +21,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_SCROLL_REGION",
         "SWIFTTUI_SCROLL_BLIT",
         "SWIFTTUI_MEASURE_CUTOFF",
+        "SWIFTTUI_PERSISTENT_LAYOUT_CACHE",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)

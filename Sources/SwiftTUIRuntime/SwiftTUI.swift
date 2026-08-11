@@ -38,6 +38,11 @@ public struct DefaultRenderer {
   let visualOnlyDropRun = VisualOnlyDropRunCounter()
 
   let frameTailRenderer: FrameTailRenderer
+  /// Cross-frame author `Layout.Cache` persistence (plan 2026-08-11-004
+  /// Stage 2), owned beside the measurement cache. `nil` when
+  /// `SWIFTTUI_PERSISTENT_LAYOUT_CACHE=0` disables persistence — a nil
+  /// store restores per-pass `makeCache` wholesale.
+  package let customLayoutCacheStore: CustomLayoutCacheStore?
   // Visibility note: `frameTailCoordinator` and `prepareFrameHead` are
   // file-internal rather than `private` so the test-only hooks in
   // `DefaultRenderer+TestingHooks.swift` can reach them.
@@ -61,6 +66,7 @@ public struct DefaultRenderer {
       renderGenerationSequencer: renderGenerationSequencer,
       elidedFrameTimingRecorder: elidedFrameTimingRecorder,
       frameTailRenderer: frameTailRenderer,
+      customLayoutCacheStore: customLayoutCacheStore,
       storeObservationBridge: { bridge in
         observationBridgeTracker.store(bridge)
       },
@@ -116,6 +122,9 @@ public struct DefaultRenderer {
       drawExtractor: drawExtractor,
       rasterizer: rasterizer
     )
+    customLayoutCacheStore =
+      FeatureGate.persistentCustomLayoutCache.initialIsEnabled()
+      ? CustomLayoutCacheStore() : nil
   }
 
   /// Package-only accessor so the run loop can register animations

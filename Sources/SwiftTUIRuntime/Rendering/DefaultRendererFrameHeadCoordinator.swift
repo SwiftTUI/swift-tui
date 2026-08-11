@@ -20,6 +20,7 @@ struct DefaultRendererFrameHeadCoordinator {
   var renderGenerationSequencer: RenderGenerationSequencer
   var elidedFrameTimingRecorder: ElidedFrameTimingRecorder
   var frameTailRenderer: FrameTailRenderer
+  var customLayoutCacheStore: CustomLayoutCacheStore?
   var storeObservationBridge: @MainActor (ObservationBridge?) -> Void
   var renderPipelineContentTree: (ResolvedNode) -> ResolvedNode
   var frameCommitSequence: FrameCommitSequence
@@ -620,6 +621,7 @@ struct DefaultRendererFrameHeadCoordinator {
     // from worker offload, so this context can carry the main-thread depth
     // limit: the small-stack worker only ever sees trees within its budget.
     let layoutPassContext = LayoutPassContext(
+      customLayoutCacheStore: customLayoutCacheStore,
       retainedLayout: frameTailRetainedInput.retainedLayout,
       invalidatedIdentities: resolveInputs.invalidatedIdentities,
       customLayoutCompatibilityDepthLimit:

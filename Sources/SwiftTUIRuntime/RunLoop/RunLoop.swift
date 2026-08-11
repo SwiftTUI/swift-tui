@@ -290,6 +290,29 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       )
     }
 
+    if let customLayoutCacheStore = renderer.customLayoutCacheStore {
+      memoryMetricTokens.append(
+        MemoryMetricRegistry.shared.register(
+          ClosureMemoryMetricProvider { [weak customLayoutCacheStore] in
+            guard let customLayoutCacheStore else {
+              return MemoryMetricSnapshot(
+                name: "CustomLayoutCacheStore.entriesByIdentity", count: 0)
+            }
+            let metrics = customLayoutCacheStore.metrics
+            return MemoryMetricSnapshot(
+              name: "CustomLayoutCacheStore.entriesByIdentity",
+              count: customLayoutCacheStore.count,
+              detail: [
+                "lookups": metrics.lookups,
+                "serves": metrics.serves,
+                "misses": metrics.misses,
+              ]
+            )
+          }
+        )
+      )
+    }
+
     let frameTailRenderer = renderer.frameTailRenderer
     memoryMetricTokens.append(
       MemoryMetricRegistry.shared.register(

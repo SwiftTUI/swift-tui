@@ -305,6 +305,7 @@ struct LatePreferenceReconciliationStage {
       rootIdentity: input.rootIdentity,
       retained: input.retained,
       layoutPassContext: LayoutPassContext(
+        customLayoutCacheStore: input.layoutPassContext.customLayoutCacheStore,
         retainedLayout: input.retained.retainedLayout,
         invalidatedIdentities: input.layoutPassContext.invalidatedIdentities,
         customLayoutCompatibilityDepthLimit:

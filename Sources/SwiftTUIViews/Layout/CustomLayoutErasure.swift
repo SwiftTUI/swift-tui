@@ -217,11 +217,13 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       engine: engine,
       passContext: passContext
     )
-    var cache = preparedCache(
+    let prepared = preparedCache(
       for: node,
       proposal: proposal,
-      subviews: subviews
+      subviews: subviews,
+      passContext: passContext
     )
+    var cache = prepared.cache
     let layout = seededLayout(for: node, proposal: proposal, passContext: passContext)
     let size = layout.sizeThatFits(
       proposal: proposal,
@@ -229,6 +231,37 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       cache: &cache
     )
     storeCache(cache, for: node, proposal: proposal)
+    #if DEBUG
+      // The plan-004 Stage 2 divergence check, size leg: a serve from the
+      // persistent store must reproduce the fresh-cache size exactly. DEBUG
+      // runs every serve (DEBUG sampling is every frame); record-only —
+      // the runtime issue is the alarm, matching the layout shadow
+      // oracle's current record-only posture — and any firing is the
+      // plan's Stage-2 stop condition.
+      if prepared.persisted {
+        var freshCache = layout.makeCache(subviews: subviews)
+        layout.updateCache(&freshCache, subviews: subviews)
+        let freshSize = layout.sizeThatFits(
+          proposal: proposal,
+          subviews: subviews,
+          cache: &freshCache
+        )
+        if freshSize != size {
+          passContext?.recordRuntimeIssue(
+            RuntimeIssue(
+              severity: .error,
+              code: "layout.persistedCacheDivergence",
+              message:
+                "a persisted Layout.Cache produced \(size.width)x\(size.height) where a "
+                + "fresh makeCache pass produced \(freshSize.width)x\(freshSize.height); "
+                + "the author cache carries pass-coupled state",
+              identity: node.identity,
+              source: debugName
+            )
+          )
+        }
+      }
+    #endif
     return size
   }
 
@@ -263,11 +296,13 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       placementRecorder: placementRecorder,
       passContext: passContext
     )
-    var cache = preparedCache(
+    let prepared = preparedCache(
       for: node,
       proposal: measured.proposal,
-      subviews: subviews
+      subviews: subviews,
+      passContext: passContext
     )
+    var cache = prepared.cache
     let layout = seededLayout(
       for: node,
       proposal: measured.proposal,
@@ -280,8 +315,46 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       cache: &cache
     )
     storeCache(cache, for: node, proposal: measured.proposal)
-    // `Layout.Cache` is pass-local: retain measurement mutations through
-    // placement, then drop every proposal entry for this container identity.
+    #if DEBUG
+      // Divergence check, placement leg (plan 2026-08-11-004 Stage 2): a
+      // persisted cache served directly at placement (no in-pass measure
+      // stored a bridge entry) must record the same subview placements a
+      // fresh cache records. Record-only, like the size leg.
+      if prepared.persisted {
+        verifyPersistedCachePlacements(
+          against: placementRecorder,
+          layout: layout,
+          node: node,
+          measured: measured,
+          in: bounds,
+          engine: engine,
+          passContext: passContext
+        )
+      }
+    #endif
+    // Persist the placement-final author cache (plan 2026-08-11-004
+    // Stage 2): recorded through the worker update channel and applied on
+    // the main actor only when the frame COMMITS, so abandoned candidates
+    // and probe passes never mutate the store.
+    if let passContext, let store = passContext.customLayoutCacheStore {
+      let finalCache = cache
+      let resolvedNode = node
+      let storedProposal = measured.proposal
+      let layoutDebugName = debugName
+      passContext.recordWorkerCustomLayoutCacheUpdate(
+        WorkerCustomLayoutCacheUpdate(identity: node.identity) {
+          store.store(
+            finalCache,
+            resolved: resolvedNode,
+            proposal: storedProposal,
+            layoutDebugName: layoutDebugName
+          )
+        }
+      )
+    }
+    // The in-pass map stays pass-local: retain measurement mutations
+    // through placement, then drop every proposal entry for this container
+    // identity. Cross-frame persistence is the store's job, above.
     discardPassLocalCacheStates(for: node.identity)
 
     // Branching oracle (plan 2026-08-11-004): custom placement re-measures
@@ -388,21 +461,125 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     }
   }
 
+  /// Prepares the author cache for one measure or place, in tier order: the
+  /// in-pass bridge map (measurement to placement inside the current pass),
+  /// the cross-frame persistent store (plan 2026-08-11-004 Stage 2), then
+  /// `makeCache`. `updateCache` runs on every tier, preserving the SwiftUI
+  /// contract that caches refresh when subviews change. `persisted` reports
+  /// a store serve so the DEBUG divergence checks know to verify it.
   private func preparedCache(
     for node: ResolvedNode,
     proposal: ProposedSize,
-    subviews: LayoutSubviews
-  ) -> L.Cache {
-    // This map only bridges measurement to placement inside the current pass.
-    // Placement discards all entries for the identity, so arbitrary author cache
-    // values do not persist across frames, proposals, or structural changes.
+    subviews: LayoutSubviews,
+    passContext: LayoutPassContext?
+  ) -> (cache: L.Cache, persisted: Bool) {
     let key = CacheKey(identity: node.identity, proposal: proposal)
-    var cache = state.withLock { state in
-      state.cachedStates[key] ?? layout.makeCache(subviews: subviews)
+    if var cache = state.withLock({ $0.cachedStates[key] }) {
+      layout.updateCache(&cache, subviews: subviews)
+      return (cache, false)
     }
+    if var persisted = persistedCache(for: node, proposal: proposal, passContext: passContext) {
+      layout.updateCache(&persisted, subviews: subviews)
+      return (persisted, true)
+    }
+    var cache = layout.makeCache(subviews: subviews)
     layout.updateCache(&cache, subviews: subviews)
-    return cache
+    return (cache, false)
   }
+
+  /// The persistent store's serve, behind the plan's validity guards: same
+  /// layout type and an equivalent-for-measurement stored node (checked by
+  /// the store itself), and nothing at or below this container invalidated
+  /// this frame — a changed subtree must rebuild its cache from scratch
+  /// through `makeCache`, not refresh a stale one.
+  private func persistedCache(
+    for node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> L.Cache? {
+    guard let passContext,
+      let store = passContext.customLayoutCacheStore,
+      !isInvalidated(node, passContext: passContext),
+      let value = store.lookup(
+        resolved: node,
+        proposal: proposal,
+        layoutDebugName: debugName
+      )
+    else {
+      return nil
+    }
+    return value as? L.Cache
+  }
+
+  /// The retainedMeasurement guard set, or the raw invalidation set when no
+  /// session exists (a full re-render frame — exactly where persisted
+  /// caches earn their keep).
+  private func isInvalidated(
+    _ node: ResolvedNode,
+    passContext: LayoutPassContext
+  ) -> Bool {
+    if let session = passContext.retainedLayout {
+      return session.isDirectlyInvalidated(node.identity)
+        || session.hasSyntheticInvalidatedAncestor(node.identity)
+        || session.containsInvalidatedDescendant(of: node.identity)
+    }
+    return passContext.invalidatedIdentities.contains { identity in
+      identity == node.identity || identity.isDescendant(of: node.identity)
+    }
+  }
+
+  #if DEBUG
+    /// Divergence check, placement leg: re-place with a fresh cache into a
+    /// second recorder and compare each child's recorded position, proposal,
+    /// and exact size.
+    private func verifyPersistedCachePlacements(
+      against placementRecorder: LayoutSubviewPlacementRecorder,
+      layout: L,
+      node: ResolvedNode,
+      measured: MeasuredNode,
+      in bounds: CellRect,
+      engine: LayoutEngine,
+      passContext: LayoutPassContext?
+    ) {
+      let verifyRecorder = LayoutSubviewPlacementRecorder()
+      let verifySubviews = layoutSubviews(
+        for: node,
+        engine: engine,
+        placementRecorder: verifyRecorder,
+        passContext: passContext
+      )
+      var freshCache = layout.makeCache(subviews: verifySubviews)
+      layout.updateCache(&freshCache, subviews: verifySubviews)
+      layout.placeSubviews(
+        in: bounds,
+        proposal: measured.proposal,
+        subviews: verifySubviews,
+        cache: &freshCache
+      )
+      for child in node.children {
+        let served = placementRecorder.placement(for: child.identity)
+        let fresh = verifyRecorder.placement(for: child.identity)
+        let diverged =
+          served?.position != fresh?.position
+          || served?.proposal != fresh?.proposal
+          || served?.exactSize != fresh?.exactSize
+        if diverged {
+          passContext?.recordRuntimeIssue(
+            RuntimeIssue(
+              severity: .error,
+              code: "layout.persistedCacheDivergence",
+              message:
+                "a persisted Layout.Cache placed a subview differently from a fresh "
+                + "makeCache pass; the author cache carries pass-coupled state",
+              identity: child.identity,
+              source: debugName
+            )
+          )
+          return
+        }
+      }
+    }
+  #endif
 
   private func storeCache(
     _ cache: L.Cache,

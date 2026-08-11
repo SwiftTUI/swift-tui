@@ -183,6 +183,15 @@ extension DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveNodeIDSnapshot()
     )
+    // The persistent author-cache store prunes alongside the measurement
+    // cache (plan 2026-08-11-004 Stage 2). Identity-keyed, so it takes the
+    // identity snapshot; the empty-store guard keeps custom-layout-free
+    // apps from paying for the snapshot at all.
+    if let customLayoutCacheStore, !customLayoutCacheStore.isEmpty {
+      customLayoutCacheStore.prune(
+        keeping: viewGraph.liveIdentitySnapshot()
+      )
+    }
     return CommittedFrameEffects(
       commitPlan: commit,
       commitDuration: commitDuration,

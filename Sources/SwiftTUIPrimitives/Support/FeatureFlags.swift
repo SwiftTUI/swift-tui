@@ -23,6 +23,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case scrollRegionEmission
   case scrollBlit
   case measureSizeStabilityCutoff
+  case persistentCustomLayoutCache
 
   package var environmentVariableName: String {
     switch self {
@@ -48,6 +49,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_SCROLL_BLIT"
     case .measureSizeStabilityCutoff:
       "SWIFTTUI_MEASURE_CUTOFF"
+    case .persistentCustomLayoutCache:
+      "SWIFTTUI_PERSISTENT_LAYOUT_CACHE"
     }
   }
 
@@ -140,6 +143,16 @@ package enum FeatureGate: CaseIterable, Sendable {
       // Promotion to a default-on kill switch requires the plan's Stage 4
       // benchmark acceptance.
       false
+    case .persistentCustomLayoutCache:
+      // Kill switch, not an opt-in (plan 2026-08-11-004 Stage 2): the
+      // `Layout.Cache` doc contract already demands value-semantic,
+      // pass-independent state, serves are equivalence- and
+      // invalidation-checked against the node the cache was built for, and
+      // the DEBUG divergence check compares every served pass against a
+      // fresh `makeCache` recompute. `SWIFTTUI_PERSISTENT_LAYOUT_CACHE=0`
+      // restores per-pass `makeCache` wholesale (the plan's triage escape
+      // hatch).
+      true
     }
   }
 
