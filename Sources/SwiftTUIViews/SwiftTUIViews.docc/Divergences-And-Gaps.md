@@ -232,11 +232,21 @@ are omitted even when SwiftUI exposes a corresponding API.
   sharpest priority edge of the layout model, kept from the historical
   compression path.
 - **Custom `Layout` types must be `Sendable`, with `Sendable` caches.**
-  *Ratified.* The renderer evaluates custom layouts on the off-main
+  *Ratified.* The renderer can evaluate custom layouts on the off-main
   frame-tail worker.
 - **`Layout` caches are pass-local scratch.** *Gap.* SwiftUI persists `Cache`
   values across passes through `updateCache`. SwiftTUI shares the cache
   between measurement and placement for one pass, then drops it.
+- **Custom-layout nesting has a depth budget.** *Gap.* Each nested custom
+  layout re-enters the engine on the native call stack, so nesting is
+  budgeted rather than unbounded: trees nested past the frame-tail worker's
+  budget of four levels are disqualified from worker offload and run the
+  frame tail on the main actor, which affords 24 levels; WASI keeps the
+  conservative limit everywhere (one small stack, no offload worker).
+  Nesting past the active budget truncates with a
+  `layout.customLayoutDepthLimitExceeded` runtime issue. The budget is a
+  consequence of the partly iterative layout engine recorded under runtime
+  internals.
 - **Measurement does not realize deferred content.** *Provisional.* Measuring
   a `GeometryReader` or an unselected `ViewThatFits` candidate does not
   realize its authored content and commits no lifecycle, task, gesture, focus,
@@ -707,7 +717,8 @@ work-stack paths for parts of measurement and placement are complete.
 - **Built-in layout is not fully iterative.** *Gap.* The explicit work-stack
   migration is partial: built-in layout still recurses on the Swift call
   stack, so the frame-tail worker uses an enlarged stack instead of a bounded
-  iterative engine.
+  iterative engine, and custom-layout nesting carries the depth budget
+  recorded in the layout section.
 - **`ViewGraph` decomposition is design-only.** *Gap.* Smaller `ViewGraph`
   types with cleaner ownership, dependency-aware (profile-gated) body
   re-evaluation, explicit context threading through resolve, and interning of
