@@ -20,6 +20,13 @@ import SwiftTUICore
 // answer. The recursive scans survive below only as the DEBUG drift oracle
 // that pins the aggregate to the tree it summarizes.
 extension FrameTailRenderer {
+  /// The deepest custom-layout nesting the ~512 KiB frame-tail dispatch
+  /// worker can take: the compatibility recursion re-enters the engine per
+  /// nesting level on the native stack, so deeper trees run the tail on the
+  /// main actor, whose pass context carries the main-thread depth limit.
+  static let workerCustomLayoutNestingBudget =
+    LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit
+
   func canOffloadLayout(
     _ input: FrameTailInput
   ) -> Bool {
@@ -28,6 +35,7 @@ extension FrameTailRenderer {
     return summary.count == 0
       && summary.mainActorOnlyIndexedChildSourceCount == 0
       && summary.layoutRealizedContentCount == 0
+      && summary.maxCustomLayoutNestingDepth <= Self.workerCustomLayoutNestingBudget
   }
 
   func needsIndexedChildSourceWorkerSnapshot(
@@ -38,6 +46,7 @@ extension FrameTailRenderer {
     return summary.count == 0
       && summary.mainActorOnlyIndexedChildSourceCount > 0
       && summary.layoutRealizedContentCount == 0
+      && summary.maxCustomLayoutNestingDepth <= Self.workerCustomLayoutNestingBudget
       // Snapshotting pre-realizes EVERY source element on the main actor
       // before the tail can offload. Past this budget that pre-realization
       // costs more than offloading the tail wins: a windowed main-actor
@@ -95,6 +104,10 @@ extension FrameTailRenderer {
       assert(
         (summary.layoutRealizedContentCount > 0) == containsLayoutRealizedContent(resolved),
         "customLayoutFallbackSummary.layoutRealizedContentCount drifted"
+      )
+      assert(
+        summary.maxCustomLayoutNestingDepth == maxCustomLayoutNestingDepthScan(resolved),
+        "customLayoutFallbackSummary.maxCustomLayoutNestingDepth drifted"
       )
     #endif
   }
@@ -162,5 +175,21 @@ extension FrameTailRenderer {
       return true
     }
     return node.children.contains { containsLayoutRealizedContent($0) }
+  }
+
+  func maxCustomLayoutNestingDepthScan(
+    _ node: ResolvedNode
+  ) -> Int {
+    var childMaximum = node.children.map(maxCustomLayoutNestingDepthScan).max() ?? 0
+    if let workerChildren = node.indexedChildSource?.workerResolvedChildren {
+      childMaximum = max(
+        childMaximum,
+        workerChildren.map(maxCustomLayoutNestingDepthScan).max() ?? 0
+      )
+    }
+    if case .custom = node.layoutBehavior {
+      return childMaximum + 1
+    }
+    return childMaximum
   }
 }

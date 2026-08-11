@@ -458,6 +458,9 @@ package struct ResolvedNode: Equatable, Sendable {
     for child in children {
       summary.merge(child.customLayoutFallbackSummary)
     }
+    if case .custom = layoutBehavior {
+      summary.recordCustomLayoutNestingLevel()
+    }
     return summary
   }
 

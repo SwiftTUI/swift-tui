@@ -615,9 +615,15 @@ struct DefaultRendererFrameHeadCoordinator {
     let frameTailRetainedInput = frameTailRenderer.retainedInput(
       invalidatedIdentities: resolveInputs.invalidatedIdentities
     )
+    // The composed pipeline's entry points are all main-actor, and trees
+    // whose custom-layout nesting exceeds the worker budget are disqualified
+    // from worker offload, so this context can carry the main-thread depth
+    // limit: the small-stack worker only ever sees trees within its budget.
     let layoutPassContext = LayoutPassContext(
       retainedLayout: frameTailRetainedInput.retainedLayout,
-      invalidatedIdentities: resolveInputs.invalidatedIdentities
+      invalidatedIdentities: resolveInputs.invalidatedIdentities,
+      customLayoutCompatibilityDepthLimit:
+        LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
     )
     let frameContext = FrameContext(
       environment: resolveInputs.environment,

@@ -890,6 +890,44 @@ struct AsyncFrameTailRenderingTests {
     #expect(issues.first?.severity == .error)
   }
 
+  @Test("custom layout nesting beyond the worker budget renders without depth issues")
+  func deepCustomLayoutNestingRendersWithoutDepthIssues() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailDeepNestedLayoutView(),
+      context: .init(identity: testIdentity("AsyncDeepNestedLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(
+      artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "layout.customLayoutDepthLimitExceeded"
+      }.isEmpty
+    )
+    // Nesting beyond the worker budget disqualifies offload: the layout pass
+    // ran inline on the main actor, whose context carries the main-thread
+    // depth limit, so the whole chain placed instead of truncating at 4.
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(raster.contains("deep split"))
+  }
+
+  @Test("custom layout nesting within the worker budget still offloads")
+  func shallowCustomLayoutNestingStillOffloads() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailShallowNestedLayoutView(),
+      context: .init(identity: testIdentity("AsyncShallowNestedLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(raster.contains("shallow split"))
+  }
+
   @Test("public SendableLayout opt-in runs layout on the frame-tail worker")
   func publicSendableLayoutOptInRunsLayoutOnFrameTailWorker() async throws {
     let rootIdentity = testIdentity("AsyncSendableLayoutRoot")
@@ -4275,6 +4313,74 @@ private final class AsyncRecursiveCustomLayoutProxy: LayoutPassContextCustomLayo
         in: CellRect(origin: bounds.origin, size: childMeasurement.measuredSize),
         passContext: passContext
       )
+    }
+  }
+}
+
+// A worker-capable single-child passthrough layout — the same public-surface
+// shape as an app's split-pane layout — nested past and within the worker
+// nesting budget by the two views below it.
+private struct AsyncFrameTailPassthroughLayout: Layout {
+  var measurementReuseSignature: String? {
+    "AsyncFrameTailPassthroughLayout.measure"
+  }
+
+  var placementReuseSignature: String? {
+    "AsyncFrameTailPassthroughLayout.place"
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    for subview in subviews {
+      subview.place(
+        at: bounds.origin,
+        anchor: .topLeading,
+        proposal: .init(width: bounds.size.width, height: bounds.size.height)
+      )
+    }
+  }
+}
+
+private struct AsyncFrameTailDeepNestedLayoutView: View {
+  var body: some View {
+    let layout = AsyncFrameTailPassthroughLayout()
+    return layout {
+      layout {
+        layout {
+          layout {
+            layout {
+              layout {
+                Text("deep split")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct AsyncFrameTailShallowNestedLayoutView: View {
+  var body: some View {
+    let layout = AsyncFrameTailPassthroughLayout()
+    return layout {
+      layout {
+        layout {
+          Text("shallow split")
+        }
+      }
     }
   }
 }

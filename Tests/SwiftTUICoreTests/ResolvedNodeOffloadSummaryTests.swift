@@ -90,6 +90,41 @@ struct ResolvedNodeOffloadSummaryTests {
     #expect(root.customLayoutFallbackSummary.layoutRealizedContentCount == 0)
   }
 
+  @Test("custom layout nesting depth aggregates the deepest chain, not sibling sums")
+  func customLayoutNestingDepthAggregatesDeepestChain() {
+    let leaf = makeCustomNode("leaf")
+    let mid = makeCustomNode("mid", children: [makeNode("spacer", children: [leaf])])
+    let sibling = makeCustomNode("sibling")
+    let root = makeNode("root", children: [mid, sibling])
+
+    #expect(leaf.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
+    #expect(mid.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+  }
+
+  @Test("children setter keeps custom layout nesting depth current")
+  func childrenSetterKeepsNestingDepthCurrent() {
+    var root = makeCustomNode("root")
+    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
+
+    root.children = [makeCustomNode("child")]
+    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+
+    root.children = []
+    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
+  }
+
+  @Test("worker-capable custom layouts count toward nesting depth")
+  func workerCapableCustomLayoutsCountTowardNestingDepth() {
+    let inner = makeWorkerCapableCustomNode("inner")
+    let outer = makeWorkerCapableCustomNode("outer", children: [inner])
+
+    // Worker capability keeps the main-actor fallback count at zero, but the
+    // compatibility recursion still nests per level, so depth counts them.
+    #expect(outer.customLayoutFallbackSummary.count == 0)
+    #expect(outer.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+  }
+
   @Test("worker-resolved children contribute their disqualifiers")
   func workerResolvedChildrenContribute() {
     var workerChild = makeNode("worker-child")
@@ -115,6 +150,60 @@ private func makeNode(
     kind: .view(name),
     children: children
   )
+}
+
+private func makeCustomNode(
+  _ name: String,
+  children: [ResolvedNode] = []
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: Identity(components: [name]),
+    kind: .view(name),
+    children: children,
+    layoutBehavior: .custom(CustomLayoutHandle(OffloadSummaryCustomLayoutProxy()))
+  )
+}
+
+private func makeWorkerCapableCustomNode(
+  _ name: String,
+  children: [ResolvedNode] = []
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: Identity(components: [name]),
+    kind: .view(name),
+    children: children,
+    layoutBehavior: .custom(
+      CustomLayoutHandle(
+        OffloadSummaryCustomLayoutProxy(),
+        workerProxy: WorkerCustomLayoutSnapshot(
+          debugName: "OffloadSummaryWorkerCustomLayout",
+          measureContainer: { _, _, _, _ in .init(width: 1, height: 1) },
+          placeSubviews: { _, _, _, _, _ in [] }
+        )
+      )
+    )
+  )
+}
+
+private final class OffloadSummaryCustomLayoutProxy: CustomLayoutProxy {
+  var debugName: String { "OffloadSummaryCustomLayout" }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> CellSize {
+    .init(width: 1, height: 1)
+  }
+
+  func placeSubviews(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    measured _: MeasuredNode,
+    in _: CellRect
+  ) -> [PlacedNode] {
+    []
+  }
 }
 
 @MainActor

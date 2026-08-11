@@ -80,7 +80,30 @@ package final class LayoutPassContext: Sendable {
     var runtimeIssues: [RuntimeIssue]
   }
 
+  /// The conservative nesting budget for custom-layout compatibility
+  /// recursion. Each nested custom layout re-enters the engine on the native
+  /// stack — measured at up to ~80 KiB per level in debug builds, with a
+  /// ~54 KiB windowed-measurement frame at the tip — so this default is
+  /// calibrated to the smallest stacks a pass can run on: the ~512 KiB
+  /// frame-tail dispatch worker and cooperative-pool threads that call the
+  /// engine directly.
   package static let defaultCustomLayoutCompatibilityDepthLimit = 4
+
+  /// The nesting budget for passes guaranteed to run on the main thread
+  /// (~8 MiB stack): the composed render pipeline's entry points are all
+  /// main-actor, and trees nested deeper than the worker budget are
+  /// disqualified from worker offload, so the pipeline's pass context can
+  /// afford real-world nesting like one split-pane layout per split.
+  /// 24 levels ≈ 2 MiB of worst-case debug stack against the main thread's
+  /// ~8 MiB. WASI keeps the conservative default: it runs everything inline
+  /// on one small wasm stack with no offload worker.
+  package static let mainActorCustomLayoutCompatibilityDepthLimit: Int = {
+    #if os(WASI)
+      defaultCustomLayoutCompatibilityDepthLimit
+    #else
+      24
+    #endif
+  }()
 
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
