@@ -40,6 +40,12 @@ SwiftTUI tracks observable reads through the runtime invalidation bridge.
 Observable writes invalidate the exact identities that observed them. They do
 not use a second rendering system.
 
+Observable model writes may happen off the main actor, as in SwiftUI's
+background-task model writes. The bridge accepts the change from any
+executor, wakes the scheduler, and applies the invalidation on the main actor
+at the next frame head. `@State` and `Binding` writes remain main-actor-only,
+enforced at compile time.
+
 ## Environment
 
 Use ``Environment`` or ``EnvironmentReader`` with ``EnvironmentValues`` for

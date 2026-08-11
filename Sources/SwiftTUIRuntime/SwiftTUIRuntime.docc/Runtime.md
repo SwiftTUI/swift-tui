@@ -214,7 +214,8 @@ Observation uses the same invalidation path as `@State`. It does not use a
 separate runtime.
 
 - `resolveBody` and `EnvironmentReader` track observable reads through an internal observation bridge
-- observable callbacks invalidate the exact observed identity on the main actor
+- observable writes may occur on any executor, matching SwiftUI's allowance for background-task model writes; the bridge marshals them instead of trapping
+- callbacks filter staleness and wake the scheduler at fire time, then the graph invalidation for the exact observed identity applies on the main actor at the next frame head
 - generation tracking suppresses stale callbacks from older frames
 - committed-frame pruning stops removed identities from continuing to invalidate hidden subtrees
 - the package provides its own `Bindable`

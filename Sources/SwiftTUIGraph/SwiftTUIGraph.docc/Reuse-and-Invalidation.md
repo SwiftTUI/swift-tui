@@ -187,13 +187,20 @@ Only after a Layer-A miss does the door ask **Layer B, memoized-body reuse**.
 This layer exists for a node reached below a re-evaluated ancestor. It still
 requires a clean, unvisited, memo-servable node. It also requires an equal
 environment, a reuse-equivalent transaction, and no self invalidation. No
-state, Observation, or focus/press dependency can remain uncovered. It then compares the newly presented
-view value with the prior value through
-`MemoValueComparator.compareEquatable`. Production memo reuse is
-`Equatable`-only. A directly `Equatable` view or an `EquatableView` or
-`.equatable()` boundary opts in. The comparator does not reflect
-non-`Equatable` containers. The reflective comparator belongs only to the
-sampled shadow oracle.
+state, Observation, or focus/press dependency can remain uncovered. An
+ancestor-side invalidation match is expected and exempt, but an invalidation
+inside the served subtree vetoes the serve: a descendant reader re-runs
+through its own identity, and serving its ancestor wholesale would replay the
+stale committed child. The value test then runs through
+`MemoValueComparator.compareForReuse`, which dispatches a comparison plan
+built once per type. An `Equatable` value keeps its own `==`. A POD value
+compares by bytes. Other certified layouts compare field by field. An
+unplannable value (closure captures, `AnyView`, opaque existentials) is
+skipped rather than reflected over, so a directly `Equatable` view or an
+`EquatableView` or `.equatable()` boundary remains the widest opt-in while
+the plan tiers extend the same gate to value-only types that never opted in.
+The comparator does not reflect at compare time. The reflective comparator
+belongs only to the sampled shadow oracle.
 
 Both layers share the same acceptance path. `recordReusedSubtree` refreshes the
 retained root and its invalidator. The door restores recorded runtime
@@ -346,7 +353,8 @@ The reuse subsystem's local oracles are deliberately small:
 - The memo shadow path recomputes sampled nodes that the production path can
   skip. It compares their
   fresh output with the committed output. A no-reads content divergence records
-  `memo-unsound-skip`. The production gate remains `Equatable`-only.
+  `memo-unsound-skip`. The production gate dispatches per-type comparison
+  plans and never reflects; reflection belongs to this oracle alone.
 
 This section is not the inventory of every graph and runtime probe. Enforcement
 tier, sampling, release behavior, residual quarantine, source recorder, and

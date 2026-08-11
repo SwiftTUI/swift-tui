@@ -260,13 +260,18 @@ that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of
 these conditions are true:
 
-- Its view value is `Equatable`-equal to the previous frame's value.
-- It did not read `@State`, `@Observable`, or focus state.
-- It passes the retained-reuse guards through the `EquatableView` or
-  `View.equatable()` opt-in.
+- Its view value compares equal to the previous frame's value under the type's
+  comparison plan, built once per type: an `Equatable` type uses its own `==`,
+  a POD type compares by bytes, and other certified layouts compare field by
+  field. An unplannable value (closure captures, `AnyView`, opaque
+  existentials) recomputes instead. The gate never reflects at compare time.
+- Its tracked dependencies (`@State`, `@Observable`, focus state) are covered
+  and clean, and no invalidation lies inside the served subtree.
+- Its environment matches the committed snapshot for the keys it depends on.
 
-This reuse applies only to `Equatable` views. It has no effect on views that do
-not opt in.
+`EquatableView` and `View.equatable()` remain the explicit opt-in. They make
+the author's `==` the whole comparison contract, including captured closures
+that the comparison plan would otherwise refuse.
 The complete ordering, input contracts, freshness-stamp algebra, suppression
 rules, and oracle boundaries are documented in
 [Reuse and invalidation](../Sources/SwiftTUIGraph/SwiftTUIGraph.docc/Reuse-and-Invalidation.md).
@@ -390,7 +395,9 @@ not links. This history moved here from the published
 - `docs/reports/2026-06-17-memo-stage0-killgate.md` demonstrated the shadow
   oracle's ability to find errors.
   `docs/reports/2026-06-17-memo-stage2-flag-gated-gate.md` established why
-  production comparison ultimately became an `Equatable`-only opt-in.
+  production comparison first shipped as an `Equatable`-only opt-in. Per-type
+  comparison plans later widened that gate; per-compare reflection stayed
+  diagnostic-only.
 - `docs/reports/2026-07-17-001-gallery-fuzzer-diagnostics-campaign.md`, §9.10
   “Style-seam re-land + retained-placement identity fix (2026-07-18, session
   5),” explains the authoring-owner override and island-bridging invalidation.
