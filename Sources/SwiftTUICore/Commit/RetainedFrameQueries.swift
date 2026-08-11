@@ -27,9 +27,12 @@ package struct RetainedFrameIndex: Sendable {
   package let measuredByNodeID: [ViewNodeID: MeasuredNode]
   package let placedByNodeID: [ViewNodeID: PlacedNode]
   package let structuralFrame: StructuralFrameIndex
-  fileprivate let resolvedStructuralIndex: [Identity: ResolvedNode]
-  fileprivate let measuredStructuralIndex: [Identity: MeasuredNode]
-  fileprivate let placedStructuralIndex: [Identity: PlacedNode]
+  // Internal (not fileprivate) so the shape-stable patcher in
+  // `RetainedFrameIndexPatching.swift` can carry these tables forward; the
+  // package-facing surface stays the accessor methods below.
+  let resolvedStructuralIndex: [Identity: ResolvedNode]
+  let measuredStructuralIndex: [Identity: MeasuredNode]
+  let placedStructuralIndex: [Identity: PlacedNode]
   /// The frame's placed tree. `PlacedNode` carries its whole subtree, so this
   /// is the previous frame's placed root and, transitively, every placed node.
   /// Held for ``placedRootIdentity`` — where ``placedPath(to:)`` terminates —
@@ -52,10 +55,15 @@ package struct RetainedFrameIndex: Sendable {
   /// the window content, so the app/scene identities above it never own a
   /// `PlacedNode`) and also breaks whenever a placed child's identity extends
   /// its placed parent's by more than one component.
-  private let placedParentByStructuralIdentity: [Identity: Identity]
-  private let placedFrameEntries: [PlacedFrameTableEntry]
-  private let placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>]
-  private let placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>]
+  let placedParentByStructuralIdentity: [Identity: Identity]
+  let placedFrameEntries: [PlacedFrameTableEntry]
+  let placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>]
+  let placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>]
+  /// Whether this index was derived by the shape-stable incremental patch
+  /// rather than a full rebuild. Diagnostic provenance only — deliberately
+  /// excluded from ``isByteEquivalent(to:)``, whose contract is that a
+  /// patched index and a full rebuild are indistinguishable by content.
+  package let derivedByPatching: Bool
 
   package var placedFrameEntryCount: Int {
     placedFrameEntries.count
@@ -102,38 +110,112 @@ package struct RetainedFrameIndex: Sendable {
     self.placedFrameEntryRangesByNodeID = placedFrameEntryRangesByNodeID
     self.placedFrameEntryRangesByStructuralIdentity =
       placedFrameEntryRangesByStructuralIdentity
+    derivedByPatching = false
+  }
+
+  /// Memberwise assembly for the shape-stable patcher
+  /// (`RetainedFrameIndexPatching.swift`); every other caller goes through
+  /// `init(frame:)` or `init(patching:with:)`.
+  init(
+    resolvedByNodeID: [ViewNodeID: ResolvedNode],
+    measuredByNodeID: [ViewNodeID: MeasuredNode],
+    placedByNodeID: [ViewNodeID: PlacedNode],
+    structuralFrame: StructuralFrameIndex,
+    resolvedStructuralIndex: [Identity: ResolvedNode],
+    measuredStructuralIndex: [Identity: MeasuredNode],
+    placedStructuralIndex: [Identity: PlacedNode],
+    placedRoot: PlacedNode,
+    placedParentByStructuralIdentity: [Identity: Identity],
+    placedFrameEntries: [PlacedFrameTableEntry],
+    placedFrameEntryRangesByNodeID: [ViewNodeID: Range<Int>],
+    placedFrameEntryRangesByStructuralIdentity: [Identity: Range<Int>],
+    derivedByPatching: Bool
+  ) {
+    self.resolvedByNodeID = resolvedByNodeID
+    self.measuredByNodeID = measuredByNodeID
+    self.placedByNodeID = placedByNodeID
+    self.structuralFrame = structuralFrame
+    self.resolvedStructuralIndex = resolvedStructuralIndex
+    self.measuredStructuralIndex = measuredStructuralIndex
+    self.placedStructuralIndex = placedStructuralIndex
+    self.placedRoot = placedRoot
+    self.placedParentByStructuralIdentity = placedParentByStructuralIdentity
+    self.placedFrameEntries = placedFrameEntries
+    self.placedFrameEntryRangesByNodeID = placedFrameEntryRangesByNodeID
+    self.placedFrameEntryRangesByStructuralIdentity =
+      placedFrameEntryRangesByStructuralIdentity
+    self.derivedByPatching = derivedByPatching
   }
 
   /// Derives the next retained index from the previous one plus the new frame.
   ///
-  /// **The incremental fragment patch (Stage 1 L3) is deferred:** this currently
-  /// performs a full rebuild (`init(frame:)`), so `previous` is unused except by
-  /// the debug check below. Measurement shows retained-index construction is a
-  /// sub-1% slice of frame time (off the critical path; `resolve_ms` dominates),
-  /// so the incremental patcher was not worth its complexity — see the
-  /// divergence and gap register
-  /// (`Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md`,
-  /// "Runtime and pipeline internals"). Until a real patch path lands,
-  /// the `#if DEBUG` byte-equivalence check compares two full rebuilds and is
-  /// therefore inert; it is retained as the oracle scaffold that becomes
-  /// meaningful the moment the patched and rebuilt indexes can differ.
+  /// Frames whose trees keep the previous frame's shape — every identity,
+  /// kind, structural path, and child count pairwise unchanged, the dominant
+  /// value-only class (state flips, animation ticks) — patch incrementally:
+  /// the structural tables carry over wholesale (walk-order key minting is a
+  /// pure function of the resolved tree's shape) and only changed nodes'
+  /// phase entries are rewritten, with descent pruned wherever a paired
+  /// subtree compares equal. Structural changes fall back to a full rebuild
+  /// by design: `StructuralNodeKey`s are minted in per-frame walk order, so
+  /// a shape change renumbers the key space and the rebuild *is* the patch.
+  /// Duplicate runtime identities also force the rebuild arm — positional
+  /// pairing is only sound when identities are unique (the reverted
+  /// paired-walk defect class; see proposal 2026-07-14-003 §Slice B).
+  ///
+  /// In DEBUG every patched index is checked byte-equivalent against a full
+  /// rebuild — the oracle this initializer carried, inert, until the patch
+  /// path landed.
   package init(
     patching previous: RetainedFrameIndex?,
     with frame: FrameArtifacts
   ) {
-    self.init(frame: frame)
-
-    #if DEBUG
-      // Inert until the incremental patch path exists (see doc comment): this
-      // compares a full rebuild against another full rebuild.
-      if previous != nil {
+    if let previous,
+      let patched = RetainedFrameIndex(patchingShapeStable: previous, frame: frame)
+    {
+      self = patched
+      #if DEBUG
         let rebuilt = RetainedFrameIndex(frame: frame)
-        precondition(
-          isByteEquivalent(to: rebuilt),
-          "RetainedFrameIndex patch diverged from full rebuild"
-        )
-      }
-    #endif
+        if let divergence = byteDivergenceDescription(from: rebuilt) {
+          preconditionFailure(
+            "RetainedFrameIndex patch diverged from full rebuild: \(divergence)"
+          )
+        }
+      #endif
+    } else {
+      self.init(frame: frame)
+    }
+  }
+
+  /// The first field on which this index differs from `other`, or `nil` when
+  /// byte-equivalent — the DEBUG patch oracle's failure diagnostic.
+  package func byteDivergenceDescription(
+    from other: RetainedFrameIndex
+  ) -> String? {
+    if resolvedByNodeID != other.resolvedByNodeID { return "resolvedByNodeID" }
+    if measuredByNodeID != other.measuredByNodeID { return "measuredByNodeID" }
+    if placedByNodeID != other.placedByNodeID { return "placedByNodeID" }
+    if structuralFrame != other.structuralFrame { return "structuralFrame" }
+    if resolvedStructuralIndex != other.resolvedStructuralIndex {
+      return "resolvedStructuralIndex"
+    }
+    if measuredStructuralIndex != other.measuredStructuralIndex {
+      return "measuredStructuralIndex"
+    }
+    if placedStructuralIndex != other.placedStructuralIndex { return "placedStructuralIndex" }
+    if placedRoot != other.placedRoot { return "placedRoot" }
+    if placedParentByStructuralIdentity != other.placedParentByStructuralIdentity {
+      return "placedParentByStructuralIdentity"
+    }
+    if placedFrameEntries != other.placedFrameEntries { return "placedFrameEntries" }
+    if placedFrameEntryRangesByNodeID != other.placedFrameEntryRangesByNodeID {
+      return "placedFrameEntryRangesByNodeID"
+    }
+    if placedFrameEntryRangesByStructuralIdentity
+      != other.placedFrameEntryRangesByStructuralIdentity
+    {
+      return "placedFrameEntryRangesByStructuralIdentity"
+    }
+    return nil
   }
 
   package func isByteEquivalent(

@@ -750,11 +750,19 @@ work-stack measurement and placement are complete.
   cached hash with O(1) inequality; whole-value interning is declined
   because the identity key space is unbounded, so a global intern table
   would leak.
-- **The retained frame index rebuilds fully every frame.** *Gap.* Deriving
-  the next retained index performs a full rebuild; the incremental fragment
-  patch is deferred because measurement shows retained-index construction is
-  a sub-1% slice of frame time. The debug byte-equivalence oracle is retained
-  for the moment a real patch path lands.
+- **The retained frame index patches shape-stable frames and rebuilds on
+  structural change.** *Ratified.* Frames whose trees keep the previous
+  frame's shape (the dominant value-only class: state flips, animation
+  ticks) derive the next index incrementally: structural tables carry over
+  wholesale, paired walks prune wherever a subtree compares equal, and only
+  changed nodes' entries are rewritten. Structural changes rebuild by
+  design: `StructuralNodeKey`s are minted in per-frame walk order, so a
+  shape change renumbers the key space and the rebuild is the patch.
+  Duplicate runtime identities also force the rebuild arm, because
+  positional pairing never routes through the identity-collapsing tables
+  (the defect class of the reverted paired-walk proof). The debug
+  byte-equivalence oracle now guards the live patch path: every patched
+  frame is checked against a full rebuild in debug builds.
 
 ## WASI and browser execution
 
@@ -774,7 +782,7 @@ divergent from the project's intent.
 - **Bounded-stack resolve is a profile mechanism, not architecture.** *Gap.*
   The chunked driver is a stack-lean profile mechanism, not a fully iterative
   engine. Resolve still recurses on the Swift call stack (built-in layout no
-  longer does — see "Runtime and pipeline internals"), so stack budgets
+  longer does; see "Runtime and pipeline internals"), so stack budgets
   remain a per-engine constraint for resolve rather than a non-issue.
 
 ## Images and compositing
