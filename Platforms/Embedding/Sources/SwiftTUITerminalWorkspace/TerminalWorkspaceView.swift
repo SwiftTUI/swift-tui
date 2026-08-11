@@ -124,6 +124,26 @@ public struct TerminalWorkspaceView: View {
       action: closeFocusedPane
     )
     .paletteCommand(
+      name: "Focus pane left",
+      description: "Alt+H / Alt+←",
+      action: { workspace.focus(.left, within: contentSize(for: size)) }
+    )
+    .paletteCommand(
+      name: "Focus pane down",
+      description: "Alt+J / Alt+↓",
+      action: { workspace.focus(.down, within: contentSize(for: size)) }
+    )
+    .paletteCommand(
+      name: "Focus pane up",
+      description: "Alt+K / Alt+↑",
+      action: { workspace.focus(.up, within: contentSize(for: size)) }
+    )
+    .paletteCommand(
+      name: "Focus pane right",
+      description: "Alt+L / Alt+→",
+      action: { workspace.focus(.right, within: contentSize(for: size)) }
+    )
+    .paletteCommand(
       name: "Split pane right",
       description: "Alt+V",
       action: { splitFocusedPane(axis: .horizontal) }
@@ -134,9 +154,34 @@ public struct TerminalWorkspaceView: View {
       action: { splitFocusedPane(axis: .vertical) }
     )
     .paletteCommand(
+      name: "New shell pane",
+      description: "Alt+N",
+      action: { splitFocusedPane(axis: .horizontal) }
+    )
+    .paletteCommand(
       name: "New shell tab",
       description: "Alt+T",
       action: appendShellTab
+    )
+    .paletteCommand(
+      name: "Focus next pane",
+      isEnabled: workspace.activePaneIDs.count > 1,
+      action: { workspace.focusNextPane() }
+    )
+    .paletteCommand(
+      name: "Focus previous pane",
+      isEnabled: workspace.activePaneIDs.count > 1,
+      action: { workspace.focusPreviousPane() }
+    )
+    .paletteCommand(
+      name: "Next tab",
+      isEnabled: workspace.tabs.count > 1,
+      action: { selectAdjacentTab(by: 1) }
+    )
+    .paletteCommand(
+      name: "Previous tab",
+      isEnabled: workspace.tabs.count > 1,
+      action: { selectAdjacentTab(by: -1) }
     )
     .paletteCommand(
       name: workspace.zoomedPaneID == nil ? "Zoom focused pane" : "Unzoom focused pane",
@@ -256,6 +301,15 @@ public struct TerminalWorkspaceView: View {
         workingDirectory: workspace.focusedPane?.workingDirectory
       )
     )
+  }
+
+  private func selectAdjacentTab(by offset: Int) {
+    guard let index = workspace.activeTabIndex, workspace.tabs.count > 1 else {
+      return
+    }
+    let count = workspace.tabs.count
+    let next = (index + offset % count + count) % count
+    workspace.selectTab(workspace.tabs[next].id)
   }
 
   private func appendShellTab() {
