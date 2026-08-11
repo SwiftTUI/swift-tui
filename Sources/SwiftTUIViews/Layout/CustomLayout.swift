@@ -222,17 +222,24 @@ public typealias LayoutSubviews = [LayoutSubview]
 /// concurrency-safe state in a layout. Read mutable app state before
 /// constructing the layout and pass the resolved values in.
 public protocol Layout: Sendable {
-  /// Scratch state for one measure/place layout pass.
+  /// Cached state for measure/place layout passes.
   ///
   /// SwiftTUI shares this cache between ``sizeThatFits(proposal:subviews:cache:)``
-  /// and ``placeSubviews(in:proposal:subviews:cache:)``.
-  /// This sharing applies to one container identity and proposal in one pass.
-  /// The cache is discarded after
-  /// placement. Thus, custom layouts must not rely on it across frames,
-  /// proposals, structural changes, or binding-driven invalidations. SwiftTUI
-  /// intentionally does not provide a cross-frame cache reuse hook. Store durable
-  /// layout state outside `Cache`. The cache must be `Sendable` because layout
-  /// passes can run on the frame-tail worker.
+  /// and ``placeSubviews(in:proposal:subviews:cache:)`` for one container
+  /// identity and proposal within a pass, and persists the placement-final
+  /// value across frames per identity and proposal when the frame commits —
+  /// matching SwiftUI's contract that caches survive between passes. A
+  /// persisted cache always passes through
+  /// ``updateCache(_:subviews:)`` before reuse, so a layout that keeps the
+  /// protocol's default `updateCache` (which rebuilds via
+  /// ``makeCache(subviews:)``) observes no reuse; override `updateCache`
+  /// with an incremental refresh to benefit. Persistence assumes the
+  /// documented contract: value-semantic, pass-independent state derived
+  /// from the subviews. A cache is never reused across structural changes
+  /// or invalidations of the container's subtree, and debug builds verify
+  /// every persisted reuse against a fresh `makeCache` pass
+  /// (`layout.persistedCacheDivergence`). The cache must be `Sendable`
+  /// because layout passes can run on the frame-tail worker.
   associatedtype Cache: Sendable = Void
 
   /// A stable signature for measurement reuse across frames, or `nil` to opt
@@ -251,10 +258,14 @@ public protocol Layout: Sendable {
   /// work.
   var placementReuseSignature: String? { get }
 
-  /// Creates the pass-local scratch cache for this layout.
+  /// Creates the cache for this layout when no shared or persisted value
+  /// exists.
   func makeCache(subviews: LayoutSubviews) -> Cache
 
-  /// Refreshes a pass-local cache before measurement or placement.
+  /// Refreshes a cache before measurement or placement — including a cache
+  /// persisted from an earlier frame. The default implementation rebuilds
+  /// through ``makeCache(subviews:)``; override it with an incremental
+  /// refresh to benefit from cross-frame persistence.
   func updateCache(
     _ cache: inout Cache,
     subviews: LayoutSubviews

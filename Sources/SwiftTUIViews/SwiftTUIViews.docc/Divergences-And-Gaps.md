@@ -234,9 +234,18 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Custom `Layout` types must be `Sendable`, with `Sendable` caches.**
   *Ratified.* The renderer can evaluate custom layouts on the off-main
   frame-tail worker.
-- **`Layout` caches are pass-local scratch.** *Gap.* SwiftUI persists `Cache`
-  values across passes through `updateCache`. SwiftTUI shares the cache
-  between measurement and placement for one pass, then drops it.
+- **`Layout` caches persist across passes.** *Ratified.* SwiftUI persists
+  `Cache` values across passes through `updateCache`; SwiftTUI now matches:
+  the cache bridges measurement and placement within a pass, and the
+  placement-final value persists per container identity and proposal (four
+  variants, least-recently-used) when the frame commits — abandoned frame
+  candidates never write. A persisted cache still passes through
+  `updateCache` (so the re-making default implementation observes no reuse),
+  is equivalence-checked against the node it was built for, is denied when
+  anything at or below the container invalidated, and is verified in debug
+  builds against a fresh `makeCache` pass
+  (`layout.persistedCacheDivergence`). `SWIFTTUI_PERSISTENT_LAYOUT_CACHE=0`
+  restores per-pass scratch wholesale.
 - **Engine re-entry nesting has a depth budget.** *Ratified.* A nested
   custom layout or hosted-collection (`List`/`Table`) windowing container
   re-enters the engine on the native call stack when measured, so nesting is
