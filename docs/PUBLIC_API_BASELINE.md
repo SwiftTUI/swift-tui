@@ -31,7 +31,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 167 | 1452 |
+| `SwiftTUIPrimitives` | 167 | 1455 |
 | `SwiftTUIGraph` | 56 | 341 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -634,7 +634,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `HorizontalAlignment` — struct — 7 members
 - `HoverPhase` — enum — 3 members
 - `HueInterpolationPath` — enum — 5 members
-- `Identity` — struct — 14 members
+- `Identity` — struct — 17 members
 - `IdentityComponent` — struct — 5 members
 - `ImageAssetReference` — enum — 3 members
 - `ImagePayload` — struct — 6 members

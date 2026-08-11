@@ -730,10 +730,26 @@ work-stack measurement and placement are complete.
   the depth budget recorded in the layout section, and the resolve-time
   `maxEngineReentryNestingDepth` aggregate routes deeper trees off the
   small-stack worker to the main-actor tail.
-- **`ViewGraph` decomposition is design-only.** *Gap.* Smaller `ViewGraph`
-  types with cleaner ownership, dependency-aware (profile-gated) body
-  re-evaluation, explicit context threading through resolve, and interning of
-  `Identity` values remain designs with no corresponding code.
+- **`ViewGraph` decomposition shipped; the residue is deliberate.**
+  *Ratified.* `ViewGraph`'s stored state is grouped into nine value field
+  groups with lifted operator types (`GraphCheckpointStore`,
+  `GraphNodeIndexQuery`, the invalidation, dirty-evaluation, and lifecycle
+  planners); the remaining mutation-heavy clusters stay extensions by
+  assessment, because their private-state coupling makes stateless
+  extraction net-negative. Dependency-aware body re-evaluation is the
+  profile-gated memo layer (`memoizedReusableSnapshot` dispatching
+  `MemoComparisonPlan` tiers, disabled under the stack-lean profile) plus
+  reader-scoped environment toleration; its recorded residual is that
+  state-slot and observable reads disqualify a node rather than comparing
+  read values. Resolve threads an explicit `ResolveContext`, crossing into
+  the graph layer through the typed `ReuseDecisionInputs` seam; the
+  surviving ambient holders (view-node context, authoring context,
+  environment storage, animation intent) are a measured design point priced
+  by the stack-lean profile. Identity currency interns components
+  (`IdentityComponent.interned`) and every `Identity` carries a mint-time
+  cached hash with O(1) inequality; whole-value interning is declined
+  because the identity key space is unbounded, so a global intern table
+  would leak.
 - **The retained frame index rebuilds fully every frame.** *Gap.* Deriving
   the next retained index performs a full rebuild; the incremental fragment
   patch is deferred because measurement shows retained-index construction is

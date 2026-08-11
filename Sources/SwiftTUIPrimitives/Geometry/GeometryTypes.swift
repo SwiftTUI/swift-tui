@@ -625,13 +625,53 @@ private let internedComponentsByKind = Mutex<[String: [IdentityComponent]]>([:])
 
 public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
   public let components: [String]
+  /// The components' hash, computed once at mint. `Identity` is the
+  /// reconciliation layer's hottest key type — invalidation sets, the graph's
+  /// identity index, and the retained frame index all hash it on every probe
+  /// — and hashing a `[String]` walks every component. Minting pays that walk
+  /// once (alongside the component-array copy every mint already performs);
+  /// each later hash is then O(1), and inequality — the common outcome of a
+  /// dictionary probe — rejects on the cached hash without touching the
+  /// components. Derived from `components` alone (per-process `Hasher` seed),
+  /// so equal identities always agree on it; it never enters the `Codable`
+  /// wire shape.
+  private let precomputedHash: Int
 
   public init(components: [String]) {
     self.components = components
+    precomputedHash = Self.precomputedHash(for: components)
   }
 
   public init(components: [IdentityComponent]) {
-    self.components = components.map(\.rawValue)
+    self.init(components: components.map(\.rawValue))
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case components
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(components: try container.decode([String].self, forKey: .components))
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(components, forKey: .components)
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.precomputedHash == rhs.precomputedHash && lhs.components == rhs.components
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(precomputedHash)
+  }
+
+  private static func precomputedHash(for components: [String]) -> Int {
+    var hasher = Hasher()
+    hasher.combine(components)
+    return hasher.finalize()
   }
 
   public var path: String {

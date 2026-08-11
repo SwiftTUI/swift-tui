@@ -1339,11 +1339,14 @@ SwiftTUIPrimitives.HueInterpolationPath.longest
 SwiftTUIPrimitives.HueInterpolationPath.shortest
 SwiftTUIPrimitives.Identity
 SwiftTUIPrimitives.Identity.<(_:_:)
+SwiftTUIPrimitives.Identity.==(_:_:)
 SwiftTUIPrimitives.Identity.child(_:)
 SwiftTUIPrimitives.Identity.child(_:)
 SwiftTUIPrimitives.Identity.components
 SwiftTUIPrimitives.Identity.description
+SwiftTUIPrimitives.Identity.encode(to:)
 SwiftTUIPrimitives.Identity.explicitID(_:)
+SwiftTUIPrimitives.Identity.hash(into:)
 SwiftTUIPrimitives.Identity.init(components:)
 SwiftTUIPrimitives.Identity.init(components:)
 SwiftTUIPrimitives.Identity.init(from:)
