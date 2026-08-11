@@ -274,11 +274,23 @@ private final class TerminalEventBroadcaster: Sendable {
 
   func stream() -> AsyncStream<TerminalEmulatorEvent> {
     AsyncStream { continuation in
-      let id = state.withLock { state in
+      let id = state.withLock { state -> Int? in
+        guard !state.isFinished else {
+          return nil
+        }
         let id = state.nextID
         state.nextID += 1
         state.continuations[id] = continuation
         return id
+      }
+
+      guard let id else {
+        // Subscriptions after `finish()` end immediately: a consumer that
+        // arrives after the session exited (a pane revisited on a hidden
+        // tab) must observe the exit instead of awaiting a stream nobody
+        // will ever finish.
+        continuation.finish()
+        return
       }
 
       continuation.onTermination = { @Sendable [weak self] _ in
@@ -298,6 +310,7 @@ private final class TerminalEventBroadcaster: Sendable {
     let continuations = state.withLock { state in
       let continuations = Array(state.continuations.values)
       state.continuations.removeAll()
+      state.isFinished = true
       return continuations
     }
     for continuation in continuations {
@@ -312,5 +325,6 @@ private final class TerminalEventBroadcaster: Sendable {
 
 private struct TerminalEventBroadcasterState {
   var nextID = 0
+  var isFinished = false
   var continuations: [Int: AsyncStream<TerminalEmulatorEvent>.Continuation] = [:]
 }

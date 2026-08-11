@@ -27,6 +27,28 @@ struct SessionLifecycleTests {
     }
   }
 
+  @Test("event streams subscribed after exit finish immediately")
+  func eventsAfterExitFinishImmediately() async throws {
+    let session = TerminalProcessSession(
+      command: "/bin/sh",
+      arguments: ["-c", "exit 0"],
+      initialSize: CellSize(width: 40, height: 10)
+    )
+    let sessionEvents = session.events()
+    try await session.start()
+    for await _ in sessionEvents {}
+
+    // A subscription arriving after the pump finished the broadcaster must
+    // terminate at once — a pane revisiting an exited session would
+    // otherwise await a stream nobody will ever finish. On regression this
+    // drain never returns and the suite's hang watchdog fails the run.
+    for await _ in session.events() {}
+
+    #expect(
+      await session.currentLifecycle() == .exited(reason: .normal(code: 0))
+    )
+  }
+
   @Test("snapshot reflects child output")
   func snapshotShowsOutput() async throws {
     let session = TerminalProcessSession(

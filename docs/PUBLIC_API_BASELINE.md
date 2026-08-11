@@ -25,7 +25,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminal` | 14 | 131 |
-| `SwiftTUITerminalWorkspace` | 14 | 118 |
+| `SwiftTUITerminalWorkspace` | 14 | 119 |
 | `SwiftTUICLI` | 6 | 25 |
 | `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 16 |
@@ -474,7 +474,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalWorkspaceNode` — enum — 7 members
 - `TerminalWorkspacePaneFrame` — struct — 3 members
 - `TerminalWorkspaceSessionStore` — class — 7 members
-- `TerminalWorkspaceState` — struct — 27 members
+- `TerminalWorkspaceState` — struct — 28 members
 - `TerminalWorkspaceTab` — struct — 8 members
 - `TerminalWorkspaceTabID` — struct — 5 members
 - `TerminalWorkspaceView` — struct — 2 members

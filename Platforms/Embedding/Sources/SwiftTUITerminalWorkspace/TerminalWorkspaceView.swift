@@ -246,13 +246,15 @@ public struct TerminalWorkspaceView: View {
           node: tab.root,
           workspace: $workspace,
           sessions: sessions,
-          focusedPane: $focusedPane
+          focusedPane: $focusedPane,
+          closePane: closePane
         )
       }
     } else {
       VStack(alignment: .leading, spacing: 1) {
         Text("No workspace tabs").foregroundStyle(.muted)
-        Text("Use the host app to create a tab.").foregroundStyle(.separator)
+        Text("Alt+T opens a new shell tab, Ctrl+K the command palette.")
+          .foregroundStyle(.separator)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
@@ -264,7 +266,8 @@ public struct TerminalWorkspaceView: View {
       session: sessions.session(for: pane),
       isFocused: workspace.focusedPaneID == pane.id,
       isZoomed: workspace.zoomedPaneID == pane.id,
-      focusedPane: $focusedPane
+      focusedPane: $focusedPane,
+      onSessionExit: { closePane(pane.id) }
     )
   }
 
@@ -329,6 +332,12 @@ public struct TerminalWorkspaceView: View {
       sessions.removeSession(for: removed)
     }
   }
+
+  private func closePane(_ paneID: TerminalPaneID) {
+    if let removed = workspace.closePane(paneID) {
+      sessions.removeSession(for: removed)
+    }
+  }
 }
 
 private struct TerminalWorkspaceNodeView: View {
@@ -336,6 +345,7 @@ private struct TerminalWorkspaceNodeView: View {
   @Binding var workspace: TerminalWorkspaceState
   var sessions: TerminalWorkspaceSessionStore
   var focusedPane: FocusState<TerminalPaneID?>.Binding
+  var closePane: @MainActor @Sendable (TerminalPaneID) -> Void
 
   var body: some View {
     switch node {
@@ -345,7 +355,8 @@ private struct TerminalWorkspaceNodeView: View {
         session: sessions.session(for: pane),
         isFocused: workspace.focusedPaneID == pane.id,
         isZoomed: workspace.zoomedPaneID == pane.id,
-        focusedPane: focusedPane
+        focusedPane: focusedPane,
+        onSessionExit: { closePane(pane.id) }
       )
     case .split(let split):
       TerminalWorkspaceSplitLayout(
@@ -356,13 +367,15 @@ private struct TerminalWorkspaceNodeView: View {
           node: split.first,
           workspace: $workspace,
           sessions: sessions,
-          focusedPane: focusedPane
+          focusedPane: focusedPane,
+          closePane: closePane
         )
         TerminalWorkspaceNodeView(
           node: split.second,
           workspace: $workspace,
           sessions: sessions,
-          focusedPane: focusedPane
+          focusedPane: focusedPane,
+          closePane: closePane
         )
       }
     }
@@ -375,6 +388,7 @@ private struct TerminalWorkspacePaneView: View {
   var isFocused: Bool
   var isZoomed: Bool
   var focusedPane: FocusState<TerminalPaneID?>.Binding
+  var onSessionExit: @MainActor @Sendable () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -391,7 +405,7 @@ private struct TerminalWorkspacePaneView: View {
         }
       }
       .padding(.horizontal, 1)
-      TerminalView(session: session)
+      TerminalView(session: session, onExit: { _ in onSessionExit() })
         .focused(focusedPane, equals: pane.id)
         .defaultFocus(focusedPane, pane.id)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

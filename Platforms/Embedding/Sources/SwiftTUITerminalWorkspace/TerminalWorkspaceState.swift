@@ -140,21 +140,32 @@ public struct TerminalWorkspaceState: Hashable, Codable, Sendable {
 
   @discardableResult
   public mutating func closeFocusedPane() -> TerminalPaneID? {
-    guard
-      canCloseFocusedPane,
-      let tabIndex = activeTabIndex,
-      let focusedPaneID
+    normalizeFocus()
+    guard canCloseFocusedPane, let focusedPaneID else {
+      return nil
+    }
+    return closePane(focusedPaneID)
+  }
+
+  /// Closes the identified pane wherever it lives, promoting its split
+  /// sibling. Closing a tab's last pane removes the whole tab; closing the
+  /// last pane of the last tab leaves an empty workspace.
+  ///
+  /// Returns the removed pane's identifier, or `nil` when no tab contains
+  /// the pane.
+  @discardableResult
+  public mutating func closePane(_ paneID: TerminalPaneID) -> TerminalPaneID? {
+    guard let tabIndex = tabs.firstIndex(where: { $0.contains(paneID) }),
+      let removal = remove(paneID: paneID, from: tabs[tabIndex].root)
     else {
       return nil
     }
 
-    guard let removal = remove(paneID: focusedPaneID, from: tabs[tabIndex].root),
-      let replacement = removal.replacement
-    else {
-      return nil
+    if let replacement = removal.replacement {
+      tabs[tabIndex].root = replacement
+    } else {
+      tabs.remove(at: tabIndex)
     }
-
-    tabs[tabIndex].root = replacement
 
     if zoomedPaneID == removal.removed {
       zoomedPaneID = nil

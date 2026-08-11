@@ -62,6 +62,72 @@ struct TerminalWorkspaceStateTests {
     #expect(state.focusedPaneID == "right")
   }
 
+  @Test("closing a nested pane by id promotes its sibling and drops zoom")
+  func closePaneByIDPromotesSiblingAndDropsZoom() {
+    var state = makeWorkspace()
+    state.splitFocusedPane(
+      axis: .horizontal,
+      newPane: TerminalPaneSpec(id: "logs", title: "logs", command: "/usr/bin/log")
+    )
+    state.toggleZoom()
+
+    let removed = state.closePane("logs")
+
+    #expect(removed == "logs")
+    #expect(state.activePaneIDs == ["shell"])
+    #expect(state.zoomedPaneID == nil)
+    #expect(state.focusedPaneID == "shell")
+  }
+
+  @Test("closing a tab's last pane removes the tab and activates a survivor")
+  func closingTabsLastPaneRemovesTab() {
+    var state = TerminalWorkspaceState(
+      tabs: [
+        TerminalWorkspaceTab(
+          id: "dev",
+          title: "dev",
+          root: .terminal(.shell(id: "dev-shell", title: "shell", command: "/bin/sh"))
+        ),
+        TerminalWorkspaceTab(
+          id: "ops",
+          title: "ops",
+          root: .terminal(.shell(id: "ops-shell", title: "ops", command: "/bin/sh"))
+        ),
+      ]
+    )
+
+    let removed = state.closePane("dev-shell")
+
+    #expect(removed == "dev-shell")
+    #expect(state.tabs.map(\.id) == ["ops"])
+    #expect(state.activeTabID == "ops")
+    #expect(state.focusedPaneID == "ops-shell")
+  }
+
+  @Test("closing the last pane of the last tab empties the workspace")
+  func closingLastPaneEmptiesWorkspace() {
+    var state = makeWorkspace()
+
+    let removed = state.closePane("shell")
+
+    #expect(removed == "shell")
+    #expect(state.tabs.isEmpty)
+    #expect(state.activeTabID == nil)
+    #expect(state.focusedPaneID == nil)
+    #expect(state.zoomedPaneID == nil)
+  }
+
+  @Test("closing an unknown pane id leaves the workspace unchanged")
+  func closingUnknownPaneLeavesWorkspaceUnchanged() {
+    var state = makeWorkspace()
+    let before = state
+
+    let removed = state.closePane("missing")
+
+    #expect(removed == nil)
+    #expect(state == before)
+  }
+
   @Test("workspace state round trips layout and command metadata")
   func codableRoundTrip() throws {
     var state = makeWorkspace()

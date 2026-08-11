@@ -3011,6 +3011,7 @@ SwiftTUITerminalWorkspace.TerminalWorkspaceState.appendTab(_:)
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.apply(_:)
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.canCloseFocusedPane
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.closeFocusedPane()
+SwiftTUITerminalWorkspace.TerminalWorkspaceState.closePane(_:)
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.focus(_:within:)
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.focusNextPane()
 SwiftTUITerminalWorkspace.TerminalWorkspaceState.focusPane(_:)
