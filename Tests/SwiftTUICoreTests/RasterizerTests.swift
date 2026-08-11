@@ -1226,19 +1226,26 @@ struct RasterizerTests {
 
   @Test("default incremental verification falls back to fresh raster for incomplete damage")
   func defaultIncrementalVerificationFallsBackToFreshRasterForIncompleteDamage() {
+    // Incomplete damage is expressed at ROW granularity: dirty rows are
+    // cleared and rebuilt in full (column ranges never narrow the clear —
+    // see `Rasterizer.clear(cells:for:surfaceWidth:)`), so the only
+    // under-report the incremental path can still ship is a changed row the
+    // damage never names.
     let rasterizer = Rasterizer()
-    let minimumSize = CellSize(width: 6, height: 1)
+    let minimumSize = CellSize(width: 6, height: 2)
     let previous = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "ABCD", width: 4),
       ])
     let current = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "AB", width: 4),
       ])
 
     let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
@@ -1252,7 +1259,7 @@ struct RasterizerTests {
       current,
       minimumSize: minimumSize,
       previousSurface: previousSurface,
-      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+      damage: .init(textRows: [.init(row: 0, columnRanges: [])])
     )
 
     // The default policy is configuration-dependent by design (see
@@ -1272,19 +1279,23 @@ struct RasterizerTests {
 
   @Test("incremental mismatch fallback reports which rows diverged")
   func incrementalMismatchFallbackReportsDivergedRows() {
+    // Row-granular incompleteness — see the fixture note on the default-policy
+    // test above.
     let rasterizer = Rasterizer(incrementalVerificationPolicy: .verifySoundDamage)
-    let minimumSize = CellSize(width: 6, height: 1)
+    let minimumSize = CellSize(width: 6, height: 2)
     let previous = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "ABCD", width: 4),
       ])
     let current = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "AB", width: 4),
       ])
 
     let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
@@ -1298,13 +1309,13 @@ struct RasterizerTests {
       current,
       minimumSize: minimumSize,
       previousSurface: previousSurface,
-      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+      damage: .init(textRows: [.init(row: 0, columnRanges: [])])
     )
 
     // The repair still happens — but it may no longer happen in silence.
     #expect(verified.surface == fresh.surface)
     #expect(verified.incrementalMismatch != nil)
-    #expect(verified.incrementalMismatch?.mismatchedRows == [0])
+    #expect(verified.incrementalMismatch?.mismatchedRows == [1])
   }
 
   @Test("a sound incremental repaint reports no mismatch")
@@ -1337,19 +1348,23 @@ struct RasterizerTests {
 
   @Test("trusted incremental raster policy skips fresh fallback for incomplete damage")
   func trustedIncrementalPolicySkipsFreshFallbackForIncompleteDamage() {
+    // Row-granular incompleteness — see the fixture note on the default-policy
+    // test above.
     let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
-    let minimumSize = CellSize(width: 6, height: 1)
+    let minimumSize = CellSize(width: 6, height: 2)
     let previous = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "ABCD", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "ABCD", width: 4),
       ])
     let current = coreRasterRoot(
       width: 6,
-      height: 1,
+      height: 2,
       children: [
-        coreRasterTextNode(id: "shrinking", row: 0, text: "AB", width: 4)
+        coreRasterTextNode(id: "stable", row: 0, text: "EF", width: 4),
+        coreRasterTextNode(id: "shrinking", row: 1, text: "AB", width: 4),
       ])
 
     let previousSurface = rasterizer.rasterize(previous, minimumSize: minimumSize)
@@ -1363,7 +1378,7 @@ struct RasterizerTests {
       current,
       minimumSize: minimumSize,
       previousSurface: previousSurface,
-      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<3])])
+      damage: .init(textRows: [.init(row: 0, columnRanges: [])])
     )
 
     #expect(trusted.surface != fresh.surface)
@@ -1674,6 +1689,56 @@ struct RasterizerTests {
     #expect(
       incremental == fresh,
       "gap rows between the dirty bands re-composited the translucent fill"
+    )
+  }
+
+  /// The column analog of the gap-row drift above: `clear` used to honor a
+  /// damage row's column ranges while every painter clamp stays row-granular,
+  /// so the un-damaged columns of a dirty row were rewritten over the previous
+  /// frame's *final* cells — a translucent fill re-tinted its own prior output
+  /// there and drifted a step per incremental frame. Found by the F13 oracle
+  /// trapping on the gifeditor keyboard-help sheet (a translucent surface fill
+  /// sharing rows with column-scoped scroll damage).
+  @Test("translucent fill outside a dirty row's damaged columns stays byte-identical")
+  func translucentFillOutsideDamagedColumnsStaysByteIdentical() {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    func tree(label: String) -> DrawNode {
+      coreRasterRoot(
+        width: 12,
+        height: 2,
+        children: [
+          coreRasterTextNode(id: "label", row: 0, text: label, width: 6),
+          fillNode(
+            "translucentRow",
+            bounds: .init(origin: .zero, size: .init(width: 12, height: 1)),
+            color: Color.red.opacity(0.5)
+          ),
+        ])
+    }
+    // The label's slot is the only claimed change; columns 6..<12 of row 0
+    // sit outside every range but share the dirty row.
+    let damage = PresentationDamage(
+      textRows: [.init(row: 0, columnRanges: [0..<6])]
+    )
+
+    let previousSurface = rasterizer.rasterize(
+      tree(label: "Alpha"),
+      minimumSize: .init(width: 12, height: 2)
+    )
+    let fresh = rasterizer.rasterize(
+      tree(label: "Beta"),
+      minimumSize: .init(width: 12, height: 2)
+    )
+    let incremental = rasterizer.rasterize(
+      tree(label: "Beta"),
+      minimumSize: .init(width: 12, height: 2),
+      previousSurface: previousSurface,
+      damage: damage
+    )
+
+    #expect(
+      incremental == fresh,
+      "columns outside the damaged ranges re-composited the translucent fill"
     )
   }
 

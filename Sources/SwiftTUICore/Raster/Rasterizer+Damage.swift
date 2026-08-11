@@ -14,6 +14,20 @@ extension Rasterizer {
     })
   }
 
+  /// Clears every dirty row **in full**, even when the damage carries column
+  /// ranges.
+  ///
+  /// Every incremental clamp in the paint walk — `write`, `tintCell`, the
+  /// per-line text culls, the fill and grid-copy row culls — is row-granular,
+  /// so painters rewrite the un-damaged columns of a dirty row regardless of
+  /// what was cleared. Rewriting is only sound over a cleanly rebuilt
+  /// underlay: over the previous frame's *final* composited cells,
+  /// destination-reading paints drift — a translucent fill re-tints its own
+  /// prior output and an opacity-baked foreground re-bakes against the stale
+  /// committed background. That is the column analog of the F125 gap-row
+  /// drift, and honoring the ranges here is what let it ship. Column ranges
+  /// stay meaningful on host-facing damage (the wire diff); they must not
+  /// narrow this clear.
   internal func clear(
     cells: inout [[RasterCell]],
     for damage: PresentationDamage,
@@ -24,36 +38,7 @@ extension Rasterizer {
       guard textRow.row >= 0, textRow.row < cells.count else {
         continue
       }
-      if textRow.columnRanges.isEmpty {
-        cells[textRow.row] = emptyRow
-        continue
-      }
-      clear(
-        columns: textRow.columnRanges,
-        inRow: textRow.row,
-        cells: &cells
-      )
-    }
-  }
-
-  internal func clear(
-    columns ranges: [Range<Int>],
-    inRow row: Int,
-    cells: inout [[RasterCell]]
-  ) {
-    guard row >= 0, row < cells.count else {
-      return
-    }
-    let rowWidth = cells[row].count
-    for range in ranges {
-      let lowerBound = max(0, range.lowerBound)
-      let upperBound = min(rowWidth, max(lowerBound, range.upperBound))
-      guard lowerBound < upperBound else {
-        continue
-      }
-      for column in lowerBound..<upperBound {
-        clearExistingGlyph(atX: column, y: row, cells: &cells)
-      }
+      cells[textRow.row] = emptyRow
     }
   }
 
