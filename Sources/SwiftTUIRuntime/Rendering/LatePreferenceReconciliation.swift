@@ -311,6 +311,7 @@ struct LatePreferenceReconciliationStage {
           LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
       ),
       animationRedrawIdentities: input.animationRedrawIdentities,
+      animationSegmentTargetIdentities: input.animationSegmentTargetIdentities,
       verifyLayoutShadow: input.verifyLayoutShadow
     )
   }

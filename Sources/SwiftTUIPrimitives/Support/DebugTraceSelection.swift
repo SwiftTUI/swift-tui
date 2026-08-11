@@ -32,7 +32,7 @@ package struct DebugTraceSelection: Sendable, Equatable {
   package static let environmentVariableName = "SWIFTTUI_TRACE"
 
   package static let knownTraceNames: Set<String> = [
-    "frames", "memo", "reuse", "inval", "soundness", "publication",
+    "frames", "memo", "reuse", "inval", "soundness", "publication", "cutoff",
   ]
 
   /// The process-level selection, parsed from `SWIFTTUI_TRACE` once.

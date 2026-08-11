@@ -20,6 +20,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_LAZY_IDEAL_ESTIMATE",
         "SWIFTTUI_SCROLL_REGION",
         "SWIFTTUI_SCROLL_BLIT",
+        "SWIFTTUI_MEASURE_CUTOFF",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -33,6 +34,9 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
+    // The size-stability cutoff is an opt-in stage gate until its Stage 4
+    // benchmark acceptance (plan 2026-08-11-002).
+    #expect(!FeatureGate.measureSizeStabilityCutoff.defaultIsEnabled)
   }
 
   @Test("the collection probes default on in DEBUG and off in release")

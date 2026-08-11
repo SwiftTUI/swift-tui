@@ -22,6 +22,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case lazyStackIdealEstimate
   case scrollRegionEmission
   case scrollBlit
+  case measureSizeStabilityCutoff
 
   package var environmentVariableName: String {
     switch self {
@@ -45,6 +46,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_SCROLL_REGION"
     case .scrollBlit:
       "SWIFTTUI_SCROLL_BLIT"
+    case .measureSizeStabilityCutoff:
+      "SWIFTTUI_MEASURE_CUTOFF"
     }
   }
 
@@ -130,6 +133,13 @@ package enum FeatureGate: CaseIterable, Sendable {
       // full-verify release probe). `SWIFTTUI_SCROLL_BLIT=0` disables the
       // blit (and with it the planner's identity fast path) wholesale.
       true
+    case .measureSizeStabilityCutoff:
+      // Opt-in stage gate (size-stability cutoff, plan 2026-08-11-002).
+      // Stage 1 is dark — behind the gate the pre-pass computes eligibility
+      // and certificates and records counters only; nothing is served.
+      // Promotion to a default-on kill switch requires the plan's Stage 4
+      // benchmark acceptance.
+      false
     }
   }
 

@@ -144,6 +144,11 @@ struct FrameTailInput {
   /// animation stages (see the barrier comment in
   /// `FrameTailPresentationDamageResolver.resolve`).
   var animationRedrawIdentities: Set<Identity> = []
+  /// Identity union of the frame's active animation segments, latched at
+  /// input construction. The measure-cutoff pre-pass excludes dirty roots
+  /// targeted by an active segment (plan 2026-08-11-002 D9) — animated nodes
+  /// usually change size per tick, so certification would be pure overhead.
+  var animationSegmentTargetIdentities: Set<Identity> = []
   /// Latched from `SoundnessProbeConfiguration.isSampledFrame` on the main
   /// actor when the input is built (the layout stage may run off-main, where
   /// that `@MainActor` state is unreadable). On a sampled frame the layout

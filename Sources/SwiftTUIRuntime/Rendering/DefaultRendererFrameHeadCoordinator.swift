@@ -638,6 +638,9 @@ struct DefaultRendererFrameHeadCoordinator {
       rootIdentity: resolveContext.identity,
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext,
+      animationSegmentTargetIdentities: AnimationInvalidationSegments.identityUnion(
+        resolveInputs.animationSegments
+      ),
       // Latch the layout shadow oracle's per-frame sampling decision here on
       // the main actor; the layout stage may run off-main, where this
       // `@MainActor` state is unreadable (same latch as the raster oracle's).

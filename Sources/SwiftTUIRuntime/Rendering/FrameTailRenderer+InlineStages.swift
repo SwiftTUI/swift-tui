@@ -6,6 +6,12 @@ struct FrameTailInlineStageRenderer: Sendable {
   /// Read once — the gates latch their first read by design.
   private static let scrollBlitEnabled = FeatureGate.scrollBlit.initialIsEnabled()
 
+  /// Stage gate for the size-stability measure cutoff's certificate pre-pass
+  /// (`SWIFTTUI_MEASURE_CUTOFF`, plan 2026-08-11-002 — Stage 1 records
+  /// counters only and serves nothing).
+  private static let measureCutoffEnabled =
+    FeatureGate.measureSizeStabilityCutoff.initialIsEnabled()
+
   var layoutEngine: LayoutEngine
   var semanticExtractor: SemanticExtractor
   var drawExtractor: DrawExtractor
@@ -17,6 +23,22 @@ struct FrameTailInlineStageRenderer: Sendable {
     beforeLayout: (@Sendable () -> Void)?
   ) -> FrameTailLayoutOutput {
     beforeLayout?()
+    if Self.measureCutoffEnabled,
+      let prePass = layoutEngine.preMeasureCutoffPrePass(
+        resolved: input.resolved,
+        passContext: input.layoutPassContext,
+        animationExcludedIdentities: input.animationRedrawIdentities
+          .union(input.animationSegmentTargetIdentities)
+      )
+    {
+      // Stage 1 is dark: counters only. Certificates are discarded and the
+      // main pass below runs unchanged; the pre-pass measures are already in
+      // the production measurement cache for the main pass to reclaim.
+      input.layoutPassContext.updateWorkMetrics {
+        $0.preMeasureCutoff.merge(prePass.metrics)
+      }
+      MeasureCutoffTrace.emit(prePass.metrics)
+    }
     let (measured, measureDuration) = measurePhase(clock: clock) {
       layoutEngine.measure(
         input.resolved,

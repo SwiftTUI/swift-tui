@@ -110,6 +110,26 @@ package final class MeasurementCache: Sendable {
     }
   }
 
+  /// The stored `(proposal, measuredSize)` baselines for `viewNodeID`, read
+  /// without equivalence checks, LRU touches, or eviction.
+  ///
+  /// The size-stability cutoff's certificate (plan 2026-08-11-002 D1) needs
+  /// the sizes previously recorded for a node whose resolved content *has*
+  /// changed — the regular `lookup` equivalence-checks the cached resolved
+  /// node and would evict exactly the entries the certificate wants to test
+  /// against. Reading must not disturb the cache: a denied certificate leaves
+  /// every entry as found.
+  package func storedBaselineSizes(
+    for viewNodeID: ViewNodeID
+  ) -> [(proposal: ProposedSize, measuredSize: CellSize)] {
+    storage.withLock { storage in
+      guard let nodeStorage = storage.entriesByNodeID[viewNodeID] else {
+        return []
+      }
+      return nodeStorage.entries.map { ($0.key, $0.value.node.measuredSize) }
+    }
+  }
+
   /// Stores `node` as the cached measurement for `resolved`.
   package func store(
     _ node: MeasuredNode,

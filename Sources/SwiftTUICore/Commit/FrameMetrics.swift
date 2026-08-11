@@ -43,6 +43,36 @@ package struct ResolveWorkMetrics: Equatable, Sendable {
   }
 }
 
+/// Counters for the size-stability measure cutoff's pre-pass (plan
+/// 2026-08-11-002 Stage 1, dark). One certificate attempt per eligible
+/// outermost dirty root; denials are counted by their first failing rule so
+/// the dark run's hit-rate report attributes every miss.
+package struct PreMeasureCutoffMetrics: Equatable, Sendable {
+  package var certificatesAttempted = 0
+  package var certificatesCertified = 0
+  package var deniedIneligibleIndexed = 0
+  package var deniedIneligibleWindowed = 0
+  package var deniedIneligibleSpine = 0
+  package var deniedIneligibleAnimated = 0
+  package var deniedNoBaseline = 0
+  package var deniedSizeMismatch = 0
+  package var deniedAbortedByCap = 0
+
+  package init() {}
+
+  package mutating func merge(_ other: Self) {
+    certificatesAttempted += other.certificatesAttempted
+    certificatesCertified += other.certificatesCertified
+    deniedIneligibleIndexed += other.deniedIneligibleIndexed
+    deniedIneligibleWindowed += other.deniedIneligibleWindowed
+    deniedIneligibleSpine += other.deniedIneligibleSpine
+    deniedIneligibleAnimated += other.deniedIneligibleAnimated
+    deniedNoBaseline += other.deniedNoBaseline
+    deniedSizeMismatch += other.deniedSizeMismatch
+    deniedAbortedByCap += other.deniedAbortedByCap
+  }
+}
+
 package struct LayoutWorkMetrics: Equatable, Sendable {
   package var measuredNodesComputed: Int
   package var measuredNodesReused: Int
@@ -54,6 +84,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   package var layoutDependentRealizations: Int
   package var layoutDependentRealizationCacheHits: Int
   package var layoutDependentMainActorFallbacks: Int
+  package var preMeasureCutoff: PreMeasureCutoffMetrics
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics
 
   package init(
@@ -67,6 +98,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     layoutDependentRealizations: Int = 0,
     layoutDependentRealizationCacheHits: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
+    preMeasureCutoff: PreMeasureCutoffMetrics = .init(),
     geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
   ) {
     self.measuredNodesComputed = measuredNodesComputed
@@ -79,6 +111,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     self.layoutDependentRealizations = layoutDependentRealizations
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
+    self.preMeasureCutoff = preMeasureCutoff
     self.geometryResolutionDiagnostics = geometryResolutionDiagnostics
   }
 
@@ -93,6 +126,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     layoutDependentRealizations += other.layoutDependentRealizations
     layoutDependentRealizationCacheHits += other.layoutDependentRealizationCacheHits
     layoutDependentMainActorFallbacks += other.layoutDependentMainActorFallbacks
+    preMeasureCutoff.merge(other.preMeasureCutoff)
     geometryResolutionDiagnostics.merge(other.geometryResolutionDiagnostics)
   }
 }
