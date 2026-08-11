@@ -112,6 +112,7 @@ Lowering helpers remain package-only implementation details.
 
 ### Guides
 
+- <doc:Coming-From-SwiftUI>
 - <doc:Divergences-And-Gaps>
 - <doc:Authoring-Views>
 - <doc:Collections>

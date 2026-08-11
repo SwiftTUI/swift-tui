@@ -765,7 +765,9 @@ This article is the project's single divergence-and-gap register; it absorbed
 the former `docs/VISION-GAP.md` gap register, and its *Gap* entries are the
 only recorded future-facing statements in this repository — shortfalls, not
 plans. The vision document states the divergence policy and the scope
-decisions. Guide articles in this catalog carry the per-surface contracts:
+decisions. For a narrative orientation over this register — what transfers,
+what to retrain, and what is missing, in reading order — see
+<doc:Coming-From-SwiftUI>. Guide articles in this catalog carry the per-surface contracts:
 <doc:AnyView> documents its own "Differences From SwiftUI" (state is keyed by
 the erased payload type), <doc:Shapes> its "deliberately absent" list, and
 <doc:State-Keying>, <doc:Dismissal-Is-Data>, <doc:Focus>, <doc:Collections>,
