@@ -23,9 +23,9 @@ public struct AnyView: PrimitiveView, ResolvableView {
 
   /// Erases the concrete type of `view`.
   ///
-  /// Prefer `scopedAnyView(...)` when authored content will be stored for later
-  /// evaluation, because that helper also restores the original
-  /// dynamic-property scope.
+  /// Prefer typed `@ViewBuilder` composition and generic storage over storing
+  /// the erased result; see the ``AnyView`` article for identity and state
+  /// behavior.
   public init<V: View>(_ view: V) {
     storage = Self.makeStorage(view, authoringContext: nil)
   }
