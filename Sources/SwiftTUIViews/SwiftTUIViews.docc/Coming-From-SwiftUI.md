@@ -197,7 +197,6 @@ current status of each.
 | Transitions are opacity and offset only; no `.scale`; `matchedGeometryEffect` interpolates position only | Compose opacity and offset; a matched pair that changes size snaps to the destination size |
 | `Menu` anchors top-leading, not at its source control | None; noted so it is not mistaken for a layout bug |
 | The lazy path requires a single direct `ForEach` | Restructure heterogeneous content into one indexed source; the eager fallback reports a runtime issue past a few hundred rows |
-| `Layout` caches are pass-local | Do not rely on `updateCache` persistence across passes; recompute cheaply |
 | No `addArc`, no general `clipShape(_:)`, no animatable path morphing | Analytic primitives plus parameter animation; see <doc:Shapes> and <doc:AspectCorrectShapes> |
 | `ToggleStyle`, `ProgressViewStyle`, `LabelStyle`, `MenuStyle` have no open protocol | Wrap and style; recorded as accidental incompleteness within the open-style design, not a stance |
 | No `onMoveCommand`/`onExitCommand`; `Text` is not `Hashable` | Note-only |

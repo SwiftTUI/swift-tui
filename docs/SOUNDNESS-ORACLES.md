@@ -195,12 +195,20 @@ on a sampled frame the tail's layout stage re-runs measure and place with every
 reuse tier disabled (no measurement cache, no retained session) and pair-walks
 the production trees against the fresh ones on identity, `measuredSize`, and
 placed `bounds`, without repairing the production value before recording. Its
-remaining measured hole is deliberate: subtrees under a windowed lazy or hosted
-product are skipped, because the production window stride is a running
-refinement the cold shadow pass legitimately cannot reproduce, and each skip
-counts into `layoutShadowWindowedExclusionCount` so the hole's size stays
-visible. If that carve-out ever has to widen beyond windowed products, treat it
-as a design smell to revisit, not a routine expansion.
+measured holes are deliberate and there are exactly two. First, subtrees under
+a windowed lazy or hosted product are skipped, because the production window
+stride is a running refinement the cold shadow pass legitimately cannot
+reproduce; each skip counts into `layoutShadowWindowedExclusionCount`. Second,
+a frame whose SHADOW pass hits the engine re-entry depth budget is skipped
+whole and counted into `layoutShadowDepthExclusionCount`: the all-fresh shadow
+consumes strictly more re-entry depth than a production pass whose serve tiers
+skip interior descents, so at the budget boundary the shadow truncates
+(`layout.customLayoutDepthLimitExceeded`) geometry production legitimately
+computed — the 2026-08-11 mrkdwn examples-gate false alarm, pinned by the
+depth-asymmetry red proof in `LayoutShadowOracleTests`. Both holes are
+fresh-pass-definition boundaries, not comparison bugs; if a THIRD carve-out
+ever seems necessary, treat it as a design smell to revisit, not a routine
+expansion.
 
 Two resolve-domain inputs are part of the fresh-pass definition rather than
 the carve-out. First, the scratch context is seeded with the production

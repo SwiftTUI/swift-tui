@@ -43,12 +43,16 @@ editor-like flows:
 Use built-in containers first. Use a custom ``Layout`` only for a reusable
 layout rule that stacks and frames cannot express clearly.
 
-Custom ``Layout`` cache values are pass-local scratch state. SwiftTUI shares
-``Layout/Cache`` between measurement and placement for one layout pass, then
-drops it after placement. The cache is recreated when a later pass runs because
-the proposal, child structure, binding-driven content, or another input changed.
-Store state that must survive across frames in a model, ``State``, or another
-owned value outside the layout cache.
+Custom ``Layout`` cache values persist. SwiftTUI shares ``Layout/Cache``
+between measurement and placement within a layout pass and persists the
+placement-final value per container and proposal when the frame commits,
+matching SwiftUI's contract. Every reuse re-enters
+``Layout/updateCache(_:subviews:)`` first — the protocol's default rebuilds
+the cache from scratch there, so override `updateCache` with an incremental
+refresh to benefit. A cache is never reused across structural changes or
+invalidations of the container's subtree. Keep caches value-semantic and
+derived from the subviews; store app state that must survive independently of
+layout in a model, ``State``, or another owned value outside the cache.
 
 ## Type Erasure
 
