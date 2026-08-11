@@ -266,6 +266,162 @@ struct MeasureSizeStabilityCutoffTests {
     #expect(result.metrics.deniedAbortedByCap == 1)
   }
 
+  private func fixedFrameTree(innerLeafWidth: Int) -> ResolvedNode {
+    // Enough clean siblings that the certified frame subtree (2 nodes) stays
+    // under the 25% subtree-share cap.
+    let fillers = (0..<6).map { index in
+      ResolvedNode(
+        viewNodeID: ViewNodeID(rawValue: UInt64(40 + index)),
+        identity: testIdentity("Root", "Filler\(index)"),
+        kind: .view("Test"),
+        intrinsicSize: .init(width: 5, height: 1)
+      )
+    }
+    return ResolvedNode(
+      viewNodeID: ViewNodeID(rawValue: 31),
+      identity: testIdentity("Root"),
+      kind: .view("VStack"),
+      children: fillers + [
+        ResolvedNode(
+          viewNodeID: ViewNodeID(rawValue: 33),
+          identity: testIdentity("Root", "F"),
+          kind: .view("Frame"),
+          children: [
+            ResolvedNode(
+              viewNodeID: ViewNodeID(rawValue: 34),
+              identity: testIdentity("Root", "F", "B"),
+              kind: .view("Test"),
+              intrinsicSize: .init(width: innerLeafWidth, height: 1)
+            )
+          ],
+          layoutBehavior: .frame(width: 6, height: 1, alignment: .center)
+        )
+      ],
+      layoutBehavior: .stack(
+        axis: .vertical,
+        spacing: 0,
+        horizontalAlignment: .leading,
+        verticalAlignment: .top
+      )
+    )
+  }
+
+  @Test("a constant-family certificate serves the spine through a patched session")
+  func constantFamilyCertificateServesSpine() throws {
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let frameIdentity = testIdentity("Root", "F")
+    let previous = fixedFrameTree(innerLeafWidth: 4)
+    let retained = session(for: engine, previousTree: previous, invalidated: [frameIdentity])
+
+    // The frame's fixed extent pins its parent-visible size; the certified
+    // win is exactly this shape — same size, different internal layout.
+    let current = fixedFrameTree(innerLeafWidth: 3)
+    let context = LayoutPassContext(
+      retainedLayout: retained,
+      invalidatedIdentities: [frameIdentity]
+    )
+    let prePass = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: current,
+        passContext: context,
+        animationExcludedIdentities: []
+      )
+    )
+    #expect(prePass.metrics.certificatesCertified == 1)
+    let servable = prePass.certificates.filter(\.qualifiesForConstantFamilyServe)
+    #expect(servable.count == 1)
+
+    let patched = try #require(retained.patchingCertifiedSubtrees(servable))
+    context.installPatchedMeasureSession(patched)
+
+    let measured = engine.measure(current, proposal: proposal, passContext: context)
+
+    // The spine served wholesale: the tree root's retained serve covers the
+    // whole product, and the served tree carries the FRESH subtree.
+    #expect(context.workMetrics.measuredNodesReused >= measured.subtreeNodeCount)
+    let servedFrame = try #require(
+      measured.childMeasurements.first(where: { $0.identity == frameIdentity })
+    )
+    #expect(servedFrame.measuredSize == .init(width: 6, height: 1))
+    #expect(servedFrame.childMeasurements.first?.measuredSize == .init(width: 3, height: 1))
+
+    // Placement keeps the ORIGINAL session (D5): fresh spine placement using
+    // the served measured tree, fresh content in the certified subtree.
+    let placed = engine.place(current, measured: measured, passContext: context)
+    let placedFrame = try #require(
+      placed.children.first(where: { $0.identity == frameIdentity })
+    )
+    #expect(placedFrame.bounds.size == .init(width: 6, height: 1))
+    #expect(placedFrame.children.first?.bounds.size == .init(width: 3, height: 1))
+
+    // The Stage 0 oracle polices the serve: a certified frame must compare
+    // silent against an all-reuse-disabled fresh pass.
+    let summary = LayoutShadowOracle.comparisonSummary(
+      resolved: current,
+      proposal: proposal,
+      productionMeasured: measured,
+      productionPlaced: placed,
+      scrollViewportContext: nil,
+      customLayoutCompatibilityDepthLimit:
+        LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit,
+      measurementSeedSession: retained
+    )
+    #expect(!summary.hasDivergence)
+  }
+
+  @Test("a non-constant certified root stays dark in Stage 2")
+  func nonConstantCertifiedRootStaysDark() throws {
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let bIdentity = testIdentity("Root", "Inner", "B")
+    let previous = tree(leafBSize: .init(width: 4, height: 1))
+    let retained = session(for: engine, previousTree: previous, invalidated: [bIdentity])
+
+    let context = LayoutPassContext(
+      retainedLayout: retained,
+      invalidatedIdentities: [bIdentity]
+    )
+    let prePass = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: tree(leafBSize: .init(width: 4, height: 1)),
+        passContext: context,
+        animationExcludedIdentities: []
+      )
+    )
+
+    #expect(prePass.metrics.certificatesCertified == 1)
+    #expect(prePass.certificates.filter(\.qualifiesForConstantFamilyServe).isEmpty)
+  }
+
+  @Test("the pre-pass never touches the main context's viewport hints")
+  func prePassLeavesMainContextHintsUnclaimed() throws {
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let bIdentity = testIdentity("Root", "Inner", "B")
+    let previous = tree(leafBSize: .init(width: 4, height: 1))
+    let retained = session(for: engine, previousTree: previous, invalidated: [bIdentity])
+
+    let context = LayoutPassContext(
+      retainedLayout: retained,
+      invalidatedIdentities: [bIdentity]
+    )
+    let hint = MeasureViewportHint(
+      axes: [.vertical],
+      contentOffset: .zero,
+      viewportSize: .init(width: 10, height: 4)
+    )
+    context.pushMeasureViewportHint(hint)
+    defer { context.popMeasureViewportHint() }
+
+    _ = engine.preMeasureCutoffPrePass(
+      resolved: tree(leafBSize: .init(width: 4, height: 1)),
+      passContext: context,
+      animationExcludedIdentities: []
+    )
+
+    // The hint must still be present and unclaimed for the main pass.
+    #expect(context.currentMeasureViewportHint == hint)
+    #expect(context.claimCurrentMeasureViewportHint(for: bIdentity) == hint)
+  }
+
   @Test("storedBaselineSizes reads variants without evicting or touching metrics")
   func storedBaselineSizesIsReadOnly() {
     let cache = MeasurementCache()

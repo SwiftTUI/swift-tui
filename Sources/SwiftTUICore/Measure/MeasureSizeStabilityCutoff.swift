@@ -24,10 +24,24 @@ package struct MeasureCutoffPolicy: Sendable {
 
 package struct MeasureCutoffCertificate: Sendable {
   package var rootIdentity: Identity
-  /// The pre-pass product at the retained proposal — the subtree the serve
-  /// stages patch into a derived session (unused in Stage 1).
+  /// The certified root's subtree in the current resolved tree — the resolved
+  /// half of the derived-session patch.
+  package var currentResolvedSubtree: ResolvedNode
+  /// The pre-pass product at the retained proposal — the measured half of the
+  /// derived-session patch.
   package var freshMeasuredAtRetainedProposal: MeasuredNode
   package var retainedProposal: ProposedSize
+
+  /// Stage 2's provably constant family: an explicit fixed-extent frame's
+  /// parent-visible response is proposal-independent, so one confirmed sample
+  /// proves all samples and the serve's soundness question is closed by
+  /// construction.
+  package var qualifiesForConstantFamilyServe: Bool {
+    if case .frame(.some, .some, _) = currentResolvedSubtree.layoutBehavior {
+      return true
+    }
+    return false
+  }
 }
 
 package struct MeasureCutoffPrePassResult: Sendable {
@@ -50,6 +64,7 @@ package enum MeasureCutoffTrace {
     DebugLogRouter.emit(
       "[MEASURE-CUTOFF] attempted=\(metrics.certificatesAttempted) "
         + "certified=\(metrics.certificatesCertified) "
+        + "served=\(metrics.certificatesServed) "
         + "denied(indexed=\(metrics.deniedIneligibleIndexed) "
         + "windowed=\(metrics.deniedIneligibleWindowed) "
         + "spine=\(metrics.deniedIneligibleSpine) "
@@ -283,6 +298,7 @@ extension LayoutEngine {
     result.certificates.append(
       .init(
         rootIdentity: root,
+        currentResolvedSubtree: currentSubtree,
         freshMeasuredAtRetainedProposal: certifiedProduct,
         retainedProposal: previousMeasured.proposal
       )

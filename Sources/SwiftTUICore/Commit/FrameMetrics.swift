@@ -50,6 +50,9 @@ package struct ResolveWorkMetrics: Equatable, Sendable {
 package struct PreMeasureCutoffMetrics: Equatable, Sendable {
   package var certificatesAttempted = 0
   package var certificatesCertified = 0
+  /// Certified roots actually lifted through a derived session this pass
+  /// (Stage 2+: the provably constant family; 0 on dark-only frames).
+  package var certificatesServed = 0
   package var deniedIneligibleIndexed = 0
   package var deniedIneligibleWindowed = 0
   package var deniedIneligibleSpine = 0
@@ -63,6 +66,7 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
   package mutating func merge(_ other: Self) {
     certificatesAttempted += other.certificatesAttempted
     certificatesCertified += other.certificatesCertified
+    certificatesServed += other.certificatesServed
     deniedIneligibleIndexed += other.deniedIneligibleIndexed
     deniedIneligibleWindowed += other.deniedIneligibleWindowed
     deniedIneligibleSpine += other.deniedIneligibleSpine

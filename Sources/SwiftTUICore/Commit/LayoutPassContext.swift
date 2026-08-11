@@ -75,6 +75,7 @@ package final class LayoutPassContext: Sendable {
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
     var deniedLayoutRealizationBoundaries: Set<Identity>
+    var patchedMeasureSession: RetainedLayoutSession?
     var placedFrameTable: PlacedFrameTable
     var customLayoutCompatibilityDepth: Int
     var customLayoutCompatibilityDepthLimit: Int
@@ -148,6 +149,7 @@ package final class LayoutPassContext: Sendable {
         workerCustomLayoutCacheUpdates: [],
         layoutDependentRealizations: seededLayoutRealizations ?? [],
         deniedLayoutRealizationBoundaries: [],
+        patchedMeasureSession: nil,
         placedFrameTable: .init(diagnosticsRecorder: geometryDiagnosticsRecorder),
         customLayoutCompatibilityDepth: 0,
         customLayoutCompatibilityDepthLimit: customLayoutCompatibilityDepthLimit,
@@ -264,6 +266,29 @@ package final class LayoutPassContext: Sendable {
   /// these subtrees from comparison instead of reporting shape noise.
   package var deniedLayoutRealizationBoundaries: Set<Identity> {
     state.withLock { $0.deniedLayoutRealizationBoundaries }
+  }
+
+  /// Installs the measure cutoff's derived session (plan 2026-08-11-002 D4):
+  /// the measure pass reads the patched copy through
+  /// ``measureSessionForReuse`` while the place pass, the damage resolver,
+  /// and diagnostics keep ``retainedLayout``. Installed once by the tail's
+  /// pre-pass before the main measure; late-preference relayouts build fresh
+  /// contexts, so the patched view never leaks across passes.
+  package func installPatchedMeasureSession(_ session: RetainedLayoutSession) {
+    state.withLock {
+      precondition(
+        $0.patchedMeasureSession == nil,
+        "the patched measure session is installed at most once per pass"
+      )
+      $0.patchedMeasureSession = session
+    }
+  }
+
+  /// The session the measure pass's reuse gates consult: the cutoff's
+  /// patched derived session when installed, the frame's retained session
+  /// otherwise.
+  package var measureSessionForReuse: RetainedLayoutSession? {
+    state.withLock { $0.patchedMeasureSession } ?? retainedLayout
   }
 
   package var layoutDependentRealizationsByIdentity: [Identity: [ResolvedNode]] {

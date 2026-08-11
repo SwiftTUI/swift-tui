@@ -31,13 +31,24 @@ struct FrameTailInlineStageRenderer: Sendable {
           .union(input.animationSegmentTargetIdentities)
       )
     {
-      // Stage 1 is dark: counters only. Certificates are discarded and the
-      // main pass below runs unchanged; the pre-pass measures are already in
-      // the production measurement cache for the main pass to reclaim.
-      input.layoutPassContext.updateWorkMetrics {
-        $0.preMeasureCutoff.merge(prePass.metrics)
+      var cutoffMetrics = prePass.metrics
+      // Stage 2: the provably constant family serves through a derived
+      // session — the measure pass reads the patched copy while place,
+      // damage, and diagnostics keep the original (D4). Everything else
+      // stays dark; a failed patch falls through to the conservative pass
+      // with the pre-pass measures already in the production cache.
+      let servable = prePass.certificates.filter(\.qualifiesForConstantFamilyServe)
+      if !servable.isEmpty,
+        let patched = input.layoutPassContext.retainedLayout?
+          .patchingCertifiedSubtrees(servable)
+      {
+        input.layoutPassContext.installPatchedMeasureSession(patched)
+        cutoffMetrics.certificatesServed = servable.count
       }
-      MeasureCutoffTrace.emit(prePass.metrics)
+      input.layoutPassContext.updateWorkMetrics {
+        $0.preMeasureCutoff.merge(cutoffMetrics)
+      }
+      MeasureCutoffTrace.emit(cutoffMetrics)
     }
     let (measured, measureDuration) = measurePhase(clock: clock) {
       layoutEngine.measure(

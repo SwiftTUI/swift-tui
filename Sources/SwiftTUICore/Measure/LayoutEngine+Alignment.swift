@@ -146,173 +146,153 @@ extension LayoutEngine {
     for resolved: ResolvedNode,
     measured: MeasuredNode
   ) -> ViewDimensions {
-    let baseDimensions: ViewDimensions
-
-    switch resolved.layoutBehavior {
-    case .padding(let insets):
-      if let child = resolved.children.first,
-        let childMeasurement = measured.childMeasurements.first
-      {
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(for: child, measured: childMeasurement),
-          offsetX: insets.leading,
-          offsetY: insets.top
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
+    // Iterative wrapper-chain walk. The previous per-level recursion copied
+    // an inline `LayoutBehavior` (~1.6 kB) onto the stack at every hop and
+    // overflowed the 512 KiB frame-tail worker on deep wrapper chains — the
+    // stack-safety class every other engine walk already converted away
+    // from. Phase 1 descends the single propagation child each wrapper
+    // forwards to; phase 2 ascends, applying the per-level propagation and
+    // guide epilogue that the recursion applied on unwind.
+    struct Level {
+      var resolved: ResolvedNode
+      var measured: MeasuredNode
+    }
+    var chain: [Level] = []
+    var currentResolved = resolved
+    var currentMeasured = measured
+    while true {
+      var next: (ResolvedNode, MeasuredNode)?
+      switch currentResolved.layoutBehavior {
+      case .padding, .safeAreaIgnoring, .safeAreaInset, .border, .frame,
+        .flexibleFrame, .offset:
+        if let child = currentResolved.children.first,
+          let childMeasurement = currentMeasured.childMeasurements.first
+        {
+          next = (child, childMeasurement)
+        }
+      case .decoration(let primaryIndex, _):
+        if currentResolved.children.indices.contains(primaryIndex),
+          currentMeasured.childMeasurements.indices.contains(primaryIndex)
+        {
+          next = (
+            currentResolved.children[primaryIndex],
+            currentMeasured.childMeasurements[primaryIndex]
+          )
+        }
+      default:
+        next = nil
       }
-    case .safeAreaIgnoring(let insets, _):
-      if let child = resolved.children.first,
-        let childMeasurement = measured.childMeasurements.first
-      {
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(for: child, measured: childMeasurement),
-          offsetX: -insets.leading,
-          offsetY: -insets.top
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
+      chain.append(Level(resolved: currentResolved, measured: currentMeasured))
+      guard let (nextResolved, nextMeasured) = next else {
+        break
       }
-    case .safeAreaInset(let edge, _, let spacing, let safeArea):
-      if let base = resolved.children.first,
-        let baseMeasurement = measured.childMeasurements.first
-      {
-        let insetMeasurement = measured.childMeasurements.dropFirst().first
-        let insetSize = insetMeasurement?.measuredSize ?? .zero
-        let consumed =
-          switch edge {
-          case .top, .bottom:
-            max(0, insetSize.height + spacing - safeArea.value(for: edge))
-          case .leading, .trailing:
-            max(0, insetSize.width + spacing - safeArea.value(for: edge))
-          }
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(for: base, measured: baseMeasurement),
-          offsetX: edge == .leading ? consumed : 0,
-          offsetY: edge == .top ? consumed : 0
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
-      }
-    case .border(let set, let placement, _, _, _, _, let sides):
-      let insets = borderLayoutInsets(
-        set: set, placement: placement, sides: sides)
-      if let child = resolved.children.first,
-        let childMeasurement = measured.childMeasurements.first
-      {
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(for: child, measured: childMeasurement),
-          offsetX: insets.leading,
-          offsetY: insets.top
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
-      }
-    case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
-      if let child = resolved.children.first,
-        let childMeasurement = measured.childMeasurements.first
-      {
-        let childDimensions = viewDimensions(for: child, measured: childMeasurement)
-        let childOrigin = alignedOrigin(
-          for: childDimensions,
-          in: CellRect(origin: .zero, size: measured.measuredSize),
-          alignment: alignment
-        )
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: childDimensions,
-          offsetX: childOrigin.x,
-          offsetY: childOrigin.y
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
-      }
-    case .offset:
-      if let child = resolved.children.first,
-        let childMeasurement = measured.childMeasurements.first
-      {
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(for: child, measured: childMeasurement),
-          offsetX: 0,
-          offsetY: 0
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
-      }
-    case .position:
-      // The wrapper takes the full measured size; alignment guides
-      // report against that area, not against the inner child.
-      baseDimensions = ViewDimensions(
-        width: measured.measuredSize.width,
-        height: measured.measuredSize.height
-      )
-    case .decoration(let primaryIndex, _):
-      if resolved.children.indices.contains(primaryIndex),
-        measured.childMeasurements.indices.contains(primaryIndex)
-      {
-        baseDimensions = propagatedViewDimensions(
-          size: measured.measuredSize,
-          from: viewDimensions(
-            for: resolved.children[primaryIndex],
-            measured: measured.childMeasurements[primaryIndex]
-          ),
-          offsetX: 0,
-          offsetY: 0
-        )
-      } else {
-        baseDimensions = ViewDimensions(
-          width: measured.measuredSize.width,
-          height: measured.measuredSize.height
-        )
-      }
-    default:
-      baseDimensions = ViewDimensions(
-        width: measured.measuredSize.width,
-        height: measured.measuredSize.height
-      )
+      currentResolved = nextResolved
+      currentMeasured = nextMeasured
     }
 
-    let textAwareDimensions =
-      switch resolved.drawPayload {
-      case .text, .textFigure, .richText:
-        baseDimensions.overridingVerticalGuides { alignment in
-          switch alignment {
-          case .firstTextBaseline:
-            return baseDimensions.height > 0 ? 1 : 0
-          case .lastTextBaseline:
-            return baseDimensions.height
-          default:
-            return nil
-          }
+    var childDimensions: ViewDimensions?
+    for level in chain.reversed() {
+      let levelResolved = level.resolved
+      let levelMeasured = level.measured
+      let baseDimensions: ViewDimensions
+      if let child = childDimensions {
+        switch levelResolved.layoutBehavior {
+        case .padding(let insets):
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: insets.leading,
+            offsetY: insets.top
+          )
+        case .safeAreaIgnoring(let insets, _):
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: -insets.leading,
+            offsetY: -insets.top
+          )
+        case .safeAreaInset(let edge, _, let spacing, let safeArea):
+          let insetSize =
+            levelMeasured.childMeasurements.dropFirst().first?.measuredSize ?? .zero
+          let consumed =
+            switch edge {
+            case .top, .bottom:
+              max(0, insetSize.height + spacing - safeArea.value(for: edge))
+            case .leading, .trailing:
+              max(0, insetSize.width + spacing - safeArea.value(for: edge))
+            }
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: edge == .leading ? consumed : 0,
+            offsetY: edge == .top ? consumed : 0
+          )
+        case .border(let set, let placement, _, _, _, _, let sides):
+          let insets = borderLayoutInsets(
+            set: set, placement: placement, sides: sides)
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: insets.leading,
+            offsetY: insets.top
+          )
+        case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
+          let childOrigin = alignedOrigin(
+            for: child,
+            in: CellRect(origin: .zero, size: levelMeasured.measuredSize),
+            alignment: alignment
+          )
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: childOrigin.x,
+            offsetY: childOrigin.y
+          )
+        case .offset, .decoration:
+          baseDimensions = propagatedViewDimensions(
+            size: levelMeasured.measuredSize,
+            from: child,
+            offsetX: 0,
+            offsetY: 0
+          )
+        default:
+          baseDimensions = ViewDimensions(
+            width: levelMeasured.measuredSize.width,
+            height: levelMeasured.measuredSize.height
+          )
         }
-      case .image, .list, .table, .shape, .rule, .canvas, .foreignSurface, .none:
-        baseDimensions
+      } else {
+        baseDimensions = ViewDimensions(
+          width: levelMeasured.measuredSize.width,
+          height: levelMeasured.measuredSize.height
+        )
       }
 
-    return resolved.layoutMetadata.applyingGuides(to: textAwareDimensions)
+      let textAwareDimensions =
+        switch levelResolved.drawPayload {
+        case .text, .textFigure, .richText:
+          baseDimensions.overridingVerticalGuides { alignment in
+            switch alignment {
+            case .firstTextBaseline:
+              return baseDimensions.height > 0 ? 1 : 0
+            case .lastTextBaseline:
+              return baseDimensions.height
+            default:
+              return nil
+            }
+          }
+        case .image, .list, .table, .shape, .rule, .canvas, .foreignSurface, .none:
+          baseDimensions
+        }
+
+      childDimensions = levelResolved.layoutMetadata.applyingGuides(to: textAwareDimensions)
+    }
+    // The chain always contains at least the entry node.
+    return childDimensions
+      ?? ViewDimensions(
+        width: measured.measuredSize.width,
+        height: measured.measuredSize.height
+      )
   }
 
   package func propagatedViewDimensions(

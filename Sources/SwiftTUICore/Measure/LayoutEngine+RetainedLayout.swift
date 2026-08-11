@@ -266,7 +266,7 @@ extension LayoutEngine {
     for resolved: ResolvedNode,
     passContext: LayoutPassContext?
   ) -> Bool {
-    guard let retainedLayout = passContext?.retainedLayout else {
+    guard let retainedLayout = passContext?.measureSessionForReuse else {
       return false
     }
 

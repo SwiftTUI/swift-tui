@@ -393,7 +393,7 @@ extension LayoutEngine {
       let retained = retainedMeasurement(
         for: node,
         proposal: proposal,
-        retainedLayout: passContext?.retainedLayout,
+        retainedLayout: passContext?.measureSessionForReuse,
         hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant,
         passContext: passContext
       )
