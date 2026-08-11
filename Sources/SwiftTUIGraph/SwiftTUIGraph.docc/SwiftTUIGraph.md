@@ -1,6 +1,6 @@
 # ``SwiftTUIGraph``
 
-The reconciliation engine — SwiftTUI's AttributeGraph analog — plus the runtime
+The reconciliation engine, SwiftTUI's AttributeGraph analog, plus the runtime
 registries and semantic vocabulary that ride on it.
 
 ## Overview

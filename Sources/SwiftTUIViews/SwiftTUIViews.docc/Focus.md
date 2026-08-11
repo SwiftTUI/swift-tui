@@ -45,12 +45,12 @@ The shape of the model:
 - the runtime handles most ordinary focus behavior automatically
 - you intervene when default behavior is not enough
 
-Thus, focus acts like a logical cursor, not a selection model. It tracks the
+Focus acts like a logical cursor, not a selection model. It tracks the
 current target for user input.
 
 ## The Core Mental Model
 
-The most useful way to think about focus is as five related but distinct layers.
+Think of focus as five related but distinct layers.
 
 ### Focus Targets
 
@@ -75,7 +75,7 @@ Custom views typically opt in with `.focusable(...)`.
 
 The focus system tracks one current target for the active context.
 
-Several things are derived from that current target:
+The runtime derives several things from that current target:
 
 - the target for keyboard input
 - the view that receives visual emphasis
@@ -119,7 +119,7 @@ This is a different job:
 - ``FocusState`` answers "which thing is focused?"
 - focused values identify the data that other UI can read from the focused area
 
-That difference matters. Focus ownership and focus-derived context are separate subsystems.
+Focus ownership and focus-derived context are separate subsystems.
 
 ## The Main API Families
 
@@ -451,8 +451,6 @@ means that a responsibility is in the wrong layer.
 
 ## Common Mistakes
 
-These are the mistakes that most often create a distorted mental model.
-
 ### Treating Focus As Generic Selection State
 
 Focus is about input routing, not arbitrary selection. Some selected things are not focused, and some focused things are not part of any broader selection model.
@@ -476,7 +474,7 @@ Focused values are best for remote, focus-dependent context such as commands and
 
 ## Practical Implications For SwiftTUI
 
-For a SwiftUI-faithful terminal runtime, the practical takeaways are straightforward:
+For a SwiftUI-faithful terminal runtime, the practical takeaways are:
 
 - focus must attach to authored controls, not to layout containers by accident
 - ``FocusState``-style bindings and focused values are separate systems
@@ -485,7 +483,7 @@ For a SwiftUI-faithful terminal runtime, the practical takeaways are straightfor
 - default-focus behavior is separate from ordinary next/previous traversal
 - scene-focused context matters for multi-window and command routing
 
-This aligns with the project's design intent:
+This matches the project's design intent:
 
 - explicit `.focusable(...)` modifiers are authoritative
 - containers do not become focus stops accidentally

@@ -39,12 +39,13 @@ to activate profiling independently of the environment.
 Three signals are independently available. Name them in the configuration or
 environment variable:
 
-- **frames** — one record per committed frame, derived from the runtime sample.
-- **memory** — periodic occupancy snapshots of long-lived stores (caches, the
-  view graph, retained frames, the animation controller).
-- **cpu** — periodic process CPU and resident-size samples.
+- **frames** emits one record per committed frame, derived from the runtime
+  sample.
+- **memory** takes periodic occupancy snapshots of long-lived stores (caches,
+  the view graph, retained frames, the animation controller).
+- **cpu** takes periodic samples of process CPU and resident size.
 
-The **frames** and **memory** signals have no standalone public types — you
+The **frames** and **memory** signals have no standalone public types. You
 reach them only by naming them in the env grammar or in a ``ProfileConfig``.
 The **cpu** signal also exposes a reusable sampling API. You can use
 ``CPUSampler`` and its related types outside the activation path.
@@ -92,7 +93,7 @@ the frames file name.
 
 | column | meaning |
 | --- | --- |
-| `frame` | run-loop frame ordinal — joins `frames.tsv` on its `frame` column |
+| `frame` | run-loop frame ordinal; joins `frames.tsv` on its `frame` column |
 | `submitted_ms` | when the frame was handed to the presentation writer |
 | `written_ms` | when `write(2)` returned. `-` means superseded. |
 | `write_ms` | `written_ms − submitted_ms`. `-` means superseded. |

@@ -26,8 +26,8 @@ public struct Binding<Value> {
 
   /// The transaction applied to writes made through this binding.
   ///
-  /// Verified against real SwiftUI (2026-08-05): an explicit ambient scope —
-  /// a surrounding `withAnimation(_:_:)` or `withTransaction(_:_:)` — wins
+  /// Verified against real SwiftUI (2026-08-05): an explicit ambient scope
+  /// (a surrounding `withAnimation(_:_:)` or `withTransaction(_:_:)`) wins
   /// over the stored transaction, including a stored `disablesAnimations`
   /// losing to an ambient animation. The stored transaction governs only
   /// writes made outside any explicit scope, which is exactly how every
@@ -74,7 +74,7 @@ public struct Binding<Value> {
   /// base value is currently nil.
   ///
   /// Reads through the returned binding trap with a diagnostic once the
-  /// base has become nil — the same read traps in SwiftUI (verified
+  /// base has become nil; the same read traps in SwiftUI (verified
   /// 2026-08-05). Author the optional check at the *reading* view, not
   /// above it: an unwrap performed high in the tree attributes the
   /// binding read to the high resolve and widens the invalidation cone
@@ -108,7 +108,7 @@ public struct Binding<Value> {
   /// Creates a binding that projects a non-optional base as an optional
   /// value.
   ///
-  /// Writing nil through the projection is ignored — the base keeps its
+  /// Writing nil through the projection is ignored: the base keeps its
   /// current value (matches SwiftUI, verified 2026-08-05).
   @MainActor
   public init<V>(_ base: Binding<V>) where Value == V? {

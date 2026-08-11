@@ -72,7 +72,7 @@ border, or implicit close button.
 When multiple presentation sources are active, SwiftTUI preserves each
 source's own binding, mounted state, tasks, and dismissal callback. Sheets,
 full-screen covers, popovers, and menus remain mounted as separate surfaces.
-the most recently activated surface is drawn above earlier surfaces.
+The most recently activated surface is drawn above earlier surfaces.
 
 Alerts and confirmation dialogs instead form first-in, first-out queues. Only
 the oldest active prompt is visible. A waiting prompt's source remains active,

@@ -31,7 +31,7 @@ public struct DragGesture: Gesture {
     public var velocity: Vector
     /// `startLocation + predictedEndTranslation`.
     public var predictedEndLocation: Point
-    /// `translation + velocity/4` — projects ~250ms of current velocity
+    /// `translation + velocity/4`: projects ~250ms of current velocity
     /// forward.
     public var predictedEndTranslation: Vector
     /// Original pointer location and precision for the current sample.

@@ -19,7 +19,7 @@ public enum PresentationChrome: Equatable, Sendable {
   /// floating card.
   case dropdown
 
-  /// Compact, intrinsic-width bordered box with no header — the
+  /// Compact, intrinsic-width bordered box with no header: the
   /// rendering used by `Menu` to float its expanded content above the
   /// surrounding layout without reflowing siblings.
   /// This chrome is smaller than `.surface` and has no title row or close button.

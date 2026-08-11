@@ -194,7 +194,7 @@ extension Gesture {
   /// Threads the gesture's value into a `@GestureState`-backed cell
   /// during the gesture, with automatic reset on gesture end.
   ///
-  /// The `inout Transaction` starts inert on every update — no preset
+  /// The `inout Transaction` starts inert on every update: no preset
   /// animation, `isContinuous` not set (matching SwiftUI, verified
   /// 2026-08-05). Mutations govern the gesture-state write for that
   /// update: setting `transaction.animation` animates the during-gesture

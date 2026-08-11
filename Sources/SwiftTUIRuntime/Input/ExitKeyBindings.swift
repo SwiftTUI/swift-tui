@@ -5,7 +5,7 @@ public import SwiftTUICore
 ///
 /// Configure per `WindowGroup` with ``WindowGroup/exitOnKeys(_:)`` or
 /// ``WindowGroup/exitOnKey(_:modifiers:)``. Each call replaces the
-/// previously configured set wholesale — there is no accumulation.
+/// previously configured set wholesale: there is no accumulation.
 ///
 /// The default is a single binding: `Ctrl+D`. Pass an empty array to
 /// disable framework-provided exit keys entirely. The runtime will then

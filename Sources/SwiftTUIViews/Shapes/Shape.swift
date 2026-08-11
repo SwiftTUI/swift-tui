@@ -2,7 +2,7 @@
 
 /// A view that renders a geometric shape using fill or stroke operations.
 ///
-/// Conform by implementing **either** ``path(in:)`` (SwiftUI-style — return the
+/// Conform by implementing **either** ``path(in:)`` (SwiftUI-style: return the
 /// outline for the proposed rect) **or** ``geometry`` (one of the analytic
 /// primitive cases). Bidirectional defaults connect these functions.
 /// A custom shape that implements only `path(in:)` gets a `.path` ``geometry`` value.

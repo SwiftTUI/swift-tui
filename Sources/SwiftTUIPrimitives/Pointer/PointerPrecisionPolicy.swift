@@ -241,8 +241,8 @@ public struct PointerInputCapabilities: Equatable, Sendable {
   /// content follows the pointer (touch-style direct manipulation).
   ///
   /// This is a statement about the host's *native interaction paradigm*, not
-  /// about what its input device can physically emit. Touch surfaces —
-  /// Android, iOS, and coarse-pointer browsers — pan by dragging the content
+  /// about what its input device can physically emit. Touch surfaces
+  /// (Android, iOS, and coarse-pointer browsers) pan by dragging the content
   /// itself, so they declare it. Terminals and desktop pointer hosts do not:
   /// there a press-drag is a click-drag, and scrolling belongs to the wheel,
   /// the scroll indicators, and the keyboard. Declaring it on a desktop host

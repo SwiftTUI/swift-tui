@@ -11,7 +11,7 @@ public struct MatchedGeometryNamespace: Hashable, Sendable {
   public static let `default` = MatchedGeometryNamespace(0)
 }
 
-/// A fully-qualified matched-geometry identifier — the namespace
+/// A fully-qualified matched-geometry identifier: the namespace
 /// plus the user-provided hashable ID, erased to a string for
 /// cross-frame lookup.
 public struct MatchedGeometryKey: Hashable, Sendable {

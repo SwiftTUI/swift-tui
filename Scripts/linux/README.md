@@ -88,7 +88,7 @@ occurs approximately 100 times less often.
 
 Run all CLI calls through `Scripts/linux.sh`. You can run it from any directory.
 It resolves the repository root from its own location. Built-in Linux build and test
-commands invoke Swift through `swiftly run swift ...`, matching the host-side
+commands invoke Swift through `swiftly run swift ...`, which matches the host-side
 toolchain rule in
 [`DEVELOPMENT.md`](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
 (in the `swift-tui-org` coordination repository).
@@ -162,7 +162,8 @@ separate CI workflows.
 **Bind mounts vs named volumes** is the key distinction:
 
 - **Bind mount** (`type=bind`): a path on your host is exposed inside the
-  container. Two-way visibility. Used for the repo so your edits are live.
+  container, and changes are visible in both directions. The repo uses this
+  mount so your edits are live.
 - **Named volume** (`type=volume`): Docker manages an opaque chunk of
   storage. The container sees a normal directory. The host has no direct path
   to it. The SwiftPM cache uses this volume because it contains Linux build
@@ -317,7 +318,7 @@ Wasm SDK. The current mount layout keeps installed toolchains visible.
 `./Scripts/linux.sh nuke` removes the container and the SwiftPM cache
 volume. Use it when:
 
-- The cache feels stale or wrong (rare — SwiftPM is good at invalidating)
+- The cache feels stale or wrong (rare; SwiftPM is good at invalidating)
 - You want to time a cold build
 - You need to free disk space
 
@@ -341,7 +342,7 @@ The image is public. Docker can try to authenticate first after you run
 Two possible causes:
 
 1. You are on a vanilla `swift:*` image, not the prebuilt image. Run
-   `./Scripts/linux.sh web` once — it triggers `ensure_wasm_sdk`.
+   `./Scripts/linux.sh web` once; it triggers `ensure_wasm_sdk`.
 2. You are on the prebuilt image, but it does not contain the SDK. Pull the
    latest tag (`./Scripts/linux.sh pull`) and `reset` the container.
 

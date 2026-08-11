@@ -112,7 +112,7 @@ public struct WindowGroup<Content: View>: Scene {
 
   /// Returns a copy of this `WindowGroup` whose exit bindings are set
   /// to `bindings`. The call replaces any previously configured set in
-  /// full — there is no accumulation — so chained calls behave as
+  /// full (there is no accumulation), so chained calls behave as
   /// last-write-wins.
   ///
   /// Pass ``ExitKeyBindings/none`` (or `[]`) to disable framework-level
@@ -169,7 +169,7 @@ public struct WindowGroup<Content: View>: Scene {
   }
 }
 
-/// A `WindowGroup` is an `ActionScope` — the scene identity is the root
+/// A `WindowGroup` is an `ActionScope`: the scene identity is the root
 /// of every focus chain rooted in that window. The scope becomes active
 /// whenever the scene's rootIdentity appears on the current focus
 /// region's `scopePath`.

@@ -118,7 +118,7 @@ public struct FrameDiagnosticPresentation: Equatable, Sendable {
 /// Identification of the cause required a local change to the rasterizer.
 /// This diagnostic lets tests and the performance harness identify the path directly.
 public struct RasterReuseDiagnostics: Equatable, Sendable {
-  /// `fresh`, `incremental`, or `incrementalRepaired` — the last meaning the
+  /// `fresh`, `incremental`, or `incrementalRepaired`. The last means the
   /// incremental surface diverged from a fresh raster and was repaired.
   public var path: String
   /// Sorted, stable tokens naming why damage production returned no damage.

@@ -21,9 +21,9 @@ package-only. Public callers usually reach committed output through
 `SwiftTUIRuntime.RenderSnapshot`, ``RasterSurface``, ``SemanticSnapshot``, and
 diagnostics types.
 
-Geometry, pointer metadata, color, and draw payload vocabulary — `CellPoint`,
+Geometry, pointer metadata, color, and draw payload vocabulary (`CellPoint`,
 `Point`, `Rect`, `Path`, `Color`, `CellPixelMetrics`, `PointerLocation`, and the
-rest — is *not* declared here. It lives one layer down in `SwiftTUIPrimitives`
+rest) is *not* declared here. It lives one layer down in `SwiftTUIPrimitives`
 and reaches you through `@_exported import`, so `import SwiftTUICore` puts it in
 scope. See the `SwiftTUIPrimitives` reference for those types. Reconciliation
 vocabulary such as `PreferenceKey`, `FocusedValues`, and

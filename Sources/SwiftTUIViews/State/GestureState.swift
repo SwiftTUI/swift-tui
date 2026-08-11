@@ -82,8 +82,8 @@ public final class GestureStateBox<Value> {
   }
 
   /// Resets to the initial seed with no transaction applied. Used by
-  /// resolve-time paths — recognizer teardown on replacement and the
-  /// registry's subtree drain — which must never animate: `.gesture(_:)`
+  /// resolve-time paths (recognizer teardown on replacement and the
+  /// registry's subtree drain), which must never animate: `.gesture(_:)`
   /// rebuilds recognizers during resolve, so a scoped reset here would
   /// animate structural churn.
   public func resetToSeed() {
@@ -215,7 +215,7 @@ private final class GestureStateGraphBindingRegistry: Sendable {
 
 /// Narrow binding type accepted by `Gesture.updating(_:body:)`.
 ///
-/// Authors never construct this directly -- `$state` on a `@GestureState`
+/// Authors never construct this directly; `$state` on a `@GestureState`
 /// produces it. The `updating` modifier captures it and hands it to the
 /// recognizer, which writes through it during gesture events.
 @MainActor
@@ -266,7 +266,7 @@ public struct GestureState<Value> {
   }
 
   /// Creates gesture state whose end-of-gesture reset applies
-  /// `resetTransaction` — typically an animation for the snap-back.
+  /// `resetTransaction`, typically an animation for the snap-back.
   /// Resolve-time resets (recognizer teardown, subtree removal) stay
   /// un-animated regardless.
   public init(

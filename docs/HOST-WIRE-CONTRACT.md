@@ -179,7 +179,7 @@ unknown payload-less ID for resync instead of silently omitting it. Browser
 resync admission is capped at 1,024 outstanding IDs. A successfully delivered
 request stays deduplicated while its ID remains present and unresolved. Payload
 arrival, removal from a presented frame, or an encoding epoch reset clears the
-encoding epoch resets. Disappearance therefore lets a later reappearance
+request. Disappearance therefore lets a later reappearance
 request the ID again.
 
 Android keeps its decoded bitmap cache bounded at 8 MiB. An ordinary eviction
@@ -267,17 +267,17 @@ encoding state rather than patching one field.
 
 The ingress lifecycle differs by transport:
 
-- **WASI browser — construction only.** `SWIFTTUI_SURFACE_DELTA` is resolved
+- **WASI browser: construction only.** `SWIFTTUI_SURFACE_DELTA` is resolved
   once when the transport is built. Runtime `caps` input is deliberately
   ignored because reload creates a new in-process transport.
-- **Localhost WebHost — once per connection, before any surface record.** The
+- **Localhost WebHost: once per connection, before any surface record.** The
   browser client sends one `caps:{"acceptsDeltaFrames":true}` record after
   opening a socket. That is now the only accepted shape. The channel accepts a
   declaration from the current connection only while the connection is in the
   pre-capabilities phase. A second declaration on the same connection does not
   start a new epoch. An accepted declaration clears the delta baseline and transmitted-image
   set, marks the session surface-active, and requests a refresh.
-- **Host-managed Android — before scene start only.** `declareCapabilities`
+- **Host-managed Android: before scene start only.** `declareCapabilities`
   rejects malformed declarations and declarations after start. The JNI bridge
   resolves the declaration symbol lazily, so a newer AAR against an older
   native host degrades to defaults.

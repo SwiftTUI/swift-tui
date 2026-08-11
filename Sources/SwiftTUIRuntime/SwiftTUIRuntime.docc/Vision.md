@@ -45,11 +45,11 @@ while keeping the API shape SwiftUI-shaped.
 A few SwiftUI APIs are omitted on principle, not as gaps. If you reach for one
 of these and get a compile error, this is why:
 
-- **No `NavigationLink`, no `@Environment(\.dismiss)` — navigation and
+- **No `NavigationLink`, no `@Environment(\.dismiss)`: navigation and
   dismissal are strictly data-driven.** `NavigationLink` subverts data-driven
   UI: it fuses a control to a navigation side effect, so navigation state
   stops being derivable from (and mutable through) the app's data.
-  `@Environment(\.dismiss)` couples reusable content to an assumed presenter —
+  `@Environment(\.dismiss)` couples reusable content to an assumed presenter:
   a view cannot know the context in which it is displayed. Instead, bindings
   to data drive navigation and presentation: a push mutates the data that
   declares a destination, and dismissal clears the binding (or item) that
@@ -57,7 +57,7 @@ of these and get a compile error, this is why:
   `onDismiss:` callback) is compatible with this stance; child-side dismissal
   commands are not. See the `SwiftTUIViews` article
   [Dismissal Is Data](https://swifttui.sh/docs/documentation/swifttuiviews/dismissal-is-data).
-- **No `.tabItem` — structured tab declarations.** Terminal tab chrome is
+- **No `.tabItem`: structured tab declarations.** Terminal tab chrome is
   structured value metadata, not an arbitrary label view tree. Declare tabs
   with `Tab(_:detail:badge:value:content:)`, which keeps the label, selection
   value, and content in one data-driven declaration. Plain tagged children

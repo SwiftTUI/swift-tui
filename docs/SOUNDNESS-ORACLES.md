@@ -186,7 +186,7 @@ does not turn the absence of a payload-specific row into proof of coverage.
 The stranded-listing implementation must compare **objects**, not names from
 mixed identity systems. `identityByNodeID` describes nodes in
 `resolvedIdentity` space, while `ViewNode.identity` and `parent.identity` are
-authored-space names. Comparing those maps manufactured 13–14 apparent
+authored-space names. Comparing those maps manufactured 13 to 14 apparent
 co-listings on a healthy graph. `ViewGraphStrandedListingProbe.swift` instead
 tests `child.parent !== node`, the same object relation the upward staleness
 walk follows.

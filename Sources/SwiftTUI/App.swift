@@ -11,7 +11,7 @@ import SwiftTUIWebHostCLI
 /// The batteries-included SwiftTUI app protocol.
 ///
 /// `SwiftTUI.App` refines the platform-neutral `SwiftTUIRuntime.App` with the
-/// command surface that the convenience product already exports. Import
+/// command surface that the convenience product already exports.
 /// A host-managed app can import `SwiftTUIRuntime` directly to remain independent of command-line parsing.
 @MainActor
 public protocol App: SwiftTUIRuntime.App, SwiftTUICommand {}
@@ -57,7 +57,7 @@ extension App {
   /// Diagnostic shim for the synchronous-`main()` launch trap.
   ///
   /// `App` refines `SwiftTUICommand` → `AsyncParsableCommand`, whose entry
-  /// point is `static func main() async` — bound correctly by `@main`. A bare
+  /// point is `static func main() async`, bound correctly by `@main`.
   /// A top-level `MyApp.main()` call can come from experience with the synchronous `SwiftUI.App.main()`.
   /// An `await MyApp.main()` call has the same result.
   /// Both calls resolve to the synchronous `ParsableCommand.main()` overload in swift-argument-parser.

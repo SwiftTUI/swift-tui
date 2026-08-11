@@ -50,8 +50,8 @@ makes a small number of intentional departures:
 
 ## Principled deviations
 
-The consumer-facing rationale for the deliberate API omissions — no
-`NavigationLink`, no `@Environment(\.dismiss)`, no `View.tabItem(_:)` — is
+The consumer-facing rationale for the deliberate API omissions (no
+`NavigationLink`, no `@Environment(\.dismiss)`, no `View.tabItem(_:)`) is
 published in the DocC article
 [About SwiftTUI](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md)
 (`SwiftTUIRuntime` catalog, "Principled Omissions"). That article is the
@@ -68,7 +68,7 @@ structured value metadata rather than an arbitrary label view tree.
   stages.
 - The shipped host presentations and packaging boundaries recorded in the
   canonical [host matrix](HOSTS-AND-PLATFORMS.md#canonical-host-matrix).
-- A semantic accessibility substrate feeding each consumer.
+- A semantic accessibility substrate that feeds each consumer.
 - Animated-image playback in the default `SwiftTUI` convenience product, with
   charts and terminal-program embedding as peer products.
 

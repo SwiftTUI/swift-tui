@@ -92,7 +92,7 @@ and then `SwiftTUIRuntime`.
   gates, checkpoints, entity routing, and lifecycle planning. It also owns the
   identity-keyed runtime registries, frame scheduler, and animation *intent*
   types. It performs
-  no layout/draw/raster/commit work — it stores render values opaquely and hands
+  no layout/draw/raster/commit work. It stores render values opaquely and hands
   erased evaluator thunks up to the Views driver. Depends on `SwiftTUIPrimitives`
   **only**. A successful `swift build --target SwiftTUIGraph` proves that graph
   code does not name a render type. It does not use Foundation.
@@ -219,7 +219,7 @@ Sources under `Vendor/` keep their upstream directory names, but the SwiftPM
 SwiftPM requires unique target names across the **entire** package graph. Any
 target reachable from one of our products enters every consumer's graph. Under
 their upstream names, these modules break consumers. For example, a package that
-depends on both swift-tui and swift-service-lifecycle, which ships its own
+depends on both swift-tui and swift-service-lifecycle (which ships its own
 `UnixSignals`) fails resolution with
 
 ```
@@ -243,8 +243,8 @@ as `PNG.Image` continue to resolve against the enum without changes.
 ## The frame pipeline, in one paragraph
 
 A frame is built by running an authored view tree through **seven typed
-phases** — `resolve → measure → place → semantics → draw → raster → commit` —
-each producing a distinct package-owned product (`ResolvedNode`, `MeasuredNode`,
+phases** (`resolve → measure → place → semantics → draw → raster → commit`).
+Each phase produces a distinct package-owned product (`ResolvedNode`, `MeasuredNode`,
 `PlacedNode`, `SemanticSnapshot`, `DrawNode`, `RasterSurface`, `CommitPlan`).
 The public one-shot renderer returns a `RenderSnapshot`. It exposes the
 committed raster, semantic snapshot, presentation damage, and diagnostics. The

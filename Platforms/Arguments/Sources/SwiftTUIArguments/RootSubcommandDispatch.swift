@@ -35,7 +35,7 @@ extension SwiftTUICommand {
   }
 
   /// The registered subcommand named by `arguments.first`, parsed against the
-  /// remaining arguments — the body most apps want for
+  /// remaining arguments: the body most apps want for
   /// ``SwiftTUICommand/swiftTUIRootSubcommand(forRawArguments:)``.
   ///
   /// ```swift

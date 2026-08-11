@@ -176,9 +176,9 @@ package protocol IntentRequestTallying: AnyObject {
 }
 
 /// A drain-pass boundary for deadline consumption: deadlines armed at or after
-/// the cut are withheld from `consumeReadyFrame(at:armedBefore:)` — deferred to
-/// the next pass, never discarded. Captured by a frame driver at pass entry so
-/// one drain is bounded to the work armed before it began (see
+/// the cut are withheld from `consumeReadyFrame(at:armedBefore:)`, deferred to
+/// the next pass rather than discarded. Captured by a frame driver at pass
+/// entry so one drain is bounded to the work armed before it began (see
 /// ``DrainPassDeadlineCutting``).
 public struct DeadlineArmCut: Equatable, Sendable {
   public var rawValue: UInt64

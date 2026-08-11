@@ -17,7 +17,7 @@ import SwiftTUICore
 /// A bundle is one directory that collects every armed diagnostic under a
 /// fixed name (`frames.tsv`, `diagnostics.tsv`, `memo.log`, `reuse.log`,
 /// `inval.log`, `soundness.log`, `profile.tsv` / `profile.jsonl`) plus a
-/// `manifest.txt` recording what was armed — so "collect debug output" is one
+/// `manifest.txt` recording what was armed, so "collect debug output" is one
 /// variable and the whole directory is the support artifact.
 ///
 /// `SWIFTTUI_DEBUG_DIR` names the directory explicitly. With `--debug` /
@@ -64,7 +64,7 @@ import SwiftTUICore
     DebugLogRouter.resolvedFilePath(override: nil, bundleFileName: name)
   }
 
-  /// The one-line, post-teardown stderr announcement — `nil` when this
+  /// The one-line, post-teardown stderr announcement, or `nil` when this
   /// session prepared no bundle.
   @_spi(Runners) public static func announcementLine() -> String? {
     preparedDirectory.map { directory in

@@ -8,8 +8,8 @@ surface embedded in a host app.
 This folder holds the **`HEAD`-state architecture and contract documentation**
 for this package. Developer-facing guides and API reference live in the
 in-source DocC catalogs (see [API reference](#api-reference) below).
-Documentation about *developing SwiftTUI itself* — the engineer onboarding
-guide, the build/test/release process, and the known-flake register — lives in
+Documentation about *developing SwiftTUI itself* (the engineer onboarding
+guide, the build/test/release process, and the known-flake register) lives in
 the [`swift-tui-org` coordination repository](https://github.com/SwiftTUI/swift-tui-org/tree/main/docs/swift-tui)
 (see [Development documentation](#development-documentation) below).
 
@@ -59,13 +59,13 @@ Documentation for *developing SwiftTUI itself* lives in the `swift-tui-org`
 coordination repository under
 [`docs/swift-tui/`](https://github.com/SwiftTUI/swift-tui-org/tree/main/docs/swift-tui):
 
-- [CODEBASE-GUIDE.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/CODEBASE-GUIDE.md)
-  — engineer onboarding: a horizontal module map plus vertical end-to-end
+- [CODEBASE-GUIDE.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/CODEBASE-GUIDE.md):
+  engineer onboarding, with a horizontal module map plus vertical end-to-end
   traces.
-- [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
-  — toolchains, the build/test gate, fixture policy, and the release process.
-- [KNOWN-TEST-FLAKES.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/KNOWN-TEST-FLAKES.md)
-  — the register of known, pre-existing flaky tests and how to tell a flake
+- [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md):
+  toolchains, the build/test gate, fixture policy, and the release process.
+- [KNOWN-TEST-FLAKES.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/KNOWN-TEST-FLAKES.md):
+  the register of known, pre-existing flaky tests and how to tell a flake
   from a real regression.
 
 ## API reference
@@ -73,12 +73,12 @@ coordination repository under
 The published reference is <https://swifttui.sh/docs/documentation/>.
 Per-symbol API documentation is authored as DocC catalogs alongside the source:
 
-- `Sources/SwiftTUICore/SwiftTUICore.docc` — geometry, phase products, cell/pixel metrics.
-- `Sources/SwiftTUIViews/SwiftTUIViews.docc` — authoring views, state, focus, gestures, drawing.
-- `Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc` — the runtime, runtime render pipeline, hosting, running apps.
-- `Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc` — animated image playback.
-- `Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc` — optional profiling: `.profiling()`, the `SWIFTTUI_PROFILE` grammar, and the frame/memory/CPU signals.
-- `Sources/SwiftTUI/SwiftTUI.docc` — the batteries-included convenience product.
+- `Sources/SwiftTUICore/SwiftTUICore.docc`: geometry, phase products, cell/pixel metrics.
+- `Sources/SwiftTUIViews/SwiftTUIViews.docc`: authoring views, state, focus, gestures, drawing.
+- `Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc`: the runtime, runtime render pipeline, hosting, running apps.
+- `Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc`: animated image playback.
+- `Sources/SwiftTUIProfiling/SwiftTUIProfiling.docc`: optional profiling with `.profiling()`, the `SWIFTTUI_PROFILE` grammar, and the frame/memory/CPU signals.
+- `Sources/SwiftTUI/SwiftTUI.docc`: the batteries-included convenience product.
 
 Build the combined archive with `Scripts/build_docc_archive.sh`.
 
@@ -87,9 +87,9 @@ Build the combined archive with `Scripts/build_docc_archive.sh`.
 `docs/` also holds four machine-managed files that are **not documentation** and
 are not part of this hierarchy:
 
-- `public_api_overrides.yml` — public-symbol classifications consumed by the API tooling.
-- `PUBLIC_API_BASELINE.md` and `.public-api-baseline.txt` — generated public-symbol baselines.
-- `.spi-api-baseline.txt` — the generated `@_spi` surface baseline.
+- `public_api_overrides.yml`: public-symbol classifications consumed by the API tooling.
+- `PUBLIC_API_BASELINE.md` and `.public-api-baseline.txt`: generated public-symbol baselines.
+- `.spi-api-baseline.txt`: the generated `@_spi` surface baseline.
 
 `Scripts/generate_public_api_inventory.sh` produces and compares them. See
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline).

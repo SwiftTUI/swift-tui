@@ -36,7 +36,7 @@ struct Debounced: DynamicProperty {
 ```
 
 The conformance is what buys composition safety. Two instances of a
-conforming wrapper in one view hold distinct composed `@State` storage — the
+conforming wrapper in one view hold distinct composed `@State` storage; the
 framework qualifies each inner slot with the property's discovered position.
 A plain helper struct that composes `@State` *without* conforming keeps the
 legacy behavior: every instance's inner slot collapses onto the wrapper's
@@ -49,16 +49,16 @@ For each body evaluation of a view that stores dynamic properties, the
 framework:
 
 1. Discovers the view's stored properties conforming to `DynamicProperty`
-   (reflection, cached per type — wrapper-free views pay one dictionary
+   (reflection, cached per type; wrapper-free views pay one dictionary
    lookup). Only *stored* properties participate; computed properties are
-   invisible to discovery, matching SwiftUI.
+   invisible to discovery, as in SwiftUI.
 2. Recursively updates each property's own discovered dynamic properties
-   first, then calls the property's `update()` — so your `update()` always
+   first, then calls the property's `update()`, so your `update()` always
    observes live composed state.
 3. Evaluates the body.
 
-The pass runs on every body-evaluation surface — composed `body`
-implementations, framework primitives, and `ViewModifier` bodies — under the
+The pass runs on every body-evaluation surface (composed `body`
+implementations, framework primitives, and `ViewModifier` bodies) under the
 same ambient authoring scope the body observes. When a subtree is served
 from reuse, neither the body nor the update pass runs; see the contract
 below.
@@ -66,14 +66,14 @@ below.
 ## The copy-semantics contract
 
 `update()` receives a *copy* of the property. Effects that go through
-reference-backed storage — every built-in wrapper: `@State`'s box,
-`@Environment`'s ambient lookup, `Binding`'s closures — persist. Mutations
-to plain stored fields of your wrapper are discarded when `update()`
-returns.
+reference-backed storage persist, and every built-in wrapper is reference
+backed: `@State`'s box, `@Environment`'s ambient lookup, `Binding`'s
+closures. Mutations to plain stored fields of your wrapper are discarded
+when `update()` returns.
 
 This is a recorded divergence from SwiftUI, where an `update()` mutation to
 a plain stored property is visible to that one body evaluation (and only
-that one — SwiftUI also starts each cycle from a pristine copy). The rule of
+that one; SwiftUI also starts each cycle from a pristine copy). The rule of
 thumb is the same in both frameworks: state that must survive between
 evaluations belongs in composed reference-backed storage, never in plain
 stored fields.
@@ -81,23 +81,23 @@ stored fields.
 ## Keep update() inside the dependency vocabulary
 
 A reused subtree skips body evaluation *and* the update pass. Every
-dependency a wrapper can express through the framework — state slots,
-environment values, focus state, focused values, observable reads — already
+dependency a wrapper can express through the framework (state slots,
+environment values, focus state, focused values, observable reads) already
 denies reuse when it changes, so a wrapper built from those is always
 consistent: if none of its inputs changed, skipping its `update()` is
 unobservable.
 
 The contract consequence: `update()` must not carry effects *outside* that
 vocabulary. A wrapper that manages its own timer, subscription, or external
-side channel from `update()` gets no guarantee the framework will call it —
+side channel from `update()` gets no guarantee the framework will call it;
 no reuse gate can deny reuse for a dependency the graph cannot see. Route
 external inputs through composed `@State` writes (which invalidate the
 owner) instead.
 
 ## Degraded paths
 
-Outside a live graph — constructing views before mounting, one-shot
-snapshot rendering without an invalidating runtime — a composed `@State`
+Outside a live graph (constructing views before mounting, or one-shot
+snapshot rendering without an invalidating runtime), a composed `@State`
 follows the same seed-storage path as a directly-declared one: reads serve
 the wrapper's initial value, writes update the detached seed. See
 <doc:State-Keying> for where graph-backed storage begins and ends, and for

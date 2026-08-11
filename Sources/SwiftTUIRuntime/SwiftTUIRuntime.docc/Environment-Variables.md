@@ -18,14 +18,14 @@ Unless a row says otherwise, boolean variables share one grammar: **unset**
 keeps the default, **empty or `0`** means off, and **any other value** means
 on. Integer and path variables state their shape in their row.
 
-Most gates read the environment **once** and latch the result — set variables
+Most gates read the environment **once** and latch the result, so set variables
 before the process launches. Command-line flags parsed by `SwiftTUICommand`
 (`SwiftTUIArguments`) layer on top of the environment result, so an explicit
 flag wins over an inherited variable.
 
-SwiftTUI also honors the standard terminal conventions — `NO_COLOR`,
+SwiftTUI also honors the standard terminal conventions (`NO_COLOR`,
 `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, `TERM`, `COLORTERM`, and
-`LANG`/`LC_*` — through ``TerminalCapabilityProfile`` and the runtime
+`LANG`/`LC_*`) through ``TerminalCapabilityProfile`` and the runtime
 configuration resolver. `NO_COLOR` always wins over `FORCE_COLOR`.
 
 Beyond that family, the framework consults these standard variables:
@@ -81,23 +81,23 @@ to a browser instead of (or alongside) the terminal.
 | --- | --- | --- |
 | `SWIFTTUI_RENDER_MODE` | `sync`, `async` (default), `async-no-cancel`, `async-no-drop` | Initial value of ``RunLoop/renderMode``, which selects the interactive pipeline documented in <doc:Runtime-Render-Pipeline>. Unrecognized values fall back to `async`. |
 
-- `sync` — the one-shot synchronous pipeline. The entire fused frame tail
+- `sync`: the one-shot synchronous pipeline. The entire fused frame tail
   (layout, semantics, draw, raster) runs on the main actor with no worker
   offload and no cancellation machinery.
-- `async` — the cancellable pipeline. The frame tail may run on the layout
+- `async`: the cancellable pipeline. The frame tail may run on the layout
   worker; a queued tail can be cancelled before start when newer input
   intent arrives, and a completed frame can be dropped when superseded
   (bounded by the drop-eligibility blockers).
-- `async-no-cancel` — never cancels a queued tail and commits completed
+- `async-no-cancel`: never cancels a queued tail and commits completed
   frames in order. Browser-hosted sessions use this mode for presentation
   cadence.
-- `async-no-drop` — keeps pre-start cancellation but never drops a
+- `async-no-drop`: keeps pre-start cancellation but never drops a
   completed frame.
 
 Even in the async modes, per-frame offload eligibility is automatic: a tree
 containing main-actor-only custom layouts, main-actor-only indexed child
 sources, or layout-realized content runs its tail on the main actor for that
-frame. There is no variable for that fallback — `sync` is the switch that
+frame. There is no variable for that fallback; `sync` is the switch that
 guarantees fully main-actor execution.
 
 ### Resolve-engine profile
@@ -183,9 +183,9 @@ listed for completeness and for driving the wasm binary directly.
 
 ### Repository tooling
 
-Variables with the `SWIFTTUI_` prefix that only the test and gate tooling
-reads — timeout scaling, fixture regeneration, serialized test execution, and
-similar — are contributor-facing and documented in the coordination
+Some variables with the `SWIFTTUI_` prefix are read only by the test and gate
+tooling: timeout scaling, fixture regeneration, serialized test execution, and
+similar. They are contributor-facing and documented in the coordination
 repository's maintainer docs (`swift-tui-org/docs/swift-tui/DEVELOPMENT.md`
 and `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`), not here.
 

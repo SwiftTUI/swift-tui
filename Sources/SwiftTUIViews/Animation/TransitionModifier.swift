@@ -7,7 +7,7 @@ extension View {
   /// The transition's insertion phase plays when this view first appears
   /// in the resolved tree.  Its removal phase plays when the view is
   /// absent from a subsequent resolve.  During the removal animation
-  /// the view is rendered as a non-semantic overlay — it does not
+  /// the view is rendered as a non-semantic overlay; it does not
   /// participate in layout, focus, semantics, or interaction.
   public func transition(_ transition: AnyTransition) -> some View {
     modifier(TransitionRegistrationModifier(transition: transition))

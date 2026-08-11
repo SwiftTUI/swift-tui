@@ -10,7 +10,7 @@ public struct ProfiledMemorySnapshot: Sendable {
   public let name: String
   public let count: Int
   public let approxBytes: Int?
-  /// Provider-specific counters carried alongside the occupancy figure — for a
+  /// Provider-specific counters carried alongside the occupancy figure: for a
   /// cache, its `lookups`/`hits`/`misses`.
   ///
   /// Entry count alone does not show whether a cache serves its lookups.

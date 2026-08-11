@@ -1,11 +1,11 @@
 # Shapes
 
-Fill, stroke, and inset terminal shapes — the built-in primitives and custom
-`Path`-based shapes — rasterized to Braille subpixels.
+Fill, stroke, and inset terminal shapes, both the built-in primitives and
+custom `Path`-based shapes, rasterized to Braille subpixels.
 
 ## Overview
 
-Conform to ``Shape`` by implementing **either** ``Shape/path(in:)`` (SwiftUI-style —
+Conform to ``Shape`` by implementing **either** ``Shape/path(in:)`` (SwiftUI-style:
 return the outline for the proposed rect) **or** ``Shape/geometry`` (one of the
 analytic primitive cases). The two are bridged automatically, so a custom shape
 usually implements only `path(in:)`. SwiftTUI ships the primitives
@@ -46,7 +46,7 @@ Build a `Path` from lines and Bézier curves (`move(to:)`,
 `addLine(to:)`, `addQuadCurve(to:control:)`, `addCurve(to:control1:control2:)`,
 `closeSubpath()`) or the shape constructors (`Path(_: Rect)`,
 `Path(roundedRect:cornerRadius:)`, `Path(ellipseIn:)`). Curves are flattened to
-polylines and filled with a winding rule (`FillRule` — `.nonZero`
+polylines and filled with a winding rule (`FillRule`: `.nonZero`
 by default, `.evenOdd` available). A custom shape composes with the full
 modifier algebra (`fill` / `stroke` / `strokeBorder` / `foregroundStyle` /
 `inset(by:)`). A custom-path `strokeBorder` clips a background to the shape's
@@ -57,7 +57,7 @@ Two properties to keep in mind, both consequences of the cell grid:
 - **Frame-relative, not aspect-corrected.** `path(in:)` is evaluated once
   against the unit rect at resolve and the normalized path is scaled into the
   placed frame at raster. A custom shape therefore *stretches to fill its
-  frame* — unlike ``Circle``, which stays round by inscribing the short axis.
+  frame*, unlike ``Circle``, which stays round by inscribing the short axis.
   Draw the proportions you want relative to the proposed rect.
 - **Sub-cell-quantized, not analytic-bit-exact.** Custom paths rasterize to the
   2×4 Braille subpixel grid with one foreground color per cell. The five

@@ -44,7 +44,7 @@ extension View {
 public struct Transaction: Sendable {
   /// The animation associated with the current transaction, if any.
   ///
-  /// Setting this to `nil` is equivalent to `.disabled` — it suppresses
+  /// Setting this to `nil` is equivalent to `.disabled`: it suppresses
   /// inherited animation without carrying an explicit curve.
   public var animation: Animation? {
     get {
@@ -81,9 +81,9 @@ public struct Transaction: Sendable {
   ///
   /// The flag is author-facing metadata: transforms installed with
   /// ``View/transaction(_:)`` can read it, and scoped writes carry it to
-  /// the next resolve. The framework neither sets nor consumes it yet —
-  /// SwiftUI does not auto-set it on gesture updates either (verified
-  /// 2026-08-05) — and it carries no animation intent of its own.
+  /// the next resolve. The framework neither sets nor consumes it yet,
+  /// and the flag carries no animation intent of its own. SwiftUI does
+  /// not auto-set it on gesture updates either (verified 2026-08-05).
   public var isContinuous: Bool = false
 
   package var request: AnimationRequest

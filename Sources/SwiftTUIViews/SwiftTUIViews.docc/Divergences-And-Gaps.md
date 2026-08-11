@@ -15,12 +15,12 @@ does implement.
 
 Every entry carries one of three statuses:
 
-- ***Ratified*** — a deliberate, recorded stance. The rationale is part of the
+- ***Ratified***: a deliberate, recorded stance. The rationale is part of the
   entry, and the divergence is expected to persist.
-- ***Provisional*** — deliberate today, held loosely. The behavior is a
+- ***Provisional***: deliberate today, held loosely. The behavior is a
   considered default that should be revisited if it causes real friction.
-- ***Gap*** — `HEAD` delivers less than the API shape or the project vision
-  implies. Gaps are recorded, not scheduled — nothing in this register is a
+- ***Gap***: `HEAD` delivers less than the API shape or the project vision
+  implies. Gaps are recorded, not scheduled; nothing in this register is a
   roadmap or a promise.
 
 Two scope notes. Under the subset policy, a bare absence is a scope decision,
@@ -33,8 +33,8 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **No `NavigationLink`.** *Ratified.* Navigation is strictly data-driven: a
   push mutates the bound path (`NavigationStack(path:root:)` plus
   `navigationDestination(for:destination:)`). `NavigationLink` fuses a control
-  to a navigation side effect, so navigation state stops being derivable from —
-  and mutable through — the app's data. There is deliberately no link-control
+  to a navigation side effect, so navigation state stops being derivable from,
+  and mutable through, the app's data. There is deliberately no link-control
   sugar.
 - **No `@Environment(\.dismiss)`.** *Ratified.* Presented content receives no
   ambient dismiss command. The presenter owns a Boolean or optional-item
@@ -50,7 +50,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **No `NavigationSplitView`.** *Provisional.* Out of scope for the current
   navigation surface.
 - **No localization, `Font`, or Dynamic Type axis.** *Ratified.* `Text` is
-  literal — string in, glyphs out. There is no `LocalizedStringKey`, `Locale`,
+  literal: string in, glyphs out. There is no `LocalizedStringKey`, `Locale`,
   bundle lookup, or right-to-left mirroring; no `Font` type or `\.font`; no
   Dynamic Type. The authoring layers are Foundation-free by policy, and a
   terminal renders one host-owned monospace glyph grid, so none of the three
@@ -68,7 +68,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`App.main()` is asynchronous.** *Ratified.* `SwiftUI.App.main()` is
   synchronous and a top-level `MyApp.main()` call works there. SwiftTUI's
   `App` refines `AsyncParsableCommand`, so only `@main` binds the asynchronous
-  entry point. A bare `MyApp.main()` — muscle memory from SwiftUI — would
+  entry point. A bare `MyApp.main()`, muscle memory from SwiftUI, would
   resolve to the synchronous `ParsableCommand.main()` overload from
   swift-argument-parser and never start the runtime, so SwiftTUI ships a
   trapping shim that rejects the call with a precise diagnostic in both DEBUG
@@ -99,8 +99,8 @@ are omitted even when SwiftUI exposes a corresponding API.
 
 - **Observation-only data flow.** *Ratified.* The state surface is `State`,
   `Binding`, `Bindable`, `Environment`, and `FocusState`. The Combine-era
-  object family — `ObservableObject`, `@Published`, `@StateObject`,
-  `@ObservedObject`, `@EnvironmentObject` — does not exist. Models are
+  object family (`ObservableObject`, `@Published`, `@StateObject`,
+  `@ObservedObject`, `@EnvironmentObject`) does not exist. Models are
   `@Observable` classes. The authoring layers are Foundation-free by policy
   and build on non-Apple platforms where Combine is unavailable, and the
   subset policy excludes APIs that modern SwiftUI itself has superseded; the
@@ -118,15 +118,15 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Equal-value `State` writes are inert.** *Provisional.* Writing a value
   equal to the current one does not invalidate the owner. A
   `Binding.animation(_:)` write of an unchanged value consequently animates
-  nothing — the write short-circuits before the transaction is read, which
+  nothing: the write short-circuits before the transaction is read, which
   matches SwiftUI's observable behavior.
 - **`DynamicProperty.update()` runs on a copy.** *Ratified.* SwiftUI mutates
   a working copy of the view value before body evaluation, so an `update()`
   mutation to a plain stored property is visible to that one body there
-  (verified against a scratch macOS probe, 2026-08-04 — neither framework
+  (verified against a scratch macOS probe, 2026-08-04; neither framework
   persists such mutations *across* evaluations). SwiftTUI's view value is
-  immutable at body evaluation — escaping evaluator closures and memo
-  snapshots capture it — and strict memory safety rules out field-offset
+  immutable at body evaluation (escaping evaluator closures and memo
+  snapshots capture it), and strict memory safety rules out field-offset
   mutation, so `update()` receives a discarded copy and the body observes
   the pre-update value. Effects through reference-backed storage (every
   built-in wrapper) persist in both frameworks; the authoring guidance is
@@ -138,13 +138,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   environment, focus, focused values, observation) already denies reuse
   when it changes, so skipping is unobservable for wrappers built from
   them. Self-managed timers or subscriptions driven from `update()` get no
-  call guarantee — no reuse gate can deny for a dependency the graph cannot
-  see. SwiftUI does not document an equivalent constraint.
+  call guarantee, because no reuse gate can deny for a dependency the graph
+  cannot see. SwiftUI does not document an equivalent constraint.
 - **Dynamic-property discovery sees stored properties only.** *Ratified.*
   Discovery reflects stored properties (as SwiftUI does); computed
   properties never participate in the update pass. Wrappers composed inside
   types that do **not** conform to `DynamicProperty` keep the legacy
-  declaration-site slot identity — two instances of such a helper in one
+  declaration-site slot identity: two instances of such a helper in one
   view silently share storage, now surfaced by the
   `state.duplicateSlotClaim` runtime issue. Conforming wrappers get
   path-qualified per-instance storage, and composition no longer requires
@@ -152,9 +152,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   shipped workaround does.
 - **Generic bounds carry strict-concurrency narrowings.** *Ratified, as a
   class.* Where SwiftUI's signature has a looser generic, SwiftTUI may add
-  `Sendable` or a comparison bound — `ForEach` IDs are `Hashable & Sendable`,
+  `Sendable` or a comparison bound (`ForEach` IDs are `Hashable & Sendable`,
   `.animation(_:value:)` requires `Equatable & Sendable`, `alignmentGuide`
-  closures are `@Sendable` — because view inputs cross the off-main frame
+  closures are `@Sendable`) because view inputs cross the off-main frame
   tail under strict, unsuppressed concurrency. Recorded once for the whole
   class; individual members do not get separate entries.
 - **`ForEach` over a collection binding writes back by identity; `Binding`
@@ -164,7 +164,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   bindings verify identity on every access: after a reorder a write
   relocates by ID (occurrence-aware for duplicate IDs), and a write whose
   element has left the collection is dropped with a
-  `forEach.staleElementBindingWrite` runtime issue — where SwiftUI writes
+  `forEach.staleElementBindingWrite` runtime issue, where SwiftUI writes
   through the captured index and can corrupt a neighbor or trap. A read of a
   departed element traps with a diagnostic, matching the optional-base
   unwrap precedent. Swift drops the contextual isolation from
@@ -172,13 +172,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   spelling does not compile against the isolated builder closure: the plain
   parameter is already the element binding (member access projects field
   bindings), and `{ @MainActor $item in ... }` restores the destructuring
-  spelling — recorded under the strict-concurrency narrowing class. The
+  spelling, recorded under the strict-concurrency narrowing class. The
   `editActions:` forms are out of scope for the core package: a default
   platform edit behavior is a high-opinion surface that belongs to optional
   extension packages, because no one owns what a TUI "should feel like" the
   way a desktop platform vendor owns its idiom. `Binding` also conforms to
   `Sequence`/`Collection`/`BidirectionalCollection`/`RandomAccessCollection`
-  where `Value` permits, as in SwiftUI — with two recorded differences: the
+  where `Value` permits, as in SwiftUI, with two recorded differences: the
   conformances are `@MainActor`-isolated (`wrappedValue` is main-actor-gated
   here; the strict-concurrency narrowing class), and the positional
   subscript's element bindings are index-denominated with SwiftUI's exact
@@ -195,8 +195,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Shape.path(in:)` receives a `Rect`, not a `CGRect`.
 - **`ScrollView(position:)` binds a raw cell offset, `ScrollCellOffset`.**
   *Ratified.* The offset type was renamed from `ScrollPosition` in the
-  pre-launch sweep so SwiftUI's name — an identity/edge/anchor abstraction
-  applied with `scrollPosition(_:)` — is no longer claimed by different
+  pre-launch sweep so SwiftUI's name (an identity/edge/anchor abstraction
+  applied with `scrollPosition(_:)`) is no longer claimed by different
   semantics. The `ScrollView(position:)` initializer itself has no SwiftUI
   counterpart.
 - **No `scrollPosition(_:)` identity abstraction.** *Gap.* SwiftUI's
@@ -205,7 +205,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   available to a faithful implementation.
 - **`ScrollViewProxy.scrollTo` returns `Bool` and adds offset forms;
   `ScrollViewReader` evaluates `content` once.** *Ratified.* The `Bool`
-  reports whether a scroll target resolved — the fail-loud preference applied
+  reports whether a scroll target resolved: the fail-loud preference applied
   to imperative scrolling. Cell-offset `scrollTo` overloads have no SwiftUI
   analog, and the reader's non-escaping content closure is evaluated once
   rather than kept re-callable.
@@ -310,7 +310,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   extracted into labeled option values; arbitrary option views degrade to
   their extracted text. Terminal option rows are single-line text by
   construction, and structured option metadata keeps every picker style
-  deterministic — the same trade recorded for tab labels. A modifier that
+  deterministic, the same trade recorded for tab labels. A modifier that
   overrides this treatment is an open gap.
 - **`TabView` resolves only the selected body.** *Ratified.* Resolving only
   the visible tab keeps resolve and commit cost proportional to the visible
@@ -323,7 +323,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   cell paints, not arbitrary views; clearing is expressed by not applying the
   modifier, and widening to an optional stays additive.
 - **List rows and table cells default to one line; authored limits are
-  honored.** *Ratified.* The single-line default is terminal-native — it is
+  honored.** *Ratified.* The single-line default is terminal-native: it is
   load-bearing for the windowed visible-layout math. What no longer happens
   is destruction or clobbering of authored values: an authored or ambient
   `lineLimit`/`truncationMode` reaches hosted rows and cells (rows grow to
@@ -337,10 +337,10 @@ are omitted even when SwiftUI exposes a corresponding API.
 
 - **`Slider` requires `in:`, and `Double` sliders are continuous by
   default.** *Ratified.* SwiftUI defaults the range to `0...1`; SwiftTUI
-  requires it. `step:` defaults to `nil` on the `Double` forms — track drags
+  requires it. `step:` defaults to `nil` on the `Double` forms (track drags
   snap to a fine span-derived quantum and arrow keys move about a tenth of
   the span, matching SwiftUI's continuous default for the most
-  SwiftUI-shaped call — while the `Int` forms keep `step: 1`.
+  SwiftUI-shaped call) while the `Int` forms keep `step: 1`.
 - **`scaledToFit()` / `scaledToFill()` are `Image`-only and imply
   `resizable()`.** *Ratified.* The `View`-level versions require an
   aspect-ratio layout pass that cell layout does not model. The `Image` forms
@@ -349,13 +349,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   reports an `image.unresolvedSource` runtime issue rather than failing
   silently.
 - **Emphasis is `Text`-scoped, with SGR extensions; decorations propagate
-  ambiently.** *Ratified.* `bold()` and `italic()` return `Text` — glyph
-  attributes with no `View`-level variants — and the SGR set adds `faint()`
+  ambiently.** *Ratified.* `bold()` and `italic()` return `Text` (glyph
+  attributes with no `View`-level variants), and the SGR set adds `faint()`
   and `blink()` with no SwiftUI analog. `underline()` and `strikethrough()`
   exist at both levels, matching SwiftUI: the `View` forms are environment
   writes that every descendant text run stamps where its own value styling
-  is unset, and a directly-styled `Text` — including an explicit
-  `.underline(false)` clear — wins over the inherited style (verified
+  is unset, and a directly-styled `Text`, including an explicit
+  `.underline(false)` clear, wins over the inherited style (verified
   against macOS SwiftUI, 2026-08-05).
 - **`lineLimit`/`truncationMode`/`textWrappingStrategy` are environment
   values with SwiftUI's replacement semantics.** *Ratified (parity).* The
@@ -363,7 +363,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   SwiftTUI-only `\.textWrappingStrategy`): the innermost write wins,
   `lineLimit(nil)` clears an inherited limit, and the raw authored value
   rides the environment while text layout clamps non-positive limits to one
-  line — each verified against macOS SwiftUI. Text-run leaves (`Text`,
+  line, each verified against macOS SwiftUI. Text-run leaves (`Text`,
   `Link`) stamp the effective values into node metadata at resolve time
   because the fused frame tail cannot read the environment. `TextEditor`
   opts its body out (its movement map wraps at the measured content width,
@@ -387,7 +387,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Focus traversal is geometry-aware and wraps.** *Ratified.* Focus starts at
   the top-most control nearest the leading edge; Tab moves forward in layout
   order and wraps back to the beginning. Traversal policy uses geometry, not
-  only a linear order. Wrapping is the terminal-native reading — there is no
+  only a linear order. Wrapping is the terminal-native reading: there is no
   surrounding native UI for focus to escape to, so the chain cycles instead
   of ending.
 - **The `List` focus highlight is row-shaped.** *Ratified.* The active row
@@ -405,12 +405,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   or `SecureField`; a `TextEditor` inserts a newline and never submits, and
   a modified Return (any modifier bits) never submits. Every enclosing
   `onSubmit` action runs, innermost first, and `submitScope(_:)` stops
-  submissions from propagating further up — SwiftUI's documented
+  submissions from propagating further up, which is SwiftUI's documented
   composition. The `of: SubmitTriggers` parameter is not implemented
   because `.text` is the only trigger a terminal can have (there is no
   `searchable` surface); adding the labeled form later is additive.
   `submitLabel` is omitted because there is no software keyboard whose
-  Return key could be relabeled — the modifier would be inert theater, the
+  Return key could be relabeled; the modifier would be inert theater, the
   same reasoning recorded for `onKeyPress` phases. Without an enclosing
   `onSubmit`, Return keeps its default routing.
 - **No `onMoveCommand` or `onExitCommand`.** *Gap.*
@@ -418,14 +418,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   *Ratified.* The closure is labeled `perform:`, matching is a
   `KeyPressMatch` value with terminal-native statics such as `.arrowUp`, and
   there is no `phases:` parameter. A terminal byte stream delivers complete
-  key events — there are no down/up/repeat phases to observe and no physical
-  keyboard state to match against — so SwiftUI's phase surface would be
+  key events, with no down/up/repeat phases to observe and no physical
+  keyboard state to match against, so SwiftUI's phase surface would be
   unimplementable theater. The name stays because the role matches: this is
   where key handling is authored.
 - **`\.openLinkAction` stands where SwiftUI has `\.openURL`, and environment
   verbs return `Bool`.** *Ratified.* The rename marks the changed contract
-  (`LinkDestination` values, terminal link delivery), and `Bool` returns —
-  here and on `\.resetFocus` — report whether any handler consumed the verb,
+  (`LinkDestination` values, terminal link delivery), and `Bool` returns,
+  here and on `\.resetFocus`, report whether any handler consumed the verb:
   the fail-loud preference applied to environment actions. No `\.openURL`
   alias ships.
 - **Toolbar items are value metadata, hoisted by preference.** *Ratified.*
@@ -445,11 +445,11 @@ are omitted even when SwiftUI exposes a corresponding API.
   families, so a queued prompt cannot intercept dismissal from a visible
   surface.
 - **`fullScreenCover` has no chrome.** *Ratified.* It occupies the complete
-  terminal proposal with no header, inset, border, or implicit close button —
+  terminal proposal with no header, inset, border, or implicit close button:
   the vision document's restrained-chrome default applied to the modal
   family.
 - **`onDismiss` is observation, not command.** *Ratified.* It runs once after
-  a committed activation disappears — for state writes, Escape, built-in
+  a committed activation disappears: for state writes, Escape, built-in
   actions, toast expiration, item-ID replacement, and removal of the
   presenting subtree alike. This is the presenter-side half of the dismissal
   stance; see <doc:Dismissal-Is-Data>.
@@ -470,7 +470,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Cell-denominated gesture defaults.** *Ratified.* `DragGesture.minimumDistance`
   defaults to `0` cells (SwiftUI: 10 points), and
   `LongPressGesture.maximumDistance` defaults to `0` cells (SwiftUI: 10
-  points). These are terminal-faithful defaults — any continuous cell
+  points). These are terminal-faithful defaults: any continuous cell
   movement is meaningful, and callers pass positive values to allow pointer
   drift. Velocity is reported in cells per second.
 - **Tap timing is explicit.** *Provisional.* A single tap has no timing
@@ -498,7 +498,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Cell-only terminals synthesize pointer locations.** *Ratified.* Where a
   host reports only cell coordinates, the runtime supplies the cell center as
   the continuous location; native, web, and terminal-pixel hosts can carry
-  true sub-cell positions. Use these for optional affordances — layout stays
+  true sub-cell positions. Use these for optional affordances; layout stays
   cell-based.
 
 ## Shapes and drawing
@@ -509,8 +509,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   output and cell-aspect correction that sampled paths cannot promise; see
   <doc:AspectCorrectShapes>.
 - **No path/vector transform adapters.** *Ratified.* No `trim(from:to:)`,
-  `offset`, `rotation`, `scale`, or `transform` shape adapters — path/vector
-  transforms have no faithful meaning over discrete cells — and no
+  `offset`, `rotation`, `scale`, or `transform` shape adapters (path/vector
+  transforms have no faithful meaning over discrete cells) and no
   `lineWidth:` stroke overloads: strokes are one cell wide, and weight is the
   glyph palette via `borderSet`.
 - **No `addArc`, no general `clipShape(_:)`, no animatable path morphing.**
@@ -519,7 +519,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   morphing paths.
 - **Custom shapes stretch; built-ins inscribe.** *Ratified.* A custom
   `path(in:)` shape fills its frame, while `Circle` stays round by inscribing
-  the short axis — recorded as consequences of the cell grid, together with
+  the short axis; both are recorded as consequences of the cell grid, together with
   sub-cell quantization of custom paths versus bit-exact primitives.
 - **`FillRule` has a dual default.** *Gap.* Hit-testing (`contains`) defaults
   to even-odd to preserve existing hit regions; the rendering bridge defaults
@@ -547,7 +547,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   not built (*Gap*). `AnimationCompletionCriteria` is accepted but the
   controller treats `.logicallyComplete` and `.removed` identically
   (*Gap*). `TransactionKey.Value` requires `Hashable & Sendable` where
-  SwiftUI leaves the associated type unconstrained (*Ratified* — the
+  SwiftUI leaves the associated type unconstrained (*Ratified*: the
   environment-`Sendable` narrowing precedent; values cross the off-main
   frame tail and participate in reuse comparisons). `isContinuous` is
   author-facing metadata: the framework neither sets nor consumes it yet,
@@ -562,15 +562,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   animation, and the signature omits `properties:` and `anchor:`.
 - **Matched-geometry namespaces work without `@Namespace`.** *Provisional.*
   The wrapper exists with SwiftUI semantics, but
-  `matchedGeometryEffect(id:in:)` also accepts `.default` — one global
-  namespace — where SwiftUI requires a `Namespace.ID`.
+  `matchedGeometryEffect(id:in:)` also accepts `.default`, one global
+  namespace, where SwiftUI requires a `Namespace.ID`.
 - **Memoized body reuse compares view inputs implicitly, with a narrower
   reach than SwiftUI's.** *Gap (narrowed).* The memo gate compares any view
-  value whose type has a comparison plan — `Equatable` conformance, a
+  value whose type has a comparison plan: `Equatable` conformance, a
   whole-value byte compare for packed POD types, or a per-field plan built
   once per type from runtime field metadata. Types the planner cannot prove
-  comparable (stored closures — `Button` actions and builder-closure storage —
-  `AnyView`, opaque existentials, non-POD non-`Equatable` enums) still
+  comparable (stored closures such as `Button` actions and builder-closure
+  storage, `AnyView`, opaque existentials, non-POD non-`Equatable` enums) still
   recompute conservatively, a ceiling SwiftUI shares for closures. The
   sampled memo shadow oracle validates every served tier; `.equatable()`
   remains the explicit opt-in for types with custom equality semantics.
@@ -592,7 +592,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   presentation, not layout semantics.
 - **Style families are open protocols.** *Ratified.* `ButtonStyle`,
   `TextFieldStyle`, `PickerStyle`, `ListStyle`, `TabViewStyle`, and peers are
-  public, extensible protocols with `Any*Style` erasers — including families
+  public, extensible protocols with `Any*Style` erasers, including families
   SwiftUI keeps closed.
 - **`ToggleStyle`, `ProgressViewStyle`, `LabelStyle`, and `MenuStyle` have no
   open protocol.** *Gap.* Their absence is accidental incompleteness within
@@ -602,15 +602,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   than `mix(with:by:)`.
 - **`.primary` and `.secondary` are semantic-role aliases; `Color.accentColor`
   is omitted.** *Ratified.* `.foregroundStyle(.primary)` and `.secondary`
-  resolve through the host theme — aliases for the `foreground` and `muted`
-  roles — matching SwiftUI's hierarchical-style spelling. They are shape
+  resolve through the host theme as aliases for the `foreground` and `muted`
+  roles, matching SwiftUI's hierarchical-style spelling. They are shape
   styles, not `Color` statics: `Color` is a concrete value (animatable,
   codable, channel math), so a theme-deferred `Color.primary` cannot exist
   without breaking that contract. The accent story is the existing `.tint`
   role; the `Color.accentColor` spelling is not claimed.
 - **`background(_ style:)` fills the view bounds only.** *Ratified.* There is
   no `ignoresSafeAreaEdges:` parameter and the fill does not bleed into safe
-  areas — the restrained-chrome default; painting beyond bounds is expressed
+  areas, the restrained-chrome default; painting beyond bounds is expressed
   with explicit containers.
 - **No `ColorScheme` axis.** *Ratified.* Views can read `colorSchemeContrast`
   and the raw `TerminalAppearance`, but there is no light/dark `ColorScheme`
@@ -620,13 +620,13 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`.opacity` cascades multiplicatively at draw extraction.** *Ratified
   (parity).* The effective opacity of every emitted draw command is the
   product of the `.opacity` factors on its ancestor chain including the
-  node's own — `container.opacity(0.3)` fades the whole subtree, nested
+  node's own: `container.opacity(0.3)` fades the whole subtree, nested
   fades multiply, and an explicit `.opacity(1)` reset is impossible,
   matching SwiftUI. Same-node modifier chains compound through the metadata
   merge. Retained draw reuse verifies the inherited factor before serving a
   cached subtree, and animated fades write the overlay root only (the
   cascade reaches descendants at extraction). A `Canvas` fades its default
-  foreground but not colors the drawing resolves internally — a residual
+  foreground but not colors the drawing resolves internally, a residual
   *Gap* shared with the image path below.
 
 ## Surface extensions with no SwiftUI analog
@@ -639,18 +639,18 @@ capabilities in the vision document. The others follow the same stance:
 - `EnvironmentReader`, for reading environment values and actions inline.
 - `TextFigure`, FIGlet banner text with embedded fonts.
 - `PointerInputCapabilities`, `CellPixelMetrics`, and `PointerLocation` input
-  metadata via `GeometryProxy` — recorded as metadata that must not change
+  metadata via `GeometryProxy`, recorded as metadata that must not change
   the base layout contract.
 - `EnvironmentValues.requestTermination` and
-  `EnvironmentValues.terminalHandoff` — recorded as runtime-injected verbs
+  `EnvironmentValues.terminalHandoff`, recorded as runtime-injected verbs
   that expose host-owned actions without putting host mechanics in views.
 - Per-side border styling (`BorderEdgeStyle`) and animatable perimeter
   gradients (`BorderBlend`).
-- `ProgressView(value:total:barWidth:)` — a terminal-cell width control on an
+- `ProgressView(value:total:barWidth:)`, a terminal-cell width control on an
   otherwise SwiftUI-shaped control.
 - The deliberately public environment members `\.isFocused` (with a setter,
   for host integrations), `\.safeAreaInsets`, `\.terminalSize`,
-  `\.controlProminence`, and `\.clipboardWriteAction` — host- and
+  `\.controlProminence`, and `\.clipboardWriteAction`: host- and
   terminal-facing values SwiftUI keeps private or does not have.
 - The `SwiftTUIProfiling` product and the host-contract surface
   (`SceneManifest`, `HostedSceneSession`, and peers).
@@ -689,8 +689,8 @@ keyboard, touch, wheel scrolling, hyperlinks, and the system clipboard
   locally and the Kotlin client logic has JVM unit tests
   (`./gradlew testDebugUnitTest`, which run without the NDK), but
   emulator/device smoke is not in CI.
-- **No `x86_64` Android packaging.** *Gap.* The framework — including the
-  vendored `swift-png`/`JPEG` image path — cross-compiles for
+- **No `x86_64` Android packaging.** *Gap.* The framework, including the
+  vendored `swift-png`/`JPEG` image path, cross-compiles for
   `x86_64-unknown-linux-android28` (the earlier `swift-png` SIMD build
   blocker was replaced by a scalar reimplementation), but `arm64-v8a` is the
   only ABI the `AndroidGallery` example currently packages and smoke-tests.
@@ -705,8 +705,8 @@ example app in `swift-tui-examples`.
 - **No Kitty keyboard protocol or OSC 99 notification namespacing.** *Gap.*
 - **No pane-local selection/copy/scrollback mode.** *Gap.*
 - **No process reattachment.** *Gap.* Reconnecting to a still-running child
-  process after the host app restarts — and a daemon-backed session
-  lifecycle — are not implemented.
+  process after the host app restarts, and a daemon-backed session
+  lifecycle, are not implemented.
 - **No iOS or WASI builds of the embedding products.** *Gap.*
 
 ## Runtime and pipeline internals
@@ -739,7 +739,7 @@ divergent from the project's intent.
 - **No per-tick frame emission under retained reuse.** *Gap.* When retained
   reuse is active (the full profile and the partial lean-profile option),
   reuse gates coalesce surface publications, so task-driven ticks that change
-  the raster surface do not always produce a frame — in Chromium 0.1.9, Life
+  the raster surface do not always produce a frame: in Chromium 0.1.9, Life
   emitted approximately one wire frame for four generations. The default lean
   profile masks this fault because it disables retained reuse. This fault
   must close before the full profile or JSPI main-thread mode becomes the
@@ -777,10 +777,10 @@ path, while unblended images keep the fast native path.
 
 This article is the project's single divergence-and-gap register; it absorbed
 the former `docs/VISION-GAP.md` gap register, and its *Gap* entries are the
-only recorded future-facing statements in this repository — shortfalls, not
+only recorded future-facing statements in this repository: shortfalls, not
 plans. The vision document states the divergence policy and the scope
-decisions. For a narrative orientation over this register — what transfers,
-what to retrain, and what is missing, in reading order — see
+decisions. For a narrative orientation over this register (what transfers,
+what to retrain, and what is missing, in reading order), see
 <doc:Coming-From-SwiftUI>. Guide articles in this catalog carry the per-surface contracts:
 <doc:AnyView> documents its own "Differences From SwiftUI" (state is keyed by
 the erased payload type), <doc:Shapes> its "deliberately absent" list, and

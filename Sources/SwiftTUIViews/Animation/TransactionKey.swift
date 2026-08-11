@@ -1,6 +1,6 @@
 import SwiftTUICore
 
-/// A key for custom values stored on a ``Transaction`` — the
+/// A key for custom values stored on a ``Transaction``: the
 /// `EnvironmentKey` shape applied to transactions.
 ///
 /// Declare a key type, give it a default, and read or write
@@ -17,12 +17,12 @@ import SwiftTUICore
 /// ```
 ///
 /// `Value` is narrowed to `Hashable & Sendable` where SwiftUI leaves the
-/// associated type unconstrained — the same narrowing this surface applies
+/// associated type unconstrained, the same narrowing this surface applies
 /// to environment values, because transaction values cross the off-main
 /// frame tail and participate in reuse comparisons.
 ///
-/// > Important: Key values participate in retained-reuse equivalence —
-/// > resolve-time transforms read them, so a stale value under subtree
+/// > Important: Key values participate in retained-reuse equivalence.
+/// > Resolve-time transforms read them, so a stale value under subtree
 /// > reuse would be a correctness bug. A key value that changes every
 /// > frame therefore silently destroys retained reuse below the writer,
 /// > the same hazard class as an unequatable environment value. Prefer

@@ -143,7 +143,7 @@ extension Int: VectorArithmetic {
 
 // MARK: - Animatable bridges for primitive VectorArithmetic types
 
-/// A ``VectorArithmetic`` value is trivially ``Animatable`` — its own
+/// A ``VectorArithmetic`` value is trivially ``Animatable``: its own
 /// value is its animatable data.  SwiftUI exposes the same identity on
 /// `Double`/`CGFloat`/`Float` so `AnyAnimatable(1.5)` works at the
 /// type-erased wrapper level.

@@ -16,7 +16,7 @@ concepts:
 
 ## Actor Isolation
 
-SwiftTUI now follows SwiftUI-style actor isolation for authored view trees.
+SwiftTUI follows SwiftUI-style actor isolation for authored view trees.
 
 - `View` bodies are `@MainActor`
 - `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor

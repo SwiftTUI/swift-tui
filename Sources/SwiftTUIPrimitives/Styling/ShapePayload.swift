@@ -10,7 +10,7 @@ public enum ShapeFillMode: Equatable, Sendable {
 /// The box gives the geometry value O(1) equality on unchanged frames.
 /// Pointer identity stops the structural comparison early.
 /// Thus, custom-path nodes do not slow the retained-reuse fast paths. The wrapped path is
-/// module-internal plumbing — author-facing code uses `Shape.path(in:)`, not
+/// module-internal plumbing; author-facing code uses `Shape.path(in:)`, not
 /// this type directly.
 public struct BoxedPath: Equatable, Sendable {
   private var storage: Boxed<Path>

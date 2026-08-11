@@ -6,9 +6,9 @@ trees, VoiceOver, and TalkBack can present your interface.
 ## Overview
 
 SwiftTUI builds accessibility into the render pipeline rather than bolting it
-on. Every frame produces one semantic snapshot, and each presentation path —
-the terminal cursor-follows-focus mode, the Web/WASI ARIA tree, and the
-native SwiftUI and Android host overlays — presents that same snapshot.
+on. Every frame produces one semantic snapshot, and each presentation path
+(the terminal cursor-follows-focus mode, the Web/WASI ARIA tree, and the
+native SwiftUI and Android host overlays) presents that same snapshot.
 
 ## Semantic Modifiers
 

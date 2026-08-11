@@ -37,7 +37,7 @@ back to this package.
 
 ## Per-Host Engine Profiles
 
-The host boundary stays shared, but resolve has two profiles. “Full” means
+The host boundary stays shared, but resolve has two profiles. "Full" means
 that the retained-reuse door is eligible. Memoized-body reuse is eligible for
 its `Equatable` opt-ins. Selective dirty-frontier evaluation can run after the
 boot frame. It does not promise a reuse hit: invalidation, suppression, churn,
@@ -46,7 +46,7 @@ and each reuse door's normal guards still decide that.
 | Host presentation | Default resolve profile |
 | --- | --- |
 | Terminal-native | Full/native |
-| Localhost WebHost | Full/native — the Swift runtime is a native server process even though presentation is in a browser. |
+| Localhost WebHost | Full/native. The Swift runtime is a native server process even though presentation is in a browser. |
 | Host-managed Android | Full/native |
 | Native SwiftUI host | Full/native |
 | WASI / browser | Stack-lean |
@@ -62,8 +62,8 @@ stacks:
 
 - Retained and memoized resolve reuse are disabled by default. Selective
   evaluation is also disabled, so frames enter resolve from the root.
-- The three synchronous per-level bindings — ambient environment, authoring
-  context, and view-node context — use MainActor-scoped save/restore slots
+- The three synchronous per-level bindings (ambient environment, authoring
+  context, and view-node context) use MainActor-scoped save/restore slots
   instead of `TaskLocal.withValue`. Async bindings remain task-local because
   they can suspend.
 - The chunked resolve driver limits inline descent depth (default 6). Cuts
@@ -79,16 +79,16 @@ directions. Their grammar is documented in <doc:Environment-Variables>.
 Hosts do not see the pipeline. They see a committed frame through a small set
 of focused contracts.
 
-- ``SemanticHostFrame`` — the value `RunLoop.presentCommittedFrame` builds
+- ``SemanticHostFrame`` is the value `RunLoop.presentCommittedFrame` builds
   when a surface adopts `SemanticHostFramePresentationSurface`. It carries the
   raster, semantic snapshot, focused identity, host-facing damage, preferred
   layout size, and a producer sequence.
-- ``PresentationSurface`` roles — a host adopts only the roles it needs:
-  - `PresentationSurfaceMetricsProvider` — reports surface size and metrics.
-  - `TerminalCommandPresentationSurface` — accepts terminal command output.
-  - `RasterPresentationSurface` — accepts a raster surface.
-  - `DamageAwarePresentationSurface` — accepts incremental damage regions.
-  - `SemanticHostFramePresentationSurface` — accepts the full semantic frame.
+- ``PresentationSurface`` roles. A host adopts only the roles it needs:
+  - `PresentationSurfaceMetricsProvider` reports surface size and metrics.
+  - `TerminalCommandPresentationSurface` accepts terminal command output.
+  - `RasterPresentationSurface` accepts a raster surface.
+  - `DamageAwarePresentationSurface` accepts incremental damage regions.
+  - `SemanticHostFramePresentationSurface` accepts the full semantic frame.
 
 | Host | Damage consumption |
 | --- | --- |
@@ -126,7 +126,7 @@ whether a pointer drag on scrollable content pans it directly, so the content
 follows the pointer.
 
 It is off unless a host asks for it, because the default paradigm is the
-desktop one — a press-drag is a click-drag, and scrolling belongs to the wheel,
+desktop one: a press-drag is a click-drag, and scrolling belongs to the wheel,
 the scroll indicators, and the keyboard. Declaring it turns on two behaviors
 together: the scroll body claims the `.down`/`.dragged`/`.up` stream to pan,
 and a drag that begins on an inner control is handed to the enclosing scroll
@@ -207,7 +207,7 @@ consumers do not need Bun or npm for localhost WebHost use.
 
 ## Terminal-Program Embedding
 
-SwiftTUI can embed a real child terminal program as authored content — a
+SwiftTUI can embed a real child terminal program as authored content, a
 deliberate terminal-native capability. `TerminalView` hosts a
 `TerminalSession`; the `terminal-workspace` example in `swift-tui-examples`
 layers tabbed and split-pane composition above it. See

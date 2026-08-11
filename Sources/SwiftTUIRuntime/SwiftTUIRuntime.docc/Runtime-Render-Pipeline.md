@@ -277,7 +277,7 @@ changes. It also records them after an insertion, removal, or re-keying of a chi
 Three properties are important:
 
 - **The diff basis is the draw tree, not the placed tree and not the
-  invalidation set.** `directlyInvalidated` is the invalidation *seed* set — the
+  invalidation set.** `directlyInvalidated` is the invalidation *seed* set: the
   identities whose state or observation changed. Re-resolution routinely changes
   what a node paints without that node being a seed (a sibling reading a derived
   value, an environment or preference propagation, a container relaying out

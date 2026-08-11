@@ -63,9 +63,9 @@ command has reproducible and testable behavior. `git`, `docker`, and `swift`
 resolve the conflict in the same way. To specify this file, use one of these
 forms:
 
-- `myapp ./info` — a value containing a path separator can never equal a verb
+- `myapp ./info`: a value containing a path separator can never equal a verb
   name.
-- `myapp -- info` — a leading `-` disqualifies a match, so the value reaches the
+- `myapp -- info`: a leading `-` disqualifies a match, so the value reaches the
   root command's positional past the argument terminator.
 
 ### What is not claimed

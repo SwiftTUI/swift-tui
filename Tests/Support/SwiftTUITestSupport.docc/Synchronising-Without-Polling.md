@@ -4,15 +4,15 @@ Pick the right wait primitive for what a test is observing.
 
 ## Overview
 
-Every primitive in this package answers the same question — *how does a test
-wait for the runtime to reach a state?* — but they differ in **where the
-observed state lives** and **whether the wait carries a failure bound**.
+Every primitive in this package answers the same question: *how does a test
+wait for the runtime to reach a state?* They differ in where the observed
+state lives and whether the wait carries a failure bound.
 
 ## Choosing A Primitive
 
-- Use ``AsyncEvent`` when the test waits for a **one-shot occurrence** — "the
-  runtime started", "the surface closed". Any number of waiters can observe the
-  same firing, and a waiter that arrives *after* the firing returns
+- Use ``AsyncEvent`` when the test waits for a **one-shot occurrence** such as
+  "the runtime started" or "the surface closed". Any number of waiters can
+  observe the same firing, and a waiter that arrives *after* the firing returns
   immediately. Firing more than once is harmless.
 
 - Use ``MainActorConditionSignal`` when the observed state lives **on the
@@ -35,7 +35,7 @@ A test that waits forever on a real bug is as unhelpful as a flaky one. When a
 wait must fail after progress stops, use a stage budget instead of a wall-clock
 timeout.
 
-A ``StageClock`` counts units of runtime progress — for the run loop, one
+A ``StageClock`` counts units of runtime progress: for the run loop, one
 completed turn. ``withStageBudget(_:within:on:_:)`` races an operation against
 a ``ProgressBudget`` of stages and throws ``StageBudgetExceeded`` if the budget
 runs out first. The bound is a stage *count*, so it is identical on a fast
@@ -62,4 +62,4 @@ variable so slow runners get proportionally longer.
 
 They remain only as a fallback for waits not yet migrated to the poll-free
 primitives. `Scripts/check_test_sync_policies.sh` ratchets their use downward.
-prefer ``AsyncEvent`` or a condition signal for any new test.
+Prefer ``AsyncEvent`` or a condition signal for any new test.

@@ -11,7 +11,7 @@ import Synchronization
   import Musl
 #endif
 
-/// Appends one tab-separated row per terminal write submission to a file — the
+/// Appends one tab-separated row per terminal write submission to a file, the
 /// `presents.tsv` sibling of `frames.tsv`.
 ///
 /// The frame row is emitted at commit, but the `write(2)` that puts its bytes

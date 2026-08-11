@@ -13,13 +13,13 @@ import SwiftTUICore
     /// The submission reached `write(2)`.
     case written
     /// A newer frame superseded it while it was still pending, or a write
-    /// failure discarded it. These bytes never reached the terminal — the
+    /// failure discarded it. These bytes never reached the terminal. The
     /// record exists so the join stays total and a dropped frame is visible
     /// as a drop rather than as a missing row.
     case superseded
   }
 
-  /// Run-loop frame ordinal this submission carries — the same value as the
+  /// Run-loop frame ordinal this submission carries, the same value as the
   /// `frame` column in `frames.tsv`.
   @_spi(Runners) public var frame: Int
   /// When the frame was handed to the presentation writer, on the main actor.

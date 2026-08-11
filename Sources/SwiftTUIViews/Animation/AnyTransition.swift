@@ -92,7 +92,7 @@ public struct AnyTransition: Sendable {
 
   // MARK: - Built-ins
 
-  /// No visual change — insertion/removal snap immediately.
+  /// No visual change: insertion/removal snap immediately.
   public static let identity = AnyTransition(
     insertion: { .identity },
     removal: { .identity }

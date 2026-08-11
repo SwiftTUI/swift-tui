@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// A gesture that requires `first` to complete before `second` receives
-/// events — SwiftUI's `SequenceGesture`. The composite ends when `second`
+/// events (SwiftUI's `SequenceGesture`). The composite ends when `second`
 /// ends. If either child fails, the whole sequence fails.
 public struct SequenceGesture<First: Gesture, Second: Gesture>: Gesture {
   /// The value of a gesture sequence, with the same structure as SwiftUI.

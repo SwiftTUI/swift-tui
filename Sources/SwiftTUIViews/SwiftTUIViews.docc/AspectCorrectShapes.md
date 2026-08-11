@@ -10,7 +10,7 @@ the terminal's cell aspect ratio.
 A Braille subpixel is `cellPixelMetrics.width / 2` pixels wide and
 `cellPixelMetrics.height / 4` pixels tall. At the conventional 8x16 cell
 these are both 4 pixels. Thus, subpixels are square, and circles are round.
-On terminals with different cell aspect — for example 10x16 — subpixels
+On terminals with a different cell aspect, for example 10x16, subpixels
 are oblong (5x4). The rasterizer scales the x-axis and y-axis independently in
 subpixel units. Thus, the emitted pixel shape has the correct proportions.
 

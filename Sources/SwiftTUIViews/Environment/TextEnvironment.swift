@@ -34,7 +34,7 @@ extension EnvironmentValues {
   /// The maximum number of lines descendant text runs may occupy, or `nil`
   /// for no limit.
   ///
-  /// Matching SwiftUI, the environment carries the authored value verbatim —
+  /// Matching SwiftUI, the environment carries the authored value verbatim:
   /// non-positive limits are clamped to one line where text is laid out, not
   /// at the write site.
   public var lineLimit: Int? {

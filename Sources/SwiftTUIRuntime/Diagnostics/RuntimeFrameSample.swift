@@ -4,7 +4,7 @@ import SwiftTUICore
 /// point. Carries already-computed `Sendable` pipeline products plus the few
 /// run-loop-resolved scalars that cannot be recomputed downstream (drained
 /// input counts, eligibility blockers, animation-controller state). Holds no
-/// formatting or derived fields — the profiling product turns this into a
+/// formatting or derived fields. The profiling product turns this into a
 /// `FrameDiagnosticRecord`.
 @_spi(Runners) public enum RuntimeFrameSample: Sendable {
   case committed(CommittedFrameSample)

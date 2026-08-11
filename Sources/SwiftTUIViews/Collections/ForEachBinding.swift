@@ -23,8 +23,8 @@ extension ForEach {
   ///
   /// Row bindings are ID-verified rather than index-captured: a write checks
   /// that the captured position still holds the captured identity, relocates
-  /// by ID when the collection reordered, and — where SwiftUI writes through
-  /// a stale index — drops a write whose element is gone entirely, reporting
+  /// by ID when the collection reordered, and (where SwiftUI writes through
+  /// a stale index) drops a write whose element is gone entirely, reporting
   /// a `forEach.staleElementBindingWrite` runtime issue instead.
   @MainActor
   public init<C>(

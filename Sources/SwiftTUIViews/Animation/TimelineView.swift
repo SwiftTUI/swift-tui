@@ -14,9 +14,9 @@ public import SwiftTUICore
 ///
 /// Built-in schedules:
 ///
-/// - ``PeriodicTimelineSchedule`` — fixed-interval ticks.  Use for
+/// - ``PeriodicTimelineSchedule``: fixed-interval ticks.  Use for
 ///   clocks, status text, and other "every N seconds" updates.
-/// - ``AnimationTimelineSchedule`` — high-frequency ticks suitable
+/// - ``AnimationTimelineSchedule``: high-frequency ticks suitable
 ///   for shimmer/glow/marquee animations.  Honors reduce-motion via
 ///   the `mode:` argument.
 ///
@@ -49,7 +49,7 @@ public protocol TimelineSchedule: Sendable {
 public enum TimelineScheduleMode: Hashable, Sendable {
   /// Normal cadence. The schedule can fire at any supported rate.
   case normal
-  /// Throttled cadence — fire less often to respect reduce-motion or
+  /// Throttled cadence: fire less often to respect reduce-motion or
   /// other low-frequency-update signals from the host.
   case lowFrequency
 }
@@ -177,8 +177,8 @@ public struct AnimationTimelineSchedule: TimelineSchedule, Hashable, Sendable {
   }
 
   /// Lazily emits the start instant, then a tick every `interval`.
-  /// When `interval` is `nil` only the start is emitted — used by
-  /// the `paused` path.
+  /// When `interval` is `nil` only the start is emitted; the `paused`
+  /// path uses this configuration.
   public struct Entries: Sequence, IteratorProtocol, Sendable {
     private var current: MonotonicInstant
     private let interval: Duration?

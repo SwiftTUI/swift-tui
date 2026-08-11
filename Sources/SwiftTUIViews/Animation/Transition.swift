@@ -6,7 +6,7 @@ import SwiftTUICore
 public enum TransitionPhase: Hashable, Sendable {
   /// The runtime inserts the view. The transition is about to play forward.
   case willAppear
-  /// The view is fully present — no visual modifiers applied.
+  /// The view is fully present, with no visual modifiers applied.
   case identity
   /// The runtime removed the view. The transition is playing its exit phase.
   case didDisappear

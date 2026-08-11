@@ -3,10 +3,10 @@
 /// `BorderSet` is one of the two systems that define the framework's
 /// border/stroke story (the other is ``StrokeStyle``):
 ///
-/// - **`BorderSet`** — *what* glyphs to draw. Top, bottom, side, and
+/// - **`BorderSet`** is *what* glyphs to draw. Top, bottom, side, and
 ///   corner characters. It also specifies optional middle-junction glyphs for tables and
 ///   subdivided containers.
-/// - **`StrokeStyle`** — *how* to draw them: line width, layout
+/// - **`StrokeStyle`** is *how* to draw them: line width, layout
 ///   placement (``StrokeStyle/Placement/outset`` or
 ///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
 ///
@@ -14,7 +14,7 @@
 /// with no arguments) selects ``rounded``. Callers who want the legacy
 /// single-line look pass ``single`` explicitly, and callers who want
 /// half-block chrome pass ``outerHalfBlock`` explicitly. There is *no*
-/// implicit transformation between `BorderSet`s — what you ask for is
+/// implicit transformation between `BorderSet`s: what you ask for is
 /// what you get drawn.
 public struct BorderSet: Equatable, Sendable {
   public var top: String
@@ -118,15 +118,15 @@ extension BorderSet {
     topLeading: "█", topTrailing: "█",
     bottomLeading: "█", bottomTrailing: "█")
 
-  /// A decorative half-block border drawn on the view's own frame edges,
-  /// overlaying content rather than reserving extra layout space.
+  /// A decorative half-block border drawn on the view's own frame edges.
+  /// It overlays content rather than reserving extra layout space.
   public static let outerHalfBlock = BorderSet(
     top: "▀", bottom: "▄", left: "▌", right: "▐",
     topLeading: "▛", topTrailing: "▜",
     bottomLeading: "▙", bottomTrailing: "▟")
 
   /// An inset half-block border that draws into the view's outermost rows and
-  /// columns, trimming a cell off content on every side rather than expanding.
+  /// columns. It trims a cell off content on every side rather than expanding.
   public static let innerHalfBlock = BorderSet(
     top: "▄", bottom: "▀", left: "▐", right: "▌",
     topLeading: "▗", topTrailing: "▖",
@@ -158,7 +158,7 @@ extension BorderSet {
     bottomLeading: " ", bottomTrailing: " ")
 
   /// A border with zero frame contribution and no glyphs. The "no border"
-  /// value — **not** to be confused with `Optional<BorderSet>.none`.
+  /// value, **not** to be confused with `Optional<BorderSet>.none`.
   public static let none = BorderSet(
     top: "", bottom: "", left: "", right: "",
     topLeading: "", topTrailing: "",

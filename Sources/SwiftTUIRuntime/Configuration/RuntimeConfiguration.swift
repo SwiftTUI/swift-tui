@@ -39,7 +39,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     case quiet
     /// Default log level.
     case normal
-    /// `-v`, `-vv`, `-vvv` — level is 1, 2, 3.
+    /// `-v`, `-vv`, `-vvv`: level is 1, 2, 3.
     case verbose(level: Int)
 
     public var rawLevel: Int {

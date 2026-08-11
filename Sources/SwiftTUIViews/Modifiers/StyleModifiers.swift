@@ -266,8 +266,8 @@ extension View {
 
   /// Underlines every descendant text run, matching SwiftUI's ambient
   /// propagation: an environment write that descendant `Text` stamps where
-  /// its own value styling is unset. A directly-styled descendant —
-  /// including an explicit `Text.underline(false)` clear — wins over the
+  /// its own value styling is unset. A directly-styled descendant,
+  /// including an explicit `Text.underline(false)` clear, wins over the
   /// inherited style; `underline(false)` at the `View` level clears an
   /// inherited underline for the subtree.
   public func underline(

@@ -2,7 +2,7 @@ public import SwiftTUICore
 
 /// A discrete gesture that recognizes `count` taps on a view.
 ///
-/// `Value == Void` — TapGesture exposes no data beyond "it fired."
+/// `Value == Void`: TapGesture exposes no data beyond "it fired."
 /// Use `SpatialTapGesture` if you need the tap location.
 ///
 /// ## Terminal-faithful semantics
@@ -14,8 +14,8 @@ public import SwiftTUICore
 /// A multi-tap sequence (`count >= 2`) limits the gap between taps with ``interTapWindow`` (F158).
 /// If the next tap does not arrive in the window, the sequence changes to `.failed`.
 /// Without a failure path,
-/// `TapGesture(count: 2).exclusively(before: TapGesture())` — the
-/// canonical double-versus-single disambiguation cannot continue to
+/// `TapGesture(count: 2).exclusively(before: TapGesture())` (the
+/// canonical double-versus-single disambiguation) cannot continue to
 /// its fallback.
 public struct TapGesture: Gesture {
   /// The maximum gap between taps of a multi-tap sequence before the

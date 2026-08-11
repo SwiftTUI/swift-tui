@@ -198,7 +198,7 @@ public struct EnvironmentSnapshot: Sendable {
   }
 
   /// The public debug projection: untyped entries plus each typed entry under
-  /// its reflected key name. Derived on demand — reading it reflects; writing
+  /// its reflected key name. Derived on demand: reading it reflects; writing
   /// a snapshot never does.
   public var values: [String: String] {
     get {

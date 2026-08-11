@@ -21,7 +21,7 @@
 /// ```
 public protocol CanvasDrawing: Sendable, Equatable {
   /// Draws this drawing into the supplied context. Primary drawing
-  /// coordinates are continuous terminal cells — see ``CanvasContext`` for
+  /// coordinates are continuous terminal cells. See ``CanvasContext`` for
   /// the coordinate system.
   func draw(into context: inout CanvasContext)
 }
@@ -75,7 +75,7 @@ public struct CanvasContext: Sendable {
 
   /// The grid-sample extent of the drawing surface.
   ///
-  /// This is ``size`` scaled by the active ``CanvasGrid``'s subdivisions — the
+  /// This is ``size`` scaled by the active ``CanvasGrid``'s subdivisions, the
   /// valid range for ``GridSample`` coordinates. Authored drawings normally
   /// work in continuous cell space with ``size`` and the ``Point`` APIs.
   /// Use `gridSize` only to address individual samples through ``GridSample``.

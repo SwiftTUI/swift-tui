@@ -443,7 +443,7 @@ public final class AndroidHostSceneHost {
   }
 
   /// The bytes of the last frame a consumer copied across the ABI. `nil`
-  /// until the host first consumes a frame — encoding happens at copy time
+  /// until the host first consumes a frame. Encoding happens at copy time
   /// (encode-at-copy), so frames the poll skips are never serialized.
   public var latestFrameBytes: [UInt8]? {
     state.latestFrameBytes
@@ -486,7 +486,7 @@ public final class AndroidHostSceneHost {
 
   /// Declares the host's wire capabilities from a `caps`-shaped JSON object
   /// (see `HostWireSchema.capabilityMappings` for the key set). Accepted
-  /// only before the scene starts — capability-gated emission must never
+  /// only before the scene starts: capability-gated emission must never
   /// change shape mid-session. Returns whether the declaration was accepted.
   /// A rejected or malformed declaration keeps the defaults,
   /// which reproduce today's wire bytes exactly.

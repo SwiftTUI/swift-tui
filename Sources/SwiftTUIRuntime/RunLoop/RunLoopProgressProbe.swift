@@ -51,7 +51,7 @@ import SwiftTUICore
 /// load-bearing here: it lets an `await` resolve against an event that already
 /// fired before the await was registered.
 ///
-/// The *perf* event log is a separate concern — the runtime forwards every
+/// The *perf* event log is a separate concern: the runtime forwards every
 /// recorded event to the ``RunLoopProgressObserver`` installed in
 /// ``ProfilingRegistry`` (the profiling product's event log).
 @_spi(Runners) @MainActor public final class RunLoopProgressProbe {

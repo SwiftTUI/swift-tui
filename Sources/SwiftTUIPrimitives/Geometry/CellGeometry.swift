@@ -42,7 +42,7 @@ public struct GridSample: Equatable, Hashable, Sendable {
 
 /// An integer size in canvas grid samples.
 ///
-/// The sample-space extent of a ``CanvasContext`` drawing surface — the cell
+/// The sample-space extent of a ``CanvasContext`` drawing surface: the cell
 /// ``CellSize`` multiplied by the active ``CanvasGrid``'s subdivisions. Read it
 /// from ``CanvasContext/gridSize``.
 public struct GridSize: Equatable, Hashable, Sendable {

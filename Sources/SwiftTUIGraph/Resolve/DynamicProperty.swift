@@ -10,7 +10,7 @@
 /// Compose the built-in wrappers (`@State`, `@Environment`, `@Binding`, …)
 /// inside a conforming wrapper rather than storing mutable values directly:
 /// `update()` runs on a copy of the enclosing view's value, so mutations to
-/// plain stored properties do not persist — state that must survive between
+/// plain stored properties do not persist; state that must survive between
 /// evaluations belongs in composed reference-backed storage. See the
 /// "Custom dynamic properties" article in the `SwiftTUIViews` documentation
 /// catalog for the full authoring contract.

@@ -25,8 +25,8 @@ For the underlying phase products and runtime scheduling, see
 
 ## Root-Hoisted Presentations
 
-Built-in presentations — `alert`, `confirmationDialog`, `sheet`, `popover`,
-`popoverTip`, menus, and `toast` — are authored inside the base view tree but
+Built-in presentations (`alert`, `confirmationDialog`, `sheet`, `popover`,
+`popoverTip`, menus, and `toast`) are authored inside the base view tree but
 displayed through root-level composition.
 
 - Base resolution collects presentation declarations during the ordinary
@@ -60,7 +60,7 @@ displayed through root-level composition.
 The runtime is keyboard-first, but it is not keyboard-only.
 
 - Keyboard input is parsed into `KeyEvent` and `InputEvent` values.
-- On terminals that support the kitty keyboard protocol, the host enables its disambiguation flag automatically (opt out with `SWIFTTUI_KITTY_KEYBOARD=0`), so keys the legacy byte encoding conflates — Escape vs. Alt-prefixed keys, Ctrl+J vs. Enter, Ctrl+I vs. Tab — arrive as distinct events
+- On terminals that support the kitty keyboard protocol, the host enables its disambiguation flag automatically (opt out with `SWIFTTUI_KITTY_KEYBOARD=0`), so keys the legacy byte encoding conflates (Escape vs. Alt-prefixed keys, Ctrl+J vs. Enter, Ctrl+I vs. Tab) arrive as distinct events
 - Terminals that advertise mouse reporting feed pointer events into the same
   semantic routing layer.
 - Focus routing remains the authoritative target-selection system for keyboard

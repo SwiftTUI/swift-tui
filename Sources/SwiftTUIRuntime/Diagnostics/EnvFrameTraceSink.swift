@@ -50,12 +50,12 @@ import Synchronization
   #endif
 
   /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
-  /// writable path — or, with the `frames` trace armed via `SWIFTTUI_TRACE`
+  /// writable path, or, with the `frames` trace armed via `SWIFTTUI_TRACE`
   /// (or `debug` on and a debug bundle active), the bundle's `frames.tsv`.
   /// Otherwise, returns `nil`. Each session build can call this method safely.
   ///
-  /// WASI has no path-based file sink — its capability model makes
-  /// arbitrary-path `open` a no-op — so this always returns `nil` there.
+  /// WASI has no path-based file sink (its capability model makes
+  /// arbitrary-path `open` a no-op), so this always returns `nil` there.
   public static func fromEnvironment(debug: Bool = false) -> EnvFrameTraceSink? {
     #if canImport(WASILibc)
       return nil

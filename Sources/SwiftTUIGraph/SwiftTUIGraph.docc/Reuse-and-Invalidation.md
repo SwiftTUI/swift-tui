@@ -50,7 +50,7 @@ recorded on `ViewNode`s visible in the live runtime registries. It is not a
 synonym for invalidation. `ViewGraphFrameDraft.RuntimeRegistrationPublication`
 in `Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift` selects
 `.unchanged`, `.subtrees`, or `.all` behavior after resolve. State and
-Observation “publish” value changes in the general Observation sense, but their
+Observation "publish" value changes in the general Observation sense, but their
 graph effect is to request invalidation and queue dirty work.
 
 **Fingerprint.** A fingerprint is an equality-friendly projection used where
@@ -114,7 +114,7 @@ must not count as an ordinary child.
 
 **Servable.** A committed subtree is servable when a reuse layer has enough
 evidence to return it instead of evaluating the body. Servability is a
-gate-specific verdict, not a synonym for “stored,” “fresh,” or “live.”
+gate-specific verdict, not a synonym for "stored," "fresh," or "live."
 `CommittedFreshness.canServeValueBlind` and `.canServeMemo` in
 `Sources/SwiftTUIGraph/Resolve/CommittedFreshness.swift` provide the stamp leg.
 The remaining proof comes from `ViewNode.canReuse`, `ViewNode.canMemoReuse`,
@@ -289,7 +289,7 @@ operation. Its island denial must remain set.
 Freshness is not liveness. Structural removal can encounter a node visited by a
 reused or superseded same-frame pass. A removal cascade can provisionally spare
 that descendant, but it enqueues `TeardownWorkReason.sparedVisitedDescent`
-instead of treating “visited” or “served” as a right to survive. Once all
+instead of treating "visited" or "served" as a right to survive. Once all
 applies have settled, `settleTeardownBarrier` in `ViewGraph.swift` runs a
 fixed-point reachability adjudication: a durable anchor or committed-root path
 keeps the node. Otherwise, `SubtreeRemovalPolicy.barrierAdjudicated` removes the

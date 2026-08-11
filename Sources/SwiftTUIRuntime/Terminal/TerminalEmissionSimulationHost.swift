@@ -2,8 +2,8 @@ import SwiftTUICore
 
 #if !canImport(WASILibc)
   /// An in-process presentation surface that runs the REAL terminal
-  /// presentation planner and emission builder against a byte-counting sink —
-  /// no tty, no writer thread.
+  /// presentation planner and emission builder against a byte-counting sink,
+  /// with no tty and no writer thread.
   ///
   /// TermUIPerf's emission-visible lane (`SWIFTTUI_PERF_EMISSION=1`) installs
   /// it in place of the semantic-host perf surface, so `present_bytes`,
@@ -11,7 +11,7 @@ import SwiftTUICore
   /// `summary.json` emission aggregates) carry the true emitted escape stream
   /// for perf scenarios instead of the structural zeros the semantic-host
   /// path reports. The planner + emission cost lands inside `present_ms` and
-  /// `total_ms` — deliberately: that cost was the measurement blind spot.
+  /// `total_ms`, deliberately: that cost was the measurement blind spot.
   /// Because the lane both adds that cost and changes the advertised
   /// capability profile, lane-on runs are only comparable with lane-on runs.
   ///
@@ -27,13 +27,13 @@ import SwiftTUICore
   /// through `presentationDamage(requested:)`. The sink is synchronous, so
   /// every emission "reaches the terminal": the prepared surface becomes the
   /// written baseline immediately, no frame can drop, and the trust latch
-  /// never trips — which matches the run loop's previously-presented damage
-  /// baseline exactly, keeping the hinted diffs honest.
+  /// never trips. That matches the run loop's previously-presented damage
+  /// baseline exactly and keeps the hinted diffs honest.
   @_spi(Runners)
   public final class TerminalEmissionSimulationHost: PresentationSurface,
     DamageAwarePresentationSurface
   {
-    /// The lane's fixed profile — see the type comment for the rationale.
+    /// The lane's fixed profile. See the type comment for the rationale.
     /// Scroll regions are ON (deterministically, not via detection) so the
     /// lane exercises the verified scroll-region emission (R2.3) exactly as
     /// a real VT100-descendant terminal would.

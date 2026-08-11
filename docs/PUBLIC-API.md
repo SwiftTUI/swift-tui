@@ -6,12 +6,12 @@ consistent new API.
 
 A machine-generated enumeration of every public symbol lives in
 `PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
-The `.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
+`.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
 important part is `@_spi(Runners)`, the host contract for the swiftui/web/android
 host repos. Thus, an SPI break creates a reviewable diff instead of a silent
 downstream failure. The inventory script generates and compares all
 three files:
-`Scripts/generate_public_api_inventory.sh` — see
+`Scripts/generate_public_api_inventory.sh`; see
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). Those files answer "is
 symbol X public?". This document explains when to use a symbol and why it has
 its current shape.
@@ -39,8 +39,8 @@ The canonical public surface is the API ordinary app code uses first:
   `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and the
   repo-owned `@Bindable`. Custom wrappers conform to `DynamicProperty`
   (SwiftUI's shape; the `@MainActor mutating update()` requirement follows
-  the isolation model below). The authoring contract — copy semantics,
-  composition identity, the dependency-vocabulary rule for `update()` —
+  the isolation model below). The authoring contract (copy semantics,
+  composition identity, the dependency-vocabulary rule for `update()`)
   lives in the DocC article
   [Custom-Dynamic-Properties.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Custom-Dynamic-Properties.md).
 - The modifier algebra: `ViewModifier`, `View.modifier(_:)`, `ModifiedContent`,
@@ -100,8 +100,8 @@ hatch. It is not the default authoring model.
 
 Semantic styling is the preferred model: views write semantic style roles, and
 a host-owned `Theme` resolves them to concrete colors. `Theme` is not part of
-the `View` authoring surface. The old public string-style helpers and public
-The `View` surface no longer includes the `Theme` shims.
+the `View` authoring surface. The `View` surface no longer includes the old
+public string-style helpers or the public `Theme` shims.
 
 Authoring-facing control and container style APIs converge on public,
 extensible style protocols rather than closed public enums.
@@ -127,7 +127,7 @@ extensible style protocols rather than closed public enums.
 
 Public naming keeps coordinate roles visible:
 
-- `Cell*` names — `CellPoint`, `CellSize`, `CellRect` — for the integer
+- `Cell*` names (`CellPoint`, `CellSize`, `CellRect`) for the integer
   terminal grid that layout, semantic bounds, and raster output use.
 - `Point`, `Size`, `Rect`, and `Vector` for continuous cell-space geometry
   delivered to gestures, hover, `Canvas` drawing, and interpolation.

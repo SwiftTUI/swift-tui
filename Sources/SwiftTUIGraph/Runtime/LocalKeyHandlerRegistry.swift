@@ -50,7 +50,7 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
   case pageUp
   case pageDown
   /// A function key, 1-based (`F1` = `.functionKey(1)`). Terminals deliver
-  /// F1–F4 as SS3 (`ESC O P…S`) or modified CSI, and F5+ as VT220 tilde
+  /// F1...F4 as SS3 (`ESC O P…S`) or modified CSI, and F5+ as VT220 tilde
   /// sequences. The parser normalizes all of them here.
   case functionKey(Int)
 }

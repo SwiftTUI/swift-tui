@@ -9,8 +9,8 @@
 
 > Run the live demo and read the API reference at **<https://swifttui.sh>**.
 
-SwiftTUI borrows the declarative model SwiftUI has proven at platform scale —
-the interface is a function of state — and aims it at terminal cells. Declare
+SwiftTUI borrows the declarative model SwiftUI has proven at platform scale
+(the interface is a function of state) and aims it at terminal cells. Declare
 views with `View`, `Scene`, `@State`, `@FocusState`, `VStack`, `ProgressView`,
 and custom `Layout` types; the framework owns layout, focus, redraw, and the
 terminal itself. Terminal first, not terminal only: the same view tree also
@@ -18,10 +18,10 @@ ships as a static WASI bundle, a localhost WebHost, a native SwiftUI surface,
 or a native Android surface, with no rewrite per target. Both browser paths
 paint to the DOM with a real accessibility tree, not a terminal emulator.
 
-No global constraint solver, no virtual DOM, no `curses`. Every view is lowered
-through a strict, inspectable pipeline — resolve → measure → place → semantics →
-draw → raster → commit — so layout is deterministic and every frame is
-snapshot-testable.
+SwiftTUI uses no global constraint solver, no virtual DOM, and no `curses`.
+Every view is lowered through a strict, inspectable pipeline (resolve →
+measure → place → semantics → draw → raster → commit), so layout is
+deterministic and every frame is snapshot-testable.
 
 ## Pre-release
 
@@ -43,22 +43,22 @@ snapshot-testable.
 
 ## Why SwiftTUI
 
-- **State in, screen out.** No draw loop, no buffer diffing, no repaint
-  bookkeeping. Views are a pure function of your app's state: change a value
-  and the runtime recomputes layout and rewrites exactly the cells that
-  changed.
+- **State in, screen out.** Views are a pure function of your app's state:
+  change a value and the runtime recomputes layout and rewrites exactly the
+  cells that changed. There is no draw loop, no buffer diffing, and no repaint
+  bookkeeping.
 - **Real components, real focus.** Buttons, text fields, pickers, sliders,
-  scroll views, and charts, with a focus engine, tab traversal, keyboard
+  scroll views, and charts come with a focus engine, tab traversal, keyboard
   chords, tap · drag · hover gestures, and animation built in. You compose
   behavior instead of hand-routing key events to widgets.
 - **The terminal, negotiated for you.** Truecolor, Kitty and Sixel images,
   OSC 8 hyperlinks, and mouse reporting are probed per session and degrade
-  gracefully — one binary is correct in kitty, a bare SSH session, or CI. You
-  write views, never escape codes.
+  gracefully: one binary is correct in kitty, a bare SSH session, or CI. You
+  write views, not escape codes.
 - **One compiled binary.** Swift 6 compiles your interface into a single fast
   executable with checked concurrency. Frames are a pure function of the view
-  tree and a size proposal — the same input always produces the same cells —
-  and tests render them as integer-cell rasters, no TTY required.
+  tree and a size proposal (the same input always produces the same cells),
+  and tests render them as integer-cell rasters without a TTY.
 - **Accessibility ships with the frame.** A semantic substrate under every frame
   drives the terminal's cursor-follows-focus mode (`--accessible`), the
   browser ARIA tree, and the native host overlays. It also drives
@@ -72,8 +72,8 @@ snapshot-testable.
 ## Quick start
 
 SwiftTUI apps are plain SwiftPM packages: any Swift 6.3+ toolchain builds and
-runs them from the command line, on macOS or Linux — no Xcode project, no
-simulator, no app store. Author a view and an `@main` `App`:
+runs them from the command line, on macOS or Linux, with no Xcode project, no
+simulator, and no app store. Author a view and an `@main` `App`:
 
 ```swift
 import SwiftTUI
@@ -235,19 +235,19 @@ mode.
 <https://swifttui.sh/docs/documentation/>. The same articles are authored as
 DocC catalogs in this repository. Start with:
 
-- [Choosing Modules And Platforms](Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md) — which product to import.
-- [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md) — execution modes, engine profiles, and platform support.
-- [About SwiftTUI](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md) — SwiftUI faithfulness and the principled API omissions.
-- [Runtime Render Pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md) — the runtime callpath, frame pipeline, diagnostics, and host handoff.
-- [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md) — semantic modifiers, announcements, and reduced motion.
-- [Environment Variables](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Environment-Variables.md) — every `SWIFTTUI_*` variable.
+- [Choosing Modules And Platforms](Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md): which product to import.
+- [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md): execution modes, engine profiles, and platform support.
+- [About SwiftTUI](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md): SwiftUI faithfulness and the principled API omissions.
+- [Runtime Render Pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md): the runtime callpath, frame pipeline, diagnostics, and host handoff.
+- [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md): semantic modifiers, announcements, and reduced motion.
+- [Environment Variables](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Environment-Variables.md): every `SWIFTTUI_*` variable.
 
 **Working on SwiftTUI?** [docs/README.md](docs/README.md) indexes the
 `HEAD`-state architecture and contract documentation
 ([ARCHITECTURE](docs/ARCHITECTURE.md), the
 [public surface policy](docs/PUBLIC-API.md), and more). Maintainer
-development docs — the codebase guide, the build/test/release process, and
-the flake register — live in the
+development docs (the codebase guide, the build/test/release process, and
+the flake register) live in the
 [`swift-tui-org` coordination repository](https://github.com/SwiftTUI/swift-tui-org/tree/main/docs/swift-tui).
 
 Questions? Join the community on

@@ -1,8 +1,8 @@
 # Accessibility (internal notes)
 
-The consumer-facing accessibility documentation — the semantic modifiers,
+The consumer-facing accessibility documentation (the semantic modifiers,
 `AccessibilityRole`/`AccessibilityPoliteness`, `AccessibilityAnnouncer`,
-reduced motion, and output-mode detection — is the published DocC article
+reduced motion, and output-mode detection) is the published DocC article
 [Accessibility](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
 (`SwiftTUIViews` catalog). This file holds the maintainer-facing pipeline
 wiring: how one snapshot feeds every consumer path.
