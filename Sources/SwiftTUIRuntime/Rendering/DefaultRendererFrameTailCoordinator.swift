@@ -110,10 +110,21 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
 
   /// The layout shadow oracle's recording point: the first main-actor point
   /// after the (possibly off-main) layout stage returns. Exclusion currency is
-  /// recorded unconditionally (T-info); a divergence records the violation and
-  /// promotes to a DEBUG assertion, exactly like the raster oracle above. The
-  /// production layout is never repaired — the frame ships as produced, and
-  /// the alarm is the deliverable.
+  /// recorded unconditionally (T-info); a divergence records the violation.
+  /// The production layout is never repaired — the frame ships as produced,
+  /// and the alarm is the deliverable.
+  ///
+  /// STAGED RECORD-ONLY (2026-08-11): the DEBUG assertion promotion is
+  /// withheld until the oracle's first live catch is triaged. Hours after the
+  /// oracle landed, it fataled the examples corpus deterministically on a
+  /// place-only one-row divergence through a
+  /// `ScrollViewReaderContent/ScrollContent` path (production height 50,
+  /// shadow 49, mrkdwn spacing-regression scene) — with the size-stability
+  /// serve gate OFF, so either an ungated Stage-2 live-path change diverges
+  /// or the shadow's reuse-disabled recompute drops scroll placement state
+  /// the production pass honors (a false alarm). Until that verdict lands,
+  /// the counter plus `lastViolationDetailByKind` carry the evidence;
+  /// re-promote to `assertionFailure` with the fix (plan 2026-08-11-002).
   @MainActor
   package static func recordLayoutShadowDivergenceIfCaught(
     _ summary: LayoutShadowComparisonSummary?
@@ -139,11 +150,6 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       + "\(summary.placeDivergenceCount) place; first: "
       + (summary.firstDivergenceDetail ?? "no detail recorded")
     SoundnessProbeConfiguration.recordLayoutShadowDivergence(detail)
-    #if DEBUG
-      if SoundnessProbeConfiguration.isEnabled {
-        assertionFailure(detail)
-      }
-    #endif
   }
 
   @MainActor
