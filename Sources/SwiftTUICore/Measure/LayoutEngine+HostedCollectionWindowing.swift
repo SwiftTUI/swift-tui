@@ -108,6 +108,34 @@ extension LayoutEngine {
       )
       sourceIndices = Array(0..<source.count)
     }
+    // Measuring each realized row below re-enters the layout engine on the
+    // native call stack — the hosted-collection sibling of the custom-layout
+    // compatibility recursion. Nested collections therefore consume real
+    // stack per level, so the re-entry shares the same depth boundary: the
+    // resolve-time `maxEngineReentryNestingDepth` aggregate keeps deep trees
+    // off the small-stack worker, and this runtime gate bounds the recursion
+    // (with a `layout.customLayoutDepthLimitExceeded` runtime issue) instead
+    // of letting a pathological nest overflow the stack.
+    guard
+      passContext?.enterCustomLayoutCompatibilityBoundary(
+        identity: node.identity,
+        debugName: collection.kind == .table ? "Table" : "List",
+        phase: .measurement
+      ) ?? true
+    else {
+      return MeasuredNode(
+        viewNodeID: node.viewNodeID,
+        identity: node.identity,
+        proposal: originalProposal,
+        measuredSize: .zero,
+        childMeasurements: [],
+        containerAllocationSnapshot: nil
+      )
+    }
+    defer {
+      passContext?.exitCustomLayoutCompatibilityBoundary()
+    }
+
     var children: [ResolvedNode] = []
     var measurements: [MeasuredNode] = []
     children.reserveCapacity(sourceIndices.count)

@@ -80,13 +80,15 @@ package final class LayoutPassContext: Sendable {
     var runtimeIssues: [RuntimeIssue]
   }
 
-  /// The conservative nesting budget for custom-layout compatibility
-  /// recursion. Each nested custom layout re-enters the engine on the native
-  /// stack — measured at up to ~80 KiB per level in debug builds, with a
-  /// ~54 KiB windowed-measurement frame at the tip — so this default is
-  /// calibrated to the smallest stacks a pass can run on: the ~512 KiB
-  /// frame-tail dispatch worker and cooperative-pool threads that call the
-  /// engine directly.
+  /// The conservative nesting budget for native layout-engine re-entry:
+  /// custom-layout compatibility recursion and hosted-collection
+  /// (`List`/`Table`) windowed row measurement share one counter, because
+  /// they consume the same real stack. Each nesting level re-enters the
+  /// engine on the native stack — measured at up to ~80 KiB per level in
+  /// debug builds, with a ~54 KiB windowed-measurement frame at the tip — so
+  /// this default is calibrated to the smallest stacks a pass can run on:
+  /// the ~512 KiB frame-tail dispatch worker and cooperative-pool threads
+  /// that call the engine directly.
   package static let defaultCustomLayoutCompatibilityDepthLimit = 4
 
   /// The nesting budget for passes guaranteed to run on the main thread
@@ -308,8 +310,8 @@ package final class LayoutPassContext: Sendable {
           severity: .error,
           code: "layout.customLayoutDepthLimitExceeded",
           message:
-            "Custom layout \(phase.rawValue) exceeded the compatibility depth limit of "
-            + "\(state.customLayoutCompatibilityDepthLimit).",
+            "Layout engine re-entry (\(phase.rawValue)) exceeded the compatibility depth "
+            + "limit of \(state.customLayoutCompatibilityDepthLimit).",
           identity: identity,
           source: debugName
         )

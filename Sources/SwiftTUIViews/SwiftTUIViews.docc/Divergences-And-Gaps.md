@@ -237,16 +237,18 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`Layout` caches are pass-local scratch.** *Gap.* SwiftUI persists `Cache`
   values across passes through `updateCache`. SwiftTUI shares the cache
   between measurement and placement for one pass, then drops it.
-- **Custom-layout nesting has a depth budget.** *Gap.* Each nested custom
-  layout re-enters the engine on the native call stack, so nesting is
+- **Engine re-entry nesting has a depth budget.** *Ratified.* A nested
+  custom layout or hosted-collection (`List`/`Table`) windowing container
+  re-enters the engine on the native call stack when measured, so nesting is
   budgeted rather than unbounded: trees nested past the frame-tail worker's
   budget of four levels are disqualified from worker offload and run the
   frame tail on the main actor, which affords 24 levels; WASI keeps the
   conservative limit everywhere (one small stack, no offload worker).
   Nesting past the active budget truncates with a
-  `layout.customLayoutDepthLimitExceeded` runtime issue. The budget is a
-  consequence of the partly iterative layout engine recorded under runtime
-  internals.
+  `layout.customLayoutDepthLimitExceeded` runtime issue. Built-in layout is
+  fully iterative (see runtime internals); this boundary is the completed
+  architecture for author-code re-entry, which is synchronous by API shape
+  and cannot be scheduled onto a heap work stack.
 - **Measurement does not realize deferred content.** *Provisional.* Measuring
   a `GeometryReader` or an unselected `ViewThatFits` candidate does not
   realize its authored content and commits no lifecycle, task, gesture, focus,
@@ -712,13 +714,22 @@ example app in `swift-tui-examples`.
 ## Runtime and pipeline internals
 
 The seven-phase pipeline, off-main frame-tail execution, and explicit
-work-stack paths for parts of measurement and placement are complete.
+work-stack measurement and placement are complete.
 
-- **Built-in layout is not fully iterative.** *Gap.* The explicit work-stack
-  migration is partial: built-in layout still recurses on the Swift call
-  stack, so the frame-tail worker uses an enlarged stack instead of a bounded
-  iterative engine, and custom-layout nesting carries the depth budget
-  recorded in the layout section.
+- **Built-in layout is iterative; engine re-entry is a bounded compatibility
+  boundary.** *Ratified.* Measurement and placement drive every built-in
+  behavior through explicit heap work stacks
+  (`LayoutEngine+MeasurementWorkStack.swift`,
+  `LayoutEngine+PlacementWorkStack.swift`, enforced by
+  `Scripts/check_layout_work_stack_guardrails.sh`), and the frame-tail
+  worker's enlarged stack no longer exists: the worker is a stock dispatch
+  queue. Native call-stack recursion survives only where author code
+  re-enters the engine synchronously, at the custom-layout compatibility
+  boundary (every `Layout` conformer, including `ScrollView`) and in
+  hosted-collection (`List`/`Table`) windowed row measurement. Both share
+  the depth budget recorded in the layout section, and the resolve-time
+  `maxEngineReentryNestingDepth` aggregate routes deeper trees off the
+  small-stack worker to the main-actor tail.
 - **`ViewGraph` decomposition is design-only.** *Gap.* Smaller `ViewGraph`
   types with cleaner ownership, dependency-aware (profile-gated) body
   re-evaluation, explicit context threading through resolve, and interning of
@@ -746,9 +757,9 @@ divergent from the project's intent.
   WASI default.
 - **Bounded-stack resolve is a profile mechanism, not architecture.** *Gap.*
   The chunked driver is a stack-lean profile mechanism, not a fully iterative
-  engine. Resolve and built-in layout (registered under "Runtime and
-  pipeline internals") still recurse on the Swift call stack, so stack
-  budgets remain a per-engine constraint rather than a non-issue.
+  engine. Resolve still recurses on the Swift call stack (built-in layout no
+  longer does — see "Runtime and pipeline internals"), so stack budgets
+  remain a per-engine constraint for resolve rather than a non-issue.
 
 ## Images and compositing
 

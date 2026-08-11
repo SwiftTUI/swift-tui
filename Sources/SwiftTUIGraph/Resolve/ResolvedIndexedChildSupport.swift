@@ -202,12 +202,14 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
   package var mainActorOnlyIndexedChildSourceElementCount: Int
   /// Layout-realized content boundaries in the subtree.
   package var layoutRealizedContentCount: Int
-  /// The deepest chain of nested custom layouts in the subtree, counting
-  /// every custom layout regardless of worker capability: each nesting level
-  /// re-enters the layout engine on the native stack (the compatibility
-  /// recursion), so the frame tail budgets this depth against the executing
-  /// thread's stack before offloading to the small-stack worker.
-  package var maxCustomLayoutNestingDepth: Int
+  /// The deepest chain of nodes whose measurement re-enters the layout
+  /// engine on the native stack: every custom layout (regardless of worker
+  /// capability, the compatibility recursion) and every hosted-collection
+  /// windowing container (`List`/`Table` measure their realized rows through
+  /// a native `measure` re-entry per nesting level). The frame tail budgets
+  /// this depth against the executing thread's stack before offloading to
+  /// the small-stack worker.
+  package var maxEngineReentryNestingDepth: Int
 
   package init(
     count: Int = 0,
@@ -215,7 +217,7 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     mainActorOnlyIndexedChildSourceCount: Int = 0,
     mainActorOnlyIndexedChildSourceElementCount: Int = 0,
     layoutRealizedContentCount: Int = 0,
-    maxCustomLayoutNestingDepth: Int = 0
+    maxEngineReentryNestingDepth: Int = 0
   ) {
     self.count = count
     self.firstIdentity = firstIdentity
@@ -223,7 +225,7 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     self.mainActorOnlyIndexedChildSourceElementCount =
       mainActorOnlyIndexedChildSourceElementCount
     self.layoutRealizedContentCount = layoutRealizedContentCount
-    self.maxCustomLayoutNestingDepth = maxCustomLayoutNestingDepth
+    self.maxEngineReentryNestingDepth = maxEngineReentryNestingDepth
   }
 
   package mutating func record(_ identity: Identity) {
@@ -242,12 +244,13 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     layoutRealizedContentCount += 1
   }
 
-  /// Records that the summarized node is itself a custom layout: one nesting
-  /// level on top of the deepest custom chain merged from its children. Call
-  /// after every child merge so the maximum is the child's, not a sibling
-  /// sum.
-  package mutating func recordCustomLayoutNestingLevel() {
-    maxCustomLayoutNestingDepth += 1
+  /// Records that the summarized node itself re-enters the engine when
+  /// measured — a custom layout or a hosted-collection windowing container:
+  /// one nesting level on top of the deepest re-entering chain merged from
+  /// its children. Call after every child merge so the maximum is the
+  /// child's, not a sibling sum.
+  package mutating func recordEngineReentryNestingLevel() {
+    maxEngineReentryNestingDepth += 1
   }
 
   package mutating func merge(_ other: Self) {
@@ -259,9 +262,9 @@ package struct CustomLayoutFallbackSummary: Equatable, Sendable {
     mainActorOnlyIndexedChildSourceElementCount +=
       other.mainActorOnlyIndexedChildSourceElementCount
     layoutRealizedContentCount += other.layoutRealizedContentCount
-    maxCustomLayoutNestingDepth = max(
-      maxCustomLayoutNestingDepth,
-      other.maxCustomLayoutNestingDepth
+    maxEngineReentryNestingDepth = max(
+      maxEngineReentryNestingDepth,
+      other.maxEngineReentryNestingDepth
     )
   }
 }

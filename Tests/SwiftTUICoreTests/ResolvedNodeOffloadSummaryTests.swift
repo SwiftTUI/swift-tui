@@ -97,21 +97,21 @@ struct ResolvedNodeOffloadSummaryTests {
     let sibling = makeCustomNode("sibling")
     let root = makeNode("root", children: [mid, sibling])
 
-    #expect(leaf.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
-    #expect(mid.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
-    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+    #expect(leaf.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 1)
+    #expect(mid.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
+    #expect(root.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
   }
 
   @Test("children setter keeps custom layout nesting depth current")
   func childrenSetterKeepsNestingDepthCurrent() {
     var root = makeCustomNode("root")
-    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
+    #expect(root.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 1)
 
     root.children = [makeCustomNode("child")]
-    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+    #expect(root.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
 
     root.children = []
-    #expect(root.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 1)
+    #expect(root.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 1)
   }
 
   @Test("worker-capable custom layouts count toward nesting depth")
@@ -122,7 +122,61 @@ struct ResolvedNodeOffloadSummaryTests {
     // Worker capability keeps the main-actor fallback count at zero, but the
     // compatibility recursion still nests per level, so depth counts them.
     #expect(outer.customLayoutFallbackSummary.count == 0)
-    #expect(outer.customLayoutFallbackSummary.maxCustomLayoutNestingDepth == 2)
+    #expect(outer.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
+  }
+
+  @Test("hosted-collection containers count toward engine re-entry nesting depth")
+  func hostedCollectionContainersCountTowardReentryDepth() {
+    var inner = makeNode("inner-list")
+    inner.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: inner.identity,
+      measurementSignature: .init(elementPaths: ["inner"]),
+      children: []
+    )
+    let row = makeNode("row", children: [inner])
+    var outer = makeNode("outer-list")
+    outer.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: outer.identity,
+      measurementSignature: .init(elementPaths: ["outer"]),
+      children: [row]
+    )
+
+    #expect(inner.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 1)
+    #expect(outer.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
+  }
+
+  @Test("lazy-stack indexed sources measure through the work stack and do not count")
+  func lazyStackSourcesDoNotCountTowardReentryDepth() {
+    var stack = ResolvedNode(
+      identity: Identity(components: ["lazy"]),
+      kind: .view("lazy"),
+      layoutBehavior: .lazyStack(
+        axis: .vertical,
+        spacing: nil,
+        horizontalAlignment: .center,
+        verticalAlignment: .center
+      )
+    )
+    stack.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: stack.identity,
+      measurementSignature: .init(elementPaths: ["lazy"]),
+      children: []
+    )
+
+    #expect(stack.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 0)
+  }
+
+  @Test("custom layouts and hosted collections share one re-entry depth chain")
+  func mixedReentryChainsShareOneDepth() {
+    var hosted = makeNode("hosted-list")
+    hosted.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: hosted.identity,
+      measurementSignature: .init(elementPaths: ["hosted"]),
+      children: []
+    )
+    let outer = makeCustomNode("outer", children: [hosted])
+
+    #expect(outer.customLayoutFallbackSummary.maxEngineReentryNestingDepth == 2)
   }
 
   @Test("worker-resolved children contribute their disqualifiers")

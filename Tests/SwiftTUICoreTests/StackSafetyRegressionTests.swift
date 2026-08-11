@@ -408,6 +408,28 @@ struct StackSafetyRegressionTests {
     )
   }
 
+  @Test("nested hosted collections respect the compatibility depth limit")
+  func nestedHostedCollectionsRespectDepthLimit() {
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext(customLayoutCompatibilityDepthLimit: 2)
+    let resolved = makeNestedHostedListChain(depth: 8)
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 20, height: 6),
+      passContext: passContext
+    )
+
+    #expect(measured.identity == resolved.identity)
+    #expect(
+      passContext.runtimeIssues.contains {
+        $0.code == "layout.customLayoutDepthLimitExceeded"
+          && $0.message.contains("measurement")
+          && $0.source == "List"
+      }
+    )
+  }
+
   @Test("direct core custom layout calls apply deterministic compatibility limit")
   func directCoreCustomLayoutCallsApplyDeterministicCompatibilityLimit() {
     let engine = LayoutEngine()
@@ -768,6 +790,44 @@ private func makeLayoutLeaf(
     kind: .view("Leaf"),
     intrinsicSize: size
   )
+}
+
+/// A hosted-collection (`List`) container whose single realized row is
+/// `rowContent`: the shape that drives `windowedHostedCollectionMeasurement`
+/// into its native `measure` re-entry per nesting level.
+private func makeHostedListNode(
+  _ name: String,
+  rowContent: ResolvedNode
+) -> ResolvedNode {
+  var node = ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("List"),
+    drawPayload: .list(
+      ListPayload(
+        items: [ListItemPayload(kind: .row, text: "row")],
+        selectedRowIndex: nil,
+        style: .plain
+      )
+    )
+  )
+  node.semanticMetadata.hostedCollectionContainer = .init(kind: .list)
+  node.indexedChildSource = IndexedChildSourceSnapshot(
+    identityRoot: node.identity,
+    measurementSignature: .init(elementPaths: [name]),
+    children: [rowContent]
+  )
+  return node
+}
+
+private func makeNestedHostedListChain(depth: Int) -> ResolvedNode {
+  var node = makeHostedListNode(
+    "hosted-0",
+    rowContent: makeLayoutLeaf("hosted-leaf", size: .init(width: 2, height: 1))
+  )
+  for level in 1..<max(1, depth) {
+    node = makeHostedListNode("hosted-\(level)", rowContent: node)
+  }
+  return node
 }
 
 private func makeDeepLayoutWrapperChain(depth: Int) -> ResolvedNode {

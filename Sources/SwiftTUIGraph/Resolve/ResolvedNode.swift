@@ -458,8 +458,21 @@ package struct ResolvedNode: Equatable, Sendable {
     for child in children {
       summary.merge(child.customLayoutFallbackSummary)
     }
-    if case .custom = layoutBehavior {
-      summary.recordCustomLayoutNestingLevel()
+    // Both arms re-enter the layout engine on the native stack when measured:
+    // a custom layout through the compatibility boundary, and an intrinsic
+    // indexed container (the hosted-collection windowing path — `List`/
+    // `Table`) through its per-row `measure` re-entry. Lazy stacks carry an
+    // indexed source too but measure through the explicit work stack, so
+    // only the intrinsic shape counts. Keyed off `layoutBehavior` +
+    // `indexedChildSource` (never `semanticMetadata`) because only those two
+    // fields recompute this summary on mutation.
+    switch layoutBehavior {
+    case .custom:
+      summary.recordEngineReentryNestingLevel()
+    case .intrinsic where indexedChildSource != nil:
+      summary.recordEngineReentryNestingLevel()
+    default:
+      break
     }
     return summary
   }
