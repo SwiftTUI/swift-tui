@@ -70,7 +70,12 @@ extension LayoutEngine {
       }
     }
 
-    return previousMeasured
+    // The equivalence walk above is structural by design, so a pure `.id`
+    // change beneath this node (with no invalidation of its own — an ancestor
+    // re-resolve can produce exactly that) still serves. Re-stamp the served
+    // subtree's identities from the current resolved tree; see
+    // `MeasuredNode.restampingIdentities(from:)` for the contract.
+    return previousMeasured.restampingIdentities(from: resolved)
   }
 
   internal func retainedPlacement(

@@ -930,6 +930,10 @@ struct AsyncFrameTailRenderingTests {
 
   @Test("public SendableLayout opt-in runs layout on the frame-tail worker")
   func publicSendableLayoutOptInRunsLayoutOnFrameTailWorker() async throws {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let rootIdentity = testIdentity("AsyncSendableLayoutRoot")
     let recorder = AsyncFrameTailSendableLayoutRecorder()
 
@@ -971,6 +975,10 @@ struct AsyncFrameTailRenderingTests {
 
   @Test("public SendableLayout cache is pass-local across async layout passes")
   func publicSendableLayoutCacheIsPassLocalAcrossAsyncLayoutPasses() async throws {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let rootIdentity = testIdentity("AsyncSendableLayoutPassLocalCacheRoot")
     let recorder = AsyncFrameTailSendableLayoutRecorder()
     let renderer = DefaultRenderer()
@@ -1005,6 +1013,10 @@ struct AsyncFrameTailRenderingTests {
 
   @Test("public SendableLayout cache is recreated after async proposal and structure changes")
   func publicSendableLayoutCacheIsRecreatedAfterAsyncProposalAndStructureChanges() async throws {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let rootIdentity = testIdentity("AsyncSendableLayoutProposalStructureCacheRoot")
     let recorder = AsyncFrameTailSendableLayoutRecorder()
     let renderer = DefaultRenderer()

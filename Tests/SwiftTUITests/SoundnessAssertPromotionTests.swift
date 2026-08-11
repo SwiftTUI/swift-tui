@@ -26,6 +26,10 @@ struct SoundnessAssertPromotionTests {
         before.committedHandlerResolutionViolationCount
       SoundnessProbeConfiguration.rasterDamageMismatchCount =
         before.rasterDamageMismatchCount
+      SoundnessProbeConfiguration.layoutShadowDivergenceCount =
+        before.layoutShadowDivergenceCount
+      SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount =
+        before.layoutShadowWindowedExclusionCount
       SoundnessProbeConfiguration.lastViolationDetail = lastDetail
       SoundnessProbeConfiguration.lastViolationDetailByKind =
         before.lastViolationDetailByKind
@@ -42,6 +46,13 @@ struct SoundnessAssertPromotionTests {
     )
     DefaultRendererFrameTailCoordinator.recordIncrementalRasterMismatchIfCaught(
       .init(mismatchedRows: [2])
+    )
+    var layoutShadowSummary = LayoutShadowComparisonSummary()
+    layoutShadowSummary.measureDivergenceCount = 1
+    layoutShadowSummary.windowedExclusionCount = 2
+    layoutShadowSummary.firstDivergenceDetail = "injected measure divergence"
+    DefaultRendererFrameTailCoordinator.recordLayoutShadowDivergenceIfCaught(
+      layoutShadowSummary
     )
 
     let after = SoundnessCounterSnapshot.current()
@@ -61,5 +72,14 @@ struct SoundnessAssertPromotionTests {
     )
     #expect(after.rasterDamageMismatchCount == before.rasterDamageMismatchCount + 1)
     #expect(after.lastViolationDetailByKind["raster-damage"]?.contains("rows [2]") == true)
+    #expect(after.layoutShadowDivergenceCount == before.layoutShadowDivergenceCount + 1)
+    #expect(
+      after.layoutShadowWindowedExclusionCount
+        == before.layoutShadowWindowedExclusionCount + 2
+    )
+    #expect(
+      after.lastViolationDetailByKind["layout-shadow-divergence"]?
+        .contains("injected measure divergence") == true
+    )
   }
 }

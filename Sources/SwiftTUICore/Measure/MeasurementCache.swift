@@ -106,7 +106,7 @@ package final class MeasurementCache: Sendable {
       compactOrderIfNeeded(in: &nodeStorage)
       storage.entriesByNodeID[viewNodeID] = nodeStorage
       storage.hits += 1
-      return cached.node
+      return cached.node.restampingIdentities(from: resolved)
     }
   }
 

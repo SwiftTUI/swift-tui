@@ -6718,6 +6718,10 @@ struct SwiftUISurfaceTests {
 
   @Test("custom Layout reuses cache between measurement and placement")
   func customLayoutReusesCacheBetweenMeasurementAndPlacement() {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let counter = LayoutCacheCounter()
 
     let artifacts = DefaultRenderer().render(
@@ -6735,6 +6739,10 @@ struct SwiftUISurfaceTests {
 
   @Test("custom Layout cache is pass-local across repeated layout passes")
   func customLayoutCacheIsPassLocalAcrossRepeatedLayoutPasses() {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let counter = LayoutCacheCounter()
     let renderer = DefaultRenderer()
     let rootIdentity = testIdentity("CustomLayoutPassLocalCacheRoot")
@@ -6768,6 +6776,10 @@ struct SwiftUISurfaceTests {
 
   @Test("custom Layout cache is recreated after proposal and structure changes")
   func customLayoutCacheIsRecreatedAfterProposalAndStructureChanges() {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let counter = LayoutCacheCounter()
     let renderer = DefaultRenderer()
     let rootIdentity = testIdentity("CustomLayoutProposalStructureCacheRoot")
@@ -6812,6 +6824,10 @@ struct SwiftUISurfaceTests {
 
   @Test("custom Layout cache is recreated after binding-driven invalidation")
   func customLayoutCacheIsRecreatedAfterBindingDrivenInvalidation() {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     final class LabelBox {
       var value = "A"
     }
@@ -6854,6 +6870,10 @@ struct SwiftUISurfaceTests {
 
   @Test("shared AnyLayout instances keep cache scoped to each container")
   func sharedAnyLayoutInstancesKeepCacheScopedPerContainer() {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     let recorder = SharedLayoutCacheRecorder()
     let sharedLayout = AnyLayout(WidthStampingLayout(recorder: recorder))
 

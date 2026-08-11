@@ -50,6 +50,10 @@ struct ListLayoutProductTests {
 
   @Test("T-31: the layout is derived once and carried, not re-derived per phase")
   func layoutIsCarriedNotRederived() throws {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     ListLayoutDerivationProbe.reset()
     let artifacts = DefaultRenderer().render(
       List(0..<20, id: \.self, selection: .constant(0 as Int?)) { row in

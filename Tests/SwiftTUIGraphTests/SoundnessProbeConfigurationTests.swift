@@ -36,6 +36,8 @@ struct SoundnessProbeConfigurationTests {
     let barrierCount = SoundnessProbeConfiguration.barrierNonConvergenceCount
     let automaticAnchorCount = SoundnessProbeConfiguration.automaticLifetimeAnchorCount
     let unclassifiedCount = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
+    let layoutShadowCount = SoundnessProbeConfiguration.layoutShadowDivergenceCount
+    let layoutShadowExclusions = SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     let detailByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
@@ -56,6 +58,8 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.barrierNonConvergenceCount = barrierCount
       SoundnessProbeConfiguration.automaticLifetimeAnchorCount = automaticAnchorCount
       SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
+      SoundnessProbeConfiguration.layoutShadowDivergenceCount = layoutShadowCount
+      SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount = layoutShadowExclusions
       SoundnessProbeConfiguration.lastViolationDetail = detail
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailByKind
     }
@@ -77,6 +81,38 @@ struct SoundnessProbeConfigurationTests {
         SoundnessProbeConfiguration.lastViolationDetailByKind["memo-unsound-skip"]
           == "drawPayload diverged"
       )
+    }
+  }
+
+  @Test("layout shadow divergences are counted with detail")
+  func layoutShadowDivergenceRecordsCountAndDetail() {
+    withRestoredProbeState {
+      SoundnessProbeConfiguration.isEnabled = false
+      let before = SoundnessProbeConfiguration.layoutShadowDivergenceCount
+      SoundnessProbeConfiguration.recordLayoutShadowDivergence("measured size diverged")
+      #expect(SoundnessProbeConfiguration.layoutShadowDivergenceCount == before + 1)
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == "measured size diverged")
+      #expect(
+        SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"]
+          == "measured size diverged"
+      )
+    }
+  }
+
+  @Test("layout shadow windowed exclusions accumulate without a violation record")
+  func layoutShadowWindowedExclusionsAccumulateInformationally() {
+    withRestoredProbeState {
+      SoundnessProbeConfiguration.isEnabled = false
+      let before = SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount
+      let divergencesBefore = SoundnessProbeConfiguration.layoutShadowDivergenceCount
+      let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+      SoundnessProbeConfiguration.recordLayoutShadowWindowedExclusions(3)
+      #expect(SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount == before + 3)
+      #expect(
+        SoundnessProbeConfiguration.layoutShadowDivergenceCount == divergencesBefore,
+        "an exclusion is T-info currency, not a violation"
+      )
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == detailBefore)
     }
   }
 

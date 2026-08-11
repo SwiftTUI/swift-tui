@@ -2,11 +2,12 @@
 /// counters.
 ///
 /// Keep this as the single counter mirror for runtime reporting and test
-/// attribution. `automaticLifetimeAnchorCount` is intentionally captured but
-/// excluded from ``violationGrowth(since:)`` because it is informational, not
-/// a violation. `lastTeardownLeakUnreachableCount` is census currency rather
-/// than a monotonic counter, so it supplies context for leak growth instead of
-/// producing an independent growth event.
+/// attribution. `automaticLifetimeAnchorCount` and
+/// `layoutShadowWindowedExclusionCount` are intentionally captured but
+/// excluded from ``violationGrowth(since:)`` because they are informational,
+/// not violations. `lastTeardownLeakUnreachableCount` is census currency
+/// rather than a monotonic counter, so it supplies context for leak growth
+/// instead of producing an independent growth event.
 package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var stampCoherenceViolationCount: Int
   package var deltaCheckpointViolationCount: Int
@@ -33,6 +34,8 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var gestureRouteResolutionViolationCount: Int
   package var actionDispatchMissCount: Int
   package var strandedListingViolationCount: Int
+  package var layoutShadowDivergenceCount: Int
+  package var layoutShadowWindowedExclusionCount: Int
   package var lastViolationDetailByKind: [String: String]
 
   @MainActor
@@ -77,6 +80,10 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
+      layoutShadowDivergenceCount:
+        SoundnessProbeConfiguration.layoutShadowDivergenceCount,
+      layoutShadowWindowedExclusionCount:
+        SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount,
       lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
     )
   }
@@ -216,6 +223,12 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       current: strandedListingViolationCount,
       to: &growth
     )
+    appendGrowth(
+      kind: "layout-shadow-divergence",
+      previous: previous.layoutShadowDivergenceCount,
+      current: layoutShadowDivergenceCount,
+      to: &growth
+    )
     return growth
   }
 
@@ -334,6 +347,13 @@ package enum SoundnessProbeConfiguration {
   package static var gestureRouteResolutionViolationCount = 0
   package static var actionDispatchMissCount = 0
   package static var strandedListingViolationCount = 0
+  package static var layoutShadowDivergenceCount = 0
+  /// T-info currency for the layout shadow oracle's windowed carve-out:
+  /// subtrees under a windowed lazy/hosted product are excluded from the
+  /// sampled comparison (their stride is a running refinement the cold shadow
+  /// pass legitimately cannot reproduce). Keeps the blind spot's size
+  /// measured; an exclusion is not a violation.
+  package static var layoutShadowWindowedExclusionCount = 0
   package static var lastViolationDetailByKind: [String: String] = [:]
   private static var lastViolationDetailStorage: String?
   package static var lastViolationDetail: String? {
@@ -385,6 +405,27 @@ package enum SoundnessProbeConfiguration {
     rasterDamageMismatchCount += 1
     recordViolationDetail(detail(), for: "raster-damage")
     emitTrace("raster-damage")
+  }
+
+  /// Records one sampled layout-shadow divergence: production measure/place
+  /// geometry did not equal a fresh all-reuse-disabled pass over the same
+  /// resolved tree and proposal. The layout stage may run on the frame-tail
+  /// worker where this `@MainActor` state is unreachable, so the comparison
+  /// summary rides the frame-tail layout output back to the frame coordinator,
+  /// which records it here. The production value is never repaired before
+  /// recording — the alarm, not a heal, is the deliverable.
+  package static func recordLayoutShadowDivergence(_ detail: @autoclosure () -> String) {
+    layoutShadowDivergenceCount += 1
+    recordViolationDetail(detail(), for: "layout-shadow-divergence")
+    emitTrace("layout-shadow-divergence")
+  }
+
+  /// Accumulates the layout shadow oracle's windowed-exclusion currency
+  /// (T-info): how many windowed subtrees the sampled comparison skipped.
+  /// Deliberately no trace line and no violation detail — an exclusion is a
+  /// measured blind spot, not a violation.
+  package static func recordLayoutShadowWindowedExclusions(_ count: Int) {
+    layoutShadowWindowedExclusionCount += count
   }
 
   /// Records one caught teardown-coherence violation from the post-finalize

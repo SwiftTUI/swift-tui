@@ -62,6 +62,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     reconciledTailLayout: ReconciledFrameTailLayout
   ) -> FrameTailOutput {
     let layout = reconciledTailLayout.layout
+    Self.recordLayoutShadowDivergenceIfCaught(layout.layoutShadow)
     let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
       draft: draft,
       layout: layout
@@ -100,6 +101,39 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     SoundnessProbeConfiguration.recordRasterDamageMismatch(detail)
     // The 2026-07-28 full-gate census observed zero unexpected mismatches.
     // Record first so the release trace and crash diagnostics retain context.
+    #if DEBUG
+      if SoundnessProbeConfiguration.isEnabled {
+        assertionFailure(detail)
+      }
+    #endif
+  }
+
+  /// The layout shadow oracle's recording point: the first main-actor point
+  /// after the (possibly off-main) layout stage returns. Exclusion currency is
+  /// recorded unconditionally (T-info); a divergence records the violation and
+  /// promotes to a DEBUG assertion, exactly like the raster oracle above. The
+  /// production layout is never repaired — the frame ships as produced, and
+  /// the alarm is the deliverable.
+  @MainActor
+  package static func recordLayoutShadowDivergenceIfCaught(
+    _ summary: LayoutShadowComparisonSummary?
+  ) {
+    guard let summary else {
+      return
+    }
+    if summary.windowedExclusionCount > 0 {
+      SoundnessProbeConfiguration.recordLayoutShadowWindowedExclusions(
+        summary.windowedExclusionCount
+      )
+    }
+    guard summary.hasDivergence else {
+      return
+    }
+    let detail =
+      "layout shadow divergence: \(summary.measureDivergenceCount) measure, "
+      + "\(summary.placeDivergenceCount) place; first: "
+      + (summary.firstDivergenceDetail ?? "no detail recorded")
+    SoundnessProbeConfiguration.recordLayoutShadowDivergence(detail)
     #if DEBUG
       if SoundnessProbeConfiguration.isEnabled {
         assertionFailure(detail)
@@ -234,6 +268,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     completionToken: FrameTailJobCancellationToken? = nil
   ) async -> AsyncFrameTailDraftOutput {
     let layout = layoutStage.layout
+    Self.recordLayoutShadowDivergenceIfCaught(layout.layoutShadow)
     let (placed, animationOverlaySnapshot) = prepareAnimationOverlaySnapshot(
       draft: draft,
       layout: layout

@@ -59,7 +59,9 @@ struct LatePreferenceReconciliationStage {
         return reconciled
       case .needsRelayout(let nextInput):
         input = nextInput
+        let previousShadow = layout.layoutShadow
         layout = renderLayout(input)
+        foldLayoutShadow(previousShadow, into: &layout)
       }
     }
 
@@ -119,12 +121,14 @@ struct LatePreferenceReconciliationStage {
         )
       case .needsRelayout(let nextInput):
         input = nextInput
+        let previousShadow = layout.layoutShadow
         layoutPass = await renderLayout(input)
         totalSuspensionDuration += layoutPass.suspensionDuration
         guard let nextLayout = layoutPass.layout else {
           return .init(layout: nil, suspensionDuration: totalSuspensionDuration)
         }
         layout = nextLayout
+        foldLayoutShadow(previousShadow, into: &layout)
         recordLayoutWork(layout)
       }
     }
@@ -211,7 +215,8 @@ struct LatePreferenceReconciliationStage {
         basedOn: input,
         resolved: reconciliation.resolved
       )
-      let finalLayout = renderLayout(finalInput)
+      var finalLayout = renderLayout(finalInput)
+      foldLayoutShadow(layout.layoutShadow, into: &finalLayout)
       return finalLayoutAfterBoundExceeded(
         input: finalInput,
         layout: finalLayout,
@@ -250,9 +255,10 @@ struct LatePreferenceReconciliationStage {
       resolved: reconciliation.resolved
     )
     let finalLayoutPass = await renderLayout(finalInput)
-    guard let finalLayout = finalLayoutPass.layout else {
+    guard var finalLayout = finalLayoutPass.layout else {
       return .init(layout: nil, suspensionDuration: finalLayoutPass.suspensionDuration)
     }
+    foldLayoutShadow(layout.layoutShadow, into: &finalLayout)
     return .init(
       layout: finalLayoutAfterBoundExceeded(
         input: finalInput,
@@ -304,9 +310,26 @@ struct LatePreferenceReconciliationStage {
         customLayoutCompatibilityDepthLimit:
           LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
       ),
-      animationRedrawIdentities: input.animationRedrawIdentities
+      animationRedrawIdentities: input.animationRedrawIdentities,
+      verifyLayoutShadow: input.verifyLayoutShadow
     )
   }
+}
+
+/// Every reconciliation pass runs its own sampled shadow comparison; a
+/// divergence caught by an intermediate pass must survive to the recording
+/// point even though only the final pass's layout output ships.
+private func foldLayoutShadow(
+  _ previous: LayoutShadowComparisonSummary?,
+  into layout: inout FrameTailLayoutOutput
+) {
+  guard var merged = previous else {
+    return
+  }
+  if let current = layout.layoutShadow {
+    merged.merge(current)
+  }
+  layout.layoutShadow = merged
 }
 
 @MainActor

@@ -92,6 +92,10 @@ struct TableLayoutProductTests {
 
   @Test("T-37: the table layout is derived once and carried, not re-derived per phase")
   func layoutIsCarriedNotRederived() throws {
+    // Invocation-economy pins measure the production pass; suppress the
+    // layout shadow oracle's sampled re-run (intentional oracle-reduction).
+    let probe = SoundnessProbeSuppression()
+    defer { probe.restore() }
     TableLayoutDerivationProbe.reset()
     let artifacts = DefaultRenderer().render(
       Table(0..<20, id: \.self, columns: [.init("Value", width: 8)]) { row in

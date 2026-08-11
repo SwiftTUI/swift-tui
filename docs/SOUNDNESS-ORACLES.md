@@ -65,6 +65,7 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `handler-resolution-gesture` — committed gesture route resolves both recognizer and pointer handler | Gesture leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A present partial pair fails. An absent optional registry is outside caller scope  <!-- oracle-map: handler-resolution-gesture ; recordInteractiveHandlerResolutionViolation ; gestureRouteResolutionViolationCount --> |
 | `action-dispatch-miss` — dispatch never targets a missing published action | Failed lookup in [`LocalActionRegistry.swift`](../Sources/SwiftTUIGraph/Runtime/LocalActionRegistry.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A found handler returning `false` is not a lookup miss  <!-- oracle-map: action-dispatch-miss ; recordActionDispatchMiss ; actionDispatchMissCount --> |
 | `stranded-listing` — a node never claims a child seated under another live parent | Post-finalize listing audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `StrandedListingProbeTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: stranded-listing ; recordStrandedListingViolation ; strandedListingViolationCount --> |
+| `layout-shadow-divergence` — sampled cached measure/place geometry equals a fresh all-reuse-disabled pass | Shadow layout comparison in [`LayoutShadowOracle.swift`](../Sources/SwiftTUICore/Measure/LayoutShadowOracle.swift), run by the frame tail's layout stage and recorded by [`DefaultRendererFrameTailCoordinator.swift`](../Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift) | T-fail. DEBUG call-site assertion. The production value is never repaired before recording | Every DEBUG layout stage. Sampled release frame | Assertion, trace scan, serialized snapshot delta | `LayoutShadowOracleTests`, `SoundnessProbeConfigurationTests`, `SoundnessAssertPromotionTests`, `SoundnessFailureChannelTests` | Windowed lazy/hosted subtrees are excluded (cold shadow stride) and counted by the T-info exclusion counter; the shadow re-evaluates in-pass-verified hysteresis seeds instead of re-deciding bistable fixed points  <!-- oracle-map: layout-shadow-divergence ; recordLayoutShadowDivergence,recordLayoutShadowWindowedExclusions ; layoutShadowDivergenceCount,layoutShadowWindowedExclusionCount --> |
 
 
 ## Counter-consumer contract
@@ -167,12 +168,37 @@ scan is the cross-suite verdict, not a claim of per-test ownership.
 We defer per-`ViewGraph` scoping until multi-scene hosting makes that
 architecture real.
 
-There is no sampled measure/place shadow oracle today. Measurement cache reuse
-depends on `isEquivalentForMeasurement`. This contract includes always-equal
-payload families and enumerated field comparisons. The memo oracle detects false-equal
-view-output reuse, but it does not prove that a cached layout result matches a
-fresh measure/place pass. A future layout oracle must compare sampled cached
-and fresh geometry without repairing the production value before recording.
+The `layout-shadow-divergence` row closes the former measure/place blind spot:
+on a sampled frame the tail's layout stage re-runs measure and place with every
+reuse tier disabled (no measurement cache, no retained session) and pair-walks
+the production trees against the fresh ones on identity, `measuredSize`, and
+placed `bounds`, without repairing the production value before recording. Its
+remaining measured hole is deliberate: subtrees under a windowed lazy or hosted
+product are skipped, because the production window stride is a running
+refinement the cold shadow pass legitimately cannot reproduce, and each skip
+counts into `layoutShadowWindowedExclusionCount` so the hole's size stays
+visible. If that carve-out ever has to widen beyond windowed products, treat it
+as a design smell to revisit, not a routine expansion.
+
+Two resolve-domain inputs are part of the fresh-pass definition rather than
+the carve-out. First, the scratch context is seeded with the production
+pass's layout-dependent realizations and never realizes live: realization
+resolves authored content against the live graph — reading and writing it —
+and is not idempotent within a frame (the first realization's entity commits
+change what a second one resolves), so realized children are input to the
+fresh pass exactly as the resolved tree is, and the observe-only contract
+holds by construction. Second, the scratch context carries the production
+session as `measurementSeedSession`, consumed only by the custom-layout
+hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`). The scroll
+indicator gutter is bistable by design — a confirmed seed keeps the previous
+frame's fixed point as anti-flicker hysteresis — so an unseeded shadow would
+re-decide knife-edge content and report a legitimate fixed-point difference as
+a divergence. Seeding is sound where stride seeding was not: the seam's
+contract verifies every derived seed against fresh in-pass measurement, so a
+seeded shadow still recomputes all geometry and still catches every unsound
+product serve. What it deliberately does not police is the seed-verification
+logic itself; a layout that trusts an unverified seed needs its own owning
+test.
 
 Equality remains an open-ended audit family. When you add a field to an
 enumerated payload comparator, update its equivalence contract and adversarial

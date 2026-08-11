@@ -332,13 +332,21 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
   /// proposal (scroll-latency R1.3). A wrong or stale retained product is
   /// safe by contract: the layout verifies whatever it derives from the seed
   /// against fresh measurement. Non-seedable layouts pass through untouched.
+  ///
+  /// The layout shadow oracle's scratch context has no retained session (no
+  /// product may be served) but carries the production session as
+  /// `measurementSeedSession`, so the fresh pass evaluates the same
+  /// hysteresis inputs production did — a bistable layout (the scroll
+  /// indicator gutter) must not re-decide its fixed point only in the shadow.
   private func seededLayout(
     for node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> L {
+    let seedSession =
+      passContext?.retainedLayout ?? passContext?.measurementSeedSession
     guard var seedable = layout as? any RetainedMeasurementSeedableLayout,
-      let previousMeasured = passContext?.retainedLayout?.measuredNode(for: node.identity),
+      let previousMeasured = seedSession?.measuredNode(for: node.identity),
       previousMeasured.proposal == proposal,
       previousMeasured.childMeasurements.count == 1
     else {

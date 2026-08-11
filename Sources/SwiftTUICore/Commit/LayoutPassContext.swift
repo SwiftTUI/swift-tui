@@ -74,6 +74,7 @@ package final class LayoutPassContext: Sendable {
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
+    var deniedLayoutRealizationBoundaries: Set<Identity>
     var placedFrameTable: PlacedFrameTable
     var customLayoutCompatibilityDepth: Int
     var customLayoutCompatibilityDepthLimit: Int
@@ -109,16 +110,35 @@ package final class LayoutPassContext: Sendable {
 
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
+  /// A previous-frame session consulted ONLY by the custom-layout
+  /// hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`) when
+  /// `retainedLayout` is absent. The layout shadow oracle's scratch context
+  /// carries the production session here so the fresh pass evaluates the same
+  /// hysteresis inputs (for example `ScrollViewLayout`'s converged
+  /// indicator-inset seed, which selects among bistable fixed points) while
+  /// every product-reuse tier stays disabled. Seeds are, by the seam's
+  /// contract, verified in-pass by fresh measurement, so this cannot hide an
+  /// unsound product serve from the oracle.
+  package let measurementSeedSession: RetainedLayoutSession?
+  /// `false` for observe-only passes (the layout shadow oracle's scratch
+  /// context): realizing layout-dependent content resolves authored closures
+  /// against the live graph — reading AND writing it — so a shadow pass must
+  /// consume the production pass's realizations instead of realizing anew.
+  private let allowsLiveLayoutRealization: Bool
   private let state: Mutex<MutableState>
 
   package init(
     retainedLayout: RetainedLayoutSession? = nil,
     invalidatedIdentities: Set<Identity> = [],
     scrollViewportContext: ScrollViewportContext? = nil,
-    customLayoutCompatibilityDepthLimit: Int = defaultCustomLayoutCompatibilityDepthLimit
+    customLayoutCompatibilityDepthLimit: Int = defaultCustomLayoutCompatibilityDepthLimit,
+    measurementSeedSession: RetainedLayoutSession? = nil,
+    seededLayoutRealizations: [LayoutDependentContentRealization]? = nil
   ) {
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
+    self.measurementSeedSession = measurementSeedSession
+    allowsLiveLayoutRealization = seededLayoutRealizations == nil
     let geometryDiagnosticsRecorder = GeometryResolutionDiagnosticsRecorder()
     state = .init(
       .init(
@@ -126,7 +146,8 @@ package final class LayoutPassContext: Sendable {
         measureViewportHints: [],
         workMetrics: .init(),
         workerCustomLayoutCacheUpdates: [],
-        layoutDependentRealizations: [],
+        layoutDependentRealizations: seededLayoutRealizations ?? [],
+        deniedLayoutRealizationBoundaries: [],
         placedFrameTable: .init(diagnosticsRecorder: geometryDiagnosticsRecorder),
         customLayoutCompatibilityDepth: 0,
         customLayoutCompatibilityDepthLimit: customLayoutCompatibilityDepthLimit,
@@ -137,6 +158,14 @@ package final class LayoutPassContext: Sendable {
 
   package var scrollViewportContext: ScrollViewportContext? {
     state.withLock { $0.scrollViewportContext }
+  }
+
+  /// The custom-layout re-entry budget this context was constructed with. The
+  /// layout shadow oracle reads it so a scratch shadow context inherits the
+  /// production pass's budget rather than silently downgrading a main-actor
+  /// pass to the worker limit.
+  package var customLayoutCompatibilityDepthLimit: Int {
+    state.withLock { $0.customLayoutCompatibilityDepthLimit }
   }
 
   /// The innermost measure-viewport hint, or `nil` outside any scroll
@@ -220,6 +249,21 @@ package final class LayoutPassContext: Sendable {
 
   package var runtimeIssues: [RuntimeIssue] {
     state.withLock { $0.runtimeIssues }
+  }
+
+  /// The realizations this pass produced (or was seeded with), in record
+  /// order. The layout shadow oracle seeds its scratch context with the
+  /// production pass's records so the fresh pass places the same realized
+  /// children without touching the live graph.
+  package var layoutDependentRealizations: [LayoutDependentContentRealization] {
+    state.withLock { $0.layoutDependentRealizations }
+  }
+
+  /// Boundaries an observe-only pass could not realize because its seeded
+  /// memo did not cover them. Expected empty in practice; the oracle excludes
+  /// these subtrees from comparison instead of reporting shape noise.
+  package var deniedLayoutRealizationBoundaries: Set<Identity> {
+    state.withLock { $0.deniedLayoutRealizationBoundaries }
   }
 
   package var layoutDependentRealizationsByIdentity: [Identity: [ResolvedNode]] {
@@ -406,6 +450,13 @@ package final class LayoutPassContext: Sendable {
         $0.layoutDependentRealizationCacheHits += 1
       }
       return cached.children
+    }
+
+    guard allowsLiveLayoutRealization else {
+      state.withLock {
+        _ = $0.deniedLayoutRealizationBoundaries.insert(signature.boundaryIdentity)
+      }
+      return []
     }
 
     let children = realize()

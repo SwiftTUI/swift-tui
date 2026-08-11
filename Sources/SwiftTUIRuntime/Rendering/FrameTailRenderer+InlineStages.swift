@@ -31,6 +31,26 @@ struct FrameTailInlineStageRenderer: Sendable {
         passContext: input.layoutPassContext
       )
     }
+    // The layout shadow oracle (`layout-shadow-divergence`): on a sampled
+    // frame, re-run measure/place with every reuse tier disabled and compare
+    // geometry. Runs outside the timed phases so `measureDuration` and
+    // `placeDuration` stay production-only; the summary rides the layout
+    // output back to the main-actor coordinator for recording. The production
+    // trees above are returned untouched — the oracle never repairs.
+    let layoutShadow: LayoutShadowComparisonSummary? =
+      input.verifyLayoutShadow
+      ? LayoutShadowOracle.comparisonSummary(
+        resolved: input.resolved,
+        proposal: input.proposal,
+        productionMeasured: measured,
+        productionPlaced: placed,
+        scrollViewportContext: input.layoutPassContext.scrollViewportContext,
+        customLayoutCompatibilityDepthLimit:
+          input.layoutPassContext.customLayoutCompatibilityDepthLimit,
+        measurementSeedSession: input.layoutPassContext.retainedLayout,
+        productionLayoutRealizations: input.layoutPassContext.layoutDependentRealizations
+      )
+      : nil
     return FrameTailLayoutOutput(
       generation: input.generation,
       measured: measured,
@@ -41,7 +61,8 @@ struct FrameTailInlineStageRenderer: Sendable {
       workerCustomLayoutCacheUpdates: input.layoutPassContext.workerCustomLayoutCacheUpdates,
       workerEnqueueToStart: .zero,
       workerCompute: .zero,
-      ranOffMain: false
+      ranOffMain: false,
+      layoutShadow: layoutShadow
     )
   }
 
@@ -146,7 +167,8 @@ struct FrameTailInlineStageRenderer: Sendable {
       rasterDuration: raster.duration,
       layoutWork: layout.layoutWork,
       workerTimings: nil,
-      measurementCache: layoutEngine.cache?.metrics
+      measurementCache: layoutEngine.cache?.metrics,
+      layoutShadow: layout.layoutShadow
     )
     return FrameTailOutput(
       generation: input.generation,

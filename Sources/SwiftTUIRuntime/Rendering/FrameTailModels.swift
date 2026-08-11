@@ -144,6 +144,12 @@ struct FrameTailInput {
   /// animation stages (see the barrier comment in
   /// `FrameTailPresentationDamageResolver.resolve`).
   var animationRedrawIdentities: Set<Identity> = []
+  /// Latched from `SoundnessProbeConfiguration.isSampledFrame` on the main
+  /// actor when the input is built (the layout stage may run off-main, where
+  /// that `@MainActor` state is unreadable). On a sampled frame the layout
+  /// stage re-runs measure/place with all reuse disabled and compares — the
+  /// `layout-shadow-divergence` oracle.
+  var verifyLayoutShadow: Bool = false
 }
 
 struct FrameTailDiagnostics {
@@ -165,6 +171,9 @@ struct FrameTailDiagnostics {
   var layoutWork: LayoutWorkMetrics
   var workerTimings: FrameWorkerTimings?
   var measurementCache: MeasurementCacheMetrics?
+  /// The layout shadow oracle's verdict for this frame, when the sampled
+  /// comparison ran (`layout-shadow-divergence`).
+  var layoutShadow: LayoutShadowComparisonSummary?
 }
 
 struct FrameTailLayoutOutput {
@@ -181,6 +190,11 @@ struct FrameTailLayoutOutput {
   var workerEnqueueToStart: Duration
   var workerCompute: Duration
   var ranOffMain: Bool
+  /// Non-nil when the sampled layout shadow comparison ran for this pass.
+  /// Late-preference reconciliation merges the summaries of every pass it
+  /// runs; the main-actor frame coordinator records the merged verdict on the
+  /// soundness probe — the tail itself may run off-main.
+  var layoutShadow: LayoutShadowComparisonSummary?
 }
 
 struct ReconciledFrameTailLayout {

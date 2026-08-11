@@ -166,4 +166,73 @@ struct ScrollViewLayoutInsetSeedTests {
         < freshContext.workMetrics.measuredNodesComputed
     )
   }
+
+  @Test("The shadow seed channel feeds the proxy when no session may serve products")
+  func measurementSeedSessionSeedsWithoutRetainedServes() throws {
+    // The layout shadow oracle's scratch context: `retainedLayout` is nil so
+    // no product-reuse tier can serve, but the production session rides
+    // `measurementSeedSession` so the hysteresis seam evaluates the same
+    // seeds production did. The seeded fast path must engage (one content
+    // measure saved) and the result must equal a cold pass for non-knife-edge
+    // content.
+    let engine = LayoutEngine()
+    let proposal = Self.viewportProposal
+    let content = contentNode("ShadowSeedContent", size: .init(width: 40, height: 100))
+    let scroll = ResolvedNode(
+      identity: testIdentity("ShadowSeedScroll"),
+      kind: .view("ScrollView"),
+      children: [content],
+      layoutBehavior: AnyLayout(verticalScrollLayout()).resolvedBehavior
+    )
+
+    let firstContext = LayoutPassContext()
+    var firstMeasured = engine.measure(scroll, proposal: proposal, passContext: firstContext)
+    // The engine's stored child premeasure ran at the container's finite
+    // proposal, so an intrinsic-size child clamps to the viewport and the
+    // derived seed would be zero. Real scroll content (text, editors) reports
+    // its unclamped wrapped extent; mirror that shape so the seed derives the
+    // reserved gutter.
+    firstMeasured.childMeasurements[0].measuredSize = .init(width: 20, height: 100)
+    let firstPlaced = engine.place(
+      scroll,
+      measured: firstMeasured,
+      in: .init(origin: .zero, size: firstMeasured.measuredSize),
+      passContext: firstContext
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: scroll,
+      measuredTree: firstMeasured,
+      placedTree: firstPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: scroll.identity,
+        bounds: .init(origin: .zero, size: firstMeasured.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+
+    let shadowContext = LayoutPassContext(
+      retainedLayout: nil,
+      measurementSeedSession: RetainedLayoutSession(
+        previousFrameIndex: .init(frame: previousFrame),
+        invalidatedIdentities: []
+      )
+    )
+    let shadowMeasured = engine.measure(scroll, proposal: proposal, passContext: shadowContext)
+
+    let freshContext = LayoutPassContext()
+    let freshMeasured = engine.measure(scroll, proposal: proposal, passContext: freshContext)
+
+    #expect(shadowMeasured.measuredSize == freshMeasured.measuredSize)
+    #expect(
+      shadowContext.workMetrics.measuredNodesReused == 0,
+      "the seed channel must never enable a product serve"
+    )
+    #expect(
+      shadowContext.workMetrics.measuredNodesComputed
+        < freshContext.workMetrics.measuredNodesComputed
+    )
+  }
 }

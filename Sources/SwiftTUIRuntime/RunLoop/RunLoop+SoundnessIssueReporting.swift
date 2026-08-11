@@ -17,6 +17,7 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
   package var handlerResolutionGesture = 0
   package var actionDispatchMiss = 0
   package var strandedListing = 0
+  package var layoutShadowDivergence = 0
 
   package init() {}
 
@@ -42,6 +43,7 @@ package struct SoundnessViolationCounts: Sendable, Equatable {
     counts.handlerResolutionGesture = snapshot.gestureRouteResolutionViolationCount
     counts.actionDispatchMiss = snapshot.actionDispatchMissCount
     counts.strandedListing = snapshot.strandedListingViolationCount
+    counts.layoutShadowDivergence = snapshot.layoutShadowDivergenceCount
     return counts
   }
 }
@@ -140,6 +142,12 @@ extension RunLoop {
       total: snapshot.strandedListingViolationCount,
       detail: snapshot.lastViolationDetailByKind["stranded-listing"],
       lastSeen: &counts.strandedListing
+    )
+    reportSoundnessViolationGrowth(
+      kind: "layoutShadowDivergence",
+      total: snapshot.layoutShadowDivergenceCount,
+      detail: snapshot.lastViolationDetailByKind["layout-shadow-divergence"],
+      lastSeen: &counts.layoutShadowDivergence
     )
     lastSeenSoundnessViolationCounts = counts
   }

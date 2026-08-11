@@ -40,6 +40,7 @@ struct SoundnessFailureChannelTests {
     "handler-resolution-gesture",
     "action-dispatch-miss",
     "stranded-listing",
+    "layout-shadow-divergence",
   ]
 
   @Test("every violation recorder emits one parseable soundness line")
@@ -178,6 +179,7 @@ struct SoundnessFailureChannelTests {
     )
     SoundnessProbeConfiguration.recordActionDispatchMiss("test")
     SoundnessProbeConfiguration.recordStrandedListingViolation("test")
+    SoundnessProbeConfiguration.recordLayoutShadowDivergence("test")
   }
 
   private static func parseTraceKind(_ line: String) -> String? {
@@ -316,6 +318,8 @@ private struct ProbeState {
   let gestureRouteResolutionViolationCount: Int
   let actionDispatchMissCount: Int
   let strandedListingViolationCount: Int
+  let layoutShadowDivergenceCount: Int
+  let layoutShadowWindowedExclusionCount: Int
   let lastViolationDetail: String?
   let lastViolationDetailByKind: [String: String]
 
@@ -364,6 +368,10 @@ private struct ProbeState {
       actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
+      layoutShadowDivergenceCount:
+        SoundnessProbeConfiguration.layoutShadowDivergenceCount,
+      layoutShadowWindowedExclusionCount:
+        SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount,
       lastViolationDetail: SoundnessProbeConfiguration.lastViolationDetail,
       lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
     )
@@ -413,6 +421,9 @@ private struct ProbeState {
     SoundnessProbeConfiguration.actionDispatchMissCount = actionDispatchMissCount
     SoundnessProbeConfiguration.strandedListingViolationCount =
       strandedListingViolationCount
+    SoundnessProbeConfiguration.layoutShadowDivergenceCount = layoutShadowDivergenceCount
+    SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount =
+      layoutShadowWindowedExclusionCount
     SoundnessProbeConfiguration.lastViolationDetail = lastViolationDetail
     SoundnessProbeConfiguration.lastViolationDetailByKind = lastViolationDetailByKind
   }
