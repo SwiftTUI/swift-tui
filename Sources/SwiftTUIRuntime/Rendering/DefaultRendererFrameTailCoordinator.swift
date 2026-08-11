@@ -285,6 +285,23 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       )
     }
 
+    // Claim the job before touching the head. The layout task is never
+    // cancelled (entry 14), so its first slot can land after the coordinator
+    // took cancelled-before-start and the caller discarded this head —
+    // materializing then would revive a spent transaction, and a cancel
+    // landing after materialize would discard the head out from under the
+    // suspend in the defer below. markStarted is atomic with
+    // cancelBeforeStart on the token, so claiming first makes the cancel
+    // impossible and losing the claim means the head must not be touched.
+    // The worker-entry markStarted stays correct as a second call
+    // (already-started reports true).
+    if let cancellationToken, !cancellationToken.markStarted() {
+      return AsyncLatePreferenceReconciliationOutput(
+        layout: nil,
+        suspensionDuration: .zero
+      )
+    }
+
     draft.transaction.materializePreparedState()
     defer {
       draft.transaction.suspendPreparedState()

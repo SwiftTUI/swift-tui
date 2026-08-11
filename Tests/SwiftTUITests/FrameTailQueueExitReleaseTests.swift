@@ -117,4 +117,53 @@ struct FrameTailQueueExitReleaseTests {
     #expect(outcome.tailJobState == .cancelledBeforeStart)
     #expect(outcome.artifacts == nil)
   }
+
+  @Test("a pre-start cancel with prepared-graph layout leaves the aborted head untouched")
+  @MainActor
+  func preStartCancelSparesThePreparedGraphHead() async {
+    // The layout task is never cancelled (entry 14). When the cancel decision
+    // wins while the job is queued, the caller aborts and discards the
+    // prepared head — and the orphaned layout task drains on its own later.
+    // Its prepared-graph branch (layout-realized content: GeometryReader)
+    // must claim the job before touching the head: without the claim it
+    // materialized the discarded head's prepared state and trapped on
+    // `materializePreparedState`'s spent-head precondition (the csvui
+    // cell-editor crash at 0.8.3).
+    let renderer = DefaultRenderer()
+    let outcome = await renderer.renderAsyncCancellable(
+      GeometryReader { _ in
+        Text("prepared-graph")
+      },
+      context: .init(identity: testIdentity("FrameTailPreparedGraphCancelRoot")),
+      proposal: .init(width: 20, height: 3),
+      awaitQueuedCancellationSignal: { _ in },
+      shouldCancelQueued: { true }
+    )
+    #expect(outcome.tailJobState == .cancelledBeforeStart)
+    #expect(outcome.artifacts == nil)
+
+    // Drain the orphaned layout task: it must bail without touching the
+    // aborted head. The yields plus the follow-up render's suspension points
+    // guarantee the orphan got its main-actor slots before the test ends.
+    for _ in 0..<8 {
+      await Task.yield()
+    }
+    let followUp = await renderer.renderAsyncCancellable(
+      GeometryReader { _ in
+        Text("after-cancel")
+      },
+      context: .init(identity: testIdentity("FrameTailPreparedGraphCancelRoot")),
+      proposal: .init(width: 20, height: 3),
+      awaitQueuedCancellationSignal: { release in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+          release.onRelease {
+            continuation.resume()
+          }
+        }
+      },
+      shouldCancelQueued: { false }
+    )
+    #expect(followUp.artifacts != nil)
+    #expect(followUp.tailJobState == .completed)
+  }
 }
