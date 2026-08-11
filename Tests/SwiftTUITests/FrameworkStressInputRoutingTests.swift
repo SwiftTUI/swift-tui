@@ -1941,3 +1941,76 @@ private struct StressInput033Fixture: View {
       }
   }
 }
+
+// MARK: - Attempt 034: onSubmit precedence and detachment across churn
+
+extension FrameworkStressInputRoutingTests {
+  @Test("Return submits ahead of ancestor key handlers and detaches with churn")
+  func stressInputRouting034SubmitPrecedesAncestorsAndDetaches() throws {
+    // Hypothesis: the focused field's submit intercept may lose the bubble
+    // race to an ancestor `.onKeyPress(.return)`, or a restored handler may
+    // keep submitting after structural churn removed the `onSubmit`.
+    let text = StressInputBox("")
+    let submits = StressInputBox(0)
+    let ancestorReturns = StressInputBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StressInput034Root"),
+      size: .init(width: 44, height: 8)
+    ) {
+      StressInput034Fixture(
+        text: text,
+        submits: submits,
+        ancestorReturns: ancestorReturns
+      )
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focus(StressInput034Fixture.fieldIdentity)
+    _ = try harness.pressKey(KeyPress(.character("h")))
+    _ = try harness.pressKey(KeyPress(.character("i")))
+    #expect(text.value == "hi")
+
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(submits.value == 1)
+    #expect(ancestorReturns.value == 0)
+    #expect(text.value == "hi")
+
+    _ = try harness.clickText("Detach submit")
+    _ = harness.runLoop.focusTracker.setFocus(to: StressInput034Fixture.fieldIdentity)
+    _ = try harness.render()
+    _ = try harness.pressKey(KeyPress(.return))
+
+    #expect(submits.value == 1)
+    #expect(ancestorReturns.value == 1)
+    #expect(text.value == "hi")
+  }
+}
+
+private struct StressInput034Fixture: View {
+  static let fieldIdentity = testIdentity("StressInput034", "Field")
+
+  let text: StressInputBox<String>
+  let submits: StressInputBox<Int>
+  let ancestorReturns: StressInputBox<Int>
+  @State private var hasSubmit = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Detach submit") { hasSubmit = false }
+      if hasSubmit {
+        TextField("Value", text: text.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+          .onSubmit { submits.value += 1 }
+      } else {
+        TextField("Value", text: text.binding())
+          .id(Self.fieldIdentity)
+          .textFieldStyle(.plain)
+      }
+    }
+    .onKeyPress(.return) { _ in
+      ancestorReturns.value += 1
+      return .handled
+    }
+  }
+}

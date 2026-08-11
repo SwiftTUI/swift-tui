@@ -119,6 +119,45 @@ private enum OpenLinkActionKey: EnvironmentKey {
   static let defaultValue = OpenLinkAction.placeholder
 }
 
+/// The composed submit action for the innermost enclosing `onSubmit` scope.
+///
+/// Text inputs whose traits declare `submitBehavior == .submit` invoke this
+/// action when the user presses Return. Construction composes one level's
+/// action ahead of the inherited chain — self-wrapped in the authoring
+/// context its `onSubmit` modifier captured, the `OpenLinkAction`
+/// construction-time shape — so every enclosing handler runs innermost-first
+/// unless a `submitScope` boundary cleared the chain.
+package struct SubmitAction: Sendable {
+  private let handler: @MainActor @Sendable () -> Void
+
+  @MainActor
+  package init(
+    authoringContext: ImperativeAuthoringContextSnapshot?,
+    action: @escaping @MainActor @Sendable () -> Void,
+    inherited: SubmitAction?
+  ) {
+    handler = {
+      withImperativeAuthoringContext(authoringContext) {
+        action()
+      }
+      inherited?()
+    }
+  }
+
+  @MainActor
+  package func callAsFunction() {
+    handler()
+  }
+}
+
+// Submit actions are user closures: a changed capture must deny reuse, the
+// same stance custom `OpenLinkAction` values record.
+extension SubmitAction: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    false
+  }
+}
+
 /// A semantic action that asks the runtime to reevaluate default focus in a
 /// namespace-scoped focus region.
 public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {

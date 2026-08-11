@@ -119,6 +119,11 @@ struct DefaultRendererFrameHeadCoordinator {
     for issue in viewGraph.frameRuntimeIssues {
       frameProducts.frameTailInput.layoutPassContext.recordRuntimeIssue(issue)
     }
+    // Dispatch-time issues recorded since the previous frame surface on this
+    // frame (see `ImperativeRuntimeIssueQueue`).
+    for issue in ImperativeRuntimeIssueQueue.drain() {
+      frameProducts.frameTailInput.layoutPassContext.recordRuntimeIssue(issue)
+    }
     let checkpoints = preparedCheckpoints(
       for: mode,
       graphDraft: graphDraft,

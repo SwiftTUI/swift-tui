@@ -18,7 +18,8 @@ package func registerTextInputBinding(
     fallbackAuthoringScope: authoringScope
   )
 
-  let handle: @MainActor (KeyPress) -> Bool = { keyPress in
+  let submitAction = context.environmentValues.submitAction
+  let applyEditingCommand: @MainActor (KeyPress) -> Bool = { keyPress in
     guard let command = textInputCommand(for: keyPress, traits: traits) else {
       return false
     }
@@ -33,10 +34,28 @@ package func registerTextInputBinding(
       clipboardReadAction: context.environmentValues.clipboardReadAction
     )
   }
+  let handle: @MainActor (KeyPress) -> Bool = { keyPress in
+    // Submit precedes editing-command resolution: it mutates no text, so it
+    // must not reach the reducer's no-change bail, and consuming here keeps
+    // Return from bubbling on to ancestor activation. Without an enclosing
+    // `onSubmit` action Return keeps its default routing.
+    if keyPress.key == .return,
+      keyPress.modifiers.isEmpty,
+      traits.submitBehavior == .submit,
+      let submitAction
+    {
+      submitAction()
+      return true
+    }
+    return applyEditingCommand(keyPress)
+  }
 
   intake.registerKeyPressHandler(identity: context.identity, handler: handle)
+  // The KeyEvent fallback carries no modifier state, so it must stay
+  // editing-only: re-wrapping a declined modified Return as a bare KeyPress
+  // would re-enter the submit intercept without the modifier bits.
   intake.registerKeyHandler(identity: context.identity) { event in
-    handle(KeyPress(event))
+    applyEditingCommand(KeyPress(event))
   }
   intake.registerPasteHandler(
     identity: context.identity,

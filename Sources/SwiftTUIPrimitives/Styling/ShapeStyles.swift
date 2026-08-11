@@ -49,6 +49,13 @@ extension ShapeStyle where Self == SemanticShapeStyle {
   public static var danger: Self { .init(.danger) }
   public static var info: Self { .init(.info) }
   public static var muted: Self { .init(.muted) }
+  /// SwiftUI's primary-content spelling; an alias for the theme's
+  /// `foreground` role, so `.foregroundStyle(.primary)` resolves through the
+  /// active theme like every other semantic role.
+  public static var primary: Self { .init(.foreground) }
+  /// SwiftUI's secondary-content spelling; an alias for the theme's `muted`
+  /// role — the de-emphasized foreground tier.
+  public static var secondary: Self { .init(.muted) }
 }
 
 extension ShapeStyle where Self == Color {

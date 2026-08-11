@@ -453,6 +453,8 @@ classifications:
     - SwiftTUIViews.PreferenceOverlayValueModifier
     - SwiftTUIViews.PreferenceTransformModifier
     - SwiftTUIViews.PreferenceWritingModifier
+    - SwiftTUIViews.SubmitActionModifier
+    - SwiftTUIViews.SubmitScopeModifier
     - SwiftTUIViews.DefaultFocusScopeModifier
 
     # ─── View additional style variants ───────────────────────────────────
@@ -472,6 +474,7 @@ classifications:
 
     # ─── View shapes + iteration ──────────────────────────────────────────
     - SwiftTUIViews.ForEach
+    - SwiftTUIViews.ForEachBindingElement
     - SwiftTUIViews.InsetShape
     - SwiftTUIViews.InsettableShape
     - "SwiftTUIViews.neverBody()"

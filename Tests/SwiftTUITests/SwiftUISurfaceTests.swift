@@ -1712,6 +1712,31 @@ struct SwiftUISurfaceTests {
     )
   }
 
+  @Test("primary and secondary spellings alias the foreground and muted roles")
+  func primaryAndSecondarySpellingsAliasThemeRoles() {
+    #expect(AnyShapeStyle(.primary) == .semantic(.foreground))
+    #expect(AnyShapeStyle(.secondary) == .semantic(.muted))
+
+    let theme = Theme(
+      foreground: try! .hex("#102030"),
+      muted: try! .hex("#405060")
+    )
+    #expect(
+      resolveStyleColorResult(style: AnyShapeStyle(.primary), theme: theme)
+        == .success(try! .hex("#102030"))
+    )
+    #expect(
+      resolveStyleColorResult(style: AnyShapeStyle(.secondary), theme: theme)
+        == .success(try! .hex("#405060"))
+    )
+
+    let resolved = Resolver().resolve(
+      Text("Deemphasized").foregroundStyle(.secondary),
+      in: .init(identity: testIdentity("Root"))
+    )
+    #expect(resolved.drawMetadata.foregroundStyle == .semantic(.muted))
+  }
+
   @Test("opacity-wrapped styles resolve with the amount applied (F172)")
   func opacityWrappedStylesResolveWithAmountApplied() {
     // Color/Gradient fold `.opacity()` eagerly at construction, so the

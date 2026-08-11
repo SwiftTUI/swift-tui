@@ -157,9 +157,33 @@ are omitted even when SwiftUI exposes a corresponding API.
   closures are `@Sendable` — because view inputs cross the off-main frame
   tail under strict, unsuppressed concurrency. Recorded once for the whole
   class; individual members do not get separate entries.
-- **`Binding` is not a `Collection`.** *Gap.* The editable-collection idiom —
-  `ForEach($items)` and per-element bindings projected from a collection
-  binding — is unavailable. Adding it later is additive.
+- **`ForEach` over a collection binding writes back by identity; `Binding`
+  is still not a `Collection`.** *Ratified, with one residual Gap.*
+  `ForEach(_:content:)` and `ForEach(_:id:content:)` accept a `Binding` to a
+  mutable collection and hand each row a `Binding` to its element. Row
+  bindings verify identity on every access: after a reorder a write
+  relocates by ID (occurrence-aware for duplicate IDs), and a write whose
+  element has left the collection is dropped with a
+  `forEach.staleElementBindingWrite` runtime issue — where SwiftUI writes
+  through the captured index and can corrupt a neighbor or trap. A read of a
+  departed element traps with a diagnostic, matching the optional-base
+  unwrap precedent. Swift drops the contextual isolation from
+  property-wrapper closure parameters, so SwiftUI's bare `{ $item in ... }`
+  spelling does not compile against the isolated builder closure: the plain
+  parameter is already the element binding (member access projects field
+  bindings), and `{ @MainActor $item in ... }` restores the destructuring
+  spelling — recorded under the strict-concurrency narrowing class. The
+  `editActions:` forms are out of scope for the core package: a default
+  platform edit behavior is a high-opinion surface that belongs to optional
+  extension packages, because no one owns what a TUI "should feel like" the
+  way a desktop platform vendor owns its idiom. `Binding` also conforms to
+  `Sequence`/`Collection`/`BidirectionalCollection`/`RandomAccessCollection`
+  where `Value` permits, as in SwiftUI — with two recorded differences: the
+  conformances are `@MainActor`-isolated (`wrappedValue` is main-actor-gated
+  here; the strict-concurrency narrowing class), and the positional
+  subscript's element bindings are index-denominated with SwiftUI's exact
+  retained-binding semantics, making the ID-verified `ForEach` rows the
+  identity-safe tier of a deliberate two-tier story.
 
 ## Geometry and units
 
@@ -366,8 +390,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   authored with `keyCommand` and `paletteCommand` on the `ActionScope`
   surface, dispatched shallowest-wins along the focus chain, with
   modifier-less bindings framework-reserved.
-- **No `onSubmit` or `submitLabel`.** *Gap.* Return inside a `TextField` is
-  not a field-level submit event.
+- **`onSubmit` takes no `of:` triggers; `submitLabel` is omitted.**
+  *Ratified.* `onSubmit(_:)` runs when Return submits a focused `TextField`
+  or `SecureField`; a `TextEditor` inserts a newline and never submits, and
+  a modified Return (any modifier bits) never submits. Every enclosing
+  `onSubmit` action runs, innermost first, and `submitScope(_:)` stops
+  submissions from propagating further up — SwiftUI's documented
+  composition. The `of: SubmitTriggers` parameter is not implemented
+  because `.text` is the only trigger a terminal can have (there is no
+  `searchable` surface); adding the labeled form later is additive.
+  `submitLabel` is omitted because there is no software keyboard whose
+  Return key could be relabeled — the modifier would be inert theater, the
+  same reasoning recorded for `onKeyPress` phases. Without an enclosing
+  `onSubmit`, Return keeps its default routing.
 - **No `onMoveCommand` or `onExitCommand`.** *Gap.*
 - **`onKeyPress` is reshaped end to end and is the canonical key API.**
   *Ratified.* The closure is labeled `perform:`, matching is a
@@ -555,7 +590,14 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where
   SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
   than `mix(with:by:)`.
-- **No `Color.primary`, `.secondary`, or `.accentColor`.** *Gap.*
+- **`.primary` and `.secondary` are semantic-role aliases; `Color.accentColor`
+  is omitted.** *Ratified.* `.foregroundStyle(.primary)` and `.secondary`
+  resolve through the host theme — aliases for the `foreground` and `muted`
+  roles — matching SwiftUI's hierarchical-style spelling. They are shape
+  styles, not `Color` statics: `Color` is a concrete value (animatable,
+  codable, channel math), so a theme-deferred `Color.primary` cannot exist
+  without breaking that contract. The accent story is the existing `.tint`
+  role; the `Color.accentColor` spelling is not claimed.
 - **`background(_ style:)` fills the view bounds only.** *Ratified.* There is
   no `ignoresSafeAreaEdges:` parameter and the fill does not bleed into safe
   areas — the restrained-chrome default; painting beyond bounds is expressed
