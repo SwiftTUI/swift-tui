@@ -13,8 +13,6 @@ struct RuntimeConfigurationTests {
     #expect(configuration.verbosity == .normal)
     #expect(configuration.web == nil)
     #expect(configuration.debug == false)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
     #expect(configuration.cursorFollowsFocus == false)
   }
 

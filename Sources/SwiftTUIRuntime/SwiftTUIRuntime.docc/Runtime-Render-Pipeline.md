@@ -335,7 +335,7 @@ are stable.
 `RuntimeConfiguration.output` and the roles implemented by the presentation
 surface.
 
-JSON and accessible output modes write command-oriented output derived from the
+The JSON output mode writes command-oriented output derived from the
 current frame. Raster hosts consume either a raster presentation surface or a
 ``SemanticHostFrame``. A semantic host frame carries:
 

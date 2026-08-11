@@ -8,11 +8,10 @@ extension RuntimeConfiguration {
   /// Precedence within env-var resolution:
   /// 1. `NO_COLOR` always wins over `FORCE_COLOR`
   /// 2. `CLICOLOR=0` disables color. `CLICOLOR_FORCE` forces it.
-  /// 3. `SWIFTTUI_JSON=1` wins over `SWIFTTUI_ACCESSIBLE=1`
-  /// 4. Accessible/linear output implies ASCII, reduced motion, no progress, and linear output
-  /// 5. `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1` enables terminal cursor focus-following
-  /// 6. `SWIFTTUI_PLAIN=1` implies `--no-color --ascii --reduce-motion`
-  /// 7. CLI flags (in `SwiftTUIArguments`) layer on top of this result
+  /// 3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1`
+  ///    plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0`
+  ///    values on those two variables
+  /// 4. CLI flags (in `SwiftTUIArguments`) layer on top of this result
   public static func detect(
     environment: [String: String],
     isStdoutTTY: Bool
@@ -32,54 +31,33 @@ extension RuntimeConfiguration {
     // Glyphs: directly mirror TerminalCapabilityProfile.detect.
     let glyphs: GlyphMode = profile.glyphLevel == .ascii ? .ascii : .unicode
 
-    // Motion / no-progress: non-TTY or CI implies reduced motion + no progress.
+    // Motion: non-TTY or CI implies reduced motion.
     let isCI = environment["CI"].map { !$0.isEmpty && $0 != "false" && $0 != "0" } ?? false
     var motion: MotionMode = (isCI || !isStdoutTTY) ? .reduced : .normal
-    var noProgress: Bool = isCI
 
     // Output mode.
     var output: OutputMode = .tui
     var glyphsResolved = glyphs
 
     // SWIFTTUI_* family — overlay on top of the above.
-    if let v = environment["SWIFTTUI_ACCESSIBLE"], !v.isEmpty, v != "0" {
-      output = .accessible
-    }
     if let v = environment["SWIFTTUI_ASCII"], !v.isEmpty, v != "0" {
       glyphsResolved = .ascii
     }
     if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty {
       motion = (v != "0") ? .reduced : .normal
     }
-    if let v = environment["SWIFTTUI_NO_PROGRESS"], !v.isEmpty {
-      noProgress = (v != "0")
-    }
-    var linear = false
-    if let v = environment["SWIFTTUI_LINEAR"], !v.isEmpty, v != "0" {
-      output = .accessible
-      linear = true
-    }
     var cursorFollowsFocus = false
     if let v = environment["SWIFTTUI_CURSOR_FOLLOWS_FOCUS"], !v.isEmpty, v != "0" {
       cursorFollowsFocus = true
     }
+    // SWIFTTUI_ACCESSIBLE is a convenience alias for reduced motion plus
+    // cursor-follows-focus. It wins over explicit `0` values on either.
+    if let v = environment["SWIFTTUI_ACCESSIBLE"], !v.isEmpty, v != "0" {
+      motion = .reduced
+      cursorFollowsFocus = true
+    }
     if let v = environment["SWIFTTUI_JSON"], !v.isEmpty, v != "0" {
       output = .json
-      linear = false
-    }
-
-    var colorResolved = color
-    if let v = environment["SWIFTTUI_PLAIN"], !v.isEmpty, v != "0" {
-      colorResolved = .never
-      glyphsResolved = .ascii
-      motion = .reduced
-    }
-
-    if output == .accessible {
-      glyphsResolved = .ascii
-      motion = .reduced
-      noProgress = true
-      linear = true
     }
 
     // Web config.
@@ -108,15 +86,13 @@ extension RuntimeConfiguration {
     let debug = (environment["SWIFTTUI_DEBUG"].map { !$0.isEmpty && $0 != "0" }) ?? false
 
     return RuntimeConfiguration(
-      color: colorResolved,
+      color: color,
       glyphs: glyphsResolved,
       motion: motion,
       output: output,
       verbosity: verbosity,
       web: web,
       debug: debug,
-      noProgress: noProgress,
-      linear: linear,
       cursorFollowsFocus: cursorFollowsFocus
     )
   }

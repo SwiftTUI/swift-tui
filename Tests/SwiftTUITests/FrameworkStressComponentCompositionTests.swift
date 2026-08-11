@@ -617,7 +617,7 @@ extension FrameworkStressComponentCompositionTests {
 extension FrameworkStressComponentCompositionTests {
   @Test("stress component composition 018 ProgressView suppression removes and restores ornament")
   func componentComposition018ProgressViewSuppressionRemovesAndRestoresOrnament() {
-    // Hypothesis: toggling no-progress policy can strand the decorated track or static summary.
+    // Hypothesis: toggling reduce-motion policy can strand the decorated track or static summary.
     struct Root: View {
       let generation: Int
       var body: some View {
@@ -628,7 +628,7 @@ extension FrameworkStressComponentCompositionTests {
     let identity = testIdentity("ComponentComposition018")
     for generation in 0..<18 {
       var environment = EnvironmentValues()
-      environment.suppressesProgress = !generation.isMultiple(of: 2)
+      environment.accessibilityReduceMotion = !generation.isMultiple(of: 2)
       let frames = componentCompositionFrames(
         Root(generation: generation), renderer: renderer, identity: identity,
         generation: generation, environmentValues: environment

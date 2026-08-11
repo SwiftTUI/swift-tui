@@ -1131,8 +1131,8 @@ extension FrameworkStressSceneHostTests {
 extension FrameworkStressSceneHostTests {
   @Test("stress scene host 025 conflicting environment modes never inherit prior implications")
   func sceneHost025ConflictingEnvironmentModesNeverInheritPriorImplications() {
-    // Hypothesis: repeated resolution can carry accessible-mode implications
-    // into later JSON, plain, or explicitly re-enabled TUI configurations.
+    // Hypothesis: repeated resolution can carry accessible-alias implications
+    // into later JSON or explicitly re-enabled TUI configurations.
     let base = ["TERM": "xterm-256color", "LANG": "en_US.UTF-8"]
 
     for generation in 0..<24 {
@@ -1143,40 +1143,32 @@ extension FrameworkStressSceneHostTests {
         environment = base.merging([
           "SWIFTTUI_ACCESSIBLE": "1",
           "SWIFTTUI_JSON": "1",
-          "SWIFTTUI_PLAIN": "1",
           "SWIFTTUI_REDUCE_MOTION": "0",
-          "SWIFTTUI_NO_PROGRESS": "0",
         ]) { _, new in new }
         expected = .init(
-          color: .never,
-          glyphs: .ascii,
           motion: .reduced,
-          output: .json
+          output: .json,
+          cursorFollowsFocus: true
         )
       case 1:
         environment = base.merging([
           "SWIFTTUI_ACCESSIBLE": "1",
           "SWIFTTUI_REDUCE_MOTION": "0",
-          "SWIFTTUI_NO_PROGRESS": "0",
+          "SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "0",
         ]) { _, new in new }
         expected = .init(
-          color: .auto,
-          glyphs: .ascii,
           motion: .reduced,
-          output: .accessible,
-          noProgress: true,
-          linear: true
+          cursorFollowsFocus: true
         )
       case 2:
         environment = base.merging([
           "CI": "true",
           "SWIFTTUI_REDUCE_MOTION": "0",
-          "SWIFTTUI_NO_PROGRESS": "0",
         ]) { _, new in new }
         expected = .default
       default:
-        environment = base.merging(["SWIFTTUI_PLAIN": "1"]) { _, new in new }
-        expected = .init(color: .never, glyphs: .ascii, motion: .reduced)
+        environment = base.merging(["SWIFTTUI_REDUCE_MOTION": "1"]) { _, new in new }
+        expected = .init(motion: .reduced)
       }
 
       #expect(RuntimeConfiguration.detect(environment: environment, isStdoutTTY: true) == expected)
@@ -1205,7 +1197,7 @@ extension FrameworkStressSceneHostTests {
       let leftOutput: RuntimeConfiguration.OutputMode =
         generation.isMultiple(of: 2)
         ? .json
-        : .accessible
+        : .tui
       let left =
         base
         .output(leftOutput)
@@ -1271,9 +1263,7 @@ extension FrameworkStressSceneHostTests {
           color: .never,
           glyphs: .ascii,
           motion: .reduced,
-          output: .accessible,
-          noProgress: true,
-          linear: true
+          cursorFollowsFocus: true
         )
         expectedGlyph = .ascii
         expectedColor = .none
@@ -1365,9 +1355,6 @@ extension FrameworkStressSceneHostTests {
       #expect(currentPivot.viewNodeID == pivotNodeID)
     }
 
-    var announcer = LiveRegionAnnouncer()
-    #expect(announcer.announcements(for: baseline).isEmpty)
-
     for generation in 1...16 {
       let reorderedRows =
         generation.isMultiple(of: 2)
@@ -1375,7 +1362,6 @@ extension FrameworkStressSceneHostTests {
         : [pivot, alpha, beta]
       let reordered = snapshot(reorderedRows, invalidated: true)
       try expectStableOwners(in: reordered)
-      #expect(announcer.announcements(for: reordered).isEmpty)
 
       beta = SceneHost028LiveRegionRow(id: 1, label: "Beta \(generation)")
       let changedRows =
@@ -1384,11 +1370,6 @@ extension FrameworkStressSceneHostTests {
         : [pivot, alpha, beta]
       let changed = snapshot(changedRows, invalidated: true)
       try expectStableOwners(in: changed)
-
-      #expect(
-        announcer.announcements(for: changed)
-          == [LiveRegionAnnouncement(politeness: .polite, label: beta.label)]
-      )
     }
   }
 }
@@ -1411,107 +1392,6 @@ private struct SceneHost028DuplicateLiveRegionList: View {
 private struct SceneHost028LiveRegionRow: Hashable, Sendable {
   var id: Int
   var label: String
-}
-
-private func sceneHostLiveRegionNode(
-  nodeID: ViewNodeID,
-  identity: Identity,
-  label: String,
-  politeness: AccessibilityPoliteness = .polite
-) -> AccessibilityNode {
-  AccessibilityNode(
-    viewNodeID: nodeID,
-    identity: identity,
-    rect: .init(origin: .zero, size: .init(width: 10, height: 1)),
-    role: .status,
-    label: label,
-    liveRegion: politeness
-  )
-}
-
-// MARK: - Attempt 029: stable live-region node through identity remint
-
-extension FrameworkStressSceneHostTests {
-  @Test("stress scene host 029 stable live region owner announces through identity remint")
-  func sceneHost029StableLiveRegionOwnerAnnouncesThroughIdentityRemint() {
-    // Hypothesis: semantic identity replacement can make an existing
-    // ViewNodeID look newly inserted and suppress every subsequent label change.
-    var announcer = LiveRegionAnnouncer()
-    let nodeID = ViewNodeID(rawValue: 2_900)
-    _ = announcer.announcements(
-      for: .init(
-        accessibilityNodes: [
-          sceneHostLiveRegionNode(
-            nodeID: nodeID,
-            identity: testIdentity("SceneHost029", "identity-0"),
-            label: "State 0"
-          )
-        ]
-      )
-    )
-
-    for generation in 1...16 {
-      let announcements = announcer.announcements(
-        for: .init(
-          accessibilityNodes: [
-            sceneHostLiveRegionNode(
-              nodeID: nodeID,
-              identity: testIdentity("SceneHost029", "identity-\(generation)"),
-              label: "State \(generation)"
-            )
-          ]
-        )
-      )
-
-      #expect(announcements.count == 1)
-      #expect(announcements.first?.label == "State \(generation)")
-      #expect(announcements.first?.politeness == .polite)
-    }
-  }
-}
-
-// MARK: - Attempt 030: semantic label and politeness churn
-
-extension FrameworkStressSceneHostTests {
-  @Test("stress scene host 030 live region label churn uses the new priority once")
-  func sceneHost030LiveRegionLabelChurnUsesNewPriorityOnce() {
-    // Hypothesis: changing a live region's label and politeness together can
-    // publish the old priority or repeat the same semantic change next frame.
-    var announcer = LiveRegionAnnouncer()
-    let nodeID = ViewNodeID(rawValue: 3_000)
-    let identity = testIdentity("SceneHost030", "status")
-    _ = announcer.announcements(
-      for: .init(
-        accessibilityNodes: [
-          sceneHostLiveRegionNode(nodeID: nodeID, identity: identity, label: "State 0")
-        ]
-      )
-    )
-
-    for generation in 1...16 {
-      let politeness: AccessibilityPoliteness =
-        generation.isMultiple(of: 2)
-        ? .assertive
-        : .polite
-      let snapshot = SemanticSnapshot(
-        accessibilityNodes: [
-          sceneHostLiveRegionNode(
-            nodeID: nodeID,
-            identity: identity,
-            label: "State \(generation)",
-            politeness: politeness
-          )
-        ]
-      )
-      let changed = announcer.announcements(for: snapshot)
-      let unchanged = announcer.announcements(for: snapshot)
-
-      #expect(changed.count == 1)
-      #expect(changed.first?.label == "State \(generation)")
-      #expect(changed.first?.politeness == politeness)
-      #expect(unchanged.isEmpty)
-    }
-  }
 }
 
 // MARK: - Attempt 031: imperative announcement burst in host frame
@@ -1603,130 +1483,5 @@ extension FrameworkStressSceneHostTests {
 
     _ = try await session.stopAndWait()
     _ = try await runTask.value
-  }
-}
-
-// MARK: - Attempt 033: live-region baseline across scene-session replacement
-
-extension FrameworkStressSceneHostTests {
-  @Test("stress scene host 033 replacement sessions reset live region state")
-  func sceneHost033ReplacementSessionsResetLiveRegionState() async throws {
-    // Hypothesis: one selected scene can retain live-region @State across
-    // replacement SceneSession run loops instead of rebuilding initial state.
-    let surface = SceneHostAccessibleSurface()
-    let selection = try #require(
-      collectWindowSceneSelections(from: SceneHostLiveRegionApp().body).first
-    )
-    var initialStates: [Int] = []
-
-    for generation in 0..<8 {
-      let baselineCount = surface.writes.count
-      let input = InjectedTerminalInputReader()
-      let resources = SceneSessionResources(
-        presentationSurface: surface,
-        terminalInputReader: input,
-        surfaceName: "accessible-host",
-        runtimeConfiguration: .init(output: .accessible)
-      )
-      let runTask = Task {
-        try await selection.run(
-          sessionName: "live-region-\(generation)",
-          resources: resources,
-          stateContainer: StateContainer(
-            initialState: SceneSessionState(),
-            invalidationIdentities: [selection.rootIdentity]
-          ),
-          focusTracker: FocusTracker(invalidationIdentities: [selection.rootIdentity])
-        )
-      }
-      await surface.updates.wait { surface.writes.count > baselineCount }
-
-      let initialWriteCount = surface.writes.count
-      input.send(.key(KeyPress(.character("i"), modifiers: .ctrl)))
-      await surface.updates.wait { surface.writes.count > initialWriteCount }
-      input.send(.key(KeyPress(.character("d"), modifiers: .ctrl)))
-      #expect(
-        try await runTask.value.exitReason
-          == .userExit(KeyPress(.character("d"), modifiers: .ctrl))
-      )
-
-      let sessionOutput = surface.writes.dropFirst(baselineCount).joined()
-      let statusStates = sceneHost033States(in: sessionOutput, prefix: "status: State ")
-      let politeStates = sceneHost033States(in: sessionOutput, prefix: "polite: State ")
-      let initialState = try #require(statusStates.first)
-      let advancedState = try #require(statusStates.last)
-
-      #expect(statusStates.count == 2)
-      #expect(advancedState == initialState + 1)
-      #expect(!politeStates.contains(initialState))
-      #expect(politeStates == [advancedState])
-      initialStates.append(initialState)
-    }
-
-    #expect(initialStates == Array(repeating: 0, count: 8))
-  }
-}
-
-private func sceneHost033States(
-  in output: String,
-  prefix: String
-) -> [Int] {
-  output.split(separator: "\n").compactMap { rawLine in
-    let line = rawLine.trimmingCharacters(in: .whitespaces)
-    guard line.hasPrefix(prefix) else {
-      return nil
-    }
-    return Int(String(line.dropFirst(prefix.count)))
-  }
-}
-
-private struct SceneHostLiveRegionApp: App {
-  var body: some Scene {
-    WindowGroup("Primary", id: "primary") {
-      SceneHostLiveRegionView()
-    }
-  }
-}
-
-private struct SceneHostLiveRegionView: View {
-  @State private var state = 0
-
-  var body: some View {
-    Panel(id: "live-region") {
-      Text("State \(state)")
-        .focusable(true)
-        .accessibilityRole(.status)
-        .accessibilityLabel("State \(state)")
-        .accessibilityLiveRegion(.polite)
-    }
-    .keyCommand("Advance", key: .character("i"), modifiers: .ctrl) {
-      state += 1
-    }
-  }
-}
-
-private final class SceneHostAccessibleSurface: PresentationSurface, Sendable {
-  let surfaceSize = CellSize(width: 40, height: 8)
-  let capabilityProfile = TerminalCapabilityProfile.previewUnicode
-  let appearance = TerminalAppearance.fallback
-  let updates = ConditionSignal()
-  private let recordedWrites = Mutex<[String]>([])
-
-  var writes: [String] {
-    recordedWrites.withLock { $0 }
-  }
-
-  func enableRawMode() throws {}
-  func disableRawMode() throws {}
-  func clearScreen() throws {}
-  func moveCursor(to _: CellPoint) throws {}
-
-  func write(_ output: String) throws {
-    recordedWrites.withLock { $0.append(output) }
-    updates.notify()
-  }
-
-  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    .rasterHostMetrics(for: surface, damage: nil)
   }
 }

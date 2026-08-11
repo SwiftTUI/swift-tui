@@ -32,8 +32,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     case tui
     /// Emit JSON instead of a TUI (consumer-defined where supported).
     case json
-    /// Linear, append-only render for screen readers / CI logs.
-    case accessible
   }
 
   public enum Verbosity: Sendable, Equatable {
@@ -83,7 +81,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var glyphs: GlyphMode
   /// Animation/motion policy.
   public var motion: MotionMode
-  /// Top-level output strategy (TUI render, JSON, or accessible linear render).
+  /// Top-level output strategy (TUI render or JSON).
   public var output: OutputMode
   /// Log verbosity level for framework-internal diagnostics.
   public var verbosity: Verbosity
@@ -92,11 +90,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var web: WebConfig?
   /// Enable framework-internal debug instrumentation (frame timings, render-tree diagnostics).
   public var debug: Bool
-  /// Replace progress bars with static status messages.
-  public var noProgress: Bool
-  /// Changes side-by-side layouts, such as `HStack`, to a top-to-bottom layout.
-  /// This mode supports narrow terminals and screen readers.
-  public var linear: Bool
   /// Move the terminal hardware cursor to the focused accessibility node after each TUI commit.
   public var cursorFollowsFocus: Bool
 
@@ -108,8 +101,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     verbosity: Verbosity = .normal,
     web: WebConfig? = nil,
     debug: Bool = false,
-    noProgress: Bool = false,
-    linear: Bool = false,
     cursorFollowsFocus: Bool = false
   ) {
     self.color = color
@@ -119,8 +110,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     self.verbosity = verbosity
     self.web = web
     self.debug = debug
-    self.noProgress = noProgress
-    self.linear = linear
     self.cursorFollowsFocus = cursorFollowsFocus
   }
 

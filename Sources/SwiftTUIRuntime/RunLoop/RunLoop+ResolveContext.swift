@@ -31,7 +31,6 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
     effectiveEnvironmentValues.accessibilityReduceMotion = runtimeConfiguration.motion == .reduced
-    effectiveEnvironmentValues.suppressesProgress = runtimeConfiguration.noProgress
     effectiveEnvironmentValues.cursorFollowsFocus =
       runtimeConfiguration.cursorFollowsFocus
       || usesTerminalCursorForTextInput

@@ -76,7 +76,7 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **An `App` is also a CLI command.** *Ratified.* The batteries-included `App`
   conforms to `SwiftTUICommand`, and apps opt into the standard option surface
   (`--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, `--json`,
-  `--linear`, `--debug`, `--web`, ...) with
+  `--debug`, `--web`, ...) with
   `@OptionGroup var swiftTUIOptions: SwiftTUIOptions`. SwiftUI's `App` has no
   argument-parsing surface. The command-enabled `App` is the
   batteries-included overlay over `SwiftTUIRuntime.App`, which remains

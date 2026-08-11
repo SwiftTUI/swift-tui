@@ -2,10 +2,10 @@
 /// placed tree.
 package struct SemanticExtractor: Sendable {
   /// Whether to run the `accessibilityWarnings` full-tree walk. Its output is
-  /// consumed ONLY by the accessibility/JSON renderers (`.accessible`/`.json`
-  /// output modes); no focus/scroll/routing/TUI consumer reads it. Default
-  /// `true` preserves behavior; the runtime passes `false` for the common
-  /// terminal (`.tui`) path so the walk becomes dead work it can skip.
+  /// consumed ONLY by the JSON renderer (`.json` output mode) and the
+  /// assistive-output testing seam; no focus/scroll/routing/TUI consumer reads
+  /// it. Default `true` preserves behavior; the runtime passes `false` for the
+  /// common terminal (`.tui`) path so the walk becomes dead work it can skip.
   private let extractsAccessibilityWarnings: Bool
 
   package init() {

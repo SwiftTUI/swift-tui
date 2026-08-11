@@ -39,27 +39,15 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.color == .never)
   }
 
-  @Test("--plain implies no-color, ascii, reduce-motion")
-  func cliPlainImpliesAll() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.plain = true
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.color == .never)
-    #expect(configuration.glyphs == .ascii)
-    #expect(configuration.motion == .reduced)
-  }
-
-  @Test("--accessible sets output mode and implied accessible policy")
-  func cliAccessibleSetsOutput() throws {
+  @Test("--accessible implies reduce-motion and cursor-follows-focus")
+  func cliAccessibleImpliesPolicy() throws {
     var options = try SwiftTUIOptions.parse([])
     options.accessible = true
     let configuration = options.runtimeConfiguration(
       environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.output == .tui)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("--json sets output mode to .json")
@@ -68,19 +56,6 @@ struct SwiftTUIOptionsResolutionTests {
     options.json = true
     let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.output == .json)
-  }
-
-  @Test("--linear selects accessible linear output")
-  func cliLinearSelectsAccessibleOutput() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.linear = true
-    let configuration = options.runtimeConfiguration(
-      environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
-    #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
   }
 
   @Test("--cursor-follows-focus enables terminal cursor focus-following")
@@ -99,31 +74,27 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.cursorFollowsFocus == true)
   }
 
-  @Test("--json takes priority over --accessible when both set")
-  func cliJsonBeatsAccessible() throws {
+  @Test("--json and --accessible compose: JSON output with accessible policy")
+  func cliJsonComposesWithAccessible() throws {
     var options = try SwiftTUIOptions.parse([])
     options.accessible = true
     options.json = true
     let configuration = options.runtimeConfiguration(
       environment: ["LANG": "en_US.UTF-8"], isStdoutTTY: true)
     #expect(configuration.output == .json)
-    #expect(configuration.glyphs == .unicode)
-    #expect(configuration.motion == .normal)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
-  @Test("--accessible beats SWIFTTUI_JSON=1")
-  func cliAccessibleBeatsEnvJson() throws {
+  @Test("--accessible composes with SWIFTTUI_JSON=1")
+  func cliAccessibleComposesWithEnvJson() throws {
     var options = try SwiftTUIOptions.parse([])
     options.accessible = true
     let configuration = options.runtimeConfiguration(
       environment: ["SWIFTTUI_JSON": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.output == .json)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("--accessible implications ignore env opt-outs")
@@ -133,53 +104,23 @@ struct SwiftTUIOptionsResolutionTests {
     let configuration = options.runtimeConfiguration(
       environment: [
         "SWIFTTUI_REDUCE_MOTION": "0",
-        "SWIFTTUI_NO_PROGRESS": "0",
+        "SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "0",
         "LANG": "en_US.UTF-8",
       ], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.output == .tui)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
-  @Test("--json beats SWIFTTUI_ACCESSIBLE=1")
-  func cliJsonBeatsEnvAccessible() throws {
+  @Test("--json composes with SWIFTTUI_ACCESSIBLE=1")
+  func cliJsonComposesWithEnvAccessible() throws {
     var options = try SwiftTUIOptions.parse([])
     options.json = true
     let configuration = options.runtimeConfiguration(
       environment: ["SWIFTTUI_ACCESSIBLE": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
     #expect(configuration.output == .json)
-    #expect(configuration.glyphs == .unicode)
-    #expect(configuration.motion == .normal)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
-  }
-
-  @Test("--json beats SWIFTTUI_LINEAR=1")
-  func cliJsonBeatsEnvLinear() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.json = true
-    let configuration = options.runtimeConfiguration(
-      environment: ["SWIFTTUI_LINEAR": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .json)
-    #expect(configuration.glyphs == .unicode)
-    #expect(configuration.motion == .normal)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
-  }
-
-  @Test("--linear beats SWIFTTUI_JSON=1")
-  func cliLinearBeatsEnvJson() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.linear = true
-    let configuration = options.runtimeConfiguration(
-      environment: ["SWIFTTUI_JSON": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("--web --port 9000 --bind 0.0.0.0 produces WebConfig")
@@ -305,14 +246,4 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.debug == true)
   }
 
-  @Test("--plain combined with --force-color: plain's no-color still wins")
-  func cliPlainBeatsForceColor() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.plain = true
-    options.forceColor = true
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.color == .never)
-    #expect(configuration.glyphs == .ascii)
-    #expect(configuration.motion == .reduced)
-  }
 }

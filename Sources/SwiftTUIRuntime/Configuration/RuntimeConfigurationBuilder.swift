@@ -52,18 +52,6 @@ extension RuntimeConfiguration {
       return copy
     }
 
-    public func noProgress(_ value: Bool) -> Self {
-      var copy = self
-      copy.configuration.noProgress = value
-      return copy
-    }
-
-    public func linear(_ value: Bool) -> Self {
-      var copy = self
-      copy.configuration.linear = value
-      return copy
-    }
-
     public func cursorFollowsFocus(_ value: Bool) -> Self {
       var copy = self
       copy.configuration.cursorFollowsFocus = value

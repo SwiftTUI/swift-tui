@@ -12,9 +12,6 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.accessible == false)
     #expect(options.ascii == false)
     #expect(options.reduceMotion == false)
-    #expect(options.noProgress == false)
-    #expect(options.plain == false)
-    #expect(options.linear == false)
     #expect(options.cursorFollowsFocus == false)
     #expect(options.json == false)
     #expect(options.web == false)
@@ -35,10 +32,10 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.reduceMotion == true)
   }
 
-  @Test("Parses --plain")
-  func parsesPlain() throws {
-    let options = try SwiftTUIOptions.parse(["--plain"])
-    #expect(options.plain == true)
+  @Test("Parses --accessible")
+  func parsesAccessible() throws {
+    let options = try SwiftTUIOptions.parse(["--accessible"])
+    #expect(options.accessible == true)
   }
 
   @Test("Parses --cursor-follows-focus")

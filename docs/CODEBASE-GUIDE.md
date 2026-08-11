@@ -163,7 +163,7 @@ and the key types you will land on. The flows below cite back to these homes.
 | **Environment** | `Sources/SwiftTUIViews/Environment/` | `Environment`, `EnvironmentValues`, `ResolveContext`, `StyleEnvironment`, and `PointerInputEnvironment`. |
 | **Animation** | `Sources/SwiftTUIRuntime/Lifecycle/` (driver) + `Sources/SwiftTUIViews/Animation/` (authoring) + `Sources/SwiftTUIGraph/Animation/` (intent) + `Sources/SwiftTUIPrimitives/Animation/` (math) | `AnimationController`, `ScrollMomentumController`, and `PointerVelocitySampler`. Authored `Animation`/`withAnimation`/`PhaseAnimator`/`TimelineView`/`AnyTransition`. Graph's `AnimationProtocols`. Primitives' `AnimatableArray`. |
 | **Presentation** | `Sources/SwiftTUIViews/Presentation/` | Boolean and optional-item modifiers emit through `PresentationTriggerLeaf`. `PresentationCoordinatorRegistry` owns family ordering and Escape dispatch. `OverlayStackEntryHost` registers presenter `onDismiss` observers on committed entry teardown. `fullScreenCover` reuses the sheet family with an internal full-screen surface mode. |
-| **Semantics / accessibility** | `Sources/SwiftTUICore/Semantics/` + `Sources/SwiftTUIRuntime/Accessibility/` | Core's `SemanticExtractor` and `SemanticSnapshot`. Runtime's `LinearAccessibilityRenderer` and `LiveRegionAnnouncer`. |
+| **Semantics / accessibility** | `Sources/SwiftTUICore/Semantics/` + `Sources/SwiftTUIRuntime/Accessibility/` | Core's `SemanticExtractor` and `SemanticSnapshot`. Runtime's `LinearAccessibilityRenderer` (testing-seam renderer behind `SwiftTUITestSupport`). |
 | **Draw / raster** | `Sources/SwiftTUICore/Draw/` and `Sources/SwiftTUICore/Raster/` | `DrawExtractor` → `DrawNode`. `Rasterizer` → `RasterSurface`. Braille/canvas drawing and image compositing also live under Draw. |
 | **Commit** | `Sources/SwiftTUICore/Commit/` | `CommitPlanner` → `CommitPlan`. `FrameArtifacts` gathers all seven products. `PresentationDamage` describes host-facing raster damage. |
 | **Styling** | `Sources/SwiftTUIPrimitives/Styling/` + `Sources/SwiftTUICore/Styling/` | Primitives owns `Color`, `Theme`, `BorderSet`, gradients, shapes, appearance, and structural text-style values. Core owns render-time collection-style layout and text-style resolution. |
@@ -863,13 +863,12 @@ the surface *this* run loop last presented (`previousPresentedRasterSurface`, di
 by `presentationDamage(for:)`), then dispatches by capability, in order:
 
 1. `output == .json` → `presentJSONFrame`.
-2. `output == .accessible` → `presentLinearAccessibilityFrame`.
-3. surface is `SemanticHostFramePresentationSurface` → build a `SemanticHostFrame`
+2. surface is `SemanticHostFramePresentationSurface` → build a `SemanticHostFrame`
    (sequence, raster, scroll-enriched semantics, focused identity, damage, preferred
    size) and `present(_:)` it. **WASI, WebHost, SwiftUI, and Android take this path.**
-4. surface is `DamageAwarePresentationSurface` → `present(raster, damage:)`. **Terminal
+3. surface is `DamageAwarePresentationSurface` → `present(raster, damage:)`. **Terminal
    takes this path.**
-5. plain `RasterPresentationSurface` → full repaint fallback.
+4. plain `RasterPresentationSurface` → full repaint fallback.
 
 Roles are defined in
 `Sources/SwiftTUIRuntime/Terminal/PresentationSurface.swift`. A terminal conforms to

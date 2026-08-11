@@ -18,11 +18,11 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 59 | 519 |
+| `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 285 | 1552 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
-| `SwiftTUIArguments` | 4 | 49 |
+| `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminal` | 14 | 131 |
 | `SwiftTUITerminalWorkspace` | 14 | 118 |
@@ -81,7 +81,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `RunLoop` — class — 11 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 4 members
-- `RuntimeConfiguration` — struct — 56 members
+- `RuntimeConfiguration` — struct — 51 members
 - `RuntimeIssueSink` — extension — 1 member
 - `RuntimeRenderMode` — enum — 9 members
 - `Scene` — protocol — 2 members
@@ -428,7 +428,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `CompletionsCommand` — struct — 13 members
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 11 members
-- `SwiftTUIOptions` — struct — 21 members
+- `SwiftTUIOptions` — struct — 18 members
 
 ## SwiftTUIPTYPrimitives
 

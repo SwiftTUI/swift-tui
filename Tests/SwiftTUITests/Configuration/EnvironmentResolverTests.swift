@@ -54,11 +54,10 @@ struct EnvironmentResolverTests {
     #expect(configuration.color == .always)
   }
 
-  @Test("CI=true triggers reduce-motion and no-progress without accessible output")
+  @Test("CI=true triggers reduce-motion while output stays TUI")
   func ciTriggersReducedMotion() {
     let configuration = RuntimeConfiguration.detect(environment: ["CI": "true"], isStdoutTTY: true)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
     #expect(configuration.output == .tui)
   }
 
@@ -75,15 +74,14 @@ struct EnvironmentResolverTests {
     #expect(configuration.glyphs == .unicode)
   }
 
-  @Test("SWIFTTUI_ACCESSIBLE=1 sets accessible output mode and implied policy")
+  @Test("SWIFTTUI_ACCESSIBLE=1 implies reduced motion and cursor-follows-focus")
   func swiftTUIAccessible() {
     let configuration = RuntimeConfiguration.detect(
       environment: ["SWIFTTUI_ACCESSIBLE": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.output == .tui)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
+    #expect(configuration.glyphs == .unicode)
   }
 
   @Test("SWIFTTUI_ASCII=1 sets ASCII glyphs")
@@ -97,15 +95,6 @@ struct EnvironmentResolverTests {
   func swiftTUIReduceMotion() {
     let configuration = RuntimeConfiguration.detect(
       environment: ["SWIFTTUI_REDUCE_MOTION": "1"], isStdoutTTY: true)
-    #expect(configuration.motion == .reduced)
-  }
-
-  @Test("SWIFTTUI_PLAIN=1 implies no-color, ascii, reduce-motion")
-  func swiftTUIPlain() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_PLAIN": "1"], isStdoutTTY: true)
-    #expect(configuration.color == .never)
-    #expect(configuration.glyphs == .ascii)
     #expect(configuration.motion == .reduced)
   }
 
@@ -150,29 +139,11 @@ struct EnvironmentResolverTests {
     #expect(configuration.output == .json)
   }
 
-  @Test("SWIFTTUI_LINEAR=1 selects accessible linear output")
-  func swiftTUILinear() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_LINEAR": "1", "LANG": "en_US.UTF-8"], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
-    #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
-  }
-
   @Test("SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1 sets cursorFollowsFocus=true")
   func swiftTUICursorFollowsFocus() {
     let configuration = RuntimeConfiguration.detect(
       environment: ["SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "1"], isStdoutTTY: true)
     #expect(configuration.cursorFollowsFocus == true)
-  }
-
-  @Test("SWIFTTUI_NO_PROGRESS=1 sets noProgress=true without CI")
-  func swiftTUINoProgressWithoutCI() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_NO_PROGRESS": "1"], isStdoutTTY: true)
-    #expect(configuration.noProgress == true)
   }
 
   @Test("CI=true SWIFTTUI_REDUCE_MOTION=0 turns motion back on (explicit env override)")
@@ -182,15 +153,8 @@ struct EnvironmentResolverTests {
     #expect(configuration.motion == .normal)
   }
 
-  @Test("CI=true SWIFTTUI_NO_PROGRESS=0 re-enables progress (explicit env override)")
-  func ciWithExplicitProgressOn() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["CI": "true", "SWIFTTUI_NO_PROGRESS": "0"], isStdoutTTY: true)
-    #expect(configuration.noProgress == false)
-  }
-
-  @Test("SWIFTTUI_JSON wins over SWIFTTUI_ACCESSIBLE when both set")
-  func swiftTUIJsonBeatsAccessible() {
+  @Test("SWIFTTUI_JSON and SWIFTTUI_ACCESSIBLE compose when both set")
+  func swiftTUIJsonComposesWithAccessible() {
     let configuration = RuntimeConfiguration.detect(
       environment: [
         "SWIFTTUI_ACCESSIBLE": "1",
@@ -198,25 +162,8 @@ struct EnvironmentResolverTests {
         "LANG": "en_US.UTF-8",
       ], isStdoutTTY: true)
     #expect(configuration.output == .json)
-    #expect(configuration.glyphs == .unicode)
-    #expect(configuration.motion == .normal)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
-  }
-
-  @Test("SWIFTTUI_JSON wins over SWIFTTUI_LINEAR when both set")
-  func swiftTUIJsonBeatsLinear() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: [
-        "SWIFTTUI_LINEAR": "1",
-        "SWIFTTUI_JSON": "1",
-        "LANG": "en_US.UTF-8",
-      ], isStdoutTTY: true)
-    #expect(configuration.output == .json)
-    #expect(configuration.glyphs == .unicode)
-    #expect(configuration.motion == .normal)
-    #expect(configuration.noProgress == false)
-    #expect(configuration.linear == false)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("SWIFTTUI_ACCESSIBLE=1 implications ignore explicit env opt-outs")
@@ -225,13 +172,11 @@ struct EnvironmentResolverTests {
       environment: [
         "SWIFTTUI_ACCESSIBLE": "1",
         "SWIFTTUI_REDUCE_MOTION": "0",
-        "SWIFTTUI_NO_PROGRESS": "0",
+        "SWIFTTUI_CURSOR_FOLLOWS_FOCUS": "0",
         "LANG": "en_US.UTF-8",
       ], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
-    #expect(configuration.glyphs == .ascii)
+    #expect(configuration.output == .tui)
     #expect(configuration.motion == .reduced)
-    #expect(configuration.noProgress == true)
-    #expect(configuration.linear == true)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 }

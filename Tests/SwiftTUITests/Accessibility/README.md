@@ -1,15 +1,17 @@
 # Accessibility Listening Review
 
 This directory documents the manual listening surface that complements the
-committed semantic, Web/WASI, SwiftUI host, and accessible-output tests.
+committed semantic, Web/WASI, and SwiftUI host tests.
 
 ## VoiceOver
 
-Use VoiceOver on macOS for both terminal accessible output and the SwiftUI host.
+Use VoiceOver on macOS for both the terminal (cursor-follows-focus) and the
+SwiftUI host.
 
-1. Start the gallery in linear accessible mode:
+1. Start the gallery in accessible mode (reduced motion plus
+   cursor-follows-focus, so the screen reader tracks the hardware cursor):
    `swiftly run swift run --package-path ../swift-tui-examples/gallery gallery-demo --accessible`
-2. Make sure that tab changes, focused controls, text input labels, live-region output,
+2. Make sure that tab changes, focused controls, text input labels,
    and `AccessibilityAnnouncer` messages are spoken in logical order.
 3. Exercise visual-only screens such as images, charts, canvas demos, and
    animated content. They must expose meaningful labels or summaries, or be
@@ -43,10 +45,10 @@ Use NVDA on Windows against the browser target.
 
 ## Orca
 
-Use Orca on Linux against the browser target, and against terminal accessible
-output when the terminal and shell combination is known to be readable.
+Use Orca on Linux against the browser target, and against the terminal when
+the terminal and shell combination is known to be readable.
 
-1. Start with `--accessible --ascii --no-progress` when testing terminal output.
+1. Start with `--accessible --ascii` when testing terminal output.
 2. Prefer the browser target for role/focus regressions.
 3. Make sure that visual-only content is either summarized or skipped consistently.
 

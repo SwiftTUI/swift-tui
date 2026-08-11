@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Suite
 struct MotionAndProgressPolicyTests {
-  @Test("runtime configuration maps reduced motion and no-progress into resolve context")
+  @Test("runtime configuration maps reduced motion into resolve context")
   func runtimeConfigurationMapsPolicyIntoResolveContext() throws {
     let rootIdentity = testIdentity("RuntimeMotionPolicyRoot")
     let scheduler = FrameScheduler()
@@ -19,7 +19,7 @@ struct MotionAndProgressPolicyTests {
       scheduler: scheduler,
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
-      runtimeConfiguration: RuntimeConfiguration(motion: .reduced, noProgress: true),
+      runtimeConfiguration: RuntimeConfiguration(motion: .reduced),
       viewBuilder: ScopedMapper { _ in
         Text("Ready")
       }
@@ -34,7 +34,6 @@ struct MotionAndProgressPolicyTests {
     let context = runLoop.resolveContext(for: frame)
 
     #expect(context.environmentValues.accessibilityReduceMotion)
-    #expect(context.environmentValues.suppressesProgress)
     #expect(context.transaction.animationRequest == .disabled)
     #expect(context.transaction.animationBatchID == nil)
   }
@@ -52,11 +51,11 @@ struct MotionAndProgressPolicyTests {
     #expect(!surface.contains("─"))
   }
 
-  @Test("no-progress removes progress ornament and keeps determinate status text")
-  func noProgressKeepsDeterminateStatusText() {
+  @Test("reduced motion removes the determinate progress ornament and keeps status text")
+  func reducedMotionKeepsDeterminateStatusText() {
     let surface = renderedSurface(
       ProgressView("Sync", value: 3, total: 4, barWidth: 8),
-      environmentValues: policyEnvironment(suppressesProgress: true),
+      environmentValues: policyEnvironment(accessibilityReduceMotion: true),
       identity: testIdentity("NoProgressDeterminate")
     )
 
@@ -166,14 +165,11 @@ struct MotionAndProgressPolicyTests {
     #expect(reducedCount == 0)
   }
 
-  @Test("static controls render unchanged under motion and progress policy")
+  @Test("static controls render unchanged under motion policy")
   func staticControlsRenderUnchangedUnderPolicy() {
     let surface = renderedSurface(
       Text("Ready"),
-      environmentValues: policyEnvironment(
-        accessibilityReduceMotion: true,
-        suppressesProgress: true
-      ),
+      environmentValues: policyEnvironment(accessibilityReduceMotion: true),
       identity: testIdentity("StaticPolicyText")
     )
 
@@ -327,12 +323,10 @@ private func renderArtifacts<V: View>(
 }
 
 private func policyEnvironment(
-  accessibilityReduceMotion: Bool = false,
-  suppressesProgress: Bool = false
+  accessibilityReduceMotion: Bool = false
 ) -> EnvironmentValues {
   var values = EnvironmentValues()
   values.accessibilityReduceMotion = accessibilityReduceMotion
-  values.suppressesProgress = suppressesProgress
   return values
 }
 

@@ -1,5 +1,10 @@
 import SwiftTUICore
 
+/// Renders a semantic snapshot to a linear reading-order string (labels,
+/// roles, values, and missing-label warnings). This is not a runtime output
+/// mode: its consumer is the `@_spi(Testing)` seam in `SwiftTUITestSupport`
+/// (`renderLinearAccessibilityOutput`), which external packages use to assert
+/// on assistive output for their views.
 package struct LinearAccessibilityRenderer: Equatable, Sendable {
   private let textSanitizer = AccessibilityTextSanitizer()
 

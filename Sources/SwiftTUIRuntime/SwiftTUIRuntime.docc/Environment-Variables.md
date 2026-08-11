@@ -46,21 +46,14 @@ start.
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_ACCESSIBLE` | boolean | Selects accessible output. Implies ASCII glyphs, reduced motion, no progress animations, and linear output. |
-| `SWIFTTUI_LINEAR` | boolean | Selects linear (append-only) output. Implies accessible output. |
-| `SWIFTTUI_JSON` | boolean | Selects JSON output. Wins over `SWIFTTUI_ACCESSIBLE`. |
-| `SWIFTTUI_PLAIN` | boolean | Shorthand for `--no-color --ascii --reduce-motion`. |
+| `SWIFTTUI_ACCESSIBLE` | boolean | Shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`. Wins over explicit `0` values on those two variables. |
+| `SWIFTTUI_JSON` | boolean | Selects JSON output. |
 | `SWIFTTUI_ASCII` | boolean | Forces ASCII glyphs in place of Unicode box drawing and symbols. |
-| `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy forces reduced motion. An explicit `0` restores normal motion even where CI or a non-TTY stdout implied reduction. |
-| `SWIFTTUI_NO_PROGRESS` | `0` / truthy | Truthy hides progress animations. An explicit `0` restores them where `CI` implied hiding. |
+| `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy forces reduced motion, which also renders progress views as static status text. An explicit `0` restores normal motion even where CI or a non-TTY stdout implied reduction. |
 | `SWIFTTUI_QUIET` | boolean | Quiet verbosity. Wins over `SWIFTTUI_VERBOSE`. |
 | `SWIFTTUI_VERBOSE` | integer > 0 | Verbose logging at the given level. |
 | `SWIFTTUI_DEBUG` | boolean | Debug mode. On the terminal CLI runner this also enables the diagnostics TSV at its default path (see `SWIFTTUI_DIAGNOSTICS`). |
 | `SWIFTTUI_CURSOR_FOLLOWS_FOCUS` | boolean | Moves the hardware terminal cursor to the focused control so screen readers can track focus. |
-
-Precedence within the family: `SWIFTTUI_JSON` > `SWIFTTUI_ACCESSIBLE` >
-`SWIFTTUI_PLAIN`; accessible/linear output then forces ASCII, reduced motion,
-and no progress regardless of the individual toggles.
 
 ### Web host session
 

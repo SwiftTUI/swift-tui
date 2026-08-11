@@ -113,11 +113,8 @@ SwiftTUIArguments.SwiftTUIOptions.forceColor
 SwiftTUIArguments.SwiftTUIOptions.init()
 SwiftTUIArguments.SwiftTUIOptions.init(from:)
 SwiftTUIArguments.SwiftTUIOptions.json
-SwiftTUIArguments.SwiftTUIOptions.linear
 SwiftTUIArguments.SwiftTUIOptions.noColor
-SwiftTUIArguments.SwiftTUIOptions.noProgress
 SwiftTUIArguments.SwiftTUIOptions.open
-SwiftTUIArguments.SwiftTUIOptions.plain
 SwiftTUIArguments.SwiftTUIOptions.port
 SwiftTUIArguments.SwiftTUIOptions.quiet
 SwiftTUIArguments.SwiftTUIOptions.reduceMotion
@@ -2568,9 +2565,7 @@ SwiftTUIRuntime.RuntimeConfiguration.Builder.cursorFollowsFocus(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.debug(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.glyphs(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.init()
-SwiftTUIRuntime.RuntimeConfiguration.Builder.linear(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.motion(_:)
-SwiftTUIRuntime.RuntimeConfiguration.Builder.noProgress(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.output(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.verbosity(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.web(port:bind:openBrowser:sceneID:)
@@ -2588,7 +2583,6 @@ SwiftTUIRuntime.RuntimeConfiguration.MotionMode.init(rawValue:)
 SwiftTUIRuntime.RuntimeConfiguration.MotionMode.normal
 SwiftTUIRuntime.RuntimeConfiguration.MotionMode.reduced
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode
-SwiftTUIRuntime.RuntimeConfiguration.OutputMode.accessible
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.init(rawValue:)
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.json
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.tui
@@ -2610,10 +2604,8 @@ SwiftTUIRuntime.RuntimeConfiguration.debug
 SwiftTUIRuntime.RuntimeConfiguration.default
 SwiftTUIRuntime.RuntimeConfiguration.detect(environment:isStdoutTTY:)
 SwiftTUIRuntime.RuntimeConfiguration.glyphs
-SwiftTUIRuntime.RuntimeConfiguration.init(color:glyphs:motion:output:verbosity:web:debug:noProgress:linear:cursorFollowsFocus:)
-SwiftTUIRuntime.RuntimeConfiguration.linear
+SwiftTUIRuntime.RuntimeConfiguration.init(color:glyphs:motion:output:verbosity:web:debug:cursorFollowsFocus:)
 SwiftTUIRuntime.RuntimeConfiguration.motion
-SwiftTUIRuntime.RuntimeConfiguration.noProgress
 SwiftTUIRuntime.RuntimeConfiguration.output
 SwiftTUIRuntime.RuntimeConfiguration.verbosity
 SwiftTUIRuntime.RuntimeConfiguration.web

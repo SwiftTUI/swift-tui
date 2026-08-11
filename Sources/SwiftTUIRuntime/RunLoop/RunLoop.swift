@@ -41,7 +41,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// weak, and the filter must outlive the install (see
   /// ``installFocusTrackerInvalidator()``).
   private var focusTrackerInvalidationFilter: FocusPresentationInvalidationFilter?
-  package var liveRegionAnnouncer = LiveRegionAnnouncer()
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()

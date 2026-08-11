@@ -34,7 +34,7 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   @Flag(
     name: .customLong("accessible"),
     help:
-      "Accessible mode: drop the TUI for a linear, append-only render. [env: SWIFTTUI_ACCESSIBLE]"
+      "Accessible mode: implies --reduce-motion and --cursor-follows-focus. [env: SWIFTTUI_ACCESSIBLE]"
   )
   public var accessible: Bool = false
 
@@ -49,24 +49,6 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
     help: "Suppress animations and spinners. [env: SWIFTTUI_REDUCE_MOTION]"
   )
   public var reduceMotion: Bool = false
-
-  @Flag(
-    name: .customLong("no-progress"),
-    help: "Replace progress bars with static status messages. [env: SWIFTTUI_NO_PROGRESS]"
-  )
-  public var noProgress: Bool = false
-
-  @Flag(
-    name: .customLong("plain"),
-    help: "Plain text only: implies --no-color, --ascii, --reduce-motion. [env: SWIFTTUI_PLAIN]"
-  )
-  public var plain: Bool = false
-
-  @Flag(
-    name: .customLong("linear"),
-    help: "Accessible linear output: drop the TUI for append-only text. [env: SWIFTTUI_LINEAR]"
-  )
-  public var linear: Bool = false
 
   @Flag(
     name: .customLong("cursor-follows-focus"),

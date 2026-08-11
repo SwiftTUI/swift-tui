@@ -17,7 +17,7 @@ reconstructs a tree. The snapshot deliberately does **not** bake in focus
 state. Consumers cross-reference live focus from `FocusTracker` during
 presentation. Thus, one snapshot stays valid when focus moves.
 
-## One snapshot, five consumers
+## One snapshot, four consumers
 
 ```mermaid
 flowchart TD
@@ -26,7 +26,6 @@ flowchart TD
     snap["SemanticSnapshot.accessibilityNodes"]
     meta --> extract --> snap
 
-    snap --> cli["Terminal: LinearAccessibilityRenderer<br/>(output == .accessible)"]
     snap --> cursor["Terminal: cursor-follows-focus"]
     snap --> web["Web / WASI: accessibilityTree JSON<br/>→ ARIA DOM mounter"]
     snap --> swiftui["SwiftUI host: HostedAccessibilityOverlay<br/>→ VoiceOver"]
@@ -37,24 +36,27 @@ flowchart TD
     focus -.cross-referenced.-> android
 ```
 
-1. **Terminal linear renderer.** When the runtime output mode is `.accessible`,
-   `LinearAccessibilityRenderer` emits a linear, screen-reader-friendly text
-   rendering of the snapshot instead of the visual frame.
-2. **Terminal cursor-follows-focus.** When `cursorFollowsFocus` is enabled, the
-   terminal cursor tracks the focused node's `cursorAnchor`, so a terminal
-   screen reader follows focus. This is opt-in and off by default.
-3. **Web / WASI ARIA.** The `web-surface` wire frame carries the
+1. **Terminal cursor-follows-focus.** When `cursorFollowsFocus` is enabled
+   (directly or through the `SWIFTTUI_ACCESSIBLE` alias), the terminal cursor
+   tracks the focused node's `cursorAnchor`, so a terminal screen reader
+   follows focus. This is opt-in and off by default.
+2. **Web / WASI ARIA.** The `web-surface` wire frame carries the
    `accessibilityTree` as JSON (a v2 frame when the tree is present). In the
    browser, the canvas is `aria-hidden` and a sibling DOM tree is populated
    from that JSON so assistive technology reads the ARIA tree.
-4. **SwiftUI host.** `HostedAccessibilityOverlay` mounts a zero-size native
+3. **SwiftUI host.** `HostedAccessibilityOverlay` mounts a zero-size native
    accessibility overlay over the raster surface. Each `AccessibilityNode`
    becomes a native element with role-derived traits. Runtime focus is pushed
    to VoiceOver (the overlay's focused element follows the runtime).
-5. **Android host.** `SwiftTUIAndroidHost` serializes accessibility nodes and
+4. **Android host.** `SwiftTUIAndroidHost` serializes accessibility nodes and
    announcements into the Android frame snapshot. `AndroidGallery` mounts a
    transparent Compose semantics overlay over the canvas so TalkBack can read
    the semantic tree rather than a single opaque image.
+
+A fifth consumer lives outside the runtime: the `SwiftTUITestSupport` seam
+`renderLinearAccessibilityOutput(_:)` renders a snapshot to a linear
+reading-order string (via the internal `LinearAccessibilityRenderer`) so
+external packages can assert on assistive output for their views.
 
 ## Known gaps
 

@@ -9,12 +9,12 @@ struct FrameworkStressArgumentResolutionTests {
   @Test("stress argument resolution 001 every Boolean flag parses together")
   func argumentResolution001EveryBooleanFlagParsesTogether() throws {
     let options = try SwiftTUIOptions.parse([
-      "--no-color", "--force-color", "--accessible", "--ascii", "--reduce-motion", "--no-progress",
-      "--plain", "--linear", "--cursor-follows-focus", "--json", "--web", "--open", "--quiet",
+      "--no-color", "--force-color", "--accessible", "--ascii", "--reduce-motion",
+      "--cursor-follows-focus", "--json", "--web", "--open", "--quiet",
       "--debug",
     ])
     #expect(options.noColor && options.forceColor && options.accessible && options.ascii)
-    #expect(options.reduceMotion && options.noProgress && options.plain && options.linear)
+    #expect(options.reduceMotion)
     #expect(options.cursorFollowsFocus && options.json && options.web && options.open)
     #expect(options.quiet && options.debug)
   }
@@ -139,12 +139,6 @@ struct FrameworkStressArgumentResolutionTests {
       options.runtimeConfiguration(environment: ["SWIFTTUI_DEBUG": "0"], isStdoutTTY: true).debug)
   }
 
-  @Test("stress argument resolution 020 no-progress remains explicit in JSON mode")
-  func argumentResolution020NoProgressRemainsExplicitInJSONMode() throws {
-    let options = try SwiftTUIOptions.parse(["--json", "--no-progress"])
-    #expect(options.runtimeConfiguration(environment: [:], isStdoutTTY: true).noProgress)
-  }
-
   @Test("stress argument resolution 021 ASCII remains explicit in JSON mode")
   func argumentResolution021ASCIIRemainsExplicitInJSONMode() throws {
     let options = try SwiftTUIOptions.parse(["--json", "--ascii"])
@@ -165,18 +159,11 @@ struct FrameworkStressArgumentResolutionTests {
     #expect(options.runtimeConfiguration(environment: [:], isStdoutTTY: false).color == .always)
   }
 
-  @Test("stress argument resolution 024 JSON clears CLI linear policy")
-  func argumentResolution024JSONClearsCLILinearPolicy() throws {
-    let options = try SwiftTUIOptions.parse(["--linear", "--json"])
+  @Test("stress argument resolution 024 accessible policy remains explicit in JSON mode")
+  func argumentResolution024AccessiblePolicyRemainsExplicitInJSONMode() throws {
+    let options = try SwiftTUIOptions.parse(["--accessible", "--json"])
     let config = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(config.output == .json)
-    #expect(config.linear == false)
-  }
-
-  @Test("stress argument resolution 025 plain policy remains explicit in JSON mode")
-  func argumentResolution025PlainPolicyRemainsExplicitInJSONMode() throws {
-    let options = try SwiftTUIOptions.parse(["--plain", "--json"])
-    let config = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(config.color == .never && config.glyphs == .ascii && config.motion == .reduced)
+    #expect(config.motion == .reduced && config.cursorFollowsFocus)
   }
 }

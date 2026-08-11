@@ -7,9 +7,8 @@ trees, VoiceOver, and TalkBack can present your interface.
 
 SwiftTUI builds accessibility into the render pipeline rather than bolting it
 on. Every frame produces one semantic snapshot, and each presentation path —
-the terminal's linear accessible output, the terminal cursor-follows-focus
-mode, the Web/WASI ARIA tree, and the native SwiftUI and Android host
-overlays — presents that same snapshot.
+the terminal cursor-follows-focus mode, the Web/WASI ARIA tree, and the
+native SwiftUI and Android host overlays — presents that same snapshot.
 
 ## Semantic Modifiers
 
@@ -48,20 +47,19 @@ phase without cycling, and `AnimatedImage` renders its first frame.
 
 ## Output-Mode Detection
 
-The output, glyph, motion, and progress policy is resolved from the process
-environment and the TTY state at session start. The precedence is fixed:
+The output, glyph, and motion policy is resolved from the process environment
+and the TTY state at session start. The precedence is fixed:
 
 1. `NO_COLOR` / `CLICOLOR=0`, then `FORCE_COLOR` / `CLICOLOR_FORCE`.
-2. `SWIFTTUI_JSON=1` selects JSON output and wins over
-   `SWIFTTUI_ACCESSIBLE=1`.
-3. `SWIFTTUI_ACCESSIBLE=1` selects accessible output, which also forces ASCII
-   glyphs, reduced motion, no progress animation, and linear rendering.
-4. `SWIFTTUI_PLAIN=1` is shorthand for no-color, ASCII, reduced motion.
-5. `CI=true` implies reduced motion and no progress animation.
-6. A non-TTY stdout implies reduced motion but not accessible output.
+2. `SWIFTTUI_JSON=1` selects JSON output.
+3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus
+   `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0` values on
+   those two variables.
+4. `CI=true` implies reduced motion (which also renders progress views as
+   static status text).
+5. A non-TTY stdout implies reduced motion.
 
-The full environment-variable reference, including the accessible-output
-family, lives in the `SwiftTUIRuntime` article
+The full environment-variable reference lives in the `SwiftTUIRuntime` article
 [Environment Variables](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables).
 
 ## Current Limits

@@ -23,12 +23,6 @@ extension RunLoop {
       )
     }
 
-    if runtimeConfiguration.output == .accessible {
-      return try presentLinearAccessibilityFrame(
-        semanticSnapshot: artifacts.semanticSnapshot
-      )
-    }
-
     let metrics: TerminalPresentationMetrics
     if let semanticHostFrameSurface =
       presentationSurface as? any SemanticHostFramePresentationSurface
@@ -135,26 +129,6 @@ extension RunLoop {
       semanticSnapshot: artifacts.semanticSnapshot,
       focusedIdentity: focusedIdentity
     )
-    guard
-      let terminalCommandSurface =
-        presentationSurface as? any TerminalCommandPresentationSurface
-    else {
-      throw PresentationSurfaceRoleError.missingTerminalCommandSurface
-    }
-    try terminalCommandSurface.write(output)
-    return metrics(forWrittenOutput: output)
-  }
-
-  private func presentLinearAccessibilityFrame(
-    semanticSnapshot: SemanticSnapshot
-  ) throws -> TerminalPresentationMetrics {
-    let output =
-      LinearAccessibilityRenderer().render(semanticSnapshot)
-      + liveRegionAnnouncer.renderAnnouncements(for: semanticSnapshot)
-    guard !output.isEmpty else {
-      return TerminalPresentationMetrics()
-    }
-
     guard
       let terminalCommandSurface =
         presentationSurface as? any TerminalCommandPresentationSurface

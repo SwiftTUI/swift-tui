@@ -24,7 +24,8 @@ struct SwiftTUICommandTests {
     let app = try TestSwiftTUICommand.parse(["--widgets", "5", "--accessible"])
     #expect(app.widgets == 5)
     let configuration = app.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.output == .accessible)
+    #expect(configuration.motion == .reduced)
+    #expect(configuration.cursorFollowsFocus == true)
   }
 
   @Test("Override of runtimeConfiguration() is honored")

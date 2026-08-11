@@ -5,23 +5,15 @@ extension SwiftTUIOptions {
   /// Resolves parsed flags + env vars into a `RuntimeConfiguration`.
   ///
   /// Precedence: explicit CLI flag > env var > TTY auto-detect > framework default.
-  /// `--no-color` always wins over `--force-color`. `--plain` implies
-  /// `--no-color --ascii --reduce-motion` but does not override explicit
-  /// per-flag settings (so `--plain --force-color` ends up `--no-color` because
-  /// `--no-color` from `--plain` wins over `--force-color`).
+  /// `--no-color` always wins over `--force-color`. `--accessible` implies
+  /// `--reduce-motion --cursor-follows-focus`.
   public func runtimeConfiguration(
     environment: [String: String] = ProcessInfo.processInfo.environment,
     isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
   ) -> RuntimeConfiguration {
-    // Step 1: Establish env-var-derived baseline. `--json` is the CLI escape hatch
-    // from env-requested accessible/linear mode, including implied policy.
-    var baselineEnvironment = environment
-    if json {
-      baselineEnvironment["SWIFTTUI_ACCESSIBLE"] = nil
-      baselineEnvironment["SWIFTTUI_LINEAR"] = nil
-    }
+    // Step 1: Establish the env-var-derived baseline.
     let baseline = RuntimeConfiguration.detect(
-      environment: baselineEnvironment, isStdoutTTY: isStdoutTTY)
+      environment: environment, isStdoutTTY: isStdoutTTY)
 
     // Step 2: Apply CLI flags on top of baseline. CLI flags shadow env vars
     //         only when they are non-default; default values pass through to baseline.
@@ -29,66 +21,37 @@ extension SwiftTUIOptions {
     var glyphs = baseline.glyphs
     var motion = baseline.motion
     var output = baseline.output
-    var noProgress = baseline.noProgress
-    var linear = baseline.linear
     var cursorFollowsFocus = baseline.cursorFollowsFocus
 
-    // --plain expands to --no-color --ascii --reduce-motion. The "effective"
-    // values are the union of the explicit flag and --plain's implication, so
-    // a per-flag override (e.g. --force-color in combination with --plain)
-    // still produces the documented result via the precedence rules below.
-    let effectiveNoColor = noColor || plain
-    let effectiveAscii = ascii || plain
-    let effectiveReduceMotion = reduceMotion || plain
+    // --accessible expands to --reduce-motion --cursor-follows-focus.
+    let effectiveReduceMotion = reduceMotion || accessible
+    let effectiveCursorFollowsFocus = self.cursorFollowsFocus || accessible
 
-    // Color: --no-color (or --plain) > --force-color, both override baseline.
-    if effectiveNoColor {
+    // Color: --no-color > --force-color, both override baseline.
+    if noColor {
       color = .never
     } else if forceColor {
       color = .always
     }
 
-    // Glyphs: --ascii (or --plain) overrides baseline.
-    if effectiveAscii {
+    // Glyphs: --ascii overrides baseline.
+    if ascii {
       glyphs = .ascii
     }
 
-    // Motion: --reduce-motion (or --plain) overrides baseline.
+    // Motion: --reduce-motion (or --accessible) overrides baseline.
     if effectiveReduceMotion {
       motion = .reduced
     }
 
-    // No-progress: --no-progress overrides baseline.
-    if self.noProgress {
-      noProgress = true
-    }
-
-    // Linear: --linear selects the accessible linear output path.
-    if self.linear {
-      output = .accessible
-      linear = true
-    }
-
     // Cursor focus-following: opt-in for TUI output.
-    if self.cursorFollowsFocus {
+    if effectiveCursorFollowsFocus {
       cursorFollowsFocus = true
     }
 
-    // Output: CLI flags override env vars, and JSON wins within the CLI layer.
-    if accessible {
-      output = .accessible
-    }
+    // Output: --json overrides the baseline output mode.
     if json {
       output = .json
-    }
-
-    if output == .accessible {
-      glyphs = .ascii
-      motion = .reduced
-      noProgress = true
-      linear = true
-    } else if output == .json {
-      linear = false
     }
 
     // Web: present iff --web or env var set; CLI values override env var values.
@@ -122,8 +85,6 @@ extension SwiftTUIOptions {
       verbosity: verbosity,
       web: web,
       debug: debug,
-      noProgress: noProgress,
-      linear: linear,
       cursorFollowsFocus: cursorFollowsFocus
     )
   }
