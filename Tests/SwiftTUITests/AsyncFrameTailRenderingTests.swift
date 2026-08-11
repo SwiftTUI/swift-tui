@@ -913,6 +913,31 @@ struct AsyncFrameTailRenderingTests {
     #expect(raster.contains("deep split"))
   }
 
+  @Test("nesting past the worker offload budget routes inline rather than offloading")
+  func truncationLimitDepthRoutesInline() async throws {
+    // Three re-entries fit the pass context's truncation limit but exceed
+    // the worker's offload budget of two: the measured per-level frame cost
+    // left no worker-stack margin at that depth (the 2026-08-11 mrkdwn
+    // 500x20 SIGBUS), so this depth must run the tail on the main actor —
+    // rendered fully, no depth issues, no worker layout timing.
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailBudgetEdgeNestedLayoutView(),
+      context: .init(identity: testIdentity("AsyncBudgetEdgeNestedLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.timing.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(
+      artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "layout.customLayoutDepthLimitExceeded"
+      }.isEmpty
+    )
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(raster.contains("edge split"))
+  }
+
   @Test("custom layout nesting within the worker budget still offloads")
   func shallowCustomLayoutNestingStillOffloads() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
@@ -4389,8 +4414,19 @@ private struct AsyncFrameTailShallowNestedLayoutView: View {
     let layout = AsyncFrameTailPassthroughLayout()
     return layout {
       layout {
+        Text("shallow split")
+      }
+    }
+  }
+}
+
+private struct AsyncFrameTailBudgetEdgeNestedLayoutView: View {
+  var body: some View {
+    let layout = AsyncFrameTailPassthroughLayout()
+    return layout {
+      layout {
         layout {
-          Text("shallow split")
+          Text("edge split")
         }
       }
     }

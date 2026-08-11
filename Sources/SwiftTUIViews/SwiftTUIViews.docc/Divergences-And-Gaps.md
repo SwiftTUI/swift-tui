@@ -241,9 +241,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   custom layout or hosted-collection (`List`/`Table`) windowing container
   re-enters the engine on the native call stack when measured, so nesting is
   budgeted rather than unbounded: trees nested past the frame-tail worker's
-  budget of four levels are disqualified from worker offload and run the
-  frame tail on the main actor, which affords 24 levels; WASI keeps the
-  conservative limit everywhere (one small stack, no offload worker).
+  offload budget of two levels run the frame tail on the main actor, whose
+  truncation boundary affords 24 levels; direct engine callers and WASI keep
+  the conservative four-level truncation limit (one small stack, no offload
+  worker).
   Nesting past the active budget truncates with a
   `layout.customLayoutDepthLimitExceeded` runtime issue. Built-in layout is
   fully iterative (see runtime internals); this boundary is the completed

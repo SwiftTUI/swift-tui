@@ -25,8 +25,21 @@ extension FrameTailRenderer {
   /// hosted-collection windowing containers each re-enter the engine per
   /// nesting level on the native stack, so deeper trees run the tail on the
   /// main actor, whose pass context carries the main-thread depth limit.
-  static let workerEngineReentryNestingBudget =
-    LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit
+  ///
+  /// Deliberately BELOW the pass context's truncation limit
+  /// (`LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit`, 4):
+  /// each re-entry costs a measured ~80 KiB debug frame plus interior
+  /// scheduling frames, with a ~54 KiB windowed-measurement frame at the
+  /// tip, so even three re-entries left no margin on the ~512 KiB worker
+  /// once node layouts grew — the 2026-08-11 SIGBUS overflow (mrkdwn's
+  /// 500x20 table under `swift test`, crash queue
+  /// `swift-tui.frame-tail-layout`, re-fired at a budget of three). Two
+  /// re-entries keeps the common offload shapes (scroll content, one
+  /// hosted collection under a scroll) on the worker; deeper trees run the
+  /// main-actor tail, whose ~8 MiB stack carries the 24-level truncation
+  /// boundary. Shrinking the per-level debug frames is the recorded
+  /// follow-up that could raise this budget again.
+  static let workerEngineReentryNestingBudget = 2
 
   func canOffloadLayout(
     _ input: FrameTailInput
