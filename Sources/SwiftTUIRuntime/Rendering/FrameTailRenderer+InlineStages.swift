@@ -50,6 +50,12 @@ struct FrameTailInlineStageRenderer: Sendable {
       }
       MeasureCutoffTrace.emit(cutoffMetrics)
     }
+    // The pipeline's final measure entry is commit-grade by definition
+    // (plan 2026-08-11-004 Stage 1): its product IS the frame's geometry.
+    assert(
+      layoutEngine.defaultMeasurementGrade == .commit,
+      "the frame tail's measure entry must issue commit-grade requests"
+    )
     let (measured, measureDuration) = measurePhase(clock: clock) {
       layoutEngine.measure(
         input.resolved,

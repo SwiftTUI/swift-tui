@@ -63,6 +63,10 @@ struct StackSequentialAllocationPlan {
 /// mutation in-place; `plan` is immutable after construction.
 final class StackSequentialAllocationState {
   let plan: StackSequentialAllocationPlan
+  /// The stack container's measurement grade: allocation offers are
+  /// commit-grade sites, so each offer issues at exactly this grade
+  /// (sticky-downward under a probe-graded container).
+  let grade: MeasurementGrade
   /// Next order position to offer space to.
   var position: Int
   /// Main-axis cells not yet consumed by processed children.
@@ -75,12 +79,14 @@ final class StackSequentialAllocationState {
 
   init(
     plan: StackSequentialAllocationPlan,
+    grade: MeasurementGrade,
     position: Int,
     remainingMain: Int,
     allocatedMainSizes: [Int],
     measurements: [MeasuredNode?]
   ) {
     self.plan = plan
+    self.grade = grade
     self.position = position
     self.remainingMain = remainingMain
     self.allocatedMainSizes = allocatedMainSizes
@@ -282,6 +288,9 @@ extension LayoutEngine {
       state.position = run.upperBound
 
       localMetrics.branching.builtinChildMeasureRequests += run.count
+      if state.grade == .probe {
+        localMetrics.branching.builtinChildMeasureRequestsProbe += run.count
+      }
       work.append(
         .finishStackAllocationBatch(
           node,
@@ -302,7 +311,8 @@ extension LayoutEngine {
               axis: axis,
               main: .finite(state.allocatedMainSizes[childIndex]),
               cross: cross
-            )
+            ),
+            state.grade
           )
         )
       }
@@ -346,6 +356,9 @@ extension LayoutEngine {
     state.allocatedMainSizes[childIndex] = offer
 
     localMetrics.branching.builtinChildMeasureRequests += 1
+    if state.grade == .probe {
+      localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+    }
     work.append(
       .stackAllocateStep(
         node,
@@ -359,7 +372,8 @@ extension LayoutEngine {
     work.append(
       .measure(
         children[childIndex],
-        stackProposal(axis: axis, main: .finite(offer), cross: cross)
+        stackProposal(axis: axis, main: .finite(offer), cross: cross),
+        state.grade
       )
     )
   }
@@ -411,6 +425,7 @@ extension LayoutEngine {
       children: children,
       axis: axis,
       measurements: allocatedMeasurements,
+      grade: state.grade,
       passContext: passContext,
       localMetrics: &localMetrics,
       work: &work,

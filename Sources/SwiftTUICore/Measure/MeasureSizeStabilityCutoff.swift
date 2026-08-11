@@ -274,10 +274,16 @@ extension LayoutEngine {
     )
     var certifiedProduct: MeasuredNode?
     for baseline in baselines {
+      // Pre-pass measures are probe-grade (plan 2026-08-11-004): their
+      // products either fail the certificate and are discarded, or are
+      // re-validated size-for-size before the patch serves them. Exact-key
+      // cache stores stay grade-blind, so the variants the main pass wants
+      // still land in the production cache.
       var fresh = measure(
         currentSubtree,
         proposal: baseline.proposal,
-        passContext: scratchContext
+        passContext: scratchContext,
+        grade: .probe
       )
       guard fresh.measuredSize == baseline.measuredSize else {
         fresh.flattenForRelease()

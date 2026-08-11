@@ -90,6 +90,11 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
   package var customContainerMeasureComputations = 0
   package var customChildMeasureRequests = 0
   package var customPlacementChildMeasureRequests = 0
+  /// Probe-grade slices of the request counters (plan 2026-08-11-004
+  /// Stage 1); commit-grade counts are the remainders. Placement
+  /// re-measures have no probe slice: placement asserts commit grade.
+  package var builtinChildMeasureRequestsProbe = 0
+  package var customChildMeasureRequestsProbe = 0
 
   package init() {}
 
@@ -119,6 +124,8 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
     customContainerMeasureComputations += other.customContainerMeasureComputations
     customChildMeasureRequests += other.customChildMeasureRequests
     customPlacementChildMeasureRequests += other.customPlacementChildMeasureRequests
+    builtinChildMeasureRequestsProbe += other.builtinChildMeasureRequestsProbe
+    customChildMeasureRequestsProbe += other.customChildMeasureRequestsProbe
   }
 }
 

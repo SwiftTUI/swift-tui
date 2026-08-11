@@ -271,8 +271,13 @@ extension LayoutEngine {
       guard let handle = token as? CustomLayoutHandle else {
         preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
       }
+      // Author probes: every `LayoutSubview.sizeThatFits` call made inside
+      // a custom layout's `sizeThatFits` is probe-grade (plan
+      // 2026-08-11-004 Stage 1) — the committed child products are the
+      // pre-measure round and the placement-time re-measures, both
+      // commit-grade on their own engines.
       return handle.measureContainer(
-        engine: self,
+        engine: withDefaultMeasurementGrade(.probe),
         node: resolved,
         proposal: proposal,
         passContext: passContext

@@ -38,8 +38,10 @@ struct BranchingFactorOracleTests {
     )
 
     // Ideal round N + allocation offers N; the specified cross skips
-    // reconciliation.
+    // reconciliation. The ideal round is probe-grade (the finite main means
+    // the allocation round supersedes it); the offers are commit-grade.
     #expect(branching.builtinChildMeasureRequests == 12)
+    #expect(branching.builtinChildMeasureRequestsProbe == 6)
     #expect(branching.builtinContainerMeasureComputations == 1)
     #expect(branching.customContainerMeasureComputations == 0)
     #expect(branching.customChildMeasureRequests == 0)
@@ -77,8 +79,11 @@ struct BranchingFactorOracleTests {
     )
 
     // Unspecified main: no allocation round. Rigid leaves make the
-    // unspecified-cross reconciliation a no-op, so R = 0 here.
+    // unspecified-cross reconciliation a no-op, so R = 0 here. With no
+    // superseding round, the ideal measurements ARE the committed ones —
+    // nothing is probe-grade.
     #expect(branching.builtinChildMeasureRequests == 6)
+    #expect(branching.builtinChildMeasureRequestsProbe == 0)
     #expect(branching.builtinContainerMeasureComputations == 1)
     try assertLedger(fixture: "ideal-only-stack", family: .builtin, branching: branching)
   }
@@ -104,8 +109,11 @@ struct BranchingFactorOracleTests {
     // 1). The flexible-frame wrapper is a container too: it computes at
     // each of the three distinct proposals it receives and forwards one
     // request per computation, so the pass totals are 8 requests over 4
-    // container computations.
+    // container computations. Probe slice: the root's ideal round (2) plus
+    // the wrapper's forwarded request DURING that round — probe purely by
+    // sticky-downward inheritance, the wrapper itself is not a probe site.
     #expect(branching.builtinChildMeasureRequests == 8)
+    #expect(branching.builtinChildMeasureRequestsProbe == 3)
     #expect(branching.builtinContainerMeasureComputations == 4)
     try assertLedger(
       fixture: "cross-reconciliation-stack", family: .builtin, branching: branching)
@@ -133,7 +141,12 @@ struct BranchingFactorOracleTests {
     // issuing 2x3 requests per computation: 6 + 3x2x6 = 42 requests over
     // 1 + 6 computations. The inner ideal rounds repeat under the offer
     // round as exact-key cache hits — requests, not fresh computations.
+    // Probe slice: root ideal 3, plus everything the inner stacks issue
+    // WHILE probe-graded (their own 18 under the root's ideal round —
+    // offers included, by stickiness), plus their ideal rounds under the
+    // root's commit-graded offers (9): 30 of 42.
     #expect(branching.builtinChildMeasureRequests == 42)
+    #expect(branching.builtinChildMeasureRequestsProbe == 30)
     #expect(branching.builtinContainerMeasureComputations == 7)
     try assertLedger(fixture: "nested-stacks", family: .builtin, branching: branching)
   }
@@ -156,6 +169,7 @@ struct BranchingFactorOracleTests {
 
     // Ideal 3 + two sequential offers + the one-member unbounded batch.
     #expect(branching.builtinChildMeasureRequests == 6)
+    #expect(branching.builtinChildMeasureRequestsProbe == 3)
     #expect(branching.builtinContainerMeasureComputations == 1)
     try assertLedger(fixture: "spacer-deficit-stack", family: .builtin, branching: branching)
   }
@@ -174,9 +188,11 @@ struct BranchingFactorOracleTests {
     )
     let branching = measuredBranching(of: resolved, proposal: Self.finiteProposal)
 
-    // 3 children measured at the real proposal, then fit probes: child 0
-    // (30 rows, rejected) and child 1 (20 rows, selected).
+    // 3 children measured at the real proposal (committed, commit-grade),
+    // then fit probes for child 0 (30 rows, rejected) and child 1 (20
+    // rows, selected) — selection-only, probe-grade.
     #expect(branching.builtinChildMeasureRequests == 5)
+    #expect(branching.builtinChildMeasureRequestsProbe == 2)
     #expect(branching.builtinContainerMeasureComputations == 1)
     try assertLedger(fixture: "view-that-fits", family: .builtin, branching: branching)
   }
@@ -207,8 +223,10 @@ struct BranchingFactorOracleTests {
 
     // Element-0 stride probe (reused inside the window) plus the 11
     // remaining band children: stride 1, 10 viewport rows, one overscan row
-    // each side plus the partial-row allowance, clamped at the top.
+    // each side plus the partial-row allowance, clamped at the top. Only
+    // the stride probe is probe-grade; the band children place.
     #expect(branching.builtinChildMeasureRequests == 12)
+    #expect(branching.builtinChildMeasureRequestsProbe == 1)
     #expect(branching.builtinContainerMeasureComputations == 1)
     try assertLedger(fixture: "windowed-lazy-list", family: .builtin, branching: branching)
   }
@@ -228,9 +246,10 @@ struct BranchingFactorOracleTests {
     )
     let measureBranching = passContext.workMetrics.branching
 
-    // N pre-measures at the container proposal plus A = N author probes
-    // from the grid's sizeThatFits.
+    // N pre-measures at the container proposal (commit-grade) plus A = N
+    // author probes from the grid's sizeThatFits (probe-grade).
     #expect(measureBranching.customChildMeasureRequests == 8)
+    #expect(measureBranching.customChildMeasureRequestsProbe == 4)
     #expect(measureBranching.customContainerMeasureComputations == 1)
     #expect(measureBranching.customPlacementChildMeasureRequests == 0)
     #expect(measureBranching.builtinContainerMeasureComputations == 0)
@@ -244,6 +263,60 @@ struct BranchingFactorOracleTests {
     )
     let placeBranching = passContext.workMetrics.branching
     #expect(placeBranching.customPlacementChildMeasureRequests == 4)
+  }
+
+  @Test("grade is sticky across the custom-layout native re-entry")
+  func gradeStickyAcrossCustomReEntry() {
+    // A custom grid inside a finite-main stack: during the stack's
+    // probe-graded ideal round the grid's PRE-MEASURES inherit probe grade
+    // through the engine value handed across the native re-entry; under the
+    // commit-graded offer round they are commit. Author probes are probe in
+    // both rounds. Two distinct proposals -> two custom computations:
+    // probe slice = 4 (pre, ideal round) + 4 + 4 (author, both) = 12 of 16.
+    let resolved = stack(
+      "sticky-root",
+      axis: .vertical,
+      children: [customGridNode(childCount: 4)]
+    )
+    let branching = measuredBranching(of: resolved, proposal: Self.finiteProposal)
+
+    #expect(branching.customContainerMeasureComputations == 2)
+    #expect(branching.customChildMeasureRequests == 16)
+    #expect(branching.customChildMeasureRequestsProbe == 12)
+  }
+
+  @Test("the commit guard records probe-latitude serves that reach commit requests")
+  func commitGuardRecordsProbeLatitudeCommitServe() {
+    let passContext = LayoutPassContext()
+
+    // A probe-grade request may take a broadened serve silently.
+    let probeViolated = passContext.recordProbeLatitudeServe(
+      identity: testIdentity("guarded"),
+      source: "BranchingFactorOracleTests",
+      requestGrade: .probe
+    )
+    #expect(!probeViolated)
+    #expect(passContext.runtimeIssues.isEmpty)
+
+    // The same serve reaching a commit-grade request is the violation.
+    let commitViolated = passContext.recordProbeLatitudeServe(
+      identity: testIdentity("guarded"),
+      source: "BranchingFactorOracleTests",
+      requestGrade: .commit
+    )
+    #expect(commitViolated)
+    let issues = passContext.runtimeIssues
+    #expect(issues.count == 1)
+    #expect(issues.first?.code == "layout.probeGradeCommit")
+    #expect(issues.first?.severity == .error)
+
+    // Deduplicated per identity, like the other layout-authored issues.
+    passContext.recordProbeLatitudeServe(
+      identity: testIdentity("guarded"),
+      source: "BranchingFactorOracleTests",
+      requestGrade: .commit
+    )
+    #expect(passContext.runtimeIssues.count == 1)
   }
 
   @Test("the ledger and this suite cover exactly the same rows")

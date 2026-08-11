@@ -7,6 +7,7 @@ extension LayoutEngine {
     axis: Axis,
     spacing: Int?,
     idealMeasurements: [MeasuredNode],
+    grade: MeasurementGrade,
     passContext: LayoutPassContext?,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
@@ -34,6 +35,7 @@ extension LayoutEngine {
         children: children,
         axis: axis,
         measurements: idealMeasurements,
+        grade: grade,
         passContext: passContext,
         localMetrics: &localMetrics,
         work: &work,
@@ -56,6 +58,7 @@ extension LayoutEngine {
     )
     let state = StackSequentialAllocationState(
       plan: plan,
+      grade: grade,
       position: 0,
       remainingMain: availableMain,
       allocatedMainSizes: idealMeasurements.map {
@@ -84,6 +87,7 @@ extension LayoutEngine {
     children: [ResolvedNode],
     axis: Axis,
     measurements: [MeasuredNode],
+    grade: MeasurementGrade,
     passContext: LayoutPassContext?,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
@@ -141,6 +145,9 @@ extension LayoutEngine {
     }
 
     localMetrics.branching.builtinChildMeasureRequests += replacementIndices.count
+    if grade == .probe {
+      localMetrics.branching.builtinChildMeasureRequestsProbe += replacementIndices.count
+    }
     work.append(
       .finishStackReconciliation(
         node,
@@ -153,7 +160,9 @@ extension LayoutEngine {
       )
     )
     for offset in replacementIndices.indices.reversed() {
-      work.append(.measure(children[replacementIndices[offset]], replacementProposals[offset]))
+      work.append(
+        .measure(children[replacementIndices[offset]], replacementProposals[offset], grade)
+      )
     }
   }
 }

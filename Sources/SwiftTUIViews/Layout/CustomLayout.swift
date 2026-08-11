@@ -65,8 +65,10 @@ public struct LayoutSubview {
   public func sizeThatFits(_ proposal: ProposedViewSize) -> LayoutSize {
     // Branching oracle (plan 2026-08-11-004): every author-initiated subview
     // measure is a custom child request — the unbounded `A` in the custom
-    // family's `>= 2N + A` shape.
-    passContext?.recordCustomChildMeasureRequest()
+    // family's `>= 2N + A` shape. The engine's default grade says which
+    // author phase this is: probe inside `sizeThatFits`, commit inside
+    // `placeSubviews`.
+    passContext?.recordCustomChildMeasureRequest(grade: engine.defaultMeasurementGrade)
     return engine.measure(
       child,
       proposal: proposal,
@@ -86,7 +88,7 @@ public struct LayoutSubview {
     guard let passContext, let hint else {
       return sizeThatFits(proposal)
     }
-    passContext.recordCustomChildMeasureRequest()
+    passContext.recordCustomChildMeasureRequest(grade: engine.defaultMeasurementGrade)
     return passContext.withMeasureViewportHint(hint) {
       engine.measure(
         child,

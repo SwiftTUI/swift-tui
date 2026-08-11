@@ -47,6 +47,10 @@ final class WindowedLazyStackMeasurementContext {
   let hint: MeasureViewportHint
   let idealProposal: ProposedSize
   let retainedSnapshot: LazyStackAllocationSnapshot?
+  /// The lazy stack's own measurement grade: band children issue at this
+  /// grade (commit site, sticky-downward); the element-0 stride probe is
+  /// probe-grade regardless.
+  let grade: MeasurementGrade
 
   init(
     node: ResolvedNode,
@@ -58,7 +62,8 @@ final class WindowedLazyStackMeasurementContext {
     verticalAlignment: VerticalAlignment,
     hint: MeasureViewportHint,
     idealProposal: ProposedSize,
-    retainedSnapshot: LazyStackAllocationSnapshot?
+    retainedSnapshot: LazyStackAllocationSnapshot?,
+    grade: MeasurementGrade
   ) {
     self.node = node
     self.originalProposal = originalProposal
@@ -70,6 +75,7 @@ final class WindowedLazyStackMeasurementContext {
     self.hint = hint
     self.idealProposal = idealProposal
     self.retainedSnapshot = retainedSnapshot
+    self.grade = grade
   }
 }
 
@@ -101,6 +107,7 @@ extension LayoutEngine {
     for node: ResolvedNode,
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
+    grade: MeasurementGrade,
     passContext: LayoutPassContext?,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
@@ -157,7 +164,8 @@ extension LayoutEngine {
         main: .unspecified,
         cross: crossDimension(of: effectiveProposal, for: axis)
       ),
-      retainedSnapshot: retainedSnapshot
+      retainedSnapshot: retainedSnapshot,
+      grade: grade
     )
 
     // Anchor stride: the previous frame's product for this identity when one
@@ -191,8 +199,9 @@ extension LayoutEngine {
       return false
     }
     localMetrics.branching.builtinChildMeasureRequests += 1
+    localMetrics.branching.builtinChildMeasureRequestsProbe += 1
     work.append(.finishWindowedLazyStackProbe(context, probeElement: probeElements[0]))
-    work.append(.measure(probeElements[0], context.idealProposal))
+    work.append(.measure(probeElements[0], context.idealProposal, .probe))
     return true
   }
 
@@ -232,6 +241,7 @@ extension LayoutEngine {
         effectiveProposal: context.effectiveProposal,
         axis: context.axis,
         spacing: context.spacing,
+        grade: context.grade,
         localMetrics: &localMetrics,
         work: &work
       )
@@ -274,6 +284,7 @@ extension LayoutEngine {
     scheduleChildren(
       scheduledChildren,
       proposal: context.idealProposal,
+      grade: context.grade,
       finish: .finishWindowedLazyStack(
         context,
         window: window,
@@ -514,6 +525,7 @@ extension LayoutEngine {
       return false
     }
     localMetrics.branching.builtinChildMeasureRequests += 1
+    localMetrics.branching.builtinChildMeasureRequestsProbe += 1
     work.append(
       .finishLazyStackIdealEstimate(
         node,
@@ -531,7 +543,8 @@ extension LayoutEngine {
           axis: axis,
           main: .unspecified,
           cross: crossDimension(of: effectiveProposal, for: axis)
-        )
+        ),
+        .probe
       )
     )
     return true
@@ -606,6 +619,7 @@ extension LayoutEngine {
     effectiveProposal: ProposedSize,
     axis: Axis,
     spacing: Int?,
+    grade: MeasurementGrade,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) {
@@ -615,9 +629,20 @@ extension LayoutEngine {
       main: .unspecified,
       cross: crossDimension(of: effectiveProposal, for: axis)
     )
+    // The one probe rule decidable at scheduling time (plan 2026-08-11-004
+    // Stage 1): under a finite effective main the allocation round
+    // supersedes these ideal products, so the ideal round is probe-grade.
+    // With the main unspecified the ideal measurements ARE the final child
+    // measurements and stay at the container's grade.
+    let idealGrade: MeasurementGrade =
+      switch mainDimension(of: effectiveProposal, for: axis) {
+      case .finite: .probe
+      case .unspecified, .infinity: grade
+      }
     scheduleChildren(
       children,
       proposal: idealProposal,
+      grade: idealGrade,
       finish: .finishStackIdeal(
         node,
         originalProposal: originalProposal,
@@ -625,7 +650,8 @@ extension LayoutEngine {
         children: children,
         axis: axis,
         spacing: spacing,
-        childCount: children.count
+        childCount: children.count,
+        grade: grade
       ),
       localMetrics: &localMetrics,
       work: &work

@@ -14,11 +14,15 @@ extension LayoutEngine {
       behavior: behavior,
       children: children
     )
+    // The engine's default grade carries the caller's phase: probe when the
+    // delegation happens inside an author `sizeThatFits`, commit at
+    // placement.
     return measureIterative(
       container,
       proposal: proposal,
       passContext: passContext,
-      allowsRootReuse: false
+      allowsRootReuse: false,
+      grade: defaultMeasurementGrade
     )
   }
 
@@ -37,7 +41,8 @@ extension LayoutEngine {
       container,
       proposal: proposal,
       passContext: passContext,
-      allowsRootReuse: false
+      allowsRootReuse: false,
+      grade: defaultMeasurementGrade
     )
     return placementRequests(
       for: container,

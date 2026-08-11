@@ -331,8 +331,52 @@ package final class LayoutPassContext: Sendable {
   /// and placement call sites sit on frames that stay live across
   /// custom-layout re-entry on the small frame-tail worker stack, and a
   /// closure context there is a per-nesting-level stack cost in -Onone.
-  package func recordCustomChildMeasureRequest() {
-    state.withLock { $0.workMetrics.branching.customChildMeasureRequests += 1 }
+  package func recordCustomChildMeasureRequest(grade: MeasurementGrade) {
+    state.withLock {
+      $0.workMetrics.branching.customChildMeasureRequests += 1
+      if grade == .probe {
+        $0.workMetrics.branching.customChildMeasureRequestsProbe += 1
+      }
+    }
+  }
+
+  /// The fail-loud commit guard (plan 2026-08-11-004 Stage 1). A serve
+  /// tier calls this when it answers a request with PROBE latitude — any
+  /// service other than exact-key, exact-validity whose soundness rests on
+  /// the product being discarded before commit. Reaching a commit-grade
+  /// request is the violation: the caller must also assert on a `true`
+  /// return (the DEBUG call-site assertion), and the recorded
+  /// `layout.probeGradeCommit` issue rides the frame record in release.
+  ///
+  /// The size-stability cutoff's certified serves never call this: they
+  /// serve fresh, certificate-validated products through the untouched
+  /// exact-validity guards, so they are exempt by construction. No
+  /// production serve tier has probe latitude at Stage 1; the first real
+  /// caller is Stage 2's persistent custom-layout cache.
+  @discardableResult
+  package func recordProbeLatitudeServe(
+    identity: Identity,
+    source: String,
+    requestGrade: MeasurementGrade
+  ) -> Bool {
+    guard requestGrade == .commit else {
+      return false
+    }
+    state.withLock { state in
+      let issue = RuntimeIssue(
+        severity: .error,
+        code: "layout.probeGradeCommit",
+        message:
+          "a probe-latitude serve from \(source) answered a commit-grade "
+          + "measurement request; probe-grade output must never commit",
+        identity: identity,
+        source: source
+      )
+      if !state.runtimeIssues.contains(issue) {
+        state.runtimeIssues.append(issue)
+      }
+    }
+    return true
   }
 
   package func recordCustomPlacementChildMeasureRequests(_ count: Int) {

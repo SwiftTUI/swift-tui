@@ -2,14 +2,18 @@ extension LayoutEngine {
   func scheduleChildren(
     _ children: [ResolvedNode],
     proposal: ProposedSize,
+    grade: MeasurementGrade,
     finish: MeasurementWorkItem,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) {
     localMetrics.branching.builtinChildMeasureRequests += children.count
+    if grade == .probe {
+      localMetrics.branching.builtinChildMeasureRequestsProbe += children.count
+    }
     work.append(finish)
     for child in children.reversed() {
-      work.append(.measure(child, proposal))
+      work.append(.measure(child, proposal, grade))
     }
   }
 

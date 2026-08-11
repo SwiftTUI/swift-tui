@@ -250,6 +250,12 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
+    // Placement-time re-measures must be commit-grade (plan 2026-08-11-004
+    // Stage 1): their products place directly.
+    assert(
+      engine.defaultMeasurementGrade == .commit,
+      "custom-layout placement received a probe-graded engine"
+    )
     let placementRecorder = LayoutSubviewPlacementRecorder()
     let subviews = layoutSubviews(
       for: node,

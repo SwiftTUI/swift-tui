@@ -1,9 +1,27 @@
 package struct LayoutEngine: Sendable {
   package let cache: MeasurementCache?
+  /// The grade a `measure` call issues at when the caller does not say
+  /// (plan 2026-08-11-004 Stage 1). `.commit` everywhere except engine
+  /// values handed into custom-layout author code: the `.custom` measure
+  /// case re-brands the engine with its item's grade for the pre-measure
+  /// (sticky-downward), and `measureContainer` re-brands with `.probe` so
+  /// author `sizeThatFits` probes are probe-grade. A value field rather
+  /// than ambient state, so nothing crosses the frame-tail worker offload.
+  package var defaultMeasurementGrade: MeasurementGrade = .commit
 
   /// Creates a layout engine with an optional retained measurement cache.
   package init(cache: MeasurementCache? = nil) {
     self.cache = cache
+  }
+
+  /// A copy of this engine whose grade-less `measure` calls issue at
+  /// `grade`.
+  package func withDefaultMeasurementGrade(
+    _ grade: MeasurementGrade
+  ) -> LayoutEngine {
+    var engine = self
+    engine.defaultMeasurementGrade = grade
+    return engine
   }
 
   /// Measures a resolved tree under `proposal`.
@@ -22,12 +40,14 @@ package struct LayoutEngine: Sendable {
   package func measure(
     _ resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified,
-    passContext: LayoutPassContext?
+    passContext: LayoutPassContext?,
+    grade: MeasurementGrade? = nil
   ) -> MeasuredNode {
     measureIterative(
       resolved,
       proposal: proposal,
-      passContext: passContext
+      passContext: passContext,
+      grade: grade ?? defaultMeasurementGrade
     )
   }
 

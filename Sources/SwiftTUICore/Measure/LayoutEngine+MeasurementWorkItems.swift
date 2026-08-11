@@ -9,8 +9,8 @@
 /// measurement cache. Indirection keeps each work-stack element pointer-sized
 /// while preserving the existing heap-backed iterative traversal.
 indirect enum MeasurementWorkItem {
-  case measure(ResolvedNode, ProposedSize)
-  case measureFresh(ResolvedNode, ProposedSize)
+  case measure(ResolvedNode, ProposedSize, MeasurementGrade)
+  case measureFresh(ResolvedNode, ProposedSize, MeasurementGrade)
   case finishNode(
     ResolvedNode,
     originalProposal: ProposedSize,
@@ -23,7 +23,8 @@ indirect enum MeasurementWorkItem {
     effectiveProposal: ProposedSize,
     edge: Edge,
     spacing: Int,
-    safeArea: EdgeInsets
+    safeArea: EdgeInsets,
+    grade: MeasurementGrade
   )
   case finishSafeAreaInset(
     ResolvedNode,
@@ -35,7 +36,8 @@ indirect enum MeasurementWorkItem {
     ResolvedNode,
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
-    primaryIndex: Int
+    primaryIndex: Int,
+    grade: MeasurementGrade
   )
   case finishDecoration(
     ResolvedNode,
@@ -45,6 +47,10 @@ indirect enum MeasurementWorkItem {
     primaryMeasurement: MeasuredNode,
     decorationIndices: [Int]
   )
+  /// The ViewThatFits finish items carry no grade: fit probes are
+  /// probe-grade unconditionally (probe composes stickily with anything),
+  /// and the committed child measurements were already scheduled at the
+  /// container's grade.
   case finishViewThatFitsChildren(
     ResolvedNode,
     originalProposal: ProposedSize,
@@ -67,7 +73,8 @@ indirect enum MeasurementWorkItem {
     children: [ResolvedNode],
     axis: Axis,
     spacing: Int?,
-    childCount: Int
+    childCount: Int,
+    grade: MeasurementGrade
   )
   case stackAllocateStep(
     ResolvedNode,

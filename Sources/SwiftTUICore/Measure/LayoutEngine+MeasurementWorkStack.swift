@@ -3,10 +3,12 @@ extension LayoutEngine {
     _ resolved: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?,
-    allowsRootReuse: Bool = true
+    allowsRootReuse: Bool = true,
+    grade: MeasurementGrade = .commit
   ) -> MeasuredNode {
     var work: [MeasurementWorkItem] = [
-      allowsRootReuse ? .measure(resolved, proposal) : .measureFresh(resolved, proposal)
+      allowsRootReuse
+        ? .measure(resolved, proposal, grade) : .measureFresh(resolved, proposal, grade)
     ]
     var results: [MeasuredNode] = []
     var localMetrics = LayoutWorkMetrics()
@@ -15,21 +17,23 @@ extension LayoutEngine {
       localMetrics.measurementWorkStackSteps += 1
 
       switch item {
-      case .measure(let node, let proposal):
+      case .measure(let node, let proposal, let grade):
         scheduleMeasurement(
           of: node,
           proposal: proposal,
           allowsReuse: true,
+          grade: grade,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work,
           results: &results
         )
-      case .measureFresh(let node, let proposal):
+      case .measureFresh(let node, let proposal, let grade):
         scheduleMeasurement(
           of: node,
           proposal: proposal,
           allowsReuse: false,
+          grade: grade,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work,
@@ -53,7 +57,8 @@ extension LayoutEngine {
         let effectiveProposal,
         let edge,
         let spacing,
-        let safeArea
+        let safeArea,
+        let grade
       ):
         finishSafeAreaInsetAdornmentMeasurement(
           node,
@@ -62,6 +67,7 @@ extension LayoutEngine {
           edge: edge,
           spacing: spacing,
           safeArea: safeArea,
+          grade: grade,
           localMetrics: &localMetrics,
           work: &work,
           results: &results
@@ -87,7 +93,8 @@ extension LayoutEngine {
         let node,
         let originalProposal,
         let effectiveProposal,
-        let primaryIndex
+        let primaryIndex,
+        let grade
       ):
         let primaryMeasurement = popMeasurement(from: &results)
         let decorationProposal = ProposedSize(
@@ -96,6 +103,9 @@ extension LayoutEngine {
         )
         let decorationIndices = node.children.indices.filter { $0 != primaryIndex }
         localMetrics.branching.builtinChildMeasureRequests += decorationIndices.count
+        if grade == .probe {
+          localMetrics.branching.builtinChildMeasureRequestsProbe += decorationIndices.count
+        }
         work.append(
           .finishDecoration(
             node,
@@ -107,7 +117,7 @@ extension LayoutEngine {
           )
         )
         for index in decorationIndices.reversed() {
-          work.append(.measure(node.children[index], decorationProposal))
+          work.append(.measure(node.children[index], decorationProposal, grade))
         }
       case .finishDecoration(
         let node,
@@ -151,6 +161,7 @@ extension LayoutEngine {
 
         let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
         localMetrics.branching.builtinChildMeasureRequests += 1
+        localMetrics.branching.builtinChildMeasureRequestsProbe += 1
         work.append(
           .finishViewThatFitsProbe(
             node,
@@ -161,7 +172,7 @@ extension LayoutEngine {
             probeIndex: 0
           )
         )
-        work.append(.measure(node.children[0], fitProbe))
+        work.append(.measure(node.children[0], fitProbe, .probe))
       case .finishViewThatFitsProbe(
         let node,
         let originalProposal,
@@ -188,6 +199,7 @@ extension LayoutEngine {
           let nextIndex = probeIndex + 1
           let fitProbe = proposalByRelaxingAxes(effectiveProposal, axes: axes)
           localMetrics.branching.builtinChildMeasureRequests += 1
+          localMetrics.branching.builtinChildMeasureRequestsProbe += 1
           work.append(
             .finishViewThatFitsProbe(
               node,
@@ -198,7 +210,7 @@ extension LayoutEngine {
               probeIndex: nextIndex
             )
           )
-          work.append(.measure(node.children[nextIndex], fitProbe))
+          work.append(.measure(node.children[nextIndex], fitProbe, .probe))
         }
       case .finishStackIdeal(
         let node,
@@ -207,7 +219,8 @@ extension LayoutEngine {
         let children,
         let axis,
         let spacing,
-        let childCount
+        let childCount,
+        let grade
       ):
         let idealMeasurements = popMeasurements(from: &results, count: childCount)
         scheduleStackAfterIdealMeasurements(
@@ -218,6 +231,7 @@ extension LayoutEngine {
           axis: axis,
           spacing: spacing,
           idealMeasurements: idealMeasurements,
+          grade: grade,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work,
@@ -370,6 +384,7 @@ extension LayoutEngine {
     of node: ResolvedNode,
     proposal: ProposedSize,
     allowsReuse: Bool,
+    grade: MeasurementGrade,
     passContext: LayoutPassContext?,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
@@ -440,13 +455,14 @@ extension LayoutEngine {
     // re-entry on the small frame-tail worker stack, and -Onone allocates
     // every inline temporary statically, so pattern-match copies here would
     // multiply by nesting depth. The helper's temporaries are transient.
-    recordScheduledContainerComputation(for: node, into: &localMetrics)
+    recordScheduledContainerComputation(for: node, grade: grade, into: &localMetrics)
 
     switch node.layoutBehavior {
     case .intrinsic, .overlay, .offset, .position:
       scheduleChildren(
         node.children,
         proposal: effectiveProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -469,6 +485,7 @@ extension LayoutEngine {
           for: node,
           originalProposal: proposal,
           effectiveProposal: effectiveProposal,
+          grade: grade,
           passContext: passContext,
           localMetrics: &localMetrics,
           work: &work
@@ -497,6 +514,7 @@ extension LayoutEngine {
         effectiveProposal: effectiveProposal,
         axis: axis,
         spacing: spacing,
+        grade: grade,
         localMetrics: &localMetrics,
         work: &work
       )
@@ -505,6 +523,7 @@ extension LayoutEngine {
       scheduleChildren(
         node.children,
         proposal: childProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -519,6 +538,7 @@ extension LayoutEngine {
       scheduleChildren(
         node.children,
         proposal: childProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -533,6 +553,7 @@ extension LayoutEngine {
         scheduleChildren(
           node.children,
           proposal: effectiveProposal,
+          grade: grade,
           finish: .finishNode(
             node,
             originalProposal: proposal,
@@ -550,6 +571,9 @@ extension LayoutEngine {
         edge: edge
       )
       localMetrics.branching.builtinChildMeasureRequests += 1
+      if grade == .probe {
+        localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+      }
       work.append(
         .finishSafeAreaInsetAdornment(
           node,
@@ -557,10 +581,11 @@ extension LayoutEngine {
           effectiveProposal: effectiveProposal,
           edge: edge,
           spacing: spacing,
-          safeArea: safeArea
+          safeArea: safeArea,
+          grade: grade
         )
       )
-      work.append(.measure(node.children[1], insetProposal))
+      work.append(.measure(node.children[1], insetProposal, grade))
     case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
         set: set,
@@ -571,6 +596,7 @@ extension LayoutEngine {
       scheduleChildren(
         node.children,
         proposal: childProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -588,6 +614,7 @@ extension LayoutEngine {
       scheduleChildren(
         node.children,
         proposal: childProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -615,6 +642,7 @@ extension LayoutEngine {
       scheduleChildren(
         node.children,
         proposal: childProposal,
+        grade: grade,
         finish: .finishNode(
           node,
           originalProposal: proposal,
@@ -629,6 +657,7 @@ extension LayoutEngine {
         scheduleChildren(
           node.children,
           proposal: effectiveProposal,
+          grade: grade,
           finish: .finishNode(
             node,
             originalProposal: proposal,
@@ -642,19 +671,24 @@ extension LayoutEngine {
       }
 
       localMetrics.branching.builtinChildMeasureRequests += 1
+      if grade == .probe {
+        localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+      }
       work.append(
         .finishDecorationPrimary(
           node,
           originalProposal: proposal,
           effectiveProposal: effectiveProposal,
-          primaryIndex: primaryIndex
+          primaryIndex: primaryIndex,
+          grade: grade
         )
       )
-      work.append(.measure(node.children[primaryIndex], effectiveProposal))
+      work.append(.measure(node.children[primaryIndex], effectiveProposal, grade))
     case .viewThatFits(let axes):
       scheduleChildren(
         node.children,
         proposal: effectiveProposal,
+        grade: grade,
         finish: .finishViewThatFitsChildren(
           node,
           originalProposal: proposal,
@@ -692,8 +726,11 @@ extension LayoutEngine {
         passContext?.exitCustomLayoutCompatibilityBoundary()
       }
 
+      // Sticky-downward grade across the native re-entry: the pre-measure's
+      // `engine.measure` calls inherit this item's grade through the engine
+      // value's default, so no ambient state crosses the worker offload.
       let childMeasurements = handle.measureChildren(
-        engine: self,
+        engine: withDefaultMeasurementGrade(grade),
         node: node,
         proposal: effectiveProposal,
         passContext: passContext
@@ -721,6 +758,7 @@ extension LayoutEngine {
     edge: Edge,
     spacing: Int,
     safeArea: EdgeInsets,
+    grade: MeasurementGrade,
     localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
@@ -734,6 +772,9 @@ extension LayoutEngine {
     )
     let baseProposal = inset(effectiveProposal, by: consumedInsets)
     localMetrics.branching.builtinChildMeasureRequests += 1
+    if grade == .probe {
+      localMetrics.branching.builtinChildMeasureRequestsProbe += 1
+    }
     work.append(
       .finishSafeAreaInset(
         node,
@@ -742,7 +783,7 @@ extension LayoutEngine {
         insetMeasurement: insetMeasurement
       )
     )
-    work.append(.measure(node.children[0], baseProposal))
+    work.append(.measure(node.children[0], baseProposal, grade))
   }
 
   /// The `.finishDecoration` case body, extracted for the same frame-size
@@ -788,6 +829,7 @@ extension LayoutEngine {
   /// temporaries stay off the re-entry-live frame.
   private func recordScheduledContainerComputation(
     for node: ResolvedNode,
+    grade: MeasurementGrade,
     into localMetrics: inout LayoutWorkMetrics
   ) {
     switch node.layoutBehavior {
@@ -795,6 +837,9 @@ extension LayoutEngine {
       if !node.children.isEmpty {
         localMetrics.branching.customContainerMeasureComputations += 1
         localMetrics.branching.customChildMeasureRequests += node.children.count
+        if grade == .probe {
+          localMetrics.branching.customChildMeasureRequestsProbe += node.children.count
+        }
       }
     default:
       if !node.children.isEmpty || node.indexedChildSource != nil {
