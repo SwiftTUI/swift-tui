@@ -17,6 +17,15 @@ package struct LayoutShadowComparisonSummary: Sendable, Equatable {
   /// Windowed lazy or hosted subtrees skipped by the D12 carve-out. T-info
   /// currency: it keeps the size of the oracle's blind spot measured.
   package var windowedExclusionCount = 0
+  /// Whole sampled frames skipped because the SHADOW pass hit the engine
+  /// re-entry depth budget (`layout.customLayoutDepthLimitExceeded`). The
+  /// all-fresh shadow legitimately consumes more re-entry depth than a
+  /// production pass whose serve tiers skip interior descents, so at the
+  /// budget boundary the shadow truncates geometry production computed and
+  /// every downstream pair diverges spuriously — the 2026-08-11 mrkdwn
+  /// examples-gate false alarm. T-info currency, same terms as the
+  /// windowed carve-out.
+  package var depthExclusionCount = 0
   /// The first diverging pair, for trace attribution. Later divergences on the
   /// same frame update counters only.
   package var firstDivergenceDetail: String?
@@ -34,6 +43,7 @@ package struct LayoutShadowComparisonSummary: Sendable, Equatable {
     measureDivergenceCount += other.measureDivergenceCount
     placeDivergenceCount += other.placeDivergenceCount
     windowedExclusionCount += other.windowedExclusionCount
+    depthExclusionCount += other.depthExclusionCount
     if firstDivergenceDetail == nil {
       firstDivergenceDetail = other.firstDivergenceDetail
     }
@@ -98,13 +108,30 @@ package enum LayoutShadowOracle {
       measured: shadowMeasured,
       passContext: scratchContext
     )
-    let summary = compare(
-      productionMeasured: productionMeasured,
-      productionPlaced: productionPlaced,
-      shadowMeasured: shadowMeasured,
-      shadowPlaced: shadowPlaced,
-      excludedSubtreeIdentities: scratchContext.deniedLayoutRealizationBoundaries
-    )
+    // Depth carve-out: when the SHADOW pass hit the engine re-entry depth
+    // budget, its truncated (zero-size) subtrees are a legal fresh-pass
+    // outcome the production pass never produced — production's serve tiers
+    // skip interior descents, so it consumes strictly less depth. Comparing
+    // would report every truncated subtree as a spurious divergence (the
+    // 2026-08-11 mrkdwn examples-gate class), so the frame is excluded
+    // whole and counted.
+    let shadowHitDepthBudget = scratchContext.runtimeIssues.contains { issue in
+      issue.code == "layout.customLayoutDepthLimitExceeded"
+    }
+    let summary: LayoutShadowComparisonSummary
+    if shadowHitDepthBudget {
+      var excluded = LayoutShadowComparisonSummary()
+      excluded.depthExclusionCount = 1
+      summary = excluded
+    } else {
+      summary = compare(
+        productionMeasured: productionMeasured,
+        productionPlaced: productionPlaced,
+        shadowMeasured: shadowMeasured,
+        shadowPlaced: shadowPlaced,
+        excludedSubtreeIdentities: scratchContext.deniedLayoutRealizationBoundaries
+      )
+    }
     // The shadow trees die here. Drain them iteratively so a deep frame's
     // teardown cannot recurse off the frame-tail worker's small stack.
     shadowPlaced.flattenForRelease()

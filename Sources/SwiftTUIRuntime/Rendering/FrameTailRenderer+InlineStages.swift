@@ -32,12 +32,17 @@ struct FrameTailInlineStageRenderer: Sendable {
       )
     {
       var cutoffMetrics = prePass.metrics
-      // Stage 2: the provably constant family serves through a derived
-      // session — the measure pass reads the patched copy while place,
-      // damage, and diagnostics keep the original (D4). Everything else
-      // stays dark; a failed patch falls through to the conservative pass
-      // with the pre-pass measures already in the production cache.
-      let servable = prePass.certificates.filter(\.qualifiesForConstantFamilyServe)
+      // Stage 3 (plan 2026-08-11-002): every certified root serves through
+      // the derived session — the measure pass reads the patched copy while
+      // place, damage, and diagnostics keep the original (D4). The
+      // multi-sample certificate (retained + cached baselines including the
+      // parent's ideal-round proposal, D1) is the general family's
+      // soundness argument, and the layout shadow oracle is the authority:
+      // a layout-shadow-divergence on a cutoff-served frame is a
+      // stop-the-line event for this stage. A failed patch falls through
+      // to the conservative pass with the pre-pass measures already in the
+      // production cache.
+      let servable = prePass.certificates
       if !servable.isEmpty,
         let patched = input.layoutPassContext.retainedLayout?
           .patchingCertifiedSubtrees(servable)

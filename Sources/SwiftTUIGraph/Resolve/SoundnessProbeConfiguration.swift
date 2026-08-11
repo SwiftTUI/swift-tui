@@ -2,8 +2,9 @@
 /// counters.
 ///
 /// Keep this as the single counter mirror for runtime reporting and test
-/// attribution. `automaticLifetimeAnchorCount` and
-/// `layoutShadowWindowedExclusionCount` are intentionally captured but
+/// attribution. `automaticLifetimeAnchorCount`,
+/// `layoutShadowWindowedExclusionCount`, and
+/// `layoutShadowDepthExclusionCount` are intentionally captured but
 /// excluded from ``violationGrowth(since:)`` because they are informational,
 /// not violations. `lastTeardownLeakUnreachableCount` is census currency
 /// rather than a monotonic counter, so it supplies context for leak growth
@@ -36,6 +37,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var strandedListingViolationCount: Int
   package var layoutShadowDivergenceCount: Int
   package var layoutShadowWindowedExclusionCount: Int
+  package var layoutShadowDepthExclusionCount: Int
   package var lastViolationDetailByKind: [String: String]
 
   @MainActor
@@ -84,6 +86,8 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
         SoundnessProbeConfiguration.layoutShadowDivergenceCount,
       layoutShadowWindowedExclusionCount:
         SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount,
+      layoutShadowDepthExclusionCount:
+        SoundnessProbeConfiguration.layoutShadowDepthExclusionCount,
       lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
     )
   }
@@ -354,6 +358,15 @@ package enum SoundnessProbeConfiguration {
   /// pass legitimately cannot reproduce). Keeps the blind spot's size
   /// measured; an exclusion is not a violation.
   package static var layoutShadowWindowedExclusionCount = 0
+  /// T-info currency for the layout shadow oracle's depth carve-out: a
+  /// sampled frame whose SHADOW pass hit the engine re-entry depth budget
+  /// (`layout.customLayoutDepthLimitExceeded`) is excluded whole. The
+  /// all-fresh shadow legitimately consumes more re-entry depth than a
+  /// production pass whose serve tiers skip interior descents, so at the
+  /// budget boundary the shadow truncates geometry production computed —
+  /// the 2026-08-11 mrkdwn false-alarm class. An exclusion is not a
+  /// violation.
+  package static var layoutShadowDepthExclusionCount = 0
   package static var lastViolationDetailByKind: [String: String] = [:]
   private static var lastViolationDetailStorage: String?
   package static var lastViolationDetail: String? {
@@ -426,6 +439,14 @@ package enum SoundnessProbeConfiguration {
   /// measured blind spot, not a violation.
   package static func recordLayoutShadowWindowedExclusions(_ count: Int) {
     layoutShadowWindowedExclusionCount += count
+  }
+
+  /// Accumulates the layout shadow oracle's depth-exclusion currency
+  /// (T-info): sampled frames skipped whole because the fresh shadow pass
+  /// hit the engine re-entry depth budget that production's serve-assisted
+  /// pass stayed under. Deliberately no trace line and no violation detail.
+  package static func recordLayoutShadowDepthExclusions(_ count: Int) {
+    layoutShadowDepthExclusionCount += count
   }
 
   /// Records one caught teardown-coherence violation from the post-finalize

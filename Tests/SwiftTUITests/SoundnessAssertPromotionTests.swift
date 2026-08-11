@@ -30,6 +30,8 @@ struct SoundnessAssertPromotionTests {
         before.layoutShadowDivergenceCount
       SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount =
         before.layoutShadowWindowedExclusionCount
+      SoundnessProbeConfiguration.layoutShadowDepthExclusionCount =
+        before.layoutShadowDepthExclusionCount
       SoundnessProbeConfiguration.lastViolationDetail = lastDetail
       SoundnessProbeConfiguration.lastViolationDetailByKind =
         before.lastViolationDetailByKind

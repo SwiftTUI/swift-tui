@@ -38,6 +38,7 @@ struct SoundnessProbeConfigurationTests {
     let unclassifiedCount = SoundnessProbeConfiguration.unclassifiedResolvedNodeCount
     let layoutShadowCount = SoundnessProbeConfiguration.layoutShadowDivergenceCount
     let layoutShadowExclusions = SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount
+    let layoutShadowDepthExclusions = SoundnessProbeConfiguration.layoutShadowDepthExclusionCount
     let detail = SoundnessProbeConfiguration.lastViolationDetail
     let detailByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
     defer {
@@ -60,6 +61,7 @@ struct SoundnessProbeConfigurationTests {
       SoundnessProbeConfiguration.unclassifiedResolvedNodeCount = unclassifiedCount
       SoundnessProbeConfiguration.layoutShadowDivergenceCount = layoutShadowCount
       SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount = layoutShadowExclusions
+      SoundnessProbeConfiguration.layoutShadowDepthExclusionCount = layoutShadowDepthExclusions
       SoundnessProbeConfiguration.lastViolationDetail = detail
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailByKind
     }
@@ -96,6 +98,23 @@ struct SoundnessProbeConfigurationTests {
         SoundnessProbeConfiguration.lastViolationDetailByKind["layout-shadow-divergence"]
           == "measured size diverged"
       )
+    }
+  }
+
+  @Test("layout shadow depth exclusions accumulate without a violation record")
+  func layoutShadowDepthExclusionsAccumulateInformationally() {
+    withRestoredProbeState {
+      SoundnessProbeConfiguration.isEnabled = false
+      let before = SoundnessProbeConfiguration.layoutShadowDepthExclusionCount
+      let divergencesBefore = SoundnessProbeConfiguration.layoutShadowDivergenceCount
+      let detailBefore = SoundnessProbeConfiguration.lastViolationDetail
+      SoundnessProbeConfiguration.recordLayoutShadowDepthExclusions(2)
+      #expect(SoundnessProbeConfiguration.layoutShadowDepthExclusionCount == before + 2)
+      #expect(
+        SoundnessProbeConfiguration.layoutShadowDivergenceCount == divergencesBefore,
+        "a depth exclusion is T-info currency, not a violation"
+      )
+      #expect(SoundnessProbeConfiguration.lastViolationDetail == detailBefore)
     }
   }
 

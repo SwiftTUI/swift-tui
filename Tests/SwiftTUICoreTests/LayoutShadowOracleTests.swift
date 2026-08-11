@@ -324,6 +324,123 @@ struct LayoutShadowOracleTests {
     #expect(!summary.hasDivergence)
   }
 
+  @Test("a shadow that hits the depth budget is excluded whole, not diverged")
+  func shadowDepthTruncationIsExcluded() {
+    // The asymmetry class behind the 2026-08-11 mrkdwn examples-gate fatal:
+    // production's serve tiers skip interior custom-layout descents, so a
+    // depth-3 tree measures fine when served retained under a budget of 2 —
+    // while the all-fresh shadow descends every level, hits the budget, and
+    // truncates the innermost container to zero. Comparing would report
+    // spurious divergences on geometry production legitimately computed.
+    let tree = nestedCustomTree("depth-probe", customDepth: 3)
+    let proposal = ProposedSize(width: 20, height: 10)
+
+    // The previous frame measured under a generous budget (4), so its
+    // products carry the real innermost geometry.
+    let engine = LayoutEngine()
+    let fullContext = LayoutPassContext(customLayoutCompatibilityDepthLimit: 4)
+    let fullMeasured = engine.measure(tree, proposal: proposal, passContext: fullContext)
+    let fullPlaced = engine.place(
+      tree,
+      measured: fullMeasured,
+      in: .init(origin: .zero, size: fullMeasured.measuredSize),
+      passContext: fullContext
+    )
+    #expect(fullContext.runtimeIssues.isEmpty)
+    #expect(fullMeasured.measuredSize == CellSize(width: 8, height: 2))
+
+    let previousFrame = FrameArtifacts(
+      resolvedTree: tree,
+      measuredTree: fullMeasured,
+      placedTree: fullPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: tree.identity,
+        bounds: .init(origin: .zero, size: fullMeasured.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let session = RetainedLayoutSession(
+      previousFrameIndex: .init(frame: previousFrame),
+      invalidatedIdentities: []
+    )
+
+    // Production under the tight budget: the retained serve answers at the
+    // root, so no custom boundary is ever entered — depth stays zero and
+    // the real geometry rides through.
+    let productionContext = LayoutPassContext(
+      retainedLayout: session,
+      customLayoutCompatibilityDepthLimit: 2
+    )
+    let productionMeasured = engine.measure(
+      tree, proposal: proposal, passContext: productionContext)
+    let productionPlaced = engine.place(
+      tree,
+      measured: productionMeasured,
+      in: .init(origin: .zero, size: productionMeasured.measuredSize),
+      passContext: productionContext
+    )
+    #expect(productionContext.runtimeIssues.isEmpty)
+    #expect(productionMeasured.measuredSize == CellSize(width: 8, height: 2))
+
+    // Pin the asymmetry mechanism itself: an all-fresh pass under the same
+    // budget truncates and records the depth issue.
+    let freshEngine = LayoutEngine(cache: nil)
+    let freshContext = LayoutPassContext(customLayoutCompatibilityDepthLimit: 2)
+    let freshMeasured = freshEngine.measure(tree, proposal: proposal, passContext: freshContext)
+    #expect(
+      freshContext.runtimeIssues.contains { issue in
+        issue.code == "layout.customLayoutDepthLimitExceeded"
+      }
+    )
+    #expect(freshMeasured.measuredSize != productionMeasured.measuredSize)
+
+    // The oracle must therefore exclude the frame whole and count it,
+    // instead of reporting the truncation as a divergence.
+    let summary = LayoutShadowOracle.comparisonSummary(
+      resolved: tree,
+      proposal: proposal,
+      productionMeasured: productionMeasured,
+      productionPlaced: productionPlaced,
+      scrollViewportContext: nil,
+      customLayoutCompatibilityDepthLimit: 2
+    )
+
+    #expect(!summary.hasDivergence)
+    #expect(summary.depthExclusionCount == 1)
+    #expect(summary.measureDivergenceCount == 0)
+    #expect(summary.placeDivergenceCount == 0)
+  }
+
+  @Test("a shadow within the depth budget still compares (no blanket exclusion)")
+  func shadowWithinBudgetStillCompares() {
+    let tree = nestedCustomTree("shallow-probe", customDepth: 2)
+    let proposal = ProposedSize(width: 20, height: 10)
+    let engine = LayoutEngine()
+    let passContext = LayoutPassContext(customLayoutCompatibilityDepthLimit: 4)
+    let measured = engine.measure(tree, proposal: proposal, passContext: passContext)
+    let placed = engine.place(
+      tree,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    let summary = LayoutShadowOracle.comparisonSummary(
+      resolved: tree,
+      proposal: proposal,
+      productionMeasured: measured,
+      productionPlaced: placed,
+      scrollViewportContext: nil,
+      customLayoutCompatibilityDepthLimit: 4
+    )
+
+    #expect(!summary.hasDivergence)
+    #expect(summary.depthExclusionCount == 0)
+  }
+
   @Test("summaries merge across reconciliation passes, first detail wins")
   func summariesMerge() {
     var first = LayoutShadowComparisonSummary()
@@ -371,6 +488,84 @@ private func reidentifiedTree(id: String) -> ResolvedNode {
       verticalAlignment: .top
     )
   )
+}
+
+/// A chain of `customDepth` nested custom layouts over one leaf, each
+/// measuring and placing its single child through native engine re-entry —
+/// the shape that consumes one unit of the compatibility depth budget per
+/// level. Reuse signatures are constant so retained serves stay eligible.
+private func nestedCustomTree(
+  _ name: String,
+  customDepth: Int
+) -> ResolvedNode {
+  var node = leaf("\(name)-leaf", size: .init(width: 8, height: 2))
+  for level in (0..<customDepth).reversed() {
+    node = customContainer("\(name)-c\(level)", child: node)
+  }
+  return node
+}
+
+private func customContainer(
+  _ name: String,
+  child: ResolvedNode
+) -> ResolvedNode {
+  let snapshot = WorkerCustomLayoutSnapshot(
+    debugName: "ShadowDepthProbeLayout",
+    measureContainer: { engine, node, proposal, passContext in
+      guard let child = node.children.first else {
+        return .zero
+      }
+      return engine.measure(child, proposal: proposal, passContext: passContext).measuredSize
+    },
+    placeSubviews: { engine, node, measured, bounds, passContext in
+      guard let child = node.children.first else {
+        return []
+      }
+      let childMeasured = engine.measure(
+        child, proposal: measured.proposal, passContext: passContext)
+      return [
+        engine.place(child, measured: childMeasured, in: bounds, passContext: passContext)
+      ]
+    }
+  )
+  return ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("ShadowDepthProbe"),
+    children: [child],
+    layoutBehavior: .custom(
+      CustomLayoutHandle(
+        ShadowDepthProbeMainProxy(),
+        measurementReuseSignature: "ShadowDepthProbeLayout",
+        placementReuseSignature: "ShadowDepthProbeLayout",
+        workerProxy: snapshot
+      )
+    )
+  )
+}
+
+/// The handle requires a main-actor proxy even when the worker proxy answers
+/// everything; this one is never consulted.
+private final class ShadowDepthProbeMainProxy: CustomLayoutProxy {
+  var debugName: String {
+    "ShadowDepthProbeLayout"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> CellSize {
+    .zero
+  }
+
+  func placeSubviews(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    measured _: MeasuredNode,
+    in _: CellRect
+  ) -> [PlacedNode] {
+    []
+  }
 }
 
 private func leaf(

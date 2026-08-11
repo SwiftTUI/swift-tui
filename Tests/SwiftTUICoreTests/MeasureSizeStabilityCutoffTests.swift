@@ -369,27 +369,64 @@ struct MeasureSizeStabilityCutoffTests {
     #expect(!summary.hasDivergence)
   }
 
-  @Test("a non-constant certified root stays dark in Stage 2")
-  func nonConstantCertifiedRootStaysDark() throws {
+  @Test("a general-family certificate serves the spine through a patched session (Stage 3)")
+  func generalFamilyCertificateServesSpine() throws {
     let engine = LayoutEngine(cache: MeasurementCache())
     let bIdentity = testIdentity("Root", "Inner", "B")
     let previous = tree(leafBSize: .init(width: 4, height: 1))
     let retained = session(for: engine, previousTree: previous, invalidated: [bIdentity])
 
+    // A non-constant root: no fixed extents pin its response, so the serve
+    // rests on the multi-sample certificate alone (D1) — the Stage 3
+    // widening this test owns.
+    let current = tree(leafBSize: .init(width: 4, height: 1))
     let context = LayoutPassContext(
       retainedLayout: retained,
       invalidatedIdentities: [bIdentity]
     )
     let prePass = try #require(
       engine.preMeasureCutoffPrePass(
-        resolved: tree(leafBSize: .init(width: 4, height: 1)),
+        resolved: current,
         passContext: context,
         animationExcludedIdentities: []
       )
     )
-
     #expect(prePass.metrics.certificatesCertified == 1)
-    #expect(prePass.certificates.filter(\.qualifiesForConstantFamilyServe).isEmpty)
+    #expect(
+      prePass.certificates.allSatisfy { !$0.qualifiesForConstantFamilyServe },
+      "the fixture must exercise the general family, not the constant one"
+    )
+
+    let patched = try #require(retained.patchingCertifiedSubtrees(prePass.certificates))
+    context.installPatchedMeasureSession(patched)
+
+    let measured = engine.measure(current, proposal: proposal, passContext: context)
+
+    // The spine served wholesale through the patched session.
+    #expect(context.workMetrics.measuredNodesReused >= measured.subtreeNodeCount)
+    let servedLeaf = try #require(
+      measured.childMeasurements
+        .first(where: { $0.identity == testIdentity("Root", "Inner") })?
+        .childMeasurements.first
+    )
+    #expect(servedLeaf.measuredSize == CellSize(width: 4, height: 1))
+
+    // Placement keeps the ORIGINAL session (D5) and the Stage 0 oracle is
+    // the stage's soundness authority: a certified, served frame must
+    // compare silent against an all-reuse-disabled fresh pass.
+    let placed = engine.place(current, measured: measured, passContext: context)
+    let summary = LayoutShadowOracle.comparisonSummary(
+      resolved: current,
+      proposal: proposal,
+      productionMeasured: measured,
+      productionPlaced: placed,
+      scrollViewportContext: nil,
+      customLayoutCompatibilityDepthLimit:
+        LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit,
+      measurementSeedSession: retained
+    )
+    #expect(!summary.hasDivergence)
+    #expect(summary.depthExclusionCount == 0)
   }
 
   @Test("the pre-pass never touches the main context's viewport hints")

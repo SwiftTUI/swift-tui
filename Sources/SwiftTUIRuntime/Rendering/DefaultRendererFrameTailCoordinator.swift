@@ -126,6 +126,11 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
         summary.windowedExclusionCount
       )
     }
+    if summary.depthExclusionCount > 0 {
+      SoundnessProbeConfiguration.recordLayoutShadowDepthExclusions(
+        summary.depthExclusionCount
+      )
+    }
     guard summary.hasDivergence else {
       return
     }

@@ -320,6 +320,7 @@ private struct ProbeState {
   let strandedListingViolationCount: Int
   let layoutShadowDivergenceCount: Int
   let layoutShadowWindowedExclusionCount: Int
+  let layoutShadowDepthExclusionCount: Int
   let lastViolationDetail: String?
   let lastViolationDetailByKind: [String: String]
 
@@ -372,6 +373,8 @@ private struct ProbeState {
         SoundnessProbeConfiguration.layoutShadowDivergenceCount,
       layoutShadowWindowedExclusionCount:
         SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount,
+      layoutShadowDepthExclusionCount:
+        SoundnessProbeConfiguration.layoutShadowDepthExclusionCount,
       lastViolationDetail: SoundnessProbeConfiguration.lastViolationDetail,
       lastViolationDetailByKind: SoundnessProbeConfiguration.lastViolationDetailByKind
     )
@@ -424,6 +427,8 @@ private struct ProbeState {
     SoundnessProbeConfiguration.layoutShadowDivergenceCount = layoutShadowDivergenceCount
     SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount =
       layoutShadowWindowedExclusionCount
+    SoundnessProbeConfiguration.layoutShadowDepthExclusionCount =
+      layoutShadowDepthExclusionCount
     SoundnessProbeConfiguration.lastViolationDetail = lastViolationDetail
     SoundnessProbeConfiguration.lastViolationDetailByKind = lastViolationDetailByKind
   }

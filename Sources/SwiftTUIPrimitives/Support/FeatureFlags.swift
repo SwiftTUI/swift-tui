@@ -138,10 +138,12 @@ package enum FeatureGate: CaseIterable, Sendable {
       true
     case .measureSizeStabilityCutoff:
       // Opt-in stage gate (size-stability cutoff, plan 2026-08-11-002).
-      // Stage 1 is dark — behind the gate the pre-pass computes eligibility
-      // and certificates and records counters only; nothing is served.
-      // Promotion to a default-on kill switch requires the plan's Stage 4
-      // benchmark acceptance.
+      // Behind the gate the pre-pass certifies size-stable dirty subtrees
+      // and, as of Stage 3, serves EVERY certified root through the derived
+      // measure session (the multi-sample certificate is the soundness
+      // argument; the layout shadow oracle is the stage authority).
+      // Promotion to a default-on kill switch still requires the plan's
+      // Stage 4 benchmark acceptance on the plan-005 harness.
       false
     case .persistentCustomLayoutCache:
       // Kill switch, not an opt-in (plan 2026-08-11-004 Stage 2): the
