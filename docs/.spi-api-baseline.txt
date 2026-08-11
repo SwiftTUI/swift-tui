@@ -32,9 +32,15 @@ SwiftTUIRuntime.BlendedImageEncodedPayload.bytes
 SwiftTUIRuntime.BlendedImageEncodedPayload.id
 SwiftTUIRuntime.BlendedImageEncodedPayload.pixelSize
 SwiftTUIRuntime.CommittedFrameSample
+SwiftTUIRuntime.DebugBundle
+SwiftTUIRuntime.DebugBundle.announcementLine()
+SwiftTUIRuntime.DebugBundle.bundleFilePath(named:)
+SwiftTUIRuntime.DebugBundle.prepareIfNeeded(configuration:)
+SwiftTUIRuntime.DebugBundle.preparedDirectory
+SwiftTUIRuntime.DebugBundle.resetForTesting()
 SwiftTUIRuntime.ElidedFrameSample
 SwiftTUIRuntime.EnvFrameTraceSink
-SwiftTUIRuntime.EnvFrameTraceSink.fromEnvironment()
+SwiftTUIRuntime.EnvFrameTraceSink.fromEnvironment(debug:)
 SwiftTUIRuntime.EnvFrameTraceSink.record(_:)
 SwiftTUIRuntime.FrameDiagnosticSink
 SwiftTUIRuntime.FrameDiagnosticSink.record(_:)

@@ -118,7 +118,8 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
 
   @Flag(
     name: .customLong("debug"),
-    help: "Enable framework-internal debug instrumentation. [env: SWIFTTUI_DEBUG]"
+    help:
+      "Debug instrumentation: collects a debug bundle (diagnostics TSV, frame trace, manifest) under SWIFTTUI_DEBUG_DIR or a temp directory. [env: SWIFTTUI_DEBUG]"
   )
   public var debug: Bool = false
 

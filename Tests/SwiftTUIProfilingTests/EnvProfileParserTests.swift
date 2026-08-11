@@ -1,3 +1,5 @@
+import Foundation
+import SwiftTUICore
 import Testing
 
 @testable import SwiftTUIProfiling
@@ -49,6 +51,35 @@ struct EnvProfileParserTests {
     let memoryOnly = EnvProfileParser.parse("memory@500ms;summary")
     #expect(memoryOnly?.signals == [.memory(interval: .milliseconds(500))])
     #expect(memoryOnly?.sinks == [.summary])
+  }
+
+  @Test("Bare tsv/jsonl sinks parse with an empty debug-bundle marker path")
+  func bareSinksParse() {
+    #expect(EnvProfileParser.parse("frames;tsv")?.sinks == [.tsv(path: "")])
+    #expect(EnvProfileParser.parse("frames;jsonl,summary")?.sinks == [.jsonl(path: ""), .summary])
+  }
+
+  @Test("Bare sinks resolve into the debug bundle or drop without one")
+  func bareSinksResolve() {
+    DebugLogRouter.resetInstalledDefaultDirectoryForTesting()
+    #expect(ProfileActivation.resolvedDescriptors([.tsv(path: ""), .summary]) == [.summary])
+
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("swifttui-profile-\(UUID().uuidString)").path
+    defer {
+      DebugLogRouter.resetInstalledDefaultDirectoryForTesting()
+      try? FileManager.default.removeItem(atPath: directory)
+    }
+    DebugLogRouter.installDefaultDebugDirectory(directory)
+    #expect(
+      ProfileActivation.resolvedDescriptors([
+        .tsv(path: ""), .jsonl(path: ""), .tsv(path: "/explicit.tsv"),
+      ]) == [
+        .tsv(path: directory + "/profile.tsv"),
+        .jsonl(path: directory + "/profile.jsonl"),
+        .tsv(path: "/explicit.tsv"),
+      ]
+    )
   }
 
   @Test("Malformed input disables profiling entirely")

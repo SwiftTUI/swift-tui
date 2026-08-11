@@ -667,7 +667,8 @@ signal handler.
 SceneSession.run` (`SceneSession.swift:244`) builds the `EnvironmentSnapshot`.
 It constructs the `RunLoop` (`:266`) with the surface, readers,
 `FrameScheduler`, `StateContainer`, `FocusTracker`, and `exitKeyBindings`. It can
-also install a `frameSink` (profiling, or `SWIFTTUI_FRAME_TRACE`). Then it calls
+also install a `frameSink` (profiling, `SWIFTTUI_FRAME_TRACE`, or the debug
+bundle's `frames.tsv` via `SWIFTTUI_TRACE=frames` / `--debug`). Then it calls
 `runLoop.run()`. The
 `RunLoop` initializer defaults `renderMode = .environmentDefault()`, which is
 `.async`.

@@ -359,7 +359,8 @@ package enum EnvironmentTolerationCensus {
       guard !frameworkKeyDenialsByKey.isEmpty else {
         return ""
       }
-      let ranked = frameworkKeyDenialsByKey
+      let ranked =
+        frameworkKeyDenialsByKey
         .sorted { ($0.value, $1.key) > ($1.value, $0.key) }
         .map { "\($0.key)=\($0.value)" }
         .joined(separator: " ")

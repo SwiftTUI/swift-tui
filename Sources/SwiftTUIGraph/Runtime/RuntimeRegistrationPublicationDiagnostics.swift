@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 package struct RuntimeRegistrationPublicationDiagnostics: Equatable, Sendable {
   package var publicationMode: String
   package var dirtyPlanResult: String
@@ -105,23 +93,9 @@ package enum RuntimeRegistrationPublicationDiagnosticsConfiguration {
   package static var isEnabled: Bool = environmentDefault()
 
   private static func environmentDefault() -> Bool {
-    guard let rawValue = environmentValue(named: environmentVariableName) else {
-      return false
+    guard FeatureFlags.environmentValue(named: environmentVariableName) != nil else {
+      return DebugTraceSelection.current.isArmed("publication")
     }
-    switch rawValue.lowercased() {
-    case "1", "true", "yes", "on":
-      return true
-    default:
-      return false
-    }
-  }
-
-  private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
+    return FeatureFlags.isEnabled(named: environmentVariableName, default: false)
   }
 }

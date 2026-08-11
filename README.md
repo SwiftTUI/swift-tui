@@ -60,8 +60,9 @@ snapshot-testable.
   tree and a size proposal — the same input always produces the same cells —
   and tests render them as integer-cell rasters, no TTY required.
 - **Accessibility ships with the frame.** A semantic substrate under every frame
-  drives a linear accessible output path. It also drives `--no-color` /
-  `--ascii` fallbacks and reduce-motion behavior. See
+  drives the terminal's cursor-follows-focus mode (`--accessible`), the
+  browser ARIA tree, and the native host overlays. It also drives
+  `--no-color` / `--ascii` fallbacks and reduce-motion behavior. See
   [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 - **One source across host presentations.** The same authored app reaches the
   [canonical host matrix](docs/HOSTS-AND-PLATFORMS.md#canonical-host-matrix);
@@ -163,7 +164,7 @@ DocC article for the full platform-by-product matrix.
 **Standard CLI flags.** Conform your `App` to `SwiftTUICommand`. This protocol
 adds the
 framework's standard flag surface (`--accessible`, `--no-color`, `--ascii`,
-`--reduce-motion`, `--json`, `--linear`, `--debug`, …) alongside your own
+`--reduce-motion`, `--json`, `--debug`, …) alongside your own
 options:
 
 ```swift

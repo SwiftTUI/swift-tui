@@ -1,15 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#elseif canImport(WASILibc)
-  import WASILibc
-#endif
-
 /// Diagnostic-only trace of **why retained reuse was denied** per node, gated by
 /// `SWIFTTUI_REUSE_TRACE` (default off). Inert and zero-cost when disabled.
 ///
@@ -146,25 +134,26 @@ package enum ReuseDenialTrace {
     reset()
   }
 
-  /// Routes a trace line to the configured file sink (when `outputFilePath` is
-  /// set and writable) otherwise to stderr — see ``DiagnosticTraceSink``.
+  /// Routes a trace line to the configured file sink (when `outputFilePath`
+  /// is set and writable), else the debug bundle, otherwise stderr — see
+  /// ``DebugLogRouter``.
   private static func emit(_ message: String) {
-    DiagnosticTraceSink.emit(message, toFileAt: outputFilePath)
+    DebugLogRouter.emit(
+      message,
+      toFileAt: DebugLogRouter.resolvedFilePath(
+        override: outputFilePath, bundleFileName: "reuse.log"
+      )
+    )
   }
 
   private static func environmentDefault() -> Bool {
     guard let rawValue = environmentValue(named: environmentVariableName) else {
-      return false
+      return DebugTraceSelection.current.isArmed("reuse")
     }
     return !rawValue.isEmpty && rawValue != "0"
   }
 
   private static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
-    }
+    FeatureFlags.environmentValue(named: name)
   }
 }

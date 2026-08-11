@@ -49,23 +49,28 @@ import Synchronization
     }
   #endif
 
-  /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty, writable path.
+  /// Returns an installed sink when `SWIFTTUI_FRAME_TRACE` names a non-empty,
+  /// writable path — or, with the `frames` trace armed via `SWIFTTUI_TRACE`
+  /// (or `debug` on and a debug bundle active), the bundle's `frames.tsv`.
   /// Otherwise, returns `nil`. Each session build can call this method safely.
   ///
   /// WASI has no path-based file sink — its capability model makes
   /// arbitrary-path `open` a no-op — so this always returns `nil` there.
-  public static func fromEnvironment() -> EnvFrameTraceSink? {
+  public static func fromEnvironment(debug: Bool = false) -> EnvFrameTraceSink? {
     #if canImport(WASILibc)
       return nil
     #else
-      guard let raw = unsafe getenv("SWIFTTUI_FRAME_TRACE") else {
+      if let path = FeatureFlags.environmentValue(named: "SWIFTTUI_FRAME_TRACE"), !path.isEmpty {
+        return EnvFrameTraceSink(path: path)
+      }
+      guard DebugTraceSelection.current.isArmed("frames") || debug,
+        let bundlePath = DebugLogRouter.resolvedFilePath(
+          override: nil, bundleFileName: "frames.tsv"
+        )
+      else {
         return nil
       }
-      let path = unsafe String(cString: raw)
-      guard !path.isEmpty else {
-        return nil
-      }
-      return EnvFrameTraceSink(path: path)
+      return EnvFrameTraceSink(path: bundlePath)
     #endif
   }
 

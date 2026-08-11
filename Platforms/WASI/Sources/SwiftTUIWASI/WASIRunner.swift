@@ -74,6 +74,9 @@ package func wasiFrameDiagnosticsEnabled(
     ?? false
 }
 
+/// Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
+/// boolean rule): the browser bridge historically sets `off` / `false` /
+/// `none` to disable, so this parser keeps accepting that wider falsy set.
 private func parseDiagnosticsFlag(_ value: String?) -> Bool? {
   guard let value else {
     return nil

@@ -1,15 +1,3 @@
-#if os(WASI) && canImport(WASILibc)
-  import WASILibc
-#elseif canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(Android)
-  import Android
-#elseif canImport(Musl)
-  import Musl
-#endif
-
 /// Whether this process runs the stack-lean resolve profile.
 ///
 /// JavaScriptCore executes wasm calls on the host thread's native stack, and
@@ -37,8 +25,11 @@
 /// composed-runtime debugging and profile-shaped gate lanes.
 @MainActor
 package let stackLeanResolveProfile: Bool = {
-  if let raw = unsafe getenv("SWIFTTUI_STACK_LEAN_PROFILE") {
-    switch unsafe String(cString: raw) {
+  // Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
+  // boolean rule): only the exact values `0` / `1` are respected, so a typo
+  // can never flip a whole engine profile.
+  if let raw = FeatureFlags.environmentValue(named: "SWIFTTUI_STACK_LEAN_PROFILE") {
+    switch raw {
     case "0":
       return false
     case "1":
@@ -69,8 +60,8 @@ package let stackLeanResolveProfile: Bool = {
 /// on `!stackLeanResolveProfile`).
 @MainActor
 package let leanRetainedReuse: Bool = {
-  if let raw = unsafe getenv("SWIFTTUI_LEAN_RETAINED_REUSE") {
-    return unsafe String(cString: raw) == "1"
-  }
-  return false
+  // Documented grammar exception: only the exact value `1` opts in — this
+  // widens the engine's reuse behavior under an already-tight stack budget,
+  // so nothing short of an explicit `1` may arm it.
+  FeatureFlags.environmentValue(named: "SWIFTTUI_LEAN_RETAINED_REUSE") == "1"
 }()

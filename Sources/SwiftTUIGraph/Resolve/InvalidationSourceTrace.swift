@@ -9,8 +9,8 @@
 /// large reused subtree (e.g. the content root) on a presentation open/close.
 ///
 /// One `[INVAL-TRACE]` line per resolved frame, written through
-/// ``DiagnosticTraceSink`` (the `SWIFTTUI_INVAL_TRACE_FILE` append-file sink when
-/// set, otherwise stderr).
+/// ``DebugLogRouter`` (the `SWIFTTUI_INVAL_TRACE_FILE` append-file sink when
+/// set, else the debug bundle, otherwise stderr).
 /// Process-global by design (F119): this subsystem's state is `@MainActor`
 /// statics keyed by per-`ViewGraph` frame IDs, so two live graphs in one
 /// process would interleave counters and misattribute trace lines. Note-only
@@ -23,9 +23,9 @@ package enum InvalidationSourceTrace {
 
   package static var isEnabled: Bool = environmentDefault()
 
-  /// File sink path; `nil` ⇒ stderr. Resolved once on first use; settable for
-  /// tests. See ``ReuseDenialTrace/outputFilePath``.
-  package static var outputFilePath: String? = DiagnosticTraceSink.environmentValue(
+  /// File sink path; `nil` ⇒ debug bundle or stderr. Resolved once on first
+  /// use; settable for tests. See ``ReuseDenialTrace/outputFilePath``.
+  package static var outputFilePath: String? = FeatureFlags.environmentValue(
     named: fileEnvironmentVariableName
   )
 
@@ -53,7 +53,7 @@ package enum InvalidationSourceTrace {
       line += " force-root-reasons=[\(disabledReasons.sorted().joined(separator: ","))]"
     }
     line += "\n"
-    DiagnosticTraceSink.emit(line, toFileAt: outputFilePath)
+    emit(line)
   }
 
   /// Caller attribution: synchronously emits a labeled source line
@@ -63,7 +63,16 @@ package enum InvalidationSourceTrace {
   package static func note(_ source: StaticString, _ identities: Set<Identity>) {
     guard isEnabled, !identities.isEmpty else { return }
     let line = "[INVAL-SRC] \(source)={\(joined(identities))}\n"
-    DiagnosticTraceSink.emit(line, toFileAt: outputFilePath)
+    emit(line)
+  }
+
+  private static func emit(_ line: String) {
+    DebugLogRouter.emit(
+      line,
+      toFileAt: DebugLogRouter.resolvedFilePath(
+        override: outputFilePath, bundleFileName: "inval.log"
+      )
+    )
   }
 
   /// Resets the sequence counter (test seam).
@@ -76,9 +85,9 @@ package enum InvalidationSourceTrace {
   }
 
   private static func environmentDefault() -> Bool {
-    guard let rawValue = DiagnosticTraceSink.environmentValue(named: environmentVariableName)
+    guard let rawValue = FeatureFlags.environmentValue(named: environmentVariableName)
     else {
-      return false
+      return DebugTraceSelection.current.isArmed("inval")
     }
     return !rawValue.isEmpty && rawValue != "0"
   }

@@ -57,6 +57,14 @@ public enum TerminalRunner {
 
     switch mode {
     case .app(let instanceName):
+      // Announce the debug bundle after the session ends (and after teardown
+      // restored the primary screen), succeed or throw — a crashed session is
+      // exactly when the bundle matters.
+      defer {
+        if let announcement = DebugBundle.announcementLine() {
+          FileHandle.standardError.write(Data(announcement.utf8))
+        }
+      }
       try await launchApp(
         selections: selections,
         sessionName: sessionName,

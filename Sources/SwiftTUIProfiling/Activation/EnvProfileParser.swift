@@ -5,9 +5,14 @@
 /// signal-list      = signal *( "," signal )
 /// signal           = "frames" | "memory" [ "@" duration ] | "cpu" [ "@" duration ]
 /// sink-list        = sink *( "," sink )
-/// sink             = "tsv=" path | "jsonl=" path | "summary"
+/// sink             = "tsv" [ "=" path ] | "jsonl" [ "=" path ] | "summary"
 /// duration         = e.g. 100ms, 1s, 2s500ms
 /// ```
+///
+/// A bare `tsv` / `jsonl` (no `=path`) writes `profile.tsv` / `profile.jsonl`
+/// into the `SWIFTTUI_DEBUG_DIR` debug bundle; without an active bundle
+/// directory that sink is dropped at activation (falling back to the summary
+/// sink when nothing else is configured).
 ///
 /// Returns `nil` for an unset, empty, or malformed value — profiling stays
 /// fully disabled rather than partially activating on bad input.
@@ -108,6 +113,14 @@ package enum EnvProfileParser {
   private static func parseSink(_ token: String) -> ProfileConfig.SinkDescriptor? {
     if token == "summary" {
       return .summary
+    }
+    // Bare `tsv` / `jsonl` (no `=path`) resolve into the debug bundle
+    // (`SWIFTTUI_DEBUG_DIR`) at activation; the empty path is the marker.
+    if token == "tsv" {
+      return .tsv(path: "")
+    }
+    if token == "jsonl" {
+      return .jsonl(path: "")
     }
     if let path = value(of: token, key: "tsv") {
       return .tsv(path: path)

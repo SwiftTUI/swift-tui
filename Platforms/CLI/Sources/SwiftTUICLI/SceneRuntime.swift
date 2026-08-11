@@ -37,6 +37,9 @@ final class SceneRuntime {
     self.isPrimary = isPrimary
     self.lifecycle = SceneLifecycle(isPrimary: isPrimary)
 
+    // Arm the session debug bundle before any sink resolves its destination,
+    // so `--debug`'s default bundle directory catches every stream.
+    DebugBundle.prepareIfNeeded(configuration: configuration)
     let frameSink: (any FrameDiagnosticSink)? =
       if isPrimary, let path = Self.diagnosticsFilePath(configuration: configuration) {
         FrameDiagnosticsFileSink(path: path)
@@ -220,10 +223,13 @@ final class SceneRuntime {
   /// Returns a diagnostics output file path when debug instrumentation or the
   /// `SWIFTTUI_DIAGNOSTICS` environment variable is enabled.
   ///
-  /// A value of `1` or `true` writes to `/tmp/termui-diagnostics.tsv`; any
+  /// A value of `1` or `true` writes the debug bundle's `diagnostics.tsv`
+  /// when a bundle directory is active (`SWIFTTUI_DEBUG_DIR`, or the default
+  /// bundle `--debug` installs), else `/tmp/termui-diagnostics.tsv`; any
   /// other truthy value is treated as a custom file path. `--debug` /
-  /// `SWIFTTUI_DEBUG=1` uses the same default path when no custom diagnostics
-  /// path is present.
+  /// `SWIFTTUI_DEBUG=1` follows the same bundle-then-default resolution when
+  /// no custom diagnostics path is present.
+  @MainActor
   static func diagnosticsFilePath(
     configuration: RuntimeConfiguration,
     environment: [String: String] = ProcessInfo.processInfo.environment
@@ -233,17 +239,23 @@ final class SceneRuntime {
     {
       return path
     }
-    return configuration.debug ? defaultDiagnosticsFilePath : nil
+    return configuration.debug ? bundleOrDefaultDiagnosticsFilePath() : nil
   }
 
   private static let defaultDiagnosticsFilePath = "/tmp/termui-diagnostics.tsv"
 
+  @MainActor
+  private static func bundleOrDefaultDiagnosticsFilePath() -> String {
+    DebugBundle.bundleFilePath(named: "diagnostics.tsv") ?? defaultDiagnosticsFilePath
+  }
+
+  @MainActor
   private static func diagnosticsFilePath(from string: String) -> String? {
     switch string.lowercased() {
     case "", "0", "false", "no":
       return nil
     case "1", "true", "yes":
-      return defaultDiagnosticsFilePath
+      return bundleOrDefaultDiagnosticsFilePath()
     default:
       return string
     }

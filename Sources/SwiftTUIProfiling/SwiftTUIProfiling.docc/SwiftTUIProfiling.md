@@ -50,21 +50,28 @@ The **cpu** signal also exposes a reusable sampling API. You can use
 ``CPUSampler`` and its related types outside the activation path.
 
 Records are routed to sinks selected by ``ProfileConfig/SinkDescriptor`` (or the
-`tsv=`/`jsonl=`/`summary` tokens in the grammar). With no sink named, activation
-falls back to a stderr ``ProfileConfig/SinkDescriptor/summary``.
+`tsv`/`jsonl`/`summary` tokens in the grammar). With no sink named, activation
+falls back to a stderr ``ProfileConfig/SinkDescriptor/summary``. A bare `tsv`
+or `jsonl` (no `=path`) writes `profile.tsv` / `profile.jsonl` into the
+`SWIFTTUI_DEBUG_DIR` debug bundle (see the `SwiftTUIRuntime`
+*Environment Variables* article); without an active bundle directory that
+sink is dropped at activation.
 
 ### The `SWIFTTUI_PROFILE` grammar
 
 ```
 SWIFTTUI_PROFILE = signal-list [ ";" sink-list ]
 signal           = "frames" | "memory" [ "@" duration ] | "cpu" [ "@" duration ]
-sink             = "tsv=" path | "jsonl=" path | "summary"
+sink             = "tsv" [ "=" path ] | "jsonl" [ "=" path ] | "summary"
 duration         = e.g. 100ms, 1s, 2s500ms
 ```
 
 ```bash
 # Frames + memory once/sec, written as TSV; works in a release build:
 SWIFTTUI_PROFILE="frames,memory@1s;tsv=/tmp/run.tsv" ./gallery-demo
+
+# The same, into the session debug bundle:
+SWIFTTUI_DEBUG_DIR=/tmp/bundle SWIFTTUI_PROFILE="frames,memory@1s;tsv" ./gallery-demo
 
 # Just the memory signal, summary to stderr — the leak check:
 SWIFTTUI_PROFILE="memory@500ms;summary" ./gallery-demo

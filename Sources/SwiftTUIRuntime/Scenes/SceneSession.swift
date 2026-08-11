@@ -280,15 +280,19 @@ import SwiftTUIViews
         WindowHostView(content: configuration.makeScopedRootView())
       }
     )
+    DebugBundle.prepareIfNeeded(configuration: resources.runtimeConfiguration)
     runLoop.frameSink = resources.frameSink
     if let frameSink = ProfilingRegistry.shared.frameSink {
       // A profiled build installs a sink via `.profiling()`; it supersedes the
       // legacy per-session logger.
       runLoop.frameSink = frameSink
-    } else if let traceSink = EnvFrameTraceSink.fromEnvironment() {
-      // Opt-in diagnostic: `SWIFTTUI_FRAME_TRACE=<path>` traces the frame
-      // pipeline to a file for reproducing timing-sensitive interaction bugs
-      // (e.g. a slow / momentarily blank tab switch) in a real terminal.
+    } else if let traceSink = EnvFrameTraceSink.fromEnvironment(
+      debug: resources.runtimeConfiguration.debug
+    ) {
+      // Opt-in diagnostic: `SWIFTTUI_FRAME_TRACE=<path>` (or the debug
+      // bundle's `frames.tsv`) traces the frame pipeline to a file for
+      // reproducing timing-sensitive interaction bugs (e.g. a slow /
+      // momentarily blank tab switch) in a real terminal.
       runLoop.frameSink = traceSink
     }
     runLoop.runtimeIssueSink = resources.runtimeIssueSink

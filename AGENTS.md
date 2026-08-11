@@ -83,7 +83,7 @@ Internal source-layout context lives in
 - New files that touch C stdio/POSIX (`open`/`write`/`getenv`/`FILE`, …) must
   stay **WASI-safe and strict-memory-safety clean**. Import each libc:
   `Darwin`, `Glibc`, `Android`, and `Musl`. Exclude path-based POSIX code with
-  `#if !canImport(WASILibc)`. Use `DiagnosticTraceSink` and
+  `#if !canImport(WASILibc)`. Use `DebugLogRouter` and
   `TerminalPOSIXController` as models. Mark each unsafe call `unsafe`.
   A WASI-only break in 0.0.19 passed the Linux-only gate. The
   `EnvFrameTraceSink` break in 0.0.26 also passed it. The repository gate now has a

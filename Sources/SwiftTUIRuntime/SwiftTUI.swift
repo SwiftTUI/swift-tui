@@ -843,8 +843,8 @@ public struct DefaultRenderer {
   /// sandwich than a fresh root resolve — deep enough that the browser demo's
   /// second frame overflowed the worker stack on WebKit while the first
   /// (full-root) frame fit. Until frontier re-entry is depth-bounded, a wasm
-  /// frame must never be deeper than the boot frame; opt back in with
-  /// `SWIFTTUI_SELECTIVE_EVALUATION=1`.
+  /// frame must never be deeper than the boot frame; there is deliberately no
+  /// environment opt-in for WASI.
   @MainActor
   package func enableSelectiveEvaluation() {
     guard !stackLeanResolveProfile else { return }

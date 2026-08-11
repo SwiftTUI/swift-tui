@@ -647,9 +647,11 @@ capabilities in the vision document. The others follow the same stance:
 
 ## Accessibility
 
-The semantic substrate, terminal linear renderer, cursor-follows-focus, and
-Web/WASI ARIA tree are complete. The SwiftUI-host overlay pushes runtime focus
-to VoiceOver, and the Android host provides a Compose semantics overlay.
+The semantic substrate, terminal cursor-follows-focus mode, and Web/WASI ARIA
+tree are complete. The SwiftUI-host overlay pushes runtime focus to VoiceOver,
+and the Android host provides a Compose semantics overlay. (The former linear
+accessible *output mode* was removed as unusable; its renderer survives only
+as the `SwiftTUITestSupport` assistive-output assertion seam.)
 
 - **Native assistive-technology focus is one-way.** *Gap.* Focus flows
   runtime → VoiceOver/TalkBack only. Native assistive-technology-originated

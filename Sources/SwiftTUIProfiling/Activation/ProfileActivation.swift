@@ -56,14 +56,41 @@ public final class ProfileActivation {
   }
 
   private func activate(_ config: ProfileConfig) {
-    sinks = makeSinks(config.sinks)
-    presentsPaths = config.sinks.compactMap { descriptor in
+    let descriptors = Self.resolvedDescriptors(config.sinks)
+    sinks = makeSinks(descriptors)
+    presentsPaths = descriptors.compactMap { descriptor in
       guard case .tsv(let path) = descriptor else {
         return nil
       }
       return Self.presentsPath(besideFramesPath: path)
     }
     installSignals(config.signals)
+  }
+
+  /// Fills the bare-`tsv`/`jsonl` descriptors (empty path) with their debug
+  /// bundle destinations (`profile.tsv` / `profile.jsonl`); drops them when
+  /// no bundle directory is active.
+  nonisolated static func resolvedDescriptors(
+    _ descriptors: [ProfileConfig.SinkDescriptor]
+  ) -> [ProfileConfig.SinkDescriptor] {
+    descriptors.compactMap { descriptor in
+      switch descriptor {
+      case .summary:
+        return descriptor
+      case .tsv(let path):
+        guard path.isEmpty else {
+          return descriptor
+        }
+        return DebugLogRouter.resolvedFilePath(override: nil, bundleFileName: "profile.tsv")
+          .map { resolved in .tsv(path: resolved) }
+      case .jsonl(let path):
+        guard path.isEmpty else {
+          return descriptor
+        }
+        return DebugLogRouter.resolvedFilePath(override: nil, bundleFileName: "profile.jsonl")
+          .map { resolved in .jsonl(path: resolved) }
+      }
+    }
   }
 
   /// Opens the `presents.tsv` sibling for each TSV sink the `frames` signal

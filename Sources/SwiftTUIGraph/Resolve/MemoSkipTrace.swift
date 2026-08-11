@@ -213,7 +213,12 @@ package enum MemoSkipTrace {
   }
 
   private static func emit(_ message: String) {
-    DiagnosticTraceSink.emit(message, toFileAt: outputFilePath)
+    DebugLogRouter.emit(
+      message,
+      toFileAt: DebugLogRouter.resolvedFilePath(
+        override: outputFilePath, bundleFileName: "memo.log"
+      )
+    )
   }
 
   private static func environmentDefault() -> Bool {
@@ -231,6 +236,9 @@ package enum MemoSkipTrace {
     guard let rawValue = environmentValue(named: sampleEnvironmentVariableName),
       let parsed = Int(rawValue), parsed > 0
     else {
+      if let selected = DebugTraceSelection.current.entry(named: "memo")?.sampleEveryNFrames {
+        return selected
+      }
       #if DEBUG
         return 1
       #else
@@ -249,7 +257,10 @@ package enum MemoSkipTrace {
     if let rawValue = environmentValue(named: environmentVariableName) {
       return !rawValue.isEmpty && rawValue != "0"
     }
-    return environmentValue(named: fileEnvironmentVariableName) != nil
+    if environmentValue(named: fileEnvironmentVariableName) != nil {
+      return true
+    }
+    return DebugTraceSelection.current.isArmed("memo")
   }
 
   private static func environmentValue(named name: String) -> String? {
