@@ -8,11 +8,4 @@ extension View {
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     resolveView(self, in: context)
   }
-
-  /// Erases `self` for local branch unification or interoperability.
-  ///
-  /// Prefer typed `@ViewBuilder` composition and generic storage when possible.
-  public var erasedToAnyView: AnyView {
-    AnyView(self)
-  }
 }

@@ -47,6 +47,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Removed
 
+- **`View.erasedToAnyView`.** The convenience accessor duplicated
+  `AnyView(_:)` while reading as an endorsement of stored erasure, which the
+  AnyView policy discourages. Call `AnyView(myView)` directly where local
+  branch unification genuinely needs it.
 - **The `SwiftTUITerminalWorkspace` product.** The tabbed/split-pane workspace
   layer moved out of the framework and now lives in the
   [`terminal-workspace` example](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace)

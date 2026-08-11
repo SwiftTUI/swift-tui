@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 285 | 1552 |
+| `SwiftTUIViews` | 285 | 1551 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -395,7 +395,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 154 members
+- `View` — protocol — 153 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

@@ -4322,7 +4322,6 @@ SwiftTUIViews.View.disabled(_:)
 SwiftTUIViews.View.environment(_:)
 SwiftTUIViews.View.environment(_:_:)
 SwiftTUIViews.View.equatable()
-SwiftTUIViews.View.erasedToAnyView
 SwiftTUIViews.View.fixedSize()
 SwiftTUIViews.View.fixedSize(horizontal:vertical:)
 SwiftTUIViews.View.focusEffectDisabled(_:)
