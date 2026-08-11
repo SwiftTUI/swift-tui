@@ -45,6 +45,15 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   section chrome honors truncation but clamps limits above one with a
   `collection.unsupportedSectionChromeLineLimit` runtime issue.
 
+### Removed
+
+- **The `SwiftTUITerminalWorkspace` product.** The tabbed/split-pane workspace
+  layer moved out of the framework and now lives in the
+  [`terminal-workspace` example](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace)
+  in `swift-tui-examples`, built on the unchanged public `SwiftTUITerminal`
+  surface. Apps that imported `SwiftTUITerminalWorkspace` can vendor that
+  example's `TerminalWorkspace` target sources directly.
+
 ### Added
 
 - **`Binding` projections and the optional-binding init family.**

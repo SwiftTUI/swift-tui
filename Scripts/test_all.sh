@@ -850,11 +850,6 @@ run_function_step \
   run_swift test --filter SwiftTUITerminalTests
 
 run_function_step \
-  "Run SwiftTUITerminalWorkspace tests" \
-  "$(swift_command_text test --filter SwiftTUITerminalWorkspaceTests)" \
-  run_swift test --filter SwiftTUITerminalWorkspaceTests
-
-run_function_step \
   "Run SwiftTUIPTYPrimitives tests" \
   "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
   run_swift test --filter SwiftTUIPTYPrimitivesTests

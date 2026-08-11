@@ -10,8 +10,8 @@ import Testing
 /// on *both* axes, so an `HStack { Text; Spacer() }` header or status bar
 /// claimed unbounded vertical appetite inside a `VStack` and competed with the
 /// intended flexible child. The visible symptom was a surface that never filled
-/// its proposal: `SwiftTUITerminalWorkspace`'s tab strip and status strip left
-/// the bottom of the terminal blank at every window height.
+/// its proposal: the terminal-workspace example's tab strip and status strip
+/// left the bottom of the terminal blank at every window height.
 ///
 /// `Divider` has always had the axis check (via `drawMetadata.leafStackAxis`);
 /// these pin the same rule for `Spacer`, plus the two directions it must *not*

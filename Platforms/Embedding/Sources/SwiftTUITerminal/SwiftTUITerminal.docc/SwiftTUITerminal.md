@@ -9,8 +9,10 @@ hosting child terminal programs inside a SwiftTUI app. Use it when your app
 needs an interactive shell, command preview, log tail, or other terminal
 program pane.
 
-Use `SwiftTUITerminalWorkspace` when you need retained tabs, split panes, and
-workspace chrome above terminal sessions.
+For retained tabs, split panes, and workspace chrome above terminal sessions,
+see the
+[`terminal-workspace` example](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace)
+in `swift-tui-examples`, which builds a full workspace layer on this product.
 
 ### Intercept host keys
 

@@ -20,7 +20,6 @@ for module in \
   SwiftTUIArguments \
   SwiftTUIPTYPrimitives \
   SwiftTUITerminal \
-  SwiftTUITerminalWorkspace \
   SwiftTUICLI \
   SwiftTUIWASI \
   SwiftTUIWebHost \

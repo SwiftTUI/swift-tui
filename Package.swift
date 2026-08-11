@@ -118,7 +118,6 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
     .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
     .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
-    .library(name: "SwiftTUITerminalWorkspace", targets: ["SwiftTUITerminalWorkspace"]),
     .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
@@ -253,15 +252,6 @@ let package = Package(
         .product(name: "SwiftTerm", package: "SwiftTerm"),
       ],
       path: "Platforms/Embedding/Sources/SwiftTUITerminal",
-      swiftSettings: swiftSettings()
-    ),
-    .target(
-      name: "SwiftTUITerminalWorkspace",
-      dependencies: [
-        "SwiftTUIRuntime",
-        "SwiftTUITerminal",
-      ],
-      path: "Platforms/Embedding/Sources/SwiftTUITerminalWorkspace",
       swiftSettings: swiftSettings()
     ),
     .target(
@@ -554,17 +544,6 @@ let package = Package(
         "SwiftTUITerminal",
       ],
       path: "Platforms/Embedding/Tests/SwiftTUITerminalTests",
-      swiftSettings: swiftSettings()
-    ),
-    .testTarget(
-      name: "SwiftTUITerminalWorkspaceTests",
-      dependencies: [
-        "SwiftTUI",
-        "SwiftTUICore",
-        "SwiftTUITerminal",
-        "SwiftTUITerminalWorkspace",
-      ],
-      path: "Platforms/Embedding/Tests/SwiftTUITerminalWorkspaceTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(

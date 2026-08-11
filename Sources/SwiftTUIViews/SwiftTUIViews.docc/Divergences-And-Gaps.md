@@ -687,8 +687,9 @@ keyboard, touch, wheel scrolling, hyperlinks, and the system clipboard
 
 ## Terminal-program embedding
 
-`TerminalView`, `TerminalProcessSession` over a pty, and the
-`SwiftTUITerminalWorkspace` tabbed/split-pane layer ship on macOS and Linux.
+`TerminalView` and `TerminalProcessSession` over a pty ship on macOS and
+Linux. The tabbed/split-pane workspace layer lives in the `terminal-workspace`
+example app in `swift-tui-examples`.
 
 - **No Sixel/Kitty graphics inside embedded panes.** *Gap.*
 - **No Kitty keyboard protocol or OSC 99 notification namespacing.** *Gap.*

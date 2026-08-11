@@ -64,7 +64,6 @@ flowchart TD
     SwiftTUIWebHostCLI --> SwiftTUICLI
     SwiftTUIWebHostCLI --> SwiftTUIArguments
     SwiftTUITerminal --> SwiftTUIRuntime
-    SwiftTUITerminalWorkspace --> SwiftTUITerminal
     SwiftTUIAnimatedImage --> SwiftTUIViews
     SwiftTUIProfiling["SwiftTUIProfiling<br/>(optional, opt-in)"] --> SwiftTUIRuntime
 ```
@@ -159,9 +158,10 @@ contains no nested Swift packages.
   [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)
   package, not under this package's `Platforms/` tree.
 - **Terminal-program embedding** — `SwiftTUITerminal` (`TerminalView`,
-  `TerminalSession`, `TerminalProcessSession`), `SwiftTUITerminalWorkspace`
-  (tabbed/split-pane workspace surfaces), and `SwiftTUIPTYPrimitives` (pty
-  creation, fd lifecycle, resize). These are macOS- and Linux-only.
+  `TerminalSession`, `TerminalProcessSession`) and `SwiftTUIPTYPrimitives` (pty
+  creation, fd lifecycle, resize). These are macOS- and Linux-only. The
+  tabbed/split-pane workspace layer lives in the `terminal-workspace` example
+  app in `SwiftTUI/swift-tui-examples`.
 
 `SwiftTUIWebHost` owns the embedded in-tree HTTP/WebSocket server
 (`WebHostLoopbackServer` + `WebHostWebSocketWire`, no external networking

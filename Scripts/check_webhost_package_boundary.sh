@@ -118,7 +118,7 @@ case "$cli_target_block" in
     ;;
 esac
 
-for host_target in SwiftTUIWebHost SwiftTUIWASI SwiftTUIWASISurfaceBridge SwiftTUITerminal SwiftTUITerminalWorkspace
+for host_target in SwiftTUIWebHost SwiftTUIWASI SwiftTUIWASISurfaceBridge SwiftTUITerminal
 do
   host_target_block=$(target_block "$host_target")
 

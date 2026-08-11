@@ -45,7 +45,6 @@ packaging boundaries live in
 | Host-managed Android app | `SwiftTUIAndroidHost` | `import SwiftTUIAndroidHost` |
 | Native SwiftUI embedding on macOS or iOS | `SwiftUIHost` from the separate [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package | `import SwiftUIHost` |
 | Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
-| Tabbed/split terminal workspaces | `SwiftTUITerminalWorkspace` | `import SwiftTUITerminalWorkspace` |
 | Charts and compact metrics | `SwiftTUICharts` (from the separate [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package) | `import SwiftTUICharts` |
 | Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
@@ -53,9 +52,8 @@ packaging boundaries live in
 `SwiftTUIWebHostCLI`, and `SwiftTUIAndroidHost` all re-export the authoring
 surface, so an executable or host usually imports one integration product.
 `SwiftTUI` additionally includes `SwiftTUIAnimatedImage` by default. Add peer
-products such as `SwiftTUITerminal` and `SwiftTUITerminalWorkspace` alongside
-your launch product only when you use those views. Charts and the SwiftUI host
-come from separate packages.
+products such as `SwiftTUITerminal` alongside your launch product only when
+you use those views. Charts and the SwiftUI host come from separate packages.
 
 ## Common Compositions
 
@@ -153,8 +151,8 @@ distribution and engine-profile matrix.
 
 ### Terminal Program Embedding
 
-`SwiftTUITerminal` and `SwiftTUITerminalWorkspace` are opt-in products for
-embedding external terminal programs inside SwiftTUI views.
+`SwiftTUITerminal` is an opt-in product for embedding external terminal
+programs inside SwiftTUI views.
 
 ```swift
 import SwiftTUI
@@ -172,8 +170,9 @@ struct ShellPane: View {
 }
 ```
 
-Use `SwiftTUITerminalWorkspace` when you want retained tabs and split panes on
-top of those terminal sessions.
+For retained tabs and split panes on top of those terminal sessions, see the
+[`terminal-workspace` example](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace)
+in `swift-tui-examples`.
 
 ## What You Do Not Need
 

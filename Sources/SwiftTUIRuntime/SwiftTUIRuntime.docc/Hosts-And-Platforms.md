@@ -209,8 +209,9 @@ consumers do not need Bun or npm for localhost WebHost use.
 
 SwiftTUI can embed a real child terminal program as authored content — a
 deliberate terminal-native capability. `TerminalView` hosts a
-`TerminalSession`; `SwiftTUITerminalWorkspace` layers tabbed and split-pane
-composition above it. See <doc:TerminalEmbedding>.
+`TerminalSession`; the `terminal-workspace` example in `swift-tui-examples`
+layers tabbed and split-pane composition above it. See
+<doc:TerminalEmbedding>.
 
 ## See Also
 

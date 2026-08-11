@@ -126,7 +126,6 @@ const PRIMARY_MODULES = [
   "SwiftTUIArguments",
   "SwiftTUIPTYPrimitives",
   "SwiftTUITerminal",
-  "SwiftTUITerminalWorkspace",
   "SwiftTUICLI",
   "SwiftTUIWASI",
   "SwiftTUIWebHost",

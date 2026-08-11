@@ -59,7 +59,6 @@ struct PackageGraphIsolationTests {
       "SwiftTUIWASI",
       "SwiftTUIWASISurfaceBridge",
       "SwiftTUITerminal",
-      "SwiftTUITerminalWorkspace",
     ] {
       let block = try #require(targetBlock(named: targetName, in: rootManifest))
       #expect(block.contains("\"SwiftTUIRuntime\""))
