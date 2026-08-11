@@ -111,7 +111,7 @@ jobs:
           # idle window) while the identical suite passes on macOS arm64 and
           # in the arm64 Linux container, and the Repo Gate's menu/presentation
           # coverage is green on these same runners. Tracked in
-          # docs/KNOWN-TEST-FLAKES.md ("TermUIPerf app-shell scenario stall on
+          # swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md ("TermUIPerf app-shell scenario stall on
           # amd64 CI"); remove this skip when that entry is closed.
           SWIFTTUI_PERF_SMOKE_SKIP: "example-app-shell-workflow"
         run: |

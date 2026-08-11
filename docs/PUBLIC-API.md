@@ -12,7 +12,7 @@ host repos. Thus, an SPI break creates a reviewable diff instead of a silent
 downstream failure. The inventory script generates and compares all
 three files:
 `Scripts/generate_public_api_inventory.sh` — see
-[DEVELOPMENT.md](DEVELOPMENT.md#public-api-baseline). Those files answer "is
+[DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). Those files answer "is
 symbol X public?". This document explains when to use a symbol and why it has
 its current shape.
 

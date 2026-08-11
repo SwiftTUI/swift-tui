@@ -27,8 +27,8 @@ import Testing
 /// the body-never-reads variant alike — so neither the fix nor a regression of
 /// it can drift unnoticed.
 ///
-/// Harness note (fixed flake #4 in docs/KNOWN-TEST-FLAKES.md): the two variants
-/// run CONCURRENTLY, so all probe bookkeeping lives in a per-run
+/// Harness note (fixed flake #4 in swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md):
+/// the two variants run CONCURRENTLY, so all probe bookkeeping lives in a per-run
 /// `ProbeGrabState` instance — a shared singleton let one variant read the
 /// other's grab values under CI load. The grab offset is captured live inside
 /// the gesture closure, never scraped from a presented frame: the tick loop

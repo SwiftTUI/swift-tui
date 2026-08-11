@@ -89,7 +89,9 @@ occurs approximately 100 times less often.
 Run all CLI calls through `Scripts/linux.sh`. You can run it from any directory.
 It resolves the repository root from its own location. Built-in Linux build and test
 commands invoke Swift through `swiftly run swift ...`, matching the host-side
-toolchain rule in [`docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md).
+toolchain rule in
+[`DEVELOPMENT.md`](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
+(in the `swift-tui-org` coordination repository).
 
 ```bash
 # First time on a new machine:

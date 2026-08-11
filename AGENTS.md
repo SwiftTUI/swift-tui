@@ -22,7 +22,8 @@ products, or repository tooling. Make sure that it passes before you complete
 the work. Example-package coverage lives in `SwiftTUI/swift-tui-examples`.
 Do not run repo-local builds or tests with bare `swift` or `xcrun swift` — use
 `swiftly run swift ...` so runs match the pinned toolchain. See
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full toolchain, gate, and
+[DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
+in the `swift-tui-org` coordination repository for the full toolchain, gate, and
 release story.
 
 ## Architecture (one-page summary)
@@ -93,7 +94,7 @@ Internal source-layout context lives in
   `--target`, not `--product`. A library-product build includes non-WASI PTY
   targets.
 - Treat fixture changes as evidence, not housekeeping — see
-  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#rendered-text-fixtures).
+  [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#rendered-text-fixtures).
 - For runtime state bugs, distinguish transient flicker from true state loss.
   If state must survive lazy-tab, deferred-content, or presentation churn,
   hoist ownership above that seam. Do not hoist unrelated state. Distinguish
@@ -172,10 +173,12 @@ Test suites are split by layer:
 Use Swift Testing (`import Testing`, `@Test`, `#expect`) for tests. For runtime
 and animation tests, use real `RunLoop` input-path coverage. Use bounded
 condition-based waits instead of fixed sleeps. See
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+[DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md).
 
 ## Documentation
 
-[docs/README.md](docs/README.md) indexes internal project documentation.
-Developer-facing guides and per-symbol API reference live in the `*.docc`
-catalogs under `Sources/`.
+[docs/README.md](docs/README.md) indexes the `HEAD`-state architecture and
+contract documentation. Developer-facing guides and per-symbol API reference
+live in the `*.docc` catalogs under `Sources/`. Maintainer development docs
+(codebase guide, build/test/release process, flake register) live in the
+`swift-tui-org` coordination repository under `docs/swift-tui/`.

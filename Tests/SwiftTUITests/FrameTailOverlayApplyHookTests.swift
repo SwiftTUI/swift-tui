@@ -10,7 +10,7 @@ import Testing
 /// worker immediately before `applyPlacedAnimationOverlaySnapshot` decorates the
 /// placed tree — i.e. just before the off-main `Boxed._modify` writes that the
 /// run-loop memory-corruption investigation (`SwiftTUI/swift-tui#12`,
-/// docs/KNOWN-TEST-FLAKES.md) is built around. Production default is `nil`
+/// swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md) is built around. Production default is `nil`
 /// (no-op); these tests pin the wiring and ordering so the seam cannot silently
 /// rot, and document the forced-repro experiment it exists to enable.
 ///

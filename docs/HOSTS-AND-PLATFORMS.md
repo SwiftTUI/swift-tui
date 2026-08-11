@@ -22,7 +22,8 @@ wholly external, in
 [`SwiftTUI/swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui).
 These boundaries keep foreign package managers and Apple-only framework
 imports out of this core SwiftPM package. Repository ownership and release
-boundaries are recorded in [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md).
+boundaries are recorded in the
+[`swift-tui-org` coordination repository's README](https://github.com/SwiftTUI/swift-tui-org#readme).
 
 ## Maintainer notes
 
@@ -31,7 +32,7 @@ boundaries are recorded in [REPOSITORY-SPLIT.md](REPOSITORY-SPLIT.md).
   [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md). The `SwiftTUIAndroidHost`
   and `swift-tui-web`/`swift-tui-swiftui` implementations must track it; the
   fixture corpus is byte-synced across those repositories (see
-  [DEVELOPMENT.md](DEVELOPMENT.md)).
+  [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)).
 - **Platform declarations.** The package declares `macOS 15` and `iOS 18`
   platforms unless the build sets `DISABLE_EXPLICIT_PLATFORMS=1` (Linux CI
   does, to skip the Apple platform restriction).

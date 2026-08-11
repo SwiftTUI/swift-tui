@@ -406,7 +406,6 @@ done <<'EOF'
 README.md
 docs/ARCHITECTURE.md
 docs/PUBLIC-API.md
-docs/RENDER-PIPELINE.md
 docs/HOSTS-AND-PLATFORMS.md
 EOF
 

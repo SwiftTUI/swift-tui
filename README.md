@@ -242,10 +242,13 @@ DocC catalogs in this repository. Start with:
 - [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md) — semantic modifiers, announcements, and reduced motion.
 - [Environment Variables](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Environment-Variables.md) — every `SWIFTTUI_*` variable.
 
-**Working on SwiftTUI?** [docs/README.md](docs/README.md) indexes the internal
-architecture and project documentation ([CODEBASE-GUIDE](docs/CODEBASE-GUIDE.md),
-[ARCHITECTURE](docs/ARCHITECTURE.md), [DEVELOPMENT](docs/DEVELOPMENT.md), the
-[public surface policy](docs/PUBLIC-API.md), and more).
+**Working on SwiftTUI?** [docs/README.md](docs/README.md) indexes the
+`HEAD`-state architecture and contract documentation
+([ARCHITECTURE](docs/ARCHITECTURE.md), the
+[public surface policy](docs/PUBLIC-API.md), and more). Maintainer
+development docs — the codebase guide, the build/test/release process, and
+the flake register — live in the
+[`swift-tui-org` coordination repository](https://github.com/SwiftTUI/swift-tui-org/tree/main/docs/swift-tui).
 
 Questions? Join the community on
 [Discord](https://discord.gg/8j35kYDFxn).
@@ -268,7 +271,8 @@ bun run test
 
 `bun run test` is the repo gate. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
 [AGENTS.md](AGENTS.md) for the full build, test, style, and pull-request rules.
-Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the complete test surface
+Read [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
+in the `swift-tui-org` coordination repository for the complete test surface
 and performance-evaluation harness.
 
 ## License

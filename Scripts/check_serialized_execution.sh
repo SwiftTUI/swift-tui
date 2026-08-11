@@ -82,14 +82,14 @@ check_log() {
     >&2 echo "error: no test-start events parsed from $log_file."
     >&2 echo "Either the lane ran no tests or the runner's output format drifted;"
     >&2 echo "both must fail here rather than silently passing (inert-tooling trap,"
-    >&2 echo "docs/KNOWN-TEST-FLAKES.md entry 14)."
+    >&2 echo "swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md entry 14)."
     return 1
   fi
 
   if [ "$peak" -gt "$max_peak" ]; then
     >&2 echo "error: peak in-flight tests $peak exceeds $max_peak: this lane ran PARALLEL."
     >&2 echo "The serialization flag is inert or was dropped. Only \`--no-parallel\`"
-    >&2 echo "serializes swift-testing (docs/KNOWN-TEST-FLAKES.md entry 14)."
+    >&2 echo "serializes swift-testing (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md entry 14)."
     return 1
   fi
 

@@ -154,7 +154,7 @@ for name in \
   eval "is_set=\${$name+x}"
   if [ -n "$is_set" ]; then
     >&2 echo "$name must not be set when running the repo gate."
-    >&2 echo "Use the fixture recorder named in docs/DEVELOPMENT.md."
+    >&2 echo "Use the fixture recorder named in swift-tui-org/docs/swift-tui/DEVELOPMENT.md."
     exit 1
   fi
 done
@@ -362,7 +362,7 @@ run_swift() {
   # Opt-in test-run modifiers, composed onto any `swift test` invocation. Both
   # default off, so the gate's behaviour is unchanged unless an operator sets
   # them deliberately (e.g. to bisect a load-sensitive flake such as the
-  # run-loop SIGSEGV in docs/KNOWN-TEST-FLAKES.md):
+  # run-loop SIGSEGV in swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md):
   #   SWIFTTUI_SWIFT_TEST_SKIP_REGEX — skip tests matching a regex.
   #   SWIFTTUI_SWIFT_TEST_SERIALIZED — run tests serially (--no-parallel) so a
   #     timing-dependent interleaving is reproducible/bisectable rather than
@@ -585,7 +585,7 @@ check_fixture_recording_environment_disabled() {
     eval "is_set=\${$name+x}"
     if [ -n "$is_set" ]; then
       >&2 echo "$name must not be set when running the repo gate."
-      >&2 echo "Use the fixture recorder named in docs/DEVELOPMENT.md."
+      >&2 echo "Use the fixture recorder named in swift-tui-org/docs/swift-tui/DEVELOPMENT.md."
       return 1
     fi
   done

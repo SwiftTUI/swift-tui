@@ -144,7 +144,7 @@ final class FrameTailJobCancellationToken: Sendable {
 /// The token doubles as the release latch for the queued-cancellation
 /// signal wait: that wait holds only while the job sits in the queue, so any
 /// queue exit — worker start or cancel-before-start — retires it without
-/// cancelling the waiting task (`docs/KNOWN-TEST-FLAKES.md` entry 14).
+/// cancelling the waiting task (`swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md` entry 14).
 extension FrameTailJobCancellationToken: PendingFrameWaitReleasing {
   var isReleased: Bool {
     currentState != .queued

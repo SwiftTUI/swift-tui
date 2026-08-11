@@ -5,7 +5,7 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Pins the cancel-free frame-tail seam (`docs/KNOWN-TEST-FLAKES.md` entry
+/// Pins the cancel-free frame-tail seam (`swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md` entry
 /// 14): the queued-cancellation signal wait is retired by the token's queue
 /// exit through `PendingFrameWaitReleasing`, never by cancelling a task, so
 /// no cancel can land concurrently with a first schedule or resume-enqueue.

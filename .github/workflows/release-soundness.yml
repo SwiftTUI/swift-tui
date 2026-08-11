@@ -3,7 +3,7 @@ name: Release Soundness Lane
 # F05: the only release-configuration test executions in the repo. Scheduled
 # rather than push/PR-gating: release builds are slow, and the lane's flaky-
 # suite step intentionally exercises the load-flaky run-loop suites
-# (docs/KNOWN-TEST-FLAKES.md #1) where an intermittent red is signal, not a
+# (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) where an intermittent red is signal, not a
 # merge blocker.
 
 on:
@@ -114,7 +114,7 @@ jobs:
           # killed the script 130 ms in while the run stayed green) — annotate
           # loudly so a red here is visible in the run summary either way.
           if ! sh ./Scripts/release_soundness_lane.sh --flaky-only; then
-            echo "::warning title=Release soundness flaky lane::flaky-trio run failed — crash signal (docs/KNOWN-TEST-FLAKES.md #1) or lane breakage; inspect this step's log"
+            echo "::warning title=Release soundness flaky lane::flaky-trio run failed — crash signal (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) or lane breakage; inspect this step's log"
             exit 1
           fi
 

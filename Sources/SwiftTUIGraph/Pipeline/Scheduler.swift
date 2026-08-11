@@ -130,8 +130,8 @@ package protocol CancelledFrameIntentReplaying: AnyObject {
 /// The frame tail's queued-cancellation wait used to be abandoned via task
 /// cancellation, and a cancel that lands concurrently with a task's first
 /// schedule or resume-enqueue can lose the wakeup inside the concurrency
-/// runtime (`docs/KNOWN-TEST-FLAKES.md` entry 14). A release latch wakes the
-/// waiter through the same continuation registry as a frame request instead,
+/// runtime (`swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md` entry 14). A release
+/// latch wakes the waiter through the same continuation registry as a frame request instead,
 /// so the wait can be retired with no task cancellation anywhere on the seam.
 package protocol PendingFrameWaitReleasing: AnyObject, Sendable {
   /// True once the wait no longer needs to hold; checked between waits.

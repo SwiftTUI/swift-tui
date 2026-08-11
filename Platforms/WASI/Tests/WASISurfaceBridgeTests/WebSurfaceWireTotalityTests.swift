@@ -273,7 +273,7 @@ struct WebSurfaceWireTotalityTests {
     // copies in lockstep — so this pin is what makes an encoder change
     // propagate loudly to the sibling repo instead of silently drifting.
     // Regenerate with SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES=1, then re-run the
-    // sync flow described in docs/DEVELOPMENT.md.
+    // sync flow described in swift-tui-org/docs/swift-tui/DEVELOPMENT.md.
     var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
     let encoded = WebSurfaceFrameEncoder.encode(
       HostWireFrameModel(

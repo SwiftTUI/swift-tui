@@ -7,8 +7,8 @@ import Testing
 struct ScenarioSmokeTests {
   /// Comma-separated `PerfScenarioName` raw values quarantined from the smoke
   /// sweep. Only CI lanes with a registered flake set this — see
-  /// docs/KNOWN-TEST-FLAKES.md for the active entries; every skip must map to
-  /// a register entry with its reproduction evidence.
+  /// swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md for the active entries;
+  /// every skip must map to a register entry with its reproduction evidence.
   private static var quarantinedScenarioNames: Set<String> {
     guard let raw = ProcessInfo.processInfo.environment["SWIFTTUI_PERF_SMOKE_SKIP"] else {
       return []

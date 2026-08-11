@@ -185,8 +185,9 @@ listed for completeness and for driving the wasm binary directly.
 
 Variables with the `SWIFTTUI_` prefix that only the test and gate tooling
 reads — timeout scaling, fixture regeneration, serialized test execution, and
-similar — are contributor-facing and documented in the repository's
-`docs/DEVELOPMENT.md` and `docs/KNOWN-TEST-FLAKES.md`, not here.
+similar — are contributor-facing and documented in the coordination
+repository's maintainer docs (`swift-tui-org/docs/swift-tui/DEVELOPMENT.md`
+and `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`), not here.
 
 ## See Also
 

@@ -6,7 +6,7 @@ import Testing
 @testable import SwiftTUIViews
 
 // Five minutes is the cadence-suite hang bound, not an expectation: on the
-// degraded amd64 CI runner class (docs/KNOWN-TEST-FLAKES.md entry 12) these
+// degraded amd64 CI runner class (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md entry 12) these
 // EOF exits run 60–120 s wall under parallel-gate load, and a one-minute
 // limit turned starvation into a deterministic red.
 @MainActor

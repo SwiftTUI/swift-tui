@@ -173,7 +173,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// the clock drives the drain directly rather than through `run()` — but if
   /// a test ever pins the clock *and* runs the full loop, route these through
   /// the seam rather than debugging the frame counts.
-  /// See `docs/KNOWN-TEST-FLAKES.md`.
+  /// See `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`.
   package var frameClock: () -> MonotonicInstant = { .now() }
 
   /// Active per-frame diagnostics sink. Installed by the profiling product (via

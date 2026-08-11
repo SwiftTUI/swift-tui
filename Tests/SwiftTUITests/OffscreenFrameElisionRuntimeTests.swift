@@ -612,7 +612,7 @@ struct OffscreenFrameElisionRuntimeTests {
     // pinning the consume instant to `frozenNow` makes those reschedules
     // invisible to the drain: only the test's explicit deadline/invalidation
     // requests drive frames. That is what makes the elision/present counts below
-    // deterministic under parallel load. See docs/KNOWN-TEST-FLAKES.md.
+    // deterministic under parallel load. See swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
     let frozenNow = MonotonicInstant.now()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -655,7 +655,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // `applyAcquiredFrame` body but renders straight-line with no suspension and
       // no drop arm, so the registration is deterministic. The elision path under
       // test is still exercised by the ASYNC deadline tick below. See
-      // docs/KNOWN-TEST-FLAKES.md.
+      // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       scheduler.requestInvalidation(of: [rootIdentity])
       var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
@@ -784,7 +784,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // shares the exact same `applyAcquiredFrame` body but renders straight-line
       // with no suspension and no drop arm, so registration is deterministic; the
       // elision path under test is still driven via the ASYNC ticks below. See
-      // docs/KNOWN-TEST-FLAKES.md.
+      // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
       while scheduler.hasPendingFrame(at: .now()) {
@@ -937,7 +937,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // shares the exact same `applyAcquiredFrame` body but renders straight-line
       // with no suspension and no drop arm, so registration is deterministic; the
       // elision path under test is still driven via the ASYNC ticks below. See
-      // docs/KNOWN-TEST-FLAKES.md.
+      // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
       while scheduler.hasPendingFrame(at: .now()) {
@@ -1061,7 +1061,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // shares the exact same `applyAcquiredFrame` body but renders straight-line
       // with no suspension and no drop arm, so registration is deterministic; the
       // elision path under test is still driven via the ASYNC ticks below. See
-      // docs/KNOWN-TEST-FLAKES.md.
+      // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
       while scheduler.hasPendingFrame(at: .now()) {
@@ -1196,7 +1196,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // shares the exact same `applyAcquiredFrame` body but renders straight-line
       // with no suspension and no drop arm, so the removal start is deterministic.
       // The elision path under test is still exercised by the ASYNC deadline ticks
-      // in Phase 1/2 below. See docs/KNOWN-TEST-FLAKES.md.
+      // in Phase 1/2 below. See swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       scheduler.requestInvalidation(of: [rootIdentity])
       var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
@@ -1337,7 +1337,7 @@ struct OffscreenFrameElisionRuntimeTests {
 
       // Mount + settle the onAppear follow-up on the real clock so the
       // repeatForever registration is deterministic (synchronous driver — same
-      // rationale as the tests above; see docs/KNOWN-TEST-FLAKES.md).
+      // rationale as the tests above; see swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md).
       scheduler.requestInvalidation(of: [rootIdentity])
       var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)

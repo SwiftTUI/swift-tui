@@ -16,7 +16,7 @@
 #
 # Modes:
 #   (default)        core + runtime suites, minus the load-flaky run-loop
-#                    suites documented in docs/KNOWN-TEST-FLAKES.md
+#                    suites documented in swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md
 #   --flaky-only     ONLY those load-flaky suites, serialized. Run from a
 #                    continue-on-error step: a SIGSEGV here is flake #1
 #                    (swift-tui#12) signal, and in release the checked
@@ -80,7 +80,7 @@ release_test() {
 
 case "$mode" in
   --flaky-only)
-    # Flake #1's prescribed dynamic pursuit (docs/KNOWN-TEST-FLAKES.md): all
+    # Flake #1's prescribed dynamic pursuit (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md): all
     # statically identified corruptor candidates are resolved (release-checked
     # or deleted outright), so if the corruption ever recurs the lead is heap
     # misuse, not an isolation race. glibc allocator guards make that trap
