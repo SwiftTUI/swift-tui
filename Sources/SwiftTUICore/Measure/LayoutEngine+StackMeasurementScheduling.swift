@@ -8,6 +8,7 @@ extension LayoutEngine {
     spacing: Int?,
     idealMeasurements: [MeasuredNode],
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
@@ -34,6 +35,7 @@ extension LayoutEngine {
         axis: axis,
         measurements: idealMeasurements,
         passContext: passContext,
+        localMetrics: &localMetrics,
         work: &work,
         results: &results
       )
@@ -69,6 +71,7 @@ extension LayoutEngine {
       axis: axis,
       state: state,
       passContext: passContext,
+      localMetrics: &localMetrics,
       work: &work,
       results: &results
     )
@@ -82,6 +85,7 @@ extension LayoutEngine {
     axis: Axis,
     measurements: [MeasuredNode],
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
@@ -136,6 +140,7 @@ extension LayoutEngine {
       return
     }
 
+    localMetrics.branching.builtinChildMeasureRequests += replacementIndices.count
     work.append(
       .finishStackReconciliation(
         node,

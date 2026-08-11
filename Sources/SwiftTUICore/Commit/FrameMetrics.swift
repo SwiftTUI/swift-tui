@@ -77,6 +77,51 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
   }
 }
 
+/// Branching-factor counters for the layout branching oracle (plan
+/// 2026-08-11-004 Stage 0): child measure requests issued by computing
+/// containers, and the container computations that issued them, split
+/// built-in vs custom. A request is any child measure a computing container
+/// issues (work item or native re-entry) — retained and cache serves still
+/// count as requests, because they change cost, not shape. Leaf-internal
+/// work (text wrapping) is in neither numerator nor denominator.
+package struct LayoutBranchingMetrics: Equatable, Sendable {
+  package var builtinContainerMeasureComputations = 0
+  package var builtinChildMeasureRequests = 0
+  package var customContainerMeasureComputations = 0
+  package var customChildMeasureRequests = 0
+  package var customPlacementChildMeasureRequests = 0
+
+  package init() {}
+
+  /// Requests over computations for built-in containers, in milli-units
+  /// (`2000` = two requests per container computation). `0` when the pass
+  /// computed no built-in container.
+  package var builtinBranchingFactorMilli: Int {
+    guard builtinContainerMeasureComputations > 0 else {
+      return 0
+    }
+    return builtinChildMeasureRequests * 1000 / builtinContainerMeasureComputations
+  }
+
+  /// Requests over computations for custom containers, in milli-units.
+  /// Measure-time requests only; placement re-measures are reported
+  /// separately because placement runs once where measurement can repeat.
+  package var customBranchingFactorMilli: Int {
+    guard customContainerMeasureComputations > 0 else {
+      return 0
+    }
+    return customChildMeasureRequests * 1000 / customContainerMeasureComputations
+  }
+
+  package mutating func merge(_ other: Self) {
+    builtinContainerMeasureComputations += other.builtinContainerMeasureComputations
+    builtinChildMeasureRequests += other.builtinChildMeasureRequests
+    customContainerMeasureComputations += other.customContainerMeasureComputations
+    customChildMeasureRequests += other.customChildMeasureRequests
+    customPlacementChildMeasureRequests += other.customPlacementChildMeasureRequests
+  }
+}
+
 package struct LayoutWorkMetrics: Equatable, Sendable {
   package var measuredNodesComputed: Int
   package var measuredNodesReused: Int
@@ -89,6 +134,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   package var layoutDependentRealizationCacheHits: Int
   package var layoutDependentMainActorFallbacks: Int
   package var preMeasureCutoff: PreMeasureCutoffMetrics
+  package var branching: LayoutBranchingMetrics
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics
 
   package init(
@@ -103,6 +149,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     layoutDependentRealizationCacheHits: Int = 0,
     layoutDependentMainActorFallbacks: Int = 0,
     preMeasureCutoff: PreMeasureCutoffMetrics = .init(),
+    branching: LayoutBranchingMetrics = .init(),
     geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
   ) {
     self.measuredNodesComputed = measuredNodesComputed
@@ -116,6 +163,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
     self.preMeasureCutoff = preMeasureCutoff
+    self.branching = branching
     self.geometryResolutionDiagnostics = geometryResolutionDiagnostics
   }
 
@@ -131,6 +179,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     layoutDependentRealizationCacheHits += other.layoutDependentRealizationCacheHits
     layoutDependentMainActorFallbacks += other.layoutDependentMainActorFallbacks
     preMeasureCutoff.merge(other.preMeasureCutoff)
+    branching.merge(other.branching)
     geometryResolutionDiagnostics.merge(other.geometryResolutionDiagnostics)
   }
 }

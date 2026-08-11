@@ -1,0 +1,20 @@
+# Layout branching-factor ledger (plan 2026-08-11-004 Stage 0).
+#
+# Format: <fixture> <family> ceiling-milli=<N>
+#
+# Each row pins the requests-per-computation ratio (in milli-units) one
+# BranchingFactorOracleTests fixture measures for one family (builtin or
+# custom). Enforcement is asymmetric, like Scripts/soundness_quarantine.txt:
+# above the ceiling fails, equal passes as "matches baseline", below passes
+# with a "reduce the ledger" warning. CI never rewrites this file; reductions
+# are manual commits. Semantics: docs/SOUNDNESS-ORACLES.md, "Layout branching
+# ledger".
+flat-stack builtin ceiling-milli=12000
+flat-stack-warm builtin ceiling-milli=0
+ideal-only-stack builtin ceiling-milli=6000
+cross-reconciliation-stack builtin ceiling-milli=2000
+nested-stacks builtin ceiling-milli=6000
+spacer-deficit-stack builtin ceiling-milli=6000
+view-that-fits builtin ceiling-milli=5000
+windowed-lazy-list builtin ceiling-milli=12000
+custom-grid custom ceiling-milli=8000

@@ -131,6 +131,7 @@ package enum FrameRecordDerivation {
       elidedAnimationCommitDuration: nil,
       elidedCommitDuration: nil
     )
+    record.layoutBranching = diag.work.layoutBranching
     if let answeredInputs = sample.answeredInputs {
       record.answeredInputCount = answeredInputs.count
       record.inputToCommitFirst = answeredInputs.first.duration(to: sample.commitInstant)

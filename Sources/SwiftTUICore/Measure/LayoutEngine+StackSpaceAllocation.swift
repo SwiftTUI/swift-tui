@@ -218,6 +218,7 @@ extension LayoutEngine {
     axis: Axis,
     state: StackSequentialAllocationState,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
@@ -232,6 +233,7 @@ extension LayoutEngine {
         axis: axis,
         state: state,
         passContext: passContext,
+        localMetrics: &localMetrics,
         work: &work,
         results: &results
       )
@@ -279,6 +281,7 @@ extension LayoutEngine {
       state.remainingMain = max(0, state.remainingMain - consumed)
       state.position = run.upperBound
 
+      localMetrics.branching.builtinChildMeasureRequests += run.count
       work.append(
         .finishStackAllocationBatch(
           node,
@@ -342,6 +345,7 @@ extension LayoutEngine {
     }
     state.allocatedMainSizes[childIndex] = offer
 
+    localMetrics.branching.builtinChildMeasureRequests += 1
     work.append(
       .stackAllocateStep(
         node,
@@ -368,6 +372,7 @@ extension LayoutEngine {
     axis: Axis,
     state: StackSequentialAllocationState,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) {
@@ -407,6 +412,7 @@ extension LayoutEngine {
       axis: axis,
       measurements: allocatedMeasurements,
       passContext: passContext,
+      localMetrics: &localMetrics,
       work: &work,
       results: &results
     )

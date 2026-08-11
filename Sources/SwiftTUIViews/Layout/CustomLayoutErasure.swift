@@ -278,6 +278,12 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     // placement, then drop every proposal entry for this container identity.
     discardPassLocalCacheStates(for: node.identity)
 
+    // Branching oracle (plan 2026-08-11-004): custom placement re-measures
+    // every child once at its recorded placement proposal. Reported apart
+    // from measure-time requests because placement runs once per pass where
+    // measurement can repeat per proposal.
+    passContext?.recordCustomPlacementChildMeasureRequests(node.children.count)
+
     return node.children.map { child in
       let placement =
         placementRecorder.placement(for: child.identity)

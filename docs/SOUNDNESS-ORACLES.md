@@ -159,6 +159,28 @@ trace-armed run is.** The S0 report is a dated snapshot and is not maintained.
 The ledger is a ceiling that has drifted 72 above reality. Read the ledger as
 "what will fail the gate", not "what is true".
 
+## Layout branching ledger
+
+[`Scripts/layout_branching_ledger.txt`](../Scripts/layout_branching_ledger.txt)
+is a ratchet in this document's T-ratchet style, but it is a **layout work
+metric**, not a graph probe: it has no `SoundnessProbeConfiguration` recorder,
+no trace kind, and no oracle-map row. Each ledger row pins a ceiling on the
+child-measure-requests-per-container-computation ratio (milli-units) that one
+`BranchingFactorOracleTests` fixture measures, split built-in vs custom
+(plan 2026-08-11-004 Stage 0). The counters live in
+`LayoutBranchingMetrics` (`Sources/SwiftTUICore/Commit/FrameMetrics.swift`)
+and ride the frame diagnostic record into the TSV sinks.
+
+Enforcement mirrors the trace scanner's asymmetry: a measured ratio above its
+ceiling fails, an exact match passes as "matches baseline", below-baseline
+passes with a "reduce the ledger" warning on stderr. CI never rewrites the
+ledger; reductions are manual commits. The suite also fails on drift in
+either direction between the ledger's rows and its own fixture coverage, so
+a row cannot silently outlive (or predate) its fixture. A request is counted
+at its issue site and still counts when a cache or retained serve answers
+it — the ledger pins *shape*; cache warmth changes cost, which the unledgered
+computation counters report separately.
+
 ## Known blind spots and scoping debt
 
 The probe state remains process-global `@MainActor` storage. Concurrent graphs

@@ -52,6 +52,20 @@ package struct MeasureViewportHint: Equatable, Sendable {
   }
 }
 
+/// What a layout pass context exists FOR (plan 2026-08-11-004). The main
+/// measure/place pass is the only purpose whose work metrics reach the frame
+/// diagnostic record and the branching-factor ledger; scratch passes (the
+/// size-stability pre-pass, the layout shadow oracle) keep their counters on
+/// their own context and merge back only what they explicitly choose to.
+package enum LayoutPassPurpose: Sendable {
+  /// The production measure/place pass, including late-preference relayouts.
+  case main
+  /// The size-stability cutoff's certificate pre-pass (plan 2026-08-11-002).
+  case sizeStabilityPrePass
+  /// The layout shadow oracle's observe-only fresh pass.
+  case shadowOracle
+}
+
 package final class LayoutPassContext: Sendable {
   /// One entry of the measure-viewport hint stack. `claimedBy` records the
   /// indexed container that anchored a window against this hint: the hint's
@@ -109,6 +123,7 @@ package final class LayoutPassContext: Sendable {
     #endif
   }()
 
+  package let purpose: LayoutPassPurpose
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
   /// A previous-frame session consulted ONLY by the custom-layout
@@ -129,6 +144,7 @@ package final class LayoutPassContext: Sendable {
   private let state: Mutex<MutableState>
 
   package init(
+    purpose: LayoutPassPurpose = .main,
     retainedLayout: RetainedLayoutSession? = nil,
     invalidatedIdentities: Set<Identity> = [],
     scrollViewportContext: ScrollViewportContext? = nil,
@@ -136,6 +152,7 @@ package final class LayoutPassContext: Sendable {
     measurementSeedSession: RetainedLayoutSession? = nil,
     seededLayoutRealizations: [LayoutDependentContentRealization]? = nil
   ) {
+    self.purpose = purpose
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
     self.measurementSeedSession = measurementSeedSession
@@ -307,6 +324,21 @@ package final class LayoutPassContext: Sendable {
     _ update: (inout LayoutWorkMetrics) -> Void
   ) {
     state.withLock { update(&$0.workMetrics) }
+  }
+
+  /// Branching-oracle issue-site counters (plan 2026-08-11-004 Stage 0) as
+  /// plain methods rather than `updateWorkMetrics` closures: the author-probe
+  /// and placement call sites sit on frames that stay live across
+  /// custom-layout re-entry on the small frame-tail worker stack, and a
+  /// closure context there is a per-nesting-level stack cost in -Onone.
+  package func recordCustomChildMeasureRequest() {
+    state.withLock { $0.workMetrics.branching.customChildMeasureRequests += 1 }
+  }
+
+  package func recordCustomPlacementChildMeasureRequests(_ count: Int) {
+    state.withLock {
+      $0.workMetrics.branching.customPlacementChildMeasureRequests += count
+    }
   }
 
   package func recordWorkerCustomLayoutCacheUpdate(

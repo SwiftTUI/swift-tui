@@ -36,6 +36,10 @@ public struct FrameDiagnosticRecord: Sendable {
   public var layoutDependentRealizations: Int
   public var layoutDependentRealizationCacheHits: Int
   public var layoutDependentMainActorFallbacks: Int
+  /// Branching-factor counters (plan 2026-08-11-004 Stage 0). `package`
+  /// (set post-init, defaulting to zeroes) so the public record surface
+  /// stays frozen.
+  package var layoutBranching: LayoutBranchingMetrics = .init()
   public var geometryAnchorResolutionMissCount: Int
   public var firstGeometryAnchorResolutionMissIdentity: String?
   public var geometryMissingNamedCoordinateSpaceCount: Int

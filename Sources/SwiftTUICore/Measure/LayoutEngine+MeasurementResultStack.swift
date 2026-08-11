@@ -3,8 +3,10 @@ extension LayoutEngine {
     _ children: [ResolvedNode],
     proposal: ProposedSize,
     finish: MeasurementWorkItem,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) {
+    localMetrics.branching.builtinChildMeasureRequests += children.count
     work.append(finish)
     for child in children.reversed() {
       work.append(.measure(child, proposal))

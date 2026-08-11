@@ -268,7 +268,10 @@ extension LayoutEngine {
     // proposal on a scratch context; every size must reproduce exactly. The
     // scratch context carries the session for the hysteresis-seeding seam
     // only (the same terms as the layout shadow oracle's fresh pass).
-    let scratchContext = LayoutPassContext(measurementSeedSession: session)
+    let scratchContext = LayoutPassContext(
+      purpose: .sizeStabilityPrePass,
+      measurementSeedSession: session
+    )
     var certifiedProduct: MeasuredNode?
     for baseline in baselines {
       var fresh = measure(

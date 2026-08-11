@@ -102,6 +102,7 @@ extension LayoutEngine {
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) -> Bool {
     guard
@@ -180,6 +181,7 @@ extension LayoutEngine {
         window: window,
         probeElement: nil,
         probeMeasurement: nil,
+        localMetrics: &localMetrics,
         work: &work
       )
     }
@@ -188,6 +190,7 @@ extension LayoutEngine {
     guard probeElements.count == 1 else {
       return false
     }
+    localMetrics.branching.builtinChildMeasureRequests += 1
     work.append(.finishWindowedLazyStackProbe(context, probeElement: probeElements[0]))
     work.append(.measure(probeElements[0], context.idealProposal))
     return true
@@ -200,6 +203,7 @@ extension LayoutEngine {
     context: WindowedLazyStackMeasurementContext,
     probeElement: ResolvedNode,
     probeMeasurement: MeasuredNode,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) {
     let anchorStride =
@@ -218,6 +222,7 @@ extension LayoutEngine {
         window: window,
         probeElement: probeElement,
         probeMeasurement: probeMeasurement,
+        localMetrics: &localMetrics,
         work: &work
       )
     else {
@@ -227,6 +232,7 @@ extension LayoutEngine {
         effectiveProposal: context.effectiveProposal,
         axis: context.axis,
         spacing: context.spacing,
+        localMetrics: &localMetrics,
         work: &work
       )
       return
@@ -242,6 +248,7 @@ extension LayoutEngine {
     window: Range<Int>,
     probeElement: ResolvedNode?,
     probeMeasurement: MeasuredNode?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) -> Bool {
     var windowChildren: [ResolvedNode] = []
@@ -274,6 +281,7 @@ extension LayoutEngine {
         reusedProbeMeasurement: probeReused ? probeMeasurement : nil,
         scheduledChildCount: scheduledChildren.count
       ),
+      localMetrics: &localMetrics,
       work: &work
     )
     return true
@@ -454,6 +462,7 @@ extension LayoutEngine {
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
     passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) -> Bool {
@@ -504,6 +513,7 @@ extension LayoutEngine {
     guard probeElements.count == 1 else {
       return false
     }
+    localMetrics.branching.builtinChildMeasureRequests += 1
     work.append(
       .finishLazyStackIdealEstimate(
         node,
@@ -596,6 +606,7 @@ extension LayoutEngine {
     effectiveProposal: ProposedSize,
     axis: Axis,
     spacing: Int?,
+    localMetrics: inout LayoutWorkMetrics,
     work: inout [MeasurementWorkItem]
   ) {
     let children = stackChildren(for: node)
@@ -616,6 +627,7 @@ extension LayoutEngine {
         spacing: spacing,
         childCount: children.count
       ),
+      localMetrics: &localMetrics,
       work: &work
     )
   }

@@ -80,6 +80,7 @@ package enum LayoutShadowOracle {
     // always passing an array (never nil) so live realization stays disabled
     // and the scratch pass is observe-only by construction.
     let scratchContext = LayoutPassContext(
+      purpose: .shadowOracle,
       retainedLayout: nil,
       invalidatedIdentities: [],
       scrollViewportContext: scrollViewportContext,

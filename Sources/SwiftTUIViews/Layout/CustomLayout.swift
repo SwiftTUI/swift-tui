@@ -63,7 +63,11 @@ public struct LayoutSubview {
 
   /// Measures the child under `proposal`.
   public func sizeThatFits(_ proposal: ProposedViewSize) -> LayoutSize {
-    engine.measure(
+    // Branching oracle (plan 2026-08-11-004): every author-initiated subview
+    // measure is a custom child request — the unbounded `A` in the custom
+    // family's `>= 2N + A` shape.
+    passContext?.recordCustomChildMeasureRequest()
+    return engine.measure(
       child,
       proposal: proposal,
       passContext: passContext
@@ -82,6 +86,7 @@ public struct LayoutSubview {
     guard let passContext, let hint else {
       return sizeThatFits(proposal)
     }
+    passContext.recordCustomChildMeasureRequest()
     return passContext.withMeasureViewportHint(hint) {
       engine.measure(
         child,

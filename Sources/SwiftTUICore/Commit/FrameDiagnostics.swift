@@ -150,6 +150,24 @@ extension FrameDiagnostics {
     dropEligibilityBlockers: Set<FrameDropBlocker> = []
   ) -> Self {
     let customLayoutFallback = resolved.customLayoutFallbackSummary
+    var work = FrameDiagnosticWork(
+      resolvedNodesComputed: resolveWork?.resolvedNodesComputed ?? 0,
+      resolvedNodesReused: resolveWork?.resolvedNodesReused ?? 0,
+      measuredNodesComputed: layoutWork?.measuredNodesComputed ?? 0,
+      measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
+      placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
+      placedNodesReused: layoutWork?.placedNodesReused ?? 0,
+      placedFrameTableEntriesReused: layoutWork?.placedFrameTableEntriesReused ?? 0,
+      layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
+      layoutDependentRealizationCacheHits:
+        layoutWork?.layoutDependentRealizationCacheHits ?? 0,
+      layoutDependentMainActorFallbacks:
+        layoutWork?.layoutDependentMainActorFallbacks ?? 0,
+      measurementCache: measurementCache,
+      customLayoutFallbackCount: customLayoutFallback.count,
+      firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
+    )
+    work.layoutBranching = layoutWork?.branching ?? .init()
     return Self(
       input: .init(
         proposal: measured.proposal,
@@ -166,23 +184,7 @@ extension FrameDiagnostics {
           scrollRoutes: semantics.scrollRoutes.count,
           selectionRoutes: semantics.selectionRoutes.count
         ),
-        work: .init(
-          resolvedNodesComputed: resolveWork?.resolvedNodesComputed ?? 0,
-          resolvedNodesReused: resolveWork?.resolvedNodesReused ?? 0,
-          measuredNodesComputed: layoutWork?.measuredNodesComputed ?? 0,
-          measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
-          placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
-          placedNodesReused: layoutWork?.placedNodesReused ?? 0,
-          placedFrameTableEntriesReused: layoutWork?.placedFrameTableEntriesReused ?? 0,
-          layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
-          layoutDependentRealizationCacheHits:
-            layoutWork?.layoutDependentRealizationCacheHits ?? 0,
-          layoutDependentMainActorFallbacks:
-            layoutWork?.layoutDependentMainActorFallbacks ?? 0,
-          measurementCache: measurementCache,
-          customLayoutFallbackCount: customLayoutFallback.count,
-          firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
-        )),
+        work: work),
       presentation: .init(
         damage: presentationDamage.map {
           .init(

@@ -62,6 +62,10 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
+  /// Branching-factor counters (plan 2026-08-11-004 Stage 0). `package`
+  /// (set post-init, defaulting to zeroes) so the public work surface stays
+  /// frozen.
+  package var layoutBranching: LayoutBranchingMetrics = .init()
 
   public init(
     resolvedNodesComputed: Int = 0,
