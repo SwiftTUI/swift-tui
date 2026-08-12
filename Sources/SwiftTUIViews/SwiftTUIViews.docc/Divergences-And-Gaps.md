@@ -818,6 +818,22 @@ path, while unblended images keep the fast native path.
   the factor needs an alpha input on the attachment/compositing path rather
   than a faked cell-level approximation.
 
+## Distribution
+
+SwiftTUI ships as a SwiftPM source package: every consumer build resolves the
+package and compiles the framework together with the app. SwiftUI ships as a
+prebuilt platform framework that no app build ever compiles.
+
+- **Consumers compile the framework in every build.** *Gap.* The build
+  configuration applies to the framework as well as the app code, so the cost
+  always lands somewhere: a release build optimizes SwiftTUI and is slow to
+  compile, while a debug build compiles quickly and runs the unoptimized
+  framework slowly. Developers arriving from SwiftUI have never had to choose
+  between these, so the trade-off is a surprising first-run experience. A
+  prebuilt SwiftTUI would remove it, but binary artifacts are inherently
+  platform- and toolchain-specific (macOS, Linux, WASI, Android), so the
+  shortfall is recorded here, not scheduled.
+
 ## Where divergences are recorded
 
 This article is the project's single divergence-and-gap register; it absorbed
