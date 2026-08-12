@@ -15,6 +15,11 @@ public struct PerfBenchConfig: Equatable, Sendable {
   /// Suite subset to run; `nil` runs every member. A focused-rerun and
   /// smoke-test seam — the suite itself is defined only by `BenchSuite`.
   public var members: [PerfScenarioName]?
+  /// Skip the warm lanes and run only the cold lane per member — the
+  /// `bench-ratchet` shape: the ratchet is cold-only (see
+  /// `BenchSuite.members`), so a ratchet check need not pay for warm
+  /// drives whose counters it will not gate.
+  public var skipWarm: Bool
   /// Rewrite the committed baseline from this run's counters instead of
   /// failing on a mismatch. The only sanctioned way to change the baseline;
   /// the diff is reviewed and committed with the cause named (D4).
@@ -29,6 +34,7 @@ public struct PerfBenchConfig: Equatable, Sendable {
     warmIterations: Int = defaultWarmIterations,
     coldIterations: Int = defaultColdIterations,
     members: [PerfScenarioName]? = nil,
+    skipWarm: Bool = false,
     updateBaseline: Bool = false,
     baselinePath: String? = nil
   ) {
@@ -37,6 +43,7 @@ public struct PerfBenchConfig: Equatable, Sendable {
     self.warmIterations = warmIterations
     self.coldIterations = coldIterations
     self.members = members
+    self.skipWarm = skipWarm
     self.updateBaseline = updateBaseline
     self.baselinePath = baselinePath
   }
@@ -184,7 +191,7 @@ public enum BenchCommand {
       let cold = try BenchColdLane.run(coldRenderable, iterations: config.coldIterations)
 
       var lanes: [PerfBenchLaneReport] = []
-      for mode in member.warmModes {
+      for mode in member.warmModes where !config.skipWarm {
         let laneRoot =
           benchRoot
           .appendingPathComponent(member.scenario.rawValue, isDirectory: true)

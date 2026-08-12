@@ -284,6 +284,7 @@ public enum PerfCommandParser {
     var warmIterations = PerfBenchConfig.defaultWarmIterations
     var coldIterations = PerfBenchConfig.defaultColdIterations
     var members: [PerfScenarioName]?
+    var skipWarm = false
     var updateBaseline = false
     var baselinePath: String?
 
@@ -313,6 +314,8 @@ public enum PerfCommandParser {
           throw PerfParseError.unknownScenario(value)
         }
         members = (members ?? []) + [parsedScenario]
+      case "--skip-warm":
+        skipWarm = true
       case "--update-baseline":
         updateBaseline = true
       case "--baseline":
@@ -332,6 +335,7 @@ public enum PerfCommandParser {
       warmIterations: warmIterations,
       coldIterations: coldIterations,
       members: members,
+      skipWarm: skipWarm,
       updateBaseline: updateBaseline,
       baselinePath: baselinePath
     )

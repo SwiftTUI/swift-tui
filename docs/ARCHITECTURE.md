@@ -196,7 +196,9 @@ Platforms/             Arguments, CLI, WASI, WebHost,
                        Android, Embedding  (sources for the product targets)
 Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
                        UnixSignals  (third-party code, own licenses)
-Tools/TermUIPerf/      Performance scenario harness
+Tools/TermUIPerf/      Performance scenario harness + committed benchmark
+                       (`bench`: BenchSuite, cold one-shot lane, counter
+                       ratchet vs Baselines/bench-counters.json)
 ```
 
 Runnable example apps live in the sibling `SwiftTUI/swift-tui-examples`
