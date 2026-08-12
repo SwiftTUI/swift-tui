@@ -152,6 +152,8 @@ public enum PerfScenarioRegistry {
   @MainActor
   public static var all: [any PerfScenario] {
     [
+      BenchDeepGridScenario(),
+      BenchStormScenario(),
       ExampleAppShellWorkflowScenario(),
       GalleryAnimationClickScenario(),
       LayoutScrollBurstScenario(),

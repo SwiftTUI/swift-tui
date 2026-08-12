@@ -27,8 +27,18 @@ public struct BenchMember: Equatable, Sendable {
 /// "the benchmark" is exactly what `bench` runs and an outside reader can
 /// cite it by member name.
 public enum BenchSuite {
-  /// D2's members. `bench-deep-grid` and `bench-storm` join in Stage 2.
+  /// D2's five members.
   public static let members: [BenchMember] = [
+    BenchMember(
+      scenario: .benchDeepGrid,
+      warmModes: [.sync, .async],
+      warmSyncRatchets: true
+    ),
+    BenchMember(
+      scenario: .benchStorm,
+      warmModes: [.async],
+      warmSyncRatchets: false
+    ),
     BenchMember(
       scenario: .lazyVStackScroll,
       warmModes: [.async],

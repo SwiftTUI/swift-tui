@@ -85,6 +85,8 @@ public struct PerfCompareConfig: Equatable, Sendable {
 }
 
 public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
+  case benchDeepGrid = "bench-deep-grid"
+  case benchStorm = "bench-storm"
   case exampleAppShellWorkflow = "example-app-shell-workflow"
   case galleryAnimationClick = "gallery-animation-click"
   case layoutScrollBurst = "layout-scroll-burst"

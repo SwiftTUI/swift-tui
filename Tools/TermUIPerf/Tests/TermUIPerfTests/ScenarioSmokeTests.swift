@@ -31,6 +31,8 @@ struct ScenarioSmokeTests {
     setenv("SWIFTTUI_PERF_SCROLL_NOTCHES", "6", 1)
     setenv("SWIFTTUI_PERF_SCROLL_CADENCE_NOTCHES", "12", 1)
     setenv("SWIFTTUI_PERF_SCROLL_DOCUMENT_BLOCKS", "24", 1)
+    setenv("SWIFTTUI_PERF_STORM_WRITER_TICKS", "25", 1)
+    setenv("SWIFTTUI_PERF_STORM_NOTCHES", "12", 1)
     defer {
       unsetenv("SWIFTTUI_PERF_LAZY_LIST_ROWS")
       unsetenv("SWIFTTUI_PERF_TABLE_ROWS")
@@ -38,6 +40,8 @@ struct ScenarioSmokeTests {
       unsetenv("SWIFTTUI_PERF_SCROLL_NOTCHES")
       unsetenv("SWIFTTUI_PERF_SCROLL_CADENCE_NOTCHES")
       unsetenv("SWIFTTUI_PERF_SCROLL_DOCUMENT_BLOCKS")
+      unsetenv("SWIFTTUI_PERF_STORM_WRITER_TICKS")
+      unsetenv("SWIFTTUI_PERF_STORM_NOTCHES")
     }
     let artifactRoot = FileManager.default.temporaryDirectory
       .appendingPathComponent("termui-perf-scenarios-\(UUID().uuidString)", isDirectory: true)

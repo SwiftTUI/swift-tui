@@ -306,6 +306,18 @@ struct DeterministicCounterTests {
     #expect(report.counters.presentBytes == nil)
   }
 
+  @Test("deep-grid cold lane pins a deep regular built-in tree")
+  @MainActor
+  func deepGridColdLanePinsBranchingShape() throws {
+    let report = try BenchColdLane.run(BenchDeepGridScenario(), iterations: 4)
+    // Exact values are the committed baseline's job (Stage 3); here assert
+    // the shape signals: 255 binary splits' worth of built-in container
+    // work, 256 leaves in the draw tree, and no custom layouts anywhere.
+    #expect((report.counters.builtinContainerMeasures ?? 0) >= 255)
+    #expect((report.counters.drawNodes ?? 0) >= 256)
+    #expect(report.counters.customContainerMeasures == 0)
+  }
+
   @Test("every suite member supports the cold lane")
   @MainActor
   func everySuiteMemberSupportsColdLane() {
