@@ -19,14 +19,31 @@
       }
 
       #webhost-root,
-      .webhost-scene-root,
-      .webhost-scene {
+      .webhost-scene-root {
         box-sizing: border-box;
         width: 100%;
         height: 100%;
         min-width: 0;
         min-height: 0;
         overflow: hidden;
+      }
+
+      .webhost-scene-root {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .webhost-scene {
+        box-sizing: border-box;
+        width: 80%;
+        height: 80%;
+        max-width: 100%;
+        max-height: 100%;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        resize: both;
       }
 
       .webhost-scene__header {
@@ -36,9 +53,10 @@
       .webhost-scene__terminal {
         box-sizing: border-box;
         width: 100%;
-        height: 100%;
+        height: auto;
         min-width: 0;
         min-height: 0;
+        align-self: stretch;
         overflow: hidden;
         touch-action: none;
         -webkit-user-select: none;
@@ -55,7 +73,7 @@
       }
     </style>
     
-  <script type="module" crossorigin src="./index-618tt2mw.js"></script></head>
+  <script type="module" crossorigin src="./index-1xmdatcd.js"></script></head>
   <body>
     <main id="webhost-root"></main>
   </body>

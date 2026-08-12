@@ -88,18 +88,22 @@ package final class WebSocketInputReader: TerminalInputReading, Sendable {
   package convenience init(
     channel: WebHostSceneChannel,
     transport: WebSocketSurfaceTransport,
+    signalReader: InProcessSignalReader? = nil,
     hooks: WebSocketInputReaderTestHooks? = nil
   ) {
     self.init(source: channel, hooks: hooks) { message, token in
       switch message {
       case .resize(let size, let cellPixelSize):
         transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
+        signalReader?.send("SIGWINCH")
       case .style(let style):
         transport.updateStyle(style)
+        signalReader?.send("SIGWINCH")
       case .pointerCapabilities(let supportsScrollPanning):
         transport.updatePointerCapabilities(
           supportsScrollPanning: supportsScrollPanning
         )
+        signalReader?.send("SIGWINCH")
       case .capabilities(let capabilities):
         await channel.applyCapabilities(
           token: token,

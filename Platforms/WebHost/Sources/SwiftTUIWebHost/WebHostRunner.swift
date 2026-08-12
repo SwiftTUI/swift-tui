@@ -98,14 +98,17 @@ public enum WebHostRunner {
       surfaceSize: CellSize(width: 80, height: 24),
       sink: session.channel
     )
+    let signalReader = InProcessSignalReader()
     let inputReader = WebSocketInputReader(
       channel: session.channel,
-      transport: transport
+      transport: transport,
+      signalReader: signalReader
     )
     let sceneTask = Task { @MainActor in
       let resources = SceneSessionResources(
         presentationSurface: transport,
         terminalInputReader: inputReader,
+        signalReader: signalReader,
         surfaceName: "web",
         runtimeConfiguration: configuration
       )

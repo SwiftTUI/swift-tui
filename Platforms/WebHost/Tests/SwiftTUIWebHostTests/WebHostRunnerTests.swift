@@ -183,6 +183,52 @@ struct WebHostRunnerTests {
     clientContinuation?.finish()
     await cancelAndDrain(task)
   }
+
+  @Test("runner fully renders the resized WebSocket surface without further input")
+  func runnerRendersResizedWebSocketSurface() async throws {
+    let server = FakeWebHostServer()
+    let task = Task { @MainActor in
+      try await WebHostRunner.run(
+        ResizableSceneApp(),
+        configuration: .init(web: .init()),
+        server: server,
+        token: WebHostToken(rawValue: "test-token"),
+        browserOpener: RecordingBrowserOpener(),
+        bannerWriter: RecordingBannerWriter()
+      )
+    }
+
+    let session = await server.startedSession()
+    var clientContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
+    let client = AsyncStream<WebHostSocketMessage> { clientContinuation = $0 }
+    let output = await session.channel.attach(client: client)
+    let recorder = WebSocketOutputRecorder()
+    let outputTask = Task {
+      for await message in output {
+        await recorder.record(message)
+      }
+    }
+
+    clientContinuation?.yield(
+      .data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8))
+    )
+    await recorder.waitForSurfaceFrameCount(1)
+
+    clientContinuation?.yield(
+      .data(Array("\u{001E}resize:100:40:9:18\n".utf8))
+    )
+    await recorder.waitForSurfaceFrameCount(2)
+
+    let resizedFrame = try #require(await recorder.surfaceFrameOutputs().last)
+    let decodedFrame = try decodedSurfaceFrame(resizedFrame)
+    #expect(decodedFrame["width"] as? Int == 100)
+    #expect(decodedFrame["height"] as? Int == 40)
+    #expect(row(of: "B", in: decodedFrame) == 39)
+
+    outputTask.cancel()
+    clientContinuation?.finish()
+    await cancelAndDrain(task)
+  }
 }
 
 @MainActor
@@ -209,6 +255,45 @@ private struct SingleSceneApp: App {
   var body: some Scene {
     WindowGroup("Primary", id: WindowIdentifier("primary")) {
       Text("Hello WebHost")
+    }
+  }
+}
+
+@MainActor
+private struct ResizableSceneApp: App {
+  var body: some Scene {
+    WindowGroup("Resizable", id: WindowIdentifier("resizable")) {
+      VStack {
+        Text("T")
+        Spacer()
+        Text("B")
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+}
+
+private func decodedSurfaceFrame(
+  _ output: String
+) throws -> [String: Any] {
+  let prefix = "\u{001E}surface:"
+  let line = output.trimmingCharacters(in: .newlines)
+  let json = String(line.dropFirst(prefix.count))
+  return try #require(
+    JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+  )
+}
+
+private func row(
+  of character: String,
+  in frame: [String: Any]
+) -> Int? {
+  guard let rows = frame["rows"] as? [[[Any]]] else {
+    return nil
+  }
+  return rows.firstIndex { cells in
+    cells.contains { cell in
+      cell.count > 1 && cell[1] as? String == character
     }
   }
 }
@@ -311,38 +396,48 @@ private final class RecordingBannerWriter: WebHostBannerWriting, Sendable {
 
 private actor WebSocketOutputRecorder {
   private var messages: [WebHostSocketMessage] = []
-  private var surfaceFrameWaiters: [CheckedContinuation<Void, Never>] = []
+  private var surfaceFrameWaiters: [(
+    count: Int,
+    continuation: CheckedContinuation<Void, Never>
+  )] = []
 
   func record(
     _ message: WebHostSocketMessage
   ) {
     messages.append(message)
-    if containsSurfaceFrame() {
-      let waiters = surfaceFrameWaiters
-      surfaceFrameWaiters = []
-      for waiter in waiters {
-        waiter.resume()
+    let frameCount = surfaceFrameOutputs().count
+    if frameCount > 0 {
+      let ready = surfaceFrameWaiters.filter { frameCount >= $0.count }
+      surfaceFrameWaiters.removeAll { frameCount >= $0.count }
+      for waiter in ready {
+        waiter.continuation.resume()
       }
-    }
-  }
-
-  func containsSurfaceFrame() -> Bool {
-    messages.contains { message in
-      guard case .data(let bytes) = message else {
-        return false
-      }
-      let output = String(decoding: bytes, as: UTF8.self)
-      return output.contains("\u{1E}surface:")
     }
   }
 
   /// Suspends until a recorded message carries a web-surface frame.
   func waitForSurfaceFrame() async {
-    if containsSurfaceFrame() {
+    await waitForSurfaceFrameCount(1)
+  }
+
+  func waitForSurfaceFrameCount(
+    _ count: Int
+  ) async {
+    if surfaceFrameOutputs().count >= count {
       return
     }
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      surfaceFrameWaiters.append(continuation)
+      surfaceFrameWaiters.append((count, continuation))
+    }
+  }
+
+  func surfaceFrameOutputs() -> [String] {
+    messages.compactMap { message in
+      guard case .data(let bytes) = message else {
+        return nil
+      }
+      let output = String(decoding: bytes, as: UTF8.self)
+      return output.contains("\u{1E}surface:") ? output : nil
     }
   }
 }

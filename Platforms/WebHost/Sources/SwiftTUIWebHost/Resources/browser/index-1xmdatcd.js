@@ -1169,36 +1169,51 @@ class BrowserWASIBridge {
 
 // src/WebSocketSceneBridge.ts
 var socketOpenState = 1;
+var normalClosureCode = 1000;
 var textEncoder2 = new TextEncoder;
+function defaultReconnectDelayMilliseconds(attempt) {
+  return Math.min(250 * 2 ** (attempt - 1), 8000);
+}
 
 class WebSocketSceneBridge {
   url;
   socket;
+  createSocket;
+  reconnectDelayMilliseconds;
   decoder = new WebHostOutputDecoder;
   queuedInput = [];
   queuedOutput = [];
   sink;
   disposed = false;
+  reconnectAttempts = 0;
+  reconnectTimer;
+  lastRenderStyleMessage;
+  lastResizeMessage;
+  lastPointerCapabilitiesMessage;
   handleOpen = () => {
+    this.reconnectAttempts = 0;
     this.flushQueuedInput();
   };
   handleMessage = (event) => {
     this.receive(event.data);
   };
-  handleClose = () => {
+  handleClose = (event) => {
     for (const record of this.decoder.flush()) {
       this.deliver(record);
     }
+    if (this.disposed || event.code === normalClosureCode) {
+      return;
+    }
+    this.queuedInput.length = 0;
+    this.scheduleReconnect();
   };
   handleError = () => {};
   constructor(options) {
     this.url = webSocketSceneURL(options);
-    this.socket = (options.webSocketFactory ?? defaultWebSocketFactory)(this.url);
-    this.socket.binaryType = "arraybuffer";
-    this.socket.addEventListener("open", this.handleOpen);
-    this.socket.addEventListener("message", this.handleMessage);
-    this.socket.addEventListener("close", this.handleClose);
-    this.socket.addEventListener("error", this.handleError);
+    this.createSocket = options.webSocketFactory ?? defaultWebSocketFactory;
+    this.reconnectDelayMilliseconds = options.reconnectDelayMilliseconds ?? defaultReconnectDelayMilliseconds;
+    this.socket = this.createSocket(this.url);
+    this.attachSocket(this.socket);
     this.sendInput(encodeCapabilitiesControlMessage());
   }
   bindOutput(sink) {
@@ -1208,13 +1223,19 @@ class WebSocketSceneBridge {
     }
   }
   resize(columns, rows, cellWidth, cellHeight) {
-    this.sendInput(encodeResizeControlMessage(columns, rows, cellWidth, cellHeight));
+    const message = encodeResizeControlMessage(columns, rows, cellWidth, cellHeight);
+    this.lastResizeMessage = message;
+    this.sendInput(message);
   }
   updateRenderStyle(style) {
-    this.sendInput(encodeRenderStyleControlMessage(style));
+    const message = encodeRenderStyleControlMessage(style);
+    this.lastRenderStyleMessage = message;
+    this.sendInput(message);
   }
   updatePointerCapabilities(supportsScrollPanning) {
-    this.sendInput(encodePointerCapabilitiesControlMessage(supportsScrollPanning));
+    const message = encodePointerCapabilitiesControlMessage(supportsScrollPanning);
+    this.lastPointerCapabilitiesMessage = message;
+    this.sendInput(message);
   }
   sendInput(chunk) {
     if (this.disposed) {
@@ -1239,13 +1260,67 @@ class WebSocketSceneBridge {
       return;
     }
     this.disposed = true;
-    this.socket.removeEventListener("open", this.handleOpen);
-    this.socket.removeEventListener("message", this.handleMessage);
-    this.socket.removeEventListener("close", this.handleClose);
-    this.socket.removeEventListener("error", this.handleError);
+    if (this.reconnectTimer !== undefined) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    this.detachSocket(this.socket);
     this.queuedInput.length = 0;
     this.queuedOutput.length = 0;
     this.socket.close(1000, "WebHost scene disposed");
+  }
+  attachSocket(socket) {
+    socket.binaryType = "arraybuffer";
+    socket.addEventListener("open", this.handleOpen);
+    socket.addEventListener("message", this.handleMessage);
+    socket.addEventListener("close", this.handleClose);
+    socket.addEventListener("error", this.handleError);
+  }
+  detachSocket(socket) {
+    socket.removeEventListener("open", this.handleOpen);
+    socket.removeEventListener("message", this.handleMessage);
+    socket.removeEventListener("close", this.handleClose);
+    socket.removeEventListener("error", this.handleError);
+  }
+  scheduleReconnect() {
+    if (this.reconnectTimer !== undefined) {
+      return;
+    }
+    this.reconnectAttempts += 1;
+    const delay = Math.max(0, this.reconnectDelayMilliseconds(this.reconnectAttempts));
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.reconnect();
+    }, delay);
+  }
+  reconnect() {
+    if (this.disposed) {
+      return;
+    }
+    this.detachSocket(this.socket);
+    let socket;
+    try {
+      socket = this.createSocket(this.url);
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
+    this.socket = socket;
+    this.attachSocket(socket);
+    const handshake = [encodeCapabilitiesControlMessage()];
+    if (this.lastRenderStyleMessage) {
+      handshake.push(this.lastRenderStyleMessage);
+    }
+    if (this.lastResizeMessage) {
+      handshake.push(this.lastResizeMessage);
+    }
+    if (this.lastPointerCapabilitiesMessage) {
+      handshake.push(this.lastPointerCapabilitiesMessage);
+    }
+    this.queuedInput.unshift(...handshake.map((chunk) => new Uint8Array(chunk)));
+    if (this.socket.readyState === socketOpenState) {
+      this.flushQueuedInput();
+    }
   }
   async receive(message) {
     if (this.disposed) {
@@ -3504,22 +3579,27 @@ class WebHostSceneRuntime {
   applyStyle(style) {
     applyWebHostTerminalStyle(this.element, style);
     this.element.style.boxSizing = "border-box";
-    this.element.style.width = "100%";
-    this.element.style.height = "100%";
+    this.element.style.width = "80%";
+    this.element.style.height = "80%";
+    this.element.style.maxWidth = "100%";
+    this.element.style.maxHeight = "100%";
     this.element.style.minWidth = "0";
     this.element.style.minHeight = "0";
     this.element.style.padding = "0.75rem";
     this.element.style.borderRadius = "16px";
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
     this.element.style.overflow = "hidden";
+    this.element.style.resize = "both";
+    this.element.style.flex = "0 0 auto";
     this.element.style.gap = "0.5rem";
-    this.element.style.gridTemplateRows = "auto 1fr";
+    this.element.style.gridTemplateRows = "auto minmax(0, 1fr)";
     this.terminalMount.style.position = "relative";
     this.terminalMount.style.boxSizing = "border-box";
     this.terminalMount.style.width = "100%";
-    this.terminalMount.style.height = "100%";
+    this.terminalMount.style.height = "auto";
     this.terminalMount.style.minWidth = "0";
     this.terminalMount.style.minHeight = "0";
+    this.terminalMount.style.alignSelf = "stretch";
     this.terminalMount.style.overflow = "hidden";
     this.terminalMount.style.overscrollBehavior = this.wheelMode === "capture" ? "contain" : "auto";
     this.terminalMount.style.outline = "none";
@@ -3664,6 +3744,8 @@ class WebHostSceneRuntime {
     this.rows = nextRows;
     this.sendResizeIfNeeded();
     this.resizeSurface();
+    this.draw();
+    this.syncAccessibilityTree();
   }
   sendResizeIfNeeded() {
     const current = {
@@ -3823,6 +3905,9 @@ class InternalWebHostAppController {
     this.sceneRoot.style.minWidth = "0";
     this.sceneRoot.style.minHeight = "0";
     this.sceneRoot.style.overflow = "hidden";
+    this.sceneRoot.style.display = "flex";
+    this.sceneRoot.style.justifyContent = "center";
+    this.sceneRoot.style.alignItems = "flex-start";
     this.mount.replaceChildren(this.sceneRoot);
     this.applyHostFrameStyle();
   }

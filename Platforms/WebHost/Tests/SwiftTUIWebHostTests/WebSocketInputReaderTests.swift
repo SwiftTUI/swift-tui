@@ -5,6 +5,26 @@ import Testing
 @testable import SwiftTUIWebHost
 
 struct WebSocketInputReaderTests {
+  @Test("resize wake survives a late signal-stream subscription")
+  func resizeWakeSurvivesLateSignalSubscription() async throws {
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 1, height: 1),
+      sink: RecordingInputTestSink()
+    )
+    let signalReader = InProcessSignalReader()
+    let client = await ChannelClient.attached(
+      transport: transport,
+      signalReader: signalReader
+    )
+
+    await client.feed("\u{001E}resize:120:60:9:18\n")
+    var signalIterator = signalReader.events().makeAsyncIterator()
+
+    #expect(transport.surfaceSize == .init(width: 120, height: 60))
+    #expect(await signalIterator.next() == "SIGWINCH")
+    signalReader.finish()
+  }
+
   @Test("resize and style input update the transport")
   func resizeAndStyleInputUpdateTransport() async throws {
     let sink = RecordingInputTestSink()
@@ -12,7 +32,12 @@ struct WebSocketInputReaderTests {
       surfaceSize: .init(width: 1, height: 1),
       sink: sink
     )
-    let client = await ChannelClient.attached(transport: transport)
+    let signalReader = InProcessSignalReader()
+    var signalIterator = signalReader.events().makeAsyncIterator()
+    let client = await ChannelClient.attached(
+      transport: transport,
+      signalReader: signalReader
+    )
     let style = TerminalRenderStyle(
       appearance: .init(
         foregroundColor: try! .hex("#102030"),
@@ -29,6 +54,9 @@ struct WebSocketInputReaderTests {
     #expect(transport.surfaceSize == .init(width: 80, height: 24))
     #expect(transport.appearance == style.appearance)
     #expect(transport.pointerInputCapabilities.precision.isSubCell)
+    #expect(await signalIterator.next() == "SIGWINCH")
+    #expect(await signalIterator.next() == "SIGWINCH")
+    signalReader.finish()
   }
 
   @Test("a caps record declares capabilities, activates delivery, and refreshes")
@@ -267,7 +295,8 @@ private struct ChannelClient {
   private let output: AsyncStream<WebHostSocketMessage>
 
   static func attached(
-    transport: WebSocketSurfaceTransport? = nil
+    transport: WebSocketSurfaceTransport? = nil,
+    signalReader: InProcessSignalReader? = nil
   ) async -> Self {
     let channel = WebHostSceneChannel()
     var clientContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
@@ -276,7 +305,11 @@ private struct ChannelClient {
     let token = await channel.currentConnectionToken() ?? 0
     let reader =
       if let transport {
-        WebSocketInputReader(channel: channel, transport: transport)
+        WebSocketInputReader(
+          channel: channel,
+          transport: transport,
+          signalReader: signalReader
+        )
       } else {
         WebSocketInputReader(source: channel)
       }
