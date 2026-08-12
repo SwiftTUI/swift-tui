@@ -218,6 +218,124 @@ struct LayoutShadowOracleTests {
     #expect(summary.windowedExclusionCount == 1)
   }
 
+  // The 2026-08-11 mrkdwn `ScrollContent` false-alarm class: a lazy
+  // container measured inside a custom scroll layout's subview walk keeps
+  // never-placed children (`lazyChildScrollEstimates`), so its estimated
+  // extent — and every wrapper bounds derived from it — is a cross-frame
+  // refinement the cold shadow legitimately re-estimates. No `measuredWindow`
+  // node is visible to the measured walk on this path.
+  @Test("an estimated lazy extent difference is tolerated, realized rows still compared")
+  func estimatedLazyExtentIsTolerated() {
+    let rootIdentity = testIdentity("scroll-content")
+    let listIdentity = testIdentity("scroll-content", "list")
+    let measured = MeasuredNode(
+      identity: rootIdentity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 20, height: 4)
+    )
+
+    func placedTree(extent: Int) -> PlacedNode {
+      var list = PlacedNode(
+        identity: listIdentity,
+        bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 20, height: extent)),
+        children: [
+          PlacedNode(
+            identity: testIdentity("scroll-content", "list", "row-0"),
+            bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 20, height: 2))
+          )
+        ]
+      )
+      list.lazyChildScrollEstimates = [
+        LazyChildScrollEstimate(
+          identity: testIdentity("scroll-content", "list", "row-9"),
+          rect: .init(origin: .init(x: 0, y: extent - 2), size: .init(width: 20, height: 2))
+        )
+      ]
+      return PlacedNode(
+        identity: rootIdentity,
+        bounds: .init(origin: .zero, size: .init(width: 20, height: extent)),
+        children: [list]
+      )
+    }
+
+    // Production refined the total extent to 50; the cold shadow estimates
+    // 49. The wrapper's bounds absorbed the estimate, so its subtree is
+    // skipped whole and counted, exactly like the measured-walk carve-out.
+    let summary = LayoutShadowOracle.compare(
+      productionMeasured: measured,
+      productionPlaced: placedTree(extent: 50),
+      shadowMeasured: measured,
+      shadowPlaced: placedTree(extent: 49)
+    )
+
+    #expect(!summary.hasDivergence)
+    #expect(summary.windowedExclusionCount == 1)
+
+    // Control: the same extent difference WITHOUT estimates anywhere is a
+    // real divergence.
+    var bareProduction = placedTree(extent: 50)
+    bareProduction.children[0].lazyChildScrollEstimates = nil
+    var bareShadow = placedTree(extent: 49)
+    bareShadow.children[0].lazyChildScrollEstimates = nil
+    let bare = LayoutShadowOracle.compare(
+      productionMeasured: measured,
+      productionPlaced: bareProduction,
+      shadowMeasured: measured,
+      shadowPlaced: bareShadow
+    )
+    #expect(bare.placeDivergenceCount == 1)
+  }
+
+  @Test("an estimate-carrying lazy container is skipped whole even when extents agree")
+  func estimateCarryingContainerIsSkippedWhole() {
+    let rootIdentity = testIdentity("scroll-content")
+    let listIdentity = testIdentity("scroll-content", "list")
+    let measured = MeasuredNode(
+      identity: rootIdentity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 20, height: 4)
+    )
+
+    func placedTree(rowY: Int) -> PlacedNode {
+      var list = PlacedNode(
+        identity: listIdentity,
+        bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 20, height: 50)),
+        children: [
+          PlacedNode(
+            identity: testIdentity("scroll-content", "list", "row-0"),
+            bounds: .init(origin: .init(x: 0, y: rowY), size: .init(width: 20, height: 2))
+          )
+        ]
+      )
+      list.lazyChildScrollEstimates = [
+        LazyChildScrollEstimate(
+          identity: testIdentity("scroll-content", "list", "row-9"),
+          rect: .init(origin: .init(x: 0, y: 48), size: .init(width: 20, height: 2))
+        )
+      ]
+      return PlacedNode(
+        identity: rootIdentity,
+        bounds: .init(origin: .zero, size: .init(width: 20, height: 50)),
+        children: [list]
+      )
+    }
+
+    // Identical totals, but the realized row's offset embeds the estimated
+    // heights of unrealized siblings — refined-exact in production, uniform
+    // stride in the cold shadow. The container subtree is the estimate's
+    // blast radius and is excluded whole (the D12 grain), counted so the
+    // blind spot stays measured.
+    let summary = LayoutShadowOracle.compare(
+      productionMeasured: measured,
+      productionPlaced: placedTree(rowY: 1),
+      shadowMeasured: measured,
+      shadowPlaced: placedTree(rowY: 0)
+    )
+
+    #expect(!summary.hasDivergence)
+    #expect(summary.windowedExclusionCount == 1)
+  }
+
   // The first divergence class this oracle caught on a full gate run: the
   // measurement cache's equivalence gate is structural by design
   // (`StructuralEquivalenceLockTests` — a pure `.id` change stays

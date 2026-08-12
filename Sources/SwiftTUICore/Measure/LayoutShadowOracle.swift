@@ -14,8 +14,13 @@ package struct LayoutShadowComparisonSummary: Sendable, Equatable {
   /// Pairs in the placed-tree walk whose identity, bounds, or child count
   /// diverged from the fresh shadow placement.
   package var placeDivergenceCount = 0
-  /// Windowed lazy or hosted subtrees skipped by the D12 carve-out. T-info
-  /// currency: it keeps the size of the oracle's blind spot measured.
+  /// Windowed lazy or hosted subtrees skipped by the D12 carve-out, plus
+  /// place-walk bounds tolerated because the production subtree carries
+  /// `lazyChildScrollEstimates` (an estimated lazy extent propagating into an
+  /// ancestor's bounds — the same running-refinement class, reached through a
+  /// custom scroll layout's subview measure where no `measuredWindow` node is
+  /// visible to the measured walk). T-info currency: it keeps the size of the
+  /// oracle's blind spot measured.
   package var windowedExclusionCount = 0
   /// Whole sampled frames skipped because the SHADOW pass hit the engine
   /// re-entry depth budget (`layout.customLayoutDepthLimitExceeded`). The
@@ -209,17 +214,34 @@ package enum LayoutShadowOracle {
       }
       guard
         production.identity == shadow.identity,
-        production.bounds == shadow.bounds,
         production.children.count == shadow.children.count
       else {
         summary.placeDivergenceCount += 1
-        if summary.firstDivergenceDetail == nil {
-          summary.firstDivergenceDetail =
-            "place shadow divergence at \(production.identity): "
-            + "production bounds=\(production.bounds) "
-            + "children=\(production.children.count), "
-            + "shadow identity=\(shadow.identity) bounds=\(shadow.bounds) "
-            + "children=\(shadow.children.count)"
+        recordPlaceDivergenceDetail(&summary, production: production, shadow: shadow)
+        continue
+      }
+      // D12, place-side: a lazy container that kept never-placed children
+      // publishes `lazyChildScrollEstimates`, and EVERY dimension derived
+      // from those estimates is a cross-frame running refinement a cold
+      // fresh pass legitimately re-estimates — the container's own extent,
+      // the extent of every wrapper up to the enclosing scroll viewport
+      // clamp, and the origins of its realized rows (their offsets embed the
+      // estimated heights of unrealized siblings above them). When the
+      // container measures inside a custom scroll layout's subview walk (the
+      // 2026-08-11 mrkdwn `ScrollContent` false alarm), no `measuredWindow`
+      // node is visible to the measured-tree carve-out, so the placed walk
+      // applies the same skip-and-count at the estimate carrier — and at an
+      // ancestor whose bounds absorbed the estimate.
+      if carriesLazyEstimates(production) {
+        summary.windowedExclusionCount += 1
+        continue
+      }
+      if production.bounds != shadow.bounds {
+        if subtreeCarriesLazyEstimates(production) {
+          summary.windowedExclusionCount += 1
+        } else {
+          summary.placeDivergenceCount += 1
+          recordPlaceDivergenceDetail(&summary, production: production, shadow: shadow)
         }
         continue
       }
@@ -229,6 +251,48 @@ package enum LayoutShadowOracle {
     }
 
     return summary
+  }
+
+  private static func recordPlaceDivergenceDetail(
+    _ summary: inout LayoutShadowComparisonSummary,
+    production: PlacedNode,
+    shadow: PlacedNode
+  ) {
+    guard summary.firstDivergenceDetail == nil else {
+      return
+    }
+    summary.firstDivergenceDetail =
+      "place shadow divergence at \(production.identity): "
+      + "production bounds=\(production.bounds) "
+      + "children=\(production.children.count), "
+      + "shadow identity=\(shadow.identity) bounds=\(shadow.bounds) "
+      + "children=\(shadow.children.count)"
+  }
+
+  /// `true` when this placed node is a lazy container that kept never-placed
+  /// children (published as `lazyChildScrollEstimates` for scroll targeting):
+  /// its total extent and its realized children's offsets are estimates
+  /// refined across frames, not fresh-pass invariants.
+  private static func carriesLazyEstimates(_ node: PlacedNode) -> Bool {
+    guard let estimates = node.lazyChildScrollEstimates else {
+      return false
+    }
+    return !estimates.isEmpty
+  }
+
+  /// `true` when the production subtree contains an estimate-carrying lazy
+  /// container (see `carriesLazyEstimates`), so bounds derived from it —
+  /// every wrapper between the container and the enclosing scroll viewport
+  /// clamp — may legitimately differ from the cold shadow's re-estimate.
+  private static func subtreeCarriesLazyEstimates(_ node: PlacedNode) -> Bool {
+    var pending: [PlacedNode] = [node]
+    while let node = pending.popLast() {
+      if carriesLazyEstimates(node) {
+        return true
+      }
+      pending.append(contentsOf: node.children)
+    }
+    return false
   }
 
   private static func carriesMeasuredWindow(_ node: MeasuredNode) -> Bool {
