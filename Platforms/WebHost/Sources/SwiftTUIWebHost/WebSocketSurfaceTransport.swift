@@ -275,8 +275,9 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
 
   /// Suspends until every byte batch handed to the transport has been sent.
   ///
-  /// Throws the first send failure observed, if any. This is the awaitable
-  /// completion signal callers use instead of blocking inside `present`.
+  /// Throws the most recent send failure not yet cleared by a successful
+  /// send, if any. This is the awaitable completion signal callers use
+  /// instead of blocking inside `present`.
   package func drain() async throws {
     await pump.waitUntilIdle()
     if let error = pump.currentError() {
@@ -311,13 +312,14 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
     guard !bytes.isEmpty else {
       return
     }
-    // Surface a prior send failure synchronously so a stuck transport stops
-    // accepting frames, then hand the batch off without blocking. The actual
-    // send happens on the pump's drain task; callers await `drain()` to learn
-    // when it finished.
-    if let error = pump.currentError() {
-      throw error
-    }
+    // Hand the batch off without blocking; the pump's drain task does the
+    // sending and callers await `drain()` to learn when it finished. A prior
+    // send failure deliberately does NOT throw here: `present` errors
+    // propagate out of the hosting run loop and end the scene, so surfacing
+    // a stale pump error from the next present turned one transient stall
+    // (a 10 s send timeout) into a permanently dead session on a client
+    // that has no reconnect. The pump drops the broken epoch and recovers
+    // instead — see `ByteSinkPump`.
     pump.enqueue(bytes)
   }
 }
@@ -329,9 +331,18 @@ package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvide
 /// child task did the async send — a pattern that deadlocked the pool under
 /// parallel load and surfaced as spurious "byte sink timed out" failures.
 ///
-/// Send failures are observed either on a later `enqueue` (via `currentError`)
-/// or by awaiting `waitUntilIdle()`. The per-send timeout still applies, but it
-/// races *inside* the drain task and so never blocks a presenting caller.
+/// A send failure is connection-scoped, not fatal. The failed batch and
+/// everything queued behind it are dropped — they extend an encoding epoch
+/// the peer can no longer decode once one record is missing — the error is
+/// retained for `waitUntilIdle()`/`currentError()` reporting, and the next
+/// enqueue starts a fresh attempt; a later successful send clears the error.
+/// Wire consistency self-heals through the existing machinery: the browser
+/// decoder detects a broken delta baseline and requests a resync, and a
+/// reconnecting client re-anchors to a keyframe via its capability
+/// declaration. The previous design latched the first error forever and
+/// skipped every later batch, so one stalled send permanently froze the
+/// session. The per-send timeout still applies, but it races *inside* the
+/// drain task and so never blocks a presenting caller.
 private final class ByteSinkPump: Sendable {
   private enum DrainStep {
     case batch([UInt8])
@@ -341,7 +352,7 @@ private final class ByteSinkPump: Sendable {
   private struct State {
     var pending: [[UInt8]] = []
     var isDraining = false
-    var firstError: WebHostByteSinkError?
+    var lastError: WebHostByteSinkError?
     var idleWaiters: [CheckedContinuation<Void, Never>] = []
   }
 
@@ -354,9 +365,9 @@ private final class ByteSinkPump: Sendable {
     self.sendTimeoutNanoseconds = sendTimeoutNanoseconds
   }
 
-  /// The first send failure observed so far, if any.
+  /// The most recent send failure not yet cleared by a successful send.
   func currentError() -> WebHostByteSinkError? {
-    state.withLock(\.firstError)
+    state.withLock(\.lastError)
   }
 
   /// Appends `bytes` to the FIFO send queue, starting a drain task if idle.
@@ -401,14 +412,15 @@ private final class ByteSinkPump: Sendable {
 
       switch step {
       case .batch(let batch):
-        if currentError() == nil {
-          do {
-            try await sendWithTimeout(batch)
-          } catch let error as WebHostByteSinkError {
-            recordError(error)
-          } catch {
-            recordError(.sendFailed(String(describing: error)))
+        do {
+          try await sendWithTimeout(batch)
+          state.withLock { state in
+            state.lastError = nil
           }
+        } catch let error as WebHostByteSinkError {
+          recordFailure(error)
+        } catch {
+          recordFailure(.sendFailed(String(describing: error)))
         }
       case .finished(let waiters):
         for waiter in waiters {
@@ -419,11 +431,14 @@ private final class ByteSinkPump: Sendable {
     }
   }
 
-  private func recordError(_ error: WebHostByteSinkError) {
+  /// Records the failure and drops the queued batches behind it: they extend
+  /// the encoding epoch the failed record broke, so delivering them would
+  /// hand the decoder deltas against a baseline it never received. The next
+  /// enqueue starts a fresh attempt.
+  private func recordFailure(_ error: WebHostByteSinkError) {
     state.withLock { state in
-      if state.firstError == nil {
-        state.firstError = error
-      }
+      state.lastError = error
+      state.pending.removeAll(keepingCapacity: false)
     }
   }
 

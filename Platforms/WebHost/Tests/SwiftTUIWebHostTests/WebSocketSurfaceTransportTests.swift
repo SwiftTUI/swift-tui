@@ -269,6 +269,52 @@ struct WebSocketSurfaceTransportTests {
     }
   }
 
+  @Test("a send failure is connection-scoped: the next present flows and clears the error")
+  func sendFailureRecoversOnNextPresent() async throws {
+    let sink = FailOnceByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.present(Self.basicSurface("AA"))
+    await #expect(throws: WebHostByteSinkError.self) {
+      try await transport.drain()
+    }
+
+    // The failed epoch is dropped; the next present must be accepted (the
+    // old latch made this throw), delivered, and its success must clear the
+    // retained error so this drain no longer throws.
+    try transport.present(Self.basicSurface("BB"))
+    try await transport.drain()
+
+    let records = await sink.strings()
+    #expect(records.count == 1)
+    #expect(records[0].contains("\"B\""))
+  }
+
+  @Test("the pump keeps attempting sends after failures instead of latching")
+  func pumpKeepsAttemptingAfterFailures() async throws {
+    let sink = AlwaysFailingByteSink()
+    let transport = WebSocketSurfaceTransport(
+      surfaceSize: .init(width: 2, height: 1),
+      sink: sink
+    )
+
+    try transport.present(Self.basicSurface("AA"))
+    await #expect(throws: WebHostByteSinkError.self) {
+      try await transport.drain()
+    }
+    try transport.present(Self.basicSurface("BB"))
+    await #expect(throws: WebHostByteSinkError.self) {
+      try await transport.drain()
+    }
+
+    // The old latch skipped every batch after the first failure; each present
+    // must reach the sink as a fresh attempt.
+    #expect(await sink.attemptCount() == 2)
+  }
+
   @MainActor
   @Test("transport sends typed clipboard records")
   func transportSendsTypedClipboardRecords() async throws {
@@ -338,6 +384,36 @@ private struct StalledByteSink: WebHostByteSink {
     // instant cancellation arrives.
     await AsyncEvent().wait()
     throw CancellationError()
+  }
+}
+
+private actor FailOnceByteSink: WebHostByteSink {
+  private var sent: [[UInt8]] = []
+  private var didFail = false
+
+  func send(_ bytes: [UInt8]) async throws {
+    guard didFail else {
+      didFail = true
+      throw WebHostByteSinkError.sendFailed("injected failure")
+    }
+    sent.append(bytes)
+  }
+
+  func strings() -> [String] {
+    sent.map { String(decoding: $0, as: UTF8.self) }
+  }
+}
+
+private actor AlwaysFailingByteSink: WebHostByteSink {
+  private var attempts = 0
+
+  func send(_: [UInt8]) async throws {
+    attempts += 1
+    throw WebHostByteSinkError.sendFailed("injected failure")
+  }
+
+  func attemptCount() -> Int {
+    attempts
   }
 }
 
