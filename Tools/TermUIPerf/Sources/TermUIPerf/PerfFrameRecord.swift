@@ -174,6 +174,9 @@ public struct PerfFrameRecord: Equatable, Sendable {
   public var causes: String
   public var phases: PerfFramePhaseTimings
   public var emission: PerfFrameEmission
+  /// Deterministic work counters (plan 2026-08-11-005): graph/layout/draw
+  /// census columns plus the plan-004 branching-factor columns.
+  public var workCounters: PerfFrameWorkCounters
   /// Commit minus the *oldest* answered input's arrival: the worst latency the
   /// frame closed out, and the one the aggregate gates on.
   public var inputToCommitFirstMs: Double?
@@ -230,6 +233,7 @@ public struct PerfFrameRecord: Equatable, Sendable {
     causes: String = "",
     phases: PerfFramePhaseTimings = PerfFramePhaseTimings(),
     emission: PerfFrameEmission = PerfFrameEmission(),
+    workCounters: PerfFrameWorkCounters = PerfFrameWorkCounters(),
     inputToCommitFirstMs: Double? = nil,
     inputToCommitLastMs: Double? = nil,
     committedAtMs: Double? = nil,
@@ -274,6 +278,7 @@ public struct PerfFrameRecord: Equatable, Sendable {
     self.causes = causes
     self.phases = phases
     self.emission = emission
+    self.workCounters = workCounters
     self.inputToCommitFirstMs = inputToCommitFirstMs
     self.inputToCommitLastMs = inputToCommitLastMs
     self.committedAtMs = committedAtMs

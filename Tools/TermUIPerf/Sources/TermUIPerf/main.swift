@@ -39,6 +39,10 @@ private func run(arguments: [String]) async throws {
     for scenarioName in PerfScenarioName.allNames {
       print(scenarioName)
     }
+  case .bench(let config):
+    let outcome = try await BenchCommand.run(config)
+    print(BenchCommand.format(outcome.report))
+    print("report: \(outcome.reportURL.path)")
   case .run(let config):
     let outcome = try await RunCommand.run(config)
     for result in outcome.perIteration {

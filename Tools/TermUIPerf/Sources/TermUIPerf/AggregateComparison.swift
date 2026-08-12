@@ -176,6 +176,11 @@ extension CompareCommand {
       metricComparison(
         "pipeline p50 ms", base.pipelineP50Ms, candidate.pipelineP50Ms, sigma),
     ]
+      + deterministicCounterMetricComparisons(
+        base: base,
+        candidate: candidate,
+        sigma: sigma
+      )
     guard let aaEnvelope else {
       return AggregateComparison(scenario: base.scenario, metrics: metrics)
     }
@@ -215,6 +220,34 @@ extension CompareCommand {
     return within
       ? " [inside recorded A/A ±\(percent)%]"
       : " [OUTSIDE recorded A/A ±\(percent)%]"
+  }
+
+  /// Report-only rows for the deterministic work counters (plan
+  /// 2026-08-11-005 Stage 0), named `counter <name>` so they can never
+  /// collide with — or accidentally join — the wall-clock watch list in
+  /// `regressionWatchedMetrics`. A counter present on one side only falls
+  /// out as `oneSided` through the shared machinery. They remain nameable by
+  /// `--require-improvement` (e.g. `counter-measured-computed`), which is a
+  /// deliberate seam: a work-count win is exactly the kind of improvement a
+  /// gated compare can certify without a wall clock.
+  private static func deterministicCounterMetricComparisons(
+    base: PerfAggregateSummary,
+    candidate: PerfAggregateSummary,
+    sigma: Double
+  ) -> [AggregateMetricComparison] {
+    let baseCounters = base.deterministicCounters ?? [:]
+    let candidateCounters = candidate.deterministicCounters ?? [:]
+    return Set(baseCounters.keys)
+      .union(candidateCounters.keys)
+      .sorted()
+      .map { name in
+        metricComparison(
+          "counter \(name)",
+          baseCounters[name] ?? PerfStat(values: []),
+          candidateCounters[name] ?? PerfStat(values: []),
+          sigma
+        )
+      }
   }
 
   /// Compares one metric. The noise band is `sigma * max(base.stddev,

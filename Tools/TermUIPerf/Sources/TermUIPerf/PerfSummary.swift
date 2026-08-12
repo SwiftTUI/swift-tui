@@ -155,6 +155,9 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   public var completedDropCount: Int
   public var customLayoutFallbackCount: Int
   public var layoutDependentMainActorFallbackCount: Int
+  /// Run-total deterministic work counters (plan 2026-08-11-005 Stage 0).
+  /// `nil` for artifacts recorded before the counters existed.
+  public var deterministicCounters: PerfDeterministicCounters?
 
   public init(
     scenario: String,
@@ -218,7 +221,8 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     rasterReuseBarrierCounts: [String: Int] = [:],
     completedDropCount: Int,
     customLayoutFallbackCount: Int,
-    layoutDependentMainActorFallbackCount: Int
+    layoutDependentMainActorFallbackCount: Int,
+    deterministicCounters: PerfDeterministicCounters? = nil
   ) {
     self.incrementalRasterFrameCount = incrementalRasterFrameCount
     self.repairedIncrementalRasterFrameCount = repairedIncrementalRasterFrameCount
@@ -282,6 +286,7 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     self.completedDropCount = completedDropCount
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.layoutDependentMainActorFallbackCount = layoutDependentMainActorFallbackCount
+    self.deterministicCounters = deterministicCounters
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -348,6 +353,7 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     case completedDropCount = "completed_drop_count"
     case customLayoutFallbackCount = "custom_layout_fallback_count"
     case layoutDependentMainActorFallbackCount = "layout_dependent_main_actor_fallback_count"
+    case deterministicCounters = "deterministic_counters"
   }
 
   public init(from decoder: Decoder) throws {
@@ -547,6 +553,12 @@ public struct PerfSummary: Codable, Equatable, Sendable {
       layoutDependentMainActorFallbackCount: try container.decode(
         Int.self,
         forKey: .layoutDependentMainActorFallbackCount
+      ),
+      // decodeIfPresent: a summary recorded before the deterministic counters
+      // existed is a valid artifact that simply has nothing to say about them.
+      deterministicCounters: try container.decodeIfPresent(
+        PerfDeterministicCounters.self,
+        forKey: .deterministicCounters
       )
     )
   }

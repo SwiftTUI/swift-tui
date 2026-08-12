@@ -162,6 +162,27 @@ enum PerfFrameDiagnosticsTSVReader {
           damageCells: optionalInt("damage_cells", fields, column),
           coalescedEventBatches: int("coalesced_event_batches", fields, column)
         ),
+        workCounters: PerfFrameWorkCounters(
+          // Fraction columns (`computed/total`): only the numerator is work.
+          resolvedComputed: fractionNumerator("resolved_computed", fields, column),
+          resolvedReused: fractionNumerator("resolved_reused", fields, column),
+          measuredComputed: fractionNumerator("measured_computed", fields, column),
+          drawNodes: optionalInt("draw_nodes", fields, column),
+          builtinContainerMeasures: optionalInt(
+            "builtin_container_measures", fields, column),
+          builtinChildMeasureRequests: optionalInt(
+            "builtin_child_measure_requests", fields, column),
+          builtinChildMeasureRequestsProbe: optionalInt(
+            "builtin_child_measure_requests_probe", fields, column),
+          customContainerMeasures: optionalInt(
+            "custom_container_measures", fields, column),
+          customChildMeasureRequests: optionalInt(
+            "custom_child_measure_requests", fields, column),
+          customChildMeasureRequestsProbe: optionalInt(
+            "custom_child_measure_requests_probe", fields, column),
+          customPlacementChildMeasureRequests: optionalInt(
+            "custom_placement_child_measure_requests", fields, column)
+        ),
         inputToCommitFirstMs: double("input_to_commit_first_ms", fields, column),
         inputToCommitLastMs: double("input_to_commit_last_ms", fields, column),
         committedAtMs: double("committed_at_ms", fields, column),
@@ -212,6 +233,23 @@ enum PerfFrameDiagnosticsTSVReader {
       return nil
     }
     return fields[index]
+  }
+
+  /// The numerator of a `computed/total` fraction column, or `nil` when the
+  /// column is absent. The whole value is also accepted as a plain integer so
+  /// a hand-written test fixture need not fabricate a denominator.
+  private static func fractionNumerator(
+    _ name: String,
+    _ fields: [String],
+    _ column: [String: Int]
+  ) -> Int? {
+    guard let value = rawField(name, fields, column), value != "-", !value.isEmpty else {
+      return nil
+    }
+    guard let slash = value.firstIndex(of: "/") else {
+      return Int(value)
+    }
+    return Int(value[value.startIndex..<slash])
   }
 
   /// An integer column that distinguishes absent/`-` from zero.

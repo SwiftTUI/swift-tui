@@ -127,7 +127,11 @@ public enum SummaryReducer {
       customLayoutFallbackCount: frames.reduce(0) { $0 + $1.customLayoutFallbacks },
       layoutDependentMainActorFallbackCount: frames.reduce(0) {
         $0 + $1.layoutDependentMainActorFallbacks
-      }
+      },
+      deterministicCounters: PerfDeterministicCounters.reduce(
+        frames: frames,
+        committedFrameCount: committedFrameCount
+      )
     )
   }
 

@@ -126,6 +126,12 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   public var headResolveCheckpointRestoreP50Ms: PerfStat
   public var headAnimationProcessResolvedTreeP50Ms: PerfStat
   public var headAnimationApplyInterpolationsP50Ms: PerfStat
+  /// Cross-iteration stats for the run-total deterministic work counters
+  /// (plan 2026-08-11-005 Stage 0), keyed by counter name (the `frames.tsv`
+  /// column vocabulary). A deterministic lane shows `min == max` for every
+  /// entry; spread here is itself a finding. `nil` for aggregates recorded
+  /// before the counters existed.
+  public var deterministicCounters: [String: PerfStat]?
 
   public init(
     scenario: String,
@@ -155,7 +161,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     headGraphCheckpointRestoreP50Ms: PerfStat = PerfStat(values: []),
     headResolveCheckpointRestoreP50Ms: PerfStat = PerfStat(values: []),
     headAnimationProcessResolvedTreeP50Ms: PerfStat = PerfStat(values: []),
-    headAnimationApplyInterpolationsP50Ms: PerfStat = PerfStat(values: [])
+    headAnimationApplyInterpolationsP50Ms: PerfStat = PerfStat(values: []),
+    deterministicCounters: [String: PerfStat]? = nil
   ) {
     self.scenario = scenario
     self.renderMode = renderMode
@@ -185,6 +192,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.headResolveCheckpointRestoreP50Ms = headResolveCheckpointRestoreP50Ms
     self.headAnimationProcessResolvedTreeP50Ms = headAnimationProcessResolvedTreeP50Ms
     self.headAnimationApplyInterpolationsP50Ms = headAnimationApplyInterpolationsP50Ms
+    self.deterministicCounters = deterministicCounters
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -219,6 +227,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
       "head_animation_process_resolved_tree_p50_ms"
     case headAnimationApplyInterpolationsP50Ms =
       "head_animation_apply_interpolations_p50_ms"
+    case deterministicCounters = "deterministic_counters"
   }
 
   public init(from decoder: Decoder) throws {
@@ -308,7 +317,11 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
       headAnimationApplyInterpolationsP50Ms: try container.decodeIfPresent(
         PerfStat.self,
         forKey: .headAnimationApplyInterpolationsP50Ms
-      ) ?? PerfStat(values: [])
+      ) ?? PerfStat(values: []),
+      deterministicCounters: try container.decodeIfPresent(
+        [String: PerfStat].self,
+        forKey: .deterministicCounters
+      )
     )
   }
 }
@@ -359,7 +372,26 @@ public enum AggregateReducer {
       headAnimationProcessResolvedTreeP50Ms: PerfStat(
         values: summaries.compactMap(\.headAnimationProcessResolvedTreeMs.p50)),
       headAnimationApplyInterpolationsP50Ms: PerfStat(
-        values: summaries.compactMap(\.headAnimationApplyInterpolationsMs.p50)))
+        values: summaries.compactMap(\.headAnimationApplyInterpolationsMs.p50)),
+      deterministicCounters: reduceDeterministicCounters(summaries))
+  }
+
+  /// One `PerfStat` per counter name over the iterations that recorded it.
+  /// `nil` when no iteration carried counters at all (pre-counter artifacts).
+  private static func reduceDeterministicCounters(
+    _ summaries: [PerfSummary]
+  ) -> [String: PerfStat]? {
+    let perIteration = summaries.compactMap { $0.deterministicCounters?.valuesByName }
+    guard !perIteration.isEmpty else {
+      return nil
+    }
+    var stats: [String: PerfStat] = [:]
+    for name in Set(perIteration.flatMap(\.keys)) {
+      stats[name] = PerfStat(
+        values: perIteration.compactMap { $0[name] }.map(Double.init)
+      )
+    }
+    return stats
   }
 }
 
@@ -418,7 +450,31 @@ extension AggregateReducer {
         aggregate.headAnimationApplyInterpolationsP50Ms
       )
     )
+    if let counters = aggregate.deterministicCounters, !counters.isEmpty {
+      lines.append("deterministic counters (run totals):")
+      for name in counters.keys.sorted() {
+        guard let stat = counters[name] else {
+          continue
+        }
+        lines.append("  \(name): \(counterLine(stat))")
+      }
+    }
     return lines.joined(separator: "\n")
+  }
+
+  /// `1234 (stable, n=20)` when every iteration agreed, else the spread —
+  /// the deterministic lanes read `stable`; anything else is drift worth
+  /// seeing before the Stage-3 ratchet formalizes it as a failure.
+  private static func counterLine(_ stat: PerfStat) -> String {
+    guard stat.sampleCount > 0 else {
+      return "n/a (0 samples)"
+    }
+    if stat.min == stat.max {
+      return "\(Int(stat.min)) (stable, n=\(stat.sampleCount))"
+    }
+    return
+      "median \(Int(stat.median)) [\(Int(stat.min))..\(Int(stat.max))] "
+      + "(VARIES, n=\(stat.sampleCount))"
   }
 
   private static func line(_ label: String, _ stat: PerfStat) -> String {

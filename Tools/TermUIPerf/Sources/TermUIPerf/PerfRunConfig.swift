@@ -4,6 +4,7 @@ import SwiftTUI
 public enum TermUIPerfCommand: Equatable, Sendable {
   case run(PerfRunConfig)
   case compare(PerfCompareConfig)
+  case bench(PerfBenchConfig)
   case listScenarios
 }
 
@@ -139,9 +140,9 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
   public var description: String {
     switch self {
     case .missingCommand:
-      return "missing command. Use run, compare, or list-scenarios."
+      return "missing command. Use run, compare, bench, or list-scenarios."
     case .unknownCommand(let command):
-      return "unknown command '\(command)'. Use run, compare, or list-scenarios."
+      return "unknown command '\(command)'. Use run, compare, bench, or list-scenarios."
     case .missingRequiredOption(let option):
       return "missing required option \(option)."
     case .missingValue(let option):
@@ -199,6 +200,8 @@ public enum PerfCommandParser {
       return .run(try parseRun(remainingArguments))
     case "compare":
       return .compare(try parseCompare(remainingArguments))
+    case "bench":
+      return .bench(try parseBench(remainingArguments))
     case "list-scenarios":
       try rejectArguments(remainingArguments)
       return .listScenarios
@@ -270,6 +273,49 @@ public enum PerfCommandParser {
       terminalSize: terminalSize,
       tag: tag,
       aaCheck: aaCheck
+    )
+  }
+
+  private static func parseBench(_ arguments: [String]) throws -> PerfBenchConfig {
+    var artifactsRoot = PerfBenchConfig.defaultArtifactsRoot
+    var configuration = PerfRunConfig.defaultConfiguration
+    var warmIterations = PerfBenchConfig.defaultWarmIterations
+    var members: [PerfScenarioName]?
+
+    var index = arguments.startIndex
+    while index < arguments.endIndex {
+      let argument = arguments[index]
+      switch argument {
+      case "--artifacts-root":
+        artifactsRoot = try value(after: argument, in: arguments, at: &index)
+      case "--configuration":
+        configuration = try value(after: argument, in: arguments, at: &index)
+      case "--iterations":
+        let value = try value(after: argument, in: arguments, at: &index)
+        guard let parsedIterations = Int(value), parsedIterations > 0 else {
+          throw PerfParseError.invalidIterations(value)
+        }
+        warmIterations = parsedIterations
+      case "--member":
+        let value = try value(after: argument, in: arguments, at: &index)
+        guard let parsedScenario = PerfScenarioName(rawValue: value) else {
+          throw PerfParseError.unknownScenario(value)
+        }
+        members = (members ?? []) + [parsedScenario]
+      default:
+        if argument.hasPrefix("-") {
+          throw PerfParseError.unknownOption(argument)
+        }
+        throw PerfParseError.unexpectedArgument(argument)
+      }
+      index = arguments.index(after: index)
+    }
+
+    return PerfBenchConfig(
+      artifactsRoot: artifactsRoot,
+      configuration: configuration,
+      warmIterations: warmIterations,
+      members: members
     )
   }
 

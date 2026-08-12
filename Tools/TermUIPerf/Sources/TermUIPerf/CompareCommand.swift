@@ -26,6 +26,32 @@ public struct SummaryComparison: Equatable, Sendable {
   public var completedDropCountDelta: Int
   public var customLayoutFallbackCountDelta: Int
   public var layoutDependentMainActorFallbackCountDelta: Int
+  /// Deterministic counter totals side by side (plan 2026-08-11-005
+  /// Stage 0), one row per counter either run recorded. Report-only here;
+  /// the hard gate on these is the Stage-3 `bench` ratchet.
+  public var deterministicCounterDeltas: [PerfCounterDelta]
+}
+
+/// One run-total deterministic counter compared across two runs. A side is
+/// `nil` when that run did not record the counter — printed as one-sided
+/// rather than fabricating a zero baseline.
+public struct PerfCounterDelta: Equatable, Sendable {
+  public var name: String
+  public var base: Int?
+  public var candidate: Int?
+
+  public init(name: String, base: Int?, candidate: Int?) {
+    self.name = name
+    self.base = base
+    self.candidate = candidate
+  }
+
+  public var delta: Int? {
+    guard let base, let candidate else {
+      return nil
+    }
+    return candidate - base
+  }
 }
 
 /// A comparison the tool refuses to make rather than silently mis-certify.
@@ -131,12 +157,54 @@ public enum CompareCommand {
       customLayoutFallbackCountDelta: candidate.customLayoutFallbackCount
         - base.customLayoutFallbackCount,
       layoutDependentMainActorFallbackCountDelta: candidate.layoutDependentMainActorFallbackCount
-        - base.layoutDependentMainActorFallbackCount
+        - base.layoutDependentMainActorFallbackCount,
+      deterministicCounterDeltas: deterministicCounterDeltas(
+        base: base,
+        candidate: candidate
+      )
     )
     return comparison
   }
 
+  /// One row per counter either side recorded, sorted by name so two compares
+  /// of the same runs print identically.
+  static func deterministicCounterDeltas(
+    base: PerfSummary,
+    candidate: PerfSummary
+  ) -> [PerfCounterDelta] {
+    let baseValues = base.deterministicCounters?.valuesByName ?? [:]
+    let candidateValues = candidate.deterministicCounters?.valuesByName ?? [:]
+    return Set(baseValues.keys)
+      .union(candidateValues.keys)
+      .sorted()
+      .map { name in
+        PerfCounterDelta(name: name, base: baseValues[name], candidate: candidateValues[name])
+      }
+  }
+
   public static func format(_ comparison: SummaryComparison) -> String {
+    var lines = [formatHeadline(comparison)]
+    if !comparison.deterministicCounterDeltas.isEmpty {
+      lines.append("deterministic counters (run totals):")
+      for counter in comparison.deterministicCounterDeltas {
+        lines.append("  \(formatCounterDelta(counter))")
+      }
+    }
+    return lines.joined(separator: "\n")
+  }
+
+  /// `measured_computed: 4701 -> 1039 (-3662)`, with `-` and a one-sided
+  /// note when only one run recorded the counter.
+  private static func formatCounterDelta(_ counter: PerfCounterDelta) -> String {
+    let base = counter.base.map(String.init) ?? "-"
+    let candidate = counter.candidate.map(String.init) ?? "-"
+    guard let delta = counter.delta else {
+      return "\(counter.name): \(base) -> \(candidate) (one-sided: counter missing on one run)"
+    }
+    return "\(counter.name): \(base) -> \(candidate) (\(formatSigned(delta)))"
+  }
+
+  private static func formatHeadline(_ comparison: SummaryComparison) -> String {
     """
     scenario: \(comparison.base.scenario)
     base mode: \(comparison.base.renderMode)
