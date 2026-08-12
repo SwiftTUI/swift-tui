@@ -1905,9 +1905,21 @@ package final class ViewGraph {
     {
       return
     }
+    // `lastHomedEntityIdentity` is the lowest-priority occupant signal: a
+    // released former occupant. The frame barrier releases an unmounted
+    // chain's entity from the routing table, and the empty-branch recommit
+    // drops it from the committed value — but the surviving branch-host node
+    // keeps the collapsed chain's state slots. Without the breadcrumb, the
+    // next `.id` generation's claim sees no occupant, skips the reset, and
+    // reads the departed content's final `@State` values (the counter-ripple
+    // wedge: the second ripple mounts with `progress == 1.0`, its
+    // `withAnimation` write is a no-op, and the empty batch's completion
+    // never fires). Same-entity re-claims still keep their slots — the
+    // deliberate transparent-chain continuity.
     let existingEntityIdentity =
       node.committed.entityIdentity
       ?? entityRoutingTable.entityByNodeID[node.viewNodeID]
+      ?? node.lastHomedEntityIdentity
     if let existingEntityIdentity,
       existingEntityIdentity != entityIdentity
     {

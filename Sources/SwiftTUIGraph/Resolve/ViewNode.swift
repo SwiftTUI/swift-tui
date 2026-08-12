@@ -98,7 +98,7 @@ package final class ViewNode {
   }
 
   /// Retained per-node state, grouped so checkpoint/restore move it as a unit
-  /// (see ``PersistentState`` in ViewNodeFieldGroups.swift). The five fields are
+  /// (see ``PersistentState`` in ViewNodeFieldGroups.swift). The six fields are
   /// computed forwarders preserving their names and `package private(set)`.
   private var persistentState = PersistentState() {
     didSet { recordCheckpointMutation() }
@@ -119,6 +119,20 @@ package final class ViewNode {
   package private(set) var registeredHandlers: NodeHandlers {
     get { persistentState.registeredHandlers }
     set { persistentState.registeredHandlers = newValue }
+  }
+  package private(set) var lastHomedEntityIdentity: EntityIdentity? {
+    get { persistentState.lastHomedEntityIdentity }
+    set { persistentState.lastHomedEntityIdentity = newValue }
+  }
+
+  /// Records the entity this node currently homes — see
+  /// ``PersistentState/lastHomedEntityIdentity`` for why the record outlives
+  /// the route's release.
+  package func noteHomedEntityIdentity(_ entity: EntityIdentity) {
+    guard lastHomedEntityIdentity != entity else {
+      return
+    }
+    lastHomedEntityIdentity = entity
   }
 
   package var isDirty: Bool {
@@ -2229,6 +2243,7 @@ extension ViewNode {
       dependencies: dependencies,
       lifecycleState: lifecycleState,
       registeredHandlers: registeredHandlers.debugTotalStateSnapshot(),
+      lastHomedEntityIdentity: lastHomedEntityIdentity,
       isDirty: isDirty,
       wasPresentAtFrameStart: wasPresentAtFrameStart,
       wasVisitedThisFrame: wasVisitedThisFrame,

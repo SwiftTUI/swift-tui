@@ -49,6 +49,7 @@ extension ViewNode {
     package var dependencies: DependencySet
     package var lifecycleState: NodeLifecycleState
     package var registeredHandlers: HandlerSnapshot
+    package var lastHomedEntityIdentity: EntityIdentity?
     package var isDirty: Bool
     package var wasPresentAtFrameStart: Bool
     package var wasVisitedThisFrame: Bool

@@ -119,5 +119,17 @@ extension ViewNode {
     package var lifecycleState: NodeLifecycleState = .alive
     package var registeredHandlers: NodeHandlers = .init()
     package var pendingChangeHandlerIDs: [String] = []
+    /// The most recent entity this node homed (recorded by every
+    /// `bindEntityRoute`), deliberately NOT cleared when the frame barrier
+    /// releases an inactive route. A collapsed `.id` chain folds its state
+    /// slots onto this node; when the chain unmounts, the barrier releases
+    /// the entity but the node survives (it is the branch host, visited every
+    /// frame), so the routing table and the committed value both forget the
+    /// occupant while its slots remain. This breadcrumb lets the next claim
+    /// (`prepareEntityRoutedOwner`) recognize that a *different* entity's
+    /// state is still parked here and fire the foreign-occupant reset —
+    /// without it, a remount under a new `.id` reads the departed content's
+    /// final `@State` values (the 0.8.7 counter-ripple wedge).
+    package var lastHomedEntityIdentity: EntityIdentity? = nil
   }
 }

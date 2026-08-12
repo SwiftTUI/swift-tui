@@ -119,6 +119,83 @@ struct BranchMountTaskSingleStartTests {
     )
   }
 
+  /// Counter-demo ripple repro (0.8.7 diagnosis): the CURRENT counter keys
+  /// each ripple mount with `.id(rippleID)` inside the branch. A remount
+  /// under a *different* explicit id must read fresh `@State` — SwiftUI
+  /// destroys state on unmount and an id change re-keys identity besides.
+  /// The probed 0.8.7 counter build showed the second mount's task reading
+  /// `progress = 1.0` (the first mount's final value): the `.id` chain's
+  /// state slots collapse onto the surviving branch-host node, the entity
+  /// release at the unmount barrier leaves them behind, and the next id's
+  /// claim finds no foreign occupant to trigger the reset. The stale value
+  /// makes the ripple's `withAnimation { progress = 1 }` a no-op write —
+  /// an empty batch whose completion never fires, wedging the app's
+  /// `activeRippleID` guard forever.
+  @Test("explicit-.id branch remount reads fresh @State")
+  func explicitIDRemountReadsFreshState() async throws {
+    let terminal = BranchTaskRecordingHost(
+      surfaceSize: .init(width: 60, height: 8)
+    )
+    let recorder = BranchTaskRunRecorder(signal: terminal.frameSignal)
+    let awaitPaneDone: @MainActor @Sendable (Int) async -> Void = {
+      [frameSignal = terminal.frameSignal] generation in
+      await frameSignal.wait {
+        terminal.frames.contains { $0.contains("pane \(generation) done") }
+      }
+    }
+    let inputReader = BranchTaskAwaitedInputReader(
+      frameSignal: terminal.frameSignal,
+      steps: [
+        .awaitCondition {
+          terminal.frames.contains { $0.contains("count 0") }
+        },
+        .press(KeyPress(.return)),
+        .awaitCondition {
+          recorder.activeTransitions == [true, false]
+        },
+        .press(KeyPress(.return)),
+        .awaitCondition {
+          recorder.activeTransitions == [true, false, true, false]
+        },
+        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+      ])
+    let rootIdentity = testIdentity("ExplicitIDBranchMountRoot")
+    let runLoop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      inputReader: inputReader,
+      signalReader: BranchTaskEmptySignalReader(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: .init(width: 60, height: 8),
+      viewBuilder: { _, _ in
+        ExplicitIDBranchMountProbe(recorder: recorder) { generation, dismiss in
+          PlainBranchTaskPane(
+            generation: generation,
+            recorder: recorder,
+            awaitPaneDone: awaitPaneDone,
+            onCompletion: dismiss
+          )
+        }
+      }
+    )
+
+    let result = try await runLoop.run()
+    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(
+      recorder.startCount(generation: 1) == 1
+        && recorder.startCount(generation: 2) == 1,
+      "one start per mount expected; recorded starts: \(recorder.startDescriptions)"
+    )
+    #expect(
+      recorder.starts.allSatisfy { $0.progress == 0 },
+      "every mount must read fresh @State; recorded starts: \(recorder.startDescriptions)"
+    )
+  }
+
   /// Runs one launch: mount the pane (return press), let its task finish and
   /// dismiss it, remount (second return press), dismiss again, then exit.
   /// Returns a failure description for harness-level breakage, nil otherwise.
@@ -231,6 +308,46 @@ private struct BranchMountTaskProbe<Pane: View>: View {
         makePane(count) {
           active = false
         }
+      }
+    }
+  }
+}
+
+/// Mirrors the CURRENT (0.7.1+) `CounterView`: the mount guard is an
+/// optional ripple id (`activeRippleID`), and the branch keys the pane with
+/// `.id(id)` so each ripple is a distinct explicit identity. The pane's
+/// dismissal clears the guard only while its own id is still active.
+private struct ExplicitIDBranchMountProbe<Pane: View>: View {
+  let recorder: BranchTaskRunRecorder
+  let makePane: @MainActor (Int, @escaping @MainActor @Sendable () -> Void) -> Pane
+
+  @State private var count = 0
+  @State private var activeID: Int? = nil
+
+  var body: some View {
+    VStack(spacing: 1) {
+      Text("count \(count)")
+      Button("Increment") {
+        count += 1
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .onChange(of: count) {
+      if activeID == nil {
+        activeID = count
+      }
+    }
+    .onChange(of: activeID) {
+      recorder.recordActive(activeID != nil)
+    }
+    .background {
+      if let id = activeID {
+        makePane(id) {
+          if activeID == id {
+            activeID = nil
+          }
+        }
+        .id(id)
       }
     }
   }

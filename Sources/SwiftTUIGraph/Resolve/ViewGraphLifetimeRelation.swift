@@ -107,7 +107,8 @@ extension ViewGraph {
     to nodeID: ViewNodeID
   ) {
     entityRoutingTable.bind(entity, to: nodeID)
-    if nodeIfExists(for: nodeID) != nil {
+    if let node = nodeIfExists(for: nodeID) {
+      node.noteHomedEntityIdentity(entity)
       lifetimeAnchors.rehomeEntity(entity, to: nodeID)
     } else {
       lifetimeAnchors.removeEntityHome(for: nodeID)
