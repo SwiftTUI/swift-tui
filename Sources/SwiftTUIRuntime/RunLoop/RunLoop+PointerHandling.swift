@@ -15,6 +15,16 @@ extension RunLoop {
     case .moved:
       break
     }
+    // A fresh press or a deliberate pan supersedes any click-restore record
+    // from a previous press (the record must only ever describe the latest
+    // press). `.up` keeps it: the frame that decides whether the clicked
+    // region survived lands after the release.
+    switch mouseEvent.kind {
+    case .down, .dragged, .scrolled:
+      pendingClickFocusRestore = nil
+    case .up, .moved:
+      break
+    }
     switch mouseEvent.kind {
     case .down(let button):
       handleMouseDown(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
@@ -66,8 +76,11 @@ extension RunLoop {
     }
 
     // Remember where the press began so a later drag can measure whether it
-    // crossed the scroll-takeover threshold (see attemptDragThresholdTransfer…).
-    pointerInteraction.beginPress(at: location)
+    // crossed the scroll-takeover threshold (see attemptDragThresholdTransfer…),
+    // and the focused values it began under so the release activation can
+    // dispatch against the focus state the user acted on (the click-to-focus
+    // below moves focus before `.up` fires the action).
+    pointerInteraction.beginPress(at: location, focusedValues: currentFocusedValues)
 
     // A fresh press inside a flinging scroll view stops the fling (touch-to-stop),
     // and seeds the pan-velocity sampler so a drag that becomes a pan can measure
@@ -94,6 +107,7 @@ extension RunLoop {
       if let focusIdentity = hitTarget.focusIdentity,
         shouldClickFocus(focusIdentity, at: location)
       {
+        recordClickFocusRestore(landing: focusIdentity)
         _ = focusTracker.setFocus(to: focusIdentity)
       }
       if shouldCapturePointer(routeID: hitTarget.region.routeID) {
@@ -118,6 +132,7 @@ extension RunLoop {
     if let focusIdentity = hitTarget.focusIdentity,
       shouldClickFocus(focusIdentity, at: location)
     {
+      recordClickFocusRestore(landing: focusIdentity)
       _ = focusTracker.setFocus(to: focusIdentity)
       pointerInteraction.arm(hitTarget.region.routeID, usesPointerHandler: false)
       setPressedIdentity(focusIdentity, transient: false)
@@ -259,15 +274,41 @@ extension RunLoop {
     }
   }
 
+  /// Records the pre-press focus as the restore target for a click-focus move
+  /// about to land on `landing`, so a landed region that vanishes on its first
+  /// rendered frame (a control revoking its own focusability as a consequence
+  /// of receiving focus) returns focus whence it came. See
+  /// `RunLoop.pendingClickFocusRestore`.
+  private func recordClickFocusRestore(landing: Identity) {
+    guard let origin = focusTracker.currentFocusIdentity, origin != landing else {
+      pendingClickFocusRestore = nil
+      return
+    }
+    pendingClickFocusRestore = PendingClickFocusRestore(
+      landedIdentity: landing,
+      originIdentity: origin
+    )
+  }
+
   private func dispatchReleaseActivation(
     identity: Identity,
     hitOwnerNodeID: ViewNodeID?
   ) {
     let invalidationsBeforeDispatch = schedulerPendingInvalidations()
-    let handled = dispatchActivationAction(
-      identity: identity,
-      hitOwnerNodeID: hitOwnerNodeID
-    )
+    // Dispatch under the press-time focused values: the press moved focus
+    // (click-to-focus) before this release, and a frame in between can have
+    // re-seated focus again (a control disabling itself once the publisher
+    // lost focus drops its region), so the live set here can describe a
+    // control the user never acted on. See
+    // `PointerInteractionState.pressFocusedValues`.
+    let handled = LiveFocusedValuesRegistry.withFocusedValuesOverride(
+      pointerInteraction.pressFocusedValues
+    ) {
+      dispatchActivationAction(
+        identity: identity,
+        hitOwnerNodeID: hitOwnerNodeID
+      )
+    }
     if handled {
       recordFollowUpInvalidation(
         for: identity,

@@ -15,6 +15,7 @@ import SwiftTUICore
 @MainActor
 package enum LiveFocusedValuesRegistry {
   private static var providersByScope: [StateGraphScopeID: @MainActor () -> FocusedValues?] = [:]
+  private static var overrideFocusedValues: FocusedValues?
 
   /// Records the live provider for `scope`, sweeping entries whose provider
   /// has died (returns `nil`). Idempotent — a run loop re-registers under the
@@ -28,10 +29,36 @@ package enum LiveFocusedValuesRegistry {
   }
 
   /// The live focused values for `scope`, or `nil` when no live provider is
-  /// registered (snapshot values remain the best available).
+  /// registered (snapshot values remain the best available). An active
+  /// ``withFocusedValuesOverride(_:_:)`` scope wins over the provider.
   package static func currentFocusedValues(
     for scope: StateGraphScopeID
   ) -> FocusedValues? {
-    providersByScope[scope]?()
+    if let overrideFocusedValues {
+      return overrideFocusedValues
+    }
+    return providersByScope[scope]?()
+  }
+
+  /// Runs `body` with `values` substituted as the live focused values for
+  /// every scope, so `@FocusedValue`/`@FocusedBinding` reads inside the
+  /// dispatched callbacks observe a caller-chosen moment instead of the
+  /// provider's current set. A pointer release activation dispatches under
+  /// the focused values captured when its press began: the press itself
+  /// moves focus (click-to-focus) before the release fires the action, so
+  /// the live set at fire time can describe a re-seated focus state the
+  /// user never acted on. `nil` runs `body` without substitution; the
+  /// override is scoped to the synchronous call.
+  package static func withFocusedValuesOverride<Result>(
+    _ values: FocusedValues?,
+    _ body: () throws -> Result
+  ) rethrows -> Result {
+    guard let values else {
+      return try body()
+    }
+    let saved = overrideFocusedValues
+    overrideFocusedValues = values
+    defer { overrideFocusedValues = saved }
+    return try body()
   }
 }

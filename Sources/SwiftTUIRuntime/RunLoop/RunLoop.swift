@@ -62,6 +62,13 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// backward into the scope, which would trap the Tab cycle. See
   /// ``processFocusSyncIteration(_:convergence:)``.
   package var pendingFocusTraversal: PendingFocusTraversal?
+  /// The most recent click-focus move, kept until the next input event. If
+  /// the region the click landed on vanishes from the semantic snapshot
+  /// before any further input — the same self-revoking class as
+  /// ``pendingFocusTraversal`` — focus returns to the control focused when
+  /// the press began instead of being re-seated into the scope. See
+  /// ``processFocusSyncIteration(_:convergence:)``.
+  package var pendingClickFocusRestore: PendingClickFocusRestore?
   package var currentFocusPresentation: FocusPresentation = .none
   package var currentFocusedValues = FocusedValues()
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []

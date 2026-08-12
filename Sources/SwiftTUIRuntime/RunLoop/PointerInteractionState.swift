@@ -33,6 +33,18 @@ package struct PointerInteractionState: Equatable, Sendable {
   /// the press origin. Set on `.down`, cleared on `.up`.
   package private(set) var dragStartLocation: PointerLocation?
 
+  /// The focused values current when the active press began, so a release
+  /// activation can dispatch against the focus state the user acted on. The
+  /// press itself moves focus (click-to-focus) before `.up` dispatches the
+  /// action, and that move can cascade: a consumer control that disables
+  /// itself when a publisher loses focus drops its focus region, and the
+  /// tracker re-seats focus elsewhere. By release time the *live* focused
+  /// values can therefore describe a control the user never acted on (the
+  /// gallery Focus Context bug: the re-seat landed on the first field, so
+  /// "Mark focused reviewed" always mutated the first field). Retained like
+  /// `dragStartLocation`; set on `.down`, cleared on `.up`.
+  package private(set) var pressFocusedValues: FocusedValues?
+
   /// Role-aware recognition produced by a scheduler deadline while this
   /// pointer stream is still down. A deadline-driven recognizer can be
   /// terminal (and re-authored) before `.up`, so the release cannot recover
@@ -57,10 +69,15 @@ package struct PointerInteractionState: Equatable, Sendable {
     capturedRouteID ?? armedRouteID
   }
 
-  /// Record where a fresh press began. The routing decision (``arm(_:usesPointerHandler:)``
-  /// or ``capture(_:)``) follows once the hit target is classified.
-  package mutating func beginPress(at location: PointerLocation) {
+  /// Record where a fresh press began and the focused values it began under.
+  /// The routing decision (``arm(_:usesPointerHandler:)`` or ``capture(_:)``)
+  /// follows once the hit target is classified.
+  package mutating func beginPress(
+    at location: PointerLocation,
+    focusedValues: FocusedValues
+  ) {
     dragStartLocation = location
+    pressFocusedValues = focusedValues
     deadlineDispatchOutcome = nil
     pointerHandlerIdentity = nil
   }
@@ -162,6 +179,7 @@ package struct PointerInteractionState: Equatable, Sendable {
     armedRouteUsesPointerHandler = false
     capturedRouteID = nil
     dragStartLocation = nil
+    pressFocusedValues = nil
     deadlineDispatchOutcome = nil
     pointerHandlerIdentity = nil
   }

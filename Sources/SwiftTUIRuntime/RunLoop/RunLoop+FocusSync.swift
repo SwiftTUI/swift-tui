@@ -17,6 +17,14 @@ extension RunLoop {
     var regionsAtTraversal: [FocusRegion]
   }
 
+  package struct PendingClickFocusRestore {
+    /// The focus region identity the click-focus landed on.
+    var landedIdentity: Identity
+    /// The identity focused when the press began — the restore target if the
+    /// landed region vanishes before any further input.
+    var originIdentity: Identity
+  }
+
   /// Runs `move` (a `FocusTracker` traversal) and records it as the pending
   /// focus traversal, replacing any previous record.
   package func performFocusTraversal(
@@ -225,6 +233,29 @@ extension RunLoop {
         in: renderedArtifacts.semanticSnapshot.focusRegions
       ) {
         focusChanged = focusTracker.setFocus(to: continuation) || focusChanged
+      }
+    }
+    // Click-focus twin of the traversal continuation above: the control a
+    // press click-focused revoked its own focusability before any further
+    // input (the same self-revoking class — e.g. a consumer button that
+    // disables itself once the publishing field lost focus). The tracker's
+    // re-seat would land on an arbitrary scope entry; return focus to the
+    // control the user was in when the press began instead, so the press +
+    // release cycle leaves focus where the user had it. Kept until the next
+    // input like the traversal record — the vanish materializes only on the
+    // frame *after* the focused-values change propagates into the control's
+    // re-resolve, so the record must survive intermediate frames where the
+    // landed region is still present. Consumed on the vanish.
+    if let pending = pendingClickFocusRestore,
+      !renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+        $0.identity == pending.landedIdentity
+      })
+    {
+      pendingClickFocusRestore = nil
+      if renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+        $0.identity == pending.originIdentity
+      }) {
+        focusChanged = focusTracker.setFocus(to: pending.originIdentity) || focusChanged
       }
     }
     // Initial focus auto-adoption (nil → a control) is deliberately *not* flagged

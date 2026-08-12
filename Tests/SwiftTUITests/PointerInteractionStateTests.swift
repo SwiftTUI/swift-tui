@@ -29,7 +29,7 @@ struct PointerInteractionStateTests {
   @Test("beginPress records the origin without arming or capturing")
   func beginPressRecordsOriginOnly() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(3, 4))
+    state.beginPress(at: location(3, 4), focusedValues: FocusedValues())
     #expect(state.dragStartLocation == location(3, 4))
     #expect(state.armedRouteID == nil)
     #expect(state.capturedRouteID == nil)
@@ -39,7 +39,7 @@ struct PointerInteractionStateTests {
   @Test("arm sets the armed route and the handler flag, keeping the origin")
   func armSetsRouteAndFlag() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(3, 4))
+    state.beginPress(at: location(3, 4), focusedValues: FocusedValues())
     state.arm(route("Button"), usesPointerHandler: true)
     #expect(state.armedRouteID == route("Button"))
     #expect(state.armedRouteUsesPointerHandler == true)
@@ -52,7 +52,7 @@ struct PointerInteractionStateTests {
   @Test("capture sets the captured route and clears the armed route + flag")
   func captureClearsArmedAndFlag() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(3, 4))
+    state.beginPress(at: location(3, 4), focusedValues: FocusedValues())
     state.arm(route("Button"), usesPointerHandler: true)
     state.capture(route("Scroll"))
     #expect(state.capturedRouteID == route("Scroll"))
@@ -79,7 +79,7 @@ struct PointerInteractionStateTests {
   @Test("clearRouting drops both routes and the flag but keeps the origin")
   func clearRoutingKeepsOrigin() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(7, 8))
+    state.beginPress(at: location(7, 8), focusedValues: FocusedValues())
     state.arm(route("Button"), usesPointerHandler: true)
     state.clearRouting()
     #expect(state.armedRouteID == nil)
@@ -93,7 +93,7 @@ struct PointerInteractionStateTests {
   @Test("fallback pointer-handler identity is independent of the armed hit route")
   func fallbackHandlerIdentityIsIndependentOfArmedRoute() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(7, 8))
+    state.beginPress(at: location(7, 8), focusedValues: FocusedValues())
     state.arm(
       route("Button"),
       usesPointerHandler: true,
@@ -107,7 +107,7 @@ struct PointerInteractionStateTests {
   @Test("clearRouting releases a captured route too")
   func clearRoutingReleasesCapture() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(7, 8))
+    state.beginPress(at: location(7, 8), focusedValues: FocusedValues())
     state.capture(route("Scroll"))
     state.clearRouting()
     #expect(state.capturedRouteID == nil)
@@ -119,7 +119,7 @@ struct PointerInteractionStateTests {
   @Test("reset returns to the fully idle state including the origin")
   func resetClearsEverything() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(7, 8))
+    state.beginPress(at: location(7, 8), focusedValues: FocusedValues())
     state.capture(route("Scroll"))
     state.reset()
     #expect(state == PointerInteractionState())
@@ -130,7 +130,7 @@ struct PointerInteractionStateTests {
   @Test("deadline recognition stays role-aware until release and reset")
   func deadlineRecognitionStaysRoleAwareUntilReset() {
     var state = PointerInteractionState()
-    state.beginPress(at: location(7, 8))
+    state.beginPress(at: location(7, 8), focusedValues: FocusedValues())
     state.arm(route("Button"), usesPointerHandler: true)
     #expect(state.activeRouteID == route("Button"))
 

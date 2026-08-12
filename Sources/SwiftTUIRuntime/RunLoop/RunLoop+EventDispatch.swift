@@ -81,8 +81,10 @@ extension RunLoop {
     // traversal branches below re-record it. The record must only ever
     // describe the *latest* input, so a landing region that vanishes later
     // for unrelated reasons (a navigation push, a tab switch) keeps the
-    // tracker's ordinary re-seat behavior.
+    // tracker's ordinary re-seat behavior. The click-restore record is the
+    // pointer twin and is superseded by keyboard input the same way.
     pendingFocusTraversal = nil
+    pendingClickFocusRestore = nil
     // Scope-based keyCommand dispatch for modifier-bearing keys (plus
     // bare function keys, which never produce text and so are safe to
     // dispatch unmodified — this runs before edit-focus absorption, so
