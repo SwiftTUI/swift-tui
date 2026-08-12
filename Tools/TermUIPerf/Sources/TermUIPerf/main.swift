@@ -43,6 +43,9 @@ private func run(arguments: [String]) async throws {
     let outcome = try await BenchCommand.run(config)
     print(BenchCommand.format(outcome.report))
     print("report: \(outcome.reportURL.path)")
+    if !outcome.report.ratchetPassed {
+      exit(1)
+    }
   case .run(let config):
     let outcome = try await RunCommand.run(config)
     for result in outcome.perIteration {

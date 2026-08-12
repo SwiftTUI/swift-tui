@@ -15,19 +15,30 @@ public struct PerfBenchConfig: Equatable, Sendable {
   /// Suite subset to run; `nil` runs every member. A focused-rerun and
   /// smoke-test seam — the suite itself is defined only by `BenchSuite`.
   public var members: [PerfScenarioName]?
+  /// Rewrite the committed baseline from this run's counters instead of
+  /// failing on a mismatch. The only sanctioned way to change the baseline;
+  /// the diff is reviewed and committed with the cause named (D4).
+  public var updateBaseline: Bool
+  /// Baseline file override; `nil` uses the committed
+  /// `Baselines/bench-counters.json` beside the tool's sources.
+  public var baselinePath: String?
 
   public init(
     artifactsRoot: String = defaultArtifactsRoot,
     configuration: String = PerfRunConfig.defaultConfiguration,
     warmIterations: Int = defaultWarmIterations,
     coldIterations: Int = defaultColdIterations,
-    members: [PerfScenarioName]? = nil
+    members: [PerfScenarioName]? = nil,
+    updateBaseline: Bool = false,
+    baselinePath: String? = nil
   ) {
     self.artifactsRoot = artifactsRoot
     self.configuration = configuration
     self.warmIterations = warmIterations
     self.coldIterations = coldIterations
     self.members = members
+    self.updateBaseline = updateBaseline
+    self.baselinePath = baselinePath
   }
 }
 
@@ -76,6 +87,13 @@ public struct PerfBenchReport: Codable, Equatable, Sendable {
   /// Provenance from the first executed run (git SHA, dirty flag, toolchain,
   /// host). `nil` only if the member filter selected nothing.
   public var provenance: PerfRunMetadata?
+  /// The D4 ratchet verdicts, one row per (scenario, lane, counter) in the
+  /// ratchet scope: cold for every member, warm-sync for the closed-loop
+  /// click members.
+  public var ratchet: [PerfBenchRatchetRow]
+  public var ratchetPassed: Bool
+  /// Whether this run rewrote the baseline (`--update-baseline`).
+  public var baselineUpdated: Bool
 
   public init(
     schemaVersion: Int = Self.currentSchemaVersion,
@@ -83,7 +101,10 @@ public struct PerfBenchReport: Codable, Equatable, Sendable {
     configuration: String,
     suite: [String],
     members: [PerfBenchMemberReport],
-    provenance: PerfRunMetadata? = nil
+    provenance: PerfRunMetadata? = nil,
+    ratchet: [PerfBenchRatchetRow] = [],
+    ratchetPassed: Bool = true,
+    baselineUpdated: Bool = false
   ) {
     self.schemaVersion = schemaVersion
     self.generatedAt = generatedAt
@@ -91,6 +112,9 @@ public struct PerfBenchReport: Codable, Equatable, Sendable {
     self.suite = suite
     self.members = members
     self.provenance = provenance
+    self.ratchet = ratchet
+    self.ratchetPassed = ratchetPassed
+    self.baselineUpdated = baselineUpdated
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -100,6 +124,9 @@ public struct PerfBenchReport: Codable, Equatable, Sendable {
     case suite
     case members
     case provenance
+    case ratchet
+    case ratchetPassed = "ratchet_passed"
+    case baselineUpdated = "baseline_updated"
   }
 }
 
@@ -134,8 +161,17 @@ public enum BenchCommand {
     try FileManager.default.createDirectory(
       at: benchRoot, withIntermediateDirectories: true)
 
+    let baselineURL =
+      config.baselinePath.map { URL(fileURLWithPath: $0) }
+      ?? PerfBenchBaseline.defaultLocation()
+    // A missing baseline file is an empty baseline: every ratcheted counter
+    // reads `new` and the run fails until `--update-baseline` seeds it.
+    var baseline =
+      (try? PerfBenchBaseline.load(from: baselineURL)) ?? PerfBenchBaseline()
+
     var memberReports: [PerfBenchMemberReport] = []
     var provenance: PerfRunMetadata?
+    var ratchetRows: [PerfBenchRatchetRow] = []
     for member in selected {
       // Cold lane first: it is cheap, and its determinism check failing
       // should abort before the member's multi-minute warm lanes run.
@@ -178,6 +214,65 @@ public enum BenchCommand {
           cold: cold
         )
       )
+
+      // Ratchet scope (D4): the cold lane for every member, plus the warm
+      // sync lane for the click-driven closed-loop members.
+      var ratchetLanes: [(lane: String, values: [String: Int])] = [
+        (BenchRatchet.coldLane, cold.counters.valuesByName)
+      ]
+      if member.warmSyncRatchets,
+        let syncAggregate = lanes.first(where: { $0.lane == "warm-sync" })?.aggregate
+      {
+        let warm = BenchRatchet.warmRatchetValues(
+          from: syncAggregate,
+          scenario: member.scenario.rawValue
+        )
+        ratchetRows.append(contentsOf: warm.nondeterministic)
+        ratchetLanes.append((BenchRatchet.warmSyncLane, warm.values))
+      }
+      for (lane, values) in ratchetLanes {
+        if config.updateBaseline {
+          // New value, preserved tolerance: a tolerance is a reviewed
+          // decision and does not reset just because the value moved.
+          let previous = baseline.entries(
+            configuration: config.configuration,
+            scenario: member.scenario.rawValue,
+            lane: lane
+          )
+          baseline.setEntries(
+            Dictionary(
+              uniqueKeysWithValues: values.map { name, value in
+                (
+                  name,
+                  PerfBenchBaselineEntry(
+                    value: value,
+                    tolerance: previous[name]?.tolerance ?? 0
+                  )
+                )
+              }
+            ),
+            configuration: config.configuration,
+            scenario: member.scenario.rawValue,
+            lane: lane
+          )
+        }
+        ratchetRows.append(
+          contentsOf: BenchRatchet.evaluate(
+            current: values,
+            baseline: baseline.entries(
+              configuration: config.configuration,
+              scenario: member.scenario.rawValue,
+              lane: lane
+            ),
+            scenario: member.scenario.rawValue,
+            lane: lane
+          )
+        )
+      }
+    }
+
+    if config.updateBaseline {
+      try baseline.write(to: baselineURL)
     }
 
     let report = PerfBenchReport(
@@ -185,7 +280,10 @@ public enum BenchCommand {
       configuration: config.configuration,
       suite: BenchSuite.members.map(\.scenario.rawValue),
       members: memberReports,
-      provenance: provenance
+      provenance: provenance,
+      ratchet: ratchetRows,
+      ratchetPassed: ratchetRows.allSatisfy(\.passed),
+      baselineUpdated: config.updateBaseline
     )
     let reportURL = benchRoot.appendingPathComponent("report.json")
     let encoder = JSONEncoder()
@@ -209,6 +307,25 @@ public enum BenchCommand {
         lines.append("")
         lines.append("=== \(member.scenario) [\(lane.lane)] ===")
         lines.append(AggregateReducer.format(lane.aggregate))
+      }
+    }
+    if !report.ratchet.isEmpty {
+      lines.append("")
+      lines.append(BenchRatchet.format(report.ratchet))
+    }
+    if report.baselineUpdated {
+      lines.append("baseline: UPDATED — review and commit the diff with the cause named")
+    } else {
+      lines.append(report.ratchetPassed ? "ratchet: PASS" : "ratchet: FAIL")
+      if !report.ratchetPassed {
+        for row in report.ratchet where !row.passed {
+          lines.append(
+            "  - \(row.scenario)/\(row.lane)/\(row.counter): \(row.verdict.rawValue)"
+          )
+        }
+        lines.append(
+          "an intentional change reruns with --update-baseline and commits the diff"
+        )
       }
     }
     return lines.joined(separator: "\n")

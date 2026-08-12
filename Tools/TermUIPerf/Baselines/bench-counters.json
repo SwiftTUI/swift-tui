@@ -1,0 +1,202 @@
+{
+  "configurations" : {
+    "debug" : {
+      "bench-deep-grid" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 3086,
+          "builtin_child_measure_requests_probe" : 2567,
+          "builtin_container_measures" : 1037,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 520,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 2067,
+          "present_cells" : 1224,
+          "resolved_computed" : 523,
+          "resolved_reused" : 0
+        }
+      },
+      "bench-storm" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 235,
+          "builtin_child_measure_requests_probe" : 128,
+          "builtin_container_measures" : 40,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 134,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 266,
+          "present_cells" : 3192,
+          "resolved_computed" : 171,
+          "resolved_reused" : 0
+        }
+      },
+      "lazy-vstack-scroll" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 621,
+          "builtin_child_measure_requests_probe" : 469,
+          "builtin_container_measures" : 88,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 5,
+          "custom_child_measure_requests_probe" : 3,
+          "custom_container_measures" : 1,
+          "custom_placement_child_measure_requests" : 1,
+          "draw_nodes" : 103,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 417,
+          "present_cells" : 549,
+          "resolved_computed" : 139,
+          "resolved_reused" : 0
+        }
+      },
+      "memo-equatable-boundary" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 1229,
+          "builtin_child_measure_requests_probe" : 912,
+          "builtin_container_measures" : 626,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 318,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 1210,
+          "present_cells" : 2796,
+          "resolved_computed" : 321,
+          "resolved_reused" : 0
+        }
+      },
+      "synthetic-continuous-animation" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 5,
+          "builtin_child_measure_requests_probe" : 2,
+          "builtin_container_measures" : 2,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 4,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 6,
+          "present_cells" : 16,
+          "resolved_computed" : 7,
+          "resolved_reused" : 0
+        }
+      }
+    },
+    "release" : {
+      "bench-deep-grid" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 3086,
+          "builtin_child_measure_requests_probe" : 2567,
+          "builtin_container_measures" : 1037,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 520,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 2067,
+          "present_cells" : 1224,
+          "resolved_computed" : 523,
+          "resolved_reused" : 0
+        }
+      },
+      "bench-storm" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 235,
+          "builtin_child_measure_requests_probe" : 128,
+          "builtin_container_measures" : 40,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 134,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 266,
+          "present_cells" : 3192,
+          "resolved_computed" : 171,
+          "resolved_reused" : 0
+        }
+      },
+      "lazy-vstack-scroll" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 621,
+          "builtin_child_measure_requests_probe" : 469,
+          "builtin_container_measures" : 88,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 5,
+          "custom_child_measure_requests_probe" : 3,
+          "custom_container_measures" : 1,
+          "custom_placement_child_measure_requests" : 1,
+          "draw_nodes" : 103,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 417,
+          "present_cells" : 549,
+          "resolved_computed" : 139,
+          "resolved_reused" : 0
+        }
+      },
+      "memo-equatable-boundary" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 1229,
+          "builtin_child_measure_requests_probe" : 912,
+          "builtin_container_measures" : 626,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 318,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 1210,
+          "present_cells" : 2796,
+          "resolved_computed" : 321,
+          "resolved_reused" : 0
+        }
+      },
+      "synthetic-continuous-animation" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 5,
+          "builtin_child_measure_requests_probe" : 2,
+          "builtin_container_measures" : 2,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 4,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 6,
+          "present_cells" : 16,
+          "resolved_computed" : 7,
+          "resolved_reused" : 0
+        }
+      }
+    }
+  },
+  "platform_overrides" : {
+
+  },
+  "schema_version" : 1
+}

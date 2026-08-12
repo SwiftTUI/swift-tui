@@ -118,7 +118,7 @@ struct PerfRunConfigTests {
 
     #expect(
       error?.description
-        == "unknown scenario 'missing-scenario'. Known scenarios: canvas-partial-reuse, example-app-shell-workflow, file-browser-selection, gallery-animation-click, gallery-tab-switch, gif-playback, layout-scroll-burst, lazy-list-1k, lazy-vstack-scroll, memo-equatable-boundary, scroll-cadence-60hz, scroll-document-chrome, scroll-document-mixed, scroll-fling-momentum, scroll-jump, scroll-notch-latency, sheet-open-latency, synthetic-continuous-animation, synthetic-disjoint-damage, synthetic-line-limit-preview, synthetic-mesh-gradient, synthetic-mesh-text, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-rich-steady-repaint, synthetic-single-tween, synthetic-text-shimmer, table-1kx4, text-input-editing."
+        == "unknown scenario 'missing-scenario'. Known scenarios: bench-deep-grid, bench-storm, canvas-partial-reuse, example-app-shell-workflow, file-browser-selection, gallery-animation-click, gallery-tab-switch, gif-playback, layout-scroll-burst, lazy-list-1k, lazy-vstack-scroll, memo-equatable-boundary, scroll-cadence-60hz, scroll-document-chrome, scroll-document-mixed, scroll-fling-momentum, scroll-jump, scroll-notch-latency, sheet-open-latency, synthetic-continuous-animation, synthetic-disjoint-damage, synthetic-line-limit-preview, synthetic-mesh-gradient, synthetic-mesh-text, synthetic-narrow-invalidation, synthetic-observable-fanout, synthetic-offscreen-phase-animator, synthetic-rich-steady-repaint, synthetic-single-tween, synthetic-text-shimmer, table-1kx4, text-input-editing."
     )
   }
 

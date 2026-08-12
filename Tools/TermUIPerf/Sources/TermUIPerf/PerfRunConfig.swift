@@ -284,6 +284,8 @@ public enum PerfCommandParser {
     var warmIterations = PerfBenchConfig.defaultWarmIterations
     var coldIterations = PerfBenchConfig.defaultColdIterations
     var members: [PerfScenarioName]?
+    var updateBaseline = false
+    var baselinePath: String?
 
     var index = arguments.startIndex
     while index < arguments.endIndex {
@@ -311,6 +313,10 @@ public enum PerfCommandParser {
           throw PerfParseError.unknownScenario(value)
         }
         members = (members ?? []) + [parsedScenario]
+      case "--update-baseline":
+        updateBaseline = true
+      case "--baseline":
+        baselinePath = try value(after: argument, in: arguments, at: &index)
       default:
         if argument.hasPrefix("-") {
           throw PerfParseError.unknownOption(argument)
@@ -325,7 +331,9 @@ public enum PerfCommandParser {
       configuration: configuration,
       warmIterations: warmIterations,
       coldIterations: coldIterations,
-      members: members
+      members: members,
+      updateBaseline: updateBaseline,
+      baselinePath: baselinePath
     )
   }
 

@@ -28,11 +28,21 @@ public struct BenchMember: Equatable, Sendable {
 /// cite it by member name.
 public enum BenchSuite {
   /// D2's five members.
+  ///
+  /// `warmSyncRatchets` is FALSE everywhere: recording the baseline failed
+  /// D3's determinism proof for the warm lanes twice, with different counter
+  /// sets each time — the committed frame census varies by an idle/settle
+  /// frame between identical fresh sessions, and on `bench-deep-grid` even
+  /// the measure-work counters intermittently inherit that variance (an
+  /// extra frame can re-measure the pressed cone). Per the D4 kill
+  /// condition the warm ratchet is demoted to gated-compare-only and the
+  /// ratchet is cold-lane only; the variance itself is filed as a finding.
+  /// Flip a member back only after the frame-census variance is pinned.
   public static let members: [BenchMember] = [
     BenchMember(
       scenario: .benchDeepGrid,
       warmModes: [.sync, .async],
-      warmSyncRatchets: true
+      warmSyncRatchets: false
     ),
     BenchMember(
       scenario: .benchStorm,
@@ -47,7 +57,7 @@ public enum BenchSuite {
     BenchMember(
       scenario: .memoEquatableBoundary,
       warmModes: [.sync, .async],
-      warmSyncRatchets: true
+      warmSyncRatchets: false
     ),
     BenchMember(
       scenario: .syntheticContinuousAnimation,
