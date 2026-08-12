@@ -68,6 +68,29 @@ package enum ReuseDenialTrace {
     invalidatedIdentityPaths.insert(path)
   }
 
+  /// Identity paths denied for `invalidation-conflict` this frame (capped) —
+  /// the `suppressed-paths` counterpart for the conflict reason, so a
+  /// multi-hundred-node `invalidation-conflict=` count can be decomposed into
+  /// the denied nodes themselves, not just the invalidated identities that
+  /// caused the denials.
+  package private(set) static var conflictIdentityPaths: [String] = []
+
+  private static let maxRecordedConflictIdentityPaths = 512
+
+  package static func recordConflictIdentity(_ path: String) {
+    guard isEnabled,
+      conflictIdentityPaths.count < maxRecordedConflictIdentityPaths
+    else { return }
+    conflictIdentityPaths.append(path)
+  }
+
+  /// Test seam: observes each frame's reason histogram at `dumpAndReset`,
+  /// before the per-frame reset erases it. Lets a deterministic fixture pin a
+  /// specific frame's counter (e.g. the palette dismissal frame's
+  /// `invalidation-conflict`) without parsing the emitted trace text.
+  package static var onFrameSummary:
+    ((_ frameID: UInt64, _ reasonCounts: [String: Int]) -> Void)?
+
   /// Records a description of one leg of the frame's retained-reuse
   /// suppression scope (focus or press moves), so a
   /// multi-hundred-node `suppressed=` count can be attributed to the member
@@ -95,6 +118,7 @@ package enum ReuseDenialTrace {
     invalidatedIdentityPaths.removeAll(keepingCapacity: true)
     suppressionScopeDescriptions.removeAll(keepingCapacity: true)
     suppressedIdentityPaths.removeAll(keepingCapacity: true)
+    conflictIdentityPaths.removeAll(keepingCapacity: true)
     planTargetDescriptions.removeAll(keepingCapacity: true)
   }
 
@@ -102,6 +126,9 @@ package enum ReuseDenialTrace {
   /// Called at `ViewGraph.beginFrame`, so each line summarizes the frame that
   /// just finished resolving.
   package static func dumpAndReset(frameID: UInt64) {
+    if isEnabled, !reasonCounts.isEmpty {
+      onFrameSummary?(frameID, reasonCounts)
+    }
     guard isEnabled, !reasonCounts.isEmpty || !suppressionScopeDescriptions.isEmpty
     else {
       reset()
@@ -125,6 +152,9 @@ package enum ReuseDenialTrace {
     }
     if !suppressedIdentityPaths.isEmpty {
       line += " | suppressed-paths: " + suppressedIdentityPaths.joined(separator: ",")
+    }
+    if !conflictIdentityPaths.isEmpty {
+      line += " | conflict-paths: " + conflictIdentityPaths.joined(separator: ",")
     }
     if !planTargetDescriptions.isEmpty {
       line += " | plan-targets: " + planTargetDescriptions.joined(separator: ";")

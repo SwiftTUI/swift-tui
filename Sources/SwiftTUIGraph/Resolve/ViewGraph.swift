@@ -2525,6 +2525,7 @@ package final class ViewGraph {
     // structural intersection with the invalidation set. Capture the invalidated
     // identities so the dirty ancestor blocking the background is visible.
     ReuseDenialTrace.record("invalidation-conflict")
+    ReuseDenialTrace.recordConflictIdentity(identity.path)
     for invalidated in invalidatedIdentities {
       ReuseDenialTrace.recordInvalidatedIdentity(invalidated.path)
     }
