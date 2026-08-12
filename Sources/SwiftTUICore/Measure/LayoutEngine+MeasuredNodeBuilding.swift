@@ -5,6 +5,7 @@ extension LayoutEngine {
     effectiveProposal: ProposedSize,
     childMeasurements: [MeasuredNode],
     selectedChildIndex: Int?,
+    issuedProposals: [ChildIssuedProposalRecord]? = nil,
     passContext: LayoutPassContext?
   ) -> MeasuredNode {
     let storedChildMeasurements = storedChildMeasurements(
@@ -42,7 +43,9 @@ extension LayoutEngine {
       containerAllocationSnapshot: containerAllocationSnapshot(
         for: node,
         childMeasurements: childMeasurements,
-        selectedChildIndex: selectedChildIndex
+        selectedChildIndex: selectedChildIndex,
+        issuedProposals: issuedProposals,
+        passContext: passContext
       )
     )
     cache?.store(measured, for: node)
@@ -52,7 +55,9 @@ extension LayoutEngine {
   private func containerAllocationSnapshot(
     for resolved: ResolvedNode,
     childMeasurements: [MeasuredNode],
-    selectedChildIndex: Int?
+    selectedChildIndex: Int?,
+    issuedProposals: [ChildIssuedProposalRecord]?,
+    passContext: LayoutPassContext?
   ) -> ContainerAllocationSnapshot? {
     guard !childMeasurements.isEmpty else {
       return nil
@@ -88,7 +93,13 @@ extension LayoutEngine {
         ChildAllocation(identity: $0.identity, size: $0.measuredSize)
       },
       selectedChildIndex: chosenChildIndex,
-      lazyStack: lazyStackSnapshot
+      lazyStack: lazyStackSnapshot,
+      childIssuedProposals: resolvedIssuedProposalRecords(
+        for: resolved,
+        childMeasurements: childMeasurements,
+        explicit: issuedProposals,
+        passContext: passContext
+      )
     )
   }
 }

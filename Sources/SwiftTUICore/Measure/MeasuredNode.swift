@@ -8,23 +8,65 @@ package struct ChildAllocation: Equatable, Sendable {
   }
 }
 
+/// The proposals a container issued to one child during its measure
+/// (plan 2026-08-11-006 Stage 0): the observed reality the cutoff's
+/// coverage certificate tests against, replacing the D10 behavior
+/// allowlist's structural proxy for "we know every proposal the parent
+/// will issue". Deduplicated; capped at
+/// ``ChildIssuedProposalRecord/maximumProposals`` with `overflowed` set
+/// so an incomplete record denies coverage loudly instead of sampling.
+package struct ChildIssuedProposalRecord: Equatable, Sendable {
+  package static let maximumProposals = 8
+
+  package var identity: Identity
+  package var proposals: [ProposedSize]
+  package var overflowed: Bool
+
+  package init(
+    identity: Identity,
+    proposals: [ProposedSize] = [],
+    overflowed: Bool = false
+  ) {
+    self.identity = identity
+    self.proposals = proposals
+    self.overflowed = overflowed
+  }
+
+  package mutating func record(_ proposal: ProposedSize) {
+    guard !proposals.contains(proposal) else {
+      return
+    }
+    guard proposals.count < Self.maximumProposals else {
+      overflowed = true
+      return
+    }
+    proposals.append(proposal)
+  }
+}
+
 /// Container-specific placement information captured during measure.
 package struct ContainerAllocationSnapshot: Equatable, Sendable {
   package var childSizes: [ChildAllocation]
   package var selectedChildIndex: Int?
   package var lazyStack: LazyStackAllocationSnapshot?
   package var hostedCollection: HostedCollectionAllocationSnapshot?
+  /// Index-parallel with `childSizes` when present (plan 2026-08-11-006).
+  /// `nil` on products built before the records existed and on windowed
+  /// products (which store no child measurements).
+  package var childIssuedProposals: [ChildIssuedProposalRecord]?
 
   package init(
     childSizes: [ChildAllocation] = [],
     selectedChildIndex: Int? = nil,
     lazyStack: LazyStackAllocationSnapshot? = nil,
-    hostedCollection: HostedCollectionAllocationSnapshot? = nil
+    hostedCollection: HostedCollectionAllocationSnapshot? = nil,
+    childIssuedProposals: [ChildIssuedProposalRecord]? = nil
   ) {
     self.childSizes = childSizes
     self.selectedChildIndex = selectedChildIndex
     self.lazyStack = lazyStack
     self.hostedCollection = hostedCollection
+    self.childIssuedProposals = childIssuedProposals
   }
 }
 

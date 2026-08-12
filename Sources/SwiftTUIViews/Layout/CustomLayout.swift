@@ -67,8 +67,14 @@ public struct LayoutSubview {
     // measure is a custom child request — the unbounded `A` in the custom
     // family's `>= 2N + A` shape. The engine's default grade says which
     // author phase this is: probe inside `sizeThatFits`, commit inside
-    // `placeSubviews`.
-    passContext?.recordCustomChildMeasureRequest(grade: engine.defaultMeasurementGrade)
+    // `placeSubviews`. The identity/proposal pair also feeds the
+    // issued-proposal record (plan 2026-08-11-006) when a custom
+    // measurement frame is open.
+    passContext?.recordCustomChildMeasureRequest(
+      grade: engine.defaultMeasurementGrade,
+      childIdentity: child.identity,
+      proposal: proposal
+    )
     return engine.measure(
       child,
       proposal: proposal,
@@ -88,7 +94,11 @@ public struct LayoutSubview {
     guard let passContext, let hint else {
       return sizeThatFits(proposal)
     }
-    passContext.recordCustomChildMeasureRequest(grade: engine.defaultMeasurementGrade)
+    passContext.recordCustomChildMeasureRequest(
+      grade: engine.defaultMeasurementGrade,
+      childIdentity: child.identity,
+      proposal: proposal
+    )
     return passContext.withMeasureViewportHint(hint) {
       engine.measure(
         child,

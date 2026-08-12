@@ -412,6 +412,12 @@ extension LayoutEngine {
           effectiveProposal: effectiveProposal,
           childMeasurements: allocatedMeasurements,
           selectedChildIndex: nil,
+          issuedProposals: stackIssuedProposalRecords(
+            children: children,
+            axis: axis,
+            effectiveProposal: effectiveProposal,
+            finalMeasurements: allocatedMeasurements
+          ),
           passContext: passContext
         )
       )

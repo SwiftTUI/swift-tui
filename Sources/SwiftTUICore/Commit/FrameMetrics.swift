@@ -60,6 +60,15 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
   package var deniedNoBaseline = 0
   package var deniedSizeMismatch = 0
   package var deniedAbortedByCap = 0
+  /// Dark coverage evaluation for spine-denied roots (plan 2026-08-11-006
+  /// Stage 0): what the recorded-proposal coverage certificate WOULD say
+  /// about the frames D10's allowlist denies today. Counted alongside the
+  /// spine denial, never instead of it — no behavior changes until the
+  /// would-eligible population is material.
+  package var darkCoverageEligible = 0
+  package var darkCoverageDeniedProposalCoverage = 0
+  package var darkCoverageDeniedRecordOverflow = 0
+  package var darkCoverageDeniedNoRecord = 0
 
   package init() {}
 
@@ -74,6 +83,10 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
     deniedNoBaseline += other.deniedNoBaseline
     deniedSizeMismatch += other.deniedSizeMismatch
     deniedAbortedByCap += other.deniedAbortedByCap
+    darkCoverageEligible += other.darkCoverageEligible
+    darkCoverageDeniedProposalCoverage += other.darkCoverageDeniedProposalCoverage
+    darkCoverageDeniedRecordOverflow += other.darkCoverageDeniedRecordOverflow
+    darkCoverageDeniedNoRecord += other.darkCoverageDeniedNoRecord
   }
 }
 

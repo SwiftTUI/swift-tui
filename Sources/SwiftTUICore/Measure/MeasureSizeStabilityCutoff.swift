@@ -71,7 +71,11 @@ package enum MeasureCutoffTrace {
         + "animated=\(metrics.deniedIneligibleAnimated) "
         + "no-baseline=\(metrics.deniedNoBaseline) "
         + "size-mismatch=\(metrics.deniedSizeMismatch) "
-        + "capped=\(metrics.deniedAbortedByCap))\n",
+        + "capped=\(metrics.deniedAbortedByCap)) "
+        + "dark-coverage(eligible=\(metrics.darkCoverageEligible) "
+        + "uncovered=\(metrics.darkCoverageDeniedProposalCoverage) "
+        + "overflow=\(metrics.darkCoverageDeniedRecordOverflow) "
+        + "no-record=\(metrics.darkCoverageDeniedNoRecord))\n",
       toFileAt: DebugLogRouter.resolvedFilePath(
         override: FeatureFlags.environmentValue(named: "SWIFTTUI_MEASURE_CUTOFF_TRACE_FILE"),
         bundleFileName: "measure-cutoff.log"
@@ -169,6 +173,10 @@ extension LayoutEngine {
     var node = treeRoot
     while node.identity != root {
       guard isSpineForwardingBehavior(node.layoutBehavior) else {
+        // Plan 2026-08-11-006 Stage 0: before denying, evaluate DARKLY what
+        // the recorded-proposal coverage certificate would say — entirely
+        // from retained state, so attribution and cost are unchanged.
+        recordDarkCoverage(for: root, session: session, into: &result)
         result.metrics.deniedIneligibleSpine += 1
         return
       }
@@ -312,6 +320,50 @@ extension LayoutEngine {
         retainedProposal: previousMeasured.proposal
       )
     )
+  }
+
+  /// Dark coverage evaluation (plan 2026-08-11-006 Stage 0): from retained
+  /// state alone, would the recorded-proposal coverage certificate admit
+  /// this spine-denied root? The immediate retained parent's
+  /// issued-proposal record for the root must exist, not have overflowed,
+  /// and be covered by the available baseline proposals (the retained
+  /// final measurement plus the cache variants). Coverage only — the size
+  /// legs still run fresh measures and can deny; this counts the
+  /// population Stage 1 could reach.
+  private func recordDarkCoverage(
+    for root: Identity,
+    session: RetainedLayoutSession,
+    into result: inout MeasureCutoffPrePassResult
+  ) {
+    guard let index = session.previousFrameIndex,
+      let parentIdentity = index.placedParentByStructuralIdentity[root],
+      let parentMeasured = session.measuredNode(for: parentIdentity),
+      let records = parentMeasured.containerAllocationSnapshot?.childIssuedProposals,
+      let record = records.first(where: { $0.identity == root }),
+      let previousMeasured = session.measuredNode(for: root)
+    else {
+      result.metrics.darkCoverageDeniedNoRecord += 1
+      return
+    }
+    guard !record.overflowed else {
+      result.metrics.darkCoverageDeniedRecordOverflow += 1
+      return
+    }
+    var baselineProposals: [ProposedSize] = [previousMeasured.proposal]
+    if let viewNodeID = index.resolvedNode(for: root)?.viewNodeID {
+      for stored in cache?.storedBaselineSizes(for: viewNodeID) ?? []
+      where !baselineProposals.contains(stored.proposal) {
+        baselineProposals.append(stored.proposal)
+      }
+    }
+    let uncovered = record.proposals.contains { proposal in
+      !baselineProposals.contains(proposal)
+    }
+    if uncovered {
+      result.metrics.darkCoverageDeniedProposalCoverage += 1
+    } else {
+      result.metrics.darkCoverageEligible += 1
+    }
   }
 
   /// D10's spine allowlist: plain stacks and single-proposal forwarding

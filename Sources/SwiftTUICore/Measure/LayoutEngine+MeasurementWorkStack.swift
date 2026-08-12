@@ -192,6 +192,12 @@ extension LayoutEngine {
               effectiveProposal: effectiveProposal,
               childMeasurements: childMeasurements,
               selectedChildIndex: probeIndex,
+              issuedProposals: viewThatFitsIssuedProposalRecords(
+                children: node.children,
+                effectiveProposal: effectiveProposal,
+                axes: axes,
+                probedThrough: probeIndex
+              ),
               passContext: passContext
             )
           )
@@ -300,12 +306,20 @@ extension LayoutEngine {
         let node,
         let originalProposal,
         let effectiveProposal,
-        _,
-        _,
+        let children,
+        let axis,
         var measurements,
         let replacementIndices
       ):
         let replacements = popMeasurements(from: &results, count: replacementIndices.count)
+        let issuedProposals = stackReconciliationIssuedProposalRecords(
+          children: children,
+          axis: axis,
+          effectiveProposal: effectiveProposal,
+          preReconciliationMeasurements: measurements,
+          replacementIndices: replacementIndices,
+          replacements: replacements
+        )
         for (index, measurement) in zip(replacementIndices, replacements) {
           measurements[index] = measurement
         }
@@ -316,6 +330,7 @@ extension LayoutEngine {
             effectiveProposal: effectiveProposal,
             childMeasurements: measurements,
             selectedChildIndex: nil,
+            issuedProposals: issuedProposals,
             passContext: passContext
           )
         )
@@ -724,6 +739,14 @@ extension LayoutEngine {
       }
       defer {
         passContext?.exitCustomLayoutCompatibilityBoundary()
+      }
+      // Author probes recorded during measureContainer land on this frame
+      // and drain into the container's issued-proposal snapshot (plan
+      // 2026-08-11-006 Stage 0). Popped before the boundary exit (defers
+      // run LIFO).
+      passContext?.pushIssuedProposalProbeFrame()
+      defer {
+        passContext?.popIssuedProposalProbeFrame()
       }
 
       // Sticky-downward grade across the native re-entry: the pre-measure's

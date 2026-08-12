@@ -85,6 +85,13 @@ package final class LayoutPassContext: Sendable {
   private struct MutableState: Sendable {
     var scrollViewportContext: ScrollViewportContext?
     var measureViewportHints: [MeasureViewportHintEntry]
+    /// One frame per in-flight custom-layout `measureContainer`, innermost
+    /// last (plan 2026-08-11-006 Stage 0): author `sizeThatFits` probes
+    /// record `(child, proposal)` into the top frame, and the `.custom`
+    /// measure case drains it into the container's issued-proposal
+    /// snapshot. Empty outside custom measurement, so placement-phase
+    /// probes drop silently.
+    var issuedProposalProbeFrames: [[Identity: [ProposedSize]]] = []
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
@@ -339,13 +346,40 @@ package final class LayoutPassContext: Sendable {
   /// and placement call sites sit on frames that stay live across
   /// custom-layout re-entry on the small frame-tail worker stack, and a
   /// closure context there is a per-nesting-level stack cost in -Onone.
-  package func recordCustomChildMeasureRequest(grade: MeasurementGrade) {
+  package func recordCustomChildMeasureRequest(
+    grade: MeasurementGrade,
+    childIdentity: Identity,
+    proposal: ProposedSize
+  ) {
     state.withLock {
       $0.workMetrics.branching.customChildMeasureRequests += 1
       if grade == .probe {
         $0.workMetrics.branching.customChildMeasureRequestsProbe += 1
       }
+      if let top = $0.issuedProposalProbeFrames.indices.last {
+        $0.issuedProposalProbeFrames[top][childIdentity, default: []].append(proposal)
+      }
     }
+  }
+
+  package func pushIssuedProposalProbeFrame() {
+    state.withLock { $0.issuedProposalProbeFrames.append([:]) }
+  }
+
+  package func popIssuedProposalProbeFrame() {
+    state.withLock {
+      precondition(
+        !$0.issuedProposalProbeFrames.isEmpty,
+        "issued-proposal probe frame underflow"
+      )
+      $0.issuedProposalProbeFrames.removeLast()
+    }
+  }
+
+  /// The innermost custom container's recorded author probes, or `nil`
+  /// outside custom measurement.
+  package func currentIssuedProposalProbes() -> [Identity: [ProposedSize]]? {
+    state.withLock { $0.issuedProposalProbeFrames.last }
   }
 
   /// The fail-loud commit guard (plan 2026-08-11-004 Stage 1). A serve
