@@ -348,6 +348,176 @@ struct IssuedProposalRecordTests {
     #expect(result.metrics.deniedAbortedByCap == 1)
   }
 
+  @Test("a windowed subtree under a stable viewport certifies with its stored hint (Stage 2)")
+  func windowedSubtreeCertifiesUnderStoredHint() throws {
+    // Root VStack -> ScrollViewLayout (custom, on the spine) -> content
+    // VStack -> indexed lazy list of uniform rows. The content node is
+    // invalidated; the certificate must window the list exactly as
+    // production does, using the hint the retained windowed product
+    // stored — uniform rows keep the cold stride identical to the
+    // refined one, so window currency reproduces.
+    let contentIdentity = testIdentity("windowed", "Scroll", "Content")
+    func tree() -> ResolvedNode {
+      let rows = (0..<40).map { index in
+        ResolvedNode(
+          viewNodeID: fixtureViewNodeID("windowed-row\(index)"),
+          identity: testIdentity("windowed", "Scroll", "Content", "List", "Row\(index)"),
+          kind: .view("Test"),
+          intrinsicSize: .init(width: 20, height: 1)
+        )
+      }
+      let list = ResolvedNode(
+        viewNodeID: fixtureViewNodeID("windowed-list"),
+        identity: testIdentity("windowed", "Scroll", "Content", "List"),
+        kind: .view("LazyVStack"),
+        layoutBehavior: .lazyStack(
+          axis: .vertical,
+          spacing: 0,
+          horizontalAlignment: .leading,
+          verticalAlignment: .top
+        ),
+        indexedChildSource: RecordTestIndexedChildSource(
+          identityRoot: testIdentity("windowed", "Scroll", "Content", "List"),
+          children: rows
+        )
+      )
+      let content = ResolvedNode(
+        viewNodeID: fixtureViewNodeID("windowed-content"),
+        identity: contentIdentity,
+        kind: .view("VStack"),
+        children: [list],
+        layoutBehavior: .stack(
+          axis: .vertical,
+          spacing: 0,
+          horizontalAlignment: .leading,
+          verticalAlignment: .top
+        )
+      )
+      let scroll = ResolvedNode(
+        viewNodeID: fixtureViewNodeID("windowed-scroll"),
+        identity: testIdentity("windowed", "Scroll"),
+        kind: .view("ScrollView"),
+        children: [content],
+        layoutBehavior: AnyLayout(
+          ScrollViewLayout(axes: .vertical, position: .zero, indicatorAxes: [])
+        ).resolvedBehavior
+      )
+      // Few enough rows that the scroll keeps a real viewport share in the
+      // 10-row proposal; enough stored nodes that the content subtree
+      // (2 stored nodes — a windowed product embeds no rows) passes the
+      // 25% share cap.
+      let padding = (0..<4).map { index in
+        leaf("windowed-pad\(index)", size: .init(width: 4, height: 1))
+      }
+      return ResolvedNode(
+        viewNodeID: fixtureViewNodeID("windowed-root"),
+        identity: testIdentity("windowed"),
+        kind: .view("VStack"),
+        children: [scroll] + padding,
+        layoutBehavior: .stack(
+          axis: .vertical,
+          spacing: 0,
+          horizontalAlignment: .leading,
+          verticalAlignment: .top
+        )
+      )
+    }
+
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let proposal = ProposedSize(width: 20, height: 10)
+    let sessionContext = LayoutPassContext()
+    let sessionTree = tree()
+    let sessionMeasured = engine.measure(
+      sessionTree, proposal: proposal, passContext: sessionContext)
+    let sessionPlaced = engine.place(
+      sessionTree, measured: sessionMeasured, passContext: sessionContext)
+    let artifacts = FrameArtifacts(
+      resolvedTree: sessionTree,
+      measuredTree: sessionMeasured,
+      placedTree: sessionPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: sessionTree.identity,
+        bounds: .init(origin: .zero, size: sessionMeasured.measuredSize)
+      ),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let session = RetainedLayoutSession(
+      previousFrameIndex: .init(frame: artifacts),
+      invalidatedIdentities: [contentIdentity]
+    )
+
+    let context = LayoutPassContext(
+      retainedLayout: session,
+      invalidatedIdentities: [contentIdentity]
+    )
+    let result = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: tree(),
+        passContext: context,
+        animationExcludedIdentities: []
+      )
+    )
+
+    #expect(result.metrics.deniedIneligibleWindowed == 0)
+    #expect(result.metrics.deniedWindowMismatch == 0)
+    #expect(result.metrics.certificatesCertified == 1)
+  }
+
+  @Test("a fresh window that drifts from the retained one fails currency (red proof)")
+  func windowCurrencyRejectsDrift() {
+    let listIdentity = testIdentity("currency", "List")
+    func product(window: Range<Int>, stride: Int) -> MeasuredNode {
+      MeasuredNode(
+        identity: testIdentity("currency"),
+        proposal: .unspecified,
+        measuredSize: .init(width: 20, height: 40),
+        childMeasurements: [
+          MeasuredNode(
+            identity: listIdentity,
+            proposal: .unspecified,
+            measuredSize: .init(width: 20, height: 40),
+            containerAllocationSnapshot: .init(
+              lazyStack: LazyStackAllocationSnapshot(
+                axis: .vertical,
+                measuredWindow: window,
+                estimatedRowStride: stride
+              )
+            )
+          )
+        ]
+      )
+    }
+    let engine = LayoutEngine()
+
+    #expect(
+      engine.windowedProductsReproduce(
+        fresh: product(window: 0..<12, stride: 1),
+        retained: product(window: 0..<12, stride: 1)
+      )
+    )
+    #expect(
+      !engine.windowedProductsReproduce(
+        fresh: product(window: 0..<8, stride: 2),
+        retained: product(window: 0..<12, stride: 1)
+      ),
+      "a drifted window or stride must fail currency"
+    )
+    #expect(
+      !engine.windowedProductsReproduce(
+        fresh: MeasuredNode(
+          identity: testIdentity("currency"),
+          proposal: .unspecified,
+          measuredSize: .init(width: 20, height: 40)
+        ),
+        retained: product(window: 0..<12, stride: 1)
+      ),
+      "a retained window with no fresh counterpart must fail currency"
+    )
+  }
+
   // MARK: - Fixtures
 
   /// Root VStack -> custom container (non-forwarding spine) -> inner VStack
@@ -521,6 +691,30 @@ private struct PassThroughLayout: Layout {
     cache _: inout Void
   ) {
     subviews.first?.place(at: bounds.origin, proposal: proposal)
+  }
+}
+
+private struct RecordTestIndexedChildSource: IndexedChildSource {
+  let identityRoot: Identity
+  let measurementSignature: IndexedChildMeasurementSignature
+  private let children: [ResolvedNode]
+
+  init(identityRoot: Identity, children: [ResolvedNode]) {
+    self.identityRoot = identityRoot
+    self.children = children
+    measurementSignature = .init(elementPaths: children.map(\.identity.path))
+  }
+
+  var count: Int {
+    children.count
+  }
+
+  func child(at index: Int) -> ResolvedNode {
+    children[index]
+  }
+
+  func elementIdentity(at index: Int) -> Identity {
+    children[index].identity
   }
 }
 

@@ -67,6 +67,12 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
   /// record denies here; a missing record denies as no-baseline.
   package var deniedProposalCoverage = 0
   package var deniedRecordOverflow = 0
+  /// Window-currency denial (plan 2026-08-11-006 Stage 2): the certificate
+  /// measure of a windowed subtree did not reproduce the retained
+  /// `measuredWindow` and `estimatedRowStride` exactly — size equality
+  /// alone is too weak where out-of-window entries are synthesized from
+  /// the stride.
+  package var deniedWindowMismatch = 0
 
   package init() {}
 
@@ -83,6 +89,7 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
     deniedAbortedByCap += other.deniedAbortedByCap
     deniedProposalCoverage += other.deniedProposalCoverage
     deniedRecordOverflow += other.deniedRecordOverflow
+    deniedWindowMismatch += other.deniedWindowMismatch
   }
 }
 

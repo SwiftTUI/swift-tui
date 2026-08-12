@@ -73,7 +73,8 @@ package enum MeasureCutoffTrace {
         + "size-mismatch=\(metrics.deniedSizeMismatch) "
         + "capped=\(metrics.deniedAbortedByCap) "
         + "coverage-uncovered=\(metrics.deniedProposalCoverage) "
-        + "record-overflow=\(metrics.deniedRecordOverflow))\n",
+        + "record-overflow=\(metrics.deniedRecordOverflow) "
+        + "window-mismatch=\(metrics.deniedWindowMismatch))\n",
       toFileAt: DebugLogRouter.resolvedFilePath(
         override: FeatureFlags.environmentValue(named: "SWIFTTUI_MEASURE_CUTOFF_TRACE_FILE"),
         bundleFileName: "measure-cutoff.log"
@@ -156,12 +157,10 @@ extension LayoutEngine {
       result.metrics.deniedIneligibleAnimated += 1
       return
     }
-    // D8: the indexed measurement signature is the ordered ID list; payload
-    // changes under a stable list are invisible to every comparator.
-    if session.affectsIndexedChildSource(within: root) {
-      result.metrics.deniedIneligibleIndexed += 1
-      return
-    }
+    // The D8 indexed deny moved below the retained-product fetch (plan
+    // 2026-08-11-006 Stage 2): a windowed subtree with a stored hint is
+    // now admissible, so the affected-source question is decided together
+    // with the window evidence.
 
     // Locate the root in the current resolved tree by lexical descent.
     // Plan 2026-08-11-006 Stage 1: a non-forwarding, non-lazy ancestor no
@@ -205,15 +204,31 @@ extension LayoutEngine {
       result.metrics.deniedAbortedByCap += 1
       return
     }
-    // D6: a windowed product is valid only for its hint; the scratch pre-pass
-    // starts with an empty hint stack and must never claim the main pass's.
-    // D8's structural half: an indexed source anywhere below re-measures
-    // through signature-blind comparators.
+    // Plan 2026-08-11-006 Stage 2: a windowed subtree is admissible when
+    // its retained windowed products agree on the hint they measured under
+    // — a windowed product STORES its `MeasureViewportHint`, and the
+    // outermost-cover construction guarantees the governing scroll (an
+    // ancestor of this root) was not invalidated this frame, so the stored
+    // hint is current. The certificate measures under that hint and the
+    // window-currency legs below require the fresh window and stride to
+    // reproduce exactly. Hosted-collection windows stay excluded (their
+    // snapshots store no hint); indexed subtrees WITHOUT windows measure
+    // exhaustively on both sides, bounded by the subtree-share cap.
+    var certificateHint: MeasureViewportHint?
     if subtreeCarriesMeasuredWindow(previousMeasured) {
-      result.metrics.deniedIneligibleWindowed += 1
-      return
-    }
-    if subtreeContainsIndexedChildSource(currentSubtree) {
+      guard let hint = agreedLazyWindowHint(in: previousMeasured) else {
+        result.metrics.deniedIneligibleWindowed += 1
+        return
+      }
+      certificateHint = hint
+    } else if session.affectsIndexedChildSource(within: root) {
+      // An affected indexed source with NO retained window measured its
+      // whole dataset exhaustively last frame, and a fresh certificate
+      // measure would realize it all again — the D17 cliff the subtree
+      // cap cannot see (windowed and exhaustive lazy products store no
+      // child measurements, so their node counts hide row counts). The
+      // ordered-ID signature blindness (D8) also stands here; both
+      // resolve only under a stored window hint.
       result.metrics.deniedIneligibleIndexed += 1
       return
     }
@@ -314,13 +329,16 @@ extension LayoutEngine {
       // products either fail the certificate and are discarded, or are
       // re-validated size-for-size before the patch serves them. Exact-key
       // cache stores stay grade-blind, so the variants the main pass wants
-      // still land in the production cache.
-      var fresh = measure(
-        currentSubtree,
-        proposal: baseline.proposal,
-        passContext: scratchContext,
-        grade: .probe
-      )
+      // still land in the production cache. The reconstructed hint scopes
+      // each measure exactly as production's enclosing scroll would.
+      var fresh = scratchContext.withMeasureViewportHint(certificateHint) {
+        measure(
+          currentSubtree,
+          proposal: baseline.proposal,
+          passContext: scratchContext,
+          grade: .probe
+        )
+      }
       guard fresh.measuredSize == baseline.measuredSize else {
         fresh.flattenForRelease()
         certifiedProduct?.flattenForRelease()
@@ -351,6 +369,18 @@ extension LayoutEngine {
       result.metrics.deniedNoBaseline += 1
       return
     }
+    // Window currency (plan 2026-08-11-006 Stage 2): the certified product
+    // must reproduce every retained windowed product's measured window and
+    // estimated row stride exactly — out-of-window entries are synthesized
+    // from the stride, so size equality alone cannot vouch for them.
+    if certificateHint != nil,
+      !windowedProductsReproduce(fresh: certifiedProduct, retained: previousMeasured)
+    {
+      var discarded = certifiedProduct
+      discarded.flattenForRelease()
+      result.metrics.deniedWindowMismatch += 1
+      return
+    }
     result.metrics.certificatesCertified += 1
     result.certificates.append(
       .init(
@@ -360,6 +390,69 @@ extension LayoutEngine {
         retainedProposal: previousMeasured.proposal
       )
     )
+  }
+
+  /// The single hint every windowed lazy product in the subtree stored, or
+  /// `nil` when hints conflict, a windowed product predates hint storage,
+  /// or a hosted-collection window (which stores no hint) is present.
+  private func agreedLazyWindowHint(in measured: MeasuredNode) -> MeasureViewportHint? {
+    var agreed: MeasureViewportHint?
+    var pending: [MeasuredNode] = [measured]
+    while let node = pending.popLast() {
+      if let snapshot = node.containerAllocationSnapshot {
+        if snapshot.hostedCollection?.measuredWindow != nil {
+          return nil
+        }
+        if let lazy = snapshot.lazyStack, lazy.measuredWindow != nil {
+          guard let hint = lazy.windowHint else {
+            return nil
+          }
+          if let agreed, agreed != hint {
+            return nil
+          }
+          agreed = hint
+        }
+      }
+      pending.append(contentsOf: node.childMeasurements)
+    }
+    return agreed
+  }
+
+  /// Window currency: every retained windowed product must reappear in the
+  /// fresh product with the same measured window and estimated row stride.
+  /// Package so the red proof can doctor products directly.
+  package func windowedProductsReproduce(
+    fresh: MeasuredNode,
+    retained: MeasuredNode
+  ) -> Bool {
+    var retainedWindows: [Identity: (window: Range<Int>, stride: Int?)] = [:]
+    var pending: [MeasuredNode] = [retained]
+    while let node = pending.popLast() {
+      if let lazy = node.containerAllocationSnapshot?.lazyStack,
+        let window = lazy.measuredWindow
+      {
+        retainedWindows[node.identity] = (window, lazy.estimatedRowStride)
+      }
+      pending.append(contentsOf: node.childMeasurements)
+    }
+    guard !retainedWindows.isEmpty else {
+      return true
+    }
+    var matched = 0
+    pending = [fresh]
+    while let node = pending.popLast() {
+      if let expected = retainedWindows[node.identity] {
+        guard let lazy = node.containerAllocationSnapshot?.lazyStack,
+          lazy.measuredWindow == expected.window,
+          lazy.estimatedRowStride == expected.stride
+        else {
+          return false
+        }
+        matched += 1
+      }
+      pending.append(contentsOf: node.childMeasurements)
+    }
+    return matched == retainedWindows.count
   }
 
   /// D10's spine allowlist: plain stacks and single-proposal forwarding
@@ -390,14 +483,4 @@ extension LayoutEngine {
     return false
   }
 
-  private func subtreeContainsIndexedChildSource(_ resolved: ResolvedNode) -> Bool {
-    var pending: [ResolvedNode] = [resolved]
-    while let node = pending.popLast() {
-      if node.indexedChildSource != nil {
-        return true
-      }
-      pending.append(contentsOf: node.children)
-    }
-    return false
-  }
 }
