@@ -606,9 +606,32 @@ are omitted even when SwiftUI exposes a corresponding API.
   `TextFieldStyle`, `PickerStyle`, `ListStyle`, `TabViewStyle`, and peers are
   public, extensible protocols with `Any*Style` erasers, including families
   SwiftUI keeps closed.
-- **`ToggleStyle`, `ProgressViewStyle`, `LabelStyle`, and `MenuStyle` have no
-  open protocol.** *Gap.* Their absence is accidental incompleteness within
-  the open-protocol design, explicitly not a stance.
+- **Styling is not yet uniformly overridable; an environment-scoped style
+  system across the full surface is the intended destination.** *Gap.* The
+  open-protocol model above — a public style protocol, a public
+  configuration carrying the authored subviews and the render state a style
+  legitimately needs, an `Any*Style` eraser stored in the environment, a
+  lower-camel-cased modifier scoping a style to one control, a subtree, or
+  an application, and retained-reuse participation — is the framework's
+  intended styling contract for every styleable surface, not only the
+  families that have it today. The destination extends that contract to
+  `Toggle`, `ProgressView`, `Label`, `Menu`, `Slider`, `Stepper`,
+  `DisclosureGroup`, `GroupBox`, `ControlGroup`, `LabeledContent`,
+  `TextEditor`, `Table` (split from `ListStyle`), `ScrollView`, `Link`, and
+  `Spinner`, and to the alert/confirmation-dialog, sheet,
+  full-screen-cover, popover, palette, and toolbar presentation surfaces —
+  body-producing where composition is the customization,
+  presentation-valued where the primitive must keep a runtime invariant,
+  with built-in treatments implemented through the same public
+  configuration and routing contract available to third-party styles. At
+  `HEAD`, those surfaces have hard-coded chrome with no independently
+  replaceable style seam, `Table` styles through `ListStyle`, and
+  `Spinner`, `.toolbar(style:)`, and the palette declaration take frames, a
+  style, or content at the declaration rather than reading the nearest
+  environment value. Changes that facilitate this destination — including
+  source-breaking replacement of those three declaration-scoped entry
+  points (toast deliberately keeps its declaration-scoped style argument)
+  — are expected as part of the burndown to 1.0.0.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where
   SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
   than `mix(with:by:)`.
