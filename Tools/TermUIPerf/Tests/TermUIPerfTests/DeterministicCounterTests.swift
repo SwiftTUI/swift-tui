@@ -282,6 +282,42 @@ struct DeterministicCounterTests {
     }
   }
 
+  @Test("cold lane produces bit-identical counters across iterations")
+  @MainActor
+  func coldLaneCountersAreIdentical() throws {
+    // 4 iterations: 1 = first render, 2-3 discarded, 4 measured — the
+    // smallest run that exercises every bucket of the D3 protocol. The lane
+    // itself throws on any counter drift, so passing IS the identity proof.
+    let report = try BenchColdLane.run(MemoEquatableBoundaryScenario(), iterations: 4)
+    #expect(report.iterations == 4)
+    #expect(report.renderMs.sampleCount == 1)
+    #expect(report.firstRenderMs > 0)
+    #expect(report.counters.committedFrames == 1)
+    #expect((report.counters.resolvedComputed ?? 0) > 0)
+    #expect((report.counters.measuredComputed ?? 0) > 0)
+    #expect((report.counters.drawNodes ?? 0) > 0)
+    #expect((report.counters.presentCells ?? 0) > 0)
+    // The memo grid is built-in containers all the way down: the plan-004
+    // branching counters must be live, and the custom slice empty.
+    #expect((report.counters.builtinChildMeasureRequests ?? 0) > 0)
+    #expect(report.counters.customContainerMeasures == 0)
+    // No presentation writer in the one-shot path: bytes must be absent,
+    // not zero.
+    #expect(report.counters.presentBytes == nil)
+  }
+
+  @Test("every suite member supports the cold lane")
+  @MainActor
+  func everySuiteMemberSupportsColdLane() {
+    for member in BenchSuite.members {
+      let scenario = PerfScenarioRegistry.scenario(named: member.scenario)
+      #expect(
+        scenario is any BenchColdRenderable,
+        "suite member \(member.scenario.rawValue) must be cold-renderable"
+      )
+    }
+  }
+
   @Test("bench rejects a scenario that is not a suite member")
   func benchRejectsNonSuiteMember() async {
     // Parse accepts any scenario name; suite membership is enforced at run

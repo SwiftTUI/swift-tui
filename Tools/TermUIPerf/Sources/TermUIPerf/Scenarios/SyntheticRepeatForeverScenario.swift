@@ -40,7 +40,13 @@ public struct SyntheticRepeatForeverScenario: PerfScenario {
   }
 }
 
-private struct PerfRepeatForeverProbeView: View {
+extension SyntheticRepeatForeverScenario: BenchColdRenderable {
+  func makeColdRoot() -> PerfRepeatForeverProbeView {
+    PerfRepeatForeverProbeView()
+  }
+}
+
+struct PerfRepeatForeverProbeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("continuous-anim")

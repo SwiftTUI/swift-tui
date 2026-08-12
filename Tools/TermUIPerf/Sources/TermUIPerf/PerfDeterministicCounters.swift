@@ -71,9 +71,12 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   public var drawNodes: Int?
   /// UTF-8 bytes presented. Meaningful as a wire number only when the
   /// emission lane was armed; the in-process host's byte count is still
-  /// deterministic and still ratchets.
-  public var presentBytes: Int
-  public var presentCells: Int
+  /// deterministic and still ratchets. `nil` in the cold lane — the one-shot
+  /// path has no presentation writer, so there are no bytes to miscount.
+  public var presentBytes: Int?
+  /// Cells presented (warm) or non-empty cells the raster produced (cold) —
+  /// both are the "rasterized cells" census of D4, each lane's honest form.
+  public var presentCells: Int?
   /// Damaged text cells over frames that reported a bounded count; `nil`
   /// when no frame carried the column.
   public var damageCells: Int?
@@ -99,8 +102,8 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     resolvedReused: Int? = nil,
     measuredComputed: Int? = nil,
     drawNodes: Int? = nil,
-    presentBytes: Int = 0,
-    presentCells: Int = 0,
+    presentBytes: Int? = nil,
+    presentCells: Int? = nil,
     damageCells: Int? = nil,
     boundedDamageRows: Int? = nil,
     fullRepaintFrames: Int = 0,
@@ -220,8 +223,8 @@ extension PerfDeterministicCounters {
     append("resolved_reused", resolvedReused)
     append("measured_computed", measuredComputed)
     append("draw_nodes", drawNodes)
-    entries.append(("present_bytes", presentBytes))
-    entries.append(("present_cells", presentCells))
+    append("present_bytes", presentBytes)
+    append("present_cells", presentCells)
     append("damage_cells", damageCells)
     append("bounded_damage_rows", boundedDamageRows)
     entries.append(("full_repaint_frames", fullRepaintFrames))

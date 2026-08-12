@@ -280,6 +280,7 @@ public enum PerfCommandParser {
     var artifactsRoot = PerfBenchConfig.defaultArtifactsRoot
     var configuration = PerfRunConfig.defaultConfiguration
     var warmIterations = PerfBenchConfig.defaultWarmIterations
+    var coldIterations = PerfBenchConfig.defaultColdIterations
     var members: [PerfScenarioName]?
 
     var index = arguments.startIndex
@@ -296,6 +297,12 @@ public enum PerfCommandParser {
           throw PerfParseError.invalidIterations(value)
         }
         warmIterations = parsedIterations
+      case "--cold-iterations":
+        let value = try value(after: argument, in: arguments, at: &index)
+        guard let parsedIterations = Int(value), parsedIterations > 0 else {
+          throw PerfParseError.invalidIterations(value)
+        }
+        coldIterations = parsedIterations
       case "--member":
         let value = try value(after: argument, in: arguments, at: &index)
         guard let parsedScenario = PerfScenarioName(rawValue: value) else {
@@ -315,6 +322,7 @@ public enum PerfCommandParser {
       artifactsRoot: artifactsRoot,
       configuration: configuration,
       warmIterations: warmIterations,
+      coldIterations: coldIterations,
       members: members
     )
   }

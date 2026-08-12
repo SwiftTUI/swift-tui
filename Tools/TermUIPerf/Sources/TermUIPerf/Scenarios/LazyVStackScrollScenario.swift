@@ -112,7 +112,16 @@ public struct LazyVStackScrollScenario: PerfScenario {
   }
 }
 
-private struct PerfLazyVStackScrollView: View {
+extension LazyVStackScrollScenario: BenchColdRenderable {
+  /// Pinned 10k rows — the committed-baseline shape. The
+  /// `SWIFTTUI_PERF_LAZY_VSTACK_ROWS` override the warm scenario honors
+  /// deliberately does not apply to the cold lane.
+  func makeColdRoot() -> PerfLazyVStackScrollView {
+    PerfLazyVStackScrollView(rowCount: Self.defaultRowCount)
+  }
+}
+
+struct PerfLazyVStackScrollView: View {
   let rowCount: Int
 
   var body: some View {

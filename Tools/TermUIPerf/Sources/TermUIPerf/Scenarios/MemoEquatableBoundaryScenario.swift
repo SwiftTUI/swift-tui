@@ -97,7 +97,20 @@ public struct MemoEquatableBoundaryScenario: PerfScenario {
   }
 }
 
-private struct MemoBoundaryProbeView: View {
+extension MemoEquatableBoundaryScenario: BenchColdRenderable {
+  /// Pinned 18x8 grid behind the `Equatable` boundary — the
+  /// committed-baseline shape. The env-var grid-size and boundary A/B knobs
+  /// the warm scenario honors deliberately do not apply to the cold lane.
+  func makeColdRoot() -> MemoBoundaryProbeView {
+    MemoBoundaryProbeView(
+      rowCount: Self.defaultRowCount,
+      columnCount: Self.columnCount,
+      useEquatableBoundary: true
+    )
+  }
+}
+
+struct MemoBoundaryProbeView: View {
   let rowCount: Int
   let columnCount: Int
   let useEquatableBoundary: Bool

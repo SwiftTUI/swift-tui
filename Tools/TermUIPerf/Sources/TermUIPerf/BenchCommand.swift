@@ -5,10 +5,13 @@ import SwiftTUI
 public struct PerfBenchConfig: Equatable, Sendable {
   public static let defaultArtifactsRoot = ".perf/bench"
   public static let defaultWarmIterations = PerfRunConfig.defaultIterations
+  /// D3's cold-lane protocol: 30 one-shot renders per configuration.
+  public static let defaultColdIterations = 30
 
   public var artifactsRoot: String
   public var configuration: String
   public var warmIterations: Int
+  public var coldIterations: Int
   /// Suite subset to run; `nil` runs every member. A focused-rerun and
   /// smoke-test seam — the suite itself is defined only by `BenchSuite`.
   public var members: [PerfScenarioName]?
@@ -17,11 +20,13 @@ public struct PerfBenchConfig: Equatable, Sendable {
     artifactsRoot: String = defaultArtifactsRoot,
     configuration: String = PerfRunConfig.defaultConfiguration,
     warmIterations: Int = defaultWarmIterations,
+    coldIterations: Int = defaultColdIterations,
     members: [PerfScenarioName]? = nil
   ) {
     self.artifactsRoot = artifactsRoot
     self.configuration = configuration
     self.warmIterations = warmIterations
+    self.coldIterations = coldIterations
     self.members = members
   }
 }
@@ -40,10 +45,19 @@ public struct PerfBenchLaneReport: Codable, Equatable, Sendable {
 public struct PerfBenchMemberReport: Codable, Equatable, Sendable {
   public var scenario: String
   public var lanes: [PerfBenchLaneReport]
+  /// The cold one-shot lane (Stage 1). Present for every member — a suite
+  /// member that cannot cold-render fails the run rather than omitting the
+  /// lane silently.
+  public var cold: PerfBenchColdReport?
 
-  public init(scenario: String, lanes: [PerfBenchLaneReport]) {
+  public init(
+    scenario: String,
+    lanes: [PerfBenchLaneReport],
+    cold: PerfBenchColdReport? = nil
+  ) {
     self.scenario = scenario
     self.lanes = lanes
+    self.cold = cold
   }
 }
 
@@ -91,12 +105,17 @@ public struct PerfBenchReport: Codable, Equatable, Sendable {
 
 public enum PerfBenchError: Error, Equatable, CustomStringConvertible {
   case notASuiteMember(String)
+  case memberNotColdRenderable(String)
 
   public var description: String {
     switch self {
     case .notASuiteMember(let name):
       let known = BenchSuite.members.map(\.scenario.rawValue).joined(separator: ", ")
       return "'\(name)' is not a benchmark suite member. Suite: \(known)."
+    case .memberNotColdRenderable(let name):
+      return
+        "suite member '\(name)' does not conform to BenchColdRenderable — every "
+        + "member must support the cold lane (plan 2026-08-11-005 D3)."
     }
   }
 }
@@ -118,6 +137,16 @@ public enum BenchCommand {
     var memberReports: [PerfBenchMemberReport] = []
     var provenance: PerfRunMetadata?
     for member in selected {
+      // Cold lane first: it is cheap, and its determinism check failing
+      // should abort before the member's multi-minute warm lanes run.
+      guard
+        let coldRenderable = PerfScenarioRegistry.scenario(named: member.scenario)
+          as? any BenchColdRenderable
+      else {
+        throw PerfBenchError.memberNotColdRenderable(member.scenario.rawValue)
+      }
+      let cold = try BenchColdLane.run(coldRenderable, iterations: config.coldIterations)
+
       var lanes: [PerfBenchLaneReport] = []
       for mode in member.warmModes {
         let laneRoot =
@@ -143,7 +172,11 @@ public enum BenchCommand {
         }
       }
       memberReports.append(
-        PerfBenchMemberReport(scenario: member.scenario.rawValue, lanes: lanes)
+        PerfBenchMemberReport(
+          scenario: member.scenario.rawValue,
+          lanes: lanes,
+          cold: cold
+        )
       )
     }
 
@@ -167,6 +200,11 @@ public enum BenchCommand {
         + report.suite.joined(separator: ", ")
     ]
     for member in report.members {
+      if let cold = member.cold {
+        lines.append("")
+        lines.append("=== \(member.scenario) [cold] ===")
+        lines.append(formatCold(cold))
+      }
       for lane in member.lanes {
         lines.append("")
         lines.append("=== \(member.scenario) [\(lane.lane)] ===")
@@ -174,6 +212,33 @@ public enum BenchCommand {
       }
     }
     return lines.joined(separator: "\n")
+  }
+
+  private static func formatCold(_ cold: PerfBenchColdReport) -> String {
+    var lines = [
+      "iterations: \(cold.iterations) "
+        + "(1 = first render, 2-3 discarded, \(cold.renderMs.sampleCount) measured)",
+      "first render ms: \(String(format: "%.3f", cold.firstRenderMs))",
+      statLine("render ms", cold.renderMs),
+      statLine("resolve ms", cold.resolveMs),
+      statLine("measure ms", cold.measureMs),
+      statLine("place ms", cold.placeMs),
+      statLine("draw ms", cold.drawMs),
+      statLine("raster ms", cold.rasterMs),
+      "deterministic counters (bit-identical across all iterations):",
+    ]
+    for (name, value) in cold.counters.orderedEntries {
+      lines.append("  \(name): \(value)")
+    }
+    return lines.joined(separator: "\n")
+  }
+
+  private static func statLine(_ label: String, _ stat: PerfStat) -> String {
+    guard stat.sampleCount > 0 else {
+      return "\(label): n/a (0 samples)"
+    }
+    return "\(label): \(String(format: "%.3f", stat.median)) "
+      + "+/- \(String(format: "%.3f", stat.stddev)) (n=\(stat.sampleCount))"
   }
 
   private static func selectedMembers(_ config: PerfBenchConfig) throws -> [BenchMember] {
