@@ -79,6 +79,11 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     var continuation: AsyncStream<String>.Continuation?
     var continuationGeneration: UInt64 = 0
     var directHandler: (@Sendable (String) -> Void)?
+    // Hosted transports can publish their initial resize while the run loop
+    // is still installing its event streams. Preserve that wake instead of
+    // leaving the first frame at the fallback grid until unrelated input.
+    var pendingSignals: [String] = []
+    var isFinished = false
   }
 
   private let state = Mutex(State())
@@ -89,7 +94,15 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     makeManagedAsyncStream { continuation in
       let generation = self.state.withLock { state in
         state.continuationGeneration &+= 1
+        guard !state.isFinished else {
+          continuation.finish()
+          return state.continuationGeneration
+        }
         state.continuation = continuation
+        for signalName in state.pendingSignals {
+          continuation.yield(signalName)
+        }
+        state.pendingSignals.removeAll(keepingCapacity: true)
         return state.continuationGeneration
       }
 
@@ -105,14 +118,30 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   }
 
   public func send(_ signalName: String) {
-    let (continuation, directHandler) = state.withLock { state in
-      (state.continuation, state.directHandler)
+    // The direct handler is arbitrary code: the Android direct pump
+    // dispatches run-loop event processing synchronously from it, and that
+    // processing can re-enter send() (a host callback requesting a surface
+    // refresh). The Mutex is not recursive, so the handler must be invoked
+    // OUTSIDE the lock. Continuation yields stay in-lock — AsyncStream's
+    // yield is non-blocking and runs no consumer code inline. A handler
+    // invocation that races clearDirectHandler()/finish() can still deliver
+    // one in-flight signal after the clear, matching the pre-buffering
+    // behavior of this type.
+    let directHandler = state.withLock { state -> (@Sendable (String) -> Void)? in
+      guard !state.isFinished else {
+        return nil
+      }
+      if let directHandler = state.directHandler {
+        return directHandler
+      }
+      if let continuation = state.continuation {
+        continuation.yield(signalName)
+      } else {
+        state.pendingSignals.append(signalName)
+      }
+      return nil
     }
-    if let directHandler {
-      directHandler(signalName)
-    } else {
-      continuation?.yield(signalName)
-    }
+    directHandler?(signalName)
   }
 
   public func finish() {
@@ -120,6 +149,8 @@ public final class InProcessSignalReader: SignalReading, Sendable {
       let continuation = state.continuation
       state.continuation = nil
       state.directHandler = nil
+      state.pendingSignals.removeAll(keepingCapacity: false)
+      state.isFinished = true
       return continuation
     }
     continuation?.finish()
@@ -128,8 +159,19 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   package func installDirectHandler(
     _ handler: @escaping @Sendable (String) -> Void
   ) {
-    state.withLock { state in
+    // Flush outside the lock for the same re-entrancy reason as send(): a
+    // buffered signal's synchronous handling can send follow-up signals.
+    let pendingSignals = state.withLock { state -> [String] in
+      guard !state.isFinished else {
+        return []
+      }
       state.directHandler = handler
+      let pending = state.pendingSignals
+      state.pendingSignals.removeAll(keepingCapacity: true)
+      return pending
+    }
+    for signalName in pendingSignals {
+      handler(signalName)
     }
   }
 

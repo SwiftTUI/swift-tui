@@ -1,10 +1,61 @@
 @_spi(Testing) import SwiftTUITestSupport
+import Synchronization
 import Testing
 
 @_spi(Runners) @testable import SwiftTUIRuntime
 
 @Suite("Async lifecycle generation fences")
 struct AsyncLifecycleGenerationTests {
+  @Test("signal reader delivers signals sent before stream subscription")
+  func signalReaderDeliversPreSubscriptionSignals() async throws {
+    let reader = InProcessSignalReader()
+
+    reader.send("SIGWINCH")
+    var iterator = reader.events().makeAsyncIterator()
+
+    #expect(await iterator.next() == "SIGWINCH")
+    reader.finish()
+  }
+
+  // The direct handler is arbitrary code and can re-enter send()
+  // synchronously (the Android direct pump dispatches event processing from
+  // it, and a presented frame's host callback can request a surface
+  // refresh). The reader's Mutex is not recursive, so these two tests hang
+  // if handler invocation ever moves back inside the lock.
+  @Test("signal reader direct handler can re-enter send without deadlocking")
+  func signalReaderDirectHandlerSupportsReentrantSend() {
+    let reader = InProcessSignalReader()
+    let received = Mutex<[String]>([])
+
+    reader.installDirectHandler { [weak reader] signalName in
+      received.withLock { $0.append(signalName) }
+      if signalName == "SIGWINCH" {
+        reader?.send("SIGUSR1")
+      }
+    }
+    reader.send("SIGWINCH")
+
+    #expect(received.withLock { $0 } == ["SIGWINCH", "SIGUSR1"])
+    reader.finish()
+  }
+
+  @Test("pre-subscription signal flush supports a re-entrant direct handler")
+  func signalReaderPendingFlushSupportsReentrantSend() {
+    let reader = InProcessSignalReader()
+    let received = Mutex<[String]>([])
+
+    reader.send("SIGWINCH")
+    reader.installDirectHandler { [weak reader] signalName in
+      received.withLock { $0.append(signalName) }
+      if signalName == "SIGWINCH" {
+        reader?.send("SIGUSR1")
+      }
+    }
+
+    #expect(received.withLock { $0 } == ["SIGWINCH", "SIGUSR1"])
+    reader.finish()
+  }
+
   @Test("signal reader ignores stale stream teardown after replacement")
   func signalReaderIgnoresStaleStreamTeardownAfterReplacement() async throws {
     let reader = InProcessSignalReader()
