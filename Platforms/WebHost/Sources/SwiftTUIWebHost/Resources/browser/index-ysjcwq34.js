@@ -3349,6 +3349,7 @@ class WebHostSceneRuntime {
   synchronizeAccessibilityFocus;
   wheelMode;
   rendererKind;
+  sceneFrame;
   painter;
   inputEncoder = new InputEventEncoder;
   currentStyle;
@@ -3386,6 +3387,7 @@ class WebHostSceneRuntime {
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
     this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
     this.rendererKind = options.renderer ?? "canvas";
+    this.sceneFrame = options.sceneFrame ?? "fill";
     const onImagePayloadMiss = (ids) => {
       return this.bridge?.requestImagePayloads?.(ids);
     };
@@ -3579,27 +3581,36 @@ class WebHostSceneRuntime {
   applyStyle(style) {
     applyWebHostTerminalStyle(this.element, style);
     this.element.style.boxSizing = "border-box";
-    this.element.style.width = "80%";
-    this.element.style.height = "80%";
-    this.element.style.maxWidth = "100%";
-    this.element.style.maxHeight = "100%";
+    if (this.sceneFrame === "resizable") {
+      this.element.style.width = "80%";
+      this.element.style.height = "80%";
+      this.element.style.maxWidth = "100%";
+      this.element.style.maxHeight = "100%";
+      this.element.style.resize = "both";
+      this.element.style.flex = "0 0 auto";
+    } else {
+      this.element.style.width = "100%";
+      this.element.style.height = "100%";
+    }
     this.element.style.minWidth = "0";
     this.element.style.minHeight = "0";
     this.element.style.padding = "0.75rem";
     this.element.style.borderRadius = "16px";
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
     this.element.style.overflow = "hidden";
-    this.element.style.resize = "both";
-    this.element.style.flex = "0 0 auto";
     this.element.style.gap = "0.5rem";
     this.element.style.gridTemplateRows = "auto minmax(0, 1fr)";
     this.terminalMount.style.position = "relative";
     this.terminalMount.style.boxSizing = "border-box";
     this.terminalMount.style.width = "100%";
-    this.terminalMount.style.height = "auto";
+    if (this.sceneFrame === "resizable") {
+      this.terminalMount.style.height = "auto";
+      this.terminalMount.style.alignSelf = "stretch";
+    } else {
+      this.terminalMount.style.height = "100%";
+    }
     this.terminalMount.style.minWidth = "0";
     this.terminalMount.style.minHeight = "0";
-    this.terminalMount.style.alignSelf = "stretch";
     this.terminalMount.style.overflow = "hidden";
     this.terminalMount.style.overscrollBehavior = this.wheelMode === "capture" ? "contain" : "auto";
     this.terminalMount.style.outline = "none";
@@ -3863,7 +3874,8 @@ async function createWebHostApp(options) {
     sceneRuntimeFactory: options.sceneRuntimeFactory ?? ((runtimeOptions) => new WebHostSceneRuntime(runtimeOptions)),
     suspendHiddenScenes: options.suspendHiddenScenes,
     visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument(),
-    renderer: options.renderer
+    renderer: options.renderer,
+    sceneFrame: options.sceneFrame
   });
   await controller.initialize();
   return controller;
@@ -3883,6 +3895,7 @@ class InternalWebHostAppController {
   bridges = new Map;
   suspendHiddenScenes;
   renderer;
+  sceneFrame;
   visibilityDocument;
   detachVisibilityListener;
   constructor(options) {
@@ -3894,6 +3907,7 @@ class InternalWebHostAppController {
     this.sceneRuntimeFactory = options.sceneRuntimeFactory;
     this.suspendHiddenScenes = options.suspendHiddenScenes;
     this.renderer = options.renderer;
+    this.sceneFrame = options.sceneFrame ?? "fill";
     this.visibilityDocument = options.visibilityDocument;
     this.scenes = options.manifest.scenes;
     this.selectedSceneId = options.initialSceneId && options.manifest.scenes.some((scene) => scene.id === options.initialSceneId) ? options.initialSceneId : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ?? options.manifest.defaultSceneId;
@@ -3905,9 +3919,13 @@ class InternalWebHostAppController {
     this.sceneRoot.style.minWidth = "0";
     this.sceneRoot.style.minHeight = "0";
     this.sceneRoot.style.overflow = "hidden";
-    this.sceneRoot.style.display = "flex";
-    this.sceneRoot.style.justifyContent = "center";
-    this.sceneRoot.style.alignItems = "flex-start";
+    if (this.sceneFrame === "resizable") {
+      this.sceneRoot.style.display = "flex";
+      this.sceneRoot.style.justifyContent = "center";
+      this.sceneRoot.style.alignItems = "flex-start";
+    } else {
+      this.sceneRoot.style.display = "block";
+    }
     this.mount.replaceChildren(this.sceneRoot);
     this.applyHostFrameStyle();
   }
@@ -3982,7 +4000,8 @@ class InternalWebHostAppController {
       bridge,
       onInput: (chunk) => bridge.sendInput(chunk),
       suspendWhenHidden: this.suspendHiddenScenes,
-      renderer: this.renderer
+      renderer: this.renderer,
+      sceneFrame: this.sceneFrame
     });
     this.bridges.set(id, bridge);
     this.runtimes.set(id, runtime);
@@ -4074,6 +4093,7 @@ async function bootstrap() {
     initialSceneId: config.initialSceneId,
     style: config.style,
     renderer: config.renderer ?? rendererFromQuery(pageURL),
+    sceneFrame: config.sceneFrame ?? "resizable",
     embeddedHost: embeddedToken ? {
       token: embeddedToken,
       webSocketBaseURL: config.embeddedHost?.webSocketBaseURL ?? new URL("./", pageURL).href
