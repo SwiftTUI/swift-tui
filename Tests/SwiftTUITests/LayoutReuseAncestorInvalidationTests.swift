@@ -86,8 +86,13 @@ struct LayoutReuseAncestorInvalidationTests {
       )
     )
 
-    #expect(updated.diagnostics.work.measuredNodesComputed == 3)
-    #expect(updated.diagnostics.work.measuredNodesReused == 4)
+    // With the size-stability cutoff on by default (plan 2026-08-11-002
+    // Stage 4), the invalidated-but-unchanged branch certifies in the
+    // pre-pass and serves retained measurements instead of recomputing
+    // (computed 3 -> 2, reused 4 -> 5). Placement is deliberately not
+    // certified (D5), so the placed economy is unchanged.
+    #expect(updated.diagnostics.work.measuredNodesComputed == 2)
+    #expect(updated.diagnostics.work.measuredNodesReused == 5)
     #expect(updated.diagnostics.work.placedNodesComputed == 3)
     #expect(updated.diagnostics.work.placedNodesReused == 4)
   }

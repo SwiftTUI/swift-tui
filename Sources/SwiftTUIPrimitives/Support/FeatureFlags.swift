@@ -137,14 +137,20 @@ package enum FeatureGate: CaseIterable, Sendable {
       // blit (and with it the planner's identity fast path) wholesale.
       true
     case .measureSizeStabilityCutoff:
-      // Opt-in stage gate (size-stability cutoff, plan 2026-08-11-002).
-      // Behind the gate the pre-pass certifies size-stable dirty subtrees
-      // and, as of Stage 3, serves EVERY certified root through the derived
-      // measure session (the multi-sample certificate is the soundness
-      // argument; the layout shadow oracle is the stage authority).
-      // Promotion to a default-on kill switch still requires the plan's
-      // Stage 4 benchmark acceptance on the plan-005 harness.
-      false
+      // Kill switch, not an opt-in (plan 2026-08-11-002 Stage 4): the
+      // pre-pass certifies size-stable dirty subtrees with the multi-sample
+      // certificate (retained + cached baselines including the parent's
+      // ideal-round proposal) and serves every certified root through the
+      // derived measure session; the layout shadow oracle polices every
+      // serve. Promoted 2026-08-11 on the plan-005 committed-benchmark A/B:
+      // lazy-vstack-scroll pipeline p50 22.5 -> 10.4 ms ([real], zero-band
+      // deterministic counter drops), measure-request counters down [real]
+      // on every suite member, and the narrow-invalidation guard flat —
+      // plus the plan-006 enablement evidence (180/180 chrome frames
+      // certified+served, oracle-clean under every-frame DEBUG sampling).
+      // `SWIFTTUI_MEASURE_CUTOFF=0` restores the conservative full
+      // ancestor-spine re-measure wholesale (and is the A/B lever).
+      true
     case .persistentCustomLayoutCache:
       // Kill switch, not an opt-in (plan 2026-08-11-004 Stage 2): the
       // `Layout.Cache` doc contract already demands value-semantic,

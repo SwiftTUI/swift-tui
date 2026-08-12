@@ -35,9 +35,16 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
-    // The size-stability cutoff is an opt-in stage gate until its Stage 4
-    // benchmark acceptance (plan 2026-08-11-002).
-    #expect(!FeatureGate.measureSizeStabilityCutoff.defaultIsEnabled)
+  }
+
+  @Test("the size-stability measure cutoff defaults on as a kill switch")
+  func measureCutoffDefaultsOn() {
+    // Plan 2026-08-11-002 Stage 4: promoted on the plan-005
+    // committed-benchmark A/B (lazy-vstack-scroll pipeline p50 -54% [real],
+    // measure-request counters down [real] suite-wide, narrow-invalidation
+    // guard flat) with the layout shadow oracle policing every serve —
+    // a kill switch (`SWIFTTUI_MEASURE_CUTOFF=0`), not an opt-in.
+    #expect(FeatureGate.measureSizeStabilityCutoff.defaultIsEnabled)
   }
 
   @Test("the collection probes default on in DEBUG and off in release")

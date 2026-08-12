@@ -6,9 +6,10 @@ struct FrameTailInlineStageRenderer: Sendable {
   /// Read once — the gates latch their first read by design.
   private static let scrollBlitEnabled = FeatureGate.scrollBlit.initialIsEnabled()
 
-  /// Stage gate for the size-stability measure cutoff's certificate pre-pass
-  /// (`SWIFTTUI_MEASURE_CUTOFF`, plan 2026-08-11-002 — Stage 1 records
-  /// counters only and serves nothing).
+  /// Kill switch for the size-stability measure cutoff's certificate
+  /// pre-pass (`SWIFTTUI_MEASURE_CUTOFF`, plan 2026-08-11-002 — default on
+  /// since the Stage 4 promotion; `=0` restores the conservative spine
+  /// re-measure wholesale).
   private static let measureCutoffEnabled =
     FeatureGate.measureSizeStabilityCutoff.initialIsEnabled()
 
