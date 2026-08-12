@@ -723,6 +723,141 @@ struct OffscreenFrameElisionRuntimeTests {
     }
   }
 
+  // MARK: - Outstanding-proposal guard (hosted resize freeze)
+
+  /// The hosted-resize freeze guard: a deadline-only tick that arrives while
+  /// the surface proposal has changed since the last prepared head must
+  /// RENDER, not elide. The failing sequence this pins (WebHost drag-resize):
+  /// a resize's SIGWINCH frame is cancelled or dropped under a newer intent
+  /// (its cause is consumed and never re-pended), and the next wake is an
+  /// off-screen animation deadline. Before the guard, that tick's head
+  /// consumed the new proposal and `commitElidedFrame` committed the latched
+  /// selector state while presenting nothing — every later frame then
+  /// compared proposal-equal, took selective evaluation with a clean tree,
+  /// and served retained layout at the stale size. The terminal never
+  /// resized again.
+  ///
+  /// Three phases: (A) an unchanged-proposal off-screen tick still elides
+  /// (the guard must not disable elision), (B) after a surface resize with
+  /// no scheduler cause left behind, the same tick renders and presents,
+  /// (C) once the new size has presented, elision resumes.
+  @Test("deadline tick renders instead of eliding while a resize is outstanding")
+  func outstandingProposalDeadlineTickRendersInsteadOfEliding() async throws {
+    let initialSize = CellSize(width: 20, height: 2)
+    let rootIdentity = testIdentity("ElisionOutstandingProposal", "Root")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: initialSize)
+    let scheduler = FrameScheduler()
+    // Frozen readiness clock, same rationale as
+    // `offscreenDeadlineTickElidesWithoutFreezingThenOnScreenRenders`: the
+    // off-screen repeatForever re-arms its deadline at the real future, so
+    // pinning the consume instant makes only the test's explicit requests
+    // drive frames.
+    let frozenNow = MonotonicInstant.now()
+    // No `proposal:` override — the run loop must read the LIVE
+    // `presentationSurface.surfaceSize`, which is what a hosted transport
+    // mutates on resize.
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = initialSize
+        return values
+      }(),
+      viewBuilder: { _, _ in
+        OffscreenAnimatedProbe()
+      }
+    )
+    runLoop.frameClock = { frozenNow }
+
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
+      // Mount synchronously (see the sibling tests: the async driver can drop
+      // the onAppear follow-up under parallel load, leaving the repeatForever
+      // unregistered).
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: frozenNow) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+      #expect(
+        runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+        "the off-screen repeatForever animation must be in flight"
+      )
+
+      // Phase A — unchanged proposal: the off-screen tick still elides.
+      let elidedBeforeA = runLoop.renderer.elidedFrameCount
+      let presentsBeforeA = terminal.presentCount
+      scheduler.requestDeadline(frozenNow)
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBeforeA,
+        "an off-screen deadline tick at an unchanged proposal must still elide"
+      )
+      #expect(
+        terminal.presentCount == presentsBeforeA,
+        "the unchanged-proposal elided tick must not present"
+      )
+
+      // Phase B — resize with no scheduler cause left behind (the skipped
+      // SIGWINCH shape), then a deadline-only tick: it must render.
+      terminal.updateSurfaceSize(CellSize(width: 24, height: 3))
+      let elidedBeforeB = runLoop.renderer.elidedFrameCount
+      let presentsBeforeB = terminal.presentCount
+      scheduler.requestDeadline(frozenNow)
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+      #expect(
+        terminal.presentCount > presentsBeforeB,
+        """
+        a deadline tick with an outstanding resize must render and present; \
+        presentsBefore=\(presentsBeforeB) after=\(terminal.presentCount)
+        """
+      )
+      #expect(
+        runLoop.renderer.elidedFrameCount == elidedBeforeB,
+        """
+        a deadline tick with an outstanding resize must not elide; \
+        elidedBefore=\(elidedBeforeB) after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+
+      // Phase C — the new size has presented; off-screen elision resumes.
+      let elidedBeforeC = runLoop.renderer.elidedFrameCount
+      let presentsBeforeC = terminal.presentCount
+      scheduler.requestDeadline(frozenNow)
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: nil
+      )
+      #expect(
+        runLoop.renderer.elidedFrameCount > elidedBeforeC,
+        "once the resized frame presented, off-screen ticks must elide again"
+      )
+      #expect(
+        terminal.presentCount == presentsBeforeC,
+        "the post-resize elided tick must not present"
+      )
+    }
+  }
+
   // MARK: - End-to-end completion timing (Task 8.1)
 
   /// The core "coalesce pixels, not logic" invariant, proven END-TO-END through
@@ -1692,13 +1827,20 @@ private struct InterleavedOffscreenBorder: View {
 }
 
 private final class ElisionProbeTerminalHost: PresentationSurface {
-  let surfaceSize: CellSize
+  private(set) var surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var presentCount = 0
 
   init(surfaceSize: CellSize) {
     self.surfaceSize = surfaceSize
+  }
+
+  /// Mirrors a hosted transport's resize (`updateSurfaceSize` + SIGWINCH)
+  /// after the wake was consumed: the size changes with no scheduler cause
+  /// left behind, exactly the state a skipped SIGWINCH frame leaves.
+  func updateSurfaceSize(_ size: CellSize) {
+    surfaceSize = size
   }
 
   func enableRawMode() throws {}

@@ -371,6 +371,15 @@ package final class FrameResolveState {
     selectiveEvaluationEnabled = false
   }
 
+  /// The proposal the most recent prepared frame head consumed, for the
+  /// off-screen elision gates. A deadline-only tick whose head would consume
+  /// (or has consumed) a proposal that differs from this one must render
+  /// rather than elide: `commitElided()` publishes the prepared selector
+  /// state — including the latched proposal — without presenting anything,
+  /// so eliding such a frame permanently swallows the resize (every later
+  /// frame compares equal and serves retained layout at the stale size).
+  package var lastPreparedProposal: ProposedSize? { previousProposal }
+
   /// The single selective-evaluation eligibility formula (F177). Both the
   /// frame-head input preparation below and the portal-translation recompute
   /// (`DefaultRendererFrameHeadCoordinator.translatePresentationPortalInvalidations`)

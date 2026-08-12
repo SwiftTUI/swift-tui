@@ -433,9 +433,14 @@ public struct DefaultRenderer {
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderExecutionResult {
     let renderer = self
+    // Sampled before computeFrameHead latches the proposal into the selector
+    // memory; both elision gates refuse to elide while a changed proposal is
+    // in hand (see makeCommitElidedFrameIfOffscreen).
+    let proposalChanged = proposal != frameState.lastPreparedProposal
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      proposalChanged: proposalChanged,
       frameInstant: frameInstant
     ) {
       return .elided
@@ -460,7 +465,8 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+          proposalChanged: proposalChanged
         ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(
@@ -560,12 +566,25 @@ public struct DefaultRenderer {
   /// when it fires, performs the reduced commit (``commitElidedFrame(draft:)``)
   /// before returning `true`. When `elisionCauses` is empty (the public
   /// preview entry points) the predicate can never fire.
+  ///
+  /// `proposalChanged` is captured BEFORE `computeFrameHead` (whose
+  /// `prepareInputs` latches the proposal into the selector memory): a head
+  /// that consumed a changed surface proposal must not be elided —
+  /// `commitElidedFrame` commits the latched proposal without presenting,
+  /// so the resize it carried would never render (the web/hosted resize
+  /// freeze: a skipped SIGWINCH frame followed by an elided deadline tick
+  /// left every later frame comparing proposal-equal against a size no
+  /// frame ever presented).
   @MainActor
   private func makeCommitElidedFrameIfOffscreen(
     elisionCauses: Set<WakeCause>,
-    elisionHasExplicitAnimationTransactions: Bool
+    elisionHasExplicitAnimationTransactions: Bool,
+    proposalChanged: Bool
   ) -> (FrameHeadDraft) -> Bool {
     { [self] draft in
+      guard !proposalChanged else {
+        return false
+      }
       let tick = draft.animationDraft.controller.lastTickResult
       guard
         OffscreenFrameElision.shouldElide(
@@ -586,8 +605,16 @@ public struct DefaultRenderer {
   private func elideOffscreenAnimationBeforeFrameHeadIfPossible(
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool,
+    proposalChanged: Bool,
     frameInstant: MonotonicInstant
   ) -> Bool {
+    // A deadline tick that arrives while an unrendered proposal is
+    // outstanding (a resize whose SIGWINCH frame was cancelled or dropped)
+    // must run a real frame: eliding it presents nothing and leaves no other
+    // wake that would ever render the new size.
+    guard !proposalChanged else {
+      return false
+    }
     guard
       let redrawIdentities =
         animationController.preFrameHeadOffscreenPropertyAnimationRedrawIdentities
@@ -625,9 +652,13 @@ public struct DefaultRenderer {
     elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
     let renderer = self
+    // Sampled before computeFrameHead latches the proposal (see
+    // makeCommitElidedFrameIfOffscreen).
+    let proposalChanged = proposal != frameState.lastPreparedProposal
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      proposalChanged: proposalChanged,
       frameInstant: frameInstant
     ) {
       return .elided
@@ -650,7 +681,8 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+          proposalChanged: proposalChanged
         ),
         latePreferenceReconciliation: { input, clock in
           renderer.frameTailCoordinator.renderLayoutResolvingLatePreferences(
@@ -721,9 +753,13 @@ public struct DefaultRenderer {
     elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
     let renderer = self
+    // Sampled before computeFrameHead latches the proposal (see
+    // makeCommitElidedFrameIfOffscreen).
+    let proposalChanged = proposal != frameState.lastPreparedProposal
     if renderer.elideOffscreenAnimationBeforeFrameHeadIfPossible(
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+      proposalChanged: proposalChanged,
       frameInstant: frameInstant
     ) {
       return .elided
@@ -746,7 +782,8 @@ public struct DefaultRenderer {
         },
         commitElidedFrameIfOffscreen: renderer.makeCommitElidedFrameIfOffscreen(
           elisionCauses: elisionCauses,
-          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions
+          elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+          proposalChanged: proposalChanged
         ),
         latePreferenceReconciliation: { draft in
           switch await renderer.frameTailCoordinator.renderFrameTailLayoutStage(draft) {
