@@ -231,11 +231,18 @@ final class TerminalImageRenderer: Sendable {
     )
 
     for attachment in prepared.imageAttachments {
+      // The overlay stamp writes onto the finished grid, so like the kitty
+      // path it must not repaint cells that later content (a presentation)
+      // painted over the image — clip to the occlusion-trimmed rect.
+      guard !attachment.effectiveVisibleBounds.isEmpty else {
+        continue
+      }
       let presentation = presentationVariant(
         for: attachment,
         fallbackBackground: fallbackBackground
       )
-      let displayAttachment = presentation?.attachment ?? attachment
+      var displayAttachment = presentation?.attachment ?? attachment
+      displayAttachment.unoccludedVisibleBounds = attachment.unoccludedVisibleBounds
       guard
         let overlay = fallbackOverlay(
           for: displayAttachment,
@@ -249,7 +256,7 @@ final class TerminalImageRenderer: Sendable {
       apply(
         overlay: overlay,
         for: displayAttachment.bounds,
-        clippedTo: displayAttachment.visibleBounds,
+        clippedTo: displayAttachment.effectiveVisibleBounds,
         to: &prepared.cells,
         surfaceSize: prepared.size
       )
@@ -316,6 +323,13 @@ final class TerminalImageRenderer: Sendable {
     var writeSteps: [String] = []
 
     for attachment in attachments.sorted(by: compareImageAttachments) {
+      // Fully occluded by later-painted cells (a presentation covers the
+      // whole image): emit nothing. The occlusion change makes the
+      // attachments differ from the previous frame, so the plan runs a
+      // full-scope replay whose placement delete removes the stale graphic.
+      guard !attachment.effectiveVisibleBounds.isEmpty else {
+        continue
+      }
       guard
         let reference = attachment.resolvedReference,
         let sourceImage = repository.decodedImage(for: reference)
@@ -329,7 +343,11 @@ final class TerminalImageRenderer: Sendable {
           for: attachment,
           fallbackBackground: fallbackBackground
         )
-        let displayAttachment = presentation?.attachment ?? attachment
+        // A blend variant rebuilds its attachment (bounds == the source's
+        // visibleBounds) without the occlusion trim; re-apply it so a
+        // covered blended image is cropped like a plain one.
+        var displayAttachment = presentation?.attachment ?? attachment
+        displayAttachment.unoccludedVisibleBounds = attachment.unoccludedVisibleBounds
         let image = presentation?.image ?? sourceImage
         // Non-PNG payloads ship as raw RGBA capped at the placement's
         // displayable pixel footprint. The placement's source rect, the
@@ -402,7 +420,7 @@ final class TerminalImageRenderer: Sendable {
 
       case .sixel:
         let outputSize = sixelOutputSize(
-          for: attachment.visibleBounds,
+          for: attachment.effectiveVisibleBounds,
           graphicsCapabilities: graphicsCapabilities
         )
         let presentation = presentationVariant(
@@ -410,7 +428,8 @@ final class TerminalImageRenderer: Sendable {
           outputSize: outputSize,
           fallbackBackground: fallbackBackground
         )
-        let displayAttachment = presentation?.attachment ?? attachment
+        var displayAttachment = presentation?.attachment ?? attachment
+        displayAttachment.unoccludedVisibleBounds = attachment.unoccludedVisibleBounds
         let image = presentation?.image ?? sourceImage
         guard
           let payload = sixelPayload(
@@ -426,7 +445,8 @@ final class TerminalImageRenderer: Sendable {
         }
 
         writeSteps.append(terminalSaveCursorSequence())
-        writeSteps.append(terminalCursorSequence(to: displayAttachment.visibleBounds.origin))
+        writeSteps.append(
+          terminalCursorSequence(to: displayAttachment.effectiveVisibleBounds.origin))
         writeSteps.append(payload)
         writeSteps.append(terminalRestoreCursorSequence())
       }
@@ -548,7 +568,7 @@ final class TerminalImageRenderer: Sendable {
     graphicsCapabilities: TerminalGraphicsCapabilities
   ) -> String? {
     let pixelSize = sixelOutputSize(
-      for: attachment.visibleBounds,
+      for: attachment.effectiveVisibleBounds,
       graphicsCapabilities: graphicsCapabilities
     )
     let paletteBudget = sixelPaletteBudget(

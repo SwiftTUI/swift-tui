@@ -253,6 +253,10 @@ package struct Rasterizer: Sendable {
       visibleIdentities: &visibleIdentities,
       presentationRecorder: presentationRecorder
     )
+    RasterImageOcclusion.apply(
+      to: &imageAttachments,
+      layers: presentationRecorder.layers
+    )
 
     return (
       RasterSurface(
@@ -345,6 +349,15 @@ package struct Rasterizer: Sendable {
       dirtySpans: dirtySpans,
       visibleIdentities: &visibleIdentities,
       presentationRecorder: presentationRecorder
+    )
+    // Recomputed from the merged (retained + fresh) sidecar every raster:
+    // retained attachments converge to the trim they already carried, and a
+    // repainted occluder re-trims the attachments beneath it. Runs before
+    // surface construction so the F13 oracle compares trimmed attachments on
+    // both sides.
+    RasterImageOcclusion.apply(
+      to: &imageAttachments,
+      layers: presentationRecorder.layers
     )
 
     let surface = RasterSurface(

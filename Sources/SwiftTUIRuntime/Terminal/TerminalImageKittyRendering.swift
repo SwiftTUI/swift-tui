@@ -165,7 +165,10 @@ func kittyPlacement(
   imagePixelSize: PixelSize
 ) -> KittyPlacement? {
   let logicalBounds = attachment.bounds
-  let visibleBounds = attachment.visibleBounds
+  // The occlusion-trimmed rect, not the raw ancestor clip: kitty draws
+  // placements above every text cell, so rows a presentation painted over
+  // the image must be cropped out of the placement entirely.
+  let visibleBounds = attachment.effectiveVisibleBounds
   guard logicalBounds.size.width > 0, logicalBounds.size.height > 0,
     visibleBounds.size.width > 0, visibleBounds.size.height > 0
   else {

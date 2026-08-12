@@ -134,6 +134,14 @@ public struct RasterImageAttachment: Equatable, Sendable {
   public var bounds: CellRect
   /// The portion of ``bounds`` currently visible after ancestor clipping.
   public var visibleBounds: CellRect
+  /// The portion of ``visibleBounds`` not covered by cell content painted
+  /// after the image, or `nil` when nothing above the image intersects it.
+  /// Rasterization derives this from the paint-order sidecar. Layered hosts
+  /// composite that order directly and ignore this; hosts whose graphics
+  /// cannot stack under later text (kitty placements, the fallback overlay
+  /// stamp) draw ``effectiveVisibleBounds`` instead. A zero-size value means
+  /// the image is fully covered and must not be drawn.
+  package var unoccludedVisibleBounds: CellRect?
   public var source: ImageSource
   public var resolvedReference: ImageAssetReference?
   public var pixelSize: PixelSize?
@@ -157,6 +165,7 @@ public struct RasterImageAttachment: Equatable, Sendable {
     self.identity = identity
     self.bounds = bounds
     self.visibleBounds = visibleBounds ?? bounds
+    self.unoccludedVisibleBounds = nil
     self.source = source
     self.resolvedReference = resolvedReference
     self.pixelSize = pixelSize
@@ -164,5 +173,11 @@ public struct RasterImageAttachment: Equatable, Sendable {
     self.isResizable = isResizable
     self.scalingMode = scalingMode
     self.compositing = compositing
+  }
+
+  /// The rect a non-layering host should draw: ``visibleBounds`` minus any
+  /// occlusion trim recorded by rasterization.
+  package var effectiveVisibleBounds: CellRect {
+    unoccludedVisibleBounds ?? visibleBounds
   }
 }
