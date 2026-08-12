@@ -130,9 +130,9 @@ struct IssuedProposalRecordTests {
     #expect(record.proposals.count == ChildIssuedProposalRecord.maximumProposals)
   }
 
-  @Test("a covered spine-denied root counts dark-coverage eligible")
-  func darkCoverageEligibleCounts() throws {
-    let (resolved, leafIdentity) = customSpineTree("dark-eligible")
+  @Test("a covered custom-spine root certifies and serves (Stage 1)")
+  func coveredCustomSpineCertifiesAndServes() throws {
+    let (resolved, leafIdentity) = customSpineTree("live-covered")
     // With a measurement cache, the leaf's ideal-round variant is a stored
     // baseline, so the recorded proposals are fully covered.
     let engine = LayoutEngine(cache: MeasurementCache())
@@ -151,14 +151,35 @@ struct IssuedProposalRecordTests {
       )
     )
 
-    #expect(result.metrics.deniedIneligibleSpine == 1)
-    #expect(result.metrics.darkCoverageEligible == 1)
-    #expect(result.metrics.darkCoverageDeniedProposalCoverage == 0)
+    #expect(result.metrics.deniedIneligibleSpine == 0)
+    #expect(result.metrics.certificatesCertified == 1)
+    #expect(result.metrics.deniedProposalCoverage == 0)
+
+    // The serve rides the same patched-session path as every certificate,
+    // and the shadow oracle stays the stage authority over the served
+    // frame.
+    let patched = try #require(session.patchingCertifiedSubtrees(result.certificates))
+    context.installPatchedMeasureSession(patched)
+    let measured = engine.measure(resolved, proposal: Self.proposal, passContext: context)
+    #expect(context.workMetrics.measuredNodesReused >= measured.subtreeNodeCount)
+
+    let placed = engine.place(resolved, measured: measured, passContext: context)
+    let summary = LayoutShadowOracle.comparisonSummary(
+      resolved: resolved,
+      proposal: Self.proposal,
+      productionMeasured: measured,
+      productionPlaced: placed,
+      scrollViewportContext: nil,
+      customLayoutCompatibilityDepthLimit:
+        LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit,
+      measurementSeedSession: session
+    )
+    #expect(!summary.hasDivergence)
   }
 
-  @Test("an uncovered recorded proposal counts dark-coverage denied")
-  func darkCoverageUncoveredCounts() throws {
-    let (resolved, leafIdentity) = customSpineTree("dark-uncovered")
+  @Test("an uncovered recorded proposal denies as proposal-coverage (Stage 1)")
+  func uncoveredProposalDeniesCoverage() throws {
+    let (resolved, leafIdentity) = customSpineTree("live-uncovered")
     // No measurement cache: the only baseline is the retained final
     // proposal, so the ideal-round entry in the record is uncovered.
     let engine = LayoutEngine(cache: nil)
@@ -177,9 +198,154 @@ struct IssuedProposalRecordTests {
       )
     )
 
-    #expect(result.metrics.deniedIneligibleSpine == 1)
-    #expect(result.metrics.darkCoverageEligible == 0)
-    #expect(result.metrics.darkCoverageDeniedProposalCoverage == 1)
+    #expect(result.metrics.certificatesCertified == 0)
+    #expect(result.metrics.deniedProposalCoverage == 1)
+  }
+
+  @Test("an overflowed parent record denies as record-overflow (Stage 1)")
+  func overflowedRecordDeniesCoverage() throws {
+    // The overflow-probing custom layout IS the immediate parent of the
+    // dirty leaf, so its overflowed record gates the coverage certificate.
+    let leafIdentity = testIdentity("live-overflow", "Inner", "Probe", "Leaf")
+    let probes = (1...9).map { width in
+      ProposedSize(width: .finite(width), height: .finite(5))
+    }
+    let custom = ResolvedNode(
+      viewNodeID: fixtureViewNodeID("live-overflow-probe"),
+      identity: testIdentity("live-overflow", "Inner", "Probe"),
+      kind: .view("FixedProbe"),
+      children: [
+        ResolvedNode(
+          viewNodeID: fixtureViewNodeID("live-overflow-leaf"),
+          identity: leafIdentity,
+          kind: .view("Test"),
+          intrinsicSize: .init(width: 6, height: 2)
+        )
+      ],
+      layoutBehavior: AnyLayout(FixedProbeLayout(probeProposals: probes)).resolvedBehavior
+    )
+    // The extra stack level keeps the dirty leaf under the 25% subtree
+    // share cap (D10), which a three-node tree would trip.
+    let inner = ResolvedNode(
+      viewNodeID: fixtureViewNodeID("live-overflow-inner"),
+      identity: testIdentity("live-overflow", "Inner"),
+      kind: .view("VStack"),
+      children: [custom],
+      layoutBehavior: .stack(
+        axis: .vertical,
+        spacing: 0,
+        horizontalAlignment: .leading,
+        verticalAlignment: .top
+      )
+    )
+    let resolved = ResolvedNode(
+      viewNodeID: fixtureViewNodeID("live-overflow-root"),
+      identity: testIdentity("live-overflow"),
+      kind: .view("VStack"),
+      children: [inner],
+      layoutBehavior: .stack(
+        axis: .vertical,
+        spacing: 0,
+        horizontalAlignment: .leading,
+        verticalAlignment: .top
+      )
+    )
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let session = retainedSession(
+      for: engine, tree: resolved, invalidated: [leafIdentity])
+
+    let context = LayoutPassContext(
+      retainedLayout: session,
+      invalidatedIdentities: [leafIdentity]
+    )
+    let result = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: resolved,
+        passContext: context,
+        animationExcludedIdentities: []
+      )
+    )
+
+    #expect(result.metrics.certificatesCertified == 0)
+    #expect(result.metrics.deniedRecordOverflow == 1)
+  }
+
+  @Test("a depth-truncated pre-pass measure denies instead of certifying (red proof)")
+  func depthTruncatedPrePassDenies() throws {
+    // A fixed-extent outermost layout MASKS interior truncation: the
+    // pre-pass measure that hit the depth budget still reproduces the
+    // retained root size, so without the depth guard this would certify a
+    // product a fresh production pass could not compute.
+    func maskedChainTree(leafWidth: Int) -> ResolvedNode {
+      var chainNode = ResolvedNode(
+        viewNodeID: fixtureViewNodeID("depth-mask-leaf"),
+        identity: testIdentity("depth-mask", "C0", "C1", "C2", "C3", "C4", "Leaf"),
+        kind: .view("Test"),
+        intrinsicSize: .init(width: leafWidth, height: 2)
+      )
+      for level in (1...4).reversed() {
+        chainNode = ResolvedNode(
+          viewNodeID: fixtureViewNodeID("depth-mask-c\(level)"),
+          identity: Identity(components: ["depth-mask"] + (0...level).map { "C\($0)" }),
+          kind: .view("PassThrough"),
+          children: [chainNode],
+          layoutBehavior: AnyLayout(PassThroughLayout()).resolvedBehavior
+        )
+      }
+      let chainRoot = ResolvedNode(
+        viewNodeID: fixtureViewNodeID("depth-mask-c0"),
+        identity: testIdentity("depth-mask", "C0"),
+        kind: .view("FixedMask"),
+        children: [chainNode],
+        layoutBehavior: AnyLayout(FixedSizeIgnoringChildrenLayout()).resolvedBehavior
+      )
+      // Sibling padding keeps the dirty chain under the 25% subtree cap.
+      let siblings = (0..<20).map { index in
+        leaf("depth-mask-pad\(index)", size: .init(width: 4, height: 1))
+      }
+      return ResolvedNode(
+        viewNodeID: fixtureViewNodeID("depth-mask-root"),
+        identity: testIdentity("depth-mask"),
+        kind: .view("VStack"),
+        children: [chainRoot] + siblings,
+        layoutBehavior: .stack(
+          axis: .vertical,
+          spacing: 0,
+          horizontalAlignment: .leading,
+          verticalAlignment: .top
+        )
+      )
+    }
+    let chainRootIdentity = testIdentity("depth-mask", "C0")
+
+    // The retained frame measured under the main-actor budget, so its
+    // products carry the real (untruncated) interior. The CURRENT tree
+    // changes the leaf inside the mask, so the measurement cache's
+    // equivalence check evicts and the certificate must measure fresh on
+    // the tight scratch budget — the descent that truncates.
+    let engine = LayoutEngine(cache: MeasurementCache())
+    let session = retainedSession(
+      for: engine,
+      tree: maskedChainTree(leafWidth: 6),
+      invalidated: [chainRootIdentity],
+      depthLimit: LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
+    )
+    let resolved = maskedChainTree(leafWidth: 7)
+
+    let context = LayoutPassContext(
+      retainedLayout: session,
+      invalidatedIdentities: [chainRootIdentity]
+    )
+    let result = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: resolved,
+        passContext: context,
+        animationExcludedIdentities: []
+      )
+    )
+
+    #expect(result.metrics.certificatesCertified == 0)
+    #expect(result.metrics.deniedAbortedByCap == 1)
   }
 
   // MARK: - Fixtures
@@ -235,9 +401,10 @@ struct IssuedProposalRecordTests {
   private func retainedSession(
     for engine: LayoutEngine,
     tree: ResolvedNode,
-    invalidated: Set<Identity>
+    invalidated: Set<Identity>,
+    depthLimit: Int = LayoutPassContext.defaultCustomLayoutCompatibilityDepthLimit
   ) -> RetainedLayoutSession {
-    let context = LayoutPassContext()
+    let context = LayoutPassContext(customLayoutCompatibilityDepthLimit: depthLimit)
     let measured = engine.measure(tree, proposal: Self.proposal, passContext: context)
     let placed = engine.place(tree, measured: measured, passContext: context)
     let artifacts = FrameArtifacts(
@@ -308,6 +475,30 @@ private struct FixedProbeLayout: Layout {
         proposal: .init(width: .finite(6), height: .finite(2))
       )
     }
+  }
+}
+
+/// Returns a fixed size while still measuring its child — the shape whose
+/// fixed extent masks interior depth truncation from the size test.
+private struct FixedSizeIgnoringChildrenLayout: Layout {
+  func makeCache(subviews _: LayoutSubviews) {}
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    _ = subviews.first?.sizeThatFits(proposal)
+    return .init(width: 10, height: 4)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    subviews.first?.place(at: bounds.origin, proposal: proposal)
   }
 }
 

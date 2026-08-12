@@ -71,11 +71,9 @@ package enum MeasureCutoffTrace {
         + "animated=\(metrics.deniedIneligibleAnimated) "
         + "no-baseline=\(metrics.deniedNoBaseline) "
         + "size-mismatch=\(metrics.deniedSizeMismatch) "
-        + "capped=\(metrics.deniedAbortedByCap)) "
-        + "dark-coverage(eligible=\(metrics.darkCoverageEligible) "
-        + "uncovered=\(metrics.darkCoverageDeniedProposalCoverage) "
-        + "overflow=\(metrics.darkCoverageDeniedRecordOverflow) "
-        + "no-record=\(metrics.darkCoverageDeniedNoRecord))\n",
+        + "capped=\(metrics.deniedAbortedByCap) "
+        + "coverage-uncovered=\(metrics.deniedProposalCoverage) "
+        + "record-overflow=\(metrics.deniedRecordOverflow))\n",
       toFileAt: DebugLogRouter.resolvedFilePath(
         override: FeatureFlags.environmentValue(named: "SWIFTTUI_MEASURE_CUTOFF_TRACE_FILE"),
         bundleFileName: "measure-cutoff.log"
@@ -165,20 +163,21 @@ extension LayoutEngine {
       return
     }
 
-    // Locate the root in the current resolved tree by lexical descent,
-    // validating the spine on the way down (D10): every ancestor must be a
-    // plain stack or a single-proposal forwarding behavior, because a custom
-    // layout may probe at proposals the baseline set cannot cover.
+    // Locate the root in the current resolved tree by lexical descent.
+    // Plan 2026-08-11-006 Stage 1: a non-forwarding, non-lazy ancestor no
+    // longer denies — it escalates the certificate to recorded-proposal
+    // coverage below. Lazy containers still deny outright: their exclusion
+    // is windowing (D6/D8 territory), not proposal-family knowledge.
     var spineParent: ResolvedNode?
+    var coverageRequired = false
     var node = treeRoot
     while node.identity != root {
-      guard isSpineForwardingBehavior(node.layoutBehavior) else {
-        // Plan 2026-08-11-006 Stage 0: before denying, evaluate DARKLY what
-        // the recorded-proposal coverage certificate would say — entirely
-        // from retained state, so attribution and cost are unchanged.
-        recordDarkCoverage(for: root, session: session, into: &result)
+      if case .lazyStack = node.layoutBehavior {
         result.metrics.deniedIneligibleSpine += 1
         return
+      }
+      if !isSpineForwardingBehavior(node.layoutBehavior) {
+        coverageRequired = true
       }
       guard
         let next = node.children.first(where: {
@@ -231,6 +230,35 @@ extension LayoutEngine {
       for stored in cache?.storedBaselineSizes(for: viewNodeID) ?? []
       where !baselines.contains(where: { $0.proposal == stored.proposal }) {
         baselines.append(stored)
+      }
+    }
+    // The coverage certificate (plan 2026-08-11-006 Stage 1): with a
+    // non-forwarding ancestor on the spine, the retained parent's
+    // issued-proposal record for this root must exist, not have
+    // overflowed, and be fully covered by the baseline set the loop below
+    // fresh-measures. Records are observed reality; the induction that
+    // makes this sufficient is that every spine ancestor is
+    // equivalence-served, so its probe family reproduces given this
+    // root's certified responses.
+    if coverageRequired {
+      guard let spineParent,
+        let parentMeasured = session.measuredNode(for: spineParent.identity),
+        let record = parentMeasured.containerAllocationSnapshot?
+          .childIssuedProposals?.first(where: { $0.identity == root })
+      else {
+        result.metrics.deniedNoBaseline += 1
+        return
+      }
+      guard !record.overflowed else {
+        result.metrics.deniedRecordOverflow += 1
+        return
+      }
+      let uncovered = record.proposals.contains { proposal in
+        !baselines.contains(where: { $0.proposal == proposal })
+      }
+      guard !uncovered else {
+        result.metrics.deniedProposalCoverage += 1
+        return
       }
     }
     if let parent = spineParent,
@@ -305,6 +333,18 @@ extension LayoutEngine {
         fresh.flattenForRelease()
       }
     }
+    // Depth-parity guard (plan 2026-08-11-006): a pre-pass measure that hit
+    // the engine re-entry depth budget produced truncated geometry — it may
+    // still MATCH a baseline (a fixed-extent ancestor masks the
+    // truncation), and certifying it would serve a product a fresh
+    // production pass could not compute. Deny instead of certifying.
+    if scratchContext.runtimeIssues.contains(where: { issue in
+      issue.code == "layout.customLayoutDepthLimitExceeded"
+    }) {
+      certifiedProduct?.flattenForRelease()
+      result.metrics.deniedAbortedByCap += 1
+      return
+    }
     guard let certifiedProduct else {
       // The retained proposal is always in the baseline set; reaching here
       // means it produced no product, which cannot happen — deny safely.
@@ -320,50 +360,6 @@ extension LayoutEngine {
         retainedProposal: previousMeasured.proposal
       )
     )
-  }
-
-  /// Dark coverage evaluation (plan 2026-08-11-006 Stage 0): from retained
-  /// state alone, would the recorded-proposal coverage certificate admit
-  /// this spine-denied root? The immediate retained parent's
-  /// issued-proposal record for the root must exist, not have overflowed,
-  /// and be covered by the available baseline proposals (the retained
-  /// final measurement plus the cache variants). Coverage only — the size
-  /// legs still run fresh measures and can deny; this counts the
-  /// population Stage 1 could reach.
-  private func recordDarkCoverage(
-    for root: Identity,
-    session: RetainedLayoutSession,
-    into result: inout MeasureCutoffPrePassResult
-  ) {
-    guard let index = session.previousFrameIndex,
-      let parentIdentity = index.placedParentByStructuralIdentity[root],
-      let parentMeasured = session.measuredNode(for: parentIdentity),
-      let records = parentMeasured.containerAllocationSnapshot?.childIssuedProposals,
-      let record = records.first(where: { $0.identity == root }),
-      let previousMeasured = session.measuredNode(for: root)
-    else {
-      result.metrics.darkCoverageDeniedNoRecord += 1
-      return
-    }
-    guard !record.overflowed else {
-      result.metrics.darkCoverageDeniedRecordOverflow += 1
-      return
-    }
-    var baselineProposals: [ProposedSize] = [previousMeasured.proposal]
-    if let viewNodeID = index.resolvedNode(for: root)?.viewNodeID {
-      for stored in cache?.storedBaselineSizes(for: viewNodeID) ?? []
-      where !baselineProposals.contains(stored.proposal) {
-        baselineProposals.append(stored.proposal)
-      }
-    }
-    let uncovered = record.proposals.contains { proposal in
-      !baselineProposals.contains(proposal)
-    }
-    if uncovered {
-      result.metrics.darkCoverageDeniedProposalCoverage += 1
-    } else {
-      result.metrics.darkCoverageEligible += 1
-    }
   }
 
   /// D10's spine allowlist: plain stacks and single-proposal forwarding
