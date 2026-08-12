@@ -212,28 +212,36 @@ package enum LayoutShadowOracle {
         // product realizes window-dependent children and is equally excluded.
         continue
       }
-      guard
-        production.identity == shadow.identity,
-        production.children.count == shadow.children.count
-      else {
+      guard production.identity == shadow.identity else {
         summary.placeDivergenceCount += 1
         recordPlaceDivergenceDetail(&summary, production: production, shadow: shadow)
         continue
       }
       // D12, place-side: a lazy container that kept never-placed children
-      // publishes `lazyChildScrollEstimates`, and EVERY dimension derived
-      // from those estimates is a cross-frame running refinement a cold
-      // fresh pass legitimately re-estimates — the container's own extent,
-      // the extent of every wrapper up to the enclosing scroll viewport
-      // clamp, and the origins of its realized rows (their offsets embed the
-      // estimated heights of unrealized siblings above them). When the
-      // container measures inside a custom scroll layout's subview walk (the
-      // 2026-08-11 mrkdwn `ScrollContent` false alarm), no `measuredWindow`
-      // node is visible to the measured-tree carve-out, so the placed walk
-      // applies the same skip-and-count at the estimate carrier — and at an
-      // ancestor whose bounds absorbed the estimate.
+      // publishes `lazyChildScrollEstimates`, and EVERY product derived from
+      // those estimates is a cross-frame running refinement a cold fresh
+      // pass legitimately re-estimates — the container's own extent, the
+      // extent of every wrapper up to the enclosing scroll viewport clamp,
+      // the origins of its realized rows (their offsets embed the estimated
+      // heights of unrealized siblings above them), and the PLACED CHILD SET
+      // itself (the visible-window range is computed from those offsets, so
+      // a row straddling the viewport boundary can realize on one side and
+      // not the other — the mrkdwn readme-regression children=10 vs 11
+      // class). When the container measures inside a custom scroll layout's
+      // subview walk (the 2026-08-11 mrkdwn `ScrollContent` false alarms),
+      // no `measuredWindow` node is visible to the measured-tree carve-out,
+      // so the placed walk applies the same skip-and-count at the estimate
+      // carrier BEFORE any geometry or child-count comparison — mirroring
+      // the measured walk's carve-out ordering — and at an ancestor whose
+      // bounds absorbed the estimate. Identity mismatches stay hard: they
+      // mean the pair walk itself is misaligned.
       if carriesLazyEstimates(production) {
         summary.windowedExclusionCount += 1
+        continue
+      }
+      guard production.children.count == shadow.children.count else {
+        summary.placeDivergenceCount += 1
+        recordPlaceDivergenceDetail(&summary, production: production, shadow: shadow)
         continue
       }
       if production.bounds != shadow.bounds {
