@@ -70,6 +70,13 @@ package enum EnvironmentKeyReuseClassification {
     // never the environment.
     "ScrollIndicatorVisibilityKey",
     "HorizontalScrollIndicatorVisibilityKey",
+    // Read only by `List`'s resolve (tracked) since the A1 List/Table split;
+    // the resolved `ListStylePresentation` travels in `ListPayload.style`,
+    // and the layout/draw phases consume the payload, never the environment.
+    "ListStyleKey",
+    // Same shape as `ListStyleKey`: one tracked read in `Table`'s resolve,
+    // the resolved `TableStylePresentation` travels in `TablePayload.style`.
+    "TableStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {
