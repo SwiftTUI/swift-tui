@@ -119,51 +119,30 @@ package struct PromptPresentationSurface: View, ActionScope {
     }
     .padding(.init(horizontal: 1, vertical: 1))
 
+    // Each container is its own primitive surface rather than a branch of
+    // one catch-all body. `.standard` and `.dropdown` are what `SheetStyle`
+    // selects between; `.menu` has no public style family until `MenuStyle`
+    // ships, so it keeps an internal primitive of its own.
     switch item.descriptor.chrome {
     case .surface:
-      content
-        .background {
-          Rectangle().fill(.terminalSurfaceBackground)
-        }
-        .overlay {
-          Rectangle().strokeBorder(
-            .terminalBorder(.accent),
-            style: item.descriptor.borderStyle,
-            background: .terminalSurfaceBackground
-          )
-        }
-        .frame(
-          minWidth: .finite(item.descriptor.minWidth),
-          maxWidth: maximumWidth,
-          alignment: .leading
-        )
-        .semanticMetadata(presentationSemanticMetadata)
+      StandardContentPortalSurface(
+        content: content,
+        borderStyle: item.descriptor.borderStyle,
+        minimumWidth: item.descriptor.minWidth,
+        maximumWidth: maximumWidth,
+        semanticMetadata: presentationSemanticMetadata
+      )
     case .menu:
-      menuContentBody
-        .padding(.init(horizontal: 1, vertical: 1))
-        .background {
-          Rectangle().fill(.terminalSurfaceBackground)
-        }
-        .overlay {
-          Rectangle().strokeBorder(
-            .terminalBorder(.accent),
-            style: item.descriptor.borderStyle
-          )
-        }
-        .semanticMetadata(presentationSemanticMetadata)
+      AnchoredContentPortalSurface(
+        content: menuContentBody,
+        borderStyle: item.descriptor.borderStyle,
+        semanticMetadata: presentationSemanticMetadata
+      )
     case .dropdown:
-      contentBody
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background {
-          Rectangle().fill(.terminalSurfaceBackground)
-        }
-        .overlay(alignment: .bottom) {
-          Divider()
-            .foregroundStyle(.separator)
-            .drawMetadata(.init(opacity: 0.6))
-            .frame(maxWidth: .infinity, alignment: .bottom)
-        }
-        .semanticMetadata(presentationSemanticMetadata)
+      DropdownContentPortalSurface(
+        content: contentBody,
+        semanticMetadata: presentationSemanticMetadata
+      )
     }
   }
 
@@ -280,5 +259,82 @@ package struct PromptPresentationSurface: View, ActionScope {
     }
     .fixedSize()
     .padding(.init(horizontal: 1, vertical: 0))
+  }
+}
+
+/// The centered, bordered sheet surface — the treatment
+/// `SheetSurfaceContainer.standard` selects.
+private struct StandardContentPortalSurface<Content: View>: View {
+  let content: Content
+  let borderStyle: StrokeStyle
+  let minimumWidth: Int
+  let maximumWidth: ProposedDimension
+  let semanticMetadata: SemanticMetadata
+
+  var body: some View {
+    content
+      .background {
+        Rectangle().fill(.terminalSurfaceBackground)
+      }
+      .overlay {
+        Rectangle().strokeBorder(
+          .terminalBorder(.accent),
+          style: borderStyle,
+          background: .terminalSurfaceBackground
+        )
+      }
+      .frame(
+        minWidth: .finite(minimumWidth),
+        maxWidth: maximumWidth,
+        alignment: .leading
+      )
+      .semanticMetadata(semanticMetadata)
+  }
+}
+
+/// The flat, edge-to-edge strip with a soft divider beneath it — the
+/// treatment `SheetSurfaceContainer.dropdown` selects, and what the palette
+/// declaration presents into.
+private struct DropdownContentPortalSurface<Content: View>: View {
+  let content: Content
+  let semanticMetadata: SemanticMetadata
+
+  var body: some View {
+    content
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .background {
+        Rectangle().fill(.terminalSurfaceBackground)
+      }
+      .overlay(alignment: .bottom) {
+        Divider()
+          .foregroundStyle(.separator)
+          .drawMetadata(.init(opacity: 0.6))
+          .frame(maxWidth: .infinity, alignment: .bottom)
+      }
+      .semanticMetadata(semanticMetadata)
+  }
+}
+
+/// The compact intrinsic-width box a `Menu` floats above its layout.
+/// Retained as an internal primitive until `MenuStyle` gives it a public
+/// family.
+private struct AnchoredContentPortalSurface<Content: View>: View {
+  let content: Content
+  let borderStyle: StrokeStyle
+  let semanticMetadata: SemanticMetadata
+
+  var body: some View {
+    content
+      .padding(.init(horizontal: 1, vertical: 1))
+      .background {
+        Rectangle().fill(.terminalSurfaceBackground)
+      }
+      .overlay {
+        Rectangle().strokeBorder(
+          .terminalBorder(.accent),
+          style: borderStyle
+        )
+      }
+      .semanticMetadata(semanticMetadata)
   }
 }
