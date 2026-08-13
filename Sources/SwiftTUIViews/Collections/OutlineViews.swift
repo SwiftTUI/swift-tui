@@ -317,28 +317,41 @@ where ID: Hashable & Sendable, RowContent: View {
 
   public var body: some View {
     EnvironmentReader(\.outlineStyle) { outlineStyle in
-      VStack(alignment: .leading, spacing: 0) {
-        ForEach(entries) { entry in
-          OutlineRow(
-            prefix: outlinePrefix(
-              ancestry: ancestry,
-              isLast: entry.isLast,
-              style: outlineStyle
-            ),
-            content: rowView(for: entry.element),
-            authoringScope: authoringScope
+      EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
+        outlineLevelBody(
+          presentation: outlineStyle.presentation(
+            for: OutlineStyleConfiguration(styleEnvironment: styleEnvironment)
           )
+        )
+      }
+    }
+  }
 
-          if !entry.children.isEmpty {
-            OutlineTree(
-              elements: entry.children,
-              id: id,
-              children: children,
-              rowContent: rowContent,
-              authoringScope: authoringScope,
-              ancestry: ancestry + [!entry.isLast]
-            )
-          }
+  @ViewBuilder @MainActor
+  private func outlineLevelBody(
+    presentation: OutlineStylePresentation
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(entries) { entry in
+        OutlineRow(
+          prefix: outlinePrefix(
+            ancestry: ancestry,
+            isLast: entry.isLast,
+            style: presentation
+          ),
+          content: rowView(for: entry.element),
+          authoringScope: authoringScope
+        )
+
+        if !entry.children.isEmpty {
+          OutlineTree(
+            elements: entry.children,
+            id: id,
+            children: children,
+            rowContent: rowContent,
+            authoringScope: authoringScope,
+            ancestry: ancestry + [!entry.isLast]
+          )
         }
       }
     }
@@ -462,21 +475,20 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, Resolvable
 private func outlinePrefix(
   ancestry: [Bool],
   isLast: Bool,
-  style: AnyOutlineStyle
+  style: OutlineStylePresentation
 ) -> String {
   guard !ancestry.isEmpty else {
     return ""
   }
 
-  let resolvedStyle = style.presentation
   let ancestorPrefix = ancestry.map { showsContinuation in
     outlineIndenter(
       showsContinuation: showsContinuation,
-      style: resolvedStyle
+      style: style
     )
   }
   .joined()
-  return ancestorPrefix + outlineConnector(isLast: isLast, style: resolvedStyle)
+  return ancestorPrefix + outlineConnector(isLast: isLast, style: style)
 }
 
 private func outlineConnector(

@@ -928,7 +928,7 @@ extension FrameworkStressTableOutlineTests {
         OutlineGroup(nodes, children: \.children) { node in
           Text(node.title)
         }
-        .outlineStyle(.ascii)
+        .outlineStyle(.plain)
       }
     }
 
@@ -1101,7 +1101,7 @@ extension FrameworkStressTableOutlineTests {
 
       var body: some View {
         OutlineGroup(nodes, children: \.children) { Text($0.title) }
-          .outlineStyle(.ascii)
+          .outlineStyle(.plain)
       }
     }
 
@@ -1181,7 +1181,6 @@ extension FrameworkStressTableOutlineTests {
     let variants: [(AnyOutlineStyle, String)] = [
       (.rounded, "╰─"),
       (.plain, "└─"),
-      (.ascii, "`-"),
     ]
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let identity = testIdentity("TableOutline020")

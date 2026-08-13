@@ -48,6 +48,10 @@ private enum ListStyleKey: EnvironmentKey {
   static let defaultValue = AnyListStyle.automatic
 }
 
+private enum TableStyleKey: EnvironmentKey {
+  static let defaultValue = AnyTableStyle.automatic
+}
+
 private enum TabViewStyleKey: EnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
@@ -188,6 +192,11 @@ extension EnvironmentValues {
   package var listStyle: AnyListStyle {
     get { self[ListStyleKey.self] }
     set { self[ListStyleKey.self] = newValue }
+  }
+
+  package var tableStyle: AnyTableStyle {
+    get { self[TableStyleKey.self] }
+    set { self[TableStyleKey.self] = newValue }
   }
 
   package var tabViewStyle: AnyTabViewStyle {

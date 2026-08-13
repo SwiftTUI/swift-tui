@@ -128,7 +128,7 @@ struct TableLayoutProductTests {
       columns: [.init(title: "Value", width: 8)],
       rows: (0..<5).map { .init(cells: [.init(text: "row \($0)")]) },
       selectedRowIndex: 1,
-      style: .plain
+      style: .bordered
     )
     let layout = DrawExtractor().visibleTableLayout(
       for: payload,

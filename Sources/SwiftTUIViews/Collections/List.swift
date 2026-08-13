@@ -73,10 +73,18 @@ extension List {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let listStyle = context.environmentValues.listStyle.presentation
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
+    let listStyle = context.environmentValues.listStyle.presentation(
+      for: ListStyleConfiguration(
+        isSelectable: selectionPolicy.isSelectable,
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        showsFocusEffect: showsFocusEffect,
+        styleEnvironment: styleEnvironment
+      )
+    )
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let itemContext = context.child(component: .named("ListItems"))

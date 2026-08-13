@@ -131,7 +131,6 @@ public struct Spinner: View {
     public static let verticalBarFill = Self("▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", tail: "█")
     public static let heavyArrowCompass = Self("⇑", "⇗", "⇒", "⇘", "⇓", "⇙", "⇐", "⇖")
     public static let lineCompass = Self("│", "╱", "─", "╲", tail: "┼")
-    public static let asciiLineCompass = Self("|", "/", "-", "\\", tail: "X")
     /// Compact 4-glyph cycle used by Claude Code's terminal "working"
     /// header: asterisk, middle dot, plus, division sign.  All four
     /// glyphs are single-cell-wide ASCII so the spinner stays at a

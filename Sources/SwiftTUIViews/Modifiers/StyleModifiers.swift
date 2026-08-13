@@ -61,6 +61,18 @@ extension View {
     listStyle(AnyListStyle(style))
   }
 
+  public func tableStyle(
+    _ style: AnyTableStyle
+  ) -> some View {
+    environment(\.tableStyle, style)
+  }
+
+  public func tableStyle<S: TableStyle>(
+    _ style: S
+  ) -> some View {
+    tableStyle(AnyTableStyle(style))
+  }
+
   /// Control how tab views render their tab bar.
   public func tabViewStyle(
     _ style: AnyTabViewStyle

@@ -82,7 +82,7 @@ public struct TablePayload: Equatable, Sendable {
   public var columns: [TableColumnPayload]
   public var rows: [TableRowPayload]
   public var selectedRowIndex: Int?
-  public var style: CollectionStylePresentation
+  public var style: TableStylePresentation
   public var foregroundStyle: AnyShapeStyle?
   public var backgroundStyle: AnyShapeStyle?
   public var borderStyle: AnyShapeStyle?
@@ -101,7 +101,7 @@ public struct TablePayload: Equatable, Sendable {
     columns: [TableColumnPayload],
     rows: [TableRowPayload],
     selectedRowIndex: Int?,
-    style: CollectionStylePresentation,
+    style: TableStylePresentation,
     foregroundStyle: AnyShapeStyle? = nil,
     backgroundStyle: AnyShapeStyle? = nil,
     borderStyle: AnyShapeStyle? = nil,

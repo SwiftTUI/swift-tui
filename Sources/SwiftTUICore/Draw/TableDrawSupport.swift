@@ -61,7 +61,7 @@ extension DrawExtractor {
     payload: TablePayload,
     symbol: String
   ) -> TableDisplayLine {
-    let glyphs = payload.style.tableBorderGlyphs
+    let glyphs = payload.style.borderGlyphs
     let borderStyle = TextStyle(
       foregroundStyle: payload.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity

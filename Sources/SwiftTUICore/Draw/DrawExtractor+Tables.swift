@@ -140,7 +140,7 @@ extension DrawExtractor {
         // Keep the row's outer border behind committed cell nodes. Column
         // separators are drawn between the hosted cell frames below.
         let borderStyle = TextStyle(
-          foregroundStyle: payload.borderStyle ?? .semantic(.separator),
+          foregroundStyle: payload.borderStyle ?? payload.style.borderStyle ?? .semantic(.separator),
           opacity: payload.opacity
         )
         let widths = layout.widths
@@ -149,7 +149,7 @@ extension DrawExtractor {
             .init(content: String(repeating: " ", count: width), style: .init())
           },
           borderStyle: borderStyle,
-          glyphs: payload.style.tableBorderGlyphs
+          glyphs: payload.style.borderGlyphs
         )
       } else {
         segments = line.segments
@@ -217,7 +217,7 @@ extension DrawExtractor {
   ///
   /// Scroll routing publishes this as the collection's viewport instead of the
   /// node's full bounds, for the same reason
-  /// ``CollectionStylePresentation/viewportBackedListContentBounds(for:in:)``
+  /// ``ListStylePresentation/viewportBackedListContentBounds(for:in:)``
   /// does: publishing the full bounds makes every scroll consumer believe two
   /// to four more rows are visible than are drawn — a table's chrome is
   /// thicker than a list's — so reveal-shaped decisions fire while the target
@@ -253,7 +253,7 @@ extension DrawExtractor {
   /// Supplying it is what makes measure, place, draw, and semantics agree on
   /// where a tall row's borders and separators go (register item D19).
   /// `rowWindow` bounds line GENERATION to a band of rows, on the same terms as
-  /// ``CollectionStylePresentation/visibleListLayout(for:in:rowHeights:rowWindow:)``:
+  /// ``ListStylePresentation/visibleListLayout(for:in:rowHeights:rowWindow:)``:
   /// inside a `ScrollView` the table is laid out against its own full content
   /// height, so generating "the visible lines" over those bounds builds a line
   /// per row of the whole dataset even though only a window was realized. The
@@ -560,10 +560,10 @@ extension DrawExtractor {
     widths: [Int]
   ) -> [TableDisplayLine] {
     let borderStyle = TextStyle(
-      foregroundStyle: payload.borderStyle ?? .semantic(.separator),
+      foregroundStyle: payload.borderStyle ?? payload.style.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity
     )
-    let glyphs = payload.style.tableBorderGlyphs
+    let glyphs = payload.style.borderGlyphs
     return positions.map { position in
       if position % 2 == 1 {
         return TableDisplayLine(
@@ -634,10 +634,10 @@ extension DrawExtractor {
     widths: [Int]
   ) -> [TableDisplayLine] {
     let borderStyle = TextStyle(
-      foregroundStyle: payload.borderStyle ?? .semantic(.separator),
+      foregroundStyle: payload.borderStyle ?? payload.style.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity
     )
-    let glyphs = payload.style.tableBorderGlyphs
+    let glyphs = payload.style.borderGlyphs
     var lines: [TableDisplayLine] = [
       .init(
         segments: borderSegments(
@@ -655,7 +655,7 @@ extension DrawExtractor {
 
     if payload.showsHeaders {
       var headerStyle = TextStyle(
-        foregroundStyle: payload.style.tableHeaderForegroundStyle ?? .semantic(.muted)
+        foregroundStyle: payload.style.headerForegroundStyle ?? .semantic(.muted)
       )
       headerStyle.opacity *= payload.opacity
       lines.append(
@@ -674,7 +674,7 @@ extension DrawExtractor {
             borderStyle: borderStyle,
             glyphs: glyphs
           ),
-          backgroundStyle: payload.style.tableHeaderBackgroundStyle,
+          backgroundStyle: payload.style.headerBackgroundStyle,
           role: .header,
           isSelectedRow: false,
           rowIndex: nil

@@ -120,7 +120,7 @@ struct CollectionStyleCharacterizationTests {
   @Test("the square-bordered table treatment renders plain glyphs")
   func borderedTableRendersSquareGlyphs() {
     #expect(
-      normalizedSurface(table.listStyle(.plain), identity: "CharTablePlain")
+      normalizedSurface(table.tableStyle(.bordered), identity: "CharTablePlain")
         == Self.squareTable
     )
   }
@@ -128,8 +128,36 @@ struct CollectionStyleCharacterizationTests {
   @Test("the inset table treatment matches the automatic treatment")
   func insetTableMatchesAutomatic() {
     #expect(
-      normalizedSurface(table.listStyle(.insetGrouped), identity: "CharTableInset")
+      normalizedSurface(table.tableStyle(.inset), identity: "CharTableInset")
         == Self.roundedTable
     )
+  }
+
+  @Test("an ancestor listStyle no longer styles a table")
+  func ancestorListStyleDoesNotStyleTable() {
+    // The A1 split's deliberate behavior change: `.listStyle` styles lists
+    // only, so a table under an ancestor list style renders the automatic
+    // table treatment. This is the silent-revert case the migration audit
+    // exists for — the compiler cannot flag these sites.
+    #expect(
+      normalizedSurface(table.listStyle(.plain), identity: "CharTableRevert")
+        == Self.roundedTable
+    )
+  }
+
+  @Test("a nearer tableStyle overrides an ancestor and does not leak to siblings")
+  func nearestTableStyleWinsAndStaysScoped() {
+    let pair = VStack(spacing: 0) {
+      table.tableStyle(.bordered)
+      table
+    }
+    .tableStyle(.inset)
+    let rendered = normalizedSurface(
+      pair,
+      identity: "CharTableScoping",
+      width: 30,
+      height: 20
+    )
+    #expect(rendered == Self.squareTable + "\n" + Self.roundedTable)
   }
 }

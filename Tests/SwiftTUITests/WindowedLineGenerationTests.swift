@@ -164,7 +164,7 @@ struct WindowedLineGenerationTests {
       columns: [.init(title: "Value", width: 8)],
       rows: (0..<1_000).map { _ in .init(cells: [.init(text: "")]) },
       selectedRowIndex: nil,
-      style: .plain
+      style: .bordered
     )
     payload.isViewportBacked = true
     let extractor = DrawExtractor()

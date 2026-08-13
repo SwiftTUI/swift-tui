@@ -108,12 +108,22 @@ extension Table {
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isSelectable = selectionPolicy.isSelectable
-    let tableStyle = context.environmentValues.listStyle.presentation
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let showsHeaders =
       context.environmentValues.tableHeaderVisibility != .hidden
     let resolvedColumns = columns.map(\.resolvedTableColumnPayload)
+    let tableStyle = context.environmentValues.tableStyle.presentation(
+      for: TableStyleConfiguration(
+        columnCount: resolvedColumns.count,
+        showsHeaders: showsHeaders,
+        isSelectable: isSelectable,
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        showsFocusEffect: showsFocusEffect,
+        styleEnvironment: styleEnvironment
+      )
+    )
     let rowContext = context.child(component: .named("TableRows"))
     var resolvedContent: ResolvedRows
     if usesIndexedDataSource, let source = makeIndexedChildSource(from: rows, in: rowContext) {
@@ -140,7 +150,7 @@ extension Table {
         resolvedContent.children,
         columns: resolvedColumns,
         rows: resolvedRows,
-        joinGlyph: tableStyle.tableBorderGlyphs.columnJoin
+        joinGlyph: tableStyle.borderGlyphs.columnJoin
       )
     }
     let selectableRowIndices = resolvedRows.indices.filter { index in
@@ -448,7 +458,7 @@ extension Table {
     from source: any IndexedChildSource,
     in context: ResolveContext,
     columns: [TableColumnPayload],
-    tableStyle: CollectionStylePresentation
+    tableStyle: TableStylePresentation
   ) -> ResolvedRows {
     var result = ResolvedRows()
     result.payloads.reserveCapacity(source.count)
@@ -497,7 +507,7 @@ extension Table {
           [node],
           columns: columns,
           rows: [rowPayload],
-          joinGlyph: tableStyle.tableBorderGlyphs.columnJoin
+          joinGlyph: tableStyle.borderGlyphs.columnJoin
         )[0]
       return node
     }

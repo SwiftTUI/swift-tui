@@ -110,7 +110,7 @@ private func viewportBackedTablePayload(showsHeaders: Bool) -> TablePayload {
     columns: [.init(title: "Value", width: 10)],
     rows: (0..<50).map { .init(cells: [.init(text: "row \($0)")]) },
     selectedRowIndex: nil,
-    style: .plain,
+    style: .bordered,
     showsHeaders: showsHeaders
   )
   payload.isViewportBacked = true

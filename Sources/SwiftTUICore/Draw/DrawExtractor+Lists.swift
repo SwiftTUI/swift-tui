@@ -221,7 +221,7 @@ extension DrawExtractor {
     layout: ListVisibleLayout,
     effectiveOpacity: Double
   ) -> [DrawCommand] {
-    guard let container = payload.style.listContainer else {
+    guard let container = payload.style.container else {
       return []
     }
 

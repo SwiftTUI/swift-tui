@@ -1,60 +1,89 @@
 public import SwiftTUICore
 
+/// An extensible list style.
+///
+/// A list style resolves a ``ListStylePresentation`` — container chrome,
+/// insets, and separator visibility — from the list's render state. Table
+/// treatments are a separate family; see `TableStyle`.
+public protocol ListStyle: Sendable {
+  var snapshotLabel: String { get }
+
+  @MainActor
+  func resolvePresentation(
+    for configuration: ListStyleConfiguration
+  ) -> ListStylePresentation
+}
+
+extension ListStyle {
+  public var snapshotLabel: String {
+    String(reflecting: Self.self)
+  }
+}
+
+/// The render state a list style may consult.
+///
+/// List chrome is focus- and enabled-sensitive; built-in styles currently
+/// resolve the same presentation for every state, and the state is supplied
+/// so custom styles can do better without a second resolution path.
+public struct ListStyleConfiguration: Sendable {
+  public var isSelectable: Bool
+  public var isEnabled: Bool
+  public var isFocused: Bool
+  public var showsFocusEffect: Bool
+  public var styleEnvironment: StyleEnvironmentSnapshot
+
+  package init(
+    isSelectable: Bool,
+    isEnabled: Bool,
+    isFocused: Bool,
+    showsFocusEffect: Bool,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) {
+    self.isSelectable = isSelectable
+    self.isEnabled = isEnabled
+    self.isFocused = isFocused
+    self.showsFocusEffect = showsFocusEffect
+    self.styleEnvironment = styleEnvironment
+  }
+}
+
 private protocol AnyListStyleBox: Sendable {
-  var baseValue: Any { get }
-  var description: String { get }
+  var snapshotLabel: String { get }
   var debugDescription: String { get }
 
-  func makePresentation() -> CollectionStylePresentation
-  func isEqual(to other: any AnyListStyleBox) -> Bool
-  func hash(into hasher: inout Hasher)
+  @MainActor
+  func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation
+  func isEqualForReuse(to other: any AnyListStyleBox) -> Bool
 }
 
 private struct ConcreteListStyleBox<S: ListStyle>: AnyListStyleBox {
   let style: S
 
-  var baseValue: Any {
-    style
-  }
-
-  var description: String {
-    String(describing: style)
+  var snapshotLabel: String {
+    style.snapshotLabel
   }
 
   var debugDescription: String {
     String(reflecting: style)
   }
 
-  func makePresentation() -> CollectionStylePresentation {
-    var presentation = style.makeCollectionStylePresentation()
-    presentation.snapshotLabel = description
+  @MainActor
+  func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
+    var presentation = style.resolvePresentation(for: configuration)
+    presentation.snapshotLabel = style.snapshotLabel
     return presentation
   }
 
-  func isEqual(to other: any AnyListStyleBox) -> Bool {
-    guard let otherStyle = other.baseValue as? S else {
+  func isEqualForReuse(to other: any AnyListStyleBox) -> Bool {
+    guard let other = other as? Self else {
       return false
     }
-    return otherStyle == style
-  }
-
-  func hash(into hasher: inout Hasher) {
-    hasher.combine(style)
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 }
 
-/// An extensible collection style shared by lists and tables.
-public protocol ListStyle: Hashable, Sendable {
-  func makeCollectionStylePresentation() -> CollectionStylePresentation
-}
-
-/// A type-erased collection style shared by lists and tables.
-public struct AnyListStyle:
-  Hashable,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+/// A type-erased list style.
+public struct AnyListStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   private let box: any AnyListStyleBox
 
   public init<S: ListStyle>(
@@ -76,88 +105,76 @@ public struct AnyListStyle:
   }
 
   public var description: String {
-    box.description
+    box.snapshotLabel
   }
 
   public var debugDescription: String {
     box.debugDescription
   }
 
-  package var presentation: CollectionStylePresentation {
-    box.makePresentation()
-  }
-
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.box.isEqual(to: rhs.box)
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    box.hash(into: &hasher)
+  @MainActor
+  package func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
+    box.presentation(for: configuration)
   }
 }
 
-/// The default collection style that resolves to grouped chrome.
-public struct AutomaticListStyle:
-  ListStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+extension AnyListStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
+/// The default list style that resolves to grouped chrome.
+public struct AutomaticListStyle: ListStyle, Sendable {
   public init() {}
 
-  public func makeCollectionStylePresentation() -> CollectionStylePresentation {
-    .insetGrouped
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "ListStyle.automatic"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: ListStyleConfiguration
+  ) -> ListStylePresentation {
+    .insetGrouped
   }
 }
 
-/// A separator-driven collection style with no outer chrome.
-public struct PlainListStyle:
-  ListStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+/// A separator-driven list style with no outer chrome.
+public struct PlainListStyle: ListStyle, Sendable {
   public init() {}
 
-  public func makeCollectionStylePresentation() -> CollectionStylePresentation {
-    .plain
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "ListStyle.plain"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: ListStyleConfiguration
+  ) -> ListStylePresentation {
+    .plain
   }
 }
 
-/// A grouped collection style with rounded section chrome.
-public struct InsetGroupedListStyle:
-  ListStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+/// A grouped list style with rounded section chrome.
+public struct InsetGroupedListStyle: ListStyle, Sendable {
   public init() {}
 
-  public func makeCollectionStylePresentation() -> CollectionStylePresentation {
-    .insetGrouped
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "ListStyle.insetGrouped"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: ListStyleConfiguration
+  ) -> ListStylePresentation {
+    .insetGrouped
   }
 }
+
+extension AutomaticListStyle: ReuseTransparentStyle {}
+extension PlainListStyle: ReuseTransparentStyle {}
+extension InsetGroupedListStyle: ReuseTransparentStyle {}

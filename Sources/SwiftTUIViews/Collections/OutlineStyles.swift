@@ -1,60 +1,74 @@
 public import SwiftTUICore
 
+/// An extensible outline style for hierarchical connectors and indent guides.
+///
+/// ASCII substitution is deliberately not an outline style: capability-driven
+/// glyph degradation is rasterizer fallback behavior.
+public protocol OutlineStyle: Sendable {
+  var snapshotLabel: String { get }
+
+  @MainActor
+  func resolvePresentation(
+    for configuration: OutlineStyleConfiguration
+  ) -> OutlineStylePresentation
+}
+
+extension OutlineStyle {
+  public var snapshotLabel: String {
+    String(reflecting: Self.self)
+  }
+}
+
+/// The render state an outline style may consult.
+///
+/// Outline connector choice currently needs only the style environment.
+public struct OutlineStyleConfiguration: Sendable {
+  public var styleEnvironment: StyleEnvironmentSnapshot
+
+  package init(
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) {
+    self.styleEnvironment = styleEnvironment
+  }
+}
+
 private protocol AnyOutlineStyleBox: Sendable {
-  var baseValue: Any { get }
-  var description: String { get }
+  var snapshotLabel: String { get }
   var debugDescription: String { get }
 
-  func makePresentation() -> OutlineStylePresentation
-  func isEqual(to other: any AnyOutlineStyleBox) -> Bool
-  func hash(into hasher: inout Hasher)
+  @MainActor
+  func presentation(for configuration: OutlineStyleConfiguration) -> OutlineStylePresentation
+  func isEqualForReuse(to other: any AnyOutlineStyleBox) -> Bool
 }
 
 private struct ConcreteOutlineStyleBox<S: OutlineStyle>: AnyOutlineStyleBox {
   let style: S
 
-  var baseValue: Any {
-    style
-  }
-
-  var description: String {
-    String(describing: style)
+  var snapshotLabel: String {
+    style.snapshotLabel
   }
 
   var debugDescription: String {
     String(reflecting: style)
   }
 
-  func makePresentation() -> OutlineStylePresentation {
-    var presentation = style.makeOutlineStylePresentation()
-    presentation.snapshotLabel = description
+  @MainActor
+  func presentation(for configuration: OutlineStyleConfiguration) -> OutlineStylePresentation {
+    var presentation = style.resolvePresentation(for: configuration)
+    presentation.snapshotLabel = style.snapshotLabel
     return presentation
   }
 
-  func isEqual(to other: any AnyOutlineStyleBox) -> Bool {
-    guard let otherStyle = other.baseValue as? S else {
+  func isEqualForReuse(to other: any AnyOutlineStyleBox) -> Bool {
+    guard let other = other as? Self else {
       return false
     }
-    return otherStyle == style
+    return styleValuesAreEqualForReuse(style, other.style)
   }
-
-  func hash(into hasher: inout Hasher) {
-    hasher.combine(style)
-  }
-}
-
-/// An extensible outline style for hierarchical connectors and indent guides.
-public protocol OutlineStyle: Hashable, Sendable {
-  func makeOutlineStylePresentation() -> OutlineStylePresentation
 }
 
 /// A type-erased outline style.
-public struct AnyOutlineStyle:
-  Hashable,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+public struct AnyOutlineStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   private let box: any AnyOutlineStyleBox
 
   public init<S: OutlineStyle>(
@@ -75,115 +89,79 @@ public struct AnyOutlineStyle:
     Self(PlainOutlineStyle())
   }
 
-  public static var ascii: Self {
-    Self(ASCIIOutlineStyle())
-  }
-
   public var description: String {
-    box.description
+    box.snapshotLabel
   }
 
   public var debugDescription: String {
     box.debugDescription
   }
 
-  package var presentation: OutlineStylePresentation {
-    box.makePresentation()
+  @MainActor
+  package func presentation(
+    for configuration: OutlineStyleConfiguration
+  ) -> OutlineStylePresentation {
+    box.presentation(for: configuration)
   }
+}
 
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.box.isEqual(to: rhs.box)
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    box.hash(into: &hasher)
+extension AnyOutlineStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
   }
 }
 
 /// The default outline style that resolves to rounded connectors.
-public struct AutomaticOutlineStyle:
-  OutlineStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+public struct AutomaticOutlineStyle: OutlineStyle, Sendable {
   public init() {}
 
-  public func makeOutlineStylePresentation() -> OutlineStylePresentation {
-    .rounded
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "OutlineStyle.automatic"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: OutlineStyleConfiguration
+  ) -> OutlineStylePresentation {
+    .rounded
   }
 }
 
 /// An outline style with rounded leaf connectors.
-public struct RoundedOutlineStyle:
-  OutlineStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+public struct RoundedOutlineStyle: OutlineStyle, Sendable {
   public init() {}
 
-  public func makeOutlineStylePresentation() -> OutlineStylePresentation {
-    .rounded
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "OutlineStyle.rounded"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: OutlineStyleConfiguration
+  ) -> OutlineStylePresentation {
+    .rounded
   }
 }
 
 /// An outline style that uses box-drawing connectors throughout.
-public struct PlainOutlineStyle:
-  OutlineStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
+public struct PlainOutlineStyle: OutlineStyle, Sendable {
   public init() {}
 
-  public func makeOutlineStylePresentation() -> OutlineStylePresentation {
-    .plain
-  }
-
-  public var description: String {
+  public var snapshotLabel: String {
     "OutlineStyle.plain"
   }
 
-  public var debugDescription: String {
-    description
+  @MainActor
+  public func resolvePresentation(
+    for configuration: OutlineStyleConfiguration
+  ) -> OutlineStylePresentation {
+    .plain
   }
 }
 
-/// An outline style that uses ASCII-only connectors.
-public struct ASCIIOutlineStyle:
-  OutlineStyle,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
-  public init() {}
-
-  public func makeOutlineStylePresentation() -> OutlineStylePresentation {
-    .ascii
-  }
-
-  public var description: String {
-    "OutlineStyle.ascii"
-  }
-
-  public var debugDescription: String {
-    description
-  }
-}
+extension AutomaticOutlineStyle: ReuseTransparentStyle {}
+extension RoundedOutlineStyle: ReuseTransparentStyle {}
+extension PlainOutlineStyle: ReuseTransparentStyle {}

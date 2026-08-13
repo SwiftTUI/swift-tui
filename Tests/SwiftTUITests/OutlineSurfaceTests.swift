@@ -27,7 +27,6 @@ struct OutlineSurfaceTests {
     arguments: [
       (AnyOutlineStyle.rounded, "╰─"),
       (AnyOutlineStyle.plain, "└─"),
-      (AnyOutlineStyle.ascii, "`-"),
     ]
   )
   func outlineGroupRendersConnectorVariants(

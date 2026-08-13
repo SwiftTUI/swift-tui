@@ -3544,7 +3544,7 @@ struct SwiftUISurfaceTests {
         .listRowBackground(Color.red)
         .listRowForegroundStyle(Color.yellow)
       }
-      .listStyle(.plain),
+      .tableStyle(.bordered),
       context: .init(identity: testIdentity("StyledTable"))
     )
 
@@ -3555,7 +3555,7 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[4][2].style?.foregroundColor == Color.yellow)
   }
 
-  @Test("Table respects listStyle and scrollIndicators environment controls")
+  @Test("Table respects tableStyle and scrollIndicators environment controls")
   func tableHonorsListChromeAndIndicatorVisibility() {
     var visibleEnvironment = EnvironmentValues()
     visibleEnvironment.focusedIdentity = testIdentity("VisibleGroupedTableControl")
@@ -3575,7 +3575,7 @@ struct SwiftUISurfaceTests {
           .tag(index)
         }
       }
-      .listStyle(.insetGrouped)
+      .tableStyle(.inset)
       .id(testIdentity("VisibleGroupedTableControl"))
       .frame(width: 20, height: 7, alignment: .topLeading),
       context: .init(
@@ -3601,7 +3601,7 @@ struct SwiftUISurfaceTests {
           .tag(index)
         }
       }
-      .listStyle(.insetGrouped)
+      .tableStyle(.inset)
       .scrollIndicators(.hidden)
       .id(testIdentity("HiddenGroupedTableControl"))
       .frame(width: 20, height: 7, alignment: .topLeading),

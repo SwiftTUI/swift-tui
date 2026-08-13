@@ -128,81 +128,6 @@ public struct TableBorderGlyphs: Equatable, Sendable {
   }
 }
 
-/// Resolved collection presentation shared by list and table payloads.
-public struct CollectionStylePresentation:
-  Equatable,
-  Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
-  public var snapshotLabel: String
-  public var listContainer: CollectionContainerChromePresentation?
-  public var listChromeScope: ListChromeScope
-  public var listContentInsets: EdgeInsets
-  public var showsListRowSeparators: Bool
-  public var showsListSectionSeparators: Bool
-  public var tableBorderGlyphs: TableBorderGlyphs
-  public var tableHeaderForegroundStyle: AnyShapeStyle?
-  public var tableHeaderBackgroundStyle: AnyShapeStyle?
-
-  public init(
-    snapshotLabel: String = "",
-    listContainer: CollectionContainerChromePresentation? = nil,
-    listChromeScope: ListChromeScope = .wholeList,
-    listContentInsets: EdgeInsets = .zero,
-    showsListRowSeparators: Bool = true,
-    showsListSectionSeparators: Bool = true,
-    tableBorderGlyphs: TableBorderGlyphs = .plain,
-    tableHeaderForegroundStyle: AnyShapeStyle? = nil,
-    tableHeaderBackgroundStyle: AnyShapeStyle? = nil
-  ) {
-    self.snapshotLabel = snapshotLabel
-    self.listContainer = listContainer
-    self.listChromeScope = listChromeScope
-    self.listContentInsets = listContentInsets
-    self.showsListRowSeparators = showsListRowSeparators
-    self.showsListSectionSeparators = showsListSectionSeparators
-    self.tableBorderGlyphs = tableBorderGlyphs
-    self.tableHeaderForegroundStyle = tableHeaderForegroundStyle
-    self.tableHeaderBackgroundStyle = tableHeaderBackgroundStyle
-  }
-
-  public var description: String {
-    snapshotLabel.isEmpty ? "CollectionStylePresentation" : snapshotLabel
-  }
-
-  public var debugDescription: String {
-    description
-  }
-
-  public static var plain: Self {
-    .init(
-      snapshotLabel: "CollectionStylePresentation.plain",
-      listContainer: nil,
-      listContentInsets: .zero,
-      showsListRowSeparators: true,
-      showsListSectionSeparators: true,
-      tableBorderGlyphs: .plain,
-      tableHeaderForegroundStyle: .semantic(.muted),
-      tableHeaderBackgroundStyle: nil
-    )
-  }
-
-  public static var insetGrouped: Self {
-    .init(
-      snapshotLabel: "CollectionStylePresentation.insetGrouped",
-      listContainer: .insetGrouped,
-      listChromeScope: .eachSection,
-      listContentInsets: .init(top: 1, leading: 1, bottom: 1, trailing: 1),
-      showsListRowSeparators: false,
-      showsListSectionSeparators: false,
-      tableBorderGlyphs: .insetGrouped,
-      tableHeaderForegroundStyle: AnyShapeStyle(.terminalBorder(.accent)),
-      tableHeaderBackgroundStyle: AnyShapeStyle(.terminalRow(.neutral, isOdd: true))
-    )
-  }
-}
-
 /// Resolved outline connector and indentation strings.
 public struct OutlineStylePresentation:
   Equatable,
@@ -255,16 +180,6 @@ public struct OutlineStylePresentation:
       emptyIndenter: "  ",
       branchConnector: "├─ ",
       leafConnector: "└─ "
-    )
-  }
-
-  public static var ascii: Self {
-    .init(
-      snapshotLabel: "OutlineStylePresentation.ascii",
-      continuingIndenter: "| ",
-      emptyIndenter: "  ",
-      branchConnector: "|- ",
-      leafConnector: "`- "
     )
   }
 }

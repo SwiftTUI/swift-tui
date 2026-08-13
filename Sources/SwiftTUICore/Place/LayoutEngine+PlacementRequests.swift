@@ -505,7 +505,7 @@ extension LayoutEngine {
       in: bounds
     )
     let leftWidth = layoutText(
-      for: payload.style.tableBorderGlyphs.left,
+      for: payload.style.borderGlyphs.left,
       width: nil
     ).size.width
     var requests: [PlacementRequest] = []

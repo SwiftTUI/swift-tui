@@ -83,15 +83,15 @@ package struct ListLineWindow: Equatable, Sendable {
   }
 }
 
-extension CollectionStylePresentation {
+extension ListStylePresentation {
   /// Display lines one row of a viewport-backed list occupies.
   package var listRowDisplaySpan: Int {
-    showsListRowSeparators ? 2 : 1
+    showsRowSeparators ? 2 : 1
   }
 
   /// Display lines preceding row 0 of a viewport-backed list.
   package var listChromeLineInset: Int {
-    listContainer != nil && listChromeScope == .eachSection ? 1 : 0
+    container != nil && chromeScope == .eachSection ? 1 : 0
   }
 
   /// The display-line window a viewport-backed list shows.
@@ -110,7 +110,7 @@ extension CollectionStylePresentation {
     showsIndicators: Bool,
     viewportLineCount: Int
   ) -> ListLineWindow {
-    let sectionInsetCount = listContainer != nil && listChromeScope == .eachSection ? 2 : 0
+    let sectionInsetCount = container != nil && chromeScope == .eachSection ? 2 : 0
     let rowSpan = listRowDisplaySpan
     let bodyLineCount = itemCount <= 0 ? 0 : itemCount * rowSpan - (rowSpan - 1)
     let displayLineCount = sectionInsetCount + bodyLineCount
@@ -197,11 +197,11 @@ extension CollectionStylePresentation {
     for layout: ListVisibleLayout,
     in bounds: CellRect
   ) -> [CellRect] {
-    guard listContainer != nil else {
+    guard container != nil else {
       return []
     }
 
-    switch listChromeScope {
+    switch chromeScope {
     case .wholeList:
       return [bounds]
     case .eachSection:
@@ -213,19 +213,19 @@ extension CollectionStylePresentation {
     for payload: ListPayload
   ) -> CellSize {
     if payload.isViewportBacked {
-      let horizontalInset = listContentInsets.leading + listContentInsets.trailing
-      let verticalInset = listContentInsets.top + listContentInsets.bottom
+      let horizontalInset = contentInsets.leading + contentInsets.trailing
+      let verticalInset = contentInsets.top + contentInsets.bottom
       let rowCount = payload.rowCount
-      let separatorCount = showsListRowSeparators ? max(0, rowCount - 1) : 0
+      let separatorCount = showsRowSeparators ? max(0, rowCount - 1) : 0
       let markerWidth = payload.showsSelectionMarker && rowCount > 0 ? 2 : 0
       return CellSize(
         width: markerWidth + horizontalInset,
         height: rowCount + separatorCount + verticalInset
       )
     }
-    let horizontalInset = listContentInsets.leading + listContentInsets.trailing
-    let perSectionVerticalInset = listContentInsets.top + listContentInsets.bottom
-    let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
+    let horizontalInset = contentInsets.leading + contentInsets.trailing
+    let perSectionVerticalInset = contentInsets.top + contentInsets.bottom
+    let usesSectionChrome = container != nil && chromeScope == .eachSection
     let lineMetrics = payload.items.enumerated().reduce(
       into: (width: 0, height: 0, rowIndex: 0, sectionCount: 0, sectionHasContent: false)
     ) { partial, element in
@@ -249,7 +249,7 @@ extension CollectionStylePresentation {
         )
         partial.height += 1
         partial.sectionHasContent = true
-        if showsListRowSeparators,
+        if showsRowSeparators,
           listRowSeparatorIsVisible(
             current: item,
             next: payload.items.dropFirst(index + 1).first
@@ -267,7 +267,7 @@ extension CollectionStylePresentation {
           }
           return
         }
-        if showsListSectionSeparators, listSectionSeparatorIsVisible(item) {
+        if showsSectionSeparators, listSectionSeparatorIsVisible(item) {
           partial.height += 1
           partial.width = max(partial.width, 1)
         }
@@ -328,16 +328,16 @@ extension CollectionStylePresentation {
     in bounds: CellRect
   ) -> CellRect {
     let verticalInsets =
-      listContainer != nil && listChromeScope == .eachSection
+      container != nil && chromeScope == .eachSection
       ? (top: 0, bottom: 0)
-      : (top: listContentInsets.top, bottom: listContentInsets.bottom)
+      : (top: contentInsets.top, bottom: contentInsets.bottom)
     return CellRect(
       origin: .init(
-        x: bounds.origin.x + listContentInsets.leading,
+        x: bounds.origin.x + contentInsets.leading,
         y: bounds.origin.y + verticalInsets.top
       ),
       size: .init(
-        width: max(0, bounds.size.width - listContentInsets.leading - listContentInsets.trailing),
+        width: max(0, bounds.size.width - contentInsets.leading - contentInsets.trailing),
         height: max(0, bounds.size.height - verticalInsets.top - verticalInsets.bottom)
       )
     )
@@ -454,7 +454,7 @@ extension CollectionStylePresentation {
       return ([], 0, 0, false)
     }
 
-    let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
+    let usesSectionChrome = container != nil && chromeScope == .eachSection
     let window = viewportBackedListWindow(
       itemCount: payload.rowCount,
       selectedRowIndex: payload.selectedRowIndex,
@@ -608,7 +608,7 @@ extension CollectionStylePresentation {
     var sectionLines: [ListDisplayLine] = []
     var sectionIndex = 0
     var rowIndex = 0
-    let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
+    let usesSectionChrome = container != nil && chromeScope == .eachSection
 
     func appendLine(_ line: ListDisplayLine) {
       if usesSectionChrome {
@@ -724,7 +724,7 @@ extension CollectionStylePresentation {
           )
         )
 
-        if showsListRowSeparators,
+        if showsRowSeparators,
           listRowSeparatorIsVisible(
             current: item,
             next: payload.items.dropFirst(index + 1).first
@@ -744,7 +744,7 @@ extension CollectionStylePresentation {
           flushSection()
           continue
         }
-        guard showsListSectionSeparators,
+        guard showsSectionSeparators,
           listSectionSeparatorIsVisible(item)
         else {
           continue
@@ -799,7 +799,7 @@ extension CollectionStylePresentation {
     in contentBounds: CellRect,
     coveringFullContent: (height: Int, yOffset: Int)? = nil
   ) -> [CellRect] {
-    guard listContainer != nil, listChromeScope == .eachSection, !lines.isEmpty else {
+    guard container != nil, chromeScope == .eachSection, !lines.isEmpty else {
       return []
     }
 
@@ -807,12 +807,12 @@ extension CollectionStylePresentation {
       return [
         CellRect(
           origin: .init(
-            x: contentBounds.origin.x - listContentInsets.leading,
+            x: contentBounds.origin.x - contentInsets.leading,
             y: contentBounds.origin.y + coveringFullContent.yOffset
           ),
           size: .init(
-            width: contentBounds.size.width + listContentInsets.leading
-              + listContentInsets.trailing,
+            width: contentBounds.size.width + contentInsets.leading
+              + contentInsets.trailing,
             height: coveringFullContent.height
           )
         )
@@ -830,12 +830,12 @@ extension CollectionStylePresentation {
       bounds.append(
         CellRect(
           origin: .init(
-            x: contentBounds.origin.x - listContentInsets.leading,
+            x: contentBounds.origin.x - contentInsets.leading,
             y: contentBounds.origin.y + start
           ),
           size: .init(
-            width: contentBounds.size.width + listContentInsets.leading
-              + listContentInsets.trailing,
+            width: contentBounds.size.width + contentInsets.leading
+              + contentInsets.trailing,
             height: endIndex - start
           )
         )

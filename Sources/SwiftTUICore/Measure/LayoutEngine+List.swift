@@ -53,8 +53,8 @@ extension LayoutEngine {
     }
     idealSize.width = max(
       idealSize.width,
-      widestChild + payload.style.listContentInsets.leading
-        + payload.style.listContentInsets.trailing
+      widestChild + payload.style.contentInsets.leading
+        + payload.style.contentInsets.trailing
     )
 
     return CellSize(

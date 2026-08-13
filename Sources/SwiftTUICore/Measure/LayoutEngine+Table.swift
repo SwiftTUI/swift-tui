@@ -13,11 +13,11 @@ extension LayoutEngine {
       $0 + max(0, $1.measuredSize.height - 1)
     }
     let leftWidth = layoutText(
-      for: payload.style.tableBorderGlyphs.left,
+      for: payload.style.borderGlyphs.left,
       width: nil
     ).size.width
     let rightWidth = layoutText(
-      for: payload.style.tableBorderGlyphs.right,
+      for: payload.style.borderGlyphs.right,
       width: nil
     ).size.width
     let widestChild = childMeasurements.map(\.measuredSize.width).max() ?? 0
@@ -51,7 +51,7 @@ extension LayoutEngine {
     var lineMetrics = (
       width: borderedTableLineWidth(
         widths: widths,
-        glyphs: payload.style.tableBorderGlyphs
+        glyphs: payload.style.borderGlyphs
       ),
       height: 2
     )
