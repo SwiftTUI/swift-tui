@@ -284,6 +284,15 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     /// Drained into the produced `ScheduledFrame` for cancellation-pressure
     /// diagnostics; reset to 0 on consume.
     var pendingIntentRequestCount: Int = 0
+    /// Monotonic count of `requestInvalidation` calls. Never reset — a
+    /// generation captured before an event dispatch must stay meaningful
+    /// regardless of frame consumes, so "did the dispatch request an
+    /// invalidation of its own" is a generation compare rather than a
+    /// pending-SET compare (whose equality lied exactly when the dispatch
+    /// re-requested an identity already pending — the coalesced
+    /// focus-flip + scroll-write backstop accident, flip plan
+    /// 2026-08-12-004 Stage 2).
+    var invalidationRequestGeneration: UInt64 = 0
   }
 
   private let coalescingLock = OSAllocatedUnfairLock<CoalescingState>(
@@ -313,6 +322,15 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     coalescingLock.withLock { $0.pendingIntentRequestCount }
   }
 
+  /// Monotonic count of `requestInvalidation` calls over the scheduler's
+  /// lifetime (never reset). The run loop captures it before dispatching an
+  /// event and compares after: an unchanged generation proves the dispatch
+  /// requested no invalidation of its own, which is the dispatch backstop's
+  /// firing condition.
+  package var invalidationRequestGeneration: UInt64 {
+    coalescingLock.withLock { $0.invalidationRequestGeneration }
+  }
+
   public func requestInput() {
     coalescingLock.withLock { state in
       state.pendingCauses.insert(.input)
@@ -326,6 +344,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(identities)
       state.pendingIntentRequestCount += 1
+      state.invalidationRequestGeneration &+= 1
     }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
@@ -630,6 +649,7 @@ extension FrameScheduler: AnimationAwareInvalidating {
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(identities)
       state.pendingIntentRequestCount += 1
+      state.invalidationRequestGeneration &+= 1
       AnimationInvalidationSegments.append(
         AnimationInvalidationSegment(
           identities: identities,

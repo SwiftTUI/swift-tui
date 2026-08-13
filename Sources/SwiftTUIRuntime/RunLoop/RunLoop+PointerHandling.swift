@@ -294,7 +294,7 @@ extension RunLoop {
     identity: Identity,
     hitOwnerNodeID: ViewNodeID?
   ) {
-    let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+    let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
     // Dispatch under the press-time focused values: the press moved focus
     // (click-to-focus) before this release, and a frame in between can have
     // re-seated focus again (a control disabling itself once the publisher
@@ -312,7 +312,7 @@ extension RunLoop {
     if handled {
       recordFollowUpInvalidation(
         for: identity,
-        schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+        schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
       )
     }
   }

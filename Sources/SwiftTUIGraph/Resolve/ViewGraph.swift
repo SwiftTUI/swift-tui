@@ -1681,7 +1681,8 @@ package final class ViewGraph {
         hasRoot: root != nil,
         graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
         nodesByNodeID: nodesByNodeID,
-        lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
+        lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
+        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
       )
     )
     guard planning.droppedTargetlessNodeCount == 0 else {

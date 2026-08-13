@@ -108,12 +108,12 @@ extension RunLoop {
     routeID: RouteID,
     phase: HoverPhase
   ) {
-    let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+    let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
     localPointerHandlerRegistry.dispatchHover(
       routeID: routeID,
       phase: phase
     )
-    if schedulerPendingInvalidations() != invalidationsBeforeDispatch {
+    if schedulerInvalidationRequestGeneration() != invalidationGenerationBeforeDispatch {
       pendingFocusTraversal = nil
     }
   }

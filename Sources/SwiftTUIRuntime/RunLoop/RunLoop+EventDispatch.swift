@@ -99,10 +99,10 @@ extension RunLoop {
       || KeyBinding.allowsModifierlessCommands(for: keyPress.key)
     {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
-      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+      let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
       if commandRegistry.dispatch(key: binding, along: commandDispatchScopePath()) {
         requestDispatchBackstopInvalidation(
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )
         return nil
       }
@@ -133,7 +133,7 @@ extension RunLoop {
       // cannot reach from a rerooted focus identity). The focused identity
       // itself dispatches first, preserving stacked-handler priority and
       // editor interception at the exact identity.
-      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+      let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
       var handled = false
       for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
       where localKeyHandlerRegistry.hasHandler(identity: identity) {
@@ -155,7 +155,7 @@ extension RunLoop {
       // replayed sets as `root_invalidated`.
       if handled {
         requestDispatchBackstopInvalidation(
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )
         return nil
       }
@@ -193,10 +193,10 @@ extension RunLoop {
     // they auto-expire.
     if keyPress == KeyPress(.escape, modifiers: []) {
       if let dismiss = renderer.topmostEscapeDismissAction() {
-        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+        let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
         dismiss()
         requestDispatchBackstopInvalidation(
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )
         return nil
       }
@@ -232,10 +232,10 @@ extension RunLoop {
       if let pop = renderer.topmostNavigationDestinationPopAction(
         along: currentFocusScopePath()
       ) {
-        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+        let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
         pop()
         requestDispatchBackstopInvalidation(
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )
         return nil
       }
@@ -263,12 +263,12 @@ extension RunLoop {
     case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)
       if let actionIdentity = focusedActivationIdentity {
-        let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+        let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
         let handled = localActionRegistry.dispatch(identity: actionIdentity)
         if handled {
           recordFollowUpInvalidation(
             for: actionIdentity,
-            schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+            schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
           )
         }
       }
@@ -297,13 +297,13 @@ extension RunLoop {
       if consumed { return }
     }
     if let focusedIdentity = focusTracker.currentFocusIdentity {
-      let invalidationsBeforeDispatch = schedulerPendingInvalidations()
+      let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
       if localKeyHandlerRegistry.dispatchPaste(
         identity: focusedIdentity,
         content: pasteEvent.content
       ) {
         requestDispatchBackstopInvalidation(
-          schedulerInvalidationsBeforeDispatch: invalidationsBeforeDispatch
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )
         return
       }

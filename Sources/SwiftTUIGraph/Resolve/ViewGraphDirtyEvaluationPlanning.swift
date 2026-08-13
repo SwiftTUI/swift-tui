@@ -3,6 +3,10 @@ struct ViewGraphDirtyEvaluationPlanningInput {
   var graphLocalDirtyNodeIDs: Set<ViewNodeID>
   var nodesByNodeID: [ViewNodeID: ViewNode]
   var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
+  /// The flattening-absorbed authored state owners (see `reindexIdentity`) —
+  /// the target walk's hazard registry for collapse-boundary lifting.
+  /// Defaults empty (no lifting) for fixtures without flattenings.
+  var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
 }
 
 struct ViewGraphDirtyEvaluationTargetPlan {
@@ -45,7 +49,8 @@ enum ViewGraphDirtyEvaluationPlanner {
       let target = evaluatorTarget(
         for: node,
         nodesByNodeID: input.nodesByNodeID,
-        lifecycleEvaluationOwnersByNodeID: input.lifecycleEvaluationOwnersByNodeID
+        lifecycleEvaluationOwnersByNodeID: input.lifecycleEvaluationOwnersByNodeID,
+        flattenedStateOwnerNodeIDByIdentity: input.flattenedStateOwnerNodeIDByIdentity
       )
       guard let target else {
         // No stitchable evaluator anywhere on this node's chain. Count it
@@ -66,6 +71,32 @@ enum ViewGraphDirtyEvaluationPlanner {
 
     guard droppedTargetlessNodeCount == 0 else {
       return (nil, droppedTargetlessNodeCount)
+    }
+    // Collapse-boundary lifting can land two dirty nodes on NESTED targets
+    // (one target's evaluator re-resolves the other's subtree anyway);
+    // running both would double-resolve the nested subtree in one pass.
+    // Coverage is EVALUATION-ANCESTRY reachability — an identity-prefix test
+    // would wrongly drop an identity-nested but graph-independent target
+    // (an island root) whose covering "ancestor" never re-resolves it.
+    let plannedTargets = Set(targetNodes.map(ObjectIdentifier.init))
+    let coveredTargets = targetNodes.filter { candidate in
+      var ancestor = evaluationAncestor(of: candidate)
+      var visited: Set<ObjectIdentifier> = []
+      while let current = ancestor {
+        let currentID = ObjectIdentifier(current)
+        guard visited.insert(currentID).inserted else {
+          break
+        }
+        if plannedTargets.contains(currentID) {
+          return true
+        }
+        ancestor = evaluationAncestor(of: current)
+      }
+      return false
+    }
+    if !coveredTargets.isEmpty {
+      let covered = Set(coveredTargets.map(ObjectIdentifier.init))
+      targetNodes.removeAll { covered.contains(ObjectIdentifier($0)) }
     }
     return (ViewGraphDirtyEvaluationTargetPlan(targetNodes: targetNodes), 0)
   }
@@ -141,9 +172,14 @@ enum ViewGraphDirtyEvaluationPlanner {
   /// the committed snapshot above the seam would stay stale. The surviving
   /// candidate is the first evaluator above the last seam.
   private static func stitchableEvaluatorTarget(
-    startingAt node: ViewNode
+    startingAt node: ViewNode,
+    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewNode? {
-    var candidate: ViewNode? = node.hasEvaluator ? node : nil
+    var candidate: ViewNode? =
+      isStitchable(
+        node,
+        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+      ) ? node : nil
     var child = node
     var visited: Set<ObjectIdentifier> = []
     while true {
@@ -157,12 +193,49 @@ enum ViewGraphDirtyEvaluationPlanner {
       if crossesSeam {
         candidate = nil
       }
-      if candidate == nil, ancestor.hasEvaluator {
+      if candidate == nil,
+        isStitchable(
+          ancestor,
+          flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+        )
+      {
         candidate = ancestor
       }
       child = ancestor
     }
     return candidate
+  }
+
+  /// Whether `node`'s evaluator re-run stitches into the committed frame on
+  /// its own. A collapse-claiming candidate (`resolvedIdentity != identity`)
+  /// hanging as its evaluation ancestor's ONLY child is not stitchable: that
+  /// shape is a single-child modifier wrapper's CONTENT capture (`.id`d
+  /// content under an enclosing `.frame`/style wrapper), and re-running it
+  /// alone resolves below the wrapper's modifier chain — losing the
+  /// wrapper's layout (a `.frame`d scroll viewport degenerates to its
+  /// content size) and re-hosting flattening-absorbed state slots across
+  /// the collapse (a just-written scroll offset re-seeds from authored
+  /// defaults). Lifting to the wrapper re-applies the modifiers. A
+  /// collapse-claiming candidate under a MULTI-child ancestor is an
+  /// ordinary child-slot wrapper (`ForEach` rows, tuple slots) whose
+  /// capture spans its whole slot content — those keep their narrow
+  /// in-place targets. Same reasoning as the island-seam candidate reset
+  /// above (the coalesced focus-flip + scroll-write pin, flip plan
+  /// 2026-08-12-004 Stage 1).
+  private static func isStitchable(
+    _ node: ViewNode,
+    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+  ) -> Bool {
+    guard node.hasEvaluator else {
+      return false
+    }
+    guard node.resolvedIdentity != node.identity else {
+      return true
+    }
+    guard let ancestor = evaluationAncestor(of: node) else {
+      return true
+    }
+    return ancestor.children.count != 1
   }
 
   private static func lifecycleEvaluationOwnerAncestor(
@@ -192,15 +265,22 @@ enum ViewGraphDirtyEvaluationPlanner {
   private static func evaluatorTarget(
     for dirtyNode: ViewNode,
     nodesByNodeID: [ViewNodeID: ViewNode],
-    lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
+    lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID],
+    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewNode? {
     if let lifecycleOwner = lifecycleEvaluationOwnerAncestor(
       of: dirtyNode,
       nodesByNodeID: nodesByNodeID,
       lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID
     ) {
-      return stitchableEvaluatorTarget(startingAt: lifecycleOwner)
+      return stitchableEvaluatorTarget(
+        startingAt: lifecycleOwner,
+        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+      )
     }
-    return stitchableEvaluatorTarget(startingAt: dirtyNode)
+    return stitchableEvaluatorTarget(
+      startingAt: dirtyNode,
+      flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+    )
   }
 }

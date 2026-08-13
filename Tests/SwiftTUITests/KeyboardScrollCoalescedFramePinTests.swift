@@ -48,15 +48,17 @@ struct KeyboardScrollCoalescedFramePinTests {
     #expect(harness.surfaceText.contains("Key 3"))
     #expect(!harness.surfaceText.contains("Key 4"))
 
-    // Mechanism (the Stage-2 flip target): today this frame is only correct
-    // because `requestDispatchBackstopInvalidation` misfires a root sweep —
-    // pending-set equality says "the dispatch scheduled nothing" exactly when
-    // the write's reader identity was already pending from the raw focus-move
-    // enqueue. The sweep re-resolves the whole fixture (~22 computed). Plan
-    // Stage 2 replaces the set-equality check with a request-count/generation
-    // check, after which this frame must stay correct WITHOUT the sweep —
-    // update this recorded shape (with evidence) when that lands.
-    #expect(observation.maxResolvedNodesComputed >= 20)
+    // Stage 2 (landed): the dispatch backstop compares the scheduler's
+    // monotonic invalidation-request GENERATION, so the scroll dispatch's own
+    // offset-write request keeps the backstop quiet even though the written
+    // identity was already pending from the raw focus-move enqueue (the
+    // pending-SET equality misfired a root sweep here, and that sweep was
+    // what masked the Stage-1 seam). The coalesced frame now runs selectively
+    // in BOTH flag states — plan formed, frontier = the covering `/content`
+    // target, recorded at 20 computed vs the sweep's 22–29 — and must stay
+    // correct without the sweep. Update the recorded value only with
+    // evidence (a trace attribution).
+    #expect(observation.maxResolvedNodesComputed <= 20)
   }
 
   @Test("Flag-on: the coalesced selective frame must render the scrolled viewport")
@@ -72,20 +74,18 @@ struct KeyboardScrollCoalescedFramePinTests {
     // The focus flip itself lands either way.
     #expect(harness.focusedIdentity == harness.scrollIdentity)
 
-    // The seam (plan Stage 1 flips this pin): the selective frame's frontier
-    // evaluator re-hosts the absorbed scroll identity on the flattening
-    // wrapper — a fresh state slot, so the just-written offset reads back 0 —
-    // and resolves below the `.frame` viewport, so the render loses the clip
-    // and indicators (every fixture row drawn).
-    withKnownIssue(
-      "coalesced flip+scroll selective seam — plan 2026-08-12-004 Stage 1 flips this pin"
-    ) {
-      #expect(harness.scrollOffsetY == 1)
-      #expect(!harness.surfaceText.contains("Key 0"))
-      #expect(harness.surfaceText.contains("Key 1"))
-      #expect(harness.surfaceText.contains("Key 3"))
-      #expect(!harness.surfaceText.contains("Key 4"))
-    }
+    // Stage 1 (landed): the planner's stitchable-target walk lifts past
+    // collapse-absorbing links (`resolvedIdentity != identity`), so the
+    // frontier evaluator re-runs the enclosing wrapper — the `.frame`
+    // viewport survives and the offset stays on the authored state owner.
+    // Before the lift, this frame re-ran the wrapper's CONTENT closure below
+    // the modifier: fresh state slot (the just-written offset read back 0),
+    // no clip, no indicators, every fixture row drawn.
+    #expect(harness.scrollOffsetY == 1)
+    #expect(!harness.surfaceText.contains("Key 0"))
+    #expect(harness.surfaceText.contains("Key 1"))
+    #expect(harness.surfaceText.contains("Key 3"))
+    #expect(!harness.surfaceText.contains("Key 4"))
   }
 }
 

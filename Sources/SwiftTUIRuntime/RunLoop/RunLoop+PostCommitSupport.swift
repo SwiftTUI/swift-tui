@@ -91,15 +91,26 @@ extension RunLoop {
     }
   }
 
-  /// The scheduler's coalesced invalidation identities right now — used to tell
-  /// whether a just-dispatched action requested an invalidation of its own.
+  /// The scheduler's coalesced invalidation identities right now — read by the
+  /// focus-sync convergence loop to compare pass-start pending work.
   func schedulerPendingInvalidations() -> Set<Identity> {
     (scheduler as? FrameScheduler)?.pendingInvalidatedIdentities ?? []
   }
 
+  /// The scheduler's monotonic invalidation-request generation — captured
+  /// before an event dispatch so "did the dispatch request an invalidation of
+  /// its own" is a generation compare. The previous pending-SET compare lied
+  /// exactly when the dispatch re-requested an identity already pending (a
+  /// scroll-offset write coalesced with the raw focus-move enqueue), misfiring
+  /// the root sweep that masked the coalesced flip+scroll selective seam
+  /// (flip plan 2026-08-12-004 Stage 2).
+  func schedulerInvalidationRequestGeneration() -> UInt64 {
+    (scheduler as? FrameScheduler)?.invalidationRequestGeneration ?? 0
+  }
+
   /// Requests the coarse root sweep after a consumed event dispatch — but only
   /// when the dispatched action scheduled no invalidation of its own
-  /// (mirroring ``recordFollowUpInvalidation(for:schedulerInvalidationsBeforeDispatch:)``).
+  /// (mirroring ``recordFollowUpInvalidation(for:schedulerInvalidationGenerationBeforeDispatch:)``).
   /// An action whose writes are tracked has already invalidated its precise
   /// readers; the redundant sweep would put the root identity in the frame's
   /// raw set — `root_invalidated` disables selective evaluation wholesale, and
@@ -107,9 +118,9 @@ extension RunLoop {
   /// converges. The sweep stays as the backstop for actions with untracked
   /// side effects, which schedule nothing.
   func requestDispatchBackstopInvalidation(
-    schedulerInvalidationsBeforeDispatch before: Set<Identity>
+    schedulerInvalidationGenerationBeforeDispatch before: UInt64
   ) {
-    guard schedulerPendingInvalidations() == before else {
+    guard schedulerInvalidationRequestGeneration() == before else {
       return
     }
     InvalidationSourceTrace.note("dispatch-backstop", [rootIdentity])
@@ -130,9 +141,10 @@ extension RunLoop {
   /// byte-identical (the follow-up is always inserted).
   func recordFollowUpInvalidation(
     for actionIdentity: Identity,
-    schedulerInvalidationsBeforeDispatch before: Set<Identity>
+    schedulerInvalidationGenerationBeforeDispatch before: UInt64
   ) {
-    let actionRequestedInvalidation = schedulerPendingInvalidations() != before
+    let actionRequestedInvalidation =
+      schedulerInvalidationRequestGeneration() != before
     guard !actionRequestedInvalidation else {
       return
     }

@@ -1094,20 +1094,33 @@ struct InteractiveRuntimeTests {
     // An action whose dispatch already requested an invalidation (its `@State`
     // write) skips the redundant owner-scope follow-up, sparing the owner's
     // disjoint descendants.
-    let beforeInvalidating = runLoop.schedulerPendingInvalidations()
+    let beforeInvalidating = runLoop.schedulerInvalidationRequestGeneration()
     runLoop.scheduler.requestInvalidation(of: [readerIdentity])
     runLoop.recordFollowUpInvalidation(
       for: actionIdentity,
-      schedulerInvalidationsBeforeDispatch: beforeInvalidating
+      schedulerInvalidationGenerationBeforeDispatch: beforeInvalidating
+    )
+    #expect(!runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
+
+    // The set-equality accident (flip plan 2026-08-12-004 Stage 2): a dispatch
+    // that re-requests an identity ALREADY pending leaves the pending SET
+    // unchanged, but it did invalidate — the generation compare must skip the
+    // follow-up where the set compare misfired it.
+    runLoop.postActionInvalidationIdentities.removeAll()
+    let beforeRepeat = runLoop.schedulerInvalidationRequestGeneration()
+    runLoop.scheduler.requestInvalidation(of: [readerIdentity])
+    runLoop.recordFollowUpInvalidation(
+      for: actionIdentity,
+      schedulerInvalidationGenerationBeforeDispatch: beforeRepeat
     )
     #expect(!runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
 
     // Backstop: an action that requested nothing keeps the owner follow-up.
     runLoop.postActionInvalidationIdentities.removeAll()
-    let beforeQuiet = runLoop.schedulerPendingInvalidations()
+    let beforeQuiet = runLoop.schedulerInvalidationRequestGeneration()
     runLoop.recordFollowUpInvalidation(
       for: actionIdentity,
-      schedulerInvalidationsBeforeDispatch: beforeQuiet
+      schedulerInvalidationGenerationBeforeDispatch: beforeQuiet
     )
     #expect(runLoop.postActionInvalidationIdentities.contains(ownerIdentity))
   }
