@@ -50,7 +50,7 @@ struct PerfRepeatForeverProbeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("continuous-anim")
-      Spinner(.brailleLoop)
+      Spinner()
     }
     .padding(1)
   }

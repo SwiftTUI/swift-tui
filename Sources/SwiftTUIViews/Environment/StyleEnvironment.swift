@@ -52,6 +52,10 @@ private enum TableStyleKey: EnvironmentKey {
   static let defaultValue = AnyTableStyle.automatic
 }
 
+private enum SpinnerStyleKey: EnvironmentKey {
+  static let defaultValue = AnySpinnerStyle.automatic
+}
+
 private enum TabViewStyleKey: EnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
@@ -197,6 +201,11 @@ extension EnvironmentValues {
   package var tableStyle: AnyTableStyle {
     get { self[TableStyleKey.self] }
     set { self[TableStyleKey.self] = newValue }
+  }
+
+  package var spinnerStyle: AnySpinnerStyle {
+    get { self[SpinnerStyleKey.self] }
+    set { self[SpinnerStyleKey.self] = newValue }
   }
 
   package var tabViewStyle: AnyTabViewStyle {

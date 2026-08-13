@@ -147,7 +147,7 @@ struct PerfStormView: View {
         Text("bench-storm")
           .foregroundStyle(.tint)
         Text("shimmer")
-        Spinner(.brailleLoop)
+        Spinner()
       }
       HStack(spacing: 1) {
         ForEach(0..<8, id: \.self) { index in

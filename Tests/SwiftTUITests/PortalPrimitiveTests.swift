@@ -199,7 +199,7 @@ private struct PortalSpinnerProbe: View {
     }
     .sheet("Inspector", isPresented: $isPresented) {
       HStack(spacing: 1) {
-        Spinner(.brailleLoop)
+        Spinner()
         Text("Loading")
       }
     }
@@ -214,7 +214,7 @@ private struct PortalSingleSpinnerProbe: View {
       isPresented = true
     }
     .sheet("Inspector", isPresented: $isPresented) {
-      Spinner(.brailleLoop)
+      Spinner()
     }
   }
 }

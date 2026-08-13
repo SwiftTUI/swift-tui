@@ -69,14 +69,20 @@ struct MotionAndProgressPolicyTests {
   func reducedMotionSuppressesSpinnerTaskTicks() {
     let normalRegistry = LocalTaskRegistry()
     _ = renderArtifacts(
-      Spinner(.init("|", "/", "-", "\\", tail: "X")),
+      Spinner()
+        .spinnerStyle(
+          GlyphSpinnerStyle(activeFrames: ["|", "/", "-", "\\"], finishedFrame: "X")
+        ),
       taskRegistry: normalRegistry,
       identity: testIdentity("NormalSpinner")
     )
 
     let reducedRegistry = LocalTaskRegistry()
     let reducedSurface = renderedSurface(
-      Spinner(.init("|", "/", "-", "\\", tail: "X")),
+      Spinner()
+        .spinnerStyle(
+          GlyphSpinnerStyle(activeFrames: ["|", "/", "-", "\\"], finishedFrame: "X")
+        ),
       environmentValues: policyEnvironment(accessibilityReduceMotion: true),
       taskRegistry: reducedRegistry,
       identity: testIdentity("ReducedSpinner")

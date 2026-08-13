@@ -617,20 +617,21 @@ are omitted even when SwiftUI exposes a corresponding API.
   families that have it today. The destination extends that contract to
   `Toggle`, `ProgressView`, `Label`, `Menu`, `Slider`, `Stepper`,
   `DisclosureGroup`, `GroupBox`, `ControlGroup`, `LabeledContent`,
-  `TextEditor`, `ScrollView`, `Link`, and
-  `Spinner`, and to the alert/confirmation-dialog, sheet,
+  `TextEditor`, `ScrollView`, and `Link`, and to the
+  alert/confirmation-dialog, sheet,
   full-screen-cover, popover, palette, and toolbar presentation surfaces —
   body-producing where composition is the customization,
   presentation-valued where the primitive must keep a runtime invariant,
   with built-in treatments implemented through the same public
   configuration and routing contract available to third-party styles. At
   `HEAD`, those surfaces have hard-coded chrome with no independently
-  replaceable style seam (`Table` now has its own environment-scoped
-  `TableStyle` family, split from `ListStyle`), and `Spinner`,
-  `.toolbar(style:)`, and the palette declaration take frames, a style, or
-  content at the declaration rather than reading the nearest environment
-  value. Changes that facilitate this destination — including
-  source-breaking replacement of those three declaration-scoped entry
+  replaceable style seam (`Table` and `Spinner` now have their own
+  environment-scoped `TableStyle` and `SpinnerStyle` families — the former
+  split from `ListStyle`, the latter replacing the removed frame-and-cadence
+  initializer), and `.toolbar(style:)` and the palette declaration still
+  take a style or content at the declaration rather than reading the
+  nearest environment value. Changes that facilitate this destination —
+  including source-breaking replacement of those declaration-scoped entry
   points (toast deliberately keeps its declaration-scoped style argument)
   — are expected as part of the burndown to 1.0.0.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where

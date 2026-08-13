@@ -715,7 +715,14 @@ extension FrameworkStressComponentCompositionTests {
         }
       }
       var body: some View {
-        Spinner(.init(head: "H", "A", "B", tail: "T"), stage: stage)
+        Spinner(stage: stage)
+          .spinnerStyle(
+            GlyphSpinnerStyle(
+              activeFrames: ["A", "B"],
+              inactiveFrame: "H",
+              finishedFrame: "T"
+            )
+          )
       }
     }
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
@@ -743,12 +750,13 @@ extension FrameworkStressComponentCompositionTests {
     // index or render the wrong replacement body's first glyph.
     struct Root: View {
       let generation: Int
-      var set: Spinner.SpinnerSet {
+      var style: GlyphSpinnerStyle {
         generation.isMultiple(of: 2)
-          ? .init(head: "x", "A", "B", tail: "X")
-          : .init(head: "y", "C", "D", "E", tail: "Y")
+          ? GlyphSpinnerStyle(activeFrames: ["A", "B"], inactiveFrame: "x", finishedFrame: "X")
+          : GlyphSpinnerStyle(
+            activeFrames: ["C", "D", "E"], inactiveFrame: "y", finishedFrame: "Y")
       }
-      var body: some View { Spinner(set, stage: .active) }
+      var body: some View { Spinner(stage: .active).spinnerStyle(style) }
     }
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let identity = testIdentity("ComponentComposition022")

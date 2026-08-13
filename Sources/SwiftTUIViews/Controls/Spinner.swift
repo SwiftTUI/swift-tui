@@ -1,43 +1,111 @@
 import SwiftTUICore
 
+/// An animated activity indicator.
+///
+/// The spinner's glyph frames, cadence, and paint come from the nearest
+/// `spinnerStyle(_:)` environment value; the primitive owns the animation
+/// task, iteration state, cancellation identity, stage semantics, and
+/// reduced-motion behavior. Custom frame sequences use `GlyphSpinnerStyle`.
 public struct Spinner: View {
-
-  public init(
-    _ set: SpinnerSet = .brailleLoop,
-    stage: Stage = .active,
-    interval: Duration = .milliseconds(64)
-  ) {
-    precondition(
-      interval > .zero,
-      "Spinner interval must be > 0 milliseconds"
-    )
-    self.set = set
+  public init(stage: Stage = .active) {
     self.stage = stage
-    self.interval = interval
   }
-  let set: SpinnerSet
+
   let stage: Stage
-  let interval: Duration
   @State var iteration: Int = 0
 
   public var body: some View {
-    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
-      spinnerBody(accessibilityReduceMotion: accessibilityReduceMotion)
+    EnvironmentReader(\.spinnerStyle) { spinnerStyle in
+      EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+        EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
+          spinnerBody(
+            presentation: resolvedPresentation(
+              style: spinnerStyle,
+              accessibilityReduceMotion: accessibilityReduceMotion,
+              styleEnvironment: styleEnvironment
+            ),
+            accessibilityReduceMotion: accessibilityReduceMotion
+          )
+        }
+      }
+    }
+  }
+
+  @MainActor
+  private func resolvedPresentation(
+    style: AnySpinnerStyle,
+    accessibilityReduceMotion: Bool,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) -> SpinnerStylePresentation {
+    let presentation = style.presentation(
+      for: SpinnerStyleConfiguration(
+        stage: stage,
+        accessibilityReduceMotion: accessibilityReduceMotion,
+        styleEnvironment: styleEnvironment
+      )
+    )
+    var problems: [String] = []
+    if presentation.activeFrames.isEmpty {
+      problems.append("active frames are empty")
+    }
+    if presentation.interval <= .zero {
+      problems.append("interval is not positive")
+    }
+    let frameWidths = Set(presentation.activeFrames.map(Self.frameCellWidth(of:)))
+    if frameWidths.count > 1 {
+      problems.append("active frames mix terminal-cell widths \(frameWidths.sorted())")
+    }
+    return StyleMisuse.validatedPresentation(
+      presentation,
+      problems: problems,
+      family: "SpinnerStyle",
+      styleLabel: style.description,
+      identity: nil,
+      report: { issue in
+        // The spinner body resolves in composed (non-primitive) context, so
+        // the issue rides the imperative queue and surfaces at the next
+        // frame head — the `forEach.staleElementBindingWrite` route.
+        ImperativeRuntimeIssueQueue.record(issue)
+      },
+      fallback: {
+        AnySpinnerStyle.automatic.presentation(
+          for: SpinnerStyleConfiguration(
+            stage: stage,
+            accessibilityReduceMotion: accessibilityReduceMotion,
+            styleEnvironment: styleEnvironment
+          )
+        )
+      }
+    )
+  }
+
+  private static func frameCellWidth(of frame: String) -> Int {
+    frame.reduce(0) { width, character in
+      width + cellWidth(of: character)
     }
   }
 
   @ViewBuilder
-  private func spinnerBody(accessibilityReduceMotion: Bool) -> some View {
+  private func spinnerBody(
+    presentation: SpinnerStylePresentation,
+    accessibilityReduceMotion: Bool
+  ) -> some View {
     if accessibilityReduceMotion {
-      spinnerText(accessibilityReduceMotion: true)
+      spinnerText(presentation: presentation, accessibilityReduceMotion: true)
     } else {
-      spinnerText(accessibilityReduceMotion: false)
-        .task(id: SpinnerTaskKey(set: set, stage: stage, interval: interval)) {
+      spinnerText(presentation: presentation, accessibilityReduceMotion: false)
+        .task(
+          id: SpinnerTaskKey(
+            activeFrames: presentation.activeFrames,
+            stage: stage,
+            interval: presentation.interval
+          )
+        ) {
           switch stage {
           case .active:
             while !Task.isCancelled {
-              try? await Task.sleep(for: interval)
-              let max = set.body.count
+              try? await Task.sleep(for: presentation.interval)
+              let max = presentation.activeFrames.count
               var newIteration = iteration + 1
               newIteration %= max
               iteration = newIteration
@@ -50,21 +118,29 @@ public struct Spinner: View {
   }
 
   @ViewBuilder
-  private func spinnerText(accessibilityReduceMotion: Bool) -> some View {
+  private func spinnerText(
+    presentation: SpinnerStylePresentation,
+    accessibilityReduceMotion: Bool
+  ) -> some View {
     Group {
       switch stage {
       case .active:
         if accessibilityReduceMotion {
-          Text(set.body.first ?? set.head)
+          Text(presentation.activeFrames.first ?? presentation.inactiveFrame)
         } else {
-          Text(set.body[safe: iteration] ?? set.body.first ?? set.head)
+          Text(
+            presentation.activeFrames[safe: iteration]
+              ?? presentation.activeFrames.first
+              ?? presentation.inactiveFrame
+          )
         }
       case .finished:
-        Text(set.tail)
+        Text(presentation.finishedFrame)
       case .inactive:
-        Text(set.head)
+        Text(presentation.inactiveFrame)
       }
     }
+    .modifier(SpinnerForegroundModifier(foregroundStyle: presentation.foregroundStyle))
   }
 
   public enum Stage: Hashable, Sendable, CustomStringConvertible {
@@ -79,85 +155,33 @@ public struct Spinner: View {
       }
     }
   }
+}
 
-  public struct SpinnerSet: Hashable, Sendable, CustomStringConvertible {
-    public enum Progression {
-      case bounce
-      case `repeat`
-    }
-    public init(
-      progression: Progression = .repeat, head: String = " ", _ body: String..., tail: String = " "
-    ) {
-      self.head = head
-      self.body = body
-      self.tail = tail
-    }
+/// Applies the presentation's paint only when one was resolved, so the
+/// default (`nil`) path inherits the ambient foreground without adding a
+/// styling node.
+private struct SpinnerForegroundModifier: ViewModifier, Sendable {
+  let foregroundStyle: AnyShapeStyle?
 
-    nonisolated public var description: String { body.first ?? head }
-    public static let circleOrbit = Self("◡", "◟", "◜", "◠", "◝", "◞", tail: "○")
-    public static let brailleRingFilled = Self("⣾", "⣷", "⣯", "⣟", "⡿", "⢿", "⣽", "⣻", tail: "⣿")
-    public static let brailleBlockFill = Self("⠉", "⠛", "⠿", "⣿", tail: "⣿")
-    public static let barRise = Self("▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", tail: "█")
-    public static let circleFill = Self("○", "◔", "◑", "◕", "●", tail: "●")
-    public static let brailleSweep = Self("⠉", "⠘", "⠰", "⢠", "⣀", "⡄", "⠆", "⠃")
-    public static let diamondPulse = Self("◇", "◈", "◆", "◈", tail: "◆")
-    public static let brailleDotOrbit = Self("⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂")
-    public static let brailleLoopFilled = Self(
-      "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", tail: "⣶")
-    public static let quadrantOrbit = Self("▖", "▘", "▝", "▗")
-    public static let clockFace = Self("◷", "◶", "◵", "◴")
-    public static let halfCircle = Self("◓", "◑", "◒", "◐")
-    public static let triangleCompass = Self("▲", "▶", "▼", "◀")
-    public static let brailleRamp = Self("⣀", "⣤", "⣶", "⣾", "⣿", "⣾", "⣶", "⣤", tail: "⣿")
-    public static let brailleLinePulse = Self("⠉", "⠒", "⣀", "⠒")
-    public static let diceRoll = Self("⚀", "⚁", "⚂", "⚃", "⚄", "⚅")
-    public static let boxCornerOrbit = Self("┌", "┐", "┘", "└")
-    public static let brailleDotFade = Self("⠈", "⠐", "⠠", "⠄", "⠂", "⠁")
-    public static let brailleLineSweep = Self("⠘", "⠰", "⠤", "⠆", "⠃", "⠉")
-    public static let brailleRing = Self("⣾", "⣷", "⣯", "⣟", "⡿", "⢿", "⣽", "⣻")
-    public static let arcOrbit = Self("◜", "◝", "◞", "◟")
-    public static let brailleLoop = Self("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
-    public static let shadeFade = Self("█", "▓", "▒", "░", tail: "█")
-    public static let dotChase = Self("∙∙∙", "●∙∙", "∙●∙", "∙∙●", tail: "●●●")
-    public static let globe = Self("🌍", "🌎", "🌏")
-    public static let moonPhase = Self("🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", tail: "🌕")
-    public static let segmentedBar = Self(
-      "▱▱▱", "▰▱▱", "▰▰▱", "▰▰▰", "▰▰▱", "▰▱▱", "▱▱▱", tail: "▰▰▰")
-    public static let arrowCompass = Self("←", "↖", "↑", "↗", "→", "↘", "↓", "↙")
-    public static let glyphPulse = Self("ᔐ", "ᯇ", "ᔑ", "ᯇ", tail: "ᦟ")
-    public static let blockCorners = Self("▙", "▛", "▜", "▟", tail: "█")
-    public static let horizontalBarFill = Self("▏", "▎", "▍", "▌", "▋", "▊", "▉", "█", tail: "█")
-    public static let quadrantCorners = Self("▝", "▗", "▖", "▘", tail: "█")
-    public static let verticalBarFill = Self("▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", tail: "█")
-    public static let heavyArrowCompass = Self("⇑", "⇗", "⇒", "⇘", "⇓", "⇙", "⇐", "⇖")
-    public static let lineCompass = Self("│", "╱", "─", "╲", tail: "┼")
-    /// Compact 4-glyph cycle used by Claude Code's terminal "working"
-    /// header: asterisk, middle dot, plus, division sign.  All four
-    /// glyphs are single-cell-wide ASCII so the spinner stays at a
-    /// constant width as it rotates.
-    public static let asteriskCycle = Self("*", "·", "+", "÷")
-    public static let oghamPulse = Self(
-      " ", "ᚁ", "ᚂ", "ᚃ", "ᚄ", "ᚅ", "ᚄ", "ᚃ", "ᚂ", "ᚁ", " ", "ᚆ", "ᚇ", "ᚈ", "ᚉ", "ᚊ", "ᚉ", "ᚈ", "ᚇ",
-      "ᚆ", tail: "ᚔ")
-    var head: String
-    var body: [String]
-    var tail: String
+  func body(content: Content) -> some View {
+    if let foregroundStyle {
+      content.foregroundStyle(foregroundStyle)
+    } else {
+      content
+    }
   }
 }
 
-struct Pair<A, B> {
-  var a: A
-  var b: B
-}
-extension Pair: Equatable where A: Equatable, B: Equatable {}
-extension Pair: Hashable where A: Hashable, B: Hashable {}
-extension Pair: Sendable where A: Sendable, B: Sendable {}
-
 /// Composite key used to drive the spinner's `.task(id:)` cancellation.
-/// Changing any of the three observed fields cleanly cancels the
-/// previous tick loop so a fresh one starts at the new rate.
+///
+/// The resolved active frame sequence, the stage, and the cadence
+/// participate, so changing any of them cancels the old tick loop cleanly.
+/// Presentation paint deliberately does not participate — a theme or
+/// contrast change restyles the glyph without resetting the spinner's
+/// phase — and replacing the style with one that resolves to the same
+/// frames, cadence, and stage does not restart the loop.
 private struct SpinnerTaskKey: Hashable, Sendable {
-  let set: Spinner.SpinnerSet
+  let activeFrames: [String]
   let stage: Spinner.Stage
   let interval: Duration
 }

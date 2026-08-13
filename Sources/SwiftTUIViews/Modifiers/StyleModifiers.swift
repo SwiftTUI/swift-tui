@@ -73,6 +73,18 @@ extension View {
     tableStyle(AnyTableStyle(style))
   }
 
+  public func spinnerStyle(
+    _ style: AnySpinnerStyle
+  ) -> some View {
+    environment(\.spinnerStyle, style)
+  }
+
+  public func spinnerStyle<S: SpinnerStyle>(
+    _ style: S
+  ) -> some View {
+    spinnerStyle(AnySpinnerStyle(style))
+  }
+
   /// Control how tab views render their tab bar.
   public func tabViewStyle(
     _ style: AnyTabViewStyle
