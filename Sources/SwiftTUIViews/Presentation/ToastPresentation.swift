@@ -36,6 +36,7 @@ public struct AnyToastStyle: Sendable, CustomStringConvertible, CustomDebugStrin
     snapshotLabel
   }
 
+  @MainActor
   package func presentation(
     for configuration: ToastStyleConfiguration
   ) -> ToastStylePresentation {
@@ -43,10 +44,24 @@ public struct AnyToastStyle: Sendable, CustomStringConvertible, CustomDebugStrin
   }
 }
 
+extension AnyToastStyle: TypedReuseEqualityProviding {
+  package func isEqualForReuse(to other: any Sendable) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return box.isEqualForReuse(to: other.box)
+  }
+}
+
 /// Defines the chrome used for transient toast notifications.
+///
+/// Toasts are deliberately declaration-scoped: a toast's tone is per-toast
+/// semantics, so `.toast(..., style:)` stays the only styling path and no
+/// toast environment key or `toastStyle(_:)` modifier exists.
 public protocol ToastStyle: Sendable {
   var snapshotLabel: String { get }
 
+  @MainActor
   func resolvePresentation(
     for configuration: ToastStyleConfiguration
   ) -> ToastStylePresentation
@@ -58,8 +73,30 @@ extension ToastStyle {
   }
 }
 
+/// The render state a toast style may consult.
+///
+/// `stackIndex` and `stackCount` are only known once the coordinator has
+/// composed the active stack, which is why a toast's style resolves at
+/// composition time rather than where it is declared.
 public struct ToastStyleConfiguration: Sendable {
-  public init() {}
+  /// This toast's position in the visible stack, oldest first.
+  public var stackIndex: Int
+  /// How many toasts are visible in the stack.
+  public var stackCount: Int
+  public var terminalSize: CellSize
+  public var styleEnvironment: StyleEnvironmentSnapshot
+
+  package init(
+    stackIndex: Int,
+    stackCount: Int,
+    terminalSize: CellSize,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) {
+    self.stackIndex = stackIndex
+    self.stackCount = stackCount
+    self.terminalSize = terminalSize
+    self.styleEnvironment = styleEnvironment
+  }
 }
 
 public struct ToastStylePresentation: Sendable {
@@ -155,19 +192,34 @@ public struct DangerToastStyle: ToastStyle {
   }
 }
 
+extension InfoToastStyle: ReuseTransparentStyle {}
+extension SuccessToastStyle: ReuseTransparentStyle {}
+extension WarningToastStyle: ReuseTransparentStyle {}
+extension DangerToastStyle: ReuseTransparentStyle {}
+
 private protocol AnyToastStyleBox: Sendable {
+  @MainActor
   func presentation(
     for configuration: ToastStyleConfiguration
   ) -> ToastStylePresentation
+  func isEqualForReuse(to other: any AnyToastStyleBox) -> Bool
 }
 
 private struct ConcreteAnyToastStyleBox<S: ToastStyle>: AnyToastStyleBox {
   let style: S
 
+  @MainActor
   func presentation(
     for configuration: ToastStyleConfiguration
   ) -> ToastStylePresentation {
     style.resolvePresentation(for: configuration)
+  }
+
+  func isEqualForReuse(to other: any AnyToastStyleBox) -> Bool {
+    guard let other = other as? Self else {
+      return false
+    }
+    return styleValuesAreEqualForReuse(style, other.style)
   }
 }
 
@@ -314,7 +366,7 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
         portalEntryID: portalEntryID,
         modalPolicy: .nonModal
       ),
-      presentation: style.presentation(for: ToastStyleConfiguration()),
+      style: style,
       duration: duration,
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
         withAuthoringContext(dismissAuthoringContext) {
@@ -357,8 +409,14 @@ package struct ToastCoordinatorBodyView: View {
     VStack(alignment: .leading, spacing: 0) {
       Spacer(minLength: 0)
       VStack(alignment: .leading, spacing: 1) {
-        ForEach(items) { item in
-          ToastPresentationView(item: item)
+        // The stack's shape is known here and nowhere earlier, so each
+        // row resolves its own style against its position in it.
+        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+          ToastPresentationView(
+            item: item,
+            stackIndex: index,
+            stackCount: items.count
+          )
         }
       }
       .padding(.bottom, 1)
@@ -370,17 +428,29 @@ package struct ToastCoordinatorBodyView: View {
 
 private struct ToastPresentationView: View {
   var item: ToastPresentationItem
+  var stackIndex: Int
+  var stackCount: Int
   @Environment(\.toastPresentationCoordinator) private var coordinatorHandle
+  @Environment(\.terminalSize) private var terminalSize
+  @Environment(\.styleEnvironmentSnapshot) private var styleEnvironment
 
   var body: some View {
     // Read during body evaluation: environment storage is ambient only while
     // resolving, so the task closure must capture the handle value, not the
     // property (an in-task read would see defaults).
     let handle = coordinatorHandle
+    let presentation = item.style.presentation(
+      for: ToastStyleConfiguration(
+        stackIndex: stackIndex,
+        stackCount: stackCount,
+        terminalSize: terminalSize,
+        styleEnvironment: styleEnvironment
+      )
+    )
     let toastBody = HStack(alignment: .center, spacing: 1) {
-      if let icon = item.presentation.icon {
+      if let icon = presentation.icon {
         Text(icon)
-          .foregroundStyle(item.presentation.iconStyle)
+          .foregroundStyle(presentation.iconStyle)
       }
       VStack {
         PortalAttachmentGroupView(
@@ -389,21 +459,21 @@ private struct ToastPresentationView: View {
         )
       }
     }
-    .padding(item.presentation.contentPadding)
+    .padding(presentation.contentPadding)
     .background {
-      Rectangle().fill(item.presentation.backgroundStyle)
+      Rectangle().fill(presentation.backgroundStyle)
     }
     .overlay {
       Rectangle().strokeBorder(
-        item.presentation.borderStyle
+        presentation.borderStyle
       )
     }
     .frame(
-      minWidth: .finite(item.presentation.minWidth),
-      maxWidth: .finite(item.presentation.maxWidth),
-      minHeight: .finite(item.presentation.minHeight),
-      idealHeight: .finite(item.presentation.idealHeight),
-      maxHeight: .finite(item.presentation.maxHeight),
+      minWidth: .finite(presentation.minWidth),
+      maxWidth: .finite(presentation.maxWidth),
+      minHeight: .finite(presentation.minHeight),
+      idealHeight: .finite(presentation.idealHeight),
+      maxHeight: .finite(presentation.maxHeight),
       alignment: .leading
     )
     // Keyed on duration so replacing the active deadline (nil<->finite,

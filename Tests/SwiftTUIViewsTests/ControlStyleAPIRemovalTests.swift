@@ -48,6 +48,40 @@ struct ControlStyleAPIRemovalTests {
     _ = List { Text("x") }.listStyle(AnyListStyle.insetGrouped)
   }
 
+  @Test("toolbars declare style-free and take their style from the environment")
+  func toolbarsAreStyleFree() {
+    _ = Panel(id: "scope") { Text("content") }
+      .toolbar()
+      .toolbarStyle(.defaultBottom)
+    _ = Panel(id: "scope") { Text("content") }
+      .toolbar()
+      .toolbarStyle(AnyToolbarStyle.defaultTop)
+    // An ancestor may set it too, since the host reads the nearest value.
+    _ = VStack {
+      Panel(id: "scope") { Text("content") }.toolbar()
+    }
+    .toolbarStyle(.defaultTop)
+  }
+
+  @Test("toast styling stays declaration-scoped")
+  func toastStylingStaysDeclarationScoped() {
+    // `.toast(..., style:)` is the only toast styling path: there is
+    // deliberately no toast environment key and no `toastStyle(_:)`
+    // modifier, so a toast's tone cannot become modifier-order-sensitive
+    // environment chaining. Absence is proved by the symbol-graph
+    // baselines; this fixture pins that the declaration path compiles with
+    // a built-in and with a custom style.
+    struct PlainToastStyle: ToastStyle {
+      func resolvePresentation(
+        for configuration: ToastStyleConfiguration
+      ) -> ToastStylePresentation {
+        ToastStylePresentation(icon: configuration.stackIndex == 0 ? "*" : "-")
+      }
+    }
+    _ = Text("x").toast("m", isPresented: .constant(true), style: .success)
+    _ = Text("x").toast("m", isPresented: .constant(true), style: PlainToastStyle())
+  }
+
   @Test("outline styles resolve through the configuration entry point")
   func outlineStylesUseResolvePresentation() {
     let resolved = AnyOutlineStyle.rounded.presentation(

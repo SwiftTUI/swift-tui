@@ -277,6 +277,7 @@ classifications:
     - SwiftTUIViews.AnyButtonStyle
     - SwiftTUIViews.AnyListStyle
     - SwiftTUIViews.AnySpinnerStyle
+    - SwiftTUIViews.AnyToolbarStyle
     - SwiftTUIViews.AnyTableStyle
     - SwiftTUIViews.AnyOutlineStyle
     - SwiftTUIViews.AnyPickerStyle

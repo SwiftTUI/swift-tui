@@ -382,7 +382,7 @@ private func stackedToastItem(
   ToastPresentationItem(
     id: id,
     contentPayloads: [],
-    presentation: InfoToastStyle().resolvePresentation(for: ToastStyleConfiguration()),
+    style: .info,
     duration: nil,
     dismiss: {}
   )

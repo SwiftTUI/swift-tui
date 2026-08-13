@@ -390,7 +390,7 @@ extension PresentationPortalForceQueueTests {
           portalEntryID: portalEntryID,
           modalPolicy: .nonModal
         ),
-        presentation: AnyToastStyle.info.presentation(for: ToastStyleConfiguration()),
+        style: .info,
         duration: nil,
         dismiss: {}
       )
@@ -668,7 +668,7 @@ private struct ImperativeToastForceQueueButton: View {
               portalEntryID: portalEntryID,
               modalPolicy: .nonModal
             ),
-            presentation: AnyToastStyle.info.presentation(for: ToastStyleConfiguration()),
+            style: .info,
             duration: nil,
             dismiss: {}
           )

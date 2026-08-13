@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 297 | 1642 |
+| `SwiftTUIViews` | 298 | 1658 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -122,10 +122,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (297)
+### Canonical surface (298)
 
 - `AccessibilityAnnouncer` — enum — 1 member
-- `ActionScope` — extension — 5 members
+- `ActionScope` — extension — 6 members
 - `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
@@ -145,6 +145,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyTabViewStyle` — struct — 7 members
 - `AnyTextFieldStyle` — struct — 6 members
 - `AnyToastStyle` — struct — 7 members
+- `AnyToolbarStyle` — struct — 5 members
 - `AnyTransition` — struct — 9 members
 - `AnyView` — struct — 2 members
 - `AppearLifecycleModifier` — struct
@@ -185,9 +186,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `CoordinateSpace` — struct — 9 members
 - `CustomAnimation` — protocol — 5 members
 - `DangerToastStyle` — struct — 2 members
-- `DefaultBottomToolbarStyle` — struct — 3 members
+- `DefaultBottomToolbarStyle` — struct — 4 members
 - `DefaultFocusScopeModifier` — struct
-- `DefaultTopToolbarStyle` — struct — 3 members
+- `DefaultTopToolbarStyle` — struct — 4 members
 - `DisappearLifecycleModifier` — struct
 - `DisclosureGroup` — struct — 3 members
 - `Divider` — struct — 2 members
@@ -384,14 +385,14 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TimelineViewContext` — struct — 3 members
 - `ToastModifier` — struct
 - `ToastStyle` — protocol — 3 members
-- `ToastStyleConfiguration` — struct — 1 member
+- `ToastStyleConfiguration` — struct — 4 members
 - `ToastStylePresentation` — struct — 11 members
 - `Toggle` — struct — 2 members
 - `ToolbarItemConfig` — struct — 11 members
 - `ToolbarItemContributionModifier` — struct
 - `ToolbarModifier` — struct
 - `ToolbarPlacement` — enum — 2 members
-- `ToolbarStyle` — protocol — 5 members
+- `ToolbarStyle` — protocol — 7 members
 - `Transaction` — struct — 5 members
 - `TransactionKey` — protocol — 2 members
 - `TransactionModifier` — struct
@@ -407,7 +408,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 157 members
+- `View` — protocol — 159 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

@@ -2946,7 +2946,8 @@ SwiftTUIViews.ActionScope.dropDestination(action:)
 SwiftTUIViews.ActionScope.keyCommand(_:key:modifiers:isEnabled:action:)
 SwiftTUIViews.ActionScope.paletteCommand(name:description:isEnabled:action:)
 SwiftTUIViews.ActionScope.paletteSheet(_:isPresented:onDismiss:content:)
-SwiftTUIViews.ActionScope.toolbar(style:)
+SwiftTUIViews.ActionScope.toolbar()
+SwiftTUIViews.ActionScope.toolbarStyle(_:)
 SwiftTUIViews.ActivePaletteCommand
 SwiftTUIViews.ActivePaletteCommand.action
 SwiftTUIViews.ActivePaletteCommand.description
@@ -3110,6 +3111,12 @@ SwiftTUIViews.AnyToastStyle.info
 SwiftTUIViews.AnyToastStyle.init(_:)
 SwiftTUIViews.AnyToastStyle.success
 SwiftTUIViews.AnyToastStyle.warning
+SwiftTUIViews.AnyToolbarStyle
+SwiftTUIViews.AnyToolbarStyle.debugDescription
+SwiftTUIViews.AnyToolbarStyle.defaultBottom
+SwiftTUIViews.AnyToolbarStyle.defaultTop
+SwiftTUIViews.AnyToolbarStyle.description
+SwiftTUIViews.AnyToolbarStyle.init(_:)
 SwiftTUIViews.AnyTransition
 SwiftTUIViews.AnyTransition.asymmetric(insertion:removal:)
 SwiftTUIViews.AnyTransition.combined(with:)
@@ -3294,11 +3301,13 @@ SwiftTUIViews.DefaultBottomToolbarStyle
 SwiftTUIViews.DefaultBottomToolbarStyle.init()
 SwiftTUIViews.DefaultBottomToolbarStyle.itemLayout
 SwiftTUIViews.DefaultBottomToolbarStyle.placement
+SwiftTUIViews.DefaultBottomToolbarStyle.snapshotLabel
 SwiftTUIViews.DefaultFocusScopeModifier
 SwiftTUIViews.DefaultTopToolbarStyle
 SwiftTUIViews.DefaultTopToolbarStyle.init()
 SwiftTUIViews.DefaultTopToolbarStyle.itemLayout
 SwiftTUIViews.DefaultTopToolbarStyle.placement
+SwiftTUIViews.DefaultTopToolbarStyle.snapshotLabel
 SwiftTUIViews.DisappearLifecycleModifier
 SwiftTUIViews.DisclosureGroup
 SwiftTUIViews.DisclosureGroup.init(_:isExpanded:content:)
@@ -4287,7 +4296,10 @@ SwiftTUIViews.ToastStyle.resolvePresentation(for:)
 SwiftTUIViews.ToastStyle.snapshotLabel
 SwiftTUIViews.ToastStyle.snapshotLabel
 SwiftTUIViews.ToastStyleConfiguration
-SwiftTUIViews.ToastStyleConfiguration.init()
+SwiftTUIViews.ToastStyleConfiguration.stackCount
+SwiftTUIViews.ToastStyleConfiguration.stackIndex
+SwiftTUIViews.ToastStyleConfiguration.styleEnvironment
+SwiftTUIViews.ToastStyleConfiguration.terminalSize
 SwiftTUIViews.ToastStylePresentation
 SwiftTUIViews.ToastStylePresentation.backgroundStyle
 SwiftTUIViews.ToastStylePresentation.borderStyle
@@ -4326,6 +4338,8 @@ SwiftTUIViews.ToolbarStyle.defaultBottom
 SwiftTUIViews.ToolbarStyle.defaultTop
 SwiftTUIViews.ToolbarStyle.itemLayout
 SwiftTUIViews.ToolbarStyle.placement
+SwiftTUIViews.ToolbarStyle.snapshotLabel
+SwiftTUIViews.ToolbarStyle.snapshotLabel
 SwiftTUIViews.Transaction
 SwiftTUIViews.Transaction.animation
 SwiftTUIViews.Transaction.disablesAnimations
@@ -4526,6 +4540,8 @@ SwiftTUIViews.View.toast(_:isPresented:style:duration:onDismiss:)
 SwiftTUIViews.View.toast(isPresented:style:duration:onDismiss:content:)
 SwiftTUIViews.View.toast(isPresented:style:duration:onDismiss:content:)
 SwiftTUIViews.View.toolbarItem(_:)
+SwiftTUIViews.View.toolbarStyle(_:)
+SwiftTUIViews.View.toolbarStyle(_:)
 SwiftTUIViews.View.transaction(_:)
 SwiftTUIViews.View.transformAnchorPreference(_:value:transform:)
 SwiftTUIViews.View.transformEnvironment(_:transform:)

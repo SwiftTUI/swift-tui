@@ -191,7 +191,10 @@ package struct ToastPresentationItem: PortalPresentationItem {
   package var id: String
   package var portalEntryID: PortalEntryID
   package var contentPayloads: [PortalAttachmentPayload]
-  package var presentation: ToastStylePresentation
+  /// The declaration's style, resolved at composition time — a toast's
+  /// `stackIndex`/`stackCount` are only known once the coordinator has
+  /// composed the active stack.
+  package var style: AnyToastStyle
   package var duration: Double?
   package var dismiss: @MainActor @Sendable () -> Void
   package var onDismiss: (@MainActor @Sendable () -> Void)?
@@ -208,7 +211,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
     id: String,
     portalEntryID: PortalEntryID? = nil,
     contentPayloads: [PortalAttachmentPayload],
-    presentation: ToastStylePresentation,
+    style: AnyToastStyle,
     duration: Double?,
     dismiss: @escaping @MainActor @Sendable () -> Void,
     onDismiss: (@MainActor @Sendable () -> Void)? = nil
@@ -221,7 +224,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
     self.id = id
     self.portalEntryID = portalEntryID
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
-    self.presentation = presentation
+    self.style = style
     self.duration = duration
     self.dismiss = dismiss
     self.onDismiss = onDismiss
