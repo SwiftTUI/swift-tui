@@ -6,34 +6,54 @@ public import SwiftTUICore
 extension ActionScope where Self: View {
   /// Declares that this scope has a toolbar.
   /// This scope absorbs toolbar items that descendant views supply through `.toolbarItem(_:)`.
-  /// It shows them as a horizontal strip above or below the content according to `style.placement`.
+  /// It shows them as a horizontal strip above or below the content according to the
+  /// nearest `toolbarStyle(_:)` value's placement.
   @MainActor
-  public func toolbar<S: ToolbarStyle>(
-    style: S
-  ) -> some View & ActionScope {
-    modifier(
-      ToolbarModifier(
-        style: style
-      )
-    )
+  public func toolbar() -> some View & ActionScope {
+    modifier(ToolbarModifier())
   }
 }
 
-/// The primitive implementation of `.toolbar(style:)`.
-/// It reads accumulated `ToolbarItemsPreferenceKey` contributions from the resolved content node.
-/// Then it uses `style.itemLayout` and `style.placement` to compose a toolbar strip next to the content.
-/// It clears the preference so items do not continue past this scope.
-public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable {
-  package let style: S
-
-  package init(style: S) {
-    self.style = style
+extension ActionScope where Self: View {
+  /// Sets the toolbar style for this scope's subtree while preserving the
+  /// `ActionScope` conformance, so a `toolbar()` declaration can follow.
+  ///
+  /// `environment(_:_:)` erases to `some View`, which would drop the
+  /// conformance, so this applies the same modifier directly —
+  /// `ModifiedContent` conditionally conforms to `ActionScope`.
+  @MainActor
+  public func toolbarStyle(
+    _ style: AnyToolbarStyle
+  ) -> some View & ActionScope {
+    modifier(
+      EnvironmentWritingModifier(
+        keyPath: \.toolbarStyle,
+        value: style
+      )
+    )
   }
+
+  @MainActor
+  public func toolbarStyle<S: ToolbarStyle>(
+    _ style: S
+  ) -> some View & ActionScope {
+    toolbarStyle(AnyToolbarStyle(style))
+  }
+}
+
+/// The primitive implementation of `.toolbar()`.
+/// It reads accumulated `ToolbarItemsPreferenceKey` contributions from the resolved content node.
+/// Then it uses the nearest `toolbarStyle` value's item layout and placement to compose a
+/// toolbar strip next to the content.
+/// It clears the preference so items do not continue past this scope.
+public struct ToolbarModifier: PrimitiveViewModifier, Sendable {
+  package init() {}
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    let style = context.environmentValues.toolbarStyle
     // Resolve the wrapped ActionScope at the ToolbarHost's own
     // identity. The scope root must remain the real graph node so
     // retained snapshot rebuilds recurse through the current
@@ -165,12 +185,12 @@ extension ResolvedNode {
   }
 
   @MainActor
-  fileprivate func withToolbarLatePreferenceHost<S: ToolbarStyle>(
-    style: S,
+  fileprivate func withToolbarLatePreferenceHost(
+    style: AnyToolbarStyle,
     context: ResolveContext
   ) -> ResolvedNode {
     var copy = self
-    let debugValue = "\(String(reflecting: S.self)):\(style.placement)"
+    let debugValue = "\(style.snapshotLabel):\(style.placement)"
     copy.layoutMetadata = copy.layoutMetadata.settingLayoutValue(
       ToolbarLatePreferenceHostDescriptor(
         debugValue: debugValue,
@@ -190,9 +210,9 @@ extension ResolvedNode {
   }
 
   @MainActor
-  fileprivate func reconciledToolbarHost<S: ToolbarStyle>(
+  fileprivate func reconciledToolbarHost(
     items: [ToolbarItemConfig],
-    style: S,
+    style: AnyToolbarStyle,
     context: ResolveContext
   ) -> ResolvedNode {
     let context = context.applyingCurrentFrameResolveInputs()
@@ -270,8 +290,8 @@ extension ResolvedNode {
 
 }
 
-private func toolbarEdge<S: ToolbarStyle>(
-  for style: S
+private func toolbarEdge(
+  for style: AnyToolbarStyle
 ) -> Edge {
   switch style.placement {
   case .top: .top
@@ -279,8 +299,8 @@ private func toolbarEdge<S: ToolbarStyle>(
   }
 }
 
-private func toolbarAlignment<S: ToolbarStyle>(
-  for style: S
+private func toolbarAlignment(
+  for style: AnyToolbarStyle
 ) -> Alignment {
   switch style.placement {
   case .top: .top
@@ -288,8 +308,8 @@ private func toolbarAlignment<S: ToolbarStyle>(
   }
 }
 
-private func toolbarEdgeSet<S: ToolbarStyle>(
-  for style: S
+private func toolbarEdgeSet(
+  for style: AnyToolbarStyle
 ) -> Edge.Set {
   switch style.placement {
   case .top: .top
@@ -308,9 +328,9 @@ private func isKind(
 private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
 
 @MainActor
-private func resolvedToolbarItemsStrip<S: ToolbarStyle>(
+private func resolvedToolbarItemsStrip(
   items: [ToolbarItemConfig],
-  style: S,
+  style: AnyToolbarStyle,
   context: ResolveContext
 ) -> ResolvedNode {
   guard let signature = ToolbarStripSignature(items: items, style: style) else {
@@ -393,14 +413,16 @@ private struct ToolbarStripSignature: Hashable {
   var layout: String
   var items: [ToolbarStripItemSignature]
 
-  init?<S: ToolbarStyle>(
+  init?(
     items: [ToolbarItemConfig],
-    style: S
+    style: AnyToolbarStyle
   ) {
-    guard let layout = toolbarLayoutSignature(style.itemLayout) else {
+    // The signature comes from the *concrete* layout, captured when the
+    // style was erased — see `AnyToolbarStyleBox.layoutSignature`.
+    guard let layout = style.layoutSignature else {
       return nil
     }
-    styleType = String(reflecting: S.self)
+    styleType = style.snapshotLabel
     placement = toolbarPlacementSignature(style.placement)
     self.layout = layout
     self.items = items.map(ToolbarStripItemSignature.init(item:))
@@ -439,7 +461,7 @@ private struct ToolbarStripIconSignature: Hashable {
   }
 }
 
-private func toolbarLayoutSignature<L: Layout>(
+func toolbarLayoutSignature<L: Layout>(
   _ layout: L
 ) -> String? {
   let layoutType = String(reflecting: L.self)
@@ -547,9 +569,9 @@ private struct ToolbarContentNode: PrimitiveView, ResolvableView {
 /// chrome-surface background behind it so the toolbar reads as a
 /// distinct bar rather than a floating row of buttons flush against
 /// the content.
-private struct ToolbarItemsStrip<S: ToolbarStyle>: PrimitiveView, ResolvableView {
+private struct ToolbarItemsStrip: PrimitiveView, ResolvableView {
   let items: [ToolbarItemConfig]
-  let style: S
+  let style: AnyToolbarStyle
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let layout = style.itemLayout

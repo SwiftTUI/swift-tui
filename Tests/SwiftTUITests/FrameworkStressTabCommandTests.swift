@@ -486,7 +486,7 @@ private struct StressTC009Fixture: View {
         )
       }
     }
-    .toolbar(style: StressTC009ToolbarStyle(placement: atBottom ? .bottom : .top))
+    .toolbar().toolbarStyle(StressTC009ToolbarStyle(placement: atBottom ? .bottom : .top))
     .frame(width: 56, height: 8, alignment: .topLeading)
   }
 }
@@ -532,7 +532,7 @@ private struct StressTC010Fixture: View {
         source("C", marker: "c")
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 62, height: 8, alignment: .topLeading)
   }
 
@@ -588,7 +588,7 @@ private struct StressTC011Fixture: View {
         source("C", marker: "c")
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 62, height: 8, alignment: .topLeading)
   }
 
@@ -643,7 +643,7 @@ private struct StressTC012Fixture: View {
           .toolbarItem(.init(title: "Outer tool") {})
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 70, height: 11, alignment: .topLeading)
   }
 
@@ -653,7 +653,7 @@ private struct StressTC012Fixture: View {
       Panel(id: "stress-tc-012-inner") {
         migratingSource
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     } else {
       Panel(id: "stress-tc-012-inner") {
         migratingSource
@@ -712,7 +712,7 @@ private struct StressTC013Fixture: View {
           .toolbarItem(.init(title: "Outer tool") {})
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 70, height: 11, alignment: .topLeading)
   }
 
@@ -722,7 +722,7 @@ private struct StressTC013Fixture: View {
       Panel(id: "stress-tc-013-inner") {
         retractingSource
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     } else {
       Panel(id: "stress-tc-013-inner") {
         retractingSource
@@ -783,7 +783,7 @@ private struct StressTC014Fixture: View {
         )
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: wide ? 50 : 30, height: 8, alignment: .topLeading)
   }
 }
@@ -837,7 +837,7 @@ private struct StressTC015Fixture: View {
           )
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 64, height: 8, alignment: .topLeading)
   }
 }

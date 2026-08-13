@@ -1370,7 +1370,7 @@ private struct StressPS030Fixture: View {
         }
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 54, height: 8, alignment: .topLeading)
   }
 
@@ -1424,7 +1424,7 @@ private struct StressPS031Fixture: View {
         }
       )
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 50, height: 7, alignment: .topLeading)
   }
 }

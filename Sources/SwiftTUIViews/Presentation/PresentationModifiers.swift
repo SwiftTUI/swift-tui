@@ -349,7 +349,7 @@ package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveView
 /// Sheet variant that absorbs `paletteCommand` contributions from the
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
 /// passes the snapshot into the sheet content closure. Mirrors the
-/// `.toolbar(style:)` absorption pattern.
+/// `.toolbar()` absorption pattern.
 public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: PrimitiveViewModifier {
   package let title: String
   package let isPresented: Binding<Bool>
@@ -449,7 +449,7 @@ extension ActionScope where Self: View {
   /// subtree. The snapshot is recomputed each resolve, so an open
   /// palette stays in sync with subtree changes.
   ///
-  /// Mirrors `.toolbar(style:)` ↔ `.toolbarItem(...)`.
+  /// Mirrors `.toolbar()` ↔ `.toolbarItem(...)`.
   @MainActor
   public func paletteSheet<S: StringProtocol, SheetContent: View>(
     _ title: S,

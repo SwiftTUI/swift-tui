@@ -550,13 +550,13 @@ private struct StressLL009Fixture: View {
           Panel(id: "inner-toolbar") {
             lateItemSource
           }
-          .toolbar(style: DefaultBottomToolbarStyle())
+          .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
         } else {
           lateItemSource
         }
       }
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 54, height: 10, alignment: .topLeading)
   }
 

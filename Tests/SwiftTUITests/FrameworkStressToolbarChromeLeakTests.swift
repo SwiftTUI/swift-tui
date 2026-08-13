@@ -115,7 +115,7 @@ private struct ToolbarItemCountChurnFixture: View {
             .toolbarItem(.init(title: "Alpha \(count)", action: {}))
         }
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     }
     .frame(width: 72, height: 20, alignment: .topLeading)
   }
@@ -142,7 +142,7 @@ private struct ToolbarChromeChurnFixture: View {
               )
             )
         }
-        .toolbar(style: DefaultBottomToolbarStyle())
+        .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       } else {
         Text("Other body")
       }

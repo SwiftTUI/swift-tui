@@ -4,7 +4,7 @@ import SwiftTUICore
 /// descendant view via `.toolbarItem(_:)`.
 ///
 /// Items are hoisted up the resolved tree via `ToolbarItemsPreferenceKey`
-/// until the nearest ancestor `ActionScope` with a `.toolbar(style:)`
+/// until the nearest ancestor `ActionScope` with a `.toolbar()`
 /// modifier absorbs them and renders a toolbar strip.
 public struct ToolbarItemConfig: Sendable {
   public enum Position: Sendable {
@@ -107,7 +107,7 @@ package enum ToolbarItemsPreferenceKey: PreferenceKey {
 
 extension View {
   /// Contributes a single toolbar item to the nearest enclosing
-  /// ActionScope that has declared a `.toolbar(style:)` modifier.
+  /// ActionScope that has declared a `.toolbar()` modifier.
   ///
   /// Contributions accumulate in declaration order and are delivered
   /// as a single aggregated list to the absorbing scope.

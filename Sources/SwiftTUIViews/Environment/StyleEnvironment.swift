@@ -56,6 +56,10 @@ private enum SpinnerStyleKey: EnvironmentKey {
   static let defaultValue = AnySpinnerStyle.automatic
 }
 
+private enum ToolbarStyleKey: EnvironmentKey {
+  static let defaultValue = AnyToolbarStyle.defaultTop
+}
+
 private enum TabViewStyleKey: EnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
@@ -206,6 +210,11 @@ extension EnvironmentValues {
   package var spinnerStyle: AnySpinnerStyle {
     get { self[SpinnerStyleKey.self] }
     set { self[SpinnerStyleKey.self] = newValue }
+  }
+
+  package var toolbarStyle: AnyToolbarStyle {
+    get { self[ToolbarStyleKey.self] }
+    set { self[ToolbarStyleKey.self] = newValue }
   }
 
   package var tabViewStyle: AnyTabViewStyle {

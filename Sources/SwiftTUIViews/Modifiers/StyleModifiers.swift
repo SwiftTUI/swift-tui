@@ -85,6 +85,20 @@ extension View {
     spinnerStyle(AnySpinnerStyle(style))
   }
 
+  /// Sets the toolbar style for this view's subtree. A toolbar host reads
+  /// the nearest value, so this may sit on the host or on any ancestor.
+  public func toolbarStyle(
+    _ style: AnyToolbarStyle
+  ) -> some View {
+    environment(\.toolbarStyle, style)
+  }
+
+  public func toolbarStyle<S: ToolbarStyle>(
+    _ style: S
+  ) -> some View {
+    toolbarStyle(AnyToolbarStyle(style))
+  }
+
   /// Control how tab views render their tab bar.
   public func tabViewStyle(
     _ style: AnyTabViewStyle

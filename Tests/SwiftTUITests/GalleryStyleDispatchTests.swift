@@ -35,7 +35,7 @@ struct GalleryStyleDispatchTests {
         modifiers: .ctrl,
         action: { fired.increment() }
       )
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     }
     try renderInitial(runLoop)
 
@@ -66,7 +66,7 @@ struct GalleryStyleDispatchTests {
       .paletteCommand(name: "one", action: {})
       .paletteCommand(name: "two", action: {})
       .paletteCommand(name: "three", action: {})
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     }
     try renderInitial(runLoop)
 
@@ -242,7 +242,7 @@ private struct GallerySimulator: View {
     .paletteCommand(name: "A", action: {})
     .paletteCommand(name: "B", action: {})
     .paletteCommand(name: "C", action: {})
-    .toolbar(style: DefaultBottomToolbarStyle())
+    .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     .paletteSheet("Command palette", isPresented: $isPaletteOpen) { commands in
       Self.snapshotAtKeyPress.update { $0 = commands }
       return Text("palette sheet")

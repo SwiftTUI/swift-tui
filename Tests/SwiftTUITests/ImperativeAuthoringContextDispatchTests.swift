@@ -845,7 +845,7 @@ private struct ToolbarScopeFixture: View {
           )
         )
     }
-    .toolbar(style: DefaultBottomToolbarStyle())
+    .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
   }
 }
 
@@ -865,7 +865,7 @@ private struct ToolbarNilConstructionContextFixture: View {
       Text(value)
         .toolbarItem(config)
     }
-    .toolbar(style: DefaultBottomToolbarStyle())
+    .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
   }
 }
 

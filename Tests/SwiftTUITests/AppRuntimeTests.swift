@@ -1851,7 +1851,7 @@ private struct GalleryLikeFocusContextTab: View {
     .padding(2)
     .toolbarItem(.init(title: "Mark Focused", action: {}))
     .panel(id: "gallery-like-focus-context")
-    .toolbar(style: .defaultBottom)
+    .toolbar().toolbarStyle(.defaultBottom)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }

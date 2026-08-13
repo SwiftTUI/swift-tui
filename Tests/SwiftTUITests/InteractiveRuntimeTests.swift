@@ -6622,7 +6622,7 @@ private struct AnimationSkipScrollFocusFixture: View {
     .paletteCommand(name: "Pointer Lab") { selection = .pointer }
     .paletteCommand(name: "Focus Context") { selection = .focus }
     .paletteCommand(name: "Task Progress") { selection = .tasks }
-    .toolbar(style: .defaultBottom)
+    .toolbar().toolbarStyle(.defaultBottom)
     .paletteSheet("Command palette", isPresented: $showPalette) { _ in
       Text("Palette")
     }

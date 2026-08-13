@@ -372,7 +372,7 @@ private func rootRuntimeIssues(
     severity: .warning,
     code: "toolbar.unhostedItems",
     message:
-      "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar(style:)` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
+      "\(unhostedToolbarItems.count) toolbar item(s) reached the scene root without an enclosing `.toolbar()` on an `ActionScope`; the item(s) were not rendered.\(titleSummary)",
     identity: sourceIdentity,
     source: ".toolbarItem(...)"
   )

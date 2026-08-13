@@ -44,7 +44,7 @@ extension ActionScope where Self: View & Sendable {
   /// Declares a searchable, consumer-invocable command. Contributions
   /// bubble up to the nearest enclosing `.paletteSheet(...)` (an
   /// `ActionScope`), which absorbs them and passes the snapshot into
-  /// its content closure. Mirrors `.toolbarItem(...)` ↔ `.toolbar(style:)`.
+  /// its content closure. Mirrors `.toolbarItem(...)` ↔ `.toolbar()`.
   @MainActor
   public func paletteCommand(
     name: String,

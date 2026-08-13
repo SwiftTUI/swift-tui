@@ -41,7 +41,7 @@ struct PaletteSheetAbsorptionTests {
           )
       }
       .paletteCommand(name: "Alpha", action: {})
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .paletteSheet("Palette", isPresented: Binding.constant(true)) { commands in
         capture.commandNames = commands.map(\.name)
         return Text("placeholder")

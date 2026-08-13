@@ -529,7 +529,7 @@ private struct ToolbarStripBenchmarkView: View {
           .init(title: "Reset", position: .top, isEnabled: true, action: {})
         )
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
     .frame(width: 40, height: 6)
   }
 }
@@ -555,7 +555,7 @@ private struct LateBubbledToolbarBenchmarkView: View {
         )
       }
     }
-    .toolbar(style: DefaultBottomToolbarStyle())
+    .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
     .frame(width: 44, height: 8)
   }
 }

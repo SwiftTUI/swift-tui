@@ -164,7 +164,7 @@ private struct TabTaskSelectionHost: View {
         .init(title: "Item", icon: nil, position: .top, isEnabled: true, action: {})
       )
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
   }
 }
 

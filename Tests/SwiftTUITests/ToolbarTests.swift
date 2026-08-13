@@ -59,7 +59,7 @@ struct ToolbarTests {
           )
         )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
 
     let context = ResolveContext(identity: testIdentity("toolbar-root"))
     let resolved = Resolver().resolve(AnyView(panel), in: context)
@@ -106,7 +106,7 @@ struct ToolbarTests {
           )
         )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
 
     let artifacts = DefaultRenderer().render(
       panel,
@@ -157,7 +157,7 @@ struct ToolbarTests {
             )
         }
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 30, height: 6)
 
     let artifacts = DefaultRenderer().render(
@@ -203,7 +203,7 @@ struct ToolbarTests {
             )
         }
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 30, height: 6)
 
     let artifacts = DefaultRenderer().render(
@@ -247,7 +247,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
       .frame(width: 20, height: 5)
     }
 
@@ -304,7 +304,7 @@ struct ToolbarTests {
           .toolbarItem(item("Second", isEnabled: false))
           .toolbarItem(item("Third"))
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
       .frame(width: 40, height: 5)
     }
 
@@ -367,7 +367,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
       .frame(width: 30, height: 6)
     }
 
@@ -424,7 +424,7 @@ struct ToolbarTests {
         }
         .frame(width: 3, height: 1)
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
 
     let artifacts = DefaultRenderer().render(
       panel,
@@ -503,7 +503,7 @@ struct ToolbarTests {
           )
         }
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
 
     let context = ResolveContext(identity: testIdentity("toolbar-root"))
     let resolved = Resolver().resolve(AnyView(view), in: context)
@@ -527,7 +527,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
       .frame(width: 20, height: 5)
 
     let artifacts = DefaultRenderer().render(
@@ -560,7 +560,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
       .frame(width: 20, height: 5)
 
     let artifacts = render(
@@ -601,7 +601,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
 
     let artifacts = DefaultRenderer().render(
       panel,
@@ -635,7 +635,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultTopToolbarStyle())
+      .toolbar().toolbarStyle(DefaultTopToolbarStyle())
 
     let context = ResolveContext(identity: testIdentity("toolbar-scope-root"))
     let resolved = Resolver().resolve(AnyView(panel), in: context)
@@ -676,7 +676,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 20, height: 5)
 
     let artifacts = DefaultRenderer().render(
@@ -718,7 +718,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 40, height: 6)
 
     let artifacts = DefaultRenderer().render(
@@ -747,7 +747,7 @@ struct ToolbarTests {
             )
           )
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 20, height: 5)
 
     let artifacts = render(

@@ -150,7 +150,7 @@ struct ButtonSystemHintTests {
           )
         )
     }
-    .toolbar(style: DefaultTopToolbarStyle())
+    .toolbar().toolbarStyle(DefaultTopToolbarStyle())
 
     var env = EnvironmentValues()
     env.terminalSize = CellSize(width: surfaceWidth, height: 6)

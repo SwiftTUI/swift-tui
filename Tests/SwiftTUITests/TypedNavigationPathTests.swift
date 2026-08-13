@@ -144,7 +144,7 @@ struct TypedNavigationPathTests {
     let model = TypedNavigationPathModel(path: [.detail(1)])
     let artifacts = DefaultRenderer().render(
       typedNavigationStack(model: model)
-        .toolbar(style: DefaultTopToolbarStyle()),
+        .toolbar().toolbarStyle(DefaultTopToolbarStyle()),
       context: .init(identity: testIdentity("TypedPathTitle")),
       proposal: .init(width: 40, height: 8)
     )

@@ -28,7 +28,7 @@ struct BoundedReconciliationTests {
             )
         }
       }
-      .toolbar(style: DefaultBottomToolbarStyle())
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
       .frame(width: 30, height: 6)
 
     let artifacts = DefaultRenderer().render(
@@ -62,7 +62,7 @@ struct BoundedReconciliationTests {
             )
         }
       }
-      .toolbar(style: OscillatingHeightToolbarStyle())
+      .toolbar().toolbarStyle(OscillatingHeightToolbarStyle())
       .frame(width: 30, height: 4)
 
     let artifacts = DefaultRenderer().render(

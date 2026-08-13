@@ -190,7 +190,7 @@ private struct GalleryLikeClickTab: View {
     .padding(1)
     .toolbarItem(.init(title: "Mark Focused", action: {}))
     .panel(id: "click-dispatch-focus-context")
-    .toolbar(style: .defaultBottom)
+    .toolbar().toolbarStyle(.defaultBottom)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
@@ -210,7 +210,7 @@ private struct GalleryLikeClickRoot: View {
     .tabViewStyle(.literalTabs)
     .toolbarItem(.init(title: "⌃K Palette", action: {}))
     .panel(id: "click-dispatch-gallery")
-    .toolbar(style: .defaultBottom)
+    .toolbar().toolbarStyle(.defaultBottom)
   }
 }
 
