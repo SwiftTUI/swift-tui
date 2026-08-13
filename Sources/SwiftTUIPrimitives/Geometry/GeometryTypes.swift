@@ -820,6 +820,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
   package var value: AnyID
   package var occurrence: Int
   package var debugDescription: String
+  package var isScopedExactIdentity: Bool
 
   package init<ID: Hashable & Sendable>(
     _ value: ID,
@@ -828,6 +829,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.value = AnyID(value)
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
+    isScopedExactIdentity = false
   }
 
   package init<ID: Hashable & Sendable>(
@@ -838,23 +840,43 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.value = AnyID(ScopedForEachEntityID(scope: scope, value: value))
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
+    isScopedExactIdentity = false
+  }
+
+  /// An exact identity scoped to the enclosing entity lifetime. Exact
+  /// identities replace their resolved path wholesale, so the path alone
+  /// cannot express that an ancestor `.id` changed. Including the enclosing
+  /// entity in the routing key keeps same-ancestor moves stable while making an
+  /// ancestor identity replacement a fresh descendant lifetime.
+  package init(
+    exactIdentity identity: Identity,
+    occurrence: Int = 0,
+    scope: EntityIdentity
+  ) {
+    value = AnyID(ScopedExactEntityID(scope: scope, identity: identity))
+    self.occurrence = occurrence
+    debugDescription = String(reflecting: identity)
+    isScopedExactIdentity = true
   }
 
   private init(
     value: AnyID,
     occurrence: Int,
-    debugDescription: String
+    debugDescription: String,
+    isScopedExactIdentity: Bool
   ) {
     self.value = value
     self.occurrence = occurrence
     self.debugDescription = debugDescription
+    self.isScopedExactIdentity = isScopedExactIdentity
   }
 
   package func withOccurrence(_ occurrence: Int) -> Self {
     Self(
       value: value,
       occurrence: occurrence,
-      debugDescription: debugDescription
+      debugDescription: debugDescription,
+      isScopedExactIdentity: isScopedExactIdentity
     )
   }
 
@@ -878,6 +900,11 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
 private struct ScopedForEachEntityID<Value: Hashable & Sendable>: Hashable, Sendable {
   var scope: StructuralPath
   var value: Value
+}
+
+private struct ScopedExactEntityID: Hashable, Sendable {
+  var scope: EntityIdentity
+  var identity: Identity
 }
 
 /// A single proposed dimension used during measure.

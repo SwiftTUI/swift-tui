@@ -1553,8 +1553,8 @@ private struct StressLL025Fixture: View {
 extension FrameworkStressLayoutLifecycleTests {
   @Test("stress 026 task registry targets newest closure across identity churn")
   func stress026TaskRegistryTargetsNewestClosureAcrossIdentityChurn() async throws {
-    // Hypothesis: identityChanged task diff suppression may leave the prior
-    // descriptor's registration or closure live when both identity and ID move.
+    // Identity replacement must retire the prior descriptor registration and
+    // publish the new generation's closure.
     let probe = StressLayoutLifecycleProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressLL026", "Root"),

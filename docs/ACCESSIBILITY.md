@@ -60,10 +60,13 @@ external packages can assert on assistive output for their views.
 
 ## Known gaps
 
-The runtime-to-native-assistive-technology direction is one-way: VoiceOver- or
-TalkBack-originated focus traversal is not yet fed back into SwiftTUI's runtime
-focus. That gap, and the absence of a WCAG conformance suite, are tracked in
-the [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
+Assistive-technology interaction is one-way. Runtime focus is pushed to
+VoiceOver, TalkBack, and the browser tree, but assistive-origin focus traversal
+is not fed back into SwiftTUI. The shared node model also carries no activation,
+adjustment, enabled/selected state, or control-value route, so the host overlays
+present semantics without yet activating or adjusting runtime controls. These
+gaps, and the absence of a WCAG conformance suite, are tracked in the
+[divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 
 The manual screen-reader listening review protocol lives in
 `Tests/SwiftTUITests/Accessibility/README.md`.

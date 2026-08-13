@@ -241,9 +241,9 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      // Viewport keying is identity-stable by construction (`ViewportLifecycleKey`
-      // tracks the node, not the resolved identity), so the diff runs without the
-      // stable arm's identity-churn suppression.
+      // Viewport keying is stable by construction (`ViewportLifecycleKey`
+      // tracks the node, not its current resolved identity), so there is no
+      // identity-change boundary to pass into the shared diff policy.
       let diff = TaskLifecycleDiff.between(
         previous: previousNode?.tasks ?? [],
         current: currentNode.tasks

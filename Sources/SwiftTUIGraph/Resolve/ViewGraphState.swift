@@ -25,15 +25,32 @@ package enum ViewportLifecycleKey: Hashable, Sendable {
   case identity(Identity)
 }
 
-/// Key for `onChange`'s cross-frame previous-value memory: the observing node's
-/// *stable* `Identity` (survives `.id`-churn re-minting) plus a per-node modifier
-/// ordinal so multiple `onChange` modifiers on one node do not collide.
+package enum ChangeObservationOwnerKey: Hashable, Sendable {
+  case scopedExactEntity(EntityIdentity)
+  case identity(Identity)
+}
+
+/// Key for `onChange`'s cross-frame previous-value memory: the observing
+/// node's resolved identity plus a per-owner modifier ordinal. Exact internal
+/// identities instead use their enclosing-lifetime-scoped entity because their
+/// resolved identity deliberately replaces the path wholesale; this keeps the
+/// ordinary identity behavior while preventing an exact descendant from
+/// escaping ancestor replacement.
 package struct ChangeObservationValueKey: Hashable, Sendable {
-  package var identity: Identity
+  package var owner: ChangeObservationOwnerKey
   package var ordinal: Int
 
-  package init(identity: Identity, ordinal: Int) {
-    self.identity = identity
+  package init(
+    entityIdentity: EntityIdentity? = nil,
+    identity: Identity,
+    ordinal: Int
+  ) {
+    owner =
+      if let entityIdentity {
+        .scopedExactEntity(entityIdentity)
+      } else {
+        .identity(identity)
+      }
     self.ordinal = ordinal
   }
 }

@@ -734,16 +734,11 @@ extension ResolveContext {
     package var frameInputs: FrameResolveInputBox?
     package var animationSegments: [AnimationInvalidationSegment]
     package var suppressesStructuralLifecycle: Bool
-    /// True while resolving inside a subtree whose owning `.id(_:)` re-rooted its
-    /// resolved identity this frame (an identity churn). Set by
-    /// ``ExactIdentityModifier`` at the churn point and inherited by every
-    /// derived (`child` / `replacingIdentity`) context, so it rides the resolve
-    /// tree downward regardless of how many identity/structural re-rooting layers
-    /// (`.id`, `AnyView`, captured-subview scopes) sit between the churned owner
-    /// and a descendant. Reuse (retained + memo) is suppressed for such
-    /// descendants so they re-resolve fresh — the committed reuse-containment
-    /// checks key on identity/structural ancestry, which a re-rooted descendant
-    /// escapes.
+    /// True while resolving a synthesized subtree whose values can change
+    /// without creating a tracked invalidation for every descendant. Set at
+    /// presentation, preference-derived overlay/background, tab-body, and
+    /// trigger-leaf seams and inherited by every derived context. Both reuse
+    /// layers stand down until those values resolve and commit fresh.
     package var withinChurnedSubtree: Bool
     /// Focus/press environment keys written by an authored `.environment` /
     /// `.transformEnvironment` modifier in this context's scope. Set by

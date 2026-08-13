@@ -257,13 +257,11 @@ extension FrameworkStressStateIdentityTests {
   }
 }
 
-// MARK: - Attempt 006: Persistent task writes through a re-minted owner
+// MARK: - Attempt 006: Ancestor identity replacement resets descendant lifetime
 
 extension FrameworkStressStateIdentityTests {
-  @Test("stress state identity 006 persistent task writes the live state owner")
-  func stateIdentity006PersistentTaskWritesLiveOwner() async throws {
-    // Hypothesis: task churn suppression preserves the original closure while outer identity
-    // replacement retires the state node that closure first captured.
+  @Test("stress state identity 006 ancestor replacement restarts task and state")
+  func stateIdentity006AncestorReplacementRestartsTaskAndState() async throws {
     let clock = StateIdentity006Clock()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StateIdentity006"),
@@ -276,16 +274,16 @@ extension FrameworkStressStateIdentityTests {
       harness.shutdown()
     }
 
+    await clock.waitUntilStarted(1)
+    #expect(try harness.render().contains("006 Task starts 1"))
     #expect(harness.activeTaskCount == 1)
     for generation in 0..<4 {
-      clock.send(1)
-      let processed = await clock.waitUntilProcessedOrStopped(generation + 1)
+      _ = try harness.clickText("Churn 006")
+      await clock.waitUntilStopped(generation + 1)
+      await clock.waitUntilStarted(generation + 2)
       let frame = try harness.render()
-      #expect(processed)
-      #expect(frame.contains("006 Ticks \(generation + 1)"))
-
-      let churnedFrame = try harness.clickText("Churn 006")
-      #expect(churnedFrame.contains("006 Generation \(generation + 1)"))
+      #expect(frame.contains("006 Generation \(generation + 1)"))
+      #expect(frame.contains("006 Task starts 1"))
       #expect(harness.activeTaskCount == 1)
     }
   }
@@ -315,16 +313,15 @@ extension FrameworkStressStateIdentityTests {
 
   private struct StateIdentity006Worker: View {
     let clock: StateIdentity006Clock
-    @State private var ticks = 0
+    @State private var taskStarts = 0
 
     var body: some View {
-      Text("006 Ticks \(ticks)")
+      Text("006 Task starts \(taskStarts)")
         .task(id: "state-identity-006-task") {
+          clock.recordTaskStarted()
           defer { clock.recordTaskStopped() }
-          for await delta in clock.stream {
-            ticks += delta
-            clock.recordProcessedTick()
-          }
+          taskStarts += 1
+          await clock.waitUntilFinished()
         }
     }
   }
@@ -332,41 +329,40 @@ extension FrameworkStressStateIdentityTests {
 
 @MainActor
 private final class StateIdentity006Clock {
-  let stream: AsyncStream<Int>
-  private var continuation: AsyncStream<Int>.Continuation!
-  private let processedSignal = MainActorConditionSignal()
-  private(set) var processedCount = 0
-  private var taskStopped = false
+  private let signal = MainActorConditionSignal()
+  private(set) var startedCount = 0
+  private(set) var stoppedCount = 0
+  private var isFinished = false
 
-  init() {
-    var capturedContinuation: AsyncStream<Int>.Continuation?
-    stream = AsyncStream { capturedContinuation = $0 }
-    continuation = capturedContinuation
-  }
-
-  func send(_ value: Int) {
-    continuation.yield(value)
-  }
-
-  func recordProcessedTick() {
-    processedCount += 1
-    processedSignal.notify()
+  func recordTaskStarted() {
+    startedCount += 1
+    signal.notify()
   }
 
   func recordTaskStopped() {
-    taskStopped = true
-    processedSignal.notify()
+    stoppedCount += 1
+    signal.notify()
   }
 
-  func waitUntilProcessedOrStopped(_ expectedCount: Int) async -> Bool {
-    await processedSignal.wait { [self] in
-      processedCount >= expectedCount || taskStopped
+  func waitUntilStarted(_ expectedCount: Int) async {
+    await signal.wait { [self] in
+      startedCount >= expectedCount
     }
-    return processedCount >= expectedCount
+  }
+
+  func waitUntilStopped(_ expectedCount: Int) async {
+    await signal.wait { [self] in
+      stoppedCount >= expectedCount
+    }
+  }
+
+  func waitUntilFinished() async {
+    await signal.wait { [self] in isFinished }
   }
 
   func finish() {
-    continuation.finish()
+    isFinished = true
+    signal.notify()
   }
 }
 

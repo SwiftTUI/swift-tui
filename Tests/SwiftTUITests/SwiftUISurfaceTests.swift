@@ -54,6 +54,31 @@ private struct SurfaceNameEnvironmentLabel: View {
   }
 }
 
+private struct AncestorIdentityStateRoot: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Replace State Ancestor") { generation += 1 }
+      Text("Ancestor generation \(generation)")
+      AncestorIdentityStateChild()
+        .id(testIdentity("StableStateDescendant"))
+        .id("state-ancestor-\(generation)")
+    }
+  }
+}
+
+private struct AncestorIdentityStateChild: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Descendant count \(count)")
+      Button("Increment State Descendant") { count += 1 }
+    }
+  }
+}
+
 private enum RaisedCenterAlignmentID: AlignmentID {
   static func defaultValue(in context: ViewDimensions) -> Int {
     context[VerticalAlignment.center]
@@ -609,6 +634,82 @@ struct SwiftUISurfaceTests {
     #expect(unchangedArtifacts.commitPlan.lifecycle.isEmpty)
   }
 
+  @Test("onChange treats an explicit ID change as a fresh observation lifetime")
+  func onChangeTreatsExplicitIDChangeAsFreshObservationLifetime() async {
+    final class ChangeBox: Sendable {
+      private let eventsBox = LockedBox<[String]>([])
+
+      var events: [String] {
+        eventsBox.value
+      }
+
+      func record(_ label: String, oldValue: Int, newValue: Int) {
+        eventsBox.withLock { events in
+          events.append("\(label):\(oldValue)->\(newValue)")
+        }
+      }
+    }
+
+    let box = ChangeBox()
+    let lifecycleRegistry = LocalLifecycleRegistry()
+    let renderer = DefaultRenderer()
+
+    func makeView(_ value: Int) -> some View {
+      VStack {
+        Text("inner \(value)")
+          .id("inner-\(value)")
+          .onChange(of: value, initial: true) { oldValue, newValue in
+            box.record("inner", oldValue: oldValue, newValue: newValue)
+          }
+        Text("outer \(value)")
+          .onChange(of: value, initial: true) { oldValue, newValue in
+            box.record("outer", oldValue: oldValue, newValue: newValue)
+          }
+          .id("outer-\(value)")
+        Text("nested \(value)")
+          .onChange(of: value, initial: true) { oldValue, newValue in
+            box.record("nested", oldValue: oldValue, newValue: newValue)
+          }
+          .id(testIdentity("NestedStable"))
+          .id("nested-owner-\(value)")
+      }
+    }
+
+    func renderAndDispatch(_ value: Int) async {
+      let artifacts = renderer.render(
+        makeView(value),
+        context: .init(
+          identity: testIdentity("Root"),
+          localLifecycleRegistry: lifecycleRegistry,
+          applyEnvironmentValues: true
+        )
+      )
+      let changeEvents = artifacts.commitPlan.lifecycle.compactMap { entry -> [String]? in
+        guard case .change(let handlerIDs) = entry.operation else {
+          return nil
+        }
+        return handlerIDs
+      }
+      for handlerID in changeEvents.flatMap({ $0 }) {
+        guard let handler = lifecycleRegistry.changeHandler(for: handlerID) else {
+          Issue.record("missing change handler \(handlerID)")
+          continue
+        }
+        await MainActor.run { handler() }
+      }
+    }
+
+    await renderAndDispatch(1)
+    await renderAndDispatch(2)
+
+    #expect(
+      box.events == [
+        "inner:1->1", "outer:1->1", "nested:1->1",
+        "inner:2->2", "outer:2->2", "nested:2->2",
+      ]
+    )
+  }
+
   @Test(
     "onChange attached to a stateful view reserves modifier storage after body state slots"
   )
@@ -786,6 +887,98 @@ struct SwiftUISurfaceTests {
       ]
     )
     #expect(removedArtifacts.commitPlan.lifecycle.map { $0.viewNodeID != nil } == [true, false])
+  }
+
+  @Test("explicit view identity churn cancels and restarts a lifecycle task")
+  func explicitViewIdentityChurnCancelsAndRestartsLifecycleTask() {
+    func makeRoot(_ generation: Int) -> some View {
+      Text("generation \(generation)")
+        .id("task-owner-\(generation)")
+        .task(id: generation) {}
+    }
+
+    let renderer = DefaultRenderer()
+    _ = renderer.render(
+      makeRoot(0),
+      context: .init(identity: testIdentity("Root"))
+    )
+    let updated = renderer.render(
+      makeRoot(1),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(updated.commitPlan.lifecycle.count == 2)
+    guard updated.commitPlan.lifecycle.count == 2 else {
+      return
+    }
+    guard
+      case .taskCancel(let oldTask) = updated.commitPlan.lifecycle[0].operation,
+      case .taskStart(let newTask) = updated.commitPlan.lifecycle[1].operation
+    else {
+      Issue.record("identity churn must emit taskCancel followed by taskStart")
+      return
+    }
+    #expect(oldTask != newTask)
+    #expect(updated.commitPlan.lifecycle.allSatisfy { $0.viewNodeID != nil })
+  }
+
+  @Test("ancestor identity churn resets state below a stable descendant ID")
+  func ancestorIdentityChurnResetsStateBelowStableDescendantID() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AncestorIdentityState"),
+      size: .init(width: 48, height: 8)
+    ) {
+      AncestorIdentityStateRoot()
+    }
+    defer { harness.shutdown() }
+
+    var frame = try harness.clickText("Increment State Descendant")
+    #expect(frame.contains("Descendant count 1"))
+
+    frame = try harness.clickText("Replace State Ancestor")
+    #expect(frame.contains("Ancestor generation 1"))
+    #expect(frame.contains("Descendant count 0"))
+
+    frame = try harness.clickText("Increment State Descendant")
+    #expect(frame.contains("Descendant count 1"))
+  }
+
+  @Test("ancestor identity churn restarts a task owned by a stable descendant ID")
+  func ancestorIdentityChurnRestartsTaskOwnedByStableDescendantID() {
+    func makeRoot(_ generation: Int) -> some View {
+      VStack {
+        Text("generation \(generation)")
+          .task {}
+          .id(testIdentity("StableTaskOwner"))
+          .id("task-ancestor-\(generation)")
+      }
+    }
+
+    let renderer = DefaultRenderer()
+    _ = renderer.render(
+      makeRoot(0),
+      context: .init(identity: testIdentity("Root"))
+    )
+    let updated = renderer.render(
+      makeRoot(1),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(updated.commitPlan.lifecycle.count == 2)
+    guard updated.commitPlan.lifecycle.count == 2 else {
+      return
+    }
+    guard
+      case .taskCancel(let oldTask) = updated.commitPlan.lifecycle[0].operation,
+      case .taskStart(let newTask) = updated.commitPlan.lifecycle[1].operation
+    else {
+      Issue.record("ancestor identity churn must emit taskCancel followed by taskStart")
+      return
+    }
+    #expect(oldTask == newTask)
+    let taskOwnerIDs = updated.commitPlan.lifecycle.compactMap(\.viewNodeID)
+    #expect(taskOwnerIDs.count == 2)
+    #expect(taskOwnerIDs.first != taskOwnerIDs.last)
   }
 
   @Test("focus changes do not emit lifecycle deltas for stable public lifecycle owners")

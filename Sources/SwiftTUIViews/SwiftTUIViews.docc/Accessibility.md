@@ -31,6 +31,8 @@ links, so consumers can reconstruct a tree. A node carries identity, parent
 identity, rect, role, label, hint, hidden, live region, and cursor anchor. It
 deliberately does **not** bake in focus state: consumers cross-reference live
 focus during presentation, so one snapshot stays valid when focus moves.
+The current node does not carry activation, adjustment, enabled/selected
+state, or an assistive-technology-originated focus route.
 
 ## Announcements
 
@@ -64,9 +66,11 @@ The full environment-variable reference lives in the `SwiftTUIRuntime` article
 
 ## Current Limits
 
-The runtime-to-native-assistive-technology direction is one-way: VoiceOver- or
-TalkBack-originated focus traversal is not yet fed back into SwiftTUI's
-runtime focus.
+Assistive-technology interaction is currently one-way. Runtime focus is
+presented to VoiceOver, TalkBack, and the browser tree, but focus traversal is
+not fed back into SwiftTUI's runtime. The semantic snapshot also has no action,
+adjustment, or control-value route, so native and browser accessibility trees
+present the interface but do not yet activate or adjust SwiftTUI controls.
 
 ## See Also
 

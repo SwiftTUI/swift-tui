@@ -125,6 +125,8 @@ slot also contains semantic handler-installation work.
 - A task survives ordinary frame updates when the runtime node and task
   descriptor are unchanged
 - A task restarts when the descriptor changes on the same runtime node
+- A task also restarts when explicit identity replacement creates a new
+  runtime lifetime, even if the descriptor compares equal
 - A task cancels when its runtime node disappears, when its descriptor is
   replaced, or when the runtime shuts down
 - Selective dirty evaluation must re-run the graph node that authored lifecycle

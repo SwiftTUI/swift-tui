@@ -454,9 +454,8 @@ package final class ViewGraph {
   /// meta-state.
   private var detachedHostedRootsRecordedThisFrame: Set<ViewNodeID> = []
 
-  /// Whether a previous `onChange` value has been recorded for this
-  /// `(identity, ordinal)` — i.e. "this is not the first observation," a signal
-  /// that survives node re-minting because it is keyed by the stable identity.
+  /// Whether a previous `onChange` value has been recorded for this lifecycle
+  /// owner and modifier ordinal — i.e. "this is not the first observation."
   ///
   /// Reads are pass-stable: within the pass that wrote the entry, the answer
   /// reflects the pass's *baseline* (the state its first resolve saw), so a
@@ -464,10 +463,16 @@ package final class ViewGraph {
   /// therefore its handler registration (see `FrameCommitState
   /// .changeObservationValues`).
   package func hasChangeObservationValue(
+    entityIdentity: EntityIdentity? = nil,
     identity: Identity,
     ordinal: Int
   ) -> Bool {
-    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)] else {
+    let key = ChangeObservationValueKey(
+      entityIdentity: entityIdentity,
+      identity: identity,
+      ordinal: ordinal
+    )
+    guard let slot = changeObservationValues[key] else {
       return false
     }
     return slot.passID == currentFrameID ? slot.baseline != nil : true
@@ -475,13 +480,20 @@ package final class ViewGraph {
 
   /// The previously-observed `onChange` value for this `(identity, ordinal)`, or
   /// `nil` if none is recorded (or a stored value of a different type). Reads
-  /// are pass-stable — see ``hasChangeObservationValue(identity:ordinal:)``.
+  /// are pass-stable — see
+  /// ``hasChangeObservationValue(entityIdentity:identity:ordinal:)``.
   package func changeObservationValue<Value>(
+    entityIdentity: EntityIdentity? = nil,
     identity: Identity,
     ordinal: Int,
     as type: Value.Type
   ) -> Value? {
-    guard let slot = changeObservationValues[.init(identity: identity, ordinal: ordinal)] else {
+    let key = ChangeObservationValueKey(
+      entityIdentity: entityIdentity,
+      identity: identity,
+      ordinal: ordinal
+    )
+    guard let slot = changeObservationValues[key] else {
       return nil
     }
     let stored = slot.passID == currentFrameID ? slot.baseline : slot.current
@@ -491,18 +503,23 @@ package final class ViewGraph {
     return stored.value(as: Value.self)
   }
 
-  /// Records the latest observed `onChange` value for this `(identity, ordinal)`
-  /// so the next resolve can detect a transition. Persists across frames and
-  /// across `.id`-churn re-minting; pruned by `finalizeFrame` once the identity
-  /// no longer has a live node. The first write of a pass shifts the previous
-  /// `current` into the pass baseline; later same-pass writes update `current`
-  /// only, so same-pass readers keep seeing the baseline.
+  /// Records the latest observed `onChange` value for this owner and ordinal so
+  /// the next resolve can detect a transition. Persists across frames; pruned
+  /// by `finalizeFrame` once the identity or scoped exact entity no longer has
+  /// a live node. The first write of a pass shifts the previous `current` into
+  /// the pass baseline; later same-pass writes update `current` only, so
+  /// same-pass readers keep seeing the baseline.
   package func recordChangeObservationValue<Value>(
     _ value: Value,
+    entityIdentity: EntityIdentity? = nil,
     identity: Identity,
     ordinal: Int
   ) {
-    let key = ChangeObservationValueKey(identity: identity, ordinal: ordinal)
+    let key = ChangeObservationValueKey(
+      entityIdentity: entityIdentity,
+      identity: identity,
+      ordinal: ordinal
+    )
     if var slot = changeObservationValues[key] {
       if slot.passID != currentFrameID {
         slot.baseline = slot.current
@@ -519,18 +536,21 @@ package final class ViewGraph {
     }
   }
 
-  /// Drops `onChange` previous-value entries whose identity no longer has a live
-  /// node. A node re-minted this frame (owner `.id` churn) is re-created at the
-  /// same identity before finalize, so it stays live and its baseline survives;
-  /// only genuinely-departed identities are pruned. Keeps the store bounded
-  /// without coupling to per-node teardown (which the churn re-mint goes
-  /// through).
+  /// Drops `onChange` previous-value entries whose lifecycle owner no longer
+  /// has a live node. Scoped exact-entity keys make ancestor replacement a
+  /// fresh lifetime even when the descendant resolves to the same exact
+  /// `Identity`; ordinary identities retain the established behavior.
   private func pruneDepartedChangeObservationValues() {
     guard !changeObservationValues.isEmpty else {
       return
     }
     changeObservationValues = changeObservationValues.filter { key, _ in
-      nodeIDByIdentity[key.identity] != nil
+      switch key.owner {
+      case .scopedExactEntity(let entityIdentity):
+        return entityRoutingTable.route(entityIdentity) != nil
+      case .identity(let identity):
+        return nodeIDByIdentity[identity] != nil
+      }
     }
   }
 
@@ -937,6 +957,14 @@ package final class ViewGraph {
   package func nodeForViewNodeID(_ viewNodeID: ViewNodeID) -> ViewNode? {
     nodeIfExists(for: viewNodeID)
   }
+
+  package func nodeForEntityIdentity(_ entityIdentity: EntityIdentity) -> ViewNode? {
+    guard let viewNodeID = entityRoutingTable.route(entityIdentity) else {
+      return nil
+    }
+    return nodeIfExists(for: viewNodeID)
+  }
+
   /// Resolves the live node that owns imperative state registered against
   /// `viewNodeID` at `identity`. The registration-time node wins while it is
   /// still the live occupant of its identity; when the identity has been
@@ -947,8 +975,9 @@ package final class ViewGraph {
   /// serves. Without the identity re-key the closures write the orphaned
   /// node's slots: the writes invalidate the identity (dirtying the fresh
   /// node), the fresh node re-resolves its unchanged slots, and every frame
-  /// completes empty — the gallery Life-tab revisit freeze. Mirrors
-  /// `onChange`'s identity-keyed cross-frame memory.
+  /// completes empty — the gallery Life-tab revisit freeze. Like `onChange`
+  /// ownership, this follows the live runtime lifetime rather than a retired
+  /// node object.
   package func liveStateOwnerNode(
     registeredOwner viewNodeID: ViewNodeID,
     identity: Identity

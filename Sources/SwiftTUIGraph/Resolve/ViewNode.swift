@@ -152,19 +152,6 @@ package final class ViewNode {
     get { frameState.wasPresentAtFrameStart }
     set { frameState.wasPresentAtFrameStart = newValue }
   }
-  package var entityDisplacedOccupantFrameID: UInt64 {
-    get { frameState.entityDisplacedOccupantFrameID }
-    set { frameState.entityDisplacedOccupantFrameID = newValue }
-  }
-  /// True when this node was freshly minted this frame after its identity
-  /// slot's prior occupant was displaced by a different entity (an explicit-id
-  /// value churn). The churn-detection predicate in `ExactIdentityModifier`
-  /// keys on `wasPresentAtFrameStart`-style rebinding, which a displacement
-  /// mint never satisfies — this is the graph-side signal that replaces it.
-  package var hasEntityDisplacedOccupantThisFrame: Bool {
-    frameState.entityDisplacedOccupantFrameID != 0
-      && frameState.entityDisplacedOccupantFrameID == frameState.preparedFrameID
-  }
 
   /// Whether this node is currently inside a `beginEvaluation` /
   /// `finishEvaluation` pair (its body resolution is on the stack).
@@ -2269,7 +2256,6 @@ extension ViewNode {
       nextValueAnimationModifierOrdinal: nextValueAnimationModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
-      entityDisplacedOccupantFrameID: entityDisplacedOccupantFrameID,
       evaluatorInstalled: evaluator != nil
     )
   }

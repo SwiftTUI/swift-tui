@@ -137,12 +137,11 @@ extension ViewGraph {
     package var liveNodeIDs: Set<ViewNodeID> = []
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] =
       [:]
-    // `onChange` previous-value memory, keyed by the observing node's *stable*
-    // identity so it survives `.id`-churn re-minting of that node (a fresh
-    // `ViewNode` with empty state slots) and is present before the node first
-    // lands in the identity index. Persists across frames (not cleared by
-    // `beginFrame`); `finalizeFrame` prunes entries whose identity no longer has
-    // a live node. See `ChangeLifecycleModifier`.
+    // `onChange` previous-value memory, keyed by resolved identity for ordinary
+    // paths and by the enclosing-lifetime-scoped entity for package-internal
+    // exact IDs. Persists across frames (not cleared by `beginFrame`);
+    // `finalizeFrame` prunes entries whose owner is no longer live. See
+    // `ChangeLifecycleModifier`.
     //
     // Each entry keeps a per-pass baseline alongside the latest write: reads
     // during the pass that wrote `current` see `baseline`, so every resolve of

@@ -152,26 +152,44 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     let intake = HandlerDescriptorIntake(context: context)
     let node = content.resolve(in: context)
     let viewGraph = context.viewGraph
-    let ownerNode = viewGraph?.nodeForIdentity(node.identity)
+    // The package-only exact `.id(Identity)` replaces the resolved path
+    // wholesale. Its scoped entity is therefore the lifecycle owner: it stays
+    // stable inside one enclosing identity lifetime and is reminted when that
+    // ancestor changes. Public generic IDs and structural paths retain the
+    // established resolved-identity ownership used by modifier-chain churn.
+    let routedEntityIdentity =
+      node.entityIdentity ?? ResolveEntityRouteStorage.current?.identity
+    let exactEntityIdentity = routedEntityIdentity.flatMap { entityIdentity in
+      entityIdentity.isScopedExactIdentity ? entityIdentity : nil
+    }
+    let ownerNode =
+      exactEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
+      ?? viewGraph?.nodeForIdentity(node.identity)
+    // A content-first `.id(...).onChange(...)` can expose a freshly routed
+    // node before its resolved identity has entered the graph index. Keep the
+    // established identity owner for baseline/ordinal semantics, but queue the
+    // event on the concrete resolved node (or its route) so `initial: true` is
+    // not swallowed on that first lifetime pass.
+    let eventOwnerNode =
+      ownerNode
+      ?? node.viewNodeID.flatMap { viewGraph?.nodeForViewNodeID($0) }
+      ?? routedEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
     let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
 
-    // `onChange`'s previous-value memory must survive `.id`-churn re-minting of
-    // the observing node (a fresh `ViewNode` with empty state slots) and be
-    // available on the node's very first resolve (before it lands in the graph's
-    // identity index). A per-node state slot satisfies neither — the first
-    // observation is swallowed and every post-churn change reads as "first". The
-    // view graph is the persistent, cross-frame home; its change-observation
-    // store keys by the *stable* identity, so it survives both. Fall back to the
-    // per-node slot only when no graph is threaded (a resolve-only path where the
-    // change handler could not be dispatched anyway).
+    // The graph store can read the owner's prior value before commit. Exact-ID
+    // entries follow the scoped entity above; ordinary entries keep their
+    // resolved-identity key. Fall back to a per-node slot only when no graph is
+    // threaded (a resolve-only path where the handler cannot dispatch).
     let hadPreviousValue: Bool
     let previousValue: Value?
     if let viewGraph {
       hadPreviousValue = viewGraph.hasChangeObservationValue(
+        entityIdentity: exactEntityIdentity,
         identity: node.identity,
         ordinal: modifierOrdinal
       )
       previousValue = viewGraph.changeObservationValue(
+        entityIdentity: exactEntityIdentity,
         identity: node.identity,
         ordinal: modifierOrdinal,
         as: Value.self
@@ -197,6 +215,7 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
     if let viewGraph {
       viewGraph.recordChangeObservationValue(
         value,
+        entityIdentity: exactEntityIdentity,
         identity: node.identity,
         ordinal: modifierOrdinal
       )
@@ -222,7 +241,7 @@ public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
           lifecycleAction(oldValue, value)
         }
       ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
-    ownerNode?.queueChangeHandler(handlerID)
+    eventOwnerNode?.queueChangeHandler(handlerID)
     return [node]
   }
 }

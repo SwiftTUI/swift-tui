@@ -148,7 +148,7 @@ The full ActionScope/commands surface is public:
 - `.keyCommand(...)` with shallowest-wins dispatch along the focus chain.
   Modifier-less bindings are framework-reserved.
 - `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
-- `.toolbar(style:)` and `.toolbarItem(...)`.
+- `.toolbar()`, `.toolbarStyle(...)`, and `.toolbarItem(...)`.
 - `Scene` and the presentation modifiers (`.alert`, `.confirmationDialog`,
   `.sheet`, `.fullScreenCover`, `.popover`, `.popoverTip`, `.toast`) conform
   to `ActionScope`. Boolean and optional-item presentation state is owned by

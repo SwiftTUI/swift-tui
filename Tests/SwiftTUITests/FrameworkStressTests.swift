@@ -2082,11 +2082,9 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
       return try harness.pressKey(KeyPress(.arrowDown))
 
     case .scrollViewHandlersStayBounded:
-      // Entity-routed lifetime (Stage 6): the stable-`.id` scroll view keeps
-      // its ViewNode — and therefore its scroll offset — across owner `.id`
-      // churn, so earlier generations' scrolls accumulate and row 1 leaves the
-      // viewport. Anchor on the generation prefix, which matches whichever
-      // row is currently visible.
+      // Replacing the owner's `.id` resets the descendant scroll lifetime and
+      // offset even though the scroll view has a stable local ID. Anchor on the
+      // generation prefix so the probe remains independent of row geometry.
       let point = try #require(harness.point(forText: "Scroll Row \(generation)."))
       return try harness.scrollPointer(at: point, deltaY: 1)
 
@@ -2718,14 +2716,13 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
       return try harness.click(point)
 
     case .verticalScrollViewHandlersRebind:
-      // Entity-routed lifetime (Stage 6): scroll offset survives owner `.id`
-      // churn, so row 0 scrolls away across generations — anchor on the label
-      // prefix (any visible row).
+      // Owner `.id` replacement resets the descendant scroll lifetime. Anchor
+      // on the label prefix so the pointer target remains row-independent.
       let point = try #require(harness.point(forText: "VScroll."))
       return try harness.scrollPointer(at: point, deltaY: 1)
 
     case .horizontalScrollViewHandlersRebind:
-      // Entity-routed lifetime (Stage 6): see verticalScrollViewHandlersRebind.
+      // See verticalScrollViewHandlersRebind.
       let point = try #require(harness.point(forText: "HScroll."))
       return try harness.scrollPointer(at: point, deltaX: 1, deltaY: 0)
 

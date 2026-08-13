@@ -12,7 +12,6 @@ extension ViewGraph {
     for identity: Identity,
     entityIdentity: EntityIdentity? = nil
   ) -> ViewNode {
-    var displacedOccupant = false
     if let entityIdentity,
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
@@ -73,12 +72,9 @@ extension ViewGraph {
           if existingEntityIdentity != nil {
             // The displaced occupant's resolved subtree departs right here.
             // The eviction's descent covers committed values, live children,
-            // and hosted-detached edges; the fresh node minted below carries
-            // the displacement mark so `ExactIdentityModifier`'s churn
-            // predicate (reuse suppression) fires even though the fresh node
-            // was never present at frame start.
+            // and hosted-detached edges. The arriving entity mints a distinct
+            // runtime lifetime below.
             removeSubtree(rootedAt: existing)
-            displacedOccupant = true
           } else {
             bindEntityRoute(entityIdentity, to: existing.viewNodeID)
             return existing
@@ -127,9 +123,6 @@ extension ViewGraph {
     identityByNodeID[viewNodeID] = identity
     if let entityIdentity {
       bindEntityRoute(entityIdentity, to: viewNodeID)
-    }
-    if displacedOccupant {
-      node.entityDisplacedOccupantFrameID = currentFrameID
     }
     return node
   }

@@ -1497,7 +1497,7 @@ extension FrameworkStressObservationEffectsTests {
     for generation in 1...16 {
       probe.events.removeAll(keepingCapacity: true)
       _ = try harness.clickText("Remint Change Owner 026")
-      #expect(probe.events == ["env-\(generation):\(generation)"])
+      #expect(probe.events == ["env-\(generation):\(generation)->\(generation)"])
     }
   }
 }
@@ -1509,8 +1509,8 @@ private struct ObservationEffects026Observer: View {
 
   var body: some View {
     Text("026 value \(value)")
-      .onChange(of: value, initial: true) { _, newValue in
-        probe.events.append("\(environmentValue):\(newValue)")
+      .onChange(of: value, initial: true) { oldValue, newValue in
+        probe.events.append("\(environmentValue):\(oldValue)->\(newValue)")
       }
   }
 }

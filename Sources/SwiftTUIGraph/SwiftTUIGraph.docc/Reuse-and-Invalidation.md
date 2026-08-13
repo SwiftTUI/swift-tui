@@ -23,9 +23,8 @@ dirty work. If the graph cannot form that proof, resolve starts at the root.
 
 The **structural-churn channel** begins while resolve evaluates those frontier
 targets or the root. Some topology changes cannot be expressed as another
-tracked value read. Examples include a new child list, a re-rooted identity, or
-a presentation or preference-derived subtree. A different live parent can also
-adopt a child.
+tracked value read. Examples include a new child list or a presentation- or
+preference-derived subtree. A different live parent can also adopt a child.
 Those paths propagate `withinChurnedSubtree` and update `CommittedFreshness`.
 They reconcile parent and `evaluationHost` relationships. They also enqueue
 teardown work. The paths force fresh resolution inside the affected cone. An
@@ -80,7 +79,7 @@ identity-axis relationships used by retained reuse, while live structural
 comparisons cover re-rooted identities and island seams. A **churned cone** is the
 downward scope of `ResolveContext.withinChurnedSubtree` in
 `Sources/SwiftTUIViews/Environment/ResolveContext.swift`. It marks a
-value-derived or identity-re-rooted structural change. Both reuse layers must
+value-derived or host-reconstructed structural change. Both reuse layers must
 stop inside this scope, even if the ordinary invalidation cone does not name
 the descendants.
 
@@ -329,12 +328,12 @@ An exact member, an ancestor of a member, or a separate wholesale focus reader
 is never exempt. This keeps evaluation connected to every real reader while
 preventing a near-root control from blanketing an unrelated content subtree.
 
-`withinChurnedSubtree` handles a different proof gap. Exact-identity rebinding,
-presentation-entry changes, preference-derived overlays/backgrounds, and
-similar values synthesized during resolve can change descendants without
+`withinChurnedSubtree` handles a different proof gap. Presentation-entry
+changes, preference-derived overlays/backgrounds, tab bodies, trigger leaves,
+and similar values synthesized during resolve can change descendants without
 creating a tracked invalidation for those descendants. The marker is inherited
-by every derived `ResolveContext`. The reuse door declines both layers until
-it resolves and commits the fresh values. This stand-down is
+by every derived `ResolveContext`. The reuse door declines both layers until it
+resolves and commits the fresh values. This stand-down is
 orthogonal to focus/press suppression: a node must pass both policies.
 
 ## The DEBUG oracle suite

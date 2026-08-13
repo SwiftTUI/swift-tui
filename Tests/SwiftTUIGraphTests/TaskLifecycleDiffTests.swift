@@ -33,16 +33,29 @@ struct TaskLifecycleDiffTests {
     #expect(!diff.cancelsKeyToCurrentIdentity)
   }
 
-  @Test("identity churn with persisting tasks suppresses cancel and restart")
-  func identityChurnWithPersistingTasksSuppressesBoth() {
+  @Test("identity churn cancels prior tasks and starts current tasks")
+  func identityChurnCancelsPriorTasksAndStartsCurrentTasks() {
     let diff = TaskLifecycleDiff.between(
       previous: [task("a"), task("b")],
       current: [task("c")],
       identityChanged: true
     )
-    #expect(diff.cancels.isEmpty)
-    #expect(diff.starts.isEmpty)
-    #expect(!diff.cancelsKeyToCurrentIdentity)
+    #expect(diff.cancels == [task("a"), task("b")])
+    #expect(diff.starts == [task("c")])
+    #expect(diff.cancelsKeyToCurrentIdentity)
+  }
+
+  @Test("identity churn restarts an otherwise unchanged task")
+  func identityChurnRestartsUnchangedTask() {
+    let unchanged = task("a")
+    let diff = TaskLifecycleDiff.between(
+      previous: [unchanged],
+      current: [unchanged],
+      identityChanged: true
+    )
+    #expect(diff.cancels == [unchanged])
+    #expect(diff.starts == [unchanged])
+    #expect(diff.cancelsKeyToCurrentIdentity)
   }
 
   @Test("identity churn with no previous tasks still starts a genuine first appearance")
@@ -51,8 +64,8 @@ struct TaskLifecycleDiffTests {
     // reduce-motion → restore transition of PhaseAnimator: the loop task is
     // absent while reduced, then reappears under a churned conditional-branch
     // identity when motion returns) must still start a task that appears this
-    // frame. Nothing persisted across the relabel, so the restart suppression
-    // that protects long-lived relabeled tasks does not apply.
+    // frame. There is nothing to cancel, but the current descriptor still
+    // begins its new identity lifetime.
     let diff = TaskLifecycleDiff.between(
       previous: [],
       current: [task("a")],
@@ -60,7 +73,7 @@ struct TaskLifecycleDiffTests {
     )
     #expect(diff.cancels.isEmpty)
     #expect(diff.starts == [task("a")])
-    #expect(!diff.cancelsKeyToCurrentIdentity)
+    #expect(diff.cancelsKeyToCurrentIdentity)
   }
 
   @Test("identity churn removing every task cancels keyed to the current identity")

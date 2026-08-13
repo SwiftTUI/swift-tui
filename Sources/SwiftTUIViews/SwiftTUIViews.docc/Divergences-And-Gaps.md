@@ -158,7 +158,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   tail under strict, unsuppressed concurrency. Recorded once for the whole
   class; individual members do not get separate entries.
 - **`ForEach` over a collection binding writes back by identity; `Binding`
-  is still not a `Collection`.** *Ratified, with one residual Gap.*
+  collection conformances stay positional.** *Ratified.*
   `ForEach(_:content:)` and `ForEach(_:id:content:)` accept a `Binding` to a
   mutable collection and hand each row a `Binding` to its element. Row
   bindings verify identity on every access: after a reorder a write
@@ -624,16 +624,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   presentation-valued where the primitive must keep a runtime invariant,
   with built-in treatments implemented through the same public
   configuration and routing contract available to third-party styles. At
-  `HEAD`, those surfaces have hard-coded chrome with no independently
-  replaceable style seam (`Table` and `Spinner` now have their own
-  environment-scoped `TableStyle` and `SpinnerStyle` families — the former
-  split from `ListStyle`, the latter replacing the removed frame-and-cadence
-  initializer), and `.toolbar(style:)` and the palette declaration still
-  take a style or content at the declaration rather than reading the
-  nearest environment value. Changes that facilitate this destination —
-  including source-breaking replacement of those declaration-scoped entry
-  points (toast deliberately keeps its declaration-scoped style argument)
-  — are expected as part of the burndown to 1.0.0.
+  `HEAD`, environment-scoped families exist for `Button`, `TextField`,
+  `Picker`, `List`, `OutlineGroup`, `Table`, `Spinner`, `Sheet`, `Toolbar`,
+  and `TabView`. Toast deliberately keeps its declaration-scoped style
+  argument, and palette rendering stays internal until the public
+  `PaletteStyle` family ships. The other listed surfaces retain hard-coded
+  chrome with no independently replaceable style seam; completing them is
+  additive Phase B work on the burndown to 1.0.0.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where
   SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
   than `mix(with:by:)`.
@@ -694,15 +691,18 @@ capabilities in the vision document. The others follow the same stance:
 
 ## Accessibility
 
-The semantic substrate, terminal cursor-follows-focus mode, and Web/WASI ARIA
-tree are complete. The SwiftUI-host overlay pushes runtime focus to VoiceOver,
-and the Android host provides a Compose semantics overlay. (The former linear
-accessible *output mode* was removed as unusable; its renderer survives only
-as the `SwiftTUITestSupport` assistive-output assertion seam.)
+The semantic substrate, terminal cursor-follows-focus mode, Web/WASI ARIA tree,
+SwiftUI-host overlay, and Android Compose semantics overlay all ship. They
+present roles, labels, hints, live regions, and runtime-originated focus. The
+shared node model does not yet carry assistive-technology activation,
+adjustment, value/state, or focus-return routes. (The former linear accessible
+*output mode* was removed as unusable; its renderer survives only as the
+`SwiftTUITestSupport` assistive-output assertion seam.)
 
-- **Native assistive-technology focus is one-way.** *Gap.* Focus flows
-  runtime → VoiceOver/TalkBack only. Native assistive-technology-originated
-  focus traversal is not fed back into SwiftTUI's runtime focus.
+- **Assistive-technology interaction is one-way.** *Gap.* Focus flows runtime
+  → VoiceOver/TalkBack/browser only. Assistive-technology-originated focus
+  traversal is not fed back into SwiftTUI's runtime focus, and semantic nodes
+  carry no activation, adjustment, or control-value route.
 - **No WCAG-referenced conformance suite or automated screen-reader
   testing.** *Gap.* Unit tests and guardrail scripts cover accessibility, but
   no conformance checklist exists.
