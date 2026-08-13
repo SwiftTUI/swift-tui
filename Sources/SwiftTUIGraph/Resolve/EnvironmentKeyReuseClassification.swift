@@ -90,6 +90,10 @@ package enum EnvironmentKeyReuseClassification {
     // preference reconciliation replays through that same host rather than
     // re-reading the environment.
     "ToolbarStyleKey",
+    // Read once at the sheet declaration's resolve, where the resolved
+    // chrome is folded into the descriptor the portal coordinator
+    // consumes; nothing re-reads the key downstream.
+    "SheetStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

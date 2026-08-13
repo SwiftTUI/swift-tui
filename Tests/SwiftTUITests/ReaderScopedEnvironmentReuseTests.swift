@@ -714,6 +714,78 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(!toleratedBoundary(in: renderer))
   }
 
+  /// `SheetStyleKey` is certified on the same shape: only a sheet
+  /// declaration reads it, at resolve.
+  @Test("a sheet-style change over a sheet-free subtree is tolerated")
+  func sheetStyleChangeOverSheetFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnySheetStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .sheetStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .automatic, dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .dropdown, dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  /// The soundness half: a subtree declaring a presented sheet reads the
+  /// key at that declaration's resolve, so the door must deny.
+  @Test("a sheet-style change with a presented sheet in the subtree is denied")
+  func sheetStyleChangeWithPresentedSheetIsDenied() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnySheetStyle
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(
+            content: Text("inner")
+              .sheet("Title", isPresented: .constant(true)) {
+                Text("sheet body")
+              }
+          )
+        }
+        .sheetStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .automatic),
+      context: .init(identity: rootIdentity)
+    )
+    _ = renderer.render(
+      Root(style: .dropdown),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
   /// Certified keys must also enter the writer index: an interior
   /// `.scrollIndicators` write decouples the subtree from the boundary's
   /// change, and only the setter's write attribution can see that.

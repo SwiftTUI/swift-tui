@@ -34,7 +34,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: context.resolvedSheetDescriptor(baseline: spec.descriptor),
+        descriptor: spec.descriptor,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: actions,
@@ -105,7 +105,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        descriptor: context.resolvedSheetDescriptor(baseline: spec.descriptor),
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
