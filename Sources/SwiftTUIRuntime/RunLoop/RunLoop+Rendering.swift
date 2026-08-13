@@ -85,6 +85,16 @@ extension RunLoop {
           proposal: proposal()
         )
         artifacts = renderedArtifacts
+        // This pass COMMITTED — its registration publication just rewrote the
+        // live registries. Absorb before the next pass can reset an owner's
+        // record without re-registering (an `onChange` that does not re-trigger
+        // registers nothing), so a plan folded into the lifecycle
+        // carry-forward still finds its closure. Mirrors the async driver's
+        // per-pass absorb in `acquireFrameArtifactsAsync`; without it this
+        // driver and production disagree about what survives a re-render.
+        lifecycleCoordinator.absorbPublishedRegistrations(
+          localLifecycleRegistry.snapshot()
+        )
         let outcome = try processFocusSyncIteration(
           renderedArtifacts,
           convergence: &convergence

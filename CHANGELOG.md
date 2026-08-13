@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`onChange` inside presented content no longer skips under the
+  synchronous frame driver.** `onChange` is the only lifecycle family whose
+  registration is conditional, so a convergence re-render that resets a
+  node's recorded handlers without re-triggering left the committed change
+  entry with nothing to dispatch. The retained handler store is the designed
+  remedy and the asynchronous driver has always fed it; the synchronous
+  driver — every synchronous test harness, and the Android host in `.sync`
+  render mode — did not. Asynchronously-driven hosts were unaffected.
+
 ### Changed — behavior-breaking
 
 - **Ambient propagation for `lineLimit`, `truncationMode`, `.opacity`,
