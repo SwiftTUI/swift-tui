@@ -199,58 +199,72 @@ package final class ViewGraph {
   var nodesByNodeID: [ViewNodeID: ViewNode] {
     get { index.nodesByNodeID }
     set { index.nodesByNodeID = newValue }
+    _modify { yield &index.nodesByNodeID }
   }
   var nodeIDByIdentity: [Identity: ViewNodeID] {
     get { index.nodeIDByIdentity }
     set { index.nodeIDByIdentity = newValue }
+    _modify { yield &index.nodeIDByIdentity }
   }
   var identityByNodeID: [ViewNodeID: Identity] {
     get { index.identityByNodeID }
     set { index.identityByNodeID = newValue }
+    _modify { yield &index.identityByNodeID }
   }
   var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] {
     get { index.nodeIDsByStructuralPath }
     set { index.nodeIDsByStructuralPath = newValue }
+    _modify { yield &index.nodeIDsByStructuralPath }
   }
   var entityRoutingTable: EntityRoutingTable {
     get { index.entityRoutingTable }
     set { index.entityRoutingTable = newValue }
+    _modify { yield &index.entityRoutingTable }
   }
   package var lifetimeAnchors: LifetimeAnchorIndex {
     get { index.lifetimeAnchors }
     set { index.lifetimeAnchors = newValue }
+    _modify { yield &index.lifetimeAnchors }
   }
   var nextViewNodeIDRawValue: UInt64 {
     get { index.nextViewNodeIDRawValue }
     set { index.nextViewNodeIDRawValue = newValue }
+    _modify { yield &index.nextViewNodeIDRawValue }
   }
   var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
     get { index.flattenedStateOwnerNodeIDByIdentity }
     set { index.flattenedStateOwnerNodeIDByIdentity = newValue }
+    _modify { yield &index.flattenedStateOwnerNodeIDByIdentity }
   }
   var effectRegistrationOwnerNodeIDs: Set<ViewNodeID> {
     get { index.effectRegistrationOwnerNodeIDs }
     set { index.effectRegistrationOwnerNodeIDs = newValue }
+    _modify { yield &index.effectRegistrationOwnerNodeIDs }
   }
   private var rootEvaluator: (@MainActor () -> Void)? {
     get { rootEvaluation.rootEvaluator }
     set { rootEvaluation.rootEvaluator = newValue }
+    _modify { yield &rootEvaluation.rootEvaluator }
   }
   private var evaluationRootIdentity: Identity? {
     get { rootEvaluation.evaluationRootIdentity }
     set { rootEvaluation.evaluationRootIdentity = newValue }
+    _modify { yield &rootEvaluation.evaluationRootIdentity }
   }
   private var viewportLifecycleNodesByKey: [ViewportLifecycleKey: LifecycleStateNode] {
     get { viewportLifecycle.viewportLifecycleNodesByKey }
     set { viewportLifecycle.viewportLifecycleNodesByKey = newValue }
+    _modify { yield &viewportLifecycle.viewportLifecycleNodesByKey }
   }
   private var viewportLifecycleOrder: [ViewportLifecycleKey] {
     get { viewportLifecycle.viewportLifecycleOrder }
     set { viewportLifecycle.viewportLifecycleOrder = newValue }
+    _modify { yield &viewportLifecycle.viewportLifecycleOrder }
   }
   private var frameOrder: [ViewNodeID] {
     get { eventBuffers.frameOrder }
     set { eventBuffers.frameOrder = newValue }
+    _modify { yield &eventBuffers.frameOrder }
   }
   /// ViewNodeIDs freshly evaluated (not reused) this frame. Read by the
   /// renderer's transition-collection window to prune registrations for nodes
@@ -259,62 +273,77 @@ package final class ViewGraph {
   package var evaluatedNodeIDsThisFrame: Set<ViewNodeID> {
     get { eventBuffers.evaluatedNodeIDsThisFrame }
     set { eventBuffers.evaluatedNodeIDsThisFrame = newValue }
+    _modify { yield &eventBuffers.evaluatedNodeIDsThisFrame }
   }
   private var stableTaskCancelEvents: [LifecycleEvent] {
     get { eventBuffers.stableTaskCancelEvents }
     set { eventBuffers.stableTaskCancelEvents = newValue }
+    _modify { yield &eventBuffers.stableTaskCancelEvents }
   }
   private var stableTaskStartEvents: [LifecycleEvent] {
     get { eventBuffers.stableTaskStartEvents }
     set { eventBuffers.stableTaskStartEvents = newValue }
+    _modify { yield &eventBuffers.stableTaskStartEvents }
   }
   private var structuralAppearEvents: [LifecycleEvent] {
     get { eventBuffers.structuralAppearEvents }
     set { eventBuffers.structuralAppearEvents = newValue }
+    _modify { yield &eventBuffers.structuralAppearEvents }
   }
   private var structuralTaskCancelEvents: [LifecycleEvent] {
     get { eventBuffers.structuralTaskCancelEvents }
     set { eventBuffers.structuralTaskCancelEvents = newValue }
+    _modify { yield &eventBuffers.structuralTaskCancelEvents }
   }
   var structuralDisappearEvents: [LifecycleEvent] {
     get { eventBuffers.structuralDisappearEvents }
     set { eventBuffers.structuralDisappearEvents = newValue }
+    _modify { yield &eventBuffers.structuralDisappearEvents }
   }
   package var teardownBarrierWork: TeardownBarrierWork {
     get { eventBuffers.teardownBarrierWork }
     set { eventBuffers.teardownBarrierWork = newValue }
+    _modify { yield &eventBuffers.teardownBarrierWork }
   }
   private var latestLifecycleEvents: [LifecycleEvent] {
     get { eventBuffers.latestLifecycleEvents }
     set { eventBuffers.latestLifecycleEvents = newValue }
+    _modify { yield &eventBuffers.latestLifecycleEvents }
   }
   var invalidatedNodeIDs: Set<ViewNodeID> {
     get { dirtyState.invalidatedNodeIDs }
     set { dirtyState.invalidatedNodeIDs = newValue }
+    _modify { yield &dirtyState.invalidatedNodeIDs }
   }
   var graphLocalDirtyNodeIDs: Set<ViewNodeID> {
     get { dirtyState.graphLocalDirtyNodeIDs }
     set { dirtyState.graphLocalDirtyNodeIDs = newValue }
+    _modify { yield &dirtyState.graphLocalDirtyNodeIDs }
   }
   var stateMutationKeys: Set<StateSlotKey> {
     get { dirtyState.stateMutationKeys }
     set { dirtyState.stateMutationKeys = newValue }
+    _modify { yield &dirtyState.stateMutationKeys }
   }
   var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] {
     get { dirtyState.stateMutationNodeIDsByKey }
     set { dirtyState.stateMutationNodeIDsByKey = newValue }
+    _modify { yield &dirtyState.stateMutationNodeIDsByKey }
   }
   var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID] {
     get { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID }
     set { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID = newValue }
+    _modify { yield &lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID }
   }
   var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>] {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsByOwner = newValue }
+    _modify { yield &lifecycleEvaluation.lifecycleEvaluationTargetsByOwner }
   }
   var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>] {
     get { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
     set { lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner = newValue }
+    _modify { yield &lifecycleEvaluation.lifecycleEvaluationTargetsRecordedByOwner }
   }
   func taskDescriptorSlot(
     for key: TaskDescriptorSlotKey
@@ -338,10 +367,12 @@ package final class ViewGraph {
   private var nextTaskDescriptorIdentityToken: UInt64 {
     get { taskDescriptors.nextTaskDescriptorIdentityToken }
     set { taskDescriptors.nextTaskDescriptorIdentityToken = newValue }
+    _modify { yield &taskDescriptors.nextTaskDescriptorIdentityToken }
   }
   private var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] {
     get { dependencyIndex.stateSlotDependents }
     set { dependencyIndex.stateSlotDependents = newValue }
+    _modify { yield &dependencyIndex.stateSlotDependents }
   }
   // Reader/writer edges are internal rather than file-private: the
   // reader-scoped environment toleration reads both from
@@ -349,49 +380,60 @@ package final class ViewGraph {
   var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] {
     get { dependencyIndex.environmentDependents }
     set { dependencyIndex.environmentDependents = newValue }
+    _modify { yield &dependencyIndex.environmentDependents }
   }
   private var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] {
     get { dependencyIndex.observableDependents }
     set { dependencyIndex.observableDependents = newValue }
+    _modify { yield &dependencyIndex.observableDependents }
   }
   var environmentKeyWriters: [ObjectIdentifier: Set<ViewNodeID>] {
     get { dependencyIndex.environmentKeyWriters }
     set { dependencyIndex.environmentKeyWriters = newValue }
+    _modify { yield &dependencyIndex.environmentKeyWriters }
   }
 
   var currentFrameID: UInt64 {
     get { frameCommit.currentFrameID }
     set { frameCommit.currentFrameID = newValue }
+    _modify { yield &frameCommit.currentFrameID }
   }
   var liveNodeIDs: Set<ViewNodeID> {
     get { frameCommit.liveNodeIDs }
     set { frameCommit.liveNodeIDs = newValue }
+    _modify { yield &frameCommit.liveNodeIDs }
   }
   var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] {
     get { frameCommit.resolvedNodeReuseCache }
     set { frameCommit.resolvedNodeReuseCache = newValue }
+    _modify { yield &frameCommit.resolvedNodeReuseCache }
   }
   private var changeObservationValues: [ChangeObservationValueKey: ChangeObservationSlot] {
     get { frameCommit.changeObservationValues }
     set { frameCommit.changeObservationValues = newValue }
+    _modify { yield &frameCommit.changeObservationValues }
   }
   private var committedRuntimeRegistrationFingerprint: RuntimeRegistrationGraphFingerprint? {
     get { frameCommit.committedRuntimeRegistrationFingerprint }
     set { frameCommit.committedRuntimeRegistrationFingerprint = newValue }
+    _modify { yield &frameCommit.committedRuntimeRegistrationFingerprint }
   }
   private var committedRuntimeRegistrationTargetIdentity: RuntimeRegistrationTargetIdentity? {
     get { frameCommit.committedRuntimeRegistrationTargetIdentity }
     set { frameCommit.committedRuntimeRegistrationTargetIdentity = newValue }
+    _modify { yield &frameCommit.committedRuntimeRegistrationTargetIdentity }
   }
   private var pendingRuntimeRegistrationRefreshRoots: Set<Identity> {
     get { frameCommit.pendingRuntimeRegistrationRefreshRoots }
     set { frameCommit.pendingRuntimeRegistrationRefreshRoots = newValue }
+    _modify { yield &frameCommit.pendingRuntimeRegistrationRefreshRoots }
   }
   // Internal rather than file-private: the reader-scoped environment
   // toleration owns this map from ViewGraphEnvironmentToleration.swift.
   var environmentDriftByBoundary: [ViewNodeID: [ObjectIdentifier: EnvironmentSnapshotValue]] {
     get { frameCommit.environmentDriftByBoundary }
     set { frameCommit.environmentDriftByBoundary = newValue }
+    _modify { yield &frameCommit.environmentDriftByBoundary }
   }
   /// F29: derived cache behind ``makeCheckpoint()`` — one live image per node,
   /// refreshed by generation compare, handed out as an O(1) COW copy. Meta-state
@@ -1186,8 +1228,7 @@ package final class ViewGraph {
   package func invalidateAndQueueDirty(_ identities: Set<Identity>) {
     ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
       nodeIDsForInvalidation(identities),
-      invalidatedNodeIDs: &invalidatedNodeIDs,
-      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      dirtyState: &dirtyState,
       nodesByNodeID: nodesByNodeID
     )
   }
@@ -1251,8 +1292,7 @@ package final class ViewGraph {
     }
     ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
       viewNodeIDs,
-      invalidatedNodeIDs: &invalidatedNodeIDs,
-      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      dirtyState: &dirtyState,
       nodesByNodeID: nodesByNodeID
     )
   }
@@ -3866,9 +3906,7 @@ package final class ViewGraph {
       identity: identity,
       task: task,
       isStructural: isStructural,
-      stableTaskCancelEvents: &stableTaskCancelEvents,
-      structuralTaskCancelEvents: &structuralTaskCancelEvents,
-      stableTaskStartEvents: stableTaskStartEvents
+      buffers: &eventBuffers
     )
   }
 
@@ -4197,10 +4235,7 @@ package final class ViewGraph {
       viewNodeID: node.viewNodeID,
       previous: previous,
       current: node.dependencies,
-      stateSlotDependents: &stateSlotDependents,
-      environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      environmentKeyWriters: &environmentKeyWriters
+      index: &dependencyIndex
     )
   }
 
@@ -4210,10 +4245,7 @@ package final class ViewGraph {
     ViewGraphDependencyIndex.remove(
       viewNodeID: node.viewNodeID,
       dependencies: node.dependencies,
-      stateSlotDependents: &stateSlotDependents,
-      environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      environmentKeyWriters: &environmentKeyWriters
+      index: &dependencyIndex
     )
   }
 

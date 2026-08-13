@@ -211,18 +211,16 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let live = planningNode(1, "Live", evaluator: false)
     live.isDirty = false
     let missing = ViewNodeID(rawValue: 99)
-    var invalidated: Set<ViewNodeID> = []
-    var queued: Set<ViewNodeID> = []
+    var dirtyState = ViewGraph.DirtyState()
 
     ViewGraphInvalidationPlanner.invalidateAndQueueDirty(
       [live.viewNodeID, missing],
-      invalidatedNodeIDs: &invalidated,
-      graphLocalDirtyNodeIDs: &queued,
+      dirtyState: &dirtyState,
       nodesByNodeID: [live.viewNodeID: live]
     )
 
-    #expect(invalidated == [live.viewNodeID, missing])
-    #expect(queued == [live.viewNodeID])
+    #expect(dirtyState.invalidatedNodeIDs == [live.viewNodeID, missing])
+    #expect(dirtyState.graphLocalDirtyNodeIDs == [live.viewNodeID])
     #expect(live.isDirty)
   }
 
@@ -282,10 +280,11 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
     let observableOld = ObjectIdentifier(GraphPlanningObservableA.self)
     let observableNew = ObjectIdentifier(GraphPlanningObservableB.self)
     let writtenOld = ObjectIdentifier(GraphPlanningEnvironmentKeyB.self)
-    var stateIndex = [stateA: Set([nodeID])]
-    var environmentIndex = [environmentShared: Set([nodeID])]
-    var observableIndex = [observableOld: Set([nodeID])]
-    var environmentWriterIndex = [writtenOld: Set([nodeID])]
+    var index = ViewGraph.DependencyIndex()
+    index.stateSlotDependents = [stateA: Set([nodeID])]
+    index.environmentDependents = [environmentShared: Set([nodeID])]
+    index.observableDependents = [observableOld: Set([nodeID])]
+    index.environmentKeyWriters = [writtenOld: Set([nodeID])]
 
     ViewGraphDependencyIndex.reindex(
       viewNodeID: nodeID,
@@ -301,20 +300,17 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
         observableReads: [observableNew],
         environmentWrites: []
       ),
-      stateSlotDependents: &stateIndex,
-      environmentDependents: &environmentIndex,
-      observableDependents: &observableIndex,
-      environmentKeyWriters: &environmentWriterIndex
+      index: &index
     )
 
-    #expect(stateIndex == [stateB: [nodeID]])
-    #expect(environmentIndex == [environmentShared: [nodeID]])
-    #expect(observableIndex == [observableNew: [nodeID]])
+    #expect(index.stateSlotDependents == [stateB: [nodeID]])
+    #expect(index.environmentDependents == [environmentShared: [nodeID]])
+    #expect(index.observableDependents == [observableNew: [nodeID]])
     // A node that stopped writing a key must drop out of the writer index
     // entirely. A retained edge would make the reader-scoped environment
     // toleration deny that key's subtree forever — a silent, permanent reuse
     // loss with no correctness symptom to catch it.
-    #expect(environmentWriterIndex.isEmpty)
+    #expect(index.environmentKeyWriters.isEmpty)
   }
 
   @Test("stress graph planning 018 entity move clears old reverse binding")

@@ -9,19 +9,22 @@ enum ViewGraphInvalidationPlanner {
     markDirty(viewNodeIDs, nodesByNodeID: nodesByNodeID)
   }
 
+  // Takes the whole `DirtyState` group as ONE `inout` value: the caller's two
+  // dirty sets live in the same stored group property, and two simultaneous
+  // `inout` projections of one class ivar are a dynamic exclusivity violation
+  // under the `_modify` field accessors.
   static func invalidateAndQueueDirty(
     _ viewNodeIDs: Set<ViewNodeID>,
-    invalidatedNodeIDs: inout Set<ViewNodeID>,
-    graphLocalDirtyNodeIDs: inout Set<ViewNodeID>,
+    dirtyState: inout ViewGraph.DirtyState,
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    invalidatedNodeIDs.formUnion(viewNodeIDs)
+    dirtyState.invalidatedNodeIDs.formUnion(viewNodeIDs)
     for viewNodeID in viewNodeIDs {
       guard let node = nodesByNodeID[viewNodeID] else {
         continue
       }
       node.markDirty()
-      graphLocalDirtyNodeIDs.insert(viewNodeID)
+      dirtyState.graphLocalDirtyNodeIDs.insert(viewNodeID)
     }
   }
 

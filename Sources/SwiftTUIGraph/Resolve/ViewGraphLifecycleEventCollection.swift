@@ -1,13 +1,15 @@
 @MainActor
 enum ViewGraphLifecycleEventCollector {
+  // The stable and structural cancel buffers cross as ONE `inout` group value:
+  // they live in the caller's single stored `LifecycleEventBuffers` property,
+  // and two simultaneous `inout` projections of one class ivar are a dynamic
+  // exclusivity violation under the `_modify` field accessors.
   static func appendTaskCancelEvent(
     viewNodeID: ViewNodeID?,
     identity: Identity,
     task: TaskDescriptor,
     isStructural: Bool,
-    stableTaskCancelEvents: inout [LifecycleEvent],
-    structuralTaskCancelEvents: inout [LifecycleEvent],
-    stableTaskStartEvents: [LifecycleEvent]
+    buffers: inout ViewGraph.LifecycleEventBuffers
   ) {
     let event = LifecycleEvent(
       viewNodeID: viewNodeID,
@@ -17,17 +19,17 @@ enum ViewGraphLifecycleEventCollector {
     guard
       !taskLifecycleEventExists(
         event,
-        stableTaskCancelEvents: stableTaskCancelEvents,
-        structuralTaskCancelEvents: structuralTaskCancelEvents,
-        stableTaskStartEvents: stableTaskStartEvents
+        stableTaskCancelEvents: buffers.stableTaskCancelEvents,
+        structuralTaskCancelEvents: buffers.structuralTaskCancelEvents,
+        stableTaskStartEvents: buffers.stableTaskStartEvents
       )
     else {
       return
     }
     if isStructural {
-      structuralTaskCancelEvents.append(event)
+      buffers.structuralTaskCancelEvents.append(event)
     } else {
-      stableTaskCancelEvents.append(event)
+      buffers.stableTaskCancelEvents.append(event)
     }
   }
 

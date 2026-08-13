@@ -597,15 +597,19 @@ private func appendLifecycleCancel(
   structuralCancels: inout [LifecycleEvent],
   starts: [LifecycleEvent]
 ) {
+  var buffers = ViewGraph.LifecycleEventBuffers()
+  buffers.stableTaskCancelEvents = stableCancels
+  buffers.structuralTaskCancelEvents = structuralCancels
+  buffers.stableTaskStartEvents = starts
   ViewGraphLifecycleEventCollector.appendTaskCancelEvent(
     viewNodeID: viewNodeID,
     identity: identity,
     task: task,
     isStructural: isStructural,
-    stableTaskCancelEvents: &stableCancels,
-    structuralTaskCancelEvents: &structuralCancels,
-    stableTaskStartEvents: starts
+    buffers: &buffers
   )
+  stableCancels = buffers.stableTaskCancelEvents
+  structuralCancels = buffers.structuralTaskCancelEvents
 }
 
 @MainActor

@@ -1,59 +1,52 @@
 @MainActor
 package enum ViewGraphDependencyIndex {
+  // The whole `DependencyIndex` group crosses as ONE `inout` value: the caller's
+  // stored group property is a single class ivar, and passing its four fields as
+  // four simultaneous `inout` projections is a dynamic exclusivity violation
+  // once the field accessors are `_modify` coroutines (class-property access
+  // enforcement is per stored property, not per sub-path).
   package static func reindex(
     viewNodeID: ViewNodeID,
     previous: DependencySet,
     current: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
-    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
+    index: inout ViewGraph.DependencyIndex
   ) {
     remove(
       viewNodeID: viewNodeID,
       dependencies: previous,
-      stateSlotDependents: &stateSlotDependents,
-      environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      environmentKeyWriters: &environmentKeyWriters
+      index: &index
     )
     insert(
       viewNodeID: viewNodeID,
       dependencies: current,
-      stateSlotDependents: &stateSlotDependents,
-      environmentDependents: &environmentDependents,
-      observableDependents: &observableDependents,
-      environmentKeyWriters: &environmentKeyWriters
+      index: &index
     )
   }
 
   package static func remove(
     viewNodeID: ViewNodeID,
     dependencies: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
-    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
+    index: inout ViewGraph.DependencyIndex
   ) {
     remove(
       viewNodeID,
       from: dependencies.stateSlotReads,
-      in: &stateSlotDependents
+      in: &index.stateSlotDependents
     )
     remove(
       viewNodeID,
       from: dependencies.environmentReads,
-      in: &environmentDependents
+      in: &index.environmentDependents
     )
     remove(
       viewNodeID,
       from: dependencies.observableReads,
-      in: &observableDependents
+      in: &index.observableDependents
     )
     remove(
       viewNodeID,
       from: dependencies.environmentWrites,
-      in: &environmentKeyWriters
+      in: &index.environmentKeyWriters
     )
   }
 
@@ -99,30 +92,27 @@ package enum ViewGraphDependencyIndex {
   private static func insert(
     viewNodeID: ViewNodeID,
     dependencies: DependencySet,
-    stateSlotDependents: inout [StateSlotKey: Set<ViewNodeID>],
-    environmentDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    observableDependents: inout [ObjectIdentifier: Set<ViewNodeID>],
-    environmentKeyWriters: inout [ObjectIdentifier: Set<ViewNodeID>]
+    index: inout ViewGraph.DependencyIndex
   ) {
     insert(
       viewNodeID,
       into: dependencies.stateSlotReads,
-      in: &stateSlotDependents
+      in: &index.stateSlotDependents
     )
     insert(
       viewNodeID,
       into: dependencies.environmentReads,
-      in: &environmentDependents
+      in: &index.environmentDependents
     )
     insert(
       viewNodeID,
       into: dependencies.observableReads,
-      in: &observableDependents
+      in: &index.observableDependents
     )
     insert(
       viewNodeID,
       into: dependencies.environmentWrites,
-      in: &environmentKeyWriters
+      in: &index.environmentKeyWriters
     )
   }
 
