@@ -6,7 +6,12 @@ import SwiftTUICore
 ///
 /// Sheets, alerts, and confirmation dialogs share one rendering path.
 /// This enum selects how the chrome around the content is drawn.
-public enum PresentationChrome: Equatable, Sendable {
+///
+/// Deliberately `package`, not public: sheet chrome is selected through the
+/// public `SheetStyle` family (`SheetSurfaceContainer`). The `menu` case has
+/// no public style family yet — `MenuStyle` arrives in a later stage — so
+/// the internal representation keeps it until then.
+package enum PresentationChrome: Equatable, Sendable {
   /// Default: rounded inset surface with a foreground-tint stroke on
   /// every side. Used by alerts, confirmation dialogs, and standard
   /// sheets.

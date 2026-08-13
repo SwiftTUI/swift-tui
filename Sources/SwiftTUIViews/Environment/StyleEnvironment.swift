@@ -60,6 +60,10 @@ private enum ToolbarStyleKey: EnvironmentKey {
   static let defaultValue = AnyToolbarStyle.defaultTop
 }
 
+private enum SheetStyleKey: EnvironmentKey {
+  static let defaultValue = AnySheetStyle.automatic
+}
+
 private enum TabViewStyleKey: EnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
@@ -215,6 +219,11 @@ extension EnvironmentValues {
   package var toolbarStyle: AnyToolbarStyle {
     get { self[ToolbarStyleKey.self] }
     set { self[ToolbarStyleKey.self] = newValue }
+  }
+
+  package var sheetStyle: AnySheetStyle {
+    get { self[SheetStyleKey.self] }
+    set { self[SheetStyleKey.self] = newValue }
   }
 
   package var tabViewStyle: AnyTabViewStyle {

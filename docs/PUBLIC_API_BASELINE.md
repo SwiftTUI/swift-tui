@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 298 | 1658 |
+| `SwiftTUIViews` | 304 | 1697 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -122,7 +122,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (298)
+### Canonical surface (304)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
@@ -140,6 +140,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyListStyle` — struct — 6 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
+- `AnySheetStyle` — struct — 6 members
 - `AnySpinnerStyle` — struct — 41 members
 - `AnyTableStyle` — struct — 6 members
 - `AnyTabViewStyle` — struct — 7 members
@@ -195,6 +196,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DragGesture` — struct — 16 members
 - `DrawMetadataModifier` — struct
 - `DropDestinationRegistrationModifier` — struct
+- `DropdownSheetStyle` — struct — 3 members
 - `Duration` — extension — 1 member
 - `Ellipse` — struct — 2 members
 - `EmptyView` — struct — 1 member
@@ -310,7 +312,6 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PreferenceTransformModifier` — struct
 - `PreferenceWritingModifier` — struct
 - `PreferredDefaultFocusModifier` — struct
-- `PresentationChrome` — enum — 3 members
 - `ProgressView` — struct — 10 members
 - `ProposedViewSize` — typealias
 - `RadialGradient` — extension — 1 member
@@ -338,6 +339,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `SequenceGesture` — struct — 8 members
 - `Shape` — protocol — 15 members
 - `ShapeStyle` — extension — 4 members
+- `SheetStyle` — protocol — 6 members
+- `SheetStyleConfiguration` — struct — 4 members
+- `SheetSurfaceContainer` — enum — 2 members
+- `SheetSurfaceStylePresentation` — struct — 10 members
 - `SimultaneousGesture` — struct — 9 members
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members
@@ -352,6 +357,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `SubmitActionModifier` — struct
 - `SubmitScopeModifier` — struct
 - `SuccessToastStyle` — struct — 2 members
+- `SurfaceSheetStyle` — struct — 3 members
 - `Tab` — struct — 2 members
 - `Table` — struct — 11 members
 - `TableColumn` — struct — 5 members
@@ -408,7 +414,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 159 members
+- `View` — protocol — 161 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

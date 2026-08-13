@@ -34,7 +34,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        descriptor: context.resolvedSheetDescriptor(baseline: spec.descriptor),
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: actions,

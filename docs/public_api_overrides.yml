@@ -276,6 +276,7 @@ classifications:
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyButtonStyle
     - SwiftTUIViews.AnyListStyle
+    - SwiftTUIViews.AnySheetStyle
     - SwiftTUIViews.AnySpinnerStyle
     - SwiftTUIViews.AnyToolbarStyle
     - SwiftTUIViews.AnyTableStyle
@@ -456,8 +457,14 @@ classifications:
     - SwiftTUIViews.GlyphSpinnerStyle
     - SwiftTUIViews.ListStyle
     - SwiftTUIViews.ListStyleConfiguration
+    - SwiftTUIViews.DropdownSheetStyle
+    - SwiftTUIViews.SheetStyle
+    - SwiftTUIViews.SheetStyleConfiguration
+    - SwiftTUIViews.SheetSurfaceContainer
+    - SwiftTUIViews.SheetSurfaceStylePresentation
     - SwiftTUIViews.SpinnerStyle
     - SwiftTUIViews.SpinnerStyleConfiguration
+    - SwiftTUIViews.SurfaceSheetStyle
     - SwiftTUIViews.SpinnerStylePresentation
     - SwiftTUIViews.TableStyle
     - SwiftTUIViews.TableStyleConfiguration
@@ -791,6 +798,10 @@ classifications:
     # TableStylePresentation.
     - SwiftTUIViews.ASCIIOutlineStyle
     - SwiftTUIPrimitives.CollectionStylePresentation
+    # Retired by the control-style A4 presentation-chrome break: sheet
+    # chrome is selected through SheetStyle/SheetSurfaceContainer. The
+    # internal representation keeps a `.menu` case until MenuStyle ships.
+    - SwiftTUIViews.PresentationChrome
     - SwiftTUIViews.GroupedListStyle
     - SwiftTUIViews.InsetListStyle
     - SwiftTUIViews.PlainPickerStyle

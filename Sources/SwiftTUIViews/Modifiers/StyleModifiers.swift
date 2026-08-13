@@ -85,6 +85,20 @@ extension View {
     spinnerStyle(AnySpinnerStyle(style))
   }
 
+  /// Sets the sheet chrome for this view's subtree. A sheet declaration
+  /// reads the nearest value when it presents.
+  public func sheetStyle(
+    _ style: AnySheetStyle
+  ) -> some View {
+    environment(\.sheetStyle, style)
+  }
+
+  public func sheetStyle<S: SheetStyle>(
+    _ style: S
+  ) -> some View {
+    sheetStyle(AnySheetStyle(style))
+  }
+
   /// Sets the toolbar style for this view's subtree. A toolbar host reads
   /// the nearest value, so this may sit on the host or on any ancestor.
   public func toolbarStyle(
