@@ -4,11 +4,17 @@ public import SwiftTUICore
 /// `PaletteCommandsPreferenceKey` and absorbed by `.paletteSheet(...)`
 /// at the nearest enclosing `ActionScope`. The absorbing scope passes
 /// the snapshot from its subtree into the sheet content closure.
-public struct ActivePaletteCommand: Sendable {
-  public let name: String
-  public let description: String?
-  public let isEnabled: Bool
-  public let action: @MainActor @Sendable () -> Void
+/// A palette-command contribution.
+///
+/// Deliberately `package`, not public: a palette is a declaration plus
+/// command data plus the framework's own rendering, so no consumer ever
+/// receives this type. The public `PaletteStyle` protocol that would hand
+/// command data to an application is Phase B work.
+package struct ActivePaletteCommand: Sendable {
+  package let name: String
+  package let description: String?
+  package let isEnabled: Bool
+  package let action: @MainActor @Sendable () -> Void
 
   package init(
     name: String,

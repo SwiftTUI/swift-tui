@@ -350,10 +350,9 @@ package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveView
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
 /// passes the snapshot into the sheet content closure. Mirrors the
 /// `.toolbar()` absorption pattern.
-public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: PrimitiveViewModifier {
+public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
   package let title: String
   package let isPresented: Binding<Bool>
-  package let sheetContentBuilder: ([ActivePaletteCommand]) -> SheetContent
   package let sheetContentAuthoringContext: AuthoringContext?
   package let dismissAuthoringContext: AuthoringContext?
   package let onDismiss: (@MainActor @Sendable () -> Void)?
@@ -362,7 +361,6 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
   package init(
     title: String,
     isPresented: Binding<Bool>,
-    sheetContentBuilder: @escaping ([ActivePaletteCommand]) -> SheetContent,
     sheetContentAuthoringContext: AuthoringContext?,
     dismissAuthoringContext: AuthoringContext?,
     onDismiss: (@MainActor @Sendable () -> Void)?,
@@ -370,7 +368,6 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
   ) {
     self.title = title
     self.isPresented = isPresented
-    self.sheetContentBuilder = sheetContentBuilder
     self.sheetContentAuthoringContext = sheetContentAuthoringContext
     self.dismissAuthoringContext = dismissAuthoringContext
     self.onDismiss = onDismiss
@@ -388,9 +385,9 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
     )
     let spec = sheetPromptPresentationSpec(chrome: .dropdown)
     // Absorbed `paletteCommand(...)` contributions are captured off the
-    // background before they are cleared, so they reach the sheet-content
-    // builder even when the background is reused (toggle-only frames) rather
-    // than re-resolved.
+    // background before they are cleared, so they reach the palette body
+    // even when the background is reused (toggle-only frames) rather than
+    // re-resolved.
     var absorbed: [ActivePaletteCommand] = []
     return resolvePresentationModifier(
       content: content,
@@ -412,7 +409,11 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
-            from: sheetContentBuilder(absorbed),
+            from: DefaultPaletteBody(
+              commands: absorbed,
+              isPresented: isPresented,
+              dismissAuthoringContext: dismissAuthoringContext
+            ),
             portalEntryID: portalEntryID
           )
         },
@@ -444,24 +445,24 @@ public struct BuiltinPaletteSheetPresentationModifier<SheetContent: View>: Primi
 }
 
 extension ActionScope where Self: View {
-  /// Presents a palette sheet whose content closure receives all
-  /// `paletteCommand(...)` contributions absorbed from this scope's
-  /// subtree. The snapshot is recomputed each resolve, so an open
-  /// palette stays in sync with subtree changes.
+  /// Presents a palette of the `paletteCommand(...)` contributions
+  /// absorbed from this scope's subtree.
+  ///
+  /// A palette is declaration plus command data: the framework renders the
+  /// commands, so there is no content closure. The snapshot is recomputed
+  /// each resolve, so an open palette stays in sync with subtree changes.
   ///
   /// Mirrors `.toolbar()` ↔ `.toolbarItem(...)`.
   @MainActor
-  public func paletteSheet<S: StringProtocol, SheetContent: View>(
+  public func paletteSheet<S: StringProtocol>(
     _ title: S,
     isPresented: Binding<Bool>,
-    onDismiss: (@MainActor @Sendable () -> Void)? = nil,
-    @ViewBuilder content: @escaping @MainActor ([ActivePaletteCommand]) -> SheetContent
+    onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View & ActionScope {
     modifier(
       BuiltinPaletteSheetPresentationModifier(
         title: String(title),
         isPresented: isPresented,
-        sheetContentBuilder: content,
         sheetContentAuthoringContext: makePortalAttachmentAuthoringContext(),
         dismissAuthoringContext: makePortalAttachmentAuthoringContext(),
         onDismiss: onDismiss,

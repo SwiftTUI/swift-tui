@@ -57,6 +57,14 @@ public struct SheetOpenLatencyScenario: PerfScenario {
         siblingTrigger: siblingTrigger
       )
     } drive: { driver in
+      // The palette arm is contentless since control-style A5: the framework
+      // renders the palette, so the probe's own "Sheet body"/"Close sheet"
+      // pair is gone from that arm. Its open marker is the framework body's
+      // empty-scope line (the probe contributes no `paletteCommand`), and it
+      // closes with Escape rather than by clicking a button it no longer
+      // supplies. The popover and spike arms still render `overlayContent`.
+      let usesFrameworkPalette = overlayKind == .palette && !spike
+      let openMarker = usesFrameworkPalette ? "No commands in the current scope." : "Sheet body"
       _ = try await driver.waitForFrame(containing: "open sheet")
       let dispatchTime = monotonicSeconds()
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
@@ -67,7 +75,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
         let openCell = try driver.cell(containing: "open sheet")
         driver.sendClick(at: openCell)
         let opened = try await driver.waitForFrame(
-          containing: "Sheet body",
+          containing: openMarker,
           afterFrame: lastFrame
         )
         if cycle == 1 {
@@ -75,12 +83,16 @@ public struct SheetOpenLatencyScenario: PerfScenario {
         }
         lastFrame = opened.frameNumber
 
-        // CLOSE: click the sheet's own close button; wait for the first frame
-        // after it that no longer shows the sheet body.
-        let closeCell = try driver.cell(containing: "Close sheet")
-        driver.sendClick(at: closeCell)
+        // CLOSE: dismiss the overlay; wait for the first frame after it that
+        // no longer shows the open marker.
+        if usesFrameworkPalette {
+          driver.sendKey(KeyPress(.escape))
+        } else {
+          let closeCell = try driver.cell(containing: "Close sheet")
+          driver.sendClick(at: closeCell)
+        }
         let closed = try await Self.waitForFrameNotContaining(
-          "Sheet body",
+          openMarker,
           afterFrame: lastFrame,
           in: driver
         )
@@ -93,7 +105,7 @@ public struct SheetOpenLatencyScenario: PerfScenario {
           eventID: "sheet-open-latency",
           eventType: "mouse_click",
           dispatchTimeSeconds: dispatchTime,
-          expectedVisualMarker: "Sheet body",
+          expectedVisualMarker: openMarker,
           firstMatchingFrame: firstOpenFrame,
           firstMatchingTimeSeconds: settled?.timestampSeconds ?? dispatchTime,
           finalSettledFrame: settled?.frameNumber ?? lastFrame,
@@ -214,9 +226,12 @@ private struct PerfSheetLatencyProbeView: View {
       background
         // A command palette: dropdown chrome (a top strip), `backdropOpacity: 0`.
         .panel(id: "palette-host")
-        .paletteSheet("Palette", isPresented: $sheetPresented) { _ in
-          overlayContent
-        }
+        // The palette is contentless since control-style A5: the
+        // framework renders the absorbed commands, so this arm now
+        // measures the framework's own palette body rather than the
+        // scenario's `overlayContent`. Comparisons across that change
+        // need both sides recorded — see report 2026-08-13-001.
+        .paletteSheet("Palette", isPresented: $sheetPresented)
     }
   }
 

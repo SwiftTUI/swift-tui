@@ -8,6 +8,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed — source-breaking (control-style Phase A)
+
+Phase A of the control-style expansion empties the program's break inventory
+(plan `2026-08-12-002`). Every removal below ships with its replacement in
+the same release; there are no deprecated aliases or transitional overloads,
+so each migration is a deterministic source edit.
+
+| Removed | Replacement |
+| --- | --- |
+| `ListStyle`/`OutlineStyle` protocol shape (`resolvePresentation(for:)` entry point, new configurations, `Hashable` dropped); `CollectionStylePresentation`; `Table` reading `listStyle` | The `TableStyle` family (`tableStyle(_:)`, `TableStyleConfiguration`, `TableStylePresentation`, `AnyTableStyle`) plus rewritten list/outline built-ins; `ListStylePresentation` and `TableStylePresentation` replace the combined presentation |
+| `ASCIIOutlineStyle`, `.outlineStyle(.ascii)`, `.asciiLineCompass` | None — glyph degradation is the rasterizer's fallback and was never a style-layer concern |
+| `Spinner(set:stage:interval:)`, `Spinner(_:stage:interval:)`, public `Spinner.SpinnerSet` | `Spinner(stage:)` plus `spinnerStyle(_:)`; custom frames use `GlyphSpinnerStyle` |
+| `.toolbar(style:)` | `.toolbar()` plus `toolbarStyle(_:)` on the toolbar host or any ancestor scope |
+| `ToastStyle`'s entry point | Renamed to `@MainActor resolvePresentation(for:)`; the configuration additionally carries `styleEnvironment`, `terminalSize`, `stackIndex`, and `stackCount` |
+| Public `PresentationChrome` and its case selection | The `SheetStyle` family (`.surface`, `.dropdown`) over a `defaultPresentation` baseline |
+| `paletteSheet(_:isPresented:onDismiss:content:)` and public `ActivePaletteCommand` | Contentless `paletteSheet(_:isPresented:onDismiss:)` — the framework renders the palette (filter field, fuzzy-ranked rows, descriptions, disabled rows, empty-scope message). A public `PaletteStyle` for replacing that rendering is deliberately deferred; it is additive and arrives without a further break. |
+
 ### Fixed
 
 - **`onChange` inside presented content no longer skips under the

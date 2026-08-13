@@ -92,9 +92,7 @@ struct DataDrivenPresentationTests {
       Text("Toast")
     }
     _ = Panel(id: "data-driven-palette") { Text("Root") }
-      .paletteSheet("Palette", isPresented: presented, onDismiss: {}) { _ in
-        Text("Palette")
-      }
+      .paletteSheet("Palette", isPresented: presented, onDismiss: {})
   }
 
   @Test("sheet item content receives the current bound value")
@@ -595,9 +593,7 @@ private struct DataDrivenPaletteFixture: View {
         "Palette",
         isPresented: $presented,
         onDismiss: { probe.events.append("palette dismissed") }
-      ) { _ in
-        Text("Palette body")
-      }
+      )
   }
 }
 

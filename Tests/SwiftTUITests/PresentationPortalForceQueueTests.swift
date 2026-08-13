@@ -296,7 +296,7 @@ struct PresentationPortalForceQueueTests {
           },
           .press(KeyPress(.return)),
           .awaitCondition {
-            terminal.frames.contains { $0.contains("FocusedMarker") }
+            terminal.frames.contains { $0.contains("SheetBodyMarker") }
           },
           .press(KeyPress(.escape)),
           .awaitCondition {
@@ -310,9 +310,9 @@ struct PresentationPortalForceQueueTests {
       }
     )
 
-    // The palette-shaped sheet adopts default focus into its TextField and
-    // a genuine value reader shows the applied @FocusState.
-    #expect(outcome.frames.contains { $0.contains("FocusedMarker") })
+    // The palette-shaped sheet adopts default focus into its TextField; the
+    // rendered command row proves the body carrying that state resolved.
+    #expect(outcome.frames.contains { $0.contains("SheetBodyMarker") })
     // The runtime focus flip must land EXACTLY once (the adoption). A
     // second reader-attributed flip invalidation means the flip RE-FIRED:
     // the attachment content's state owner moved to a different host node
@@ -538,9 +538,12 @@ private struct SheetStateOwnerProbe: View {
         isPresented = true
       }
       .panel(id: "stateOwnerHost")
-      .paletteSheet("Palette", isPresented: $isPresented) { _ in
-        SheetStateOwnerContent()
-      }
+      // A contentless palette renders the framework's own body, which carries
+      // the `@State`/`@FocusState` this probe is about. The absorbed command's
+      // name is the body's rendered marker: the caller no longer supplies
+      // content, so a contributed row is what proves the body is up.
+      .paletteCommand(name: "SheetBodyMarker", action: {})
+      .paletteSheet("Palette", isPresented: $isPresented)
       Text("Background")
     }
   }

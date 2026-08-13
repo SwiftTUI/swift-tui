@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 304 | 1697 |
+| `SwiftTUIViews` | 303 | 1692 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -122,11 +122,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (304)
+### Canonical surface (303)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
-- `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
 - `Animation` — struct — 20 members

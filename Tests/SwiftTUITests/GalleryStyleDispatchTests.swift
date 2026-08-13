@@ -91,14 +91,19 @@ struct GalleryStyleDispatchTests {
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-    // Read the captured palette command and fire its action.
-    let captured = GalleryStyleOuter.capturedCommands.value
-    #expect(captured.count >= 1, "expected at least one palette command, got \(captured.count)")
-    guard let first = captured.first(where: { $0.name == "Switch" }) else {
-      Issue.record("palette command 'Switch' not present in snapshot: \(captured.map(\.name))")
-      return
-    }
-    first.action()
+    // A contentless palette hands no command list to the caller, so the probe
+    // drives the real activation path instead of calling a captured closure:
+    // the palette renders the absorbed command, and Return on the focused
+    // filter field activates the selected row. That is a stronger claim — it
+    // shows the absorbed command reached the rendering AND that activating it
+    // runs the action under the declaring view's authoring scope.
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Switch"), "absorbed command did not render:\n\(surfaceText)")
+
+    _ = runLoop.handleKeyPress(KeyPress(.return))
+    var activationFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &activationFrames)
+
     #expect(GalleryStyleOuter.selectionSink.value == 1)
   }
 
@@ -120,10 +125,17 @@ struct GalleryStyleDispatchTests {
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     }
 
-    #expect(
-      PaletteDupProbeRoot.absorbed.value.count == 3,
-      "expected exactly 3 palette commands after re-resolves, got \(PaletteDupProbeRoot.absorbed.value.count)"
-    )
+    // Observed on the rendered surface rather than through a content closure
+    // the contentless palette no longer has: each absorbed command must appear
+    // exactly once. A duplicate would paint a second row.
+    let surfaceText = latestSurfaceText(for: runLoop)
+    for name in ["Alpha probe", "Bravo probe", "Charlie probe"] {
+      let occurrences = surfaceText.ranges(of: name).count
+      #expect(
+        occurrences == 1,
+        "expected '\(name)' exactly once after re-resolves, got \(occurrences):\n\(surfaceText)"
+      )
+    }
   }
 
   @Test("Alt+digit keyCommand fires via the input path")
@@ -170,8 +182,10 @@ struct GalleryStyleDispatchTests {
     try runLoop.renderPendingFrames(renderedFrames: &rendered)
 
     let surfaceText = latestSurfaceText(for: runLoop)
+    // Dropdown chrome: no title bar. The palette is contentless now, so its
+    // presence is asserted through the framework body's rendered command rows.
     #expect(!surfaceText.contains("Command palette"))
-    #expect(surfaceText.contains("palette sheet"))
+    #expect(surfaceText.contains("Alpha probe"), "palette body did not render:\n\(surfaceText)")
   }
 
   @Test("Wrapper-hosted gallery palette still presents immediately after ⌃K")
@@ -196,7 +210,7 @@ struct GalleryStyleDispatchTests {
 
     let surfaceText = latestSurfaceText(for: runLoop)
     #expect(!surfaceText.contains("Command palette"))
-    #expect(surfaceText.contains("palette sheet"))
+    #expect(surfaceText.contains("Alpha probe"), "palette body did not render:\n\(surfaceText)")
   }
 
 }
@@ -211,11 +225,7 @@ private final class LockedBoxLocal<T> {
 
 @MainActor
 private struct GallerySimulator: View {
-  static let snapshotAtKeyPress = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
-
-  static func reset() {
-    snapshotAtKeyPress.update { $0 = [] }
-  }
+  static func reset() {}
 
   @State private var isPaletteOpen: Bool = false
 
@@ -239,14 +249,11 @@ private struct GallerySimulator: View {
         isPaletteOpen = true
       }
     )
-    .paletteCommand(name: "A", action: {})
-    .paletteCommand(name: "B", action: {})
-    .paletteCommand(name: "C", action: {})
+    .paletteCommand(name: "Alpha probe", action: {})
+    .paletteCommand(name: "Bravo probe", action: {})
+    .paletteCommand(name: "Charlie probe", action: {})
     .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
-    .paletteSheet("Command palette", isPresented: $isPaletteOpen) { commands in
-      Self.snapshotAtKeyPress.update { $0 = commands }
-      return Text("palette sheet")
-    }
+    .paletteSheet("Command palette", isPresented: $isPaletteOpen)
   }
 }
 
@@ -262,7 +269,6 @@ private struct WrappedGallerySimulator: View {
 @MainActor
 private struct PaletteDupProbeRoot: View {
   static let tickSource = LockedBoxLocal<Int>(initial: 0)
-  static let absorbed = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
 
   @State private var tick: Int = 0
 
@@ -272,13 +278,10 @@ private struct PaletteDupProbeRoot: View {
     }
     .tabViewStyle(.literalTabs)
     .panel(id: "gallery")
-    .paletteCommand(name: "A", action: {})
-    .paletteCommand(name: "B", action: {})
-    .paletteCommand(name: "C", action: {})
-    .paletteSheet("__capture", isPresented: .constant(true)) { commands in
-      Self.absorbed.update { $0 = commands }
-      return EmptyView()
-    }
+    .paletteCommand(name: "Alpha probe", action: {})
+    .paletteCommand(name: "Bravo probe", action: {})
+    .paletteCommand(name: "Charlie probe", action: {})
+    .paletteSheet("__capture", isPresented: .constant(true))
     .onAppear {
       tick = Self.tickSource.value
     }
@@ -290,7 +293,6 @@ private struct GalleryStyleOuter: View {
   @State private var selection: Int = 0
 
   static let selectionSink = LockedBoxLocal<Int>(initial: 0)
-  static let capturedCommands = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
 
   var body: some View {
     TabView(selection: $selection) {
@@ -306,10 +308,7 @@ private struct GalleryStyleOuter: View {
         Self.selectionSink.update { $0 = selection }
       }
     )
-    .paletteSheet("__capture", isPresented: .constant(true)) { commands in
-      Self.capturedCommands.update { $0 = commands }
-      return EmptyView()
-    }
+    .paletteSheet("__capture", isPresented: .constant(true))
   }
 }
 

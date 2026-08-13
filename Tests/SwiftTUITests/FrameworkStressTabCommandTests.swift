@@ -1,3 +1,4 @@
+import Observation
 import SwiftTUITestSupport
 import Testing
 
@@ -14,8 +15,18 @@ import Testing
 struct FrameworkStressTabCommandTests {}
 
 @MainActor
+@Observable
 private final class TabCommandStressProbe {
   var events: [String] = []
+  /// Drives command-set mutations while a palette is open.
+  ///
+  /// Before A5 these attempts clicked a button rendered inside the
+  /// palette's own content. A palette is contentless now — and the sheet
+  /// is modal, so a background button would not be clickable either — so
+  /// the mutation is made here and the next `render()` observes it. What
+  /// each attempt pins (insertion, removal, duplicate ownership,
+  /// re-enablement, source-scope retargeting) is unchanged.
+  var mutation = false
 }
 
 // MARK: - Attempt 001: focused-tab identity through reorder
@@ -858,8 +869,18 @@ extension FrameworkStressTabCommandTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open insert palette")
-    _ = try harness.clickText("Insert palette prefix")
+    let opened = try harness.clickText("Open insert palette")
+    #expect(opened.contains("C palette command"), "palette did not open")
+    // Insert a command while the palette is open (formerly a button inside
+    // the palette's content; see TabCommandStressProbe.mutation).
+    probe.mutation = true
+    let afterInsert = try harness.renderAfterExternalMutation()
+    // NON-VACUITY: the inserted command must actually reach the open
+    // palette, or the activation below proves nothing about retargeting.
+    #expect(
+      afterInsert.contains("Prefix palette command"),
+      "mutation did not reach the open palette:\n\(afterInsert)"
+    )
     _ = try harness.clickText("C palette command")
 
     #expect(probe.events == ["c"])
@@ -869,7 +890,6 @@ extension FrameworkStressTabCommandTests {
 @MainActor
 private struct StressTC016Fixture: View {
   let probe: TabCommandStressProbe
-  @State private var hasPrefix = false
   @State private var showsPalette = false
 
   var body: some View {
@@ -878,7 +898,7 @@ private struct StressTC016Fixture: View {
         Button("Open insert palette") {
           showsPalette = true
         }
-        if hasPrefix {
+        if probe.mutation {
           commandSource("Prefix palette command", marker: "prefix")
         }
         commandSource("B palette command", marker: "b")
@@ -886,19 +906,7 @@ private struct StressTC016Fixture: View {
       }
     }
     .panel(id: "stress-tc-016-host")
-    .paletteSheet("Insert palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Insert palette prefix") {
-          hasPrefix = true
-        }
-        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
-          Button(entry.element.name) {
-            entry.element.action()
-          }
-          .disabled(!entry.element.isEnabled)
-        }
-      }
-    }
+    .paletteSheet("Insert palette", isPresented: $showsPalette)
     .frame(width: 70, height: 14, alignment: .topLeading)
   }
 
@@ -926,9 +934,19 @@ extension FrameworkStressTabCommandTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open removal palette")
-    let frame = try harness.clickText("Remove B command")
+    let opened = try harness.clickText("Open removal palette")
+    #expect(opened.contains("B removable command"), "palette did not open with B:\n\(opened)")
+    // Remove a command while the palette is open (formerly a button inside
+    // the palette's content; see TabCommandStressProbe.mutation).
+    probe.mutation = true
+    let frame = try harness.renderAfterExternalMutation()
     #expect(!frame.contains("B removable command"))
+    // NON-VACUITY: the palette must still be open and populated, or the
+    // absence of B above proves nothing about removal.
+    #expect(
+      frame.contains("C surviving command"),
+      "the open palette lost its surviving command:\n\(frame)"
+    )
 
     _ = try harness.clickText("C surviving command")
     #expect(probe.events == ["c"])
@@ -938,7 +956,6 @@ extension FrameworkStressTabCommandTests {
 @MainActor
 private struct StressTC017Fixture: View {
   let probe: TabCommandStressProbe
-  @State private var includesB = true
   @State private var showsPalette = false
 
   var body: some View {
@@ -947,26 +964,14 @@ private struct StressTC017Fixture: View {
         Button("Open removal palette") {
           showsPalette = true
         }
-        if includesB {
+        if !probe.mutation {
           commandSource("B removable command", marker: "b")
         }
         commandSource("C surviving command", marker: "c")
       }
     }
     .panel(id: "stress-tc-017-host")
-    .paletteSheet("Removal palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Remove B command") {
-          includesB = false
-        }
-        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
-          Button(entry.element.name) {
-            entry.element.action()
-          }
-          .disabled(!entry.element.isEnabled)
-        }
-      }
-    }
+    .paletteSheet("Removal palette", isPresented: $showsPalette)
     .frame(width: 70, height: 14, alignment: .topLeading)
   }
 
@@ -994,10 +999,21 @@ extension FrameworkStressTabCommandTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open duplicate palette")
-    _ = try harness.clickText("Reverse palette owners")
+    let opened = try harness.clickText("Open duplicate palette")
+    #expect(opened.contains("Duplicate palette action"), "palette did not open:\n\(opened)")
+    // Reverse the contributing owners while the palette is open (formerly a
+    // button inside the palette's content; see TabCommandStressProbe.mutation).
+    probe.mutation = true
+    let reversedFrame = try harness.renderAfterExternalMutation()
+    #expect(
+      reversedFrame.contains("Duplicate palette action"),
+      "the open palette lost its rows:\n\(reversedFrame)"
+    )
     _ = try harness.clickText("Duplicate palette action")
 
+    // Both rows carry the same name, so the first row's action is the only
+    // discriminator: `b` can only fire if the reversal reached the open
+    // palette. This assertion is therefore its own non-vacuity guard.
     #expect(probe.events == ["b"])
   }
 }
@@ -1005,7 +1021,6 @@ extension FrameworkStressTabCommandTests {
 @MainActor
 private struct StressTC018Fixture: View {
   let probe: TabCommandStressProbe
-  @State private var reversed = false
   @State private var showsPalette = false
 
   var body: some View {
@@ -1014,7 +1029,7 @@ private struct StressTC018Fixture: View {
         Button("Open duplicate palette") {
           showsPalette = true
         }
-        if reversed {
+        if probe.mutation {
           commandSource(owner: "B", marker: "b")
           commandSource(owner: "A", marker: "a")
         } else {
@@ -1024,18 +1039,7 @@ private struct StressTC018Fixture: View {
       }
     }
     .panel(id: "stress-tc-018-host")
-    .paletteSheet("Duplicate palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Reverse palette owners") {
-          reversed = true
-        }
-        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
-          Button(entry.element.name) {
-            entry.element.action()
-          }
-        }
-      }
-    }
+    .paletteSheet("Duplicate palette", isPresented: $showsPalette)
     .frame(width: 70, height: 14, alignment: .topLeading)
   }
 
@@ -1063,14 +1067,22 @@ extension FrameworkStressTabCommandTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open enablement palette")
-    _ = try harness.clickText("Enable palette command")
+    let opened = try harness.clickText("Open enablement palette")
+    #expect(opened.contains("Mutable palette action"), "palette did not open:\n\(opened)")
+    // Reenable the command (and advance its generation) while the palette is
+    // open — formerly a button inside the palette's own content.
+    probe.mutation = true
+    let reenabled = try harness.renderAfterExternalMutation()
+    #expect(
+      reenabled.contains("Mutable palette action"),
+      "the open palette lost the reenabled row:\n\(reenabled)"
+    )
     _ = try harness.clickText("Mutable palette action")
 
     // The reenabled row's deferred action captures the enclosing view's
-    // `@State`; dispatching it under the construction-time authoring scope
-    // (the fixture that owns `generation`) reads the live generation, so the
-    // current generation's action fires.
+    // state; dispatching it under the construction-time authoring scope reads
+    // the live generation, so the current generation's action fires. A
+    // disabled row acts on nothing, so this assertion also guards vacuity.
     #expect(probe.events == ["generation-1"])
   }
 }
@@ -1078,9 +1090,9 @@ extension FrameworkStressTabCommandTests {
 @MainActor
 private struct StressTC019Fixture: View {
   let probe: TabCommandStressProbe
-  @State private var enabled = false
-  @State private var generation = 0
   @State private var showsPalette = false
+
+  private var generation: Int { probe.mutation ? 1 : 0 }
 
   var body: some View {
     Panel(id: "stress-tc-019-source") {
@@ -1088,24 +1100,11 @@ private struct StressTC019Fixture: View {
         showsPalette = true
       }
     }
-    .paletteCommand(name: "Mutable palette action", isEnabled: enabled) {
+    .paletteCommand(name: "Mutable palette action", isEnabled: probe.mutation) {
       probe.events.append("generation-\(generation)")
     }
     .panel(id: "stress-tc-019-host")
-    .paletteSheet("Enablement palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Enable palette command") {
-          generation = 1
-          enabled = true
-        }
-        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
-          Button(entry.element.name) {
-            entry.element.action()
-          }
-          .disabled(!entry.element.isEnabled)
-        }
-      }
-    }
+    .paletteSheet("Enablement palette", isPresented: $showsPalette)
     .frame(width: 70, height: 13, alignment: .topLeading)
   }
 }
@@ -1126,10 +1125,20 @@ extension FrameworkStressTabCommandTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open scoped palette")
-    _ = try harness.clickText("Replace palette scope")
+    let opened = try harness.clickText("Open scoped palette")
+    #expect(opened.contains("Scoped palette action"), "palette did not open:\n\(opened)")
+    // Replace the contributing Panel identity while the palette is open —
+    // formerly a button inside the palette's own content.
+    probe.mutation = true
+    let replaced = try harness.renderAfterExternalMutation()
+    #expect(
+      replaced.contains("Scoped palette action"),
+      "the open palette lost the row after the scope swap:\n\(replaced)"
+    )
     _ = try harness.clickText("Scoped palette action")
 
+    // `scope-1` can only fire if the row followed the replacement source
+    // scope, so this assertion is its own non-vacuity guard.
     #expect(probe.events == ["scope-1"])
   }
 }
@@ -1137,8 +1146,9 @@ extension FrameworkStressTabCommandTests {
 @MainActor
 private struct StressTC020Fixture: View {
   let probe: TabCommandStressProbe
-  @State private var generation = 0
   @State private var showsPalette = false
+
+  private var generation: Int { probe.mutation ? 1 : 0 }
 
   var body: some View {
     Panel(id: "stress-tc-020-source-\(generation)") {
@@ -1150,18 +1160,7 @@ private struct StressTC020Fixture: View {
       probe.events.append("scope-\(generation)")
     }
     .panel(id: "stress-tc-020-host")
-    .paletteSheet("Scoped palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Replace palette scope") {
-          generation += 1
-        }
-        ForEach(Array(commands.enumerated()), id: \.offset) { entry in
-          Button(entry.element.name) {
-            entry.element.action()
-          }
-        }
-      }
-    }
+    .paletteSheet("Scoped palette", isPresented: $showsPalette)
     .frame(width: 70, height: 13, alignment: .topLeading)
   }
 }

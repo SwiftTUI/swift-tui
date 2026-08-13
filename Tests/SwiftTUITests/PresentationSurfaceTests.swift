@@ -13,17 +13,39 @@ struct PresentationSurfaceTests {
       Panel(id: "PaletteHost") {
         Text("Workspace")
       }
-      .paletteSheet("Command palette", isPresented: .constant(true)) { _ in
-        Text("palette sheet")
-      },
+      .paletteSheet("Command palette", isPresented: .constant(true)),
       context: .init(identity: testIdentity("DropdownPresentationChromeRoot")),
       proposal: .init(width: 40, height: 10)
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("palette sheet"))
+    // A contentless palette renders the framework's own body, so the presence
+    // check is now its filter field rather than a caller-supplied string.
+    #expect(surface.contains("Filter commands"), "palette body did not render:\n\(surface)")
     #expect(!surface.contains("Command palette"))
     #expect(!surface.contains("×"))
+  }
+
+  /// Ported from the gallery's `CommandPaletteTests` when control-style A5
+  /// moved `CommandPaletteList` into the framework as `DefaultPaletteBody`:
+  /// the palette's filter field must publish a focusable region, or the body
+  /// renders but cannot be typed into.
+  @Test("the default palette body publishes a focusable filter region")
+  func defaultPaletteBodyPublishesFocusableFilterRegion() throws {
+    let artifacts = DefaultRenderer().render(
+      Panel(id: "PaletteHost") {
+        Text("Workspace")
+      }
+      .paletteSheet("Command palette", isPresented: .constant(true)),
+      context: .init(identity: testIdentity("DefaultPaletteFocusRoot")),
+      proposal: .init(width: 44, height: 12)
+    )
+
+    let focusRegions = artifacts.semanticSnapshot.focusRegions
+    #expect(!focusRegions.isEmpty, "palette published no focusable region")
+    #expect(
+      focusRegions.contains { $0.rect.size.width > 0 && $0.rect.size.height > 0 }
+    )
   }
 
   @Test("presentation overlays carry explicit surface composition metadata")

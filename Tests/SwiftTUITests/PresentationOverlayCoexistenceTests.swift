@@ -208,7 +208,14 @@ struct PresentationOverlayCoexistenceTests {
     #expect(frame.contains("palette command fired"))
     expectNoViolations("palette action", #_sourceLocation)
     frame = try harness.clickText("Palette")
-    frame = try harness.clickText("Dismiss Palette", chooseLast: true)
+    #expect(frame.contains("Presentation Lab Sample Action"), "palette did not reopen:\n\(frame)")
+    // A contentless palette carries no app-supplied dismiss button; Escape is
+    // the framework's own dismissal, the same one the sheet cases above use.
+    frame = try harness.pressKey(KeyPress(.escape))
+    #expect(
+      !frame.contains("Presentation Lab Sample Action"),
+      "palette must close on Escape; frame:\n\(frame)"
+    )
     expectNoViolations("palette dismiss", #_sourceLocation)
 
     // Tab churn after all of the presentation churn.
@@ -468,17 +475,7 @@ private struct LabMirrorTab: View {
         lastEvent = "palette command fired"
       }
     )
-    .paletteSheet("Presentation commands", isPresented: $showPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        ForEach(commands, id: \.name) { command in
-          Button(command.name) {
-            command.action()
-            showPalette = false
-          }
-        }
-        Button("Dismiss Palette") { showPalette = false }
-      }
-    }
+    .paletteSheet("Presentation commands", isPresented: $showPalette)
     .alert(
       "Build gate updated",
       isPresented: $showAlert,

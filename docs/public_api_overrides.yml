@@ -356,7 +356,6 @@ classifications:
     - SwiftTUIViews.ViewModifierContent
 
     # ─── View toolbar / commands / palette ────────────────────────────────
-    - SwiftTUIViews.ActivePaletteCommand
     - SwiftTUIViews.ToolbarItemConfig
     - SwiftTUIViews.ToolbarPlacement
 
@@ -802,6 +801,12 @@ classifications:
     # chrome is selected through SheetStyle/SheetSurfaceContainer. The
     # internal representation keeps a `.menu` case until MenuStyle ships.
     - SwiftTUIViews.PresentationChrome
+    # Retired by the control-style A5 palette break: `paletteSheet` is
+    # contentless and the framework renders the absorbed commands, so no
+    # consumer receives the command payload. The type survives as `package`
+    # for the internal default rendering; a public palette command surface
+    # returns with the Phase B `PaletteStyle` protocol.
+    - SwiftTUIViews.ActivePaletteCommand
     - SwiftTUIViews.GroupedListStyle
     - SwiftTUIViews.InsetListStyle
     - SwiftTUIViews.PlainPickerStyle

@@ -2945,14 +2945,9 @@ SwiftTUIViews.AccessibilityAnnouncer.announce(_:politeness:)
 SwiftTUIViews.ActionScope.dropDestination(action:)
 SwiftTUIViews.ActionScope.keyCommand(_:key:modifiers:isEnabled:action:)
 SwiftTUIViews.ActionScope.paletteCommand(name:description:isEnabled:action:)
-SwiftTUIViews.ActionScope.paletteSheet(_:isPresented:onDismiss:content:)
+SwiftTUIViews.ActionScope.paletteSheet(_:isPresented:onDismiss:)
 SwiftTUIViews.ActionScope.toolbar()
 SwiftTUIViews.ActionScope.toolbarStyle(_:)
-SwiftTUIViews.ActivePaletteCommand
-SwiftTUIViews.ActivePaletteCommand.action
-SwiftTUIViews.ActivePaletteCommand.description
-SwiftTUIViews.ActivePaletteCommand.isEnabled
-SwiftTUIViews.ActivePaletteCommand.name
 SwiftTUIViews.AnchorPreferenceTransformModifier
 SwiftTUIViews.AnchorPreferenceWritingModifier
 SwiftTUIViews.Animation

@@ -1445,9 +1445,16 @@ extension FrameworkStressPresentationSemanticsTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("Open palette sheet")
-    let frame = try harness.clickText("Advance palette source")
-    #expect(frame.contains("Palette command 1"))
+    let opened = try harness.clickText("Open palette sheet")
+    #expect(opened.contains("Palette command 0"), "palette did not open:\n\(opened)")
+    // Advance the source generation while the palette is open — formerly a
+    // button inside the palette's own content, which a contentless palette
+    // cannot host and a modal sheet would not let the background receive.
+    probe.firstBool = true
+    let frame = try harness.renderAfterExternalMutation()
+    // The refreshed payload reaching the open palette is exactly what this
+    // attempt pins, so this assertion is its own non-vacuity guard.
+    #expect(frame.contains("Palette command 1"), "palette kept the activation snapshot:\n\(frame)")
     _ = try harness.clickText("Palette command 1")
 
     #expect(probe.markers == ["palette-1"])
@@ -1458,7 +1465,8 @@ extension FrameworkStressPresentationSemanticsTests {
 private struct StressPS032Fixture: View {
   let probe: StressPresentationProbe
   @State private var showsPalette = false
-  @State private var generation = 0
+
+  private var generation: Int { probe.firstBool ? 1 : 0 }
 
   var body: some View {
     Panel(id: "palette-source") {
@@ -1470,18 +1478,7 @@ private struct StressPS032Fixture: View {
       probe.markers.append("palette-\(generation)")
     }
     .panel(id: "palette-host")
-    .paletteSheet("Stress palette", isPresented: $showsPalette) { commands in
-      VStack(alignment: .leading, spacing: 0) {
-        Button("Advance palette source") {
-          generation += 1
-        }
-        if let command = commands.first {
-          Button(command.name) {
-            command.action()
-          }
-        }
-      }
-    }
+    .paletteSheet("Stress palette", isPresented: $showsPalette)
     .frame(width: 70, height: 16, alignment: .topLeading)
   }
 }

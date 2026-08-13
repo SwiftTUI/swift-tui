@@ -4905,6 +4905,7 @@ private struct MultipleTaskModifierStressID: Equatable, Sendable {
 final class StressRuntimeHarness<Content: View> {
   private let terminal: StressRecordingHost
   let runLoop: SwiftTUIRuntime.RunLoop<Int, Content>
+  private let rootIdentity: Identity
   private var renderedFrames = 0
   private var didShutdown = false
 
@@ -4937,6 +4938,7 @@ final class StressRuntimeHarness<Content: View> {
     focusTracker.invalidator = scheduler
     self.terminal = terminal
     self.runLoop = runLoop
+    self.rootIdentity = rootIdentity
 
     scheduler.requestInvalidation(of: [rootIdentity])
     _ = try render()
@@ -5070,6 +5072,16 @@ final class StressRuntimeHarness<Content: View> {
     }
     didShutdown = true
     runLoop.lifecycleCoordinator.shutdown()
+  }
+
+  /// Renders after a mutation the graph cannot see: a probe box the fixture
+  /// reads is an ordinary class property, so writing it invalidates nothing.
+  /// Requesting the root's invalidation makes the observing render explicit
+  /// instead of depending on a frame some earlier interaction left pending.
+  @discardableResult
+  func renderAfterExternalMutation() throws -> String {
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    return try render()
   }
 
   @discardableResult
