@@ -343,7 +343,7 @@ if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/Swift
   fail "ShapeStyle should stay a public extensible style protocol."
 fi
 
-for style_protocol in ButtonStyle TextFieldStyle PickerStyle ListStyle OutlineStyle ToastStyle TabViewStyle; do
+for style_protocol in ButtonStyle TextFieldStyle PickerStyle ListStyle TableStyle OutlineStyle ToastStyle TabViewStyle; do
   if ! rg -n -P --quiet -- "public protocol ${style_protocol}\\b" Sources/SwiftTUIViews; then
     fail "${style_protocol} should be a public extensible style protocol in SwiftTUIViews."
   fi
