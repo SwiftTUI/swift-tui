@@ -85,6 +85,11 @@ package enum EnvironmentKeyReuseClassification {
     // certification rests on read-shape identity with them plus a dedicated
     // boundary test, not on a denial-count reduction.
     "SpinnerStyleKey",
+    // One tracked read in the toolbar host's resolve; the resolved layout
+    // and placement reach output as the composed strip node, and the late
+    // preference reconciliation replays through that same host rather than
+    // re-reading the environment.
+    "ToolbarStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

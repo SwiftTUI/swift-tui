@@ -634,6 +634,86 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(!toleratedBoundary(in: renderer))
   }
 
+  /// `ToolbarStyleKey` is certified on the same shape: only a toolbar host
+  /// reads it, at resolve.
+  @Test("a toolbar-style change over a toolbar-free subtree is tolerated")
+  func toolbarStyleChangeOverToolbarFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnyToolbarStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .toolbarStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .defaultTop, dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .defaultBottom, dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  /// The soundness half: a subtree hosting a toolbar reads the key at the
+  /// host's resolve, so the door must deny and the strip must move edges.
+  @Test("a toolbar-style change with a toolbar host in the subtree is denied")
+  func toolbarStyleChangeWithHostInSubtreeIsDenied() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnyToolbarStyle
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(
+            content: Panel(id: "toolbar-host") {
+              Text("inner").toolbarItem(
+                .init(
+                  title: "Act",
+                  icon: nil,
+                  position: .top,
+                  isEnabled: true,
+                  action: {}
+                )
+              )
+            }
+            .toolbar()
+          )
+        }
+        .toolbarStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .defaultTop),
+      context: .init(identity: rootIdentity)
+    )
+    _ = renderer.render(
+      Root(style: .defaultBottom),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
   /// Certified keys must also enter the writer index: an interior
   /// `.scrollIndicators` write decouples the subtree from the boundary's
   /// change, and only the setter's write attribution can see that.
