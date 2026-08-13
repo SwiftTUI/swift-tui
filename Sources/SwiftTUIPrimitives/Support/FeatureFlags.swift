@@ -165,16 +165,23 @@ package enum FeatureGate: CaseIterable, Sendable {
       // hatch).
       true
     case .focusMoveInvalidationNarrowing:
-      // Opt-in until the canary/A-B pass (plan 2026-08-12-001 Stage 2): the
+      // Kill switch, not an opt-in (flip plan 2026-08-12-004 Stage 3): the
       // run loop translates focus-tracker move notifications into frame-time
       // endpoint invalidations, re-validated against the live reader
       // registries per resolve pass, instead of enqueuing event-time raw
       // identities. An endpoint that departed with its presentation (the
-      // palette close-button leaf) then contributes nothing -- previously its
+      // palette close-button leaf) then contributes nothing — previously its
       // unmappable identity remapped onto the outermost portal host and
-      // conflict-denied the whole background. `SWIFTTUI_FOCUS_MOVE_NARROWING=1`
-      // opts in; absent keeps the event-time enqueue wholesale.
-      false
+      // conflict-denied the whole background (palette close conflicts
+      // 177 → 0 at 176 rows; close class gone at 704 — report
+      // 2026-08-12-003's A/B). The one named flip blocker — the coalesced
+      // focus-flip + internal-scroll selective seam, masked flag-off by the
+      // dispatch backstop's set-equality accident — is fixed (flip plan
+      // Stages 1–2: collapse-boundary frontier lifting; generation-compare
+      // backstop), pinned by `KeyboardScrollCoalescedFramePinTests`.
+      // `SWIFTTUI_FOCUS_MOVE_NARROWING=0` restores the event-time raw
+      // enqueue wholesale (and is the A/B lever).
+      true
     }
   }
 

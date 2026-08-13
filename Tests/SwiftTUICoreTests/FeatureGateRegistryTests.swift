@@ -36,10 +36,15 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
-    // Focus-move narrowing (plan 2026-08-12-001 Stage 2) stays opt-in until
-    // the coalesced focus-flip + internal-scroll selective seam is fixed
-    // (the flag-on InteractiveRuntimeTests keyboard-scroll guard).
-    #expect(!FeatureGate.focusMoveInvalidationNarrowing.defaultIsEnabled)
+  }
+
+  @Test("focus-move narrowing defaults on as a kill switch")
+  func focusMoveNarrowingDefaultsOn() {
+    // Flip plan 2026-08-12-004 Stage 3: default-on after the coalesced
+    // focus-flip + internal-scroll selective seam fix (Stages 1–2), on the
+    // -003 report's A/B (palette close conflicts 177 → 0). The env var is the
+    // kill switch and A/B lever (`SWIFTTUI_FOCUS_MOVE_NARROWING=0`).
+    #expect(FeatureGate.focusMoveInvalidationNarrowing.defaultIsEnabled)
   }
 
   @Test("the size-stability measure cutoff defaults on as a kill switch")

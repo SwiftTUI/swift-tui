@@ -78,11 +78,11 @@ struct PaletteCloseFramePinTests {
     #expect(focusedPath.hasSuffix("VStack[0]"), "focus restored to \(focusedPath)")
   }
 
-  @Test("Stage 1-2 target: palette close resolve work collapses to the open's shape")
+  @Test("Default configuration: palette close resolve work matches the open's shape")
   func closeFrameResolveWorkMatchesOpenTarget() async throws {
-    // Pins the DEFAULT configuration's close shape as a known issue: when the
-    // narrowing gate's default flips on, this pin flips with it (remove the
-    // withKnownIssue wrapper and retire the legacy baseline above).
+    // Pins the DEFAULT configuration's close shape. Default-on since the flip
+    // (plan 2026-08-12-004 Stage 3); the legacy baseline test above stays as
+    // the explicit latch-off regression pin for the kill-switch path.
     let wasEnabled = FocusMoveInvalidationNarrowing.isEnabled
     FocusMoveInvalidationNarrowing.isEnabled =
       FeatureGate.focusMoveInvalidationNarrowing.defaultIsEnabled
@@ -93,16 +93,11 @@ struct PaletteCloseFramePinTests {
     let open = try await harness.openPalette()
     let close = try await harness.closePalette()
 
-    // The plan's acceptance: the close-frame class drops to the open's shape
-    // (conflict ~= 0, resolve work independent of the background size).
-    // Currently red -- the known issue IS the Stage-0 baseline; Stages 1-2
-    // remove this wrapper and let the assertions stand.
-    withKnownIssue(
-      "palette close cone -- plan 2026-08-12-001 Stages 1-2 flip this pin"
-    ) {
-      #expect(close.maxInvalidationConflicts == 0)
-      #expect(close.maxResolvedNodesComputed <= open.maxResolvedNodesComputed + 8)
-    }
+    // The -001 plan's acceptance, standing since the default flip: the
+    // close-frame class matches the open's shape (no conflict cone, resolve
+    // work independent of the background size).
+    #expect(close.maxInvalidationConflicts == 0)
+    #expect(close.maxResolvedNodesComputed <= open.maxResolvedNodesComputed + 8)
   }
 }
 
