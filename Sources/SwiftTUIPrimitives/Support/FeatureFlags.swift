@@ -24,6 +24,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case scrollBlit
   case measureSizeStabilityCutoff
   case persistentCustomLayoutCache
+  case focusMoveInvalidationNarrowing
 
   package var environmentVariableName: String {
     switch self {
@@ -51,6 +52,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_MEASURE_CUTOFF"
     case .persistentCustomLayoutCache:
       "SWIFTTUI_PERSISTENT_LAYOUT_CACHE"
+    case .focusMoveInvalidationNarrowing:
+      "SWIFTTUI_FOCUS_MOVE_NARROWING"
     }
   }
 
@@ -161,6 +164,17 @@ package enum FeatureGate: CaseIterable, Sendable {
       // restores per-pass `makeCache` wholesale (the plan's triage escape
       // hatch).
       true
+    case .focusMoveInvalidationNarrowing:
+      // Opt-in until the canary/A-B pass (plan 2026-08-12-001 Stage 2): the
+      // run loop translates focus-tracker move notifications into frame-time
+      // endpoint invalidations, re-validated against the live reader
+      // registries per resolve pass, instead of enqueuing event-time raw
+      // identities. An endpoint that departed with its presentation (the
+      // palette close-button leaf) then contributes nothing -- previously its
+      // unmappable identity remapped onto the outermost portal host and
+      // conflict-denied the whole background. `SWIFTTUI_FOCUS_MOVE_NARROWING=1`
+      // opts in; absent keeps the event-time enqueue wholesale.
+      false
     }
   }
 

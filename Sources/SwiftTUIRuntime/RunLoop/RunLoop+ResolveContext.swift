@@ -93,7 +93,7 @@ extension RunLoop {
       environment: environment,
       environmentValues: effectiveEnvironmentValues,
       transaction: transactionSnapshot,
-      invalidatedIdentities: scheduledFrame.invalidatedIdentities,
+      invalidatedIdentities: focusNarrowedInvalidationIdentities(for: scheduledFrame),
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,
       localLifecycleRegistry: localLifecycleRegistry,

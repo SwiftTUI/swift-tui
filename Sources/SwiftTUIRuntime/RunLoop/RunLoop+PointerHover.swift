@@ -181,8 +181,21 @@ extension RunLoop {
     if let identity {
       invalidatedIdentities.insert(identity)
     }
-    if !invalidatedIdentities.isEmpty {
-      scheduler.requestInvalidation(of: invalidatedIdentities)
+    guard !invalidatedIdentities.isEmpty else {
+      return
     }
+    // Press moves are the focus moves' twin (same reader family, same
+    // suppression-scope legs): under focus-move narrowing their endpoints are
+    // deferred to frame-time re-validation too, so a press on a control whose
+    // presentation departs before the frame (the palette's close button)
+    // stops carrying an unmappable identity into the dismissal pass.
+    if FocusMoveInvalidationNarrowing.isEnabled,
+      let filter = focusTrackerInvalidationFilter
+    {
+      filter.recordDeferredMoveEndpoints(invalidatedIdentities)
+      scheduler.requestInvalidation(of: [])
+      return
+    }
+    scheduler.requestInvalidation(of: invalidatedIdentities)
   }
 }

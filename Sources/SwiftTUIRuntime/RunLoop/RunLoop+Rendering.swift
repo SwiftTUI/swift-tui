@@ -268,6 +268,10 @@ extension RunLoop {
     // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
     previousFrameFocusIdentity = focusTracker.currentFocusIdentity
     previousFramePressedIdentity = pressedIdentity
+    // The committed frame reflected every pending focus move; endpoints
+    // deferred by the narrowing filter are spent. (Superseded frames do not
+    // reach here, so their replays keep re-deriving the same contribution.)
+    focusTrackerInvalidationFilter?.clearPendingMoveEndpoints()
     // A frame was genuinely applied: the pre-start cancel run is broken.
     consecutivePreStartCancelCount = 0
     let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
@@ -664,6 +668,46 @@ extension RunLoop {
     }
 
     return scope
+  }
+
+  /// The pass's invalidation identities under focus-move narrowing
+  /// (plan 2026-08-12-001 Stage 2): the scheduled frame's identities — which
+  /// hold only non-focus sources while narrowing defers tracker notifications
+  /// — plus every pending focus-move endpoint that still warrants a recompute
+  /// cone NOW, re-validated against the live registries exactly like the
+  /// suppression-scope legs (`insertFocusMoveMember`): an endpoint whose root
+  /// path carries a runtime-focus reader and that declared no
+  /// focus-presentation-inert slots. A departed endpoint fails the reader
+  /// check (its path has no live readers) and contributes nothing — where the
+  /// event-time enqueue carried its unmappable identity into the pass and the
+  /// reuse door's conservative nearest-live-ancestor remap conflict-denied
+  /// the whole tree (the measured palette-close cone).
+  func focusNarrowedInvalidationIdentities(
+    for scheduledFrame: ScheduledFrame
+  ) -> Set<Identity> {
+    guard FocusMoveInvalidationNarrowing.isEnabled,
+      let filter = focusTrackerInvalidationFilter,
+      !filter.pendingMoveEndpointsSinceLastCommit.isEmpty
+    else {
+      return scheduledFrame.invalidatedIdentities
+    }
+    var identities = scheduledFrame.invalidatedIdentities
+    var kept = 0
+    for endpoint in filter.pendingMoveEndpointsSinceLastCommit {
+      if !renderer.hasFocusPresentationInertSlots(for: endpoint),
+        renderer.hasRuntimeFocusReaderOnPath(to: endpoint)
+      {
+        identities.insert(endpoint)
+        kept += 1
+      }
+    }
+    if ReuseDenialTrace.isEnabled {
+      let dropped = filter.pendingMoveEndpointsSinceLastCommit.count - kept
+      ReuseDenialTrace.recordSuppressionScopeDescription(
+        "focus-move-narrowing(kept=\(kept),dropped=\(dropped))"
+      )
+    }
+    return identities
   }
 
   /// A focus/press move's old/new identity enters the suppression scope as a

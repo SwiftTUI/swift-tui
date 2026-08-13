@@ -40,7 +40,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// Retains the tracker's invalidation filter: `FocusTracker.invalidator` is
   /// weak, and the filter must outlive the install (see
   /// ``installFocusTrackerInvalidator()``).
-  private var focusTrackerInvalidationFilter: FocusPresentationInvalidationFilter?
+  // Visibility note: internal (not `private`) so the focus-narrowing seam in
+  // `RunLoop+Rendering.swift` can read pending move endpoints and clear them
+  // at the committed-frame boundary.
+  var focusTrackerInvalidationFilter: FocusPresentationInvalidationFilter?
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()

@@ -22,6 +22,11 @@ struct PaletteCloseFramePinTests {
 
   @Test("Palette close-frame resolve work and conflict count match the recorded baseline")
   func closeFrameShapeMatchesRecordedBaseline() async throws {
+    // This test pins the legacy (narrowing-off) close shape regardless of the
+    // process environment; the flag-on shape is pinned separately below.
+    let wasEnabled = FocusMoveInvalidationNarrowing.isEnabled
+    FocusMoveInvalidationNarrowing.isEnabled = false
+    defer { FocusMoveInvalidationNarrowing.isEnabled = wasEnabled }
     let harness = try PaletteClosePinHarness(rowCount: Self.rowCount)
     defer { harness.tearDownTrace() }
 
@@ -49,8 +54,39 @@ struct PaletteCloseFramePinTests {
     #expect(focusedPath.hasSuffix("VStack[0]"), "focus restored to \(focusedPath)")
   }
 
+  @Test("Focus-move narrowing collapses the palette close to the open's shape")
+  func closeFrameCollapsesUnderFocusMoveNarrowing() async throws {
+    let wasEnabled = FocusMoveInvalidationNarrowing.isEnabled
+    FocusMoveInvalidationNarrowing.isEnabled = true
+    defer { FocusMoveInvalidationNarrowing.isEnabled = wasEnabled }
+    let harness = try PaletteClosePinHarness(rowCount: Self.rowCount)
+    defer { harness.tearDownTrace() }
+
+    let open = try await harness.openPalette()
+    let close = try await harness.closePalette()
+
+    // With the tracker's move endpoints re-validated at frame time, the
+    // departed overlay identities contribute nothing and the dismissal cycle
+    // stops scaling with the background: no row-grid conflict denials, and
+    // resolve work in the open's O(overlay) band.
+    #expect(close.maxInvalidationConflicts <= 2)
+    #expect(close.maxResolvedNodesComputed <= open.maxResolvedNodesComputed + 8)
+
+    // The narrowing must not change dismissal behavior: the palette closed
+    // (asserted by `closePalette`) and focus is back on the trigger control.
+    let focusedPath = harness.focusedIdentity?.path ?? "nil"
+    #expect(focusedPath.hasSuffix("VStack[0]"), "focus restored to \(focusedPath)")
+  }
+
   @Test("Stage 1-2 target: palette close resolve work collapses to the open's shape")
   func closeFrameResolveWorkMatchesOpenTarget() async throws {
+    // Pins the DEFAULT configuration's close shape as a known issue: when the
+    // narrowing gate's default flips on, this pin flips with it (remove the
+    // withKnownIssue wrapper and retire the legacy baseline above).
+    let wasEnabled = FocusMoveInvalidationNarrowing.isEnabled
+    FocusMoveInvalidationNarrowing.isEnabled =
+      FeatureGate.focusMoveInvalidationNarrowing.defaultIsEnabled
+    defer { FocusMoveInvalidationNarrowing.isEnabled = wasEnabled }
     let harness = try PaletteClosePinHarness(rowCount: Self.rowCount)
     defer { harness.tearDownTrace() }
 
@@ -229,7 +265,12 @@ private final class PaletteClosePinHarness {
     defer { renderedFrames = localRenderedFrames }
     var iterations = 0
     while scheduler.hasPendingFrame(at: .now()) && iterations < 12 {
-      _ = try await runLoop.renderPendingFramesAsync(renderedFrames: &localRenderedFrames)
+      // Synchronous drain on purpose: the reuse trace's counters are
+      // process-global (F119), and the async tail's chunked resolve suspends
+      // mid-pass -- a concurrently running test's `beginFrame` would dump and
+      // reset a partially accumulated conflict count. The sync path resolves
+      // without suspension, so each frame's histogram stays whole.
+      try runLoop.renderPendingFrames(renderedFrames: &localRenderedFrames)
       iterations += 1
     }
   }
