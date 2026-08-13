@@ -77,6 +77,14 @@ package enum EnvironmentKeyReuseClassification {
     // Same shape as `ListStyleKey`: one tracked read in `Table`'s resolve,
     // the resolved `TableStylePresentation` travels in `TablePayload.style`.
     "TableStyleKey",
+    // Same shape again: one tracked read in `Spinner`'s body, and the
+    // resolved `SpinnerStylePresentation` reaches output only as the glyph
+    // text and task key the body produces. Unlike the three keys above,
+    // this one carries no measurable census population — nothing in the
+    // corpus changes a spinner style across a reuse boundary — so its
+    // certification rests on read-shape identity with them plus a dedicated
+    // boundary test, not on a denial-count reduction.
+    "SpinnerStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

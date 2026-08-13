@@ -493,6 +493,147 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(!toleratedBoundary(in: renderer))
   }
 
+  /// `ListStyleKey` and `TableStyleKey` are certified on the same shape as
+  /// `ButtonStyleKey`: one tracked read at `List`/`Table` resolve, with the
+  /// resolved presentation carried in the draw payload rather than re-read
+  /// from the environment.
+  @Test("a list-style change over a collection-free subtree is tolerated")
+  func listStyleChangeOverCollectionFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnyListStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .listStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .plain, dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .insetGrouped, dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  /// The soundness half: a subtree containing a `List` reads the key at the
+  /// list's resolve, so the door must deny and the chrome must visibly change.
+  @Test("a list-style change with a list in the subtree is denied and restyles")
+  func listStyleChangeWithListInSubtreeRestyles() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnyListStyle
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: List { Text("row") })
+        }
+        .listStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .plain),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .insetGrouped),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    // `.insetGrouped` paints the rounded container `.plain` does not.
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("╭"))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  /// `SpinnerStyleKey` is certified on the same read shape, but unlike the
+  /// keys above it has *no* denial population in the corpus — nothing there
+  /// changes a spinner style across a boundary. These two cases are that
+  /// certification's exercised evidence: the win, and its soundness half.
+  @Test("a spinner-style change over a spinner-free subtree is tolerated")
+  func spinnerStyleChangeOverSpinnerFreeSubtreeIsTolerated() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnySpinnerStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .spinnerStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .moonPhase, dynamic: "v1"),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .globe, dynamic: "v2"),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("a spinner-style change with a spinner in the subtree is denied and restyles")
+  func spinnerStyleChangeWithSpinnerInSubtreeRestyles() {
+    let renderer = makeRenderer()
+
+    struct Root: View {
+      let style: AnySpinnerStyle
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Spinner())
+        }
+        .spinnerStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: .moonPhase),
+      context: .init(identity: rootIdentity)
+    )
+    let frame = renderer.render(
+      Root(style: .globe),
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      )
+    )
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("🌍"))
+    #expect(!rendered.contains("🌑"))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
   /// Certified keys must also enter the writer index: an interior
   /// `.scrollIndicators` write decouples the subtree from the boundary's
   /// change, and only the setter's write attribution can see that.
