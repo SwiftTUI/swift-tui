@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 514 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 292 | 1579 |
+| `SwiftTUIViews` | 297 | 1642 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 4 | 46 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -122,7 +122,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (292)
+### Canonical surface (297)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 5 members
@@ -140,6 +140,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyListStyle` — struct — 6 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
+- `AnySpinnerStyle` — struct — 41 members
 - `AnyTableStyle` — struct — 6 members
 - `AnyTabViewStyle` — struct — 7 members
 - `AnyTextFieldStyle` — struct — 6 members
@@ -225,6 +226,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `GestureStateBinding` — struct — 2 members
 - `GestureStateBox` — class — 6 members
 - `GestureStateGesture` — struct — 7 members
+- `GlyphSpinnerStyle` — struct — 8 members
 - `Group` — struct — 1 member
 - `GroupBox` — struct — 3 members
 - `HorizontalAlignmentGuideModifier` — struct
@@ -339,7 +341,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Slider` — struct — 4 members
 - `Spacer` — struct — 2 members
 - `SpatialTapGesture` — struct — 9 members
-- `Spinner` — struct — 50 members
+- `Spinner` — struct — 7 members
+- `SpinnerStyle` — protocol — 41 members
+- `SpinnerStyleConfiguration` — struct — 3 members
+- `SpinnerStylePresentation` — struct — 6 members
 - `Standard` — enum — 12 members
 - `State` — struct — 5 members
 - `Stepper` — struct — 4 members
@@ -402,7 +407,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 155 members
+- `View` — protocol — 157 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

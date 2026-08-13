@@ -276,6 +276,7 @@ classifications:
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyButtonStyle
     - SwiftTUIViews.AnyListStyle
+    - SwiftTUIViews.AnySpinnerStyle
     - SwiftTUIViews.AnyTableStyle
     - SwiftTUIViews.AnyOutlineStyle
     - SwiftTUIViews.AnyPickerStyle
@@ -451,8 +452,12 @@ classifications:
     - SwiftTUIViews.InlinePickerStyle
     - SwiftTUIViews.LinkButtonStyle
     - SwiftTUIViews.LiteralTabsTabViewStyle
+    - SwiftTUIViews.GlyphSpinnerStyle
     - SwiftTUIViews.ListStyle
     - SwiftTUIViews.ListStyleConfiguration
+    - SwiftTUIViews.SpinnerStyle
+    - SwiftTUIViews.SpinnerStyleConfiguration
+    - SwiftTUIViews.SpinnerStylePresentation
     - SwiftTUIViews.TableStyle
     - SwiftTUIViews.TableStyleConfiguration
     - SwiftTUIViews.MenuPickerStyle
@@ -775,6 +780,10 @@ classifications:
     - SwiftTUIRuntime.FileOpenError
     - SwiftTUIRuntime.Standard
     - SwiftTUIViews.ErrorToastStyle
+    # NOTE: the control-style A2 spinner break retired the nested
+    # `Spinner.SpinnerSet` vocabulary and the declaration-scoped spinner
+    # initializer. Nested declarations are not top-level names, so their
+    # removal is carried by the flat baseline diff rather than this list.
     # Retired by the control-style A1 List/Table split (plan 2026-08-12-002):
     # ASCII outline selection moved to rasterizer fallback, and the combined
     # collection presentation split into ListStylePresentation and
