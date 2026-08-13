@@ -84,6 +84,22 @@ package enum ReuseDenialTrace {
     conflictIdentityPaths.append(path)
   }
 
+  /// Identity paths denied for `no-node` this frame (capped) — the door
+  /// consulted an identity with no live graph node, so the resolve minted a
+  /// fresh subtree there. Decomposes a `no-node=` storm into the identities
+  /// that failed to map (the coalesced flip+scroll seam's signature: a
+  /// selective frame re-minting a committed subtree wholesale).
+  package private(set) static var noNodeIdentityPaths: [String] = []
+
+  private static let maxRecordedNoNodeIdentityPaths = 512
+
+  package static func recordNoNodeIdentity(_ path: String) {
+    guard isEnabled,
+      noNodeIdentityPaths.count < maxRecordedNoNodeIdentityPaths
+    else { return }
+    noNodeIdentityPaths.append(path)
+  }
+
   /// Test seam: observes each frame's reason histogram at `dumpAndReset`,
   /// before the per-frame reset erases it. Lets a deterministic fixture pin a
   /// specific frame's counter (e.g. the palette dismissal frame's
@@ -119,6 +135,7 @@ package enum ReuseDenialTrace {
     suppressionScopeDescriptions.removeAll(keepingCapacity: true)
     suppressedIdentityPaths.removeAll(keepingCapacity: true)
     conflictIdentityPaths.removeAll(keepingCapacity: true)
+    noNodeIdentityPaths.removeAll(keepingCapacity: true)
     planTargetDescriptions.removeAll(keepingCapacity: true)
   }
 
@@ -155,6 +172,9 @@ package enum ReuseDenialTrace {
     }
     if !conflictIdentityPaths.isEmpty {
       line += " | conflict-paths: " + conflictIdentityPaths.joined(separator: ",")
+    }
+    if !noNodeIdentityPaths.isEmpty {
+      line += " | no-node-paths: " + noNodeIdentityPaths.joined(separator: ",")
     }
     if !planTargetDescriptions.isEmpty {
       line += " | plan-targets: " + planTargetDescriptions.joined(separator: ";")

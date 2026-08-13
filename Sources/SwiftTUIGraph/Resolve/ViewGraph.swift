@@ -2547,6 +2547,7 @@ package final class ViewGraph {
     }
     guard let node = nodeIfExists(for: identity) else {
       ReuseDenialTrace.record("no-node")
+      ReuseDenialTrace.recordNoNodeIdentity(identity.path)
       return
     }
     if invalidatedIdentities.isEmpty {
