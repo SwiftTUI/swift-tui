@@ -148,6 +148,11 @@ package enum HostWireSchema {
       .init("bounds", wire: .key("bounds")),
       .init("visibleBounds", wire: .key("visibleBounds")),
       .init(
+        "unoccludedVisibleBounds",
+        wire: .notSerialized(
+          "terminal-only occlusion trim (kitty placements / overlay stamps); layered hosts composite paint order natively and ignore it"
+        )),
+      .init(
         "source",
         wire: .derived("format + dataBase64 via the resolved reference")),
       .init(
