@@ -940,10 +940,30 @@ struct WebSurfaceTransportTests {
     #expect(firstImage["visibleBounds"] as? [Int] == [2, 0, 2, 2])
     #expect(firstImage["pixelSize"] as? [Int] == [3, 2])
     #expect(firstImage["scalingMode"] as? String == "stretch")
+    #expect(firstImage["opacity"] as? Double == 1)
     #expect(firstImage["dataBase64"] as? String == "iVBORw==")
 
     #expect(secondImage["id"] as? String == firstImage["id"] as? String)
     #expect(secondImage["dataBase64"] == nil)
+  }
+
+  @Test("an opacity-only image update reuses payload bytes and carries new placement alpha")
+  func opacityOnlyImageUpdateDoesNotRetransmitPayload() throws {
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+    let firstFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 1), state: &state)
+    )
+    let fadedFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 0.25), state: &state)
+    )
+    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+    let fadedImage = try #require((fadedFrame["images"] as? [[String: Any]])?.first)
+
+    #expect(firstImage["id"] as? String == fadedImage["id"] as? String)
+    #expect(firstImage["opacity"] as? Double == 1)
+    #expect(fadedImage["opacity"] as? Double == 0.25)
+    #expect(firstImage["dataBase64"] != nil)
+    #expect(fadedImage["dataBase64"] == nil)
   }
 
   @Test("encoder emits blended image payloads as cached png variants")
@@ -1495,7 +1515,7 @@ struct WebSurfaceTransportTests {
     )
   }
 
-  private static func imageSurface() -> RasterSurface {
+  private static func imageSurface(opacity: Double = 1) -> RasterSurface {
     let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
     return RasterSurface(
       size: .init(width: 4, height: 2),
@@ -1511,7 +1531,8 @@ struct WebSurfaceTransportTests {
           source: .data(bytes),
           resolvedReference: .embeddedImage(bytes),
           pixelSize: .init(width: 3, height: 2),
-          isResizable: true
+          isResizable: true,
+          opacity: opacity
         )
       ]
     )

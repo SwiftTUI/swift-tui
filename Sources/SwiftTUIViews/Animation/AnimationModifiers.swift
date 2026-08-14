@@ -191,7 +191,7 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     // (`isContinuous`, future additions) flows through on the context copy
     // untouched — this modifier authors animation intent, not a whole
     // transaction (plan 2026-08-04-002 mechanics §5).
-    if context.environmentValues.accessibilityReduceMotion {
+    if context.environmentValues.renderingReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else if let animation {
       // Deliver the concrete animation to the renderer-owned sink (the
@@ -293,7 +293,7 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     transform(&transaction)
 
     var childContext = context
-    if context.environmentValues.accessibilityReduceMotion {
+    if context.environmentValues.renderingReduceMotion {
       childContext.transaction.animationRequest = .disabled
     } else {
       childContext.transaction.animationRequest = transaction.request

@@ -48,6 +48,87 @@ struct PresentationSurfaceTests {
     )
   }
 
+  @Test("a filtered default-palette command is semantic in the rendered frame")
+  func filteredDefaultPaletteCommandIsSemanticInRenderedFrame() throws {
+    let probe = FilteredPaletteSemanticProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FilteredDefaultPaletteSemanticRoot"),
+      size: .init(width: 44, height: 12)
+    ) {
+      FilteredPaletteSemanticFixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    for character in "counter" {
+      _ = try harness.pressKey(KeyPress(.character(character)))
+    }
+
+    #expect(harness.frame.contains("Counter"))
+    #expect(harness.frame.contains("Switch to counter"))
+    #expect(!harness.frame.contains("Images"))
+    let renderedPoint = try #require(harness.point(forText: "Counter"))
+    let commands = harness.runLoop.latestSemanticSnapshot.accessibilityNodes.filter {
+      $0.role == .button && $0.rect.contains(renderedPoint.containingCell)
+    }
+    let command = try #require(commands.count == 1 ? commands[0] : nil)
+    #expect(command.label == "Counter")
+    #expect(
+      !harness.runLoop.latestSemanticSnapshot.accessibilityNodes.contains {
+        $0.label?.contains("Switch to counter") == true
+      }
+    )
+    #expect(command.rect.size.width > 0)
+    #expect(command.rect.size.height > 0)
+
+    _ = try harness.click(renderedPoint)
+    #expect(probe.selection == "Counter")
+  }
+
+  @Test("default palette arrow navigation mutates its authored selection state")
+  func defaultPaletteArrowNavigationMutatesAuthoredSelectionState() throws {
+    let probe = FilteredPaletteSemanticProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DefaultPaletteArrowSelectionRoot"),
+      size: .init(width: 44, height: 12)
+    ) {
+      FilteredPaletteSemanticFixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("> Counter"))
+    let moved = try harness.pressKey(KeyPress(.arrowDown))
+    #expect(moved.contains("> Images"), "palette selection did not move:\n\(moved)")
+  }
+
+  @Test("a status infers its current text across same-identity replacement frames")
+  func statusInfersCurrentTextAcrossSameIdentityReplacementFrames() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("CurrentStatusSemanticRoot"),
+      size: .init(width: 44, height: 8)
+    ) {
+      CurrentStatusSemanticFixture()
+    }
+    defer { harness.shutdown() }
+
+    let initial = try #require(
+      harness.runLoop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.role == .status
+      }
+    )
+    #expect(initial.label == "Clipboard: idle")
+
+    let copiedFrame = try harness.clickText("Copy journey token")
+    #expect(copiedFrame.contains("Clipboard: copied"))
+    let copied = try #require(
+      harness.runLoop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.role == .status
+      }
+    )
+    #expect(copied.identity == initial.identity)
+    #expect(copied.viewNodeID == initial.viewNodeID)
+    #expect(copied.label == "Clipboard: copied")
+  }
+
   @Test("presentation overlays carry explicit surface composition metadata")
   func presentationOverlaysCarrySurfaceCompositionMetadata() throws {
     let contentRootIdentity = testIdentity("SurfaceCompositionRoot")
@@ -436,6 +517,46 @@ struct PresentationSurfaceTests {
 
     #expect(messageIndex >= 3)
     #expect(messageLine.first != " ")
+  }
+}
+
+@MainActor
+private final class FilteredPaletteSemanticProbe {
+  var selection: String?
+}
+
+@MainActor
+private struct FilteredPaletteSemanticFixture: View {
+  let probe: FilteredPaletteSemanticProbe
+
+  var body: some View {
+    Panel(id: "palette-source") {
+      Text("Workspace")
+    }
+    .paletteCommand(name: "Counter", description: "Switch to counter") {
+      probe.selection = "Counter"
+    }
+    .paletteCommand(name: "Images") {
+      probe.selection = "Images"
+    }
+    .panel(id: "palette-host")
+    .paletteSheet("Command palette", isPresented: .constant(true))
+  }
+}
+
+@MainActor
+private struct CurrentStatusSemanticFixture: View {
+  @State private var status = "Clipboard: idle"
+
+  var body: some View {
+    VStack(alignment: .leading) {
+      Button("Copy journey token") {
+        status = "Clipboard: copied"
+      }
+      Text(status)
+        .accessibilityRole(.status)
+        .accessibilityLiveRegion(.polite)
+    }
   }
 }
 

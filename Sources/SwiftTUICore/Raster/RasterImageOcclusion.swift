@@ -20,15 +20,10 @@
 /// fragments (blend modes) do not trim — blended stacking over images is
 /// modeled by `RasterImageCompositing`, not occlusion.
 ///
-/// Cross-frame soundness: incremental rasterization retains sidecar layers
-/// and attachments with the same row predicate, so two intersecting layers in
-/// one sidecar were recorded in the same frame and their orders compare as
-/// paint order. The one residual gap is a fresh attachment whose bounds
-/// extend beyond the dirty rows into a retained fragment recorded above it in
-/// an earlier frame: the retained fragment's order is lower, so that band
-/// stays untrimmed until the occluder repaints. Reaching it requires damage
-/// that dirties part of an attachment while leaving the overlapping occluder
-/// rows clean; presentation flows dirty both together.
+/// Cross-frame soundness: incremental rasterization retains sidecar layers as
+/// an untouched prefix. When damage intersects an image, it expands to a
+/// paint-order-closed suffix before recording, so every layer that can compare
+/// above the re-emitted image is recorded again in authored traversal order.
 enum RasterImageOcclusion {
   /// Recomputes every attachment's `unoccludedVisibleBounds` from the
   /// sidecar. Runs after each paint (fresh and incremental); the result is a

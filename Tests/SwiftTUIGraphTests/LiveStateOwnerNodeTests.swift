@@ -2,16 +2,11 @@ import Testing
 
 @testable import SwiftTUIGraph
 
-// `ViewGraph.liveStateOwnerNode(registeredOwner:identity:)` re-keys
-// closure-held `@State` access across a same-identity node re-mint: the
-// registration-time node wins while it is still the live occupant of its
-// identity; a fresh mint at the same identity supersedes it. Without the
-// re-key, `.task`/`.onAppear` closures registered before a re-mint keep
-// writing the orphaned node's slots — writes whose invalidations dirty the
-// fresh node, which re-resolves its unchanged slots into an empty frame,
-// forever (the gallery Life-tab revisit freeze).
+// Callback-facing state ownership is exact-lifetime keyed. Authored Identity
+// is deliberately absent: a later node at the same path is a distinct owner,
+// even if raw node allocation also repeats after checkpoint rollback.
 @MainActor
-@Suite("ViewGraph.liveStateOwnerNode")
+@Suite("ViewGraph state-owner lifetimes")
 struct LiveStateOwnerNodeTests {
   private let rootIdentity = testIdentity("LiveOwnerRoot")
   private let childIdentity = testIdentity("LiveOwnerRoot", "Child")
@@ -45,22 +40,21 @@ struct LiveStateOwnerNodeTests {
     )
   }
 
-  @Test("the registration-time node wins while it is the live occupant")
-  func registeredOccupantWins() throws {
+  @Test("a live exact handle resolves in O(1)")
+  func liveExactHandleResolves() throws {
     let graph = makeGraph()
     let registered = try #require(graph.nodeForIdentity(childIdentity))
+    let handle = try #require(registered.stateOwnerHandle)
 
-    let resolved = graph.liveStateOwnerNode(
-      registeredOwner: registered.viewNodeID,
-      identity: childIdentity
-    )
-    #expect(resolved === registered)
+    #expect(graph.nodeForOwnerLifetimeID(handle.ownerLifetime) === registered)
+    #expect(LiveViewGraphRegistry.node(for: handle) === registered)
   }
 
-  @Test("a same-identity re-mint supersedes the registration-time node")
-  func remintSupersedesRegisteredNode() throws {
+  @Test("a same-identity re-mint cannot capture the retired handle")
+  func remintDoesNotCaptureRetiredHandle() throws {
     let graph = makeGraph()
     let registered = try #require(graph.nodeForIdentity(childIdentity))
+    let registeredHandle = try #require(registered.stateOwnerHandle)
 
     // Leave and return: teardown evicts the node, the next visit mints a
     // fresh one at the same identity.
@@ -69,30 +63,18 @@ struct LiveStateOwnerNodeTests {
     let reminted = try #require(graph.nodeForIdentity(childIdentity))
     #expect(reminted !== registered)
     #expect(reminted.viewNodeID != registered.viewNodeID)
-
-    let resolved = graph.liveStateOwnerNode(
-      registeredOwner: registered.viewNodeID,
-      identity: childIdentity
-    )
-    #expect(
-      resolved === reminted,
-      "closure-held state access must follow the identity to the live occupant"
-    )
+    #expect(reminted.ownerLifetimeID != registered.ownerLifetimeID)
+    #expect(LiveViewGraphRegistry.node(for: registeredHandle) == nil)
+    #expect(LiveViewGraphRegistry.node(for: reminted.stateOwnerHandle!) === reminted)
   }
 
-  @Test("with no live occupant the registered node is the fallback")
-  func absentIdentityFallsBackToRegisteredNode() throws {
+  @Test("a retired owner handle resolves nil")
+  func retiredHandleResolvesNil() throws {
     let graph = makeGraph()
     let registered = try #require(graph.nodeForIdentity(childIdentity))
+    let handle = try #require(registered.stateOwnerHandle)
 
     removeChild(from: graph)
-
-    // The identity has no live occupant and the registered node is out of the
-    // index; degrade to today's behavior (nil), never to a different node.
-    let resolved = graph.liveStateOwnerNode(
-      registeredOwner: registered.viewNodeID,
-      identity: childIdentity
-    )
-    #expect(resolved == nil || resolved === registered)
+    #expect(LiveViewGraphRegistry.node(for: handle) == nil)
   }
 }

@@ -139,6 +139,7 @@ struct PerfLazyVStackScrollView: View {
             }
           }
         }
+        .padding(1)
       }
       .frame(height: 24)
       .border(.separator)

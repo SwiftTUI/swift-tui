@@ -74,6 +74,21 @@ struct WithAnimationCompletionIsolationTests {
 
     #expect(model.completionRuns == 1)
   }
+
+  @Test("completion criteria reach the runtime sink")
+  func completionCriteriaReachRuntimeSink() {
+    let sink = CapturingCompletionSink()
+
+    AnimationCompletionStorage.withSink(sink) {
+      withAnimation(
+        nil,
+        completionCriteria: .removed,
+        {}
+      ) {}
+    }
+
+    #expect(sink.barrier == .removed)
+  }
 }
 
 /// Stands in for the main-actor view state a completion closure exists to
@@ -93,11 +108,14 @@ private final class NonSendableCounter {
 @MainActor
 private final class CapturingCompletionSink: AnimationCompletionSink {
   private(set) var captured: (@MainActor @Sendable () -> Void)?
+  private(set) var barrier: AnimationCompletionBarrier?
 
   func registerCompletion(
     batchID _: AnimationBatchID,
+    barrier: AnimationCompletionBarrier = .logicallyComplete,
     closure: @escaping @MainActor @Sendable () -> Void
   ) {
+    self.barrier = barrier
     captured = closure
   }
 }

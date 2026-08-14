@@ -350,7 +350,7 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
   }
 
   public var body: some View {
-    EnvironmentReader(\.accessibilityReduceMotion) { reduceMotion in
+    EnvironmentReader(\.renderingReduceMotion) { reduceMotion in
       timelineBody(reduceMotion: reduceMotion)
     }
   }

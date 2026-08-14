@@ -27,7 +27,7 @@ public struct BenchMember: Equatable, Sendable {
 /// "the benchmark" is exactly what `bench` runs and an outside reader can
 /// cite it by member name.
 public enum BenchSuite {
-  /// D2's five members.
+  /// D2's original five members plus the preview-readiness Stage-0 controls.
   ///
   /// `warmSyncRatchets` is FALSE everywhere: recording the baseline failed
   /// D3's determinism proof for the warm lanes twice, with different counter
@@ -62,6 +62,21 @@ public enum BenchSuite {
     BenchMember(
       scenario: .syntheticContinuousAnimation,
       warmModes: [.async],
+      warmSyncRatchets: false
+    ),
+    BenchMember(
+      scenario: .dynamicPropertyHeavy,
+      warmModes: [.sync, .async],
+      warmSyncRatchets: false
+    ),
+    BenchMember(
+      scenario: .galleryTabSwitch,
+      warmModes: [.sync, .async],
+      warmSyncRatchets: false
+    ),
+    BenchMember(
+      scenario: .stillImagePresentation,
+      warmModes: [.sync, .async],
       warmSyncRatchets: false
     ),
   ]

@@ -619,7 +619,8 @@ final class TerminalImageRenderer: Sendable {
     return blendCompositor.decodedVariant(
       for: attachment,
       outputSize: outputSize,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      precompositePlacementOpacity: true
     )
   }
 }

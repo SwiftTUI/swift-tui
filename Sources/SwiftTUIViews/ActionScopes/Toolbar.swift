@@ -166,11 +166,35 @@ private func reconcileToolbarHostSubtree(
     return (node, changed, requiresRelayout)
   }
 
-  let items = node.preferenceValues[ToolbarItemsPreferenceKey.self]
+  let content = node.toolbarHostContent()
+  let items =
+    content.children.flatMap(toolbarItemsForNearestHost(in:))
+    + node.directToolbarItemContributions
   let reconciled = descriptor.reconcile(node, items)
   changed = changed || reconciled != node
   requiresRelayout = requiresRelayout || !reconciled.isEquivalentForPlacement(to: node)
   return (reconciled, changed, requiresRelayout)
+}
+
+/// Reconstructs the complete preference input for the nearest toolbar host
+/// from authored contribution metadata. A retained graph snapshot rebuild can
+/// replace children without re-running an unchanged contribution modifier;
+/// its reduced `preferenceValues` cache is therefore not an authoritative
+/// source for node-local items. Nested hosts are absorption boundaries and
+/// rebuild their own item lists independently.
+private func toolbarItemsForNearestHost(
+  in node: ResolvedNode
+) -> [ToolbarItemConfig] {
+  if node.layoutMetadata.layoutValue(
+    for: toolbarLatePreferenceHostMetadataKey,
+    as: ToolbarLatePreferenceHostDescriptor.self
+  ) != nil {
+    return []
+  }
+
+  return
+    node.children.flatMap(toolbarItemsForNearestHost(in:))
+    + node.directToolbarItemContributions
 }
 
 extension ResolvedNode {
@@ -271,7 +295,7 @@ extension ResolvedNode {
     return scopeWithStrip
   }
 
-  private func toolbarHostContent() -> (
+  fileprivate func toolbarHostContent() -> (
     children: [ResolvedNode],
     layoutBehavior: LayoutBehavior,
     hasHostedToolbar: Bool

@@ -1,13 +1,19 @@
 package struct StateSlotKey: Hashable, Sendable {
-  package var owner: ViewNodeID
+  /// The immutable lifetime of the node that owns the slot.
+  ///
+  /// `ViewNodeID` is intentionally not part of this address: graph checkpoint
+  /// rollback rewinds the raw-node allocator, so a later unrelated node can
+  /// reuse the same raw ID. Owner-lifetime IDs are issued by the graph's
+  /// non-checkpointed monotonic sequencer and therefore stay ABA-safe.
+  package var owner: NodeOwnerLifetimeID
   package var slot: StateSlotIdentifier
 
-  package init(owner: ViewNodeID, slot: StateSlotIdentifier) {
+  package init(owner: NodeOwnerLifetimeID, slot: StateSlotIdentifier) {
     self.owner = owner
     self.slot = slot
   }
 
-  package init(owner: ViewNodeID, ordinal: Int) {
+  package init(owner: NodeOwnerLifetimeID, ordinal: Int) {
     self.init(owner: owner, slot: StateSlotIdentifier(ordinal: ordinal))
   }
 
@@ -20,14 +26,58 @@ package struct StateSlotKey: Hashable, Sendable {
 }
 
 package struct StateGraphScopeID: Hashable, Sendable {
-  package let rawValue: UInt
+  package let rawValue: UInt64
 
+  @MainActor private static var nextRawValue: UInt64 = 0
+
+  @MainActor
   package init(_ viewGraph: ViewGraph) {
-    rawValue = UInt(bitPattern: ObjectIdentifier(viewGraph))
+    self = viewGraph.stateGraphScopeID
   }
 
-  package init(rawValue: UInt) {
+  package init(rawValue: UInt64) {
     self.rawValue = rawValue
+  }
+
+  @MainActor
+  package static func issue() -> Self {
+    precondition(nextRawValue < .max, "StateGraphScopeID exhausted")
+    nextRawValue += 1
+    return Self(rawValue: nextRawValue)
+  }
+}
+
+/// Graph-local, immutable lifetime identity for one authored state owner.
+///
+/// The value is meaningful only together with its graph scope. Unlike
+/// `ViewNodeID`, its allocator is never checkpointed or rewound.
+package struct NodeOwnerLifetimeID: Hashable, Comparable, Sendable, CustomStringConvertible {
+  package let rawValue: UInt64
+
+  package init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  package static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+
+  package var description: String {
+    "owner-lifetime-\(rawValue)"
+  }
+}
+
+/// Sendable route from an authored callback to its exact graph-backed owner.
+package struct StateOwnerHandle: Hashable, Sendable {
+  package let graphScope: StateGraphScopeID
+  package let ownerLifetime: NodeOwnerLifetimeID
+
+  package init(
+    graphScope: StateGraphScopeID,
+    ownerLifetime: NodeOwnerLifetimeID
+  ) {
+    self.graphScope = graphScope
+    self.ownerLifetime = ownerLifetime
   }
 }
 
@@ -65,5 +115,13 @@ package struct DependencySet: Equatable {
     self.observableReads = observableReads
     self.focusComparisonTargets = focusComparisonTargets
     self.environmentWrites = environmentWrites
+  }
+
+  package mutating func formUnion(_ other: Self) {
+    stateSlotReads.formUnion(other.stateSlotReads)
+    environmentReads.formUnion(other.environmentReads)
+    observableReads.formUnion(other.observableReads)
+    focusComparisonTargets.formUnion(other.focusComparisonTargets)
+    environmentWrites.formUnion(other.environmentWrites)
   }
 }

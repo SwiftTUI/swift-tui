@@ -13,7 +13,7 @@ struct DependencyTrackerTests {
   @Test("each read kind lands in the current capture set")
   func readsLandInCurrentSet() {
     let tracker = DependencyTracker()
-    let slot = StateSlotKey(owner: ViewNodeID(rawValue: 1), ordinal: 0)
+    let slot = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 1), ordinal: 0)
     let environmentKey = ObjectIdentifier(DependencyTrackerTests.self)
     let observableID = ObjectIdentifier(DependencyTracker.self)
 
@@ -37,7 +37,7 @@ struct DependencyTrackerTests {
   @Test("reset returns the captured session and starts the next one empty")
   func resetReturnsAndClears() {
     let tracker = DependencyTracker()
-    let slot = StateSlotKey(owner: ViewNodeID(rawValue: 2), ordinal: 1)
+    let slot = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 2), ordinal: 1)
     tracker.recordStateRead(slot)
 
     let captured = tracker.reset()
@@ -46,15 +46,15 @@ struct DependencyTrackerTests {
 
     // The returned set is a value: the tracker's next session cannot
     // retroactively mutate it.
-    tracker.recordStateRead(StateSlotKey(owner: ViewNodeID(rawValue: 3), ordinal: 0))
+    tracker.recordStateRead(StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 3), ordinal: 0))
     #expect(captured.stateSlotReads == [slot])
   }
 
   @Test("restoring a checkpoint discards reads recorded after it")
   func checkpointRestoreDiscardsLaterReads() {
     let tracker = DependencyTracker()
-    let early = StateSlotKey(owner: ViewNodeID(rawValue: 4), ordinal: 0)
-    let late = StateSlotKey(owner: ViewNodeID(rawValue: 4), ordinal: 1)
+    let early = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 4), ordinal: 0)
+    let late = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 4), ordinal: 1)
 
     tracker.recordStateRead(early)
     let checkpoint = tracker.makeCheckpoint()
@@ -71,11 +71,11 @@ struct DependencyTrackerTests {
   @Test("a checkpoint is a value: later tracker mutation cannot corrupt it")
   func checkpointIsAValue() {
     let tracker = DependencyTracker()
-    let early = StateSlotKey(owner: ViewNodeID(rawValue: 5), ordinal: 0)
+    let early = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 5), ordinal: 0)
     tracker.recordStateRead(early)
 
     let checkpoint = tracker.makeCheckpoint()
-    tracker.recordStateRead(StateSlotKey(owner: ViewNodeID(rawValue: 5), ordinal: 1))
+    tracker.recordStateRead(StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 5), ordinal: 1))
     _ = tracker.reset()
 
     #expect(checkpoint.currentDependencies.stateSlotReads == [early])

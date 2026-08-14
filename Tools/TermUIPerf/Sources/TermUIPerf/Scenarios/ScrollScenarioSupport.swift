@@ -99,6 +99,7 @@ struct PerfScrollFlingView: View {
             }
           }
         }
+        .padding(1)
       }
       .frame(height: 24)
       .border(.separator)
@@ -129,6 +130,7 @@ struct PerfScrollDocumentView: View {
           }
         }
       }
+      .padding(1)
       .frame(height: 24)
       .border(.separator)
     }

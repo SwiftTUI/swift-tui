@@ -170,6 +170,7 @@ private struct DefaultPaletteBodyContent: View {
       }
     }
     .buttonStyle(.plain)
+    .accessibilityLabel(command.name)
     .focusable(false)
     .onTapGesture {
       perform(command)

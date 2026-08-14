@@ -20,6 +20,7 @@ extension SwiftTUIOptions {
     var color = baseline.color
     var glyphs = baseline.glyphs
     var motion = baseline.motion
+    var stableOutput = baseline.stableOutput
     var output = baseline.output
     var cursorFollowsFocus = baseline.cursorFollowsFocus
 
@@ -42,6 +43,9 @@ extension SwiftTUIOptions {
     // Motion: --reduce-motion (or --accessible) overrides baseline.
     if effectiveReduceMotion {
       motion = .reduced
+    }
+    if self.stableOutput {
+      stableOutput = true
     }
 
     // Cursor focus-following: opt-in for TUI output.
@@ -81,6 +85,7 @@ extension SwiftTUIOptions {
       color: color,
       glyphs: glyphs,
       motion: motion,
+      stableOutput: stableOutput,
       output: output,
       verbosity: verbosity,
       web: web,

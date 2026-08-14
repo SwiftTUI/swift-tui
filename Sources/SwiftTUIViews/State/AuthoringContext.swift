@@ -32,6 +32,10 @@ package struct AuthoringContext {
   var focusedValues: FocusedValues
   var viewNode: SwiftTUICore.ViewNode?
   var ownerNodeID: SwiftTUICore.ViewNodeID?
+  /// Stable graph + authored-owner lifetime address for stateful property
+  /// wrappers. Unlike `ownerNodeID`, this never rewinds through checkpoint
+  /// rollback and never follows authored identity into a new entity lifetime.
+  var stateOwnerHandle: StateOwnerHandle?
   var stateGraphScope: StateGraphScopeID?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
   /// When this context is a per-mount rebase of a captured enclosing scope
@@ -55,6 +59,7 @@ package struct AuthoringContext {
     focusedValues: FocusedValues,
     viewNode: SwiftTUICore.ViewNode? = nil,
     ownerNodeID: SwiftTUICore.ViewNodeID? = nil,
+    stateOwnerHandle: StateOwnerHandle? = nil,
     stateGraphScope: StateGraphScopeID? = nil,
     ordinalTracker: AuthoringOrdinalTracker = .init(),
     rebasedFromOwnerNodeID: SwiftTUICore.ViewNodeID? = nil
@@ -68,8 +73,16 @@ package struct AuthoringContext {
     self.focusedValues = focusedValues
     self.viewNode = viewNode
     self.ownerNodeID = ownerNodeID ?? viewNode?.viewNodeID
+    self.stateOwnerHandle = stateOwnerHandle ?? viewNode?.stateOwnerHandle
+    if let stateGraphScope, let resolvedHandle = self.stateOwnerHandle {
+      precondition(
+        stateGraphScope == resolvedHandle.graphScope,
+        "AuthoringContext state graph scope and owner handle diverged"
+      )
+    }
     self.stateGraphScope =
-      stateGraphScope ?? viewNode?.ownerGraph.map(StateGraphScopeID.init)
+      self.stateOwnerHandle?.graphScope ?? stateGraphScope
+      ?? viewNode?.ownerGraph.map(StateGraphScopeID.init)
     self.ordinalTracker = ordinalTracker
     self.rebasedFromOwnerNodeID = rebasedFromOwnerNodeID
   }
@@ -100,39 +113,17 @@ package func currentAuthoringContext() -> AuthoringContext? {
 
 @MainActor
 func graphScopeID(for context: AuthoringContext?) -> StateGraphScopeID? {
-  context?.stateGraphScope ?? context?.viewNode?.ownerGraph.map(StateGraphScopeID.init)
+  context?.stateOwnerHandle?.graphScope ?? context?.stateGraphScope
+    ?? context?.viewNode?.ownerGraph.map(StateGraphScopeID.init)
 }
 
-package struct StateStorageOwner: Hashable, Sendable {
-  package var graphScope: StateGraphScopeID?
-  package var ownerNodeID: ViewNodeID
-
-  package init(
-    graphScope: StateGraphScopeID?,
-    ownerNodeID: ViewNodeID
-  ) {
-    self.graphScope = graphScope
-    self.ownerNodeID = ownerNodeID
-  }
-}
+package typealias StateStorageOwner = StateOwnerHandle
 
 @MainActor
 package func stateStorageOwner(
   for context: AuthoringContext
 ) -> StateStorageOwner? {
-  let ownerNodeID: ViewNodeID?
-  if let contextOwnerNodeID = context.ownerNodeID {
-    ownerNodeID = contextOwnerNodeID
-  } else {
-    ownerNodeID = context.viewNode?.viewNodeID
-  }
-  guard let ownerNodeID else {
-    return nil
-  }
-  return StateStorageOwner(
-    graphScope: graphScopeID(for: context),
-    ownerNodeID: ownerNodeID
-  )
+  context.stateOwnerHandle ?? context.viewNode?.stateOwnerHandle
 }
 
 /// Resolves the live owner node an authoring context names, for property
@@ -145,11 +136,9 @@ package func stateStorageOwner(
 /// caller falls back to its seed storage.
 @MainActor
 package func liveAuthoringOwnerNode(
-  ownerNodeID: ViewNodeID?,
-  stateGraphScope: StateGraphScopeID?,
-  ownerIdentity: Identity? = nil
+  stateOwnerHandle: StateOwnerHandle?
 ) -> SwiftTUICore.ViewNode? {
-  guard let ownerNodeID else {
+  guard let stateOwnerHandle else {
     return nil
   }
 
@@ -157,31 +146,12 @@ package func liveAuthoringOwnerNode(
     guard let currentGraph = ViewNodeContext.current?.ownerGraph else {
       return nil
     }
-    if let stateGraphScope,
-      stateGraphScope != StateGraphScopeID(currentGraph)
-    {
+    guard stateOwnerHandle.graphScope == StateGraphScopeID(currentGraph) else {
       return nil
     }
-    return currentGraph.nodeForViewNodeID(ownerNodeID)
+    return currentGraph.nodeForOwnerLifetimeID(stateOwnerHandle.ownerLifetime)
   }
-
-  guard
-    let stateGraphScope,
-    let scopedGraph = LiveViewGraphRegistry.graph(for: stateGraphScope)
-  else {
-    return nil
-  }
-  // Outside a resolve pass the frozen `ownerNodeID` can name a node the graph
-  // re-minted after registration (a lazy-tab revisit, a displacement
-  // eviction). Re-key by the registration identity so imperative accesses
-  // land on the state the committed graph serves.
-  if let ownerIdentity {
-    return scopedGraph.liveStateOwnerNode(
-      registeredOwner: ownerNodeID,
-      identity: ownerIdentity
-    )
-  }
-  return scopedGraph.nodeForViewNodeID(ownerNodeID)
+  return LiveViewGraphRegistry.node(for: stateOwnerHandle)
 }
 
 package struct CapturedAuthoringContextSnapshot: Sendable {
@@ -190,6 +160,7 @@ package struct CapturedAuthoringContextSnapshot: Sendable {
   package let structuralPath: StructuralPath
   package let focusedValues: FocusedValues
   package let ownerNodeID: SwiftTUICore.ViewNodeID?
+  package let stateOwnerHandle: StateOwnerHandle?
   package let stateGraphScope: StateGraphScopeID?
 
   @MainActor
@@ -202,6 +173,7 @@ package struct CapturedAuthoringContextSnapshot: Sendable {
     structuralPath = context.structuralPath
     focusedValues = context.focusedValues
     ownerNodeID = context.ownerNodeID
+    stateOwnerHandle = context.stateOwnerHandle
     stateGraphScope = graphScopeID(for: context)
   }
 
@@ -216,6 +188,7 @@ package struct CapturedAuthoringContextSnapshot: Sendable {
       focusedValues: focusedValues,
       viewNode: nil,
       ownerNodeID: ownerNodeID,
+      stateOwnerHandle: stateOwnerHandle,
       stateGraphScope: stateGraphScope,
       ordinalTracker: ordinalTracker
     )
@@ -272,6 +245,7 @@ package func dynamicPropertyAuthoringContext(
       focusedValues: context.focusedValues,
       viewNode: viewNode,
       ownerNodeID: current.ownerNodeID,
+      stateOwnerHandle: current.stateOwnerHandle,
       stateGraphScope: current.stateGraphScope,
       ordinalTracker: current.ordinalTracker,
       rebasedFromOwnerNodeID: current.rebasedFromOwnerNodeID
@@ -341,13 +315,14 @@ package func withAuthoringContext<Result>(
 /// A sendable snapshot of the graph-scoped authoring identity an imperative
 /// callback should mutate through when it fires outside a resolve pass.
 ///
-/// The snapshot intentionally stores identity and focused values only. It must
-/// not retain the `ViewNode`; callbacks recover the current graph-bound state
-/// location through the identity captured at registration time.
+/// The snapshot does not retain the `ViewNode`; callbacks recover graph-backed
+/// state only through the captured owner-lifetime handle. Authored identity is
+/// retained for invalidation/registration metadata, never as successor proof.
 package struct ImperativeAuthoringContextSnapshot: Sendable {
   package let viewIdentity: Identity
   package let focusedValues: FocusedValues
   package let ownerNodeID: SwiftTUICore.ViewNodeID?
+  package let stateOwnerHandle: StateOwnerHandle?
   package let stateGraphScope: StateGraphScopeID?
   /// The environment ambient where the handler was registered — its lexical
   /// position in the hierarchy. Unlike `focusedValues` (runtime state, read
@@ -368,6 +343,7 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
     viewIdentity = context.viewIdentity
     focusedValues = context.focusedValues
     ownerNodeID = context.ownerNodeID
+    stateOwnerHandle = context.stateOwnerHandle
     stateGraphScope = graphScopeID(for: context)
     environmentValues = EnvironmentValuesStorage.current
   }
@@ -376,12 +352,14 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
     viewIdentity: Identity,
     focusedValues: FocusedValues,
     ownerNodeID: SwiftTUICore.ViewNodeID?,
+    stateOwnerHandle: StateOwnerHandle?,
     stateGraphScope: StateGraphScopeID?,
     environmentValues: EnvironmentValues?
   ) {
     self.viewIdentity = viewIdentity
     self.focusedValues = focusedValues
     self.ownerNodeID = ownerNodeID
+    self.stateOwnerHandle = stateOwnerHandle
     self.stateGraphScope = stateGraphScope
     self.environmentValues = environmentValues
   }
@@ -399,6 +377,7 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
       viewIdentity: viewIdentity,
       focusedValues: focusedValues,
       ownerNodeID: ownerNodeID,
+      stateOwnerHandle: stateOwnerHandle,
       stateGraphScope: stateGraphScope,
       environmentValues: environmentValues ?? self.environmentValues
     )
@@ -418,6 +397,7 @@ package struct ImperativeAuthoringContextSnapshot: Sendable {
       viewIdentity: viewIdentity,
       focusedValues: liveFocusedValues ?? focusedValues,
       ownerNodeID: ownerNodeID,
+      stateOwnerHandle: stateOwnerHandle,
       stateGraphScope: stateGraphScope
     )
   }

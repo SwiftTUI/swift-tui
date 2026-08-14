@@ -27,7 +27,30 @@ package enum FocusBindingKeySuffix: Hashable, Sendable, CustomStringConvertible 
   }
 }
 
-package typealias FocusBindingKey = ViewNodeRuntimeKey<FocusBindingKeySuffix>
+/// Stable focus-storage registration identity. A raw `ViewNodeID` can be
+/// rewound by checkpoint rollback, so focus bindings use the same graph +
+/// owner-lifetime address as State storage. Local/legacy bindings stay
+/// owner-less and carry their identity entirely in the suffix.
+package struct FocusBindingKey: Hashable, Sendable, CustomStringConvertible {
+  package var owner: StateOwnerHandle?
+  package var suffix: FocusBindingKeySuffix
+
+  package init(
+    owner: StateOwnerHandle?,
+    suffix: FocusBindingKeySuffix
+  ) {
+    self.owner = owner
+    self.suffix = suffix
+  }
+
+  package var description: String {
+    let ownerDescription =
+      owner.map { owner in
+        "graph:\(owner.graphScope.rawValue)/owner:\(owner.ownerLifetime.rawValue)"
+      } ?? "unowned"
+    return "\(ownerDescription)#\(suffix)"
+  }
+}
 
 package struct DefaultFocusScopeRegistrationSnapshot: Equatable, Sendable {
   package var namespace: MatchedGeometryNamespace
@@ -356,7 +379,7 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     self.init(
       identity: identity,
       bindingKey: FocusBindingKey(
-        ownerNodeID: nil,
+        owner: nil,
         suffix: .legacy(bindingID)
       ),
       bindingID: bindingID,
@@ -417,7 +440,7 @@ package final class LocalFocusBindingRegistry: Equatable {
     register(
       identity: identity,
       bindingKey: FocusBindingKey(
-        ownerNodeID: nil,
+        owner: nil,
         suffix: .legacy(bindingID)
       ),
       bindingID: bindingID,

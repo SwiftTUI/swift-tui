@@ -1,5 +1,23 @@
 public import SwiftTUICore
 
+/// Reuse currency for ancestor gesture suppression.
+///
+/// `gestureSuppressionScopes` is resolve-only registration state and is not
+/// itself part of the graph's retained-reuse key. Mirroring the exact scope
+/// chain into the environment snapshot makes a live mask flip deny reuse only
+/// below the attachment whose descendant policy changed. The next resolve then
+/// republishes recognizers and pointer routes exactly as a fresh build would.
+private struct GestureSuppressionScopesEnvironmentKey: EnvironmentKey {
+  static var defaultValue: [Identity] { [] }
+}
+
+extension EnvironmentValues {
+  package var gestureSuppressionScopesForReuse: [Identity] {
+    get { self[GestureSuppressionScopesEnvironmentKey.self] }
+    set { self[GestureSuppressionScopesEnvironmentKey.self] = newValue }
+  }
+}
+
 // MARK: - View.gesture(_:including:)
 
 extension View {
@@ -77,6 +95,10 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     var contentContext = context
     if !mask.contains(.subviews) {
       contentContext.gestureSuppressionScopes.append(context.identity)
+      contentContext = contentContext.settingEnvironment(
+        \.gestureSuppressionScopesForReuse,
+        to: contentContext.gestureSuppressionScopes
+      )
     }
     // Resolve the content first so its identity and region exist.
     var node = content.resolve(in: contentContext)

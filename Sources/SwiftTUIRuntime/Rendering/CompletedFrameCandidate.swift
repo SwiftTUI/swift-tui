@@ -1,4 +1,5 @@
 import SwiftTUICore
+import SwiftTUIViews
 
 /// Completed async frame before actual commit.
 ///
@@ -10,6 +11,10 @@ struct CompletedFrameCandidate {
   var tailOutput: AsyncFrameTailDraftOutput
   var resolved: ResolvedNode
   var workerTimings: FrameWorkerTimings?
+  /// Value-only outgoing-tab snapshots read while the suspended committed
+  /// graph is still live. Commit applies them after prepared materialization;
+  /// a dropped candidate discards them without mutating the graph.
+  var dormantTabArchiveRefreshes: [DormantTabArchiveCommitRefresh]
   /// Commit preview used only for drop classification. The live graph and
   /// runtime registrations are checkpoint-restored after building it; actual
   /// side effects are applied only by `commitCompletedFrameCandidate`.

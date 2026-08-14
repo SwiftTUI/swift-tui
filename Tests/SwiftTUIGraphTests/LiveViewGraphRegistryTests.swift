@@ -48,4 +48,19 @@ struct LiveViewGraphRegistryTests {
     #expect(LiveViewGraphRegistry.graph(for: scopeA) == nil)
     #expect(LiveViewGraphRegistry.graph(for: scopeB) === b)
   }
+
+  @Test("graph scope identities are monotonic lifetime tokens, not object addresses")
+  func graphScopeIdentitiesDoNotReuseRetiredObjectAddresses() {
+    var graph: ViewGraph? = ViewGraph()
+    let retiredScope = StateGraphScopeID(graph!)
+    graph = nil
+    #expect(LiveViewGraphRegistry.graph(for: retiredScope) == nil)
+
+    // Immediate deallocate/reallocate exercises the allocator's address-reuse
+    // path. A scope is a graph lifetime, so the successor may never receive
+    // the retired token even when its object address is recycled.
+    let successor = ViewGraph()
+    #expect(StateGraphScopeID(successor) != retiredScope)
+    #expect(LiveViewGraphRegistry.graph(for: retiredScope) == nil)
+  }
 }

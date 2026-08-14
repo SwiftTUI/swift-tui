@@ -203,7 +203,11 @@ public struct Binding<Value> {
 
 extension Binding: Sendable where Value: Sendable {}
 
-extension Binding: DynamicProperty {}
+extension Binding: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}
 
 @dynamicMemberLookup
 @propertyWrapper
@@ -244,14 +248,14 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
   }
 }
 
-/// `Bindable` is the one built-in wrapper whose storage is a plain stored
-/// property rather than a reference box or closure pair, so its conformance
-/// is deliberately inert: there is no location to bind in ``update()``, and
-/// mutations to the stored model *reference* made during an update pass run
-/// on a copy and do not persist (the ratified copy-semantics divergence).
-/// Observable reads and writes through the model keep their existing
+/// `Bindable` stores an observable reference directly. There is no location
+/// to bind during update; observable accesses retain their existing tracked
 /// invalidation path.
-extension Bindable: DynamicProperty {}
+extension Bindable: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}
 
 /// The primary axis used by directional layout and scrolling APIs.
 public enum Axis {

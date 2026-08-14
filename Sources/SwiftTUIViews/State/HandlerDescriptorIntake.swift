@@ -33,7 +33,11 @@ import SwiftTUICore
 // - `fallbackAuthoringScope:` / `fallbackSnapshot:` — the resolve-time
 //   ambient context wins; the stored scope/snapshot from the public API call
 //   site is the fallback for registrations that resolve outside an authoring
-//   pass. Modifier-family order (keyCommand, toggle, lifecycle).
+//   pass. Modifier-family order (toggle, lifecycle).
+// - `preferringSnapshot:` — a public-API capture wins over the resolve-time
+//   ambient. Handler modifiers such as `keyCommand` use this when their action
+//   closes over the enclosing body's dynamic properties; a lower registration
+//   node is not that storage owner and may retire independently.
 
 @MainActor
 package struct HandlerDescriptorIntake {

@@ -128,6 +128,7 @@ private struct PerfTextEditingView: View {
       Text("buf:\(text)|")
       TextField("perf-input", text: $text)
         .textFieldStyle(.plain)
+        .padding(1)
         .frame(maxWidth: 40, alignment: .leading)
         .border(.separator)
       Divider()
@@ -139,6 +140,7 @@ private struct PerfTextEditingView: View {
           Text("value \(row * 7)")
             .foregroundStyle(.separator)
         }
+        .padding(1)
         .border(.separator)
       }
     }

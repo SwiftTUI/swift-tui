@@ -1,23 +1,86 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
+package struct AccessibilityVisualLabelRoutes: Sendable {
+  package var inferredRolesByTraversalOrdinal: [Int: AccessibilityRole] = [:]
+  package var claimedVisualTraversalOrdinals: Set<Int> = []
+}
+
+private struct AccessibilityVisualCandidate: Sendable {
+  var traversalOrdinal: Int
+  var role: AccessibilityRole
+}
+
+private enum AccessibilityVisualCandidateSummary: Sendable {
+  case none
+  case unique(AccessibilityVisualCandidate)
+  case ambiguous
+
+  mutating func merge(_ other: Self) {
+    switch (self, other) {
+    case (_, .none):
+      break
+    case (.none, _):
+      self = other
+    case (.unique, .unique), (.unique, .ambiguous), (.ambiguous, .unique),
+      (.ambiguous, .ambiguous):
+      self = .ambiguous
+    }
+  }
+}
+
 extension SemanticExtractor {
-  func accessibilityNodes(
+  func accessibilityNodesAndVisualLabelRoutes(
     from root: PlacedNode,
     focusRegions: [FocusRegion]
-  ) -> [AccessibilityNode] {
+  ) -> (nodes: [AccessibilityNode], visualLabelRoutes: AccessibilityVisualLabelRoutes) {
     let focusIdentities = accessibilityFocusIdentities(from: focusRegions)
     let textInputCursorAnchors = textInputAccessibilityCursorAnchors(from: root)
+    var visualLabelRoutes = AccessibilityVisualLabelRoutes()
+    var visualCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
     var emittedSubtrees: Set<Identity> = []
     var hiddenDescendantSubtrees: Set<Identity> = []
-    var stack: [(node: PlacedNode, isExit: Bool)] = [(root, false)]
+    var nextTraversalOrdinal = 0
+    var stack:
+      [(
+        node: PlacedNode,
+        traversalOrdinal: Int?,
+        parentTraversalOrdinal: Int?
+      )] = [(root, nil, nil)]
 
     while let frame = stack.popLast() {
       let node = frame.node
-      if node.isTransient || node.semanticMetadata.accessibilityHidden {
-        continue
-      }
+      if let traversalOrdinal = frame.traversalOrdinal {
+        var visualCandidateSummary: AccessibilityVisualCandidateSummary = .none
+        if node.semanticMetadata.accessibilityRole == .image,
+          accessibilityVisualContentIsUnlabeled(node)
+        {
+          visualCandidateSummary = .unique(
+            AccessibilityVisualCandidate(
+              traversalOrdinal: traversalOrdinal,
+              role: .image
+            )
+          )
+        }
+        if let childSummary = visualCandidateSummaries.removeValue(
+          forKey: traversalOrdinal
+        ) {
+          visualCandidateSummary.merge(childSummary)
+        }
+        if hasNonEmptyAccessibilityLabel(node.semanticMetadata.accessibilityLabel),
+          case .unique(let candidate) = visualCandidateSummary
+        {
+          visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal] = candidate.role
+          visualLabelRoutes.claimedVisualTraversalOrdinals.insert(
+            candidate.traversalOrdinal
+          )
+          visualCandidateSummary = .none
+        }
+        if let parentTraversalOrdinal = frame.parentTraversalOrdinal {
+          visualCandidateSummaries[parentTraversalOrdinal, default: .none].merge(
+            visualCandidateSummary
+          )
+        }
 
-      if frame.isExit {
         let childSummary = accessibilityChildSummary(
           for: node,
           emittedSubtrees: emittedSubtrees,
@@ -32,17 +95,26 @@ extension SemanticExtractor {
           hiddenDescendantSubtrees.insert(node.identity)
         }
       } else {
-        stack.append((node, true))
+        let traversalOrdinal = nextTraversalOrdinal
+        nextTraversalOrdinal += 1
+        if node.isTransient || node.semanticMetadata.accessibilityHidden {
+          continue
+        }
+
+        stack.append((node, traversalOrdinal, frame.parentTraversalOrdinal))
         for child in node.children.reversed() {
-          stack.append((child, false))
+          stack.append((child, nil, traversalOrdinal))
         }
       }
     }
 
     var nodes: [AccessibilityNode] = []
+    var nextEmitTraversalOrdinal = 0
     var emitStack: [(node: PlacedNode, emittedParentIdentity: Identity?)] = [(root, nil)]
     while let frame = emitStack.popLast() {
       let node = frame.node
+      let traversalOrdinal = nextEmitTraversalOrdinal
+      nextEmitTraversalOrdinal += 1
       if node.isTransient || node.semanticMetadata.accessibilityHidden {
         continue
       }
@@ -61,7 +133,9 @@ extension SemanticExtractor {
           hasEmittedChild: childSummary.hasEmittedChild,
           hasHiddenDescendant: childSummary.hasHiddenDescendant,
           focusIdentities: focusIdentities,
-          textInputCursorAnchors: textInputCursorAnchors
+          textInputCursorAnchors: textInputCursorAnchors,
+          inferredVisualRole:
+            visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal]
         ) {
           nodes.append(accessibilityNode)
           childParentIdentity = node.identity
@@ -73,22 +147,27 @@ extension SemanticExtractor {
       }
     }
 
-    return nodes
+    return (nodes, visualLabelRoutes)
   }
 
   func accessibilityWarnings(
-    from root: PlacedNode
+    from root: PlacedNode,
+    visualLabelRoutes: AccessibilityVisualLabelRoutes
   ) -> [AccessibilityWarning] {
     var warnings: [AccessibilityWarning] = []
+    var nextTraversalOrdinal = 0
     var stack = [root]
 
     while let node = stack.popLast() {
+      let traversalOrdinal = nextTraversalOrdinal
+      nextTraversalOrdinal += 1
       if node.isTransient || node.semanticMetadata.accessibilityHidden {
         continue
       }
 
       if let visualContent = node.semanticMetadata.accessibilityVisualContent,
-        accessibilityVisualContentIsUnlabeled(node)
+        accessibilityVisualContentIsUnlabeled(node),
+        !visualLabelRoutes.claimedVisualTraversalOrdinals.contains(traversalOrdinal)
       {
         warnings.append(
           AccessibilityWarning(
@@ -167,7 +246,8 @@ extension SemanticExtractor {
     hasEmittedChild: Bool,
     hasHiddenDescendant: Bool,
     focusIdentities: Set<Identity>,
-    textInputCursorAnchors: [Identity: CellPoint]
+    textInputCursorAnchors: [Identity: CellPoint],
+    inferredVisualRole: AccessibilityRole?
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
       node,
@@ -178,7 +258,8 @@ extension SemanticExtractor {
       let role = accessibilityRole(
         for: node,
         isRelevant: selfIsRelevant,
-        hasEmittedChild: hasEmittedChild
+        hasEmittedChild: hasEmittedChild,
+        inferredVisualRole: inferredVisualRole
       )
     else {
       return nil
@@ -232,10 +313,14 @@ extension SemanticExtractor {
   private func accessibilityRole(
     for node: PlacedNode,
     isRelevant: Bool,
-    hasEmittedChild: Bool
+    hasEmittedChild: Bool,
+    inferredVisualRole: AccessibilityRole?
   ) -> AccessibilityRole? {
     if let role = node.semanticMetadata.accessibilityRole {
       return role
+    }
+    if let inferredVisualRole {
+      return inferredVisualRole
     }
     if isRelevant || hasEmittedChild {
       return .group
@@ -267,7 +352,7 @@ extension SemanticExtractor {
     _ role: AccessibilityRole
   ) -> Bool {
     switch role {
-    case .button, .link, .tab, .menuItem, .heading:
+    case .button, .link, .tab, .menuItem, .heading, .status:
       true
     default:
       false

@@ -1311,3 +1311,161 @@ private struct GestureScroll025Fixture: View {
       .frame(width: 38, height: 6, alignment: .topLeading)
   }
 }
+
+// MARK: - Attempt 026: ancestor mask flip over retained gesture routes
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 026 ancestor mask flip republishes retained descendant roles")
+  func gestureScroll026AncestorMaskFlipRepublishesRetainedDescendantRoles() throws {
+    // Hypothesis: the ancestor body re-resolves when `suppressesSubviews`
+    // changes, but a value-equal gesture-bearing child can take memoized reuse
+    // and replay the registration authored under the previous mask.
+    let events = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll026Root"),
+      size: .init(width: 48, height: 8)
+    ) {
+      GestureScroll026Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("Retained gesture target")
+    #expect(events.value.contains("child-high"))
+    #expect(events.value.contains("child-simultaneous"))
+
+    events.value = []
+    _ = try harness.clickText("Suppress child gestures")
+    _ = try harness.clickText("Retained gesture target")
+    #expect(events.value == ["ancestor"])
+    #expect(harness.gestureRecognizerCount == 1)
+
+    events.value = []
+    _ = try harness.clickText("Restore child gestures")
+    _ = try harness.clickText("Retained gesture target")
+    #expect(events.value.contains("child-high"))
+    #expect(events.value.contains("child-simultaneous"))
+    #expect(harness.gestureRecognizerCount == 2)
+  }
+}
+
+private struct GestureScroll026Fixture: View {
+  let events: GestureScrollBox<[String]>
+  @State private var suppressesSubviews = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button(
+        suppressesSubviews ? "Restore child gestures" : "Suppress child gestures"
+      ) {
+        suppressesSubviews.toggle()
+      }
+
+      VStack(alignment: .leading, spacing: 0) {
+        GestureScroll026RetainedChild(events: events)
+          .equatable()
+      }
+      .gesture(
+        TapGesture().onEnded { events.value.append("ancestor") },
+        including: suppressesSubviews ? .gesture : .all
+      )
+    }
+  }
+}
+
+private struct GestureScroll026RetainedChild: View, Equatable {
+  let events: GestureScrollBox<[String]>
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.events === rhs.events
+  }
+
+  var body: some View {
+    Text("Retained gesture target")
+      .frame(width: 30, height: 1, alignment: .leading)
+      .gesture(TapGesture().onEnded { events.value.append("child-ordinary") })
+      .highPriorityGesture(
+        TapGesture().onEnded { events.value.append("child-high") }
+      )
+      .simultaneousGesture(
+        TapGesture().onEnded { events.value.append("child-simultaneous") }
+      )
+  }
+}
+
+// MARK: - Attempt 027: live mask flip retires an active descendant
+
+extension FrameworkStressGestureScrollTests {
+  @Test("stress gesture scroll 027 live mask flip retires an active descendant recognizer")
+  func gestureScroll027LiveMaskFlipRetiresActiveDescendantRecognizer() throws {
+    let events = GestureScrollBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GestureScroll027Root"),
+      size: .init(width: 48, height: 6)
+    ) {
+      GestureScroll027Fixture(events: events)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Active masked drag"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+
+    // The descendant's first active callback flips its ancestor to `.gesture`.
+    // Publication must retire the live recognizer immediately; keeping an
+    // active recognizer across the flip would diverge from the fresh-build
+    // registration set and let later samples reach departed behavior.
+    #expect(events.value == ["child-changed"])
+    #expect(harness.gestureRecognizerCount == 1)
+
+    _ = try harness.sendMouse(
+      .dragged(.primary),
+      at: Point(x: start.x + 3, y: start.y)
+    )
+    _ = try harness.sendMouse(
+      .up(.primary),
+      at: Point(x: start.x + 3, y: start.y)
+    )
+    #expect(events.value == ["child-changed"])
+  }
+}
+
+private struct GestureScroll027Fixture: View {
+  let events: GestureScrollBox<[String]>
+  @State private var suppressesSubviews = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      GestureScroll027RetainedChild(
+        suppressesSubviews: $suppressesSubviews,
+        events: events
+      )
+      .equatable()
+    }
+    .gesture(
+      TapGesture().onEnded { events.value.append("ancestor-ended") },
+      including: suppressesSubviews ? .gesture : .all
+    )
+  }
+}
+
+private struct GestureScroll027RetainedChild: View, Equatable {
+  let suppressesSubviews: Binding<Bool>
+  let events: GestureScrollBox<[String]>
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.events === rhs.events
+  }
+
+  var body: some View {
+    Text("Active masked drag")
+      .frame(width: 28, height: 2, alignment: .leading)
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { _ in
+            guard !suppressesSubviews.wrappedValue else { return }
+            events.value.append("child-changed")
+            suppressesSubviews.wrappedValue = true
+          }
+          .onEnded { _ in events.value.append("child-ended") }
+      )
+  }
+}

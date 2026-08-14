@@ -76,6 +76,7 @@ private final class RecordingAnimationSink:
 
   func registerCompletion(
     batchID _: AnimationBatchID,
+    barrier _: AnimationCompletionBarrier = .logicallyComplete,
     closure _: @escaping @MainActor @Sendable () -> Void
   ) {}
 

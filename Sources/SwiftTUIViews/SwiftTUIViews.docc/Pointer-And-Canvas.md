@@ -94,7 +94,11 @@ receiving the same stream alongside a high-priority recognizer.
 
 All three attachment modifiers honor ``GestureMask``. In particular,
 `including: .subviews` omits the gesture at the modified view, while
-`including: .gesture` omits descendant gesture attachments.
+`including: .gesture` omits descendant gesture attachments. Gesture modifier
+levels stacked at the exact attachment identity are self gestures rather than
+subviews. The ancestor-suppression scope is retained-reuse currency, so changing
+a live mask republishes a spared gesture-bearing subtree without requiring an
+unrelated descendant state change.
 
 ## Coordinate Spaces And Hit Testing
 

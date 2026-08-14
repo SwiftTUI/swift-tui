@@ -8,7 +8,7 @@ import Testing
 // shapes the static field metadata cannot prove (existential-typed fields,
 // class and enum containers) keep the per-instance `Mirror` walk with
 // identical discovery semantics. Behavioral equivalence of the two extraction
-// mechanisms is pinned here via update() event logs; the pass's ordering,
+// mechanisms is pinned here via update(in:) event logs; the pass's ordering,
 // nesting, and slot-identity contracts stay pinned by
 // `DynamicPropertyUpdatePassTests`.
 @MainActor
@@ -25,14 +25,21 @@ private final class PlanEventLog {
 private struct PlanRecorder: DynamicProperty {
   private let log: PlanEventLog
   private let tag: String
+  private let result: DynamicPropertyUpdateResult
 
-  init(log: PlanEventLog, tag: String) {
+  init(
+    log: PlanEventLog,
+    tag: String,
+    result: DynamicPropertyUpdateResult = .unchanged
+  ) {
     self.log = log
     self.tag = tag
+    self.result = result
   }
 
-  mutating func update() {
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     log.append("update:\(tag)")
+    return result
   }
 
   var wrappedValue: String {
@@ -67,6 +74,16 @@ private struct ExistentiallyTypedContainer {
 }
 
 @MainActor
+private struct PlainFirstExistentialContainer {
+  var boxed: Any
+}
+
+@MainActor
+private struct DynamicFirstExistentialContainer {
+  var boxed: Any
+}
+
+@MainActor
 private final class ClassContainer {
   @PlanRecorder var stored: String
 
@@ -83,6 +100,23 @@ private enum EnumContainer {
 
 private struct PlainContainer {
   var value = 7
+}
+
+@MainActor
+private struct UncertifiedProperty: DynamicProperty {}
+
+@MainActor
+private struct UncertifiedContainer {
+  var property = UncertifiedProperty()
+}
+
+@MainActor
+private struct ChangedContainer {
+  var property: PlanRecorder
+
+  init(log: PlanEventLog) {
+    property = PlanRecorder(log: log, tag: "changed", result: .changed)
+  }
 }
 
 @MainActor
@@ -115,6 +149,53 @@ struct DynamicPropertyUpdatePlanTests {
     #expect(log.events == ["update:boxed"], "the fallback walk must still update the boxed wrapper")
   }
 
+  @Test("a plain-first existential field discovers a later DynamicProperty value")
+  func plainFirstExistentialDoesNotCacheAnEmptyPlan() {
+    let log = PlanEventLog()
+
+    runDynamicPropertyUpdatePass(
+      on: PlainFirstExistentialContainer(boxed: "plain")
+    )
+    #expect(
+      DynamicPropertyDescriptorCache.diagnosticPlanKind(
+        reflecting: PlainFirstExistentialContainer(boxed: "plain")
+      ) == .mirrorWalk
+    )
+    runDynamicPropertyUpdatePass(
+      on: PlainFirstExistentialContainer(
+        boxed: PlanRecorder(log: log, tag: "plain-first-dynamic")
+      )
+    )
+
+    #expect(log.events == ["update:plain-first-dynamic"])
+    #expect(
+      DynamicPropertyDescriptorCache.hasCachedPlan(
+        for: PlainFirstExistentialContainer.self
+      )
+    )
+  }
+
+  @Test("a dynamic-first existential plan tolerates plain values and updates later wrappers")
+  func dynamicFirstExistentialPlanRemainsValueConditional() {
+    let log = PlanEventLog()
+
+    runDynamicPropertyUpdatePass(
+      on: DynamicFirstExistentialContainer(
+        boxed: PlanRecorder(log: log, tag: "dynamic-first")
+      )
+    )
+    runDynamicPropertyUpdatePass(
+      on: DynamicFirstExistentialContainer(boxed: 17)
+    )
+    runDynamicPropertyUpdatePass(
+      on: DynamicFirstExistentialContainer(
+        boxed: PlanRecorder(log: log, tag: "dynamic-again")
+      )
+    )
+
+    #expect(log.events == ["update:dynamic-first", "update:dynamic-again"])
+  }
+
   @Test("a class container keeps the Mirror walk and still updates")
   func classContainerFallsBackToMirrorWalk() {
     let log = PlanEventLog()
@@ -145,5 +226,12 @@ struct DynamicPropertyUpdatePlanTests {
       DynamicPropertyDescriptorCache.diagnosticPlanKind(reflecting: PlainContainer()) == .empty
     )
     #expect(DynamicPropertyDescriptorCache.hasCachedPlan(for: PlainContainer.self))
+  }
+
+  @Test("update results aggregate conservatively")
+  func updateResultsAggregateConservatively() {
+    let log = PlanEventLog()
+    #expect(runDynamicPropertyUpdatePass(on: ChangedContainer(log: log)) == .changed)
+    #expect(runDynamicPropertyUpdatePass(on: UncertifiedContainer()) == .uncertified)
   }
 }

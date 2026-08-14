@@ -8,6 +8,16 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed — source-breaking (0.9 preview readiness)
+
+The preview-readiness closure deliberately narrows two extension points before
+they become compatibility promises:
+
+| Removed or changed | Replacement |
+| --- | --- |
+| `DynamicProperty.mutating update()` | `DynamicProperty.update(in:) -> DynamicPropertyUpdateResult`. The nonmutating contract supports reference-backed or composed graph storage, conservative reuse certification, and lifetime-scoped async invalidation. Plain value mutation now fails to conform instead of being silently discarded. |
+| Public `Transition` / `TransitionContent` custom-transition authoring and `AnyTransition.init(_:)` | The implemented built-in `AnyTransition` palette: opacity, move, offset, combined, and asymmetric effects. |
+
 ### Changed — source-breaking (control-style Phase A)
 
 Phase A of the control-style expansion empties the program's break inventory
@@ -58,12 +68,12 @@ so each migration is a deterministic source edit.
   subtree, nested fades multiply (0.4 × 0.5 = 0.2), and the explicit-reset
   pattern (`.opacity(0.4)` … `.opacity(1)`) yields 0.4 instead of 1.0 —
   the same-node metadata merge multiplies instead of replacing. Shape
-  fills, strokes, rules, borders, canvas foregrounds, and list/table chrome
-  now honor the factor too (a `.opacity` directly on a shape leaf was
-  previously dropped). Image attachments still cannot carry the factor —
-  recorded as a register gap. Retained draw reuse verifies the inherited
-  factor before serving a cached subtree, so an ancestor-only fade repaints
-  descendants correctly.
+  fills, strokes, rules, borders, canvas foregrounds, list/table chrome, and
+  still-image attachments now honor the factor too (a `.opacity` directly on
+  a shape or image leaf was previously dropped). Image alpha is transported
+  through terminal, browser/WASI, SwiftUI-host, and Android presentation;
+  retained draw reuse verifies the inherited factor before serving a cached
+  subtree, so an ancestor-only fade repaints descendants correctly.
 - **List/Table rows honor authored text attributes.** Authored or ambient
   `lineLimit`/`truncationMode` now reach hosted rows and table cells
   (`Table`'s hosted cells default to single-line tail truncation instead of
@@ -124,26 +134,55 @@ so each migration is a deterministic source edit.
   reset snaps. Resolve-time resets (recognizer teardown, subtree removal)
   never animate.
 
-- **`DynamicProperty` — the custom-property-wrapper extension point.** The
-  protocol matches SwiftUI's shape (`mutating func update()`, `@MainActor`,
-  no-op default), and all nine built-in wrappers conform (`State`,
-  `Binding`, `Bindable`, `Environment`, `FocusState`, `GestureState`,
-  `Namespace`, `FocusedValue`, `FocusedBinding`). Before each body
-  evaluation — on every surface: composed bodies, framework primitives, and
-  `ViewModifier` bodies — the framework discovers a view's conforming
-  stored properties (reflect-once-per-type descriptor cache; wrapper-free
-  views pay one dictionary lookup) and runs `update()` nested-first under
-  the body's ambient authoring scope. Wrappers composed inside a discovered
-  dynamic property get **path-qualified slot identity**: two instances of
-  one composed wrapper now hold distinct `@State`/`@FocusState`/
-  `@GestureState` storage instead of silently sharing the wrapper's
-  declaration-site slot. Composition in types that do not conform keeps the
-  legacy shared-slot behavior and now reports a `state.duplicateSlotClaim`
-  runtime issue; the different-value-type collision keeps trapping, with
-  the slot's decoded source position and discovery path in the message.
-  `update()` runs on a copy — mutations to plain stored properties do not
-  persist (a recorded divergence; see the "Custom dynamic properties"
-  documentation article for the authoring contract).
+- **`DynamicProperty` — a total custom-property-wrapper extension point.**
+  `update(in:)` runs nested-first before the graph's sole retained-reuse door
+  on every body and primitive evaluation surface. Its result certifies
+  `unchanged`, reports `changed`, or defaults third-party storage to
+  conservative `uncertified`; a transitive subtree bit carries that decision
+  through retained reuse without walking the live graph. Built-in wrappers
+  preserve the cheap certified path and path-qualified composed storage.
+  `DynamicPropertyContext` supplies a graph/node/generation-scoped async
+  invalidation lease whose callbacks become inert after supersession,
+  rollback, wrapper departure, subtree removal, or graph retirement.
+
+- **Dormant `TabView` state.** Deselecting a tab tears down its body, render
+  tree, tasks, registrations, gestures, and observation edges while archiving
+  only persistent graph-owned value slots. Reselecting the same stable tag
+  within the same tab-owner lifetime restores state before body evaluation;
+  inactive bodies remain unevaluated, and removed tags or owner replacement
+  evict the archive. Persistent slots that contain a class, task/native object,
+  closure/binding, unmanaged reference, or pointer are not retained across the
+  dormant seam; the runtime emits `tab.dormantStateUnsupportedValue` with a
+  remedy to use recursively value-only state or hoist ownership above the tab.
+
+### Changed — preview behavior
+
+- **Stable captured output is separate from accessibility reduce motion.**
+  CI/non-TTY detection and the new stable-output option make built-in animated
+  presentation deterministic without changing what app code reads from
+  `accessibilityReduceMotion`. Only explicit user/host reduce-motion input sets
+  the accessibility preference; built-in animation consults the combined
+  rendering policy.
+
+- **Picker degradation is fail-loud.** A tagged, unmodified `Text` remains the
+  lossless option shape. Unsupported option structure or modifiers keep their
+  extracted text and tag routing but emit one deduplicated
+  `picker.unrepresentableOptionContent` runtime issue per option identity.
+
+- **Live ancestor `GestureMask` changes refresh retained descendants.** The
+  exact suppression scope now participates in reuse currency, so ordinary,
+  high-priority, and simultaneous recognizer installation/removal matches a
+  fresh resolve even when the descendant body is retained.
+
+- **Animation completion criteria now have distinct barriers.**
+  `.logicallyComplete` fires when every carrier reaches its final value;
+  `.removed` waits until every exit overlay is drained. Both remain immediate
+  for empty or disabled batches and fire exactly once.
+
+- **Default fill and border behavior aligns with the preview contract.**
+  `Path.contains` and implicit rendering use nonzero fill unless `.evenOdd` is
+  explicit. Unlabeled/default `border` placement is inset and does not expand
+  sibling allocation; `.outset` remains explicit.
 
 ### Fixed
 

@@ -1,9 +1,43 @@
-import Testing
 @_spi(Runners) import SwiftTUI
 @_spi(Runners) import SwiftTUIRuntime
+import Testing
+
 @_spi(Runners) @testable import TermUIPerf
 
 struct PerfTerminalHostTests {
+  @Test("frame arriving during the final idle sleep is still observed")
+  @MainActor
+  func frameArrivingDuringFinalIdleSleepIsObserved() async throws {
+    let host = PerfTerminalHost(size: PerfTerminalSize(columns: 8, rows: 1))
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+    var currentTime = startedAt
+    var sleepCount = 0
+
+    let frame = try await PerfScenarioRunner.waitForFrameMatching(
+      in: host,
+      afterFrame: 0,
+      timeout: .milliseconds(1),
+      hardCap: .seconds(1),
+      timeoutMarker: "ready",
+      now: { currentTime },
+      sleep: {
+        sleepCount += 1
+        _ = try host.present(
+          RasterSurface(
+            size: CellSize(width: 8, height: 1),
+            lines: ["ready"]
+          ))
+        currentTime = startedAt.advanced(by: .milliseconds(2))
+      },
+      matches: { $0.text.contains("ready") }
+    )
+
+    #expect(sleepCount == 1)
+    #expect(frame.frameNumber == 1)
+    #expect(frame.text.contains("ready"))
+  }
+
   @Test("raster presentation records full repaint metrics")
   func rasterPresentationRecordsFullRepaintMetrics() throws {
     let host = PerfTerminalHost(size: PerfTerminalSize(columns: 6, rows: 2))

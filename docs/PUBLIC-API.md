@@ -38,9 +38,10 @@ The canonical public surface is the API ordinary app code uses first:
 - Property wrappers and environment plumbing: `@State`, `@Binding`,
   `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and the
   repo-owned `@Bindable`. Custom wrappers conform to `DynamicProperty`
-  (SwiftUI's shape; the `@MainActor mutating update()` requirement follows
-  the isolation model below). The authoring contract (copy semantics,
-  composition identity, the dependency-vocabulary rule for `update()`)
+  through the reference-backed
+  `update(in:) -> DynamicPropertyUpdateResult` contract. The context carries
+  a lifetime-scoped invalidation lease for asynchronous storage, and the
+  result explicitly certifies or denies reuse. The complete authoring contract
   lives in the DocC article
   [Custom-Dynamic-Properties.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Custom-Dynamic-Properties.md).
 - The modifier algebra: `ViewModifier`, `View.modifier(_:)`, `ModifiedContent`,

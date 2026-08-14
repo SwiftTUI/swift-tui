@@ -100,4 +100,36 @@ struct AnimationResolvedTreeSkipTests {
     #expect(controller.resolvedTreeProcessingSkipCount == 1)
     #expect(controller.debugStateSnapshot().previousTreeRoot == reused)
   }
+
+  @Test("graph animation-input token must match the processed baseline")
+  func graphAnimationInputTokenMustMatchProcessedBaseline() {
+    let controller = AnimationController()
+    let tree = ResolvedNode(
+      identity: Identity(components: ["AnimationSkipGraphToken"]),
+      kind: .view("Root")
+    )
+    let transactionPlan = FrameAnimationTransactionPlan(base: .init())
+    let timestamp = MonotonicInstant.now()
+
+    controller.processResolvedTree(
+      tree,
+      transactionPlan: transactionPlan,
+      timestamp: timestamp,
+      graphAnimationInputToken: 41
+    )
+
+    #expect(
+      controller.canSkipResolvedTreeProcessing(
+        transactionPlan: transactionPlan,
+        graphAnimationInputToken: 41
+      )
+    )
+    #expect(
+      !controller.canSkipResolvedTreeProcessing(
+        transactionPlan: transactionPlan,
+        graphAnimationInputToken: 42
+      ),
+      "a canonical graph write after animation processing must defeat a zero-work skip"
+    )
+  }
 }

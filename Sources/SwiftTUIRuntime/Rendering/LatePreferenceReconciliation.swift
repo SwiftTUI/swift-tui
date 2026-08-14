@@ -43,6 +43,17 @@ private enum LatePreferenceReconciliationStep {
 /// layout-realized content before semantics, draw, raster, and commit.
 struct LatePreferenceReconciliationStage {
   var policy: LatePreferenceReconciliationPolicy
+  /// Purely reapplies presentation values already sampled by the animation
+  /// stage. It must not advance curves or mutate animation bookkeeping.
+  var projectResolvedPresentation: @MainActor (ResolvedNode) -> ResolvedNode
+
+  init(
+    policy: LatePreferenceReconciliationPolicy,
+    projectResolvedPresentation: @escaping @MainActor (ResolvedNode) -> ResolvedNode = { $0 }
+  ) {
+    self.policy = policy
+    self.projectResolvedPresentation = projectResolvedPresentation
+  }
 
   @MainActor
   func run(
@@ -150,15 +161,16 @@ struct LatePreferenceReconciliationStage {
     shouldRelayoutLayoutRealizationSnapshot: (FrameTailInput) -> Bool = { _ in false }
   ) -> LatePreferenceReconciliationStep {
     let realizations = input.layoutPassContext.layoutDependentRealizationsByIdentity
-    let realized = input.resolved.applyingLayoutDependentRealizations(realizations)
-    let reconciliation = reconcileLatePreferenceConsumers(in: realized)
-    let runtimeIssues = layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
+    let canonicalRealized = input.canonicalResolved.applyingLayoutDependentRealizations(realizations)
+    let reconciliation = reconcileLatePreferenceConsumers(in: canonicalRealized)
+    let presented = projectResolvedPresentation(reconciliation.resolved)
+    let runtimeIssues = layoutRuntimeIssues(input: input, resolved: presented)
 
     if reconciliation.requiresRelayout {
       return .needsRelayout(
         relayoutInput(
           basedOn: input,
-          resolved: reconciliation.resolved
+          canonicalResolved: reconciliation.resolved
         )
       )
     }
@@ -168,7 +180,7 @@ struct LatePreferenceReconciliationStage {
     ) {
       let nextInput = relayoutInput(
         basedOn: input,
-        resolved: workerSnapshot
+        canonicalResolved: workerSnapshot
       )
       if shouldRelayoutLayoutRealizationSnapshot(nextInput) {
         return .needsRelayout(nextInput)
@@ -176,12 +188,13 @@ struct LatePreferenceReconciliationStage {
     }
 
     var finalInput = input
-    finalInput.resolved = reconciliation.resolved
+    finalInput.canonicalResolved = reconciliation.resolved
+    finalInput.resolved = presented
     return .finished(
       ReconciledFrameTailLayout(
         input: finalInput,
         layout: layout,
-        resolved: reconciliation.resolved,
+        resolved: presented,
         runtimeIssues: runtimeIssues
       )
     )
@@ -194,18 +207,20 @@ struct LatePreferenceReconciliationStage {
     budget: Int,
     renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
   ) -> ReconciledFrameTailLayout {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
+    let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let presented = projectResolvedPresentation(reconciliation.resolved)
     if !reconciliation.requiresRelayout {
       var finalInput = input
-      finalInput.resolved = reconciliation.resolved
+      finalInput.canonicalResolved = reconciliation.resolved
+      finalInput.resolved = presented
       return ReconciledFrameTailLayout(
         input: finalInput,
         layout: layout,
-        resolved: reconciliation.resolved,
-        runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
+        resolved: presented,
+        runtimeIssues: layoutRuntimeIssues(input: input, resolved: presented)
       )
     }
 
@@ -213,7 +228,7 @@ struct LatePreferenceReconciliationStage {
     case .warnAndCommitLatestReconciledLayout:
       let finalInput = relayoutInput(
         basedOn: input,
-        resolved: reconciliation.resolved
+        canonicalResolved: reconciliation.resolved
       )
       var finalLayout = renderLayout(finalInput)
       foldLayoutShadow(layout.layoutShadow, into: &finalLayout)
@@ -232,19 +247,21 @@ struct LatePreferenceReconciliationStage {
     budget: Int,
     renderLayout: (FrameTailInput) async -> AsyncFrameTailLayoutPass
   ) async -> AsyncLatePreferenceReconciliationOutput {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
+    let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let presented = projectResolvedPresentation(reconciliation.resolved)
     if !reconciliation.requiresRelayout {
       var finalInput = input
-      finalInput.resolved = reconciliation.resolved
+      finalInput.canonicalResolved = reconciliation.resolved
+      finalInput.resolved = presented
       return .init(
         layout: ReconciledFrameTailLayout(
           input: finalInput,
           layout: layout,
-          resolved: reconciliation.resolved,
-          runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved)
+          resolved: presented,
+          runtimeIssues: layoutRuntimeIssues(input: input, resolved: presented)
         ),
         suspensionDuration: .zero
       )
@@ -252,7 +269,7 @@ struct LatePreferenceReconciliationStage {
 
     let finalInput = relayoutInput(
       basedOn: input,
-      resolved: reconciliation.resolved
+      canonicalResolved: reconciliation.resolved
     )
     let finalLayoutPass = await renderLayout(finalInput)
     guard var finalLayout = finalLayoutPass.layout else {
@@ -275,17 +292,19 @@ struct LatePreferenceReconciliationStage {
     layout: FrameTailLayoutOutput,
     budget: Int
   ) -> ReconciledFrameTailLayout {
-    let realized = input.resolved.applyingLayoutDependentRealizations(
+    let realized = input.canonicalResolved.applyingLayoutDependentRealizations(
       input.layoutPassContext.layoutDependentRealizationsByIdentity
     )
     let reconciliation = reconcileLatePreferenceConsumers(in: realized)
+    let presented = projectResolvedPresentation(reconciliation.resolved)
     var finalInput = input
-    finalInput.resolved = reconciliation.resolved
+    finalInput.canonicalResolved = reconciliation.resolved
+    finalInput.resolved = presented
     return ReconciledFrameTailLayout(
       input: finalInput,
       layout: layout,
-      resolved: reconciliation.resolved,
-      runtimeIssues: layoutRuntimeIssues(input: input, resolved: reconciliation.resolved) + [
+      resolved: presented,
+      runtimeIssues: layoutRuntimeIssues(input: input, resolved: presented) + [
         latePreferenceReconciliationLimitIssue(
           rootIdentity: input.rootIdentity,
           relayoutPassBudget: budget
@@ -294,13 +313,16 @@ struct LatePreferenceReconciliationStage {
     )
   }
 
+  @MainActor
   private func relayoutInput(
     basedOn input: FrameTailInput,
-    resolved: ResolvedNode
+    canonicalResolved: ResolvedNode
   ) -> FrameTailInput {
-    FrameTailInput(
+    let presented = projectResolvedPresentation(canonicalResolved)
+    return FrameTailInput(
       generation: input.generation,
-      resolved: resolved,
+      canonicalResolved: canonicalResolved,
+      resolved: presented,
       proposal: input.proposal,
       rootIdentity: input.rootIdentity,
       retained: input.retained,
@@ -311,6 +333,8 @@ struct LatePreferenceReconciliationStage {
         customLayoutCompatibilityDepthLimit:
           LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
       ),
+      graphAnimationInputToken: input.graphAnimationInputToken,
+      evaluatedNodeIDs: input.evaluatedNodeIDs,
       animationRedrawIdentities: input.animationRedrawIdentities,
       animationSegmentTargetIdentities: input.animationSegmentTargetIdentities,
       verifyLayoutShadow: input.verifyLayoutShadow

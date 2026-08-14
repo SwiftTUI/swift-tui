@@ -346,7 +346,6 @@ public struct TabViewStyleConfiguration: Sendable {
 
 public struct TabViewStyleBodyConfiguration: Sendable {
   public struct Content: PrimitiveView, ResolvableView, Sendable {
-    package var activeContentIndex: Int?
     package var payload: LazySubviewPayload?
     /// The declaring `TabView`'s control identity — the identity focus rests
     /// on while the tab strip is focused. Recorded so the content slot can
@@ -356,15 +355,33 @@ public struct TabViewStyleBodyConfiguration: Sendable {
     /// move onto/off the strip must not pull the whole content subtree into
     /// the retained-reuse suppression cone.
     package var controlIdentity: Identity?
+    /// Entity lifetime for the active tab generation. Descendant exact IDs
+    /// scope to this route, so replacing the TabView owner resets them while a
+    /// reorder within the same owner preserves them.
+    package var payloadEntityIdentity: EntityIdentity?
+    /// Owner-scoped authored identity for the structural child below the
+    /// dormant entity host. This keeps different tab lifetimes out of the
+    /// same identity-index slot without retaining a graph-node address.
+    package var payloadStructuralIdentity: TabDormantPayloadStructuralIdentity?
+    /// Reports a value-only locator for the freshly resolved payload back to
+    /// its declaring TabView. The sink captures the owner weakly, so retained
+    /// style/evaluator values cannot form a graph-node cycle.
+    package var dormantArchiveLocatorSink:
+      (@MainActor @Sendable (DormantStateArchiveLocator) -> Void)?
 
     package init(
-      activeContentIndex: Int?,
       payload: LazySubviewPayload?,
-      controlIdentity: Identity? = nil
+      controlIdentity: Identity? = nil,
+      payloadEntityIdentity: EntityIdentity? = nil,
+      payloadStructuralIdentity: TabDormantPayloadStructuralIdentity? = nil,
+      dormantArchiveLocatorSink:
+        (@MainActor @Sendable (DormantStateArchiveLocator) -> Void)? = nil
     ) {
-      self.activeContentIndex = activeContentIndex
       self.payload = payload
       self.controlIdentity = controlIdentity
+      self.payloadEntityIdentity = payloadEntityIdentity
+      self.payloadStructuralIdentity = payloadStructuralIdentity
+      self.dormantArchiveLocatorSink = dormantArchiveLocatorSink
     }
 
     package func resolveElements(
@@ -375,6 +392,10 @@ public struct TabViewStyleBodyConfiguration: Sendable {
       }
 
       if let controlIdentity {
+        // The style-owned `configuration.content` slot is itself independent
+        // of focus presentation. Declare it before payload resolution so a
+        // focus-only frame can reuse the slot without evaluating a node-less
+        // authored payload body merely to reach the routed child below.
         context.viewGraph?.declareFocusPresentationInertSlot(
           context.identity,
           forControl: controlIdentity
@@ -383,14 +404,53 @@ public struct TabViewStyleBodyConfiguration: Sendable {
 
       // Keep the style-owned content slot transparent while preserving the
       // lazy payload boundary that owns active-tab lifecycle and state.
-      let payloadContext = context.indexedChild(
-        kind: .init(rawValue: "TabContentPayload"),
-        index: activeContentIndex ?? 0
+      let payloadContext = context.child(
+        component: .named("TabContentPayload")
       )
-      let child = payload.resolve(
-        in: payloadContext,
-        placementRoot: context
-      )
+      let payloadRoute = payloadEntityIdentity.map {
+        ResolveEntityRoute(
+          identity: $0,
+          structuralPath: payloadContext.structuralPath
+        )
+      }
+      var child = withResolveEntityRoute(payloadRoute) {
+        if let payloadEntityIdentity {
+          payload.resolveInEntityRoutedHost(
+            in: payloadContext,
+            entityIdentity: payloadEntityIdentity,
+            structuralIdentity: payloadStructuralIdentity
+          )
+        } else {
+          payload.resolve(
+            in: payloadContext,
+            placementRoot: context
+          )
+        }
+      }
+      if child.entityIdentity == nil, let payloadEntityIdentity {
+        child.attachingEntityIdentity(
+          payloadEntityIdentity,
+          at: payloadContext.structuralPath
+        )
+      }
+
+      if let controlIdentity {
+        // Also declare the identity the payload actually returned. Style-body
+        // builder normalization may consume or rebase the authored slot, and
+        // dirty-frontier entry can begin inside the entity-hosted content cone.
+        context.viewGraph?.declareFocusPresentationInertSlot(
+          child.identity,
+          forControl: controlIdentity
+        )
+      }
+
+      if payload.lifecyclePolicy == .dormantStatePreserving,
+        let graph = context.viewGraph
+      {
+        dormantArchiveLocatorSink?(
+          graph.dormantStateArchiveLocator(rootedAt: child)
+        )
+      }
 
       return [
         ResolvedNode(

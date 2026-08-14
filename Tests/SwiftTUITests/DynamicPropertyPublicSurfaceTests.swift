@@ -1,4 +1,4 @@
-// Stage 3 acceptance fixture (plan 2026-08-04-003 §7): a third-party dynamic
+// Stage 1 acceptance fixture (plan 2026-08-13-001): a third-party dynamic
 // property written against the PUBLIC authoring surface only — the wrapper
 // and view below use nothing beyond what `import SwiftTUI` re-exports (the
 // non-@testable imports here expose package-level plumbing to the *driver*
@@ -18,6 +18,10 @@ private struct CountedBumps: DynamicProperty {
   @State private var count = 0
 
   init() {}
+
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
 
   var wrappedValue: Int {
     count

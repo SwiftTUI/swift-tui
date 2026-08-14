@@ -14,6 +14,7 @@ extension AnimationController {
     package var completionLedger: CompletionLedger
     package var activeAnimations: [AnimationKey: ActiveAnimation]
     package var removingNodes: [ViewNodeID: RemovalEntry]
+    package var currentResolvedPresentationProjection: ResolvedPresentationProjection
     package var lastTickResult: AnimationTickResult
     package var resolvedTreeProcessingSkipCount: Int
     package var lastResolvedTreeProcessedNodeCount: Int

@@ -16,7 +16,7 @@ public struct Spinner: View {
 
   public var body: some View {
     EnvironmentReader(\.spinnerStyle) { spinnerStyle in
-      EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+      EnvironmentReader(\.renderingReduceMotion) { accessibilityReduceMotion in
         EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
           spinnerBody(
             presentation: resolvedPresentation(

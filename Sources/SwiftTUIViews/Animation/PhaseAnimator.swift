@@ -97,8 +97,8 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   }
 
   public var body: some View {
-    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
-      phaseAnimatorBody(accessibilityReduceMotion: accessibilityReduceMotion)
+    EnvironmentReader(\.renderingReduceMotion) { renderingReduceMotion in
+      phaseAnimatorBody(accessibilityReduceMotion: renderingReduceMotion)
     }
   }
 

@@ -766,9 +766,10 @@ extension ResolveContext {
     /// gestures on the masking chain node stay exempt while genuine subview
     /// attachments (including nested masking nodes) are suppressed.
     /// Registration-time suppression: a suppressed attachment never
-    /// registers its recognizer, pointer route, or hit-test metadata. A
-    /// mask *flip* over a spared gesture-bearing subtree is therefore not
-    /// retro-applied until that subtree re-resolves.
+    /// registers its recognizer, pointer route, or hit-test metadata.
+    /// `GestureAttachmentModifier` mirrors this chain into private
+    /// environment-snapshot currency, so a live mask flip denies retained
+    /// reuse below the changed attachment and republishes that cone.
     package var gestureSuppressionScopes: [Identity] = []
     /// Forwards deadline requests to the frame scheduler.
     /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.

@@ -43,12 +43,13 @@ struct PathConstructionTests {
     #expect(star.contains(far, fillRule: .evenOdd) == false)
   }
 
-  @Test("contains defaults to evenOdd (preserves legacy hit-test behavior)")
-  func containsDefaultIsEvenOdd() {
+  @Test("contains defaults to the rendering nonZero rule")
+  func containsDefaultIsNonZero() {
     let star = pentagram()
     let center = Point(x: 0, y: 0)
-    // The no-argument form must equal the explicit even-odd form.
-    #expect(star.contains(center) == star.contains(center, fillRule: .evenOdd))
+    #expect(star.contains(center) == true)
+    #expect(star.contains(center) == star.contains(center, fillRule: .nonZero))
+    #expect(star.contains(center, fillRule: .evenOdd) == false)
   }
 
   @Test("a simple convex square contains its center and excludes outside")

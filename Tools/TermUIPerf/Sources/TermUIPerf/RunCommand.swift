@@ -51,7 +51,7 @@ public enum RunCommand {
       return try await runAACheck(config, scenario: scenario, artifactRoot: artifactRoot)
     }
 
-    PerfScenarioRunner.configureReuseTraceArtifact(at: artifactRoot)
+    let reuseTraceURL = PerfScenarioRunner.configureReuseTraceArtifact(at: artifactRoot)
     var perIteration: [PerfScenarioRunResult] = []
     var aggregates: [PerfAggregateSummary] = []
 
@@ -65,6 +65,13 @@ public enum RunCommand {
       perIteration.append(contentsOf: pass.results)
       aggregates.append(pass.aggregate)
       try writeAggregate(pass.aggregate, to: artifactRoot, tag: config.tag)
+    }
+
+    if let reuseTraceURL {
+      try PerfReuseDenialCensus.writeIfPresent(
+        traceURL: reuseTraceURL,
+        to: artifactRoot.appendingPathComponent("reuse-census.json")
+      )
     }
 
     return PerfRunOutcome(perIteration: perIteration, aggregates: aggregates)

@@ -125,6 +125,7 @@ private final class CapturingCompletionSink: AnimationCompletionSink {
 
   func registerCompletion(
     batchID: AnimationBatchID,
+    barrier _: AnimationCompletionBarrier = .logicallyComplete,
     closure: @escaping @MainActor @Sendable () -> Void
   ) {
     lastClosure = closure

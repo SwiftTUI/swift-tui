@@ -159,15 +159,19 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
 
   @MainActor
   func renderLayoutResolvingLatePreferences(
-    _ initialInput: FrameTailInput,
-    clock: ContinuousClock?
+    _ draft: FrameHeadDraft
   ) -> ReconciledFrameTailLayout {
     LatePreferenceReconciliationStage(
-      policy: latePreferenceReconciliationPolicy
-    ).run(initialInput: initialInput) { input in
+      policy: latePreferenceReconciliationPolicy,
+      projectResolvedPresentation: { canonical in
+        var presented = canonical
+        draft.animationDraft.controller.reapplyCurrentResolvedPresentation(to: &presented)
+        return presented
+      }
+    ).run(initialInput: draft.frameTailInput) { input in
       frameTailRenderer.renderLayout(
         input,
-        clock: clock
+        clock: draft.clock
       )
     }
   }
@@ -332,7 +336,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       return await renderLayoutResolvingLatePreferencesAsync(
         draft.frameTailInput,
         clock: draft.clock,
-        cancellationToken: cancellationToken
+        cancellationToken: cancellationToken,
+        animationController: draft.animationDraft.controller
       )
     }
 
@@ -360,7 +365,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     let layoutResult = await renderLayoutResolvingLatePreferencesAsync(
       draft.frameTailInput,
       clock: draft.clock,
-      cancellationToken: cancellationToken
+      cancellationToken: cancellationToken,
+      animationController: draft.animationDraft.controller
     )
     if layoutResult.layout != nil {
       draft.transaction.recordPreparedGraphState()
@@ -372,10 +378,16 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   private func renderLayoutResolvingLatePreferencesAsync(
     _ initialInput: FrameTailInput,
     clock: ContinuousClock?,
-    cancellationToken: FrameTailJobCancellationToken?
+    cancellationToken: FrameTailJobCancellationToken?,
+    animationController: AnimationController
   ) async -> AsyncLatePreferenceReconciliationOutput {
     await LatePreferenceReconciliationStage(
-      policy: latePreferenceReconciliationPolicy
+      policy: latePreferenceReconciliationPolicy,
+      projectResolvedPresentation: { canonical in
+        var presented = canonical
+        animationController.reapplyCurrentResolvedPresentation(to: &presented)
+        return presented
+      }
     ).runAsync(
       initialInput: initialInput,
       shouldRelayoutLayoutRealizationSnapshot: { input in

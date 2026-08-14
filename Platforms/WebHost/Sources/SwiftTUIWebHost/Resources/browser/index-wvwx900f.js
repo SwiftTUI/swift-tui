@@ -846,7 +846,7 @@ function isWebHostSurfaceImage(value) {
     return false;
   }
   const image = value;
-  return typeof image.id === "string" && isWebHostSurfaceImageFormat(image.format) && isWebHostSurfaceRect(image.bounds) && isWebHostSurfaceRect(image.visibleBounds) && isWebHostSurfaceScalingMode(image.scalingMode) && (image.pixelSize === undefined || isWebHostSurfaceSize(image.pixelSize)) && (image.dataBase64 === undefined || typeof image.dataBase64 === "string");
+  return typeof image.id === "string" && isWebHostSurfaceImageFormat(image.format) && isWebHostSurfaceRect(image.bounds) && isWebHostSurfaceRect(image.visibleBounds) && isWebHostSurfaceScalingMode(image.scalingMode) && (image.opacity === undefined || typeof image.opacity === "number" && Number.isFinite(image.opacity)) && (image.pixelSize === undefined || isWebHostSurfaceSize(image.pixelSize)) && (image.dataBase64 === undefined || typeof image.dataBase64 === "string");
 }
 function isWebHostSurfaceDamage(value) {
   if (!value || typeof value !== "object") {
@@ -2250,6 +2250,7 @@ class CanvasSurfacePainter {
     context.beginPath();
     context.rect(clipX * metrics.cellWidth, clipY * metrics.cellHeight, clipWidth * metrics.cellWidth, clipHeight * metrics.cellHeight);
     context.clip();
+    context.globalAlpha = normalizedImageOpacity(image.opacity);
     context.drawImage(decodedImage, boundsX * metrics.cellWidth, boundsY * metrics.cellHeight, boundsWidth * metrics.cellWidth, boundsHeight * metrics.cellHeight);
     context.restore();
   }
@@ -2478,6 +2479,12 @@ class CanvasSurfacePainter {
     context.stroke();
     context.setLineDash([]);
   }
+}
+function normalizedImageOpacity(opacity) {
+  if (opacity === undefined || !Number.isFinite(opacity)) {
+    return 1;
+  }
+  return Math.max(0, Math.min(1, opacity));
 }
 function isPaintableSurfaceImage(image) {
   const [, , boundsWidth, boundsHeight] = image.bounds;
@@ -2765,6 +2772,7 @@ class DomSurfacePainter {
       entry.image.style.top = `${(boundsY - clipY) * metrics.cellHeight}px`;
       entry.image.style.width = `${boundsWidth * metrics.cellWidth}px`;
       entry.image.style.height = `${boundsHeight * metrics.cellHeight}px`;
+      entry.image.style.opacity = String(normalizedImageOpacity2(image.opacity));
       if (image.dataBase64) {
         const source = `data:image/${image.format};base64,${image.dataBase64}`;
         if (entry.source !== source) {
@@ -2800,6 +2808,12 @@ class DomSurfacePainter {
       }
     }
   }
+}
+function normalizedImageOpacity2(opacity) {
+  if (opacity === undefined || !Number.isFinite(opacity)) {
+    return 1;
+  }
+  return Math.max(0, Math.min(1, opacity));
 }
 function metricsKeyFor(metrics) {
   return [

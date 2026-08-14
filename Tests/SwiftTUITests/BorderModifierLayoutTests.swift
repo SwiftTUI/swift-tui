@@ -4,75 +4,136 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Layout-only assertions for the rewritten `.border(...)` view modifier.
-///
-/// M2.B flips `.border` from the legacy `.overlay(Rectangle().strokeBorder)`
-/// inset-and-occlude behavior to a layout-aware outset: the border frame
-/// grows by the border set's per-side display widths, and the child's
-/// content is never occluded.  These tests pin the frame-growth invariant.
+/// Layout, raster, and interaction assertions for the public inset default.
 @MainActor
 struct BorderModifierLayoutTests {
-  @Test("public .border grows its frame by the border set's layout insets")
-  func borderGrowsLayout() {
-    // "hi" is 2x1.  .single contributes 1 display cell on each side.
-    // Total frame is 4x3 after the outset rewrite.
+  @Test("public .border defaults to non-layout-affecting inset placement")
+  func borderDefaultsToInsetLayout() {
     let artifacts = DefaultRenderer().render(
       Text("hi").border(set: .single),
-      context: .init(identity: testIdentity("BorderGrows"))
+      context: .init(identity: testIdentity("BorderDefaultsToInset"))
     )
 
-    #expect(artifacts.rasterSurface.size.width == 4)
-    #expect(artifacts.rasterSurface.size.height == 3)
-  }
-
-  @Test("public .border(sides: [.top]) only grows in the top direction")
-  func borderTopOnly() {
-    let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, sides: [.top]),
-      context: .init(identity: testIdentity("BorderTopOnly"))
-    )
-
-    // "hi" is 2x1.  Only the top edge contributes — left/right/bottom
-    // widths are masked out.  Width stays 2, height becomes 2.
     #expect(artifacts.rasterSurface.size.width == 2)
-    #expect(artifacts.rasterSurface.size.height == 2)
-  }
-
-  @Test("public .border with .innerHalfBlock and explicit inset placement does not grow the frame")
-  func borderInsetDoesNotGrow() {
-    let artifacts = DefaultRenderer().render(
-      Text("hello").border(set: .innerHalfBlock, placement: .inset),
-      context: .init(identity: testIdentity("BorderInset"))
-    )
-
-    // "hello" is 5x1.  Explicit `.inset` placement means the border
-    // glyphs overdraw the outermost child cells rather than reserving
-    // new ones.  Frame stays 5x1.
-    #expect(artifacts.rasterSurface.size.width == 5)
     #expect(artifacts.rasterSurface.size.height == 1)
   }
 
-  @Test("public .border default uses .rounded")
-  func borderDefaultIsRounded() {
+  @Test("explicit outset placement keeps the layout-growing behavior")
+  func explicitOutsetGrowsLayout() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(),
-      context: .init(identity: testIdentity("BorderDefault"))
+      Text("hi").border(set: .single, placement: .outset),
+      context: .init(identity: testIdentity("BorderExplicitOutset"))
     )
 
-    // `.rounded` uses 1-cell widths on every side, so the default grows
-    // the frame by 1 on each edge: "hi" is 2x1, output is 4x3.
     #expect(artifacts.rasterSurface.size.width == 4)
     #expect(artifacts.rasterSurface.size.height == 3)
   }
 
-  @Test("public .border(set:) with only horizontal sides grows only in the vertical axis")
-  func borderHorizontalOnly() {
-    let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, sides: [.top, .bottom]),
-      context: .init(identity: testIdentity("BorderHorizontalOnly"))
+  @Test("every public border overload defaults to inset placement")
+  func everyBorderOverloadDefaultsToInset() {
+    let expectedSize = CellSize(width: 3, height: 3)
+    let content = VStack(spacing: 0) {
+      Text("abc")
+      Text("def")
+      Text("ghi")
+    }
+
+    let styled = DefaultRenderer().render(
+      content.border(Color.red, set: .single),
+      context: .init(identity: testIdentity("BorderStyleOverloadDefault"))
+    )
+    let perEdge = DefaultRenderer().render(
+      content.border(BorderEdgeStyle(Color.red), set: .single),
+      context: .init(identity: testIdentity("BorderEdgeOverloadDefault"))
+    )
+    let blended = DefaultRenderer().render(
+      content.border(
+        blend: BorderBlend([Color.red, Color.blue]),
+        set: .single
+      ),
+      context: .init(identity: testIdentity("BorderBlendOverloadDefault"))
     )
 
-    #expect(artifacts.rasterSurface.size.width == 2)
+    #expect(styled.rasterSurface.size == expectedSize)
+    #expect(perEdge.rasterSurface.size == expectedSize)
+    #expect(blended.rasterSurface.size == expectedSize)
+  }
+
+  @Test("default inset border leaves sibling allocation unchanged")
+  func defaultInsetLeavesSiblingAllocationUnchanged() {
+    func renderedWidth<Content: View>(_ content: Content, name: String) -> Int {
+      DefaultRenderer().render(
+        content,
+        context: .init(identity: testIdentity(name))
+      ).rasterSurface.size.width
+    }
+
+    let baseline = renderedWidth(
+      HStack(spacing: 0) {
+        Text("abc")
+        Text("xyz")
+      },
+      name: "BorderSiblingBaseline"
+    )
+    let inset = renderedWidth(
+      HStack(spacing: 0) {
+        Text("abc").border(set: .ascii)
+        Text("xyz")
+      },
+      name: "BorderSiblingInset"
+    )
+    let outset = renderedWidth(
+      HStack(spacing: 0) {
+        Text("abc").border(set: .ascii, placement: .outset)
+        Text("xyz")
+      },
+      name: "BorderSiblingOutset"
+    )
+
+    #expect(baseline == 6)
+    #expect(inset == baseline)
+    #expect(outset == baseline + 2)
+  }
+
+  @Test("default ASCII border rasterizes inside and clips to the content frame")
+  func defaultInsetASCIIRasterAndClipping() {
+    let artifacts = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("abc")
+        Text("def")
+        Text("ghi")
+      }
+      .border(set: .ascii),
+      context: .init(identity: testIdentity("BorderDefaultASCIIRaster"))
+    )
+
+    #expect(artifacts.rasterSurface.size.width == 3)
     #expect(artifacts.rasterSurface.size.height == 3)
+    #expect(artifacts.rasterSurface.lines == ["+-+", "|e|", "+-+"])
+  }
+
+  @Test("default inset border does not enlarge its hit region")
+  func defaultInsetHitRegionDoesNotGrow() throws {
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+    var context = ResolveContext(identity: testIdentity("BorderDefaultHitRegion"))
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("abc")
+        Text("def")
+        Text("ghi")
+      }
+      .border(set: .ascii)
+      .gesture(TapGesture().onEnded {}),
+      context: context
+    )
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+
+    #expect(region.rect.size == CellSize(width: 3, height: 3))
   }
 }

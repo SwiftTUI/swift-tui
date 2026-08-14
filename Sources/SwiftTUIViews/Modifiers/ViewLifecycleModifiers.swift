@@ -4,13 +4,23 @@ extension View {
   public func onAppear(
     perform action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
-    modifier(AppearLifecycleModifier(action: action))
+    modifier(
+      AppearLifecycleModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
+        action: action
+      )
+    )
   }
 
   public func onDisappear(
     perform action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
-    modifier(DisappearLifecycleModifier(action: action))
+    modifier(
+      DisappearLifecycleModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
+        action: action
+      )
+    )
   }
 
   public func onChange<Value: Equatable>(
@@ -50,6 +60,7 @@ extension View {
       TaskLifecycleModifier(
         priority: priority,
         descriptorIdentity: nil,
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -65,6 +76,7 @@ extension View {
       TaskLifecycleModifier(
         priority: priority,
         descriptorIdentity: TaskLifecycleDescriptorIdentity(value),
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -83,6 +95,7 @@ private func recordLifecycleEvaluationOwner(
 }
 
 public struct AppearLifecycleModifier: PrimitiveViewModifier {
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: () -> Void
 
   package func resolve<Base: View>(
@@ -94,7 +107,10 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let intake = HandlerDescriptorIntake(context: context)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      preferringSnapshot: authoringContext
+    )
     let lifecycleAction = action
     let handlerID =
       intake.registerAppearHandler(
@@ -112,6 +128,7 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
 }
 
 public struct DisappearLifecycleModifier: PrimitiveViewModifier {
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: () -> Void
 
   package func resolve<Base: View>(
@@ -123,7 +140,10 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
       for: node.identity,
       in: context
     )
-    let intake = HandlerDescriptorIntake(context: context)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      preferringSnapshot: authoringContext
+    )
     let lifecycleAction = action
     let handlerID =
       intake.registerDisappearHandler(
@@ -283,15 +303,18 @@ private struct TaskLifecycleDescriptorIdentity {
 public struct TaskLifecycleModifier: PrimitiveViewModifier {
   var priority: TaskPriority
   fileprivate var descriptorIdentity: TaskLifecycleDescriptorIdentity?
+  fileprivate var authoringContext: ImperativeAuthoringContextSnapshot?
   let action: () async -> Void
 
   fileprivate init(
     priority: TaskPriority,
     descriptorIdentity: TaskLifecycleDescriptorIdentity?,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
     action: @escaping () async -> Void
   ) {
     self.priority = priority
     self.descriptorIdentity = descriptorIdentity
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -300,7 +323,10 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let intake = HandlerDescriptorIntake(context: context)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      preferringSnapshot: authoringContext
+    )
     let taskAction = action
     let lifecycleIdentity = node.identity
     recordLifecycleEvaluationOwner(

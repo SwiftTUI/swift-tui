@@ -167,6 +167,7 @@ enum BenchColdLane {
     let work = snapshot.diagnostics.work
     let counts = snapshot.diagnostics.counts
     let branching = work.layoutBranchingCounters
+    let rasterImageAttachments = snapshot.rasterSurface.imageAttachments.count
     return PerfDeterministicCounters(
       committedFrames: 1,
       answeredInputs: 0,
@@ -174,6 +175,9 @@ enum BenchColdLane {
       resolvedReused: work.resolvedNodesReused,
       measuredComputed: work.measuredNodesComputed,
       drawNodes: counts.drawNodes,
+      // Preserve absence for non-image scenarios. The still-image baseline's
+      // value 1 becomes `stale` if image resolution ever silently disappears.
+      rasterImageAttachments: rasterImageAttachments > 0 ? rasterImageAttachments : nil,
       presentCells: rasterizedCells(snapshot.rasterSurface),
       builtinContainerMeasures: branching.builtinContainerMeasures,
       builtinChildMeasureRequests: branching.builtinChildMeasureRequests,

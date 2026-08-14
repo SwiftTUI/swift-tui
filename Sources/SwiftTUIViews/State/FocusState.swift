@@ -1,6 +1,6 @@
 public import SwiftTUICore
 
-private struct FocusStateSnapshot<Value: Equatable> {
+private struct FocusStateSnapshot<Value: Equatable>: Equatable {
   var value: Value
   var hasPendingRequest: Bool
   /// Monotonic count of authored requests (`requestValue` calls). Runtime
@@ -16,8 +16,7 @@ private struct FocusStateSnapshot<Value: Equatable> {
   var requestGeneration: UInt64
 }
 
-@MainActor
-private final class FocusStateStorage<Value: Equatable> {
+private struct FocusStateStorage<Value: Equatable>: Equatable {
   private var snapshot: FocusStateSnapshot<Value>
 
   init(
@@ -36,14 +35,14 @@ private final class FocusStateStorage<Value: Equatable> {
     snapshot
   }
 
-  func requestValue(_ newValue: Value) {
+  mutating func requestValue(_ newValue: Value) {
     snapshot.value = newValue
     snapshot.hasPendingRequest = true
     snapshot.requestGeneration &+= 1
   }
 
   @discardableResult
-  func applyRuntimeValue(
+  mutating func applyRuntimeValue(
     _ newValue: Value,
     observedRequestGeneration: UInt64
   ) -> Bool {
@@ -59,6 +58,34 @@ private final class FocusStateStorage<Value: Equatable> {
     snapshot.value = newValue
     snapshot.hasPendingRequest = false
     return didChange
+  }
+}
+
+@MainActor
+private final class FocusStateStorageCell<Value: Equatable> {
+  private var storage: FocusStateStorage<Value>
+
+  init(_ storage: FocusStateStorage<Value>) {
+    self.storage = storage
+  }
+
+  func currentSnapshot() -> FocusStateSnapshot<Value> {
+    storage.currentSnapshot()
+  }
+
+  func requestValue(_ newValue: Value) {
+    storage.requestValue(newValue)
+  }
+
+  @discardableResult
+  func applyRuntimeValue(
+    _ newValue: Value,
+    observedRequestGeneration: UInt64
+  ) -> Bool {
+    storage.applyRuntimeValue(
+      newValue,
+      observedRequestGeneration: observedRequestGeneration
+    )
   }
 }
 
@@ -94,62 +121,76 @@ private struct FocusStateLocation<Value: Equatable> {
 private final class FocusStateBox<Value: Equatable> {
   private let slotOrdinal: Int
 
-  private struct Storage {
-    var localStorage: FocusStateStorage<Value>
-    var boundLocation: FocusStateLocation<Value>?
-    var isBoundLocationPathQualified: Bool
+  private struct BoundLocation {
+    var location: FocusStateLocation<Value>
+    var isPathQualified: Bool
   }
 
-  private var storage: Storage
+  private struct FallbackKey: Hashable {
+    var owner: StateOwnerHandle
+    var slot: StateSlotIdentifier
+  }
+
+  private let localStorage: FocusStateStorageCell<Value>
+  private var boundLocationsByOwner: [StateOwnerHandle: BoundLocation] = [:]
+  private var fallbackStorageByOwnerAndSlot: [FallbackKey: FocusStateStorageCell<Value>] = [:]
 
   init(
     seedValue: Value,
     slotOrdinal: Int
   ) {
     self.slotOrdinal = slotOrdinal
-    storage = Storage(
-      localStorage: .init(value: seedValue),
-      boundLocation: nil,
-      isBoundLocationPathQualified: false
-    )
+    localStorage = FocusStateStorageCell(.init(value: seedValue))
   }
 
   func currentLocalSnapshot() -> FocusStateSnapshot<Value> {
-    storage.localStorage.currentSnapshot()
+    localStorage.currentSnapshot()
   }
 
   func requestLocalValue(_ newValue: Value) {
-    storage.localStorage.requestValue(newValue)
+    localStorage.requestValue(newValue)
   }
 
-  @discardableResult
-  func applyRuntimeLocalValue(
-    _ newValue: Value,
-    observedRequestGeneration: UInt64
-  ) -> Bool {
-    storage.localStorage.applyRuntimeValue(
-      newValue,
-      observedRequestGeneration: observedRequestGeneration
-    )
+  var localStorageCell: FocusStateStorageCell<Value> {
+    localStorage
   }
 
   func remember(
     _ location: FocusStateLocation<Value>,
+    for owner: StateOwnerHandle,
     pathQualified: Bool = false
   ) {
-    storage.boundLocation = location
-    storage.isBoundLocationPathQualified = pathQualified
+    boundLocationsByOwner[owner] = BoundLocation(
+      location: location,
+      isPathQualified: pathQualified
+    )
   }
 
-  func currentLocation() -> FocusStateLocation<Value>? {
-    storage.boundLocation
+  func currentLocation(for owner: StateOwnerHandle) -> FocusStateLocation<Value>? {
+    boundLocationsByOwner[owner]?.location
   }
 
-  func currentPathQualifiedLocation() -> FocusStateLocation<Value>? {
-    guard storage.isBoundLocationPathQualified else {
+  func currentPathQualifiedLocation(
+    for owner: StateOwnerHandle
+  ) -> FocusStateLocation<Value>? {
+    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
       return nil
     }
-    return storage.boundLocation
+    return bound.location
+  }
+
+  func fallbackStorageCell(
+    for owner: StateOwnerHandle,
+    slot: StateSlotIdentifier,
+    seed: FocusStateStorage<Value>
+  ) -> FocusStateStorageCell<Value> {
+    let key = FallbackKey(owner: owner, slot: slot)
+    if let storage = fallbackStorageByOwnerAndSlot[key] {
+      return storage
+    }
+    let storage = FocusStateStorageCell(seed)
+    fallbackStorageByOwnerAndSlot[key] = storage
+    return storage
   }
 
   var currentOrdinal: Int {
@@ -240,18 +281,31 @@ public struct FocusState<Value: Equatable> {
     Binding(location: activeLocation() ?? localLocation())
   }
 
+  #if DEBUG
+    package var debugStorageObject: AnyObject {
+      box
+    }
+  #endif
+
   private func activeLocation() -> FocusStateLocation<Value>? {
-    if let context = currentAuthoringContext() {
+    if let context = currentAuthoringContext(),
+      let owner = stateStorageOwner(for: context)
+    {
       // A path-qualified binding made by this evaluation's update pass wins
       // during resolve — re-making here has no ambient path and would claim
       // (and prime) the unqualified slot (see `State.activeLocation`).
       if ViewNodeContext.current != nil,
-        let qualified = box.currentPathQualifiedLocation()
+        let qualified = box.currentPathQualifiedLocation(for: owner)
       {
         return qualified
       }
-      let location = makeLocation(for: context)
-      box.remember(location)
+      if ViewNodeContext.current == nil,
+        let remembered = box.currentLocation(for: owner)
+      {
+        return remembered
+      }
+      let location = makeLocation(for: context, owner: owner)
+      box.remember(location, for: owner)
       // Materialize the backing slot (seeded from the local box) without
       // recording a read: mentioning `$focus` hosts the storage, it does not
       // consume the value. Genuine reads go through `snapshot`.
@@ -259,153 +313,160 @@ public struct FocusState<Value: Equatable> {
       return location
     }
 
-    return box.currentLocation()
+    return nil
   }
 
   private func makeLocation(
     for context: AuthoringContext,
+    owner: StateOwnerHandle,
     path: StateSlotPath = .root
   ) -> FocusStateLocation<Value> {
     let slotIdentifier = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
     let seedSnapshot = box.currentLocalSnapshot()
+    let seedStorage = FocusStateStorage(
+      value: seedSnapshot.value,
+      hasPendingRequest: seedSnapshot.hasPendingRequest,
+      requestGeneration: seedSnapshot.requestGeneration
+    )
 
-    // Imperative contexts (a `.task` loop, an action callback) carry the
-    // owner by ID with no live node reference; recover the node the same
-    // way `@State`'s imperative location does, so a `$focus` write from a
-    // task reaches the live slot instead of silently landing in the
-    // detached local box.
-    let ownerNode =
-      context.viewNode
-      ?? liveAuthoringOwnerNode(
-        ownerNodeID: context.ownerNodeID,
-        stateGraphScope: context.stateGraphScope
-      )
-    if let viewNode = ownerNode {
-      if ViewNodeContext.current != nil {
-        // Resolve-time claim bookkeeping (see `ViewNode.recordStateSlotClaim`).
-        viewNode.recordStateSlotClaim(
-          slotIdentifier,
-          claimant: ObjectIdentifier(box)
-        )
-      }
-      let bindingKey = FocusBindingKey(
-        ownerNodeID: viewNode.viewNodeID,
-        suffix: path.isEmpty
-          ? .stateSlot(ordinal: slotIdentifier.ordinal)
-          : .pathQualifiedStateSlot(slotIdentifier)
-      )
-      // The unqualified spelling stays byte-identical to the legacy format;
-      // only path-qualified bindings extend it.
-      let bindingID =
-        path.isEmpty
-        ? "\(viewNode.identity.path)#FocusState[\(slotIdentifier.ordinal)]"
-        : "\(viewNode.identity.path)#FocusState[\(slotIdentifier)]"
-      // Resolve the slot storage at CALL time, not capture time: a location's
-      // closures outlive the body evaluation that created them (focus-binding
-      // registrations are restored across selective frames), while commit-time
-      // checkpoint restores can replace the node's stored slot instance. A
-      // captured instance goes stale after such a restore — a runtime focus
-      // flip would then write a detached ghost and only reach the live slot a
-      // frame late, once a re-registration re-captured it.
-      //
-      // Storage resolution is read-attribution-free (`primedStateSlot`):
-      // infrastructure touches (the prime, focus-sync's runtime
-      // re-application) are not value reads. Genuine reads record through
-      // the `snapshot` closure below.
-      let seedValue = seedSnapshot.value
-      let seedHasPendingRequest = seedSnapshot.hasPendingRequest
-      let seedRequestGeneration = seedSnapshot.requestGeneration
-      // Storage resolution is additionally identity-aware, mirroring
-      // `@State` (F135): when the registration-time node was displaced by a
-      // fresh mint at the same identity, a runtime focus flip must reach the
-      // live occupant's slot, not the orphaned node's.
-      let liveStorageIdentity = viewNode.identity
-      let liveStorage: @MainActor () -> FocusStateStorage<Value> = {
-        let liveViewNode =
-          viewNode.ownerGraph?.liveStateOwnerNode(
-            registeredOwner: viewNode.viewNodeID,
-            identity: liveStorageIdentity
-          ) ?? viewNode
-        return liveViewNode.primedStateSlot(
-          slotIdentifier,
-          seed: FocusStateStorage(
-            value: seedValue,
-            hasPendingRequest: seedHasPendingRequest,
-            requestGeneration: seedRequestGeneration
-          )
-        )
-      }
-      let readKey = StateSlotKey(owner: viewNode.viewNodeID, slot: slotIdentifier)
-
-      return FocusStateLocation(
-        bindingKey: bindingKey,
-        bindingID: bindingID,
-        prime: {
-          _ = liveStorage()
-        },
-        snapshot: {
-          // A value read is a genuine dependency of the node evaluating it
-          // (a body read records on the body). Outside resolve there is no
-          // evaluated output that could go stale (imperative reads see live
-          // storage at call time), so nothing is recorded.
-          if let reader = ViewNodeContext.current {
-            reader.recordStateReadDependency(readKey)
-          }
-          return liveStorage().currentSnapshot()
-        },
-        bookkeepingSnapshot: {
-          liveStorage().currentSnapshot()
-        },
-        requestValue: { newValue in
-          liveStorage().requestValue(newValue)
-          // An authored request must reach a re-resolve of the registration
-          // site to be consumed (`hasPendingRequest` is published at
-          // resolve); the owner cone guarantees that regardless of reader
-          // attribution.
-          viewNode.requestInvalidation()
-        },
-        applyRuntimeValue: { newValue, observedRequestGeneration, registrationIdentity in
-          let didChange = liveStorage().applyRuntimeValue(
-            newValue,
-            observedRequestGeneration: observedRequestGeneration
-          )
-          if didChange {
-            // Focus-sync applied a runtime flip: invalidate the receiving
-            // registration site (so it re-registers with fresh bookkeeping)
-            // plus the slot's recorded value readers — not the owner's
-            // whole identity cone.
-            viewNode.invalidateStateSlotReadersForRuntimeChange(
-              slotIdentifier,
-              registrationScope: registrationIdentity
-            )
-          }
-          return didChange
-        }
+    if ViewNodeContext.current != nil,
+      let viewNode = liveAuthoringOwnerNode(stateOwnerHandle: owner)
+    {
+      viewNode.recordStateSlotClaim(
+        slotIdentifier,
+        claimant: ObjectIdentifier(box)
       )
     }
 
-    return localLocation()
+    let bindingKey = FocusBindingKey(
+      owner: owner,
+      suffix: path.isEmpty
+        ? .stateSlot(ordinal: slotIdentifier.ordinal)
+        : .pathQualifiedStateSlot(slotIdentifier)
+    )
+    let bindingID =
+      "graph:\(owner.graphScope.rawValue)/owner:\(owner.ownerLifetime.rawValue)"
+      + "#FocusState[\(slotIdentifier)]"
+    let readKey = StateSlotKey(owner: owner.ownerLifetime, slot: slotIdentifier)
+    let fallbackStorage = box.fallbackStorageCell(
+      for: owner,
+      slot: slotIdentifier,
+      seed: seedStorage
+    )
+
+    let liveStorage: @MainActor () -> (SwiftTUICore.ViewNode, FocusStateStorage<Value>)? = {
+      guard let node = LiveViewGraphRegistry.node(for: owner) else {
+        return nil
+      }
+      let storage = withPersistentDormantStateSlot {
+        node.primedStateSlot(slotIdentifier, seed: seedStorage)
+      }
+      return (node, storage)
+    }
+    let storeAuthoredLiveStorage:
+      @MainActor (
+        SwiftTUICore.ViewNode,
+        FocusStateStorage<Value>
+      ) -> Void = { node, storage in
+        withPersistentDormantStateSlot {
+          node.setStateSlot(
+            slotIdentifier,
+            value: storage,
+            invalidationIdentity: node.identity
+          )
+        }
+      }
+    let storeRuntimeLiveStorage:
+      @MainActor (
+        SwiftTUICore.ViewNode,
+        FocusStateStorage<Value>
+      ) -> Void = { node, storage in
+        withPersistentDormantStateSlot {
+          _ = node.setStateSlotRecordingMutationWithoutGenericInvalidation(
+            slotIdentifier,
+            value: storage
+          )
+        }
+      }
+
+    return FocusStateLocation(
+      bindingKey: bindingKey,
+      bindingID: bindingID,
+      prime: {
+        if liveStorage() == nil {
+          _ = fallbackStorage.currentSnapshot()
+        }
+      },
+      snapshot: {
+        if let reader = ViewNodeContext.current {
+          reader.recordStateReadDependency(readKey)
+        }
+        if let (_, storage) = liveStorage() {
+          return storage.currentSnapshot()
+        }
+        return fallbackStorage.currentSnapshot()
+      },
+      bookkeepingSnapshot: {
+        if let (_, storage) = liveStorage() {
+          return storage.currentSnapshot()
+        }
+        return fallbackStorage.currentSnapshot()
+      },
+      requestValue: { newValue in
+        guard let (node, current) = liveStorage() else {
+          fallbackStorage.requestValue(newValue)
+          return
+        }
+        var storage = current
+        storage.requestValue(newValue)
+        storeAuthoredLiveStorage(node, storage)
+        node.requestInvalidation()
+      },
+      applyRuntimeValue: { newValue, observedRequestGeneration, registrationIdentity in
+        guard let (node, current) = liveStorage(),
+          current.currentSnapshot().requestGeneration == observedRequestGeneration
+        else {
+          // Runtime registrations are generation-specific and never mutate a
+          // retired owner's fallback or a replacement lifetime.
+          return false
+        }
+        var storage = current
+        let didChange = storage.applyRuntimeValue(
+          newValue,
+          observedRequestGeneration: observedRequestGeneration
+        )
+        storeRuntimeLiveStorage(node, storage)
+        if didChange {
+          node.invalidateStateSlotReadersForRuntimeChange(
+            slotIdentifier,
+            registrationScope: registrationIdentity
+          )
+        }
+        return didChange
+      }
+    )
   }
 
   private func localLocation() -> FocusStateLocation<Value> {
-    FocusStateLocation(
+    let localStorage = box.localStorageCell
+    return FocusStateLocation(
       bindingKey: FocusBindingKey(
-        ownerNodeID: nil,
-        suffix: .local(ObjectIdentifier(box))
+        owner: nil,
+        suffix: .local(ObjectIdentifier(localStorage))
       ),
-      bindingID: "FocusState.local[\(ObjectIdentifier(box))]",
+      bindingID: "FocusState.local[\(ObjectIdentifier(localStorage))]",
       prime: {},
       snapshot: {
-        box.currentLocalSnapshot()
+        localStorage.currentSnapshot()
       },
       bookkeepingSnapshot: {
-        box.currentLocalSnapshot()
+        localStorage.currentSnapshot()
       },
       requestValue: { newValue in
-        box.requestLocalValue(newValue)
+        localStorage.requestValue(newValue)
       },
       applyRuntimeValue: { newValue, observedRequestGeneration, _ in
-        box.applyRuntimeLocalValue(
+        localStorage.applyRuntimeValue(
           newValue,
           observedRequestGeneration: observedRequestGeneration
         )
@@ -464,22 +525,24 @@ extension FocusState.Binding {
 extension FocusState: DynamicProperty {
   /// Binds the focus slot eagerly under the discovered-property path when
   /// the update pass reached this wrapper through a composed dynamic
-  /// property (see `State.update()`). Top-level wrappers keep lazy binding
+  /// property (see `State.update(in:)`). Top-level wrappers keep lazy binding
   /// and their exact `FocusBindingKey`.
-  public mutating func update() {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     let path = DynamicPropertyPathScope.current
     guard !path.isEmpty else {
-      return
+      return .unchanged
     }
     guard
       ViewNodeContext.current != nil,
-      let context = currentAuthoringContext()
+      let context = currentAuthoringContext(),
+      let owner = stateStorageOwner(for: context)
     else {
-      return
+      return .unchanged
     }
-    let location = makeLocation(for: context, path: path)
-    box.remember(location, pathQualified: true)
+    let location = makeLocation(for: context, owner: owner, path: path)
+    box.remember(location, for: owner, pathQualified: true)
     location.prime()
+    return .unchanged
   }
 }
 

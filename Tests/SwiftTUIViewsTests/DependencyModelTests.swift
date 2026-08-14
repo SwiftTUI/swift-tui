@@ -81,7 +81,8 @@ struct DependencyModelTests {
 
     let stateRead = try #require(dependencies.stateSlotReads.first)
     #expect(dependencies.stateSlotReads.count == 1)
-    #expect(snapshot.nodeIDByIdentity[testIdentity("Root")] == stateRead.owner)
+    let ownerNodeID = try #require(snapshot.nodeIDByIdentity[testIdentity("Root")])
+    #expect(snapshot.nodesByNodeID[ownerNodeID]?.ownerLifetimeID == stateRead.owner)
   }
 
   @Test("wrapper dependency manifest matches shipped axes")

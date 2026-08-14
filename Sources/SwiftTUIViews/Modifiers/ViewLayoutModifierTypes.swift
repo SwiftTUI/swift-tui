@@ -246,13 +246,6 @@ public struct OffsetModifier: PrimitiveViewModifier, Sendable, Equatable {
   }
 }
 
-extension OffsetModifier: TransitionEffectProvidingModifier {
-  package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
-    modifiers.offsetX = x
-    modifiers.offsetY = y
-  }
-}
-
 public struct PositionModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var x: Int
   package var y: Int

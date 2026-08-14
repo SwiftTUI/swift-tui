@@ -1061,6 +1061,81 @@ struct AnimationPipelineIntegrationTests {
   }
 
   @Test(
+    "cached foreground presentation reprojects onto reconciled canonical input without resampling"
+  )
+  func cachedForegroundPresentationReprojectsWithoutResampling() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+    let identity = Identity(components: [.named("presentation-reprojection-leaf")])
+    let t0 = MonotonicInstant.now()
+
+    var redMetadata = DrawMetadata()
+    redMetadata.baseStyle.foregroundStyle = .color(.red)
+    let red = ResolvedNode(
+      identity: identity,
+      kind: .view("Text"),
+      drawMetadata: redMetadata
+    )
+    controller.processResolvedTree(red, transaction: .init(), timestamp: t0)
+
+    let orange = Color(red: 0.829, green: 0.414, blue: 0)
+    var orangeMetadata = DrawMetadata()
+    orangeMetadata.baseStyle.foregroundStyle = .color(orange)
+    let canonicalTarget = ResolvedNode(
+      identity: identity,
+      kind: .view("Text"),
+      drawMetadata: orangeMetadata
+    )
+    var animatedTransaction = TransactionSnapshot()
+    animatedTransaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      canonicalTarget,
+      transaction: animatedTransaction,
+      timestamp: t0
+    )
+
+    var sampledPresentation = canonicalTarget
+    let tickBeforeProjection = controller.applyInterpolations(
+      to: &sampledPresentation,
+      at: t0.advanced(by: .milliseconds(250))
+    )
+    let sampledColor = try #require(
+      Self.extractResolvedForegroundColor(sampledPresentation)
+    )
+    #expect(sampledColor != .red)
+    #expect(sampledColor != orange)
+
+    // Model a toolbar/late-preference pass rebuilding the canonical target.
+    // Reprojection must paint the exact already-sampled presentation onto that
+    // fresh canonical value without a second curve evaluation or tick mutation.
+    var reconciledPresentation = canonicalTarget
+    _ = controller.reapplyCurrentResolvedPresentation(to: &reconciledPresentation)
+    let reprojectedColor = try #require(
+      Self.extractResolvedForegroundColor(reconciledPresentation)
+    )
+    #expect(reprojectedColor == sampledColor)
+    #expect(controller.lastTickResult.hasPendingWork == tickBeforeProjection.hasPendingWork)
+    #expect(controller.lastTickResult.nextDeadline == tickBeforeProjection.nextDeadline)
+    #expect(controller.lastTickResult.redrawIdentities == tickBeforeProjection.redrawIdentities)
+
+    let canonicalColor = try #require(Self.extractResolvedForegroundColor(canonicalTarget))
+    #expect(canonicalColor == orange)
+  }
+
+  private static func extractResolvedForegroundColor(_ node: ResolvedNode) -> Color? {
+    if case .color(let color) = node.drawMetadata.baseStyle.foregroundStyle {
+      return color
+    }
+    for child in node.children {
+      if let color = extractResolvedForegroundColor(child) {
+        return color
+      }
+    }
+    return nil
+  }
+
+  @Test(
     "an in-flight property animation follows its entity across an identity-changing move (G10a)"
   )
   func propertyAnimationFollowsEntityAcrossMove() throws {
@@ -2186,6 +2261,108 @@ struct AnimationControllerPropertyTests {
         )
       }
     }
+  }
+
+  @Test(
+    "logical and removed completion criteria observe distinct removal barriers"
+  )
+  func removalCompletionCriteriaAreDistinct() throws {
+    func completionCounts(
+      barrier: AnimationCompletionBarrier,
+      batchID: AnimationBatchID
+    ) -> (afterLogicalCompletion: Int, afterRemoval: Int) {
+      let controller = AnimationController()
+      let animation = Animation.linear(duration: .milliseconds(100))
+      controller.register(animation)
+
+      let fireCount = FireCounter()
+      controller.registerCompletion(batchID: batchID, barrier: barrier) {
+        fireCount.increment()
+      }
+
+      let rootIdentity = Identity(components: [.named("criteria-root")])
+      let leafIdentity = Identity(
+        components: [.named("criteria-root"), .named("criteria-leaf")]
+      )
+      let leafNodeID = ViewNodeID(rawValue: batchID.value)
+      controller.beginTransitionCollection()
+      controller.registerTransition(
+        for: leafIdentity,
+        viewNodeID: leafNodeID,
+        transition: AnyTransition.opacity
+      )
+      controller.finishTransitionCollection()
+
+      let leaf = ResolvedNode(
+        viewNodeID: leafNodeID,
+        identity: leafIdentity,
+        kind: .view("Leaf")
+      )
+      let initial = ResolvedNode(
+        identity: rootIdentity,
+        kind: .view("Root"),
+        children: [leaf]
+      )
+      let start = MonotonicInstant.now()
+      controller.processResolvedTree(initial, transaction: .init(), timestamp: start)
+      controller.capturePlacedTree(
+        PlacedNode(
+          identity: rootIdentity,
+          kind: .view("Root"),
+          bounds: CellRect(origin: .zero, size: .init(width: 8, height: 1)),
+          children: [
+            PlacedNode(
+              identity: leafIdentity,
+              kind: .view("Leaf"),
+              bounds: CellRect(origin: .zero, size: .init(width: 4, height: 1))
+            )
+          ]
+        )
+      )
+
+      let removed = ResolvedNode(
+        identity: rootIdentity,
+        kind: .view("Root"),
+        children: []
+      )
+      controller.beginTransitionCollection()
+      controller.finishTransitionCollection()
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      transaction.animationBatchID = batchID
+      controller.processResolvedTree(removed, transaction: transaction, timestamp: start)
+
+      let livePlaced = PlacedNode(
+        identity: rootIdentity,
+        kind: .view("Root"),
+        bounds: CellRect(origin: .zero, size: .init(width: 8, height: 1))
+      )
+      _ = controller.placedAnimationOverlaySnapshot(
+        for: livePlaced,
+        at: start.advanced(by: .milliseconds(200))
+      )
+      let afterLogicalCompletion = fireCount.count
+
+      _ = controller.placedAnimationOverlaySnapshot(
+        for: livePlaced,
+        at: start.advanced(by: .milliseconds(201))
+      )
+      return (afterLogicalCompletion, fireCount.count)
+    }
+
+    let logical = completionCounts(
+      barrier: .logicallyComplete,
+      batchID: AnimationBatchID(9_201)
+    )
+    let removed = completionCounts(
+      barrier: .removed,
+      batchID: AnimationBatchID(9_202)
+    )
+
+    #expect(logical.afterLogicalCompletion == 1)
+    #expect(logical.afterRemoval == 1)
+    #expect(removed.afterLogicalCompletion == 0)
+    #expect(removed.afterRemoval == 1)
   }
 
   @Test(

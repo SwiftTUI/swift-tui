@@ -15,6 +15,9 @@ extension ViewGraph {
   /// that map between identities, view-node IDs, and the live `ViewNode`s.
   package struct GraphIndex {
     package var nodesByNodeID: [ViewNodeID: ViewNode] = [:]
+    /// O(1) authoritative route from a callback's immutable owner lifetime to
+    /// the node currently serving that lifetime in this checkpoint image.
+    package var nodesByOwnerLifetimeID: [NodeOwnerLifetimeID: ViewNode] = [:]
     package var nodeIDByIdentity: [Identity: ViewNodeID] = [:]
     package var identityByNodeID: [ViewNodeID: Identity] = [:]
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>] = [:]
@@ -28,14 +31,13 @@ extension ViewGraph {
     // planning and invalidation must keep landing there (its evaluator
     // re-runs the collapsed chain and stitches the output). The authored
     // child node keeps the live `@State`/`@FocusState` slots, so identity →
-    // node resolution for AUTHORING (`beginEvaluation`, imperative-state
-    // re-keys) prefers it through this map — otherwise every post-commit
+    // node resolution for AUTHORING (`beginEvaluation`) prefers it through
+    // this map — otherwise every post-commit
     // pass re-hosts the slots on the absorber, re-seeded from authored
     // defaults. Recorded by `reindexIdentity` when the shadowed occupant is
     // authored at the claimed identity and holds state slots; removed when
     // that node leaves the graph. See `pruneAbsorbedShadowedNodes` (the
-    // owner's lifetime anchors to the absorber's hosted-detached edge) and
-    // `liveStateOwnerNode`.
+    // owner's lifetime anchors to the absorber's hosted-detached edge).
     package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
     // Node IDs that recorded (or adopted) an effect-family registration
     // (lifecycle/task/preference observation) at least once while resident in
@@ -95,7 +97,8 @@ extension ViewGraph {
     package var invalidatedNodeIDs: Set<ViewNodeID> = []
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID> = []
     package var stateMutationKeys: Set<StateSlotKey> = []
-    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] = [:]
+    package var stateMutationOwnerLifetimeIDsByKey:
+      [StateSlotKey: Set<NodeOwnerLifetimeID>] = [:]
   }
 
   /// Lifecycle-evaluation ownership edges: which owner re-evaluates which
@@ -118,7 +121,7 @@ extension ViewGraph {
   /// edges for reader-attributed-only environment keys (authored
   /// `.environment` sites), consumed by the reader-scoped reuse toleration.
   package struct DependencyIndex {
-    package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] = [:]
+    package var stateSlotDependents: [StateSlotKey: Set<NodeOwnerLifetimeID>] = [:]
     package var environmentDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
     package var observableDependents: [ObjectIdentifier: Set<ViewNodeID>] = [:]
     package var environmentKeyWriters: [ObjectIdentifier: Set<ViewNodeID>] = [:]
@@ -134,6 +137,10 @@ extension ViewGraph {
   /// it monotonic. See the matching per-node generation on ``ViewNode``.
   package struct FrameCommitState {
     package var currentFrameID: UInt64 = 0
+    /// O(1) content token for canonical inputs consumed by the animation
+    /// controller. Checkpoint restore carries the token with the graph state;
+    /// a separate monotonic sequencer on `ViewGraph` mints ABA-safe successors.
+    package var animationInputMutationToken: UInt64 = 0
     package var liveNodeIDs: Set<ViewNodeID> = []
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry] =
       [:]

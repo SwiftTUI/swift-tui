@@ -10,8 +10,8 @@ manages for a view: conform a custom property wrapper to it and the wrapper
 becomes a first-class participant in view evaluation. Before each body
 evaluation the framework discovers the view's conforming stored properties,
 gives wrappers composed *inside* them their own per-instance state storage,
-and calls the property's `update()` under the enclosing view's authoring
-scope.
+and calls the property's `update(in:)` under the enclosing view's authoring
+scope, before the graph decides whether it can reuse prior output.
 
 ```swift
 @propertyWrapper
@@ -28,9 +28,10 @@ struct Debounced: DynamicProperty {
     accepted
   }
 
-  mutating func update() {
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     // Runs before every body evaluation of the enclosing view, after
     // this wrapper's own composed dynamic properties have updated.
+    return .unchanged
   }
 }
 ```
@@ -53,46 +54,84 @@ framework:
    lookup). Only *stored* properties participate; computed properties are
    invisible to discovery, as in SwiftUI.
 2. Recursively updates each property's own discovered dynamic properties
-   first, then calls the property's `update()`, so your `update()` always
+   first, then calls the property's `update(in:)`, so your update always
    observes live composed state.
-3. Evaluates the body.
+3. Uses the returned certification at the graph's reuse door, then evaluates
+   the body only when reuse is declined.
 
-The pass runs on every body-evaluation surface (composed `body`
+The pass covers every body-evaluation surface (composed `body`
 implementations, framework primitives, and `ViewModifier` bodies) under the
-same ambient authoring scope the body observes. When a subtree is served
-from reuse, neither the body nor the update pass runs; see the contract
-below.
+same ambient authoring scope the body observes. A certified enclosing subtree
+may be served without descending into its already-certified children.
 
-## The copy-semantics contract
+## The reference-backed contract
 
-`update()` receives a *copy* of the property. Effects that go through
-reference-backed storage persist, and every built-in wrapper is reference
-backed: `@State`'s box, `@Environment`'s ambient lookup, `Binding`'s
-closures. Mutations to plain stored fields of your wrapper are discarded
-when `update()` returns.
+`update(in:)` is nonmutating. This deliberately makes the old plain-value
+`mutating update()` source shape fail to conform instead of accepting a
+mutation that an existential or resilient container cannot safely write back.
+Keep evaluation-visible custom state in reference storage or composed
+built-in wrappers (`@State`'s box, `@Environment`'s ambient lookup, or a
+`Binding`'s closures).
 
-This is a recorded divergence from SwiftUI, where an `update()` mutation to
-a plain stored property is visible to that one body evaluation (and only
-that one; SwiftUI also starts each cycle from a pristine copy). The rule of
-thumb is the same in both frameworks: state that must survive between
-evaluations belongs in composed reference-backed storage, never in plain
-stored fields.
+SwiftUI permits a plain stored-property mutation to affect one evaluation's
+temporary working value. SwiftTUI 0.9 deliberately narrows that extension
+shape so supported struct, class, enum, existential, and resilient containers
+all have one honest contract.
 
-## Keep update() inside the dependency vocabulary
+## Certify reuse explicitly
 
-A reused subtree skips body evaluation *and* the update pass. Every
-dependency a wrapper can express through the framework (state slots,
-environment values, focus state, focused values, observable reads) already
-denies reuse when it changes, so a wrapper built from those is always
-consistent: if none of its inputs changed, skipping its `update()` is
-unobservable.
+Return `.unchanged` only after registering every dependency that can affect
+the wrapper's visible result. Return `.changed` when the result changed during
+this update. The default is `.uncertified`; it conservatively denies both
+retained and memoized reuse, including reuse of an enclosing subtree.
 
-The contract consequence: `update()` must not carry effects *outside* that
-vocabulary. A wrapper that manages its own timer, subscription, or external
-side channel from `update()` gets no guarantee the framework will call it;
-no reuse gate can deny reuse for a dependency the graph cannot see. Route
-external inputs through composed `@State` writes (which invalidate the
-owner) instead.
+For a timer, subscription, or other external side channel, retain
+`context.invalidationLease` in reference-backed storage. The lease can fire
+from any executor and invalidates only the exact live graph node and
+registration generation that issued it; a callback for departed content is
+inert.
+
+```swift
+@propertyWrapper
+struct AsyncReading<Value>: DynamicProperty {
+  @MainActor
+  final class Storage {
+    var value: Value
+    var lease: DynamicPropertyInvalidationLease?
+
+    init(_ value: Value) {
+      self.value = value
+    }
+
+    nonisolated func receive(_ value: Value) {
+      Task { @MainActor in
+        self.value = value
+        self.lease?.invalidate()
+      }
+    }
+  }
+
+  private let storage: Storage
+
+  init(wrappedValue: Value) {
+    storage = Storage(wrappedValue)
+  }
+
+  var wrappedValue: Value {
+    storage.value
+  }
+
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    storage.lease = context.invalidationLease
+    return .unchanged
+  }
+}
+```
+
+Replace the stored lease on every update. A later registration supersedes the
+old generation, and the framework revokes the route when the wrapper or graph
+departs. The storage is still responsible for stopping its external work when
+its own lifetime ends.
 
 ## Degraded paths
 

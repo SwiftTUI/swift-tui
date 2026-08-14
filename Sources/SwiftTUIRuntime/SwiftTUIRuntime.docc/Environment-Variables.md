@@ -48,7 +48,8 @@ start.
 | `SWIFTTUI_ACCESSIBLE` | boolean | Shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`. Wins over explicit `0` values on those two variables. |
 | `SWIFTTUI_JSON` | boolean | Selects JSON output. |
 | `SWIFTTUI_ASCII` | boolean | Forces ASCII glyphs in place of Unicode box drawing and symbols. |
-| `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy forces reduced motion, which also renders progress views as static status text. An explicit `0` restores normal motion even where CI or a non-TTY stdout implied reduction. |
+| `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy sets the app-visible accessibility reduce-motion preference and renders built-in animation in its static form. |
+| `SWIFTTUI_STABLE_OUTPUT` | `0` / truthy | Explicitly disables built-in animation for deterministic capture without changing the accessibility preference. When unset, `CI=true` or a non-TTY stdout enables stable output automatically. |
 | `SWIFTTUI_QUIET` | boolean | Quiet verbosity. Wins over `SWIFTTUI_VERBOSE`. |
 | `SWIFTTUI_VERBOSE` | integer > 0 | Verbose logging at the given level. |
 | `SWIFTTUI_DEBUG` | boolean | Debug mode: arms the session debug bundle (see *Debug bundles and trace selection*), including the diagnostics TSV and the frame trace. |

@@ -57,6 +57,7 @@ public enum PerfScenarioError: Error, Equatable, CustomStringConvertible {
   case noWindowScene(String)
   case markerTimedOut(String)
   case markerHasNoCell(String)
+  case markerUnexpectedlyPresent(String)
   case environmentUnavailable
 
   public var description: String {
@@ -69,6 +70,8 @@ public enum PerfScenarioError: Error, Equatable, CustomStringConvertible {
       return "timed out waiting for marker '\(marker)'."
     case .markerHasNoCell(let marker):
       return "marker '\(marker)' was not found in the latest frame."
+    case .markerUnexpectedlyPresent(let marker):
+      return "marker '\(marker)' was already present before its scripted input."
     case .environmentUnavailable:
       return "environment mutation is unavailable on this platform."
     }
@@ -175,6 +178,8 @@ public enum PerfScenarioRegistry {
       MemoEquatableBoundaryScenario(),
       CanvasPartialReuseScenario(),
       GifPlaybackScenario(),
+      DynamicPropertyHeavyScenario(),
+      StillImagePresentationScenario(),
       LazyList1KScenario(),
       Table1Kx4Scenario(),
       LazyVStackScrollScenario(),
@@ -208,6 +213,22 @@ public struct PerfScenarioDriver {
       containing: marker,
       afterFrame: frameNumber,
       timeout: timeout
+    )
+  }
+
+  @MainActor
+  public func waitForFrame(
+    notContaining marker: String,
+    afterFrame frameNumber: Int = 0,
+    timeout: Duration = .seconds(2),
+    hardCap: Duration = .seconds(30)
+  ) async throws -> PerfPresentedFrame {
+    try await PerfScenarioRunner.waitForFrame(
+      in: terminalHost,
+      notContaining: marker,
+      afterFrame: frameNumber,
+      timeout: timeout,
+      hardCap: hardCap
     )
   }
 
@@ -583,12 +604,56 @@ public enum PerfScenarioRunner {
     hardCap: Duration = .seconds(30)
   ) async throws -> PerfPresentedFrame {
     let clock = ContinuousClock()
-    let hardDeadline = clock.now.advanced(by: hardCap)
-    var deadline = clock.now.advanced(by: timeout)
+    return try await waitForFrameMatching(
+      in: terminalHost,
+      afterFrame: frameNumber,
+      timeout: timeout,
+      hardCap: hardCap,
+      timeoutMarker: marker,
+      now: { clock.now },
+      sleep: { try await Task.sleep(nanoseconds: 1_000_000) },
+      matches: { $0.text.contains(marker) }
+    )
+  }
+
+  @MainActor
+  public static func waitForFrame(
+    in terminalHost: PerfTerminalHost,
+    notContaining marker: String,
+    afterFrame frameNumber: Int = 0,
+    timeout: Duration = .seconds(2),
+    hardCap: Duration = .seconds(30)
+  ) async throws -> PerfPresentedFrame {
+    let clock = ContinuousClock()
+    return try await waitForFrameMatching(
+      in: terminalHost,
+      afterFrame: frameNumber,
+      timeout: timeout,
+      hardCap: hardCap,
+      timeoutMarker: "!\(marker)",
+      now: { clock.now },
+      sleep: { try await Task.sleep(nanoseconds: 1_000_000) },
+      matches: { !$0.text.contains(marker) }
+    )
+  }
+
+  @MainActor
+  static func waitForFrameMatching(
+    in terminalHost: PerfTerminalHost,
+    afterFrame frameNumber: Int,
+    timeout: Duration,
+    hardCap: Duration,
+    timeoutMarker: String,
+    now: () -> ContinuousClock.Instant,
+    sleep: () async throws -> Void,
+    matches: (PerfPresentedFrame) -> Bool
+  ) async throws -> PerfPresentedFrame {
+    let hardDeadline = now().advanced(by: hardCap)
+    var deadline = now().advanced(by: timeout)
     var newestObserved = terminalHost.presentedFrames.last?.frameNumber ?? 0
-    while clock.now < deadline && clock.now < hardDeadline {
+    while now() < hardDeadline {
       if let frame = terminalHost.presentedFrames.last(where: {
-        $0.frameNumber > frameNumber && $0.text.contains(marker)
+        $0.frameNumber > frameNumber && matches($0)
       }) {
         return frame
       }
@@ -596,15 +661,19 @@ public enum PerfScenarioRunner {
       // keeps presenting new frames the scenario is advancing — just slowly,
       // e.g. on a loaded CI runner — so re-arm the idle window. The hard cap
       // bounds the wait even when continuous animation frames keep arriving.
+      let currentTime = now()
       if let newest = terminalHost.presentedFrames.last?.frameNumber,
         newest > newestObserved
       {
         newestObserved = newest
-        deadline = clock.now.advanced(by: timeout)
+        deadline = currentTime.advanced(by: timeout)
       }
-      try await Task.sleep(nanoseconds: 1_000_000)
+      guard currentTime < deadline else {
+        break
+      }
+      try await sleep()
     }
-    throw PerfScenarioError.markerTimedOut(marker)
+    throw PerfScenarioError.markerTimedOut(timeoutMarker)
   }
 
   @MainActor
@@ -753,15 +822,16 @@ public enum PerfScenarioRunner {
   /// artifacts root so the diagnostic is captured as a run artifact instead of
   /// scrolling past on stderr (where it was previously misread as silent). An
   /// explicit operator override of the file path is respected.
-  static func configureReuseTraceArtifact(at artifactRoot: URL) {
+  @discardableResult
+  static func configureReuseTraceArtifact(at artifactRoot: URL) -> URL? {
     guard let raw = environmentValue("SWIFTTUI_REUSE_TRACE"),
       !raw.isEmpty,
       raw != "0"
     else {
-      return
+      return nil
     }
     if let existing = environmentValue("SWIFTTUI_REUSE_TRACE_FILE"), !existing.isEmpty {
-      return
+      return URL(fileURLWithPath: existing)
     }
     try? FileManager.default.createDirectory(
       at: artifactRoot,
@@ -769,5 +839,6 @@ public enum PerfScenarioRunner {
     )
     let path = artifactRoot.appendingPathComponent("reuse-trace.log").path
     try? setEnvironmentValue(path, for: "SWIFTTUI_REUSE_TRACE_FILE")
+    return URL(fileURLWithPath: path)
   }
 }

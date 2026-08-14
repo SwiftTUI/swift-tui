@@ -342,7 +342,11 @@ public struct Environment<Value: Sendable> {
   }
 }
 
-extension Environment: DynamicProperty {}
+extension Environment: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}
 
 extension EnvironmentValues {
   package var stackAxis: SwiftTUICore.Axis? {

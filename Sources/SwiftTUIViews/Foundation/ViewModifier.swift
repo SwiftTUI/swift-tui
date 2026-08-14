@@ -47,6 +47,46 @@ package struct ModifierContentInputs<Base: View> {
     }
   }
 
+  package func withDynamicPropertyAuthoringScope<Result>(
+    in context: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?,
+    _ body: () -> Result
+  ) -> Result {
+    applyAuthoringContext {
+      let scope = dynamicPropertyAuthoringContext(
+        for: context,
+        current: currentAuthoringContext(),
+        viewNode: graphNode
+      )
+      return withAuthoringContext(scope, body)
+    }
+  }
+
+  package func preparedDynamicPropertyContext(
+    in fallback: ResolveContext
+  ) -> ResolveContext? {
+    ForwardedDynamicPropertyPreparationScope.preparedContext(
+      for: base,
+      fallback: fallback,
+      graphNode: ViewNodeContext.current
+    )
+  }
+
+  private func contentResolveContext(
+    in context: ResolveContext
+  ) -> ResolveContext {
+    if let prepared = preparedDynamicPropertyContext(in: context) {
+      return prepared
+    }
+    // Default/structural/entity-routing modifiers cannot prepare their base
+    // at the outer wrapper: only this actual content edge knows its node and
+    // path. Prepare the whole forwarded value here so a base that is itself a
+    // DynamicProperty receives its root update as well as its nested updates,
+    // then let the central resolver consume that exact preparation.
+    _ = prepareDynamicProperties(in: context)
+    return context
+  }
+
   private func applyOwnedAuthoringContext<Result>(
     in context: ResolveContext,
     _ body: () -> Result
@@ -59,6 +99,7 @@ package struct ModifierContentInputs<Base: View> {
         focusedValues: context.focusedValues,
         viewNode: ViewNodeContext.current,
         ownerNodeID: ViewNodeContext.current?.viewNodeID ?? scope.ownerNodeID,
+        stateOwnerHandle: ViewNodeContext.current?.stateOwnerHandle ?? scope.stateOwnerHandle,
         stateGraphScope: ViewNodeContext.current?.ownerGraph.map(StateGraphScopeID.init)
           ?? scope.stateGraphScope,
         ordinalTracker: scope.ordinalTracker,
@@ -72,11 +113,19 @@ package struct ModifierContentInputs<Base: View> {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     applyAuthoringContext {
-      let erased: Any = base
-      if let resolvable = erased as? any ResolvableView {
-        return resolvable.resolveElements(in: context)
-      }
-      return resolveViewElements(base, in: context)
+      // The actual content edge owns the central update/evaluation seam. A
+      // certified same-node producer may already have prepared this exact
+      // context before its own reuse door; every other edge evaluates here.
+      let resolved = resolveView(
+        base,
+        in: contentResolveContext(in: context)
+      )
+      return consumeDeclaredChild(
+        resolved,
+        resolvedUnder: context.identity,
+        in: context.viewGraph,
+        policy: .declaredBuilder
+      )
     }
   }
 
@@ -104,20 +153,63 @@ package struct ModifierContentInputs<Base: View> {
 
   package func resolve(in context: ResolveContext) -> ResolvedNode {
     applyAuthoringContext {
-      resolveView(base, in: context)
+      resolveView(
+        base,
+        in: contentResolveContext(in: context)
+      )
     }
   }
 
   package func resolveOwned(in context: ResolveContext) -> ResolvedNode {
     applyOwnedAuthoringContext(in: context) {
-      var resolved = normalizeResolvedElements(
-        resolveViewElements(base, in: context),
-        in: context
+      // Identity modifiers are structural content edges too. Going through
+      // the central resolver is what lets an entity-routed base update once
+      // at its routed owner instead of being guessed at the outer wrapper.
+      var resolved = resolveView(
+        base,
+        in: contentResolveContext(in: context)
       )
-      assignEntityIdentityOccurrences(to: &resolved._storedChildren)
       resolved.structuralPath = context.structuralPath
       return resolved
     }
+  }
+
+  package func prepareDynamicProperties(
+    in context: ResolveContext
+  ) -> DynamicPropertyUpdateResult {
+    let routeIdentity = entityRouteIdentity(for: base, in: context)
+    let graphNode: SwiftTUICore.ViewNode?
+    if let routeIdentity,
+      let routed = context.viewGraph?.nodeForEntityIdentity(routeIdentity)
+    {
+      graphNode = routed
+    } else {
+      graphNode = context.viewGraph?.prepareDynamicPropertyUpdate(
+        identity: context.identity,
+        entityIdentity: routeIdentity
+      )
+    }
+    let forwardedContext = AdditionalDynamicPropertyUpdateContext(
+      resolveContext: context,
+      graphNode: graphNode
+    )
+    let result = EnvironmentValuesStorage.binding(context.environmentValues) {
+      ViewNodeContext.withCurrentValue(graphNode) {
+        withDynamicPropertyAuthoringScope(
+          in: context,
+          graphNode: graphNode
+        ) {
+          runForwardedDynamicPropertyUpdates(on: base, in: forwardedContext)
+        }
+      }
+    }
+    ForwardedDynamicPropertyPreparationScope.record(
+      base,
+      context: context,
+      graphNode: graphNode,
+      result: result
+    )
+    return result
   }
 }
 
@@ -127,10 +219,32 @@ package protocol PrimitiveViewModifier: ViewModifier where Body == Never {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode]
+
+  /// Returns the exact same-node context in which this modifier will resolve
+  /// its content, when the modifier can prove that mapping before `resolve`.
+  ///
+  /// `nil` is the conservative default. Structural, entity-routing, and
+  /// arbitrary-context modifiers then deny their outer reuse door and let the
+  /// actual nested central resolve own the content update and lease.
+  func dynamicPropertyContentPreparation<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveContext?
+}
+
+extension PrimitiveViewModifier {
+  package func dynamicPropertyContentPreparation<Base: View>(
+    content _: ModifierContentInputs<Base>,
+    in _: ResolveContext
+  ) -> ResolveContext? {
+    nil
+  }
 }
 
 public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, ResolvableView {
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
+  private let updateDynamicPropertiesClosure:
+    @MainActor (ResolveContext) -> DynamicPropertyUpdateResult
 
   package init<Base: View>(
     base: Base,
@@ -143,6 +257,9 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
     resolveElementsClosure = { context in
       inputs.resolveElements(in: context)
     }
+    updateDynamicPropertiesClosure = { context in
+      inputs.prepareDynamicProperties(in: context)
+    }
   }
 
   public var body: Never {
@@ -150,7 +267,12 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveElementsClosure(context)
+    // A composed modifier may place this carrier at any point in its body (or
+    // omit it). `View.resolveBody` calls ResolvableView bodies directly, so
+    // this carrier itself is the only exact pre-content seam: prepare here,
+    // then let the nested central resolve consume the result.
+    _ = updateDynamicPropertiesClosure(context)
+    return resolveElementsClosure(context)
   }
 }
 
@@ -169,16 +291,63 @@ public struct ModifiedContent<Content, Modifier> {
 
 extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
   public var body: some View {
-    // Composed modifiers are a body-evaluation surface of their own: the
-    // modifier value's discovered dynamic properties update here, before
-    // `modifier.body` constructs its output under the same ambient scope.
-    runDynamicPropertyUpdatePass(on: modifier)
     return modifier.body(
       content: ViewModifierContent(
         base: content,
         authoringScope: authoringScope
       )
     )
+  }
+}
+
+extension ModifiedContent: AdditionalDynamicPropertyUpdating
+where Content: View, Modifier: ViewModifier {
+  package func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool {
+    // The modifier is forwarded here. Content is either prepared under an
+    // explicitly certified same-node primitive context, or updated by the
+    // actual structural/composed carrier. Outer reflection must never walk it
+    // under a guessed node/path first.
+    index == 0 || index == 1
+  }
+
+  package func updateAdditionalDynamicProperties(
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult {
+    var result = runForwardedDynamicPropertyUpdates(on: modifier, in: context)
+    guard let primitive = modifier as? any PrimitiveViewModifier else {
+      // A composed modifier may place Content anywhere in an arbitrary body,
+      // so the outer wrapper cannot invent a preparation context. Deny outer
+      // reuse; the ViewModifierContent carrier updates once at its real node.
+      return hasDynamicPropertyUpdateSurface(content)
+        ? result.merging(.uncertified)
+        : result
+    }
+
+    let inputs = ModifierContentInputs(
+      base: content,
+      authoringScope: authoringScope
+    )
+    guard
+      let contentContext = primitive.dynamicPropertyContentPreparation(
+        content: inputs,
+        in: context.resolveContext
+      ),
+      contentContext.identity == context.resolveContext.identity,
+      contentContext.structuralPath == context.resolveContext.structuralPath
+    else {
+      // Unknown and structural primitives are fail-closed. Their actual
+      // content edge enters resolveView with the exact child/routed context.
+      return hasDynamicPropertyUpdateSurface(content)
+        ? result.merging(.uncertified)
+        : result
+    }
+    result = result.merging(inputs.prepareDynamicProperties(in: contentContext))
+    return result
+  }
+
+  package func hasAdditionalDynamicPropertyUpdateSurface() -> Bool {
+    hasDynamicPropertyUpdateSurface(content)
+      || hasDynamicPropertyUpdateSurface(modifier)
   }
 }
 

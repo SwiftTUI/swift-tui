@@ -35,6 +35,19 @@ sibling repositories: [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-we
 (Gradle/Maven AAR + plugin). Tagged releases or released artifacts couple them
 back to this package.
 
+## 0.9 Preview Support Contract
+
+| Surface | 0.9 tier | Supported boundary |
+| --- | --- | --- |
+| Terminal runtime | Supported preview surface | Native macOS and Linux launch, input, raster presentation, and terminal graphics through the published SwiftPM products. |
+| WASI / browser and localhost WebHost | Supported preview surface | Published npm/browser packages, keyboard and pointer input, resize and scroll, canvas/DOM raster presentation, and the converged host wire. |
+| Native SwiftUI host | Supported preview surface | The lockstep external host on macOS 15+ and iOS 18+, including keyboard, pointer/touch, clipboard writes, native image placement, and semantic presentation. |
+| Android Compose host | Preview, arm64 | `arm64-v8a`, API 28+, NDK `27.3.13750724`, Swift 6.3.x, the Swift Android SDK, and the published AAR/Gradle-plugin packaging path. The core host can cross-compile x86_64, but x86_64 packaging and Android IME marked/pre-edit composition are outside the 0.9 support claim. |
+| Accessibility overlays | One-way presentation preview | Browser ARIA, AppKit/UIKit, and Compose overlays present reading order, names, roles, hidden state, live announcements, cursor anchoring, and runtime-origin focus. Assistive-origin focus, activation, adjustment, editing, and value/state actions do not route back into SwiftTUI in 0.9. |
+
+Calling an overlay a real accessibility tree describes the host-native tree it
+mounts; it does not imply bidirectional assistive control.
+
 ## Per-Host Engine Profiles
 
 The host boundary stays shared, but resolve has two profiles. "Full" means

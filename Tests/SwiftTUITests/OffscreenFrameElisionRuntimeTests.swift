@@ -517,7 +517,7 @@ struct OffscreenFrameElisionRuntimeTests {
       handlers: OneShotRenderStageHandlers(
         animationInjection: { $0 },
         commitElidedFrameIfOffscreen: { _ in true },
-        latePreferenceReconciliation: { _, _ in
+        latePreferenceReconciliation: { _ in
           reached.latePreference = true
           Issue.record("latePreferenceReconciliation ran for an elided one-shot frame")
           fatalError("unreachable: elided frame must skip late-preference reconciliation")

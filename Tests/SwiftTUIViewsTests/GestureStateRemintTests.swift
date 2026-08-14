@@ -3,12 +3,9 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
-/// F135: `@GestureState` access must be re-keyed like `@State` — a recognizer
-/// update that fires after the owning identity was re-minted (lazy-tab
-/// revisit, mid-frame eviction) must land on the LIVE occupant's slot. The
-/// previous location closures captured the registration-time node strongly
-/// and re-resolved by node ID only, so post-re-mint updates wrote the
-/// orphaned node's slots.
+/// A recognizer registration belongs to one exact graph-owner lifetime. An
+/// authored identity can be re-minted for a different entity after teardown;
+/// stale recognizer updates must remain inert with respect to that new owner.
 @MainActor
 struct GestureStateRemintTests {
   @MainActor
@@ -49,8 +46,8 @@ struct GestureStateRemintTests {
     column: GestureRemintProbe.column
   )
 
-  @Test("a recognizer update after a same-identity re-mint lands on the live occupant")
-  func recognizerUpdateFollowsIdentityAcrossRemint() throws {
+  @Test("a recognizer update does not cross a same-identity owner re-mint")
+  func recognizerUpdateDoesNotCrossOwnerRemint() throws {
     let captured = CapturedGestureBox()
     let probe = GestureRemintProbe(captured: captured)
     let graph = ViewGraph()
@@ -92,16 +89,16 @@ struct GestureStateRemintTests {
     let reminted = try #require(graph.nodeForIdentity(ownerIdentity))
     #expect(reminted !== registered, "the re-mint premise did not hold")
 
-    // The recognizer fires: its box still holds the body-time location
-    // (no fresh body ran for the gesture's owner). The write must follow
-    // the identity to the live occupant.
+    // The recognizer fires with its retired owner handle. Identity equality is
+    // not successor authority, so the write may update only the retired
+    // binding's transient fallback, never the live replacement slot.
     withImperativeAuthoringContext(snapshot) {
       box.setValue(42)
     }
 
     #expect(
-      reminted.stateSlot(ordinal: Self.offsetOrdinal, seed: 0) == 42,
-      "the recognizer update wrote the orphaned node's slot instead of the live occupant's"
+      reminted.stateSlot(ordinal: Self.offsetOrdinal, seed: 0) == 0,
+      "the retired recognizer crossed into a distinct owner lifetime"
     )
   }
 }

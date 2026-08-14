@@ -35,11 +35,18 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
 
       let firstTaskCell = try driver.cell(containing: "task 0")
+      let scrollMarker = "task 29"
+      if driver.terminalHost.presentedFrames.last?.text.contains(scrollMarker) == true {
+        throw PerfScenarioError.markerUnexpectedlyPresent(scrollMarker)
+      }
       driver.sendScroll(deltaY: 6, at: firstTaskCell)
       let scrolled = try await driver.waitForFrame(
-        containing: "App shell workload",
+        containing: scrollMarker,
         afterFrame: lastFrame
       )
+      if scrolled.text.contains("task 0  selected") {
+        throw PerfScenarioError.markerUnexpectedlyPresent("task 0 row after scroll")
+      }
       lastFrame = scrolled.frameNumber
 
       let menuCell = try driver.cell(containing: "open menu")
@@ -52,10 +59,9 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
 
       let closeMenuCell = try driver.cell(containing: "close menu")
       driver.sendClick(at: closeMenuCell)
-      let menuClosed = try await Self.waitForFrameNotContaining(
-        "Menu body",
-        afterFrame: lastFrame,
-        in: driver
+      let menuClosed = try await driver.waitForFrame(
+        notContaining: "Menu body",
+        afterFrame: lastFrame
       )
       lastFrame = menuClosed.frameNumber
 
@@ -69,10 +75,9 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
 
       let closeSheetCell = try driver.cell(containing: "close sheet")
       driver.sendClick(at: closeSheetCell)
-      let sheetClosed = try await Self.waitForFrameNotContaining(
-        "Save sheet body",
-        afterFrame: lastFrame,
-        in: driver
+      let sheetClosed = try await driver.waitForFrame(
+        notContaining: "Save sheet body",
+        afterFrame: lastFrame
       )
       lastFrame = sheetClosed.frameNumber
 
@@ -100,39 +105,6 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
     }
   }
 
-  @MainActor
-  private static func waitForFrameNotContaining(
-    _ marker: String,
-    afterFrame frameNumber: Int,
-    in driver: PerfScenarioDriver,
-    timeout: Duration = .seconds(2),
-    hardCap: Duration = .seconds(30)
-  ) async throws -> PerfPresentedFrame {
-    let clock = ContinuousClock()
-    let hardDeadline = clock.now.advanced(by: hardCap)
-    var deadline = clock.now.advanced(by: timeout)
-    var newestObserved = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
-    while clock.now < deadline && clock.now < hardDeadline {
-      if let frame = driver.terminalHost.presentedFrames.last(where: {
-        $0.frameNumber > frameNumber && !$0.text.contains(marker)
-      }) {
-        return frame
-      }
-      // Progress-gated deadline (never fixed wall-clock): while the run loop
-      // keeps presenting new frames the scenario is advancing — just slowly,
-      // e.g. on a loaded CI runner — so re-arm the idle window. The hard cap
-      // bounds the wait even when continuous animation frames keep arriving.
-      if let newest = driver.terminalHost.presentedFrames.last?.frameNumber,
-        newest > newestObserved
-      {
-        newestObserved = newest
-        deadline = clock.now.advanced(by: timeout)
-      }
-      try await Task.sleep(nanoseconds: 1_000_000)
-    }
-    throw PerfScenarioError.markerTimedOut("!\(marker)")
-  }
-
   private static func resolvedTaskCount() -> Int {
     guard let raw = environmentValue("SWIFTTUI_PERF_APP_SHELL_TASKS"),
       let parsed = Int(raw),
@@ -140,7 +112,7 @@ public struct ExampleAppShellWorkflowScenario: PerfScenario {
     else {
       return defaultTaskCount
     }
-    return parsed
+    return max(30, parsed)
   }
 }
 
@@ -210,7 +182,7 @@ private struct PerfExampleAppShellView: View {
 
   private var taskList: some View {
     ScrollView(.vertical) {
-      LazyVStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
         ForEach(0..<taskCount, id: \.self) { index in
           Button("task \(index)  \(index == selectedTask ? "selected" : "open")") {
             selectedTask = index
@@ -219,6 +191,7 @@ private struct PerfExampleAppShellView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
+      .padding(1)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .border(.separator)

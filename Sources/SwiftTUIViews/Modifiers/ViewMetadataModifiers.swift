@@ -452,14 +452,6 @@ package struct DrawEffectModifier: PrimitiveViewModifier, Sendable, Equatable {
   }
 }
 
-extension DrawMetadataModifier: TransitionEffectProvidingModifier {
-  package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
-    if let opacity = metadata.baseStyle.explicitOpacity {
-      modifiers.opacity = opacity
-    }
-  }
-}
-
 public struct SemanticMetadataModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var metadata: SemanticMetadata
 
@@ -490,7 +482,17 @@ public struct EnvironmentWritingModifier<Value>: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    return content.resolveElements(in: context.settingEnvironment(keyPath, to: value))
+    return content.resolveElements(
+      in: content.preparedDynamicPropertyContext(in: context)
+        ?? dynamicPropertyContentPreparation(content: content, in: context)!
+    )
+  }
+
+  package func dynamicPropertyContentPreparation<Base: View>(
+    content _: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveContext? {
+    context.settingEnvironment(keyPath, to: value)
   }
 }
 
@@ -502,12 +504,20 @@ public struct EnvironmentTransformModifier<Value>: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    content.resolveElements(
-      in: context.transformingEnvironment(keyPath) { value in
-        content.withAuthoredClosureScope {
-          transform(&value)
-        }
+    let transformed =
+      content.preparedDynamicPropertyContext(in: context)
+      ?? dynamicPropertyContentPreparation(content: content, in: context)!
+    return content.resolveElements(in: transformed)
+  }
+
+  package func dynamicPropertyContentPreparation<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveContext? {
+    context.transformingEnvironment(keyPath) { value in
+      content.withAuthoredClosureScope {
+        transform(&value)
       }
-    )
+    }
   }
 }

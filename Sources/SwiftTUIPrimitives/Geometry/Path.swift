@@ -160,9 +160,9 @@ public struct Path: Equatable, Sendable {
   // MARK: - Queries
 
   /// Whether `point` lies inside (or on the boundary of) the filled path
-  /// under the given `fillRule`. Defaults to `.evenOdd` to preserve the
-  /// established pointer hit-test behavior.
-  public func contains(_ point: Point, fillRule: FillRule = .evenOdd) -> Bool {
+  /// under the given `fillRule`. The default matches shape rendering's
+  /// non-zero winding rule; pass `.evenOdd` for an explicit parity fill.
+  public func contains(_ point: Point, fillRule: FillRule = .nonZero) -> Bool {
     var crossings = 0
     var winding = 0
     for segment in closedSegments() {

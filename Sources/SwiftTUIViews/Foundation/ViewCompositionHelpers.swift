@@ -6,6 +6,8 @@ import SwiftTUICore
 package struct ScopedContentPayload: Sendable {
   private let resolveElementsClosure:
     @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
+  private let resolveEntityRoutedElementsClosure:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
@@ -22,6 +24,9 @@ package struct ScopedContentPayload: Sendable {
     resolveElementsClosure = { context, _ in
       builder.resolveElements(in: context)
     }
+    resolveEntityRoutedElementsClosure = { context, _ in
+      [resolveView(builder, in: context)]
+    }
   }
 
   package init(
@@ -29,6 +34,7 @@ package struct ScopedContentPayload: Sendable {
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
   ) {
     resolveElementsClosure = resolveElements
+    resolveEntityRoutedElementsClosure = resolveElements
   }
 
   package func resolveElements(
@@ -44,6 +50,22 @@ package struct ScopedContentPayload: Sendable {
     )
   }
 
+  /// Resolves the captured builder through the central graph seam below a
+  /// caller-owned entity host.
+  ///
+  /// Ordinary scoped payloads lower transparently. Dormant entity hosts need a
+  /// real central resolve at their qualified structural child so dynamic
+  /// properties prepare against the same node whose authored metadata commits.
+  package func resolveElementsInEntityRoutedHost(
+    in context: ResolveContext,
+    placementRoot: ResolveContext? = nil
+  ) -> [ResolvedNode] {
+    resolveEntityRoutedElementsClosure(
+      context,
+      (placementRoot ?? context).asEntityHost()
+    )
+  }
+
   package func resolve(
     in context: ResolveContext,
     placementRoot: ResolveContext? = nil
@@ -53,6 +75,92 @@ package struct ScopedContentPayload: Sendable {
       in: context
     )
   }
+
+  package func resolveInEntityRoutedHost(
+    in context: ResolveContext,
+    entityIdentity: EntityIdentity,
+    structuralIdentity: TabDormantPayloadStructuralIdentity?
+  ) -> ResolvedNode {
+    let route = ResolveEntityRoute(
+      identity: entityIdentity,
+      structuralPath: context.structuralPath
+    )
+    return withResolveEntityRoute(route) {
+      resolveView(
+        EntityRoutedScopedContentHost(
+          payload: self,
+          entityIdentity: entityIdentity,
+          structuralIdentity: structuralIdentity
+        ),
+        in: context
+      )
+    }
+  }
+}
+
+/// Gives a caller-supplied entity route a concrete graph owner at the lazy
+/// payload position. Authored content resolves unchanged at a fully qualified,
+/// unowned structural child, so its own IDs and metadata cannot displace or
+/// overwrite the dormant entity host.
+@MainActor
+private struct EntityRoutedScopedContentHost: PrimitiveView, ResolvableView {
+  var payload: ScopedContentPayload
+  var entityIdentity: EntityIdentity
+  var structuralIdentity: TabDormantPayloadStructuralIdentity?
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let contentContext = context.child(
+      component: tabContentValueComponent(structuralIdentity)
+    )
+    // Keep the stable dormant entity visible as ancestry for a nested TabView,
+    // but leave the qualified authored child unowned: the route is bound to the
+    // outer host's path and therefore cannot claim `contentContext`. A public
+    // `.id` can still own the child without displacing the tab lifetime.
+    let ancestryRoute = ResolveEntityRoute(
+      identity: entityIdentity,
+      structuralPath: context.structuralPath
+    )
+    let content = withResolveEntityRoute(ancestryRoute) {
+      normalizeResolvedElements(
+        payload.resolveElementsInEntityRoutedHost(
+          in: contentContext,
+          placementRoot: context
+        ),
+        in: contentContext
+      )
+    }
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("TabContentEntityHost"),
+        children: [content],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
+  }
+}
+
+private func tabContentValueComponent(
+  _ identity: TabDormantPayloadStructuralIdentity?
+) -> IdentityComponent {
+  guard let identity else {
+    return .named("TabContentValue")
+  }
+  let tag = identity.typedTagComponent.reduce(into: "") { result, character in
+    switch character {
+    case "%": result.append("%25")
+    case "/": result.append("%2F")
+    case "]": result.append("%5D")
+    case ";": result.append("%3B")
+    case "=": result.append("%3D")
+    default: result.append(character)
+    }
+  }
+  return IdentityComponent(
+    rawValue:
+      "TabContentValue[tag=\(tag);optional=\(identity.includeOptional);occurrence=\(identity.occurrence);generation=\(identity.generation)]"
+  )
 }
 
 @MainActor
@@ -139,6 +247,9 @@ package enum LazySubviewPayloadOrigin: Sendable, Equatable {
 
 package enum LazySubviewLifecyclePolicy: Sendable, Equatable {
   case activeOnly
+  /// Resolve only while active, but preserve explicitly certified value-state
+  /// slots in the declaring lazy container's bounded dormant archive.
+  case dormantStatePreserving
 }
 
 @MainActor
@@ -229,6 +340,23 @@ package struct LazySubviewPayload: Sendable {
       return payload.resolve(in: context, placementRoot: placementRoot)
     case .portal(let payload):
       return payload.resolve(in: context, placementRoot: placementRoot)
+    }
+  }
+
+  package func resolveInEntityRoutedHost(
+    in context: ResolveContext,
+    entityIdentity: EntityIdentity,
+    structuralIdentity: TabDormantPayloadStructuralIdentity?
+  ) -> ResolvedNode {
+    switch storage {
+    case .scopedContent(let payload):
+      return payload.resolveInEntityRoutedHost(
+        in: context,
+        entityIdentity: entityIdentity,
+        structuralIdentity: structuralIdentity
+      )
+    case .portal(let payload):
+      return payload.resolve(in: context, placementRoot: context)
     }
   }
 

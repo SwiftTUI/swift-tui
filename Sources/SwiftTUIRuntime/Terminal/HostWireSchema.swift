@@ -166,6 +166,7 @@ package enum HostWireSchema {
         "isResizable",
         wire: .notSerialized("web resizes are round-tripped through the runtime, not host-local")),
       .init("scalingMode", wire: .key("scalingMode")),
+      .init("opacity", wire: .key("opacity")),
       .init(
         "compositing",
         wire: .derived("pre-blended PNG payload replaces the raw source when compositing is set")),
@@ -264,7 +265,7 @@ package enum HostWireSchema {
     ]
     package static let lineStyleKeys: Set<String> = ["pattern", "color"]
     package static let imageKeys: Set<String> = [
-      "id", "format", "bounds", "visibleBounds", "scalingMode", "pixelSize",
+      "id", "format", "bounds", "visibleBounds", "scalingMode", "opacity", "pixelSize",
       "dataBase64",
     ]
     package static let damageKeys: Set<String> = [

@@ -30,38 +30,36 @@ are omitted even when SwiftUI exposes a corresponding API.
 
 ## Omissions
 
-- **No `NavigationLink`.** *Ratified.* Navigation is strictly data-driven: a
-  push mutates the bound path (`NavigationStack(path:root:)` plus
-  `navigationDestination(for:destination:)`). `NavigationLink` fuses a control
-  to a navigation side effect, so navigation state stops being derivable from,
-  and mutable through, the app's data. There is deliberately no link-control
-  sugar.
-- **No `@Environment(\.dismiss)`.** *Ratified.* Presented content receives no
-  ambient dismiss command. The presenter owns a Boolean or optional-item
-  binding, and dismissal clears that source value. A view cannot know the
-  context in which it is displayed, so a child-side self-dismissal command
-  couples reusable content to an assumed presenter. Presenter-side observation
-  (`onDismiss:`) is compatible with the stance; child-side dismissal commands
-  are not. See <doc:Dismissal-Is-Data>.
+- **No value-based `NavigationLink` yet.** *Provisional.* A push currently
+  mutates the bound path (`NavigationStack(path:root:)` plus
+  `navigationDestination(for:destination:)`), so navigation remains wholly
+  data-driven. A value-only link control that appends to that path is a
+  compatible additive direction; destination-building links are not part of
+  the current surface.
+- **No `@Environment(\.dismiss)` yet.** *Provisional.* The presenter currently
+  owns a Boolean or optional-item binding, and dismissal clears that source
+  value; `onDismiss:` observes the result. A scoped `DismissAction`-like
+  environment verb that reports whether the presenter handled it is a
+  compatible additive direction and would still leave app data authoritative.
+  See <doc:Dismissal-Is-Data>.
 - **No `View.tabItem(_:)`.** *Provisional.* Tabs are declared with the
   structured `Tab(_:detail:badge:value:content:)` form.
 - **No heterogeneous `NavigationPath`.** *Provisional.* Only the homogeneous
   `Binding<[Route]>` path form ships.
 - **No `NavigationSplitView`.** *Provisional.* Out of scope for the current
   navigation surface.
-- **No localization, `Font`, or Dynamic Type axis.** *Ratified.* `Text` is
-  literal: string in, glyphs out. There is no `LocalizedStringKey`, `Locale`,
-  bundle lookup, or right-to-left mirroring; no `Font` type or `\.font`; no
-  Dynamic Type. The authoring layers are Foundation-free by policy, and a
-  terminal renders one host-owned monospace glyph grid, so none of the three
-  axes has a value the framework could honor. One forward-compatibility hedge
-  ships with this stance: `Text(verbatim:)` is an explicit-literal alias of
-  `Text(_:)`, so code that states verbatim intent today keeps exactly this
-  behavior even if a key-resolving `Text(_:)` is ever introduced. Retrofitting
-  key semantics onto `Text(_:)` without that hedge would silently change every
-  existing caller, which is why the stance is recorded rather than left
-  implicit. (The emphasis vocabulary that SwiftUI hangs off `Font` lives
-  directly on `Text` here; see the controls section.)
+- **`Text(_:)` is permanently literal.** *Ratified.* A string is content, not
+  a localization key. `Text(verbatim:)` is an explicit alias of `Text(_:)`,
+  not a compatibility hedge for silently changing that initializer later.
+  Any future localization, locale-aware formatting, or bidirectional-text API
+  must use an explicit additive spelling. Those directions remain
+  *Provisional*: there is currently no `LocalizedStringKey`, `Locale`, bundle
+  lookup, or right-to-left mirroring.
+- **No `Font` or Dynamic Type axis.** *Ratified.* The authoring layers are
+  Foundation-free by policy and a terminal renders one host-owned monospace
+  glyph grid, so neither abstraction has a value the framework could honor.
+  The emphasis vocabulary that SwiftUI hangs off `Font` lives directly on
+  `Text` here; see the controls section.
 
 ## App entry, scenes, and lifecycle
 
@@ -120,26 +118,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Binding.animation(_:)` write of an unchanged value consequently animates
   nothing: the write short-circuits before the transaction is read, which
   matches SwiftUI's observable behavior.
-- **`DynamicProperty.update()` runs on a copy.** *Ratified.* SwiftUI mutates
-  a working copy of the view value before body evaluation, so an `update()`
-  mutation to a plain stored property is visible to that one body there
-  (verified against a scratch macOS probe, 2026-08-04; neither framework
-  persists such mutations *across* evaluations). SwiftTUI's view value is
-  immutable at body evaluation (escaping evaluator closures and memo
-  snapshots capture it), and strict memory safety rules out field-offset
-  mutation, so `update()` receives a discarded copy and the body observes
-  the pre-update value. Effects through reference-backed storage (every
-  built-in wrapper) persist in both frameworks; the authoring guidance is
-  identical: keep mutable state in composed reference-backed storage. See
+- **`DynamicProperty` uses a narrower, reference-backed update contract.**
+  *Ratified.* SwiftUI mutates a temporary working value, so a plain stored
+  mutation is visible for one evaluation. SwiftTUI instead requires the
+  nonmutating `update(in:) -> DynamicPropertyUpdateResult`: evaluation-visible
+  custom state lives in reference storage or composed built-ins, and a plain
+  `mutating update()` fails to conform rather than being silently discarded.
+  The result explicitly certifies or denies retained and memoized reuse.
+  `DynamicPropertyContext.invalidationLease` supplies a lifetime-scoped route
+  for asynchronous storage; departed callbacks are inert. See
   <doc:Custom-Dynamic-Properties>.
-- **`update()` effects must stay inside the graph's dependency
-  vocabulary.** *Ratified.* A reused subtree skips body evaluation and the
-  update pass together; every wrapper-expressible dependency (state,
-  environment, focus, focused values, observation) already denies reuse
-  when it changes, so skipping is unobservable for wrappers built from
-  them. Self-managed timers or subscriptions driven from `update()` get no
-  call guarantee, because no reuse gate can deny for a dependency the graph
-  cannot see. SwiftUI does not document an equivalent constraint.
 - **Dynamic-property discovery sees stored properties only.** *Ratified.*
   Discovery reflects stored properties (as SwiftUI does); computed
   properties never participate in the update pass. Wrappers composed inside
@@ -275,12 +263,11 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`padding()` is one cell.** *Ratified.* SwiftUI's unlabeled default is
   platform-adaptive; the cell is the terminal's natural quantum, and the
   literal default keeps padded layouts predictable.
-- **`border` defaults to outset placement and participates in layout.**
-  *Ratified.* SwiftUI's border is an inset overlay that never affects layout.
-  A terminal border occupies whole cells, so an overlay border eats content
-  cells; the default outset placement grows the frame instead, which is the
-  honest cell-grid reading. Inset placement remains available where SwiftUI's
-  overlay behavior is wanted.
+- **`border` defaults to inset placement and does not affect layout.**
+  *Ratified (parity).* The default occupies the content's existing outermost
+  cells, aligning with SwiftUI's non-layout-affecting overlay behavior.
+  SwiftTUI additionally exposes explicit `placement: .outset`, which reserves
+  terminal cells around the content and grows the frame.
 - **`ignoresSafeArea` takes the edge set positionally.** *Ratified.*
   SwiftUI's first positional is `SafeAreaRegions`; terminal safe areas have a
   single region, so the positional parameter is the edge set. The labeled
@@ -319,11 +306,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   `onChange`. SwiftTUI retains its terminal-specific activation callback
   rather than adopting SwiftUI's unrelated sort/customize surface.
 - **`Picker` options are scraped to text.** *Ratified.* Option content is
-  extracted into labeled option values; arbitrary option views degrade to
-  their extracted text. Terminal option rows are single-line text by
-  construction, and structured option metadata keeps every picker style
-  deterministic, the same trade recorded for tab labels. A modifier that
-  overrides this treatment is an open gap.
+  extracted into labeled option values. An unmodified tagged `Text` value is
+  represented losslessly. Arbitrary structure and unsupported modifiers keep
+  their extracted text and tag routing, but emit one deduplicated
+  `picker.unrepresentableOptionContent` runtime issue naming the option
+  identity instead of degrading silently. Terminal option rows are
+  single-line text by construction, and structured option metadata keeps every
+  picker style deterministic, the same trade recorded for tab labels. A
+  metadata-only authoring shape for non-Text content remains an additive gap.
 - **`TabView` resolves only the selected body.** *Ratified.* Resolving only
   the visible tab keeps resolve and commit cost proportional to the visible
   surface, which matters more on a terminal than in SwiftUI's retained scene
@@ -493,10 +483,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   high-priority recognizer claims the pointer stream, sibling recognizers do
   not receive it and a descendant control does not activate;
   `simultaneousGesture` is the explicit exception.
-- **`GestureMask` applies at registration time.** *Provisional.* A mask flip
-  over a spared subtree is not retro-applied until that subtree re-resolves,
-  and the mask governs gesture recognizers, not hover handlers or control
-  activation.
+- **`GestureMask` applies at registration time.** *Ratified.* The exact
+  ancestor-suppression scope chain participates in retained-reuse currency, so
+  a live mask flip narrowly re-resolves and republishes gesture-bearing
+  descendants as a from-scratch build would. Modifier levels stacked at the
+  exact masking identity remain self gestures; strict descendant identities
+  are subviews. The mask governs gesture recognizers, not hover handlers or
+  control activation.
 - **`DragGesture.Value` and `SpatialTapGesture.Value` carry extra fields.**
   *Ratified.* Drag values add pointer provenance and the sampled `path` for
   the current gesture (with a documented lifetime); spatial tap values add a
@@ -520,11 +513,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   bridged. The five analytic primitives carry exact, fixture-pinned cell
   output and cell-aspect correction that sampled paths cannot promise; see
   <doc:AspectCorrectShapes>.
-- **No path/vector transform adapters.** *Ratified.* No `trim(from:to:)`,
-  `offset`, `rotation`, `scale`, or `transform` shape adapters (path/vector
-  transforms have no faithful meaning over discrete cells) and no
-  `lineWidth:` stroke overloads: strokes are one cell wide, and weight is the
-  glyph palette via `borderSet`.
+- **No path/vector transform adapters yet.** *Provisional.*
+  `trim(from:to:)`, `offset`, `rotation`, `scale`, and `transform` shape
+  adapters are absent. SwiftTUI's continuous cell-space paths can support
+  additive transforms before rasterization, with the result quantized at the
+  cell boundary; they are an open direction, not part of the current API.
+- **Strokes are one cell wide.** *Ratified.* There are no `lineWidth:` stroke
+  overloads; authors select apparent weight through the glyph palette via
+  `borderSet`.
 - **No `addArc`, no general `clipShape(_:)`, no animatable path morphing.**
   *Gap.* `addArc` needs an angle type; clipping to an arbitrary path is
   unimplemented; parameterized shapes animate their parameters instead of
@@ -533,9 +529,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   `path(in:)` shape fills its frame, while `Circle` stays round by inscribing
   the short axis; both are recorded as consequences of the cell grid, together with
   sub-cell quantization of custom paths versus bit-exact primitives.
-- **`FillRule` has a dual default.** *Gap.* Hit-testing (`contains`) defaults
-  to even-odd to preserve existing hit regions; the rendering bridge defaults
-  to non-zero, SwiftUI's default.
+- **`FillRule` defaults are coherent.** *Ratified.* Path rendering and
+  `Path.contains` both default to non-zero winding. Authors can request
+  `.evenOdd` explicitly for both rendering and hit testing.
 - **`Canvas` prefers value drawings.** *Ratified.*
   `Canvas(SomeCanvasDrawing())` is the recommended form because value
   drawings compare structurally across rerenders; the SwiftUI-shaped closure
@@ -552,23 +548,24 @@ are omitted even when SwiftUI exposes a corresponding API.
   `VectorArithmetic` with truncate-toward-zero scaling, so a delta of one
   jumps at the end of the curve. Terminal cell coordinates are
   integer-quantized; callers needing sub-cell precision use `Double`.
-- **`Transaction` residue: `tracksVelocity` absent, completion criteria
-  inert, `TransactionKey.Value` narrowed.** *Gap / Ratified mix.*
+- **`Transaction` residue: `tracksVelocity` absent and
+  `TransactionKey.Value` narrowed.** *Gap / Ratified mix.*
   `Transaction` carries animation intent, `disablesAnimations`,
   `isContinuous`, and custom `TransactionKey` values. `tracksVelocity` is
-  not built (*Gap*). `AnimationCompletionCriteria` is accepted but the
-  controller treats `.logicallyComplete` and `.removed` identically
-  (*Gap*). `TransactionKey.Value` requires `Hashable & Sendable` where
+  not built (*Gap*). `AnimationCompletionCriteria.logicallyComplete` fires
+  when every curve reaches its logical endpoint, while `.removed` waits for a
+  retained removal overlay to leave the tree. For non-removal animation they
+  coincide. `TransactionKey.Value` requires `Hashable & Sendable` where
   SwiftUI leaves the associated type unconstrained (*Ratified*: the
   environment-`Sendable` narrowing precedent; values cross the off-main
   frame tail and participate in reuse comparisons). `isContinuous` is
   author-facing metadata: the framework neither sets nor consumes it yet,
   and a SwiftUI probe (2026-08-05) showed SwiftUI does not auto-set it on
   drag updates either.
-- **The transition effect palette is opacity and offset.** *Gap.* Other
-  modifiers inside a custom `Transition.body` are silently ignored, and there
-  is no built-in `.scale` transition; `TransitionContent` is an inert probe
-  placeholder rather than SwiftUI's fully capable view.
+- **Custom `Transition` bodies are not exposed.** *Ratified.* SwiftTUI ships
+  the built-in `AnyTransition` opacity, move, offset, combined, and asymmetric
+  effects. It does not accept an arbitrary view body and then silently discard
+  unsupported modifiers. A built-in `.scale` transition remains a *Gap*.
 - **`matchedGeometryEffect` interpolates position only.** *Gap.* A matched
   pair that changes size snaps to the destination size for the whole
   animation, and the signature omits `properties:` and `anchor:`.
@@ -588,11 +585,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   remains the explicit opt-in for types with custom equality semantics.
 - **Reduced motion changes rendering, not just timing.** *Ratified.* Under
   reduced motion, `Spinner` renders static text, `PhaseAnimator` renders only
-  its first phase, and `AnimatedImage` renders its first frame; `CI=true` and
-  non-TTY stdout imply reduced motion. SwiftUI treats the flag as advisory.
+  its first phase, and `AnimatedImage` renders its first frame. SwiftUI treats
+  the flag as advisory.
   Terminal output is frequently captured, piped, and read by screen readers;
-  degrading to stable output is the terminal-native reading of the
-  accessibility preference rather than a per-app opt-in.
+  `CI=true` and non-TTY stdout therefore select a distinct stable-output
+  policy with those same deterministic built-in forms. They do not claim an
+  accessibility preference or change `accessibilityReduceMotion` for app code.
 
 ## Styling and color
 
@@ -703,9 +701,13 @@ adjustment, value/state, or focus-return routes. (The former linear accessible
   → VoiceOver/TalkBack/browser only. Assistive-technology-originated focus
   traversal is not fed back into SwiftTUI's runtime focus, and semantic nodes
   carry no activation, adjustment, or control-value route.
-- **No WCAG-referenced conformance suite or automated screen-reader
-  testing.** *Gap.* Unit tests and guardrail scripts cover accessibility, but
-  no conformance checklist exists.
+- **No WCAG conformance suite or automated screen-reader testing.** *Gap.*
+  Unit tests and guardrail scripts cover semantic presentation. The
+  coordination-root report
+  `2026-08-13-006-preview-semantic-presentation-checklist.md` adds a WCAG
+  2.2-referenced checklist, explicitly not a conformance claim; its
+  candidate-pin browser, VoiceOver, TalkBack, and terminal observations remain
+  pending.
 
 ## Android host
 
@@ -722,15 +724,17 @@ keyboard, touch, wheel scrolling, hyperlinks, and the system clipboard
   composition (beyond committed text) is not implemented.
 - **No Android content URI import.** *Gap.* SAF / `content://` ingestion into
   the runtime drop path is not implemented.
-- **No automated Android runtime gate.** *Gap.* `AndroidGallery` assembles
-  locally and the Kotlin client logic has JVM unit tests
-  (`./gradlew testDebugUnitTest`, which run without the NDK), but
-  emulator/device smoke is not in CI.
+- **Android runtime acceptance is not closed.** *Gap.* A connected arm64
+  emulator/device instrumentation journey exists for the public Compose,
+  JNI, and NDK host. The current candidate has not passed its state-changing
+  repaint, tab-retention, and device-alpha acceptance, and connected runtime
+  smoke is not a stable CI gate. `AndroidGallery` assembly and the NDK-free
+  Kotlin JVM tests do not close that acceptance.
 - **No `x86_64` Android packaging.** *Gap.* The framework, including the
   vendored `swift-png`/`JPEG` image path, cross-compiles for
   `x86_64-unknown-linux-android28` (the earlier `swift-png` SIMD build
   blocker was replaced by a scalar reimplementation), but `arm64-v8a` is the
-  only ABI the `AndroidGallery` example currently packages and smoke-tests.
+  only ABI the `AndroidGallery` example currently packages.
 
 ## Terminal-program embedding
 
@@ -837,12 +841,6 @@ path, while unblended images keep the fast native path.
   overlapping blended images do not composite as ordered layers, and the
   precomposed variant is not replayed on native hosts outside the terminal
   image path.
-- **Images do not honor the opacity cascade.** *Gap.* Image attachments
-  carry no view-level alpha channel, so `.opacity` on or above an `Image`
-  fades the surrounding cell content but not the attachment itself. Honoring
-  the factor needs an alpha input on the attachment/compositing path rather
-  than a faked cell-level approximation.
-
 ## Distribution
 
 SwiftTUI ships as a SwiftPM source package: every consumer build resolves the

@@ -3292,17 +3292,6 @@ struct InteractiveRuntimeTests {
       )
     )
 
-    // The seed-fallback probe only exists in DEBUG (it is compiled out of
-    // release builds alongside its production hook); the release soundness
-    // lane builds this suite in release configuration.
-    #if DEBUG
-      let degradedIdentities = LockedBox([Identity]())
-      StateSeedFallbackProbe.onDegradedLocation = { identity in
-        degradedIdentities.value.append(identity)
-      }
-      defer { StateSeedFallbackProbe.onDegradedLocation = nil }
-    #endif
-
     let result = try await runTerminalInputHarness(
       terminal: terminal,
       events: [
@@ -3322,12 +3311,6 @@ struct InteractiveRuntimeTests {
       positionBox.value.y >= 1,
       "the scroll write must land on the graph-backed slot"
     )
-    #if DEBUG
-      #expect(
-        degradedIdentities.value.isEmpty,
-        "no @State access during a live-graph scroll may degrade to a seed-backed location: \(degradedIdentities.value)"
-      )
-    #endif
   }
 
   @MainActor

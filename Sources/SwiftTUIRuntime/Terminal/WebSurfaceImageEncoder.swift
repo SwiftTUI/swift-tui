@@ -80,6 +80,7 @@ extension WebSurfaceFrameEncoder {
       "\"bounds\":\(encodeRect(payload.bounds))",
       "\"visibleBounds\":\(encodeRect(payload.visibleBounds))",
       "\"scalingMode\":\(jsonString(attachment.scalingMode.rawValue))",
+      "\"opacity\":\(attachment.opacity)",
     ]
     if let pixelSize = payload.pixelSize {
       fields.append("\"pixelSize\":\(encodeSize(pixelSize))")

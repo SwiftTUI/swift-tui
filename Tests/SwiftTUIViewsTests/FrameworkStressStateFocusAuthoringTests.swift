@@ -163,7 +163,7 @@ struct FrameworkStressStateFocusAuthoringTests {
     _ = stateFocusResolve(StateFocusProjectionOnlyView(), identity: identity, graph: graph)
     let owner = try #require(graph.nodeForIdentity(identity))
     let key = StateSlotKey(
-      owner: owner.viewNodeID,
+      owner: owner.ownerLifetimeID,
       ordinal: StateSlotOrdinals.authored(line: 14, column: 14)
     )
     #expect(graph.stateDependentIdentities(for: key).isEmpty)
@@ -176,7 +176,7 @@ struct FrameworkStressStateFocusAuthoringTests {
     _ = stateFocusResolve(StateFocusWrappedReadView(), identity: identity, graph: graph)
     let owner = try #require(graph.nodeForIdentity(identity))
     let key = StateSlotKey(
-      owner: owner.viewNodeID,
+      owner: owner.ownerLifetimeID,
       ordinal: StateSlotOrdinals.authored(line: 15, column: 15)
     )
     #expect(!graph.stateDependentIdentities(for: key).isEmpty)
@@ -189,7 +189,7 @@ struct FrameworkStressStateFocusAuthoringTests {
     _ = stateFocusResolve(StateFocusBookkeepingView(), identity: identity, graph: graph)
     let owner = try #require(graph.nodeForIdentity(identity))
     let key = StateSlotKey(
-      owner: owner.viewNodeID,
+      owner: owner.ownerLifetimeID,
       ordinal: StateSlotOrdinals.authored(line: 16, column: 16)
     )
     #expect(graph.stateDependentIdentities(for: key).isEmpty)
@@ -209,7 +209,7 @@ struct FrameworkStressStateFocusAuthoringTests {
     #expect(registry.snapshot().count == 1)
     let owner = try #require(graph.nodeForIdentity(identity))
     let key = StateSlotKey(
-      owner: owner.viewNodeID,
+      owner: owner.ownerLifetimeID,
       ordinal: StateSlotOrdinals.authored(line: 17, column: 17)
     )
     #expect(graph.stateDependentIdentities(for: key).isEmpty)

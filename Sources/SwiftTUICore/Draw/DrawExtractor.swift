@@ -277,11 +277,13 @@ extension DrawExtractor {
         )
       )
     case .image(let payload):
+      var fadedPayload = payload
+      fadedPayload.opacity *= effectiveOpacity
       commands.append(
         .image(
           bounds: bounds,
           identity: identity,
-          payload: payload
+          payload: fadedPayload
         )
       )
     case .list(let payload):

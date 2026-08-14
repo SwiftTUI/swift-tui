@@ -210,6 +210,7 @@ private func forEachIterationAuthoringContext(
       focusedValues: scope.focusedValues,
       viewNode: scope.viewNode,
       ownerNodeID: scope.ownerNodeID,
+      stateOwnerHandle: scope.stateOwnerHandle,
       stateGraphScope: scope.stateGraphScope,
       ordinalTracker: scope.ordinalTracker,
       rebasedFromOwnerNodeID: scope.rebasedFromOwnerNodeID

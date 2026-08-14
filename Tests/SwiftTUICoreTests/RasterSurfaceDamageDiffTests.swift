@@ -5,6 +5,36 @@ import Testing
 
 @Suite
 struct RasterSurfaceDamageDiffTests {
+  @Test("an image opacity change damages its attachment bounds")
+  func imageOpacityChangeDamagesAttachmentBounds() {
+    let bounds = CellRect(origin: .init(x: 2, y: 3), size: .init(width: 4, height: 2))
+    let prior = RasterImageAttachment(
+      identity: Identity(components: ["opacity-image"]),
+      bounds: bounds,
+      source: .path("opacity.png"),
+      opacity: 1
+    )
+    let current = RasterImageAttachment(
+      identity: Identity(components: ["opacity-image"]),
+      bounds: bounds,
+      source: .path("opacity.png"),
+      opacity: 0.5
+    )
+
+    let damage = RasterSurfaceDamageDiff.diff(
+      previous: RasterSurface(size: .init(width: 10, height: 8), imageAttachments: [prior]),
+      current: RasterSurface(size: .init(width: 10, height: 8), imageAttachments: [current])
+    )
+
+    #expect(
+      damage
+        == PresentationDamage(textRows: [
+          .init(row: 3, columnRanges: [2..<6]),
+          .init(row: 4, columnRanges: [2..<6]),
+        ])
+    )
+  }
+
   @Test("diff returns nil when there is no previous surface")
   func diffReturnsNilWithoutPreviousSurface() {
     let current = RasterSurface(size: .init(width: 4, height: 1), lines: ["ABCD"])

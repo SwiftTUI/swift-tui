@@ -1,31 +1,158 @@
+/// The reuse certification produced by one dynamic-property update.
+public enum DynamicPropertyUpdateResult: Equatable, Sendable {
+  /// The property registered every dependency and certifies that its
+  /// evaluation-visible result did not change.
+  case unchanged
+  /// The property's evaluation-visible result changed during this update.
+  case changed
+  /// The property cannot certify reuse transparency.
+  case uncertified
+
+  package func merging(_ other: Self) -> Self {
+    switch (self, other) {
+    case (.uncertified, _), (_, .uncertified):
+      return .uncertified
+    case (.changed, _), (_, .changed):
+      return .changed
+    case (.unchanged, .unchanged):
+      return .unchanged
+    }
+  }
+}
+
+/// A lifetime-scoped route from asynchronous custom storage back to the view
+/// graph that registered it.
+///
+/// A lease does not expose its graph node or authored identity. Calling
+/// ``invalidate()`` after that node or graph departs is harmless.
+public final class DynamicPropertyInvalidationLease: Sendable {
+  private let invalidateClosure: @Sendable () -> Void
+
+  package init(_ invalidate: @escaping @Sendable () -> Void) {
+    invalidateClosure = invalidate
+  }
+
+  /// Requests a new evaluation of the lease's live owner.
+  ///
+  /// This method may be called from any executor.
+  public nonisolated func invalidate() {
+    invalidateClosure()
+  }
+
+  package static let inert = DynamicPropertyInvalidationLease {}
+}
+
+/// Per-evaluation services available to a custom dynamic property.
+public struct DynamicPropertyContext: Sendable {
+  /// A graph- and node-scoped invalidation route for asynchronous storage.
+  public let invalidationLease: DynamicPropertyInvalidationLease
+
+  package init(invalidationLease: DynamicPropertyInvalidationLease) {
+    self.invalidationLease = invalidationLease
+  }
+}
+
 /// A stored property of a view (or of another dynamic property) that the
 /// framework updates before each body evaluation.
 ///
-/// Conform a custom property wrapper to `DynamicProperty` to make it a
-/// first-class participant in view evaluation: the framework discovers
-/// conforming stored properties, gives wrappers composed *inside* them
-/// distinct per-instance state storage, and calls ``update()`` under the
-/// enclosing view's authoring scope before the body runs.
-///
-/// Compose the built-in wrappers (`@State`, `@Environment`, `@Binding`, …)
-/// inside a conforming wrapper rather than storing mutable values directly:
-/// `update()` runs on a copy of the enclosing view's value, so mutations to
-/// plain stored properties do not persist; state that must survive between
-/// evaluations belongs in composed reference-backed storage. See the
-/// "Custom dynamic properties" article in the `SwiftTUIViews` documentation
-/// catalog for the full authoring contract.
+/// Custom conformances are reference-backed: the update method is
+/// nonmutating, so a plain value mutation cannot be silently applied to an
+/// extracted copy. Compose built-in wrappers or keep evaluation-visible state
+/// in reference storage, and return an honest reuse certification.
+@MainActor
 public protocol DynamicProperty {
   /// Refreshes the property's state before the enclosing body evaluates.
   ///
-  /// The framework calls this on every body evaluation of the enclosing
-  /// view, after nested dynamic properties have been updated and with the
-  /// enclosing view's authoring scope installed. The default implementation
-  /// does nothing.
+  /// Nested dynamic properties update first. The default is conservative:
+  /// third-party storage that does not explicitly certify transparency denies
+  /// retained and memoized reuse.
   @MainActor
-  mutating func update()
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult
 }
 
 extension DynamicProperty {
   @MainActor
-  public mutating func update() {}
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .uncertified
+  }
+}
+
+/// Framework-owned properties whose update never retains or fires the context
+/// lease. Package-only so third-party properties cannot accidentally opt out
+/// of the live invalidation route promised by their public context.
+package protocol DynamicPropertyLeaseIndependent: DynamicProperty {}
+
+/// Graph-slot-backed property storage whose authored wrapper value carries no
+/// additional evaluation input. Memo comparison may omit these fields because
+/// their visible values are covered by graph dependencies. Package-only:
+/// custom wrappers must keep their own configuration in the value comparison.
+package protocol DynamicPropertyMemoStorageOnly: DynamicProperty {}
+
+package struct DynamicPropertyLeaseRegistrationKey: Hashable, Sendable {
+  package var containerTypeName: String
+  package var structuralPath: String
+  var fieldPath: String
+  var occurrenceOrdinal: Int
+}
+
+@MainActor
+private enum DynamicPropertyLeaseTokenSource {
+  private static var nextToken: UInt64 = 0
+
+  static func issue(
+    containerType: Any.Type,
+    structuralPath: String,
+    fieldPath: String
+  ) -> DynamicPropertyInvalidationLease {
+    guard
+      let node = ViewNodeContext.current,
+      let graph = node.ownerGraph
+    else {
+      return .inert
+    }
+    let graphScope = StateGraphScopeID(graph)
+    let nodeID = node.viewNodeID
+    let occurrenceOrdinal = node.claimDynamicPropertyLeaseOccurrenceOrdinal()
+    let key = DynamicPropertyLeaseRegistrationKey(
+      containerTypeName: String(reflecting: containerType),
+      structuralPath: structuralPath,
+      fieldPath: fieldPath,
+      occurrenceOrdinal: occurrenceOrdinal
+    )
+    nextToken &+= 1
+    let token = nextToken
+    node.registerDynamicPropertyLease(key, token: token)
+
+    return DynamicPropertyInvalidationLease {
+      Task { @MainActor in
+        guard
+          let liveGraph = LiveViewGraphRegistry.graph(for: graphScope),
+          let liveNode = liveGraph.nodeForViewNodeID(nodeID),
+          liveNode.isDynamicPropertyLeaseCurrent(key, token: token)
+        else {
+          return
+        }
+        liveNode.invalidator?.requestInvalidation(of: [liveNode.identity])
+      }
+    }
+  }
+}
+
+extension DynamicPropertyContext {
+  package static let leaseIndependent = Self(invalidationLease: .inert)
+
+  @MainActor
+  package static func current(
+    containerType: Any.Type,
+    structuralPath: String,
+    fieldPath: String
+  ) -> Self {
+    Self(
+      invalidationLease: DynamicPropertyLeaseTokenSource.issue(
+        containerType: containerType,
+        structuralPath: structuralPath,
+        fieldPath: fieldPath
+      )
+    )
+  }
 }

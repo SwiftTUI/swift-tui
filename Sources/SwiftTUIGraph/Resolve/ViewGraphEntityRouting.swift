@@ -8,6 +8,32 @@
 // accessors; the guard order inside `nodeForIdentity` is load-bearing.
 
 extension ViewGraph {
+  /// The sole production fresh-node minting door. Raw node IDs may repeat
+  /// after checkpoint rollback; owner lifetimes never do.
+  private func mintFreshNode(
+    identity: Identity,
+    installIdentityIndex: Bool
+  ) -> ViewNode {
+    // 64-bit raw-ID wraparound remains practically unreachable. Lifetime
+    // safety does not depend on this allocator because the separate owner
+    // sequencer below is checked and never checkpointed.
+    nextViewNodeIDRawValue &+= 1
+    let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
+    let node = ViewNode(
+      viewNodeID: viewNodeID,
+      identity: identity,
+      ownerLifetimeID: issueNodeOwnerLifetimeID()
+    )
+    node.ownerGraph = self
+    nodesByNodeID[viewNodeID] = node
+    nodesByOwnerLifetimeID[node.ownerLifetimeID] = node
+    identityByNodeID[viewNodeID] = identity
+    if installIdentityIndex {
+      nodeIDByIdentity[identity] = viewNodeID
+    }
+    return node
+  }
+
   func nodeForIdentity(
     for identity: Identity,
     entityIdentity: EntityIdentity? = nil
@@ -16,6 +42,12 @@ extension ViewGraph {
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
       if let routedNode = nodeIfExists(for: routedNodeID) {
+        // A route-prepared owner is provisional until authored resolution
+        // claims it. Reaching it through the ordinary entity-routing door is
+        // that claim: withdraw its end-of-frame scratch debt before the
+        // teardown barrier runs. Ordinary routed nodes have no such debt, so
+        // this is a no-op for every non-staged adoption.
+        consumeTeardownWork(.resolveScopeScratch, for: [routedNodeID])
         // Re-routing moves the node to a new `Identity`. Clear the old
         // identity's index entry so nothing else resolving at the old
         // (possibly aliased) identity this frame adopts the moved node — that
@@ -110,20 +142,65 @@ extension ViewGraph {
       return stateOwner
     }
 
-    // 64-bit wraparound is deliberately unguarded (F122): unreachable in practice, and the generation-equality oracles assume no value reuse — do not narrow the width.
-    nextViewNodeIDRawValue &+= 1
-    let viewNodeID = ViewNodeID(rawValue: nextViewNodeIDRawValue)
-    let node = ViewNode(
-      viewNodeID: viewNodeID,
-      identity: identity
-    )
-    node.ownerGraph = self
-    nodesByNodeID[viewNodeID] = node
-    nodeIDByIdentity[identity] = viewNodeID
-    identityByNodeID[viewNodeID] = identity
+    let node = mintFreshNode(identity: identity, installIdentityIndex: true)
     if let entityIdentity {
-      bindEntityRoute(entityIdentity, to: viewNodeID)
+      bindEntityRoute(entityIdentity, to: node.viewNodeID)
     }
+    return node
+  }
+
+  /// Prepares an entity-routed owner without displacing a co-resident owner
+  /// that has the same authored structural identity.
+  ///
+  /// Entity routing, rather than the identity index, is authoritative for
+  /// these owners. This matters when two authored lifetimes deliberately
+  /// share one immutable structural identity (for example, a value host and a
+  /// top-level explicit-identity child). Normal first-allocation routing may
+  /// evict the occurrence-zero occupant so an authored replacement converges;
+  /// restore preparation must keep both records alive until their respective
+  /// authored entity claims arrive. A fresh co-resident node therefore keeps
+  /// the authored identity on the node and route, but leaves the existing
+  /// identity-index occupant untouched.
+  ///
+  /// Every prepared owner carries resolve-scope scratch debt. Ordinary
+  /// `nodeForIdentity(for:entityIdentity:)` route adoption clears that debt;
+  /// an unclaimed owner is reclaimed at the frame teardown barrier. The
+  /// checkpointed graph index and teardown work make candidate-frame rollback
+  /// restore both membership and route ownership atomically.
+  package func prepareEntityRoutedOwnerPreservingCoResidentIdentity(
+    identity: Identity,
+    entityIdentity: EntityIdentity
+  ) -> ViewNode {
+    let node: ViewNode
+    if let routedNodeID = entityRoutingTable.route(entityIdentity),
+      let routedNode = nodeIfExists(for: routedNodeID)
+    {
+      // This is another preparation of the same provisional route, not its
+      // authored adoption. Keep the scratch debt below.
+      node = routedNode
+    } else if let occupant = nodeIfExists(for: identity) {
+      let occupantEntityIdentity =
+        occupant.committed.entityIdentity
+        ?? entityRoutingTable.entityByNodeID[occupant.viewNodeID]
+        ?? occupant.lastHomedEntityIdentity
+      if occupantEntityIdentity == entityIdentity {
+        bindEntityRoute(entityIdentity, to: occupant.viewNodeID)
+        node = occupant
+      } else {
+        // Do not write `nodeIDByIdentity[identity]`: the existing occupant is
+        // still the structural lookup result until normal authored adoption
+        // selects one of the co-resident entity routes.
+        let coResident = mintFreshNode(identity: identity, installIdentityIndex: false)
+        bindEntityRoute(entityIdentity, to: coResident.viewNodeID)
+        node = coResident
+      }
+    } else {
+      node = nodeForIdentity(for: identity, entityIdentity: entityIdentity)
+    }
+
+    enqueueTeardownWork(.resolveScopeScratch, for: node.viewNodeID)
+    node.prepareForFrame(currentFrameID)
+    node.beginDynamicPropertyUpdate()
     return node
   }
 

@@ -119,7 +119,8 @@ extension ViewGraph {
     walk: SubtreeRemovalWalk? = nil
   ) {
     guard let current = nodesByNodeID[node.viewNodeID],
-      current === node
+      current === node,
+      nodesByOwnerLifetimeID[node.ownerLifetimeID] === node
     else {
       return
     }
@@ -476,10 +477,15 @@ extension ViewGraph {
     discardTeardownWork(for: node.viewNodeID)
     identityByNodeID.removeValue(forKey: node.viewNodeID)
     nodesByNodeID.removeValue(forKey: node.viewNodeID)
+    // A sanctioned successor may already serve this immutable owner lifetime.
+    // Retiring an older representation must not erase the successor's route.
+    if nodesByOwnerLifetimeID[node.ownerLifetimeID] === node {
+      nodesByOwnerLifetimeID.removeValue(forKey: node.ownerLifetimeID)
+    }
     // The effect-owner index mirrors `nodesByNodeID` membership exactly (its
-    // only removal is here, beside the node store's): a discarded node's ID
-    // never re-enters the map (IDs are minted monotonically), so this cannot
-    // strand a future owner.
+    // only removal is here, beside the node store's). Raw IDs can repeat after
+    // checkpoint rollback, but the exact-node + owner-lifetime CAS at this
+    // function's entry proves this removal still targets the current occupant.
     effectRegistrationOwnerNodeIDs.remove(node.viewNodeID)
   }
 

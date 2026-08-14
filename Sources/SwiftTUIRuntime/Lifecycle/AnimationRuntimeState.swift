@@ -122,6 +122,12 @@ package struct RemovalEntry: Sendable {
   /// from the value currently on screen instead of snapping back
   /// to full opacity.
   package var startOpacity: Double = 1.0
+  /// Batch retained by this visual exit until its selected completion barrier.
+  package var completionBatchID: AnimationBatchID? = nil
+  /// The curve has reached its final value. The final overlay remains for one
+  /// committed presentation turn so `.logicallyComplete` and `.removed` are
+  /// observably distinct barriers.
+  package var isLogicallyComplete = false
   /// Frozen PlacedNode subtree captured from the previous frame's
   /// placed tree at the moment the removal was snapped.  When
   /// present, the controller injects this subtree into the placed

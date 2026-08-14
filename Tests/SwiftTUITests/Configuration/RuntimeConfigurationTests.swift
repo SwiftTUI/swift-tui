@@ -9,6 +9,7 @@ struct RuntimeConfigurationTests {
     #expect(configuration.color == .auto)
     #expect(configuration.glyphs == .unicode)
     #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == false)
     #expect(configuration.output == .tui)
     #expect(configuration.verbosity == .normal)
     #expect(configuration.web == nil)

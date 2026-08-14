@@ -101,7 +101,7 @@ public struct KeyPressModifier: PrimitiveViewModifier, Sendable {
     }
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerKeyPressHandler(identity: node.identity) { keyPress in
       guard match.matches(keyPress) else {

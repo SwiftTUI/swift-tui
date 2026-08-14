@@ -1412,7 +1412,10 @@ struct RuntimeRegistrationRestoreScopingTests {
     registry.register(
       identity: preservedIdentity,
       bindingKey: FocusBindingKey(
-        ownerNodeID: ViewNodeID(rawValue: 1),
+        owner: StateOwnerHandle(
+          graphScope: StateGraphScopeID(rawValue: 1),
+          ownerLifetime: NodeOwnerLifetimeID(rawValue: 1)
+        ),
         suffix: .stateSlot(ordinal: 0)
       ),
       bindingID: bindingID,
@@ -1423,7 +1426,10 @@ struct RuntimeRegistrationRestoreScopingTests {
     registry.register(
       identity: removedIdentity,
       bindingKey: FocusBindingKey(
-        ownerNodeID: ViewNodeID(rawValue: 2),
+        owner: StateOwnerHandle(
+          graphScope: StateGraphScopeID(rawValue: 1),
+          ownerLifetime: NodeOwnerLifetimeID(rawValue: 2)
+        ),
         suffix: .stateSlot(ordinal: 0)
       ),
       bindingID: bindingID,

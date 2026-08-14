@@ -20,6 +20,12 @@ package enum AnimationContextStorage {
   @TaskLocal package static var currentCustomValues: [ObjectIdentifier: AnyHashableSendable] = [:]
 }
 
+/// Internal completion barrier carried across the graph/runtime boundary.
+package enum AnimationCompletionBarrier: Sendable, Equatable {
+  case logicallyComplete
+  case removed
+}
+
 /// Sink used by the View-layer `withAnimation` to register completion
 /// closures with the animation controller.  The controller fires the
 /// closure once every animation and every removal overlay tagged with
@@ -28,6 +34,7 @@ package enum AnimationContextStorage {
 package protocol AnimationCompletionSink: AnyObject, Sendable {
   func registerCompletion(
     batchID: AnimationBatchID,
+    barrier: AnimationCompletionBarrier,
     closure: @escaping @MainActor @Sendable () -> Void
   )
 }

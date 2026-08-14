@@ -161,7 +161,7 @@ struct StateInvalidationDependencyTests {
 
     let owner = try #require(graph.nodeForIdentity(ownerIdentity))
     let unreadKey = StateSlotKey(
-      owner: owner.viewNodeID,
+      owner: owner.ownerLifetimeID,
       ordinal: ConditionalStateReaderProbe.valueOrdinal
     )
     #expect(graph.stateDependentIdentities(for: unreadKey).isEmpty)
@@ -204,7 +204,7 @@ struct StateInvalidationDependencyTests {
     // Exactly one `@State` slot exists (the probe's `flag`). The key carries the
     // owner node and ordinal.
     guard let key = graph.debugTotalStateSnapshot().stateSlotDependents.keys.first,
-      let owner = graph.nodeForViewNodeID(key.owner)
+      let owner = graph.nodeForOwnerLifetimeID(key.owner)
     else {
       return nil
     }
@@ -250,7 +250,7 @@ struct StateInvalidationDependencyTests {
       value: false,
       invalidationIdentity: ownerIdentity
     )
-    let unreadKey = StateSlotKey(owner: owner.viewNodeID, ordinal: 0)
+    let unreadKey = StateSlotKey(owner: owner.ownerLifetimeID, ordinal: 0)
     #expect(graph.stateDependentIdentities(for: unreadKey).isEmpty)
 
     let spy = StateWriteRecordingInvalidator()

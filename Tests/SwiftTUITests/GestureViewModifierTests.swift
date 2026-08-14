@@ -307,4 +307,80 @@ struct GestureViewModifierTests {
     // (this is a no-op if no handler exists, and box.count remains 0).
     #expect(box.count == 0)
   }
+
+  @Test("a gesture-only mask exempts gestures stacked at the exact attachment identity")
+  func gestureOnlyMaskKeepsSameIdentityStack() throws {
+    @MainActor final class Counts {
+      var inner = 0
+      var outer = 0
+    }
+
+    let counts = Counts()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    var context = ResolveContext(identity: testIdentity("GestureMaskExactIdentity"))
+    context.localPointerHandlerRegistry = pointerRegistry
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = LocalGestureStateRegistry()
+
+    let artifacts = DefaultRenderer().render(
+      Text("Stacked mask")
+        .frame(width: 16, height: 1)
+        .gesture(TapGesture().onEnded { counts.inner += 1 })
+        .gesture(
+          TapGesture().onEnded { counts.outer += 1 },
+          including: .gesture
+        ),
+      context: context,
+      proposal: .init(width: 20, height: 3)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    _ = pointerRegistry.dispatch(
+      routeID: region.routeID,
+      event: .init(
+        kind: .down(.primary),
+        location: Point(region.rect.origin),
+        targetRect: region.rect
+      )
+    )
+    _ = pointerRegistry.dispatch(
+      routeID: region.routeID,
+      event: .init(
+        kind: .up(.primary),
+        location: Point(region.rect.origin),
+        targetRect: region.rect
+      )
+    )
+
+    #expect(counts.inner == 1)
+    #expect(counts.outer == 1)
+    #expect(gestureRegistry.snapshot().count == 1)
+  }
+
+  @Test("nested gesture-only masks suppress only strict descendant identities")
+  func nestedGestureMasksUseStrictDescendantIdentity() {
+    let gestureRegistry = LocalGestureRegistry()
+    var context = ResolveContext(identity: testIdentity("GestureMaskNested"))
+    context.localPointerHandlerRegistry = LocalPointerHandlerRegistry()
+    context.localGestureRegistry = gestureRegistry
+    context.localGestureStateRegistry = LocalGestureStateRegistry()
+
+    _ = DefaultRenderer().render(
+      VStack {
+        VStack {
+          Text("Nested leaf")
+            .gesture(TapGesture().onEnded {})
+        }
+        .gesture(TapGesture().onEnded {}, including: .gesture)
+      }
+      .gesture(TapGesture().onEnded {}, including: .all),
+      context: context,
+      proposal: .init(width: 20, height: 4)
+    )
+
+    // Outer and middle attachments publish. The strict descendant leaf does
+    // not; a same-identity modifier level would have remained eligible.
+    #expect(gestureRegistry.snapshot().count == 2)
+  }
 }

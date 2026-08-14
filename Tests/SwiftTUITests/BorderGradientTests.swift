@@ -20,7 +20,8 @@ struct BorderGradientTests {
     // through blue at the perimeter midpoint).
     let view = Text("hi").border(
       blend: BorderBlend([Color.red, Color.blue, Color.red]),
-      set: .single
+      set: .single,
+      placement: .outset
     )
     let artifacts = DefaultRenderer().render(
       view,
@@ -54,8 +55,18 @@ struct BorderGradientTests {
     // Render the same view at phase 0 and phase 0.5; at least one
     // perimeter cell should differ.
     let blend = BorderBlend([Color.red, Color.green, Color.blue, Color.red])
-    let view0 = Text("hi").border(blend: blend, set: .single, phase: 0)
-    let viewHalf = Text("hi").border(blend: blend, set: .single, phase: 0.5)
+    let view0 = Text("hi").border(
+      blend: blend,
+      set: .single,
+      placement: .outset,
+      phase: 0
+    )
+    let viewHalf = Text("hi").border(
+      blend: blend,
+      set: .single,
+      placement: .outset,
+      phase: 0.5
+    )
     let art0 = DefaultRenderer().render(
       view0,
       context: .init(identity: testIdentity("BorderBlendPhase0"))
@@ -184,7 +195,12 @@ struct BorderGradientTests {
 
     // Frame 1 (seed): phase 0, no animation intent.
     _ = renderer.render(
-      Text("hi").border(blend: blend, set: .single, phase: 0),
+      Text("hi").border(
+        blend: blend,
+        set: .single,
+        placement: .outset,
+        phase: 0
+      ),
       context: .init(identity: rootIdentity)
     )
 
@@ -193,7 +209,12 @@ struct BorderGradientTests {
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     _ = renderer.render(
-      Text("hi").border(blend: blend, set: .single, phase: 1.0),
+      Text("hi").border(
+        blend: blend,
+        set: .single,
+        placement: .outset,
+        phase: 1.0
+      ),
       context: .init(identity: rootIdentity, transaction: transaction)
     )
     #expect(
@@ -209,6 +230,7 @@ struct BorderGradientTests {
     let view = Text("hi").border(
       blend: BorderBlend([Color.red, Color.blue]),
       set: .single,
+      placement: .outset,
       sides: [.top]
     )
     let artifacts = DefaultRenderer().render(

@@ -44,7 +44,7 @@ public struct PointerHoverModifier: PrimitiveViewModifier, Sendable {
     // and the hover-driven state change is not rendered.
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerPointerHoverHandler(
       routeID: routeID,

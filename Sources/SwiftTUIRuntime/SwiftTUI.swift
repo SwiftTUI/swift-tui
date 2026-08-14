@@ -684,10 +684,9 @@ public struct DefaultRenderer {
           elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
           proposalChanged: proposalChanged
         ),
-        latePreferenceReconciliation: { input, clock in
+        latePreferenceReconciliation: { draft in
           renderer.frameTailCoordinator.renderLayoutResolvingLatePreferences(
-            input,
-            clock: clock
+            draft
           )
         },
         fusedFrameTail: { draft, reconciledTailLayout in
@@ -721,6 +720,7 @@ public struct DefaultRenderer {
     )
     let effects = commitFrameEffects(
       draft: draft,
+      canonicalResolved: reconciledTailLayout.input.canonicalResolved,
       resolved: resolved,
       placed: tail.placed,
       semantics: tail.semantics,

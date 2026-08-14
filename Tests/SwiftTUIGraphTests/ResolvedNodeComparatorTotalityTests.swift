@@ -36,6 +36,10 @@ struct ResolvedNodeComparatorTotalityTests {
     "subtreeNodeCount": "derived cache recomputed from children — comparing children subsumes it",
     "customLayoutFallbackSummary":
       "derived cache recomputed from indexedChildSource/layoutRealizedContent didSets",
+    "directDynamicPropertyReuseCertified":
+      "reuse input whose observable consequence is compared through supportsRetainedReuse",
+    "subtreeDynamicPropertyReuseCertified":
+      "derived from direct certification and children; supportsRetainedReuse subsumes it",
     "subtreeRuntimeNodeIDsStamped":
       "runtime stamping bookkeeping — its own doc excludes it from == alongside viewNodeID",
   ]
@@ -105,6 +109,43 @@ struct ResolvedNodeComparatorTotalityTests {
       "isTransient": "placement cache key: overlay marking compared by placementEquivalence",
     ],
   ]
+
+  @Test("child recomputation cannot launder direct DynamicProperty uncertification")
+  func dynamicPropertyCertificationSurvivesSnapshotRebuild() {
+    let child = ResolvedNode(
+      identity: testIdentity("DynamicPropertyCertification", "child"),
+      kind: .view("Text")
+    )
+    var direct = ResolvedNode(
+      identity: testIdentity("DynamicPropertyCertification", "direct"),
+      kind: .view("Host")
+    )
+    direct.directDynamicPropertyReuseCertified = false
+
+    #expect(!direct.subtreeDynamicPropertyReuseCertified)
+    #expect(!direct.supportsRetainedReuse)
+
+    // `ViewNode.snapshot()` rebuilds a committed value and then assigns its
+    // children. That setter formerly recomputed support from layout + children
+    // alone, silently turning a directly uncertified node reusable again.
+    direct.children = [child]
+    #expect(!direct.directDynamicPropertyReuseCertified)
+    #expect(!direct.subtreeDynamicPropertyReuseCertified)
+    #expect(!direct.supportsRetainedReuse)
+
+    var ancestor = ResolvedNode(
+      identity: testIdentity("DynamicPropertyCertification", "ancestor"),
+      kind: .view("VStack"),
+      children: [direct]
+    )
+    #expect(ancestor.directDynamicPropertyReuseCertified)
+    #expect(!ancestor.subtreeDynamicPropertyReuseCertified)
+    #expect(!ancestor.supportsRetainedReuse)
+
+    ancestor.children = [direct, child]
+    #expect(!ancestor.subtreeDynamicPropertyReuseCertified)
+    #expect(!ancestor.supportsRetainedReuse)
+  }
 
   private func comparableFieldNames() throws -> [String] {
     try SourceParsingTestSupport.parsedStoredVarNames(

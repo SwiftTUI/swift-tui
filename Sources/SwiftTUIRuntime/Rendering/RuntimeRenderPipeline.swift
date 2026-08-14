@@ -75,7 +75,7 @@ struct OneShotRenderStageHandlers {
   /// has run the reduced commit for an off-screen-only animation tick, telling
   /// the executor to skip the tail, present, and commit stages.
   var commitElidedFrameIfOffscreen: (FrameHeadDraft) -> Bool
-  var latePreferenceReconciliation: (FrameTailInput, ContinuousClock?) -> ReconciledFrameTailLayout
+  var latePreferenceReconciliation: (FrameHeadDraft) -> ReconciledFrameTailLayout
   var fusedFrameTail: (FrameHeadDraft, ReconciledFrameTailLayout) -> FrameTailOutput
   var commit: (FrameHeadDraft, ReconciledFrameTailLayout, FrameTailOutput) -> FrameArtifacts
 }
@@ -147,10 +147,7 @@ struct RuntimeRenderPipeline: Sendable {
         currentDraft = handlers.animationInjection(currentDraft)
         elided = handlers.commitElidedFrameIfOffscreen(currentDraft)
       case .latePreferenceReconciliation:
-        reconciledLayout = handlers.latePreferenceReconciliation(
-          currentDraft.frameTailInput,
-          currentDraft.clock
-        )
+        reconciledLayout = handlers.latePreferenceReconciliation(currentDraft)
       case .fusedFrameTail:
         guard let layout = reconciledLayout else {
           preconditionFailure(

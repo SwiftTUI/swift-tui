@@ -3,11 +3,10 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
-// The diagnostic memo comparator must classify property-wrapper storage by
-// `DynamicProperty` conformance, not by a hard-coded type-name prefix list
-// (plan 2026-08-04-003 §1.3): the prefix list omits four of the nine
-// built-ins and every third-party wrapper, so the shadow oracle mis-compares
-// values that differ only in wrapper box identity.
+// Only graph-slot wrappers whose visible values are covered by recorded graph
+// dependencies may disappear from memo comparison. A custom DynamicProperty's
+// box and configuration are authored inputs unless it can use the framework's
+// package-only storage marker.
 @propertyWrapper
 @MainActor
 private struct BoxedProbe: DynamicProperty {
@@ -47,15 +46,21 @@ private struct NamespaceHost {
 }
 
 @MainActor
+private struct ErasedStorageHost {
+  let _storage: any DynamicProperty
+  let label: String
+}
+
+@MainActor
 struct DynamicPropertyMemoClassificationTests {
-  @Test("a custom wrapper's storage is classified as wrapper storage")
-  func customWrapperStorageIsSkipped() {
-    // The two values differ only in the wrapper's private box identity —
-    // slot identity, not data. The comparator must not let the box identity
-    // read as a value change.
+  @Test("a custom wrapper's storage remains an authored memo input")
+  func customWrapperStorageIsCompared() {
+    // The wrapper's private box may hold evaluation-visible state. Treating
+    // every DynamicProperty field as graph-slot identity false-equals two
+    // independently authored wrapper values.
     let first = CustomWrapperHost(constant: 1, label: "same")
     let second = CustomWrapperHost(constant: 1, label: "same")
-    #expect(MemoValueComparator.compare(first, second) == .equal)
+    #expect(MemoValueComparator.compare(first, second) == .changed)
 
     // A genuine data change outside the wrapper storage still reads as one.
     let changed = CustomWrapperHost(constant: 1, label: "different")
@@ -86,5 +91,21 @@ struct DynamicPropertyMemoClassificationTests {
     let first = StateHost(label: "same")
     let second = StateHost(label: "same")
     #expect(MemoValueComparator.compare(first, second) == .equal)
+  }
+
+  @Test("diagnostic storage omission requires marker certification on both children")
+  func storageClassificationRequiresBothChildrenToBeCertified() {
+    let certified = ErasedStorageHost(_storage: State(initialValue: 0), label: "same")
+    let uncertified = ErasedStorageHost(_storage: Binding.constant(0), label: "same")
+
+    #expect(MemoValueComparator.compare(certified, uncertified) == .changed)
+  }
+
+  @Test("diagnostic storage omission requires the same marker-backed child type")
+  func storageClassificationRequiresMatchingCertifiedTypes() {
+    let state = ErasedStorageHost(_storage: State(initialValue: 0), label: "same")
+    let focus = ErasedStorageHost(_storage: FocusState<Bool>(), label: "same")
+
+    #expect(MemoValueComparator.compare(state, focus) == .changed)
   }
 }

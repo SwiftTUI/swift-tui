@@ -236,6 +236,36 @@ struct AnimatedImageTests {
     #expect(attachment.resolvedReference == .embeddedImage(frames[0].imageData))
   }
 
+  @Test("AnimatedImage uses stable first-frame output without claiming reduced motion")
+  func animatedImageUsesStableOutputWithoutAccessibilityPreference() throws {
+    let frames = [
+      Self.frame(red: 255, green: 0, blue: 0),
+      Self.frame(red: 0, green: 0, blue: 255),
+    ]
+    let sequence = AnimatedImageSequence(
+      frames: frames,
+      frameDelays: [.milliseconds(20), .milliseconds(20)]
+    )
+    let taskRegistry = LocalTaskRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.stableOutput = true
+
+    let artifacts = DefaultRenderer().render(
+      AnimatedImage(sequence),
+      context: ResolveContext(
+        identity: Identity(components: ["animated-image.stable-output"]),
+        environmentValues: environmentValues,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+
+    #expect(environmentValues.accessibilityReduceMotion == false)
+    #expect(taskRegistry.snapshot().isEmpty)
+    #expect(attachment.resolvedReference == .embeddedImage(frames[0].imageData))
+  }
+
   @Test("AnimatedImage blendMode renders first frame with compositing under reduced motion")
   func animatedImageBlendModeRendersFirstFrameWithCompositingUnderReducedMotion() throws {
     let frames = [

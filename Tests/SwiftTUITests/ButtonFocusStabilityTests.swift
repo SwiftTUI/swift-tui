@@ -141,6 +141,112 @@ struct ButtonFocusStabilityTests {
       "display should not still show v=A")
   }
 
+  @Test("deeply nested Button action mutates its authored @State owner")
+  func deeplyNestedButtonMutatesAuthoredStateOwner() async throws {
+    let terminalSize = CellSize(width: 100, height: 40)
+    let rootIdentity = testIdentity("DeepButtonStateOwner")
+    let trace = DeepButtonStateOwnerTrace()
+    let view = DeepButtonStateOwnerFixture(trace: trace)
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      view,
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let buttonLabel = try #require(
+      initial.placedTree.flattenedDescendants.first { node in
+        if case .text("inc") = node.drawPayload { return true }
+        return false
+      }
+    )
+
+    let host = RecordingTerminalHostLocal(size: terminalSize)
+    _ = try await Self.runHarness(
+      host: host,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: Point(buttonLabel.bounds.origin))),
+        .mouse(.init(kind: .up(.primary), location: Point(buttonLabel.bounds.origin))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize
+    ) {
+      view
+    }
+
+    let finalSurface = try #require(host.lastPresentedSurface)
+    #expect(trace.actionCount == 1, "the deeply nested Button action must execute exactly once")
+    #expect(
+      trace.actionOwner != trace.authoredOwner,
+      "the fixture must exercise a forwarded action whose Button owner differs from its @State owner"
+    )
+    #expect(
+      finalSurface.lines.contains(where: { $0.contains("count 1") }),
+      "the action's @State write must land on the current live authored owner"
+    )
+  }
+
+  @Test("Button in an offset conditional overlay closes its authored state owner")
+  func conditionalOverlayButtonMutatesAuthoredStateOwner() async throws {
+    let terminalSize = CellSize(width: 30, height: 8)
+    let rootIdentity = testIdentity("ConditionalOverlayStateOwner")
+    let actionCount = LockedBox<Int>(0)
+
+    struct Fixture: View {
+      let actionCount: LockedBox<Int>
+      @State private var menuPresented = true
+
+      var body: some View {
+        ZStack(alignment: .topLeading) {
+          Text("App shell")
+          if menuPresented {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("Menu body")
+              Button("close menu") {
+                actionCount.value += 1
+                menuPresented = false
+              }
+            }
+            .offset(x: 1, y: 1)
+          }
+        }
+      }
+    }
+
+    let view = Fixture(actionCount: actionCount)
+    var environment = EnvironmentValues()
+    environment.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      view,
+      context: .init(identity: rootIdentity, environmentValues: environment),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let closeLabel = try #require(
+      initial.placedTree.flattenedDescendants.first { node in
+        if case .text("close menu") = node.drawPayload { return true }
+        return false
+      }
+    )
+
+    let host = RecordingTerminalHostLocal(size: terminalSize)
+    _ = try await Self.runHarness(
+      host: host,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: Point(closeLabel.bounds.origin))),
+        .mouse(.init(kind: .up(.primary), location: Point(closeLabel.bounds.origin))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize
+    ) {
+      view
+    }
+
+    let finalSurface = try #require(host.lastPresentedSurface)
+    #expect(actionCount.value == 1)
+    #expect(!finalSurface.lines.contains(where: { $0.contains("Menu body") }))
+  }
+
   @Test("trailing delete Button inside selected TabView content mutates content state")
   func trailingDeleteButtonInsideSelectedTabViewContentMutatesState() async throws {
     let terminalSize = CellSize(width: 20, height: 6)
@@ -453,6 +559,177 @@ struct ButtonFocusStabilityTests {
       viewBuilder: { _, _ in viewBuilder() }
     )
     return try await runLoop.run()
+  }
+}
+
+@MainActor
+private final class DeepButtonStateOwnerTrace {
+  var actionCount = 0
+  var authoredOwner: StateOwnerHandle?
+  var actionOwner: StateOwnerHandle?
+}
+
+private struct DeepButtonStateOwnerFixture: View {
+  let trace: DeepButtonStateOwnerTrace
+  @State private var count = 0
+
+  var body: some View {
+    trace.authoredOwner = currentImperativeAuthoringContextSnapshot()?.stateOwnerHandle
+    DeepButtonTree.root(counterValue: count) {
+      trace.actionCount += 1
+      trace.actionOwner = currentImperativeAuthoringContextSnapshot()?.stateOwnerHandle
+      count += 1
+    }
+  }
+}
+
+private struct DeepButtonLeaf: View {
+  let isCounter: Bool
+  let counterValue: Int
+  let increment: @MainActor @Sendable () -> Void
+
+  var body: some View {
+    if isCounter {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("count \(counterValue)")
+        Button("inc", action: increment)
+      }
+    } else {
+      Text("cell")
+    }
+  }
+}
+
+private struct DeepButtonSplit<Child: View>: View {
+  let horizontal: Bool
+  let first: Child
+  let second: Child
+
+  var body: some View {
+    if horizontal {
+      HStack(alignment: .top, spacing: 0) {
+        first
+        second
+      }
+    } else {
+      VStack(alignment: .leading, spacing: 0) {
+        first
+        second
+      }
+    }
+  }
+}
+
+@MainActor
+private enum DeepButtonTree {
+  typealias L1 = DeepButtonSplit<DeepButtonLeaf>
+  typealias L2 = DeepButtonSplit<L1>
+  typealias L3 = DeepButtonSplit<L2>
+  typealias L4 = DeepButtonSplit<L3>
+  typealias L5 = DeepButtonSplit<L4>
+  typealias L6 = DeepButtonSplit<L5>
+  typealias L7 = DeepButtonSplit<L6>
+  typealias L8 = DeepButtonSplit<L7>
+
+  struct Region {
+    var rowBase: Int
+    var columnBase: Int
+    var rows: Int
+    var columns: Int
+  }
+
+  static func root(
+    counterValue: Int,
+    increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L8 {
+    l8(
+      Region(rowBase: 0, columnBase: 0, rows: 16, columns: 16),
+      counterValue: counterValue,
+      increment: increment
+    )
+  }
+
+  private static func split<Child: View>(
+    depth: Int,
+    _ region: Region,
+    child: (Region) -> Child
+  ) -> DeepButtonSplit<Child> {
+    if depth % 2 == 1 {
+      let half = region.columns / 2
+      var left = region
+      left.columns = half
+      var right = region
+      right.columnBase += half
+      right.columns = region.columns - half
+      return DeepButtonSplit(horizontal: true, first: child(left), second: child(right))
+    }
+    let half = region.rows / 2
+    var top = region
+    top.rows = half
+    var bottom = region
+    bottom.rowBase += half
+    bottom.rows = region.rows - half
+    return DeepButtonSplit(horizontal: false, first: child(top), second: child(bottom))
+  }
+
+  private static func leaf(
+    _ region: Region,
+    counterValue: Int,
+    increment: @escaping @MainActor @Sendable () -> Void
+  ) -> DeepButtonLeaf {
+    DeepButtonLeaf(
+      isCounter: region.rowBase == 0 && region.columnBase == 0,
+      counterValue: counterValue,
+      increment: increment
+    )
+  }
+
+  private static func l1(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L1 {
+    split(depth: 1, region) { leaf($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l2(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L2 {
+    split(depth: 2, region) { l1($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l3(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L3 {
+    split(depth: 3, region) { l2($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l4(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L4 {
+    split(depth: 4, region) { l3($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l5(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L5 {
+    split(depth: 5, region) { l4($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l6(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L6 {
+    split(depth: 6, region) { l5($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l7(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L7 {
+    split(depth: 7, region) { l6($0, counterValue: counterValue, increment: increment) }
+  }
+
+  private static func l8(
+    _ region: Region, counterValue: Int, increment: @escaping @MainActor @Sendable () -> Void
+  ) -> L8 {
+    split(depth: 8, region) { l7($0, counterValue: counterValue, increment: increment) }
   }
 }
 

@@ -1,6 +1,9 @@
 @MainActor
 package final class ViewNode {
   package let viewNodeID: ViewNodeID
+  /// Immutable authored-owner lifetime. Fresh graph allocations receive a
+  /// new token even when checkpoint rollback reuses `viewNodeID`.
+  package let ownerLifetimeID: NodeOwnerLifetimeID
   package let identity: Identity
   package weak var invalidator: (any Invalidating)? {
     didSet { recordCheckpointMutation() }
@@ -183,6 +186,45 @@ package final class ViewNode {
     set { persistentState.pendingChangeHandlerIDs = newValue }
   }
 
+  package func registerDynamicPropertyLease(
+    _ key: DynamicPropertyLeaseRegistrationKey,
+    token: UInt64
+  ) {
+    persistentState.dynamicPropertyLeaseTokens[key] = token
+    frameState.dynamicPropertyLeaseKeysSeenThisUpdate.insert(key)
+  }
+
+  package func claimDynamicPropertyLeaseOccurrenceOrdinal() -> Int {
+    let ordinal = frameState.nextDynamicPropertyLeaseOccurrenceOrdinal
+    frameState.nextDynamicPropertyLeaseOccurrenceOrdinal += 1
+    return ordinal
+  }
+
+  package func beginDynamicPropertyUpdate() {
+    // A modifier-content resolve may enter the same node recursively. Its
+    // direct properties belong to the outer evaluation's lease census; only a
+    // new outer update replaces the prior successful evaluation's set.
+    guard evaluationDepth == 0 else {
+      return
+    }
+    frameState.dynamicPropertyLeaseKeysSeenThisUpdate.removeAll(keepingCapacity: true)
+    frameState.nextDynamicPropertyLeaseOccurrenceOrdinal = 0
+  }
+
+  private func reconcileDynamicPropertyLeases() {
+    persistentState.dynamicPropertyLeaseTokens =
+      persistentState.dynamicPropertyLeaseTokens.filter {
+        frameState.dynamicPropertyLeaseKeysSeenThisUpdate.contains($0.key)
+      }
+  }
+
+  package func isDynamicPropertyLeaseCurrent(
+    _ key: DynamicPropertyLeaseRegistrationKey,
+    token: UInt64
+  ) -> Bool {
+    persistentState.dynamicPropertyLeaseTokens[key] == token
+  }
+
   private let dependencyTracker: DependencyTracker
   /// Cross-frame internal bookkeeping, grouped so checkpoint/restore move it as
   /// a unit (see ``EvaluationState`` in ViewNodeFieldGroups.swift). The five
@@ -256,9 +298,11 @@ package final class ViewNode {
 
   package init(
     viewNodeID: ViewNodeID,
-    identity: Identity
+    identity: Identity,
+    ownerLifetimeID: NodeOwnerLifetimeID
   ) {
     self.viewNodeID = viewNodeID
+    self.ownerLifetimeID = ownerLifetimeID
     self.identity = identity
     committed = ResolvedNode(
       identity: identity,
@@ -275,6 +319,19 @@ package final class ViewNode {
     // evaluationDepth default to 0 and hasCommittedPresence/
     // suppressesStructuralLifecycle to false via EvaluationState()'s defaults.
     evaluator = nil
+  }
+
+  /// Standalone-node fixture initializer. Nodes inserted into a `ViewGraph`
+  /// must use the graph-issued owner lifetime supplied by its minting door.
+  package convenience init(
+    viewNodeID: ViewNodeID,
+    identity: Identity
+  ) {
+    self.init(
+      viewNodeID: viewNodeID,
+      identity: identity,
+      ownerLifetimeID: NodeOwnerLifetimeID(rawValue: viewNodeID.rawValue)
+    )
   }
 
   /// Bumps the checkpoint-mutation generation. Recording is structural: the
@@ -312,12 +369,29 @@ package final class ViewNode {
     )
   }
 
+  /// Callback-facing handle for this node while it belongs to a graph.
+  package var stateOwnerHandle: StateOwnerHandle? {
+    guard let ownerGraph,
+      ownerGraph.nodeForOwnerLifetimeID(ownerLifetimeID) === self
+    else {
+      return nil
+    }
+    return StateOwnerHandle(
+      graphScope: ownerGraph.stateGraphScopeID,
+      ownerLifetime: ownerLifetimeID
+    )
+  }
+
   package func prepareForFrame(
     _ frameID: UInt64
   ) {
     guard preparedFrameID != frameID else {
       return
     }
+    // Dynamic-property updates run after this frame preparation but before
+    // the reuse door. Start their dependency intake here so a subsequent
+    // fresh evaluation can retain those reads instead of clearing them.
+    _ = dependencyTracker.reset()
     wasPresentAtFrameStart = hasCommittedPresence
     wasVisitedThisFrame = false
     previousChildrenIdentities = children.map(\.identity)
@@ -352,7 +426,6 @@ package final class ViewNode {
       nextTaskModifierOrdinal = 0
       nextValueAnimationModifierOrdinal = 0
       stateSlotClaimantsThisEvaluation.removeAll(keepingCapacity: true)
-      _ = dependencyTracker.reset()
     }
     evaluationDepth += 1
   }
@@ -429,6 +502,11 @@ package final class ViewNode {
     wasVisitedThisFrame = true
     visitedFrameID = frameID
     isDirty = false
+    // A certified update may have refreshed direct dependencies before the
+    // reuse door. Preserve the committed body dependencies and add those
+    // registrations; the union is conservative when a body did not re-run.
+    dependencies.formUnion(dependencyTracker.reset())
+    reconcileDynamicPropertyLeases()
   }
 
   /// Closes a `beginEvaluation` without committing: the chunked resolve
@@ -450,6 +528,7 @@ package final class ViewNode {
       return false
     }
 
+    reconcileDynamicPropertyLeases()
     dependencies = dependencyTracker.reset()
     return true
   }
@@ -477,7 +556,7 @@ package final class ViewNode {
     _ identifier: StateSlotIdentifier,
     seed: @autoclosure () -> Value
   ) -> Value {
-    let readKey = StateSlotKey(owner: viewNodeID, slot: identifier)
+    let readKey = StateSlotKey(owner: ownerLifetimeID, slot: identifier)
     if let reader = ViewNodeContext.current {
       // Reader-attributed: the dependency belongs to the node actually
       // evaluating this read (which may be a descendant consuming a projected
@@ -602,7 +681,7 @@ package final class ViewNode {
     let didChange = slot.set(value)
     stateSlots[identifier] = slot
     if didChange {
-      let key = StateSlotKey(owner: viewNodeID, slot: identifier)
+      let key = StateSlotKey(owner: ownerLifetimeID, slot: identifier)
       ownerGraph?.queueDirtyForStateChange(key)
       let invalidationIdentities = stateChangeInvalidationIdentities(
         for: key,
@@ -629,6 +708,26 @@ package final class ViewNode {
         invalidator?.requestInvalidation(of: invalidationIdentities)
       }
     }
+  }
+
+  /// Stores runtime-synchronized slot bookkeeping without issuing the generic
+  /// state-write invalidation. The mutation still enters graph dirty/checkpoint
+  /// currency; the caller is responsible for issuing its own scoped external
+  /// invalidation when the runtime-visible value changed.
+  @discardableResult
+  package func setStateSlotRecordingMutationWithoutGenericInvalidation<Value>(
+    _ identifier: StateSlotIdentifier,
+    value: Value
+  ) -> Bool {
+    var slot = stateSlots[identifier] ?? .init()
+    let didChange = slot.set(value)
+    stateSlots[identifier] = slot
+    if didChange {
+      ownerGraph?.recordStateMutation(
+        StateSlotKey(owner: ownerLifetimeID, slot: identifier)
+      )
+    }
+    return didChange
   }
 
   /// The identities to invalidate for a state-slot write: the genuine readers
@@ -743,7 +842,7 @@ package final class ViewNode {
   package func resetStateSlotsSparingReadThisFrame() {
     let readSlotsOwnedBySelf = Set(
       dependencyTracker.currentDependencies.stateSlotReads.lazy
-        .filter { $0.owner == self.viewNodeID }
+        .filter { $0.owner == self.ownerLifetimeID }
         .map(\.slot)
     )
     guard !readSlotsOwnedBySelf.isEmpty else {
@@ -868,7 +967,7 @@ package final class ViewNode {
     _ identifier: StateSlotIdentifier,
     registrationScope: Identity?
   ) {
-    let key = StateSlotKey(owner: viewNodeID, slot: identifier)
+    let key = StateSlotKey(owner: ownerLifetimeID, slot: identifier)
     var invalidationIdentities =
       ownerGraph?.stateDependentIdentities(for: key) ?? []
     if let registrationScope {
@@ -2114,6 +2213,9 @@ package final class ViewNode {
 extension ViewNode {
   package struct Checkpoint {
     package var viewNodeID: ViewNodeID
+    /// Immutable owner currency paired with `viewNodeID`. Generation equality
+    /// is meaningful only after this token also matches.
+    package var ownerLifetimeID: NodeOwnerLifetimeID
     // The four upward references mirror the live properties' `weak` storage.
     // This matters once images persist in the F29 ``NodeCheckpointImageStore``:
     // a strong `ownerGraph`/`invalidator` here would form a permanent retain
@@ -2159,6 +2261,7 @@ extension ViewNode {
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
       viewNodeID: viewNodeID,
+      ownerLifetimeID: ownerLifetimeID,
       invalidator: invalidator,
       ownerGraph: ownerGraph,
       parent: parent,
@@ -2182,8 +2285,9 @@ extension ViewNode {
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     precondition(
-      checkpoint.viewNodeID == viewNodeID,
-      "Cannot restore checkpoint for \(checkpoint.viewNodeID) onto \(viewNodeID)."
+      checkpoint.viewNodeID == viewNodeID && checkpoint.ownerLifetimeID == ownerLifetimeID,
+      "Cannot restore checkpoint for \(checkpoint.viewNodeID)/\(checkpoint.ownerLifetimeID) "
+        + "onto \(viewNodeID)/\(ownerLifetimeID)."
     )
     invalidator = checkpoint.invalidator
     ownerGraph = checkpoint.ownerGraph
@@ -2210,6 +2314,7 @@ extension ViewNode {
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
       viewNodeID: viewNodeID,
+      ownerLifetimeID: ownerLifetimeID,
       invalidatorInstalled: invalidator != nil,
       ownerGraphInstalled: ownerGraph != nil,
       parentIdentity: parent?.identity,
@@ -2239,6 +2344,10 @@ extension ViewNode {
       bodyStateSlotCount: bodyStateSlotCount,
       currentBodyStateSlotCount: currentBodyStateSlotCount,
       pendingChangeHandlerIDs: pendingChangeHandlerIDs,
+      dynamicPropertyLeaseKeysSeenThisUpdate: frameState.dynamicPropertyLeaseKeysSeenThisUpdate,
+      nextDynamicPropertyLeaseOccurrenceOrdinal:
+        frameState.nextDynamicPropertyLeaseOccurrenceOrdinal,
+      dynamicPropertyLeaseTokens: persistentState.dynamicPropertyLeaseTokens,
       dependencyTracker: dependencyTracker.currentDependencies,
       registrationCaptureDepth: registrationCaptureDepth,
       runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,

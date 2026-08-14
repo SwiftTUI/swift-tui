@@ -52,7 +52,9 @@ Geometry is integer terminal cells, in two named coordinate domains: the
 (`Point`, `Rect`) for gestures, hover, and `Canvas`. There is no `CGFloat`
 and no CoreGraphics. `frame(width:height:)` takes `Int`, `padding()` is
 literally one cell, and a `border` occupies real cells, so it defaults to
-*outset* placement and participates in layout instead of overlaying content.
+*inset* placement without changing layout allocation. Request `.outset`
+explicitly when the border should reserve cells instead of painting over the
+content's outermost cells.
 `Spacer()` reserves nothing until siblings leave room.
 
 ### State is the only authority
@@ -107,9 +109,12 @@ untagged rows fail loud instead of guessing. See <doc:Focus> and
 
 Tabs are `Tab(...)` values, `Table` takes `[TableColumn]` metadata with
 positional row cells, toolbar items are `ToolbarItemConfig` values, and
-`Picker` options are scraped to labeled text. All four surfaces follow the
-same stance: structured value metadata gives deterministic terminal chrome
-without resolving arbitrary label view trees.
+`Picker` options are scraped to labeled text. Tagged, unmodified `Text` values
+are represented losslessly. Other option trees keep their extracted text and
+tag routing but emit `picker.unrepresentableOptionContent`, so deterministic
+terminal chrome no longer hides discarded structure or modifiers. All four
+surfaces follow the same stance: structured value metadata gives deterministic
+terminal chrome without retaining arbitrary label view trees.
 
 ### Restrained chrome, fail-loud verbs
 
@@ -123,8 +128,9 @@ reports issues instead of silently inferring intent.
 ### Accessibility and capture as defaults
 
 Reduced motion changes *rendering*, not just timing: `Spinner` goes static
-and `PhaseAnimator` holds its first phase. `CI=true` or a non-TTY stdout
-imply it. Semantic style roles (`.foreground`, `.tint`, `.warning`,
+and `PhaseAnimator` holds its first phase. `CI=true` or a non-TTY stdout use
+the same stable built-in rendering without changing the app-visible
+accessibility preference. Semantic style roles (`.foreground`, `.tint`, `.warning`,
 and the `.primary`/`.secondary` aliases) resolve through a host-owned theme;
 there is deliberately no `ColorScheme`. And an `App` is also a CLI command,
 with `--accessible`, `--no-color`, `--ascii`, `--reduce-motion`, and
@@ -145,7 +151,7 @@ surprise. Each links back to its register section by name.
 | `.frame(width: 20.5)`, `CGRect`, `CGFloat` | Geometry is `Int` cells plus continuous cell space; no CoreGraphics types | The `CellRect`/`Rect` vocabulary; `frame(width:height:)` takes `Int` |
 | `Text("a") + Text("b").bold()`; `.font(.title)` | No `+`, no `Font`; `Text` is literal, with no localization | Interpolate: `Text("a \(Text("b").bold())")`; emphasis lives on `Text`; banners via `TextFigure` |
 | `.keyboardShortcut("s")` | Does not exist | `keyCommand`/`paletteCommand` on the `ActionScope` surface |
-| `.padding()`; `.border(.red)` | Padding is one literal cell; the border *grows the frame* (outset default) | Expect cell-quantized layout; `.inset` placement restores overlay behavior |
+| `.padding()`; `.border(.red)` | Padding is one literal cell; the border paints into the existing frame (inset default) | Expect cell-quantized layout; request `.outset` to reserve border cells |
 
 ### The first week
 
@@ -166,10 +172,10 @@ surprise. Each links back to its register section by name.
 - **Equal-value `@State` writes are inert.** Writing an unchanged value does
   not invalidate the owner, so a `Binding.animation(_:)` write of an equal
   value animates nothing.
-- **`DynamicProperty.update()` runs on a copy.** Keep mutable state in
-  reference-backed storage (<doc:Custom-Dynamic-Properties>), and know that
-  `update()` side effects outside the graph's dependency vocabulary get no
-  call guarantee under reuse.
+- **`DynamicProperty` is reference-backed.** Its nonmutating
+  `update(in:) -> DynamicPropertyUpdateResult` rejects plain-value mutation,
+  carries an invalidation lease for asynchronous storage, and makes custom
+  reuse certification explicit (<doc:Custom-Dynamic-Properties>).
 - **Composed wrappers need `DynamicProperty`.** Property wrappers composed
   inside a helper type that does *not* conform to `DynamicProperty` share
   storage by declaration site, surfaced by the `state.duplicateSlotClaim`
@@ -179,8 +185,9 @@ surprise. Each links back to its register section by name.
   lifecycle, task, gesture, focus, or semantic side effects.
 - **A missing named coordinate space falls back to global** with a frame
   diagnostic rather than trapping.
-- **Reduced motion changes what renders, and `CI=true` or a non-TTY stdout
-  imply it.** Screenshots captured in pipelines show the static forms.
+- **Reduced motion changes what renders; capture stability is a separate
+  policy.** `CI=true` and non-TTY stdout show the same static built-in forms,
+  while app reads of `accessibilityReduceMotion` remain unchanged.
 
 ## Not there yet
 

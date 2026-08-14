@@ -124,17 +124,22 @@ struct BenchRatchetTests {
     )
   }
 
-  @Test("the committed baseline loads and covers every ratchet lane in debug")
+  @Test("the committed baseline loads and covers every cold ratchet lane")
   func committedBaselineCoversRatchetLanes() throws {
     let baseline = try PerfBenchBaseline.load(from: PerfBenchBaseline.defaultLocation())
     #expect(baseline.schemaVersion == PerfBenchBaseline.currentSchemaVersion)
-    for member in BenchSuite.members {
-      let cold = baseline.entries(
-        configuration: "debug",
-        scenario: member.scenario.rawValue,
-        lane: BenchRatchet.coldLane
-      )
-      #expect(!cold.isEmpty, "debug cold baseline missing for \(member.scenario.rawValue)")
+    for configuration in ["debug", "release"] {
+      for member in BenchSuite.members {
+        let cold = baseline.entries(
+          configuration: configuration,
+          scenario: member.scenario.rawValue,
+          lane: BenchRatchet.coldLane
+        )
+        #expect(
+          !cold.isEmpty,
+          "\(configuration) cold baseline missing for \(member.scenario.rawValue)"
+        )
+      }
     }
   }
 

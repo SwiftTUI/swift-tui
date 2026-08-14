@@ -8,6 +8,45 @@ import Testing
 @MainActor
 @Suite
 struct ImageSurfaceTests {
+  @Test("an explicitly labeled image stays one image-role node through host projection")
+  func explicitlyLabeledImageKeepsImageRoleThroughHostProjection() throws {
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 4)
+    )
+    let artifacts = DefaultRenderer().render(
+      Image(data: pngBytes)
+        .resizable()
+        .frame(width: 4, height: 2)
+        .opacity(0.5)
+        .background(Color.blue)
+        .accessibilityLabel("Half opacity red image"),
+      context: .init(identity: testIdentity("LabeledImage"))
+    )
+
+    let accessibilityNodes = artifacts.semanticSnapshot.accessibilityNodes.filter {
+      $0.label == "Half opacity red image"
+    }
+    let node = try #require(accessibilityNodes.first)
+    #expect(accessibilityNodes.count == 1)
+    #expect(node.role == .image)
+    #expect(artifacts.semanticSnapshot.accessibilityWarnings.isEmpty)
+
+    let wire = HostWireFrameModel(
+      surface: artifacts.rasterSurface,
+      sequence: 1,
+      semanticSnapshot: artifacts.semanticSnapshot,
+      focusedIdentity: nil,
+      damage: nil,
+      preferredLayoutSize: nil
+    )
+    let wireNode = try #require(
+      wire.accessibilityNodes.first { $0.label == "Half opacity red image" }
+    )
+    #expect(wireNode.roleToken == AccessibilityRole.image.description)
+  }
+
   @Test("embedded PNG bytes resolve into a raster image attachment")
   func embeddedImageBytesResolveIntoAttachment() throws {
     let pngBytes = try makePNGBytes(
@@ -40,6 +79,24 @@ struct ImageSurfaceTests {
     )
 
     #expect(artifacts.rasterSurface.imageAttachments.isEmpty)
+  }
+
+  @Test("nested opacity reaches a raster image attachment multiplicatively")
+  func nestedOpacityReachesRasterAttachment() throws {
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 4)
+    )
+
+    let artifacts = DefaultRenderer().render(
+      Image(data: pngBytes)
+        .opacity(0.5)
+        .opacity(0.4)
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+
+    #expect(attachment.opacity == 0.2)
   }
 
   @Test("named image resources resolve through explicit imageResourceRoots")

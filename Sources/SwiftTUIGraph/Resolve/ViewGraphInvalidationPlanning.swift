@@ -37,10 +37,10 @@ enum ViewGraphInvalidationPlanner {
     markDirty(viewNodeIDs, nodesByNodeID: nodesByNodeID)
   }
 
-  static func stateChangeDirtyNodeIDs(
+  static func stateChangeDirtyOwnerLifetimeIDs(
     for key: StateSlotKey,
-    stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
-  ) -> Set<ViewNodeID> {
+    stateSlotDependents: [StateSlotKey: Set<NodeOwnerLifetimeID>]
+  ) -> Set<NodeOwnerLifetimeID> {
     // Reader-attributed: dirty only the genuine readers — a projection-only owner
     // is recorded as no reader and is therefore spared, which is what takes
     // sheet/palette open from O(background) to O(overlay). The write side

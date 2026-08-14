@@ -33,12 +33,26 @@ package enum LiveViewGraphRegistry {
   /// same key.
   package static func register(_ graph: ViewGraph) {
     graphsByScope = graphsByScope.filter { $0.value.graph != nil }
-    graphsByScope[StateGraphScopeID(graph)] = WeakViewGraphRef(graph)
+    if let existing = graphsByScope[graph.stateGraphScopeID]?.graph {
+      precondition(existing === graph, "A graph lifetime cannot be registered twice")
+    }
+    graphsByScope[graph.stateGraphScopeID] = WeakViewGraphRef(graph)
   }
 
   /// The live graph for `scope`, or `nil` if it has been retired (or was never
   /// registered).
   package static func graph(for scope: StateGraphScopeID) -> ViewGraph? {
-    graphsByScope[scope]?.graph
+    guard let graph = graphsByScope[scope]?.graph,
+      graph.stateGraphScopeID == scope
+    else {
+      return nil
+    }
+    return graph
+  }
+
+  /// Resolves an exact callback-facing state owner without consulting raw node
+  /// IDs or authored identities.
+  package static func node(for handle: StateOwnerHandle) -> ViewNode? {
+    graph(for: handle.graphScope)?.nodeForOwnerLifetimeID(handle.ownerLifetime)
   }
 }

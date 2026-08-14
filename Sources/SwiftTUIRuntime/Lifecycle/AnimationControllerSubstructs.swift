@@ -34,6 +34,12 @@ extension AnimationController {
     /// ViewNodeID (same node, new parent Identity) is recognized as a survivor
     /// rather than a removal-plus-insertion.
     package var liveNodeIDs: Set<ViewNodeID> = []
+    /// O(1) currency for the canonical ViewGraph inputs processed into this
+    /// baseline. A tail-side graph write can advance the graph token without
+    /// contributing ordinary resolve work to the next deadline frame; the
+    /// renderer must then process that frame even when its resolve counters are
+    /// otherwise empty.
+    package var graphAnimationInputToken: UInt64?
 
     package init() {}
 
@@ -49,6 +55,40 @@ extension AnimationController {
       childIndexByIdentity.removeAll(keepingCapacity: true)
       identities.removeAll(keepingCapacity: true)
       liveNodeIDs.removeAll(keepingCapacity: true)
+      graphAnimationInputToken = nil
+    }
+  }
+
+  /// The already-sampled resolved-tree presentation for one animation tick.
+  ///
+  /// Late-preference reconciliation may rebuild the canonical resolved tree
+  /// after the animation stage. Re-projecting this value is intentionally a
+  /// pure tree rewrite: it never evaluates an animation curve a second time,
+  /// advances custom animation state, or fires completions twice.
+  package struct ResolvedPresentationProjection: Sendable {
+    package var interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]] = [:]
+    package var interpolatedIdentityByNodeID: [ViewNodeID: Identity] = [:]
+    package var interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
+    package var parentByIdentity: [Identity: Identity] = [:]
+    package var childIndexByIdentity: [Identity: Int] = [:]
+    package var removalInjectionsByParent:
+      [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
+
+    package init(
+      interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]] = [:],
+      interpolatedIdentityByNodeID: [ViewNodeID: Identity] = [:],
+      interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]] = [:],
+      parentByIdentity: [Identity: Identity] = [:],
+      childIndexByIdentity: [Identity: Int] = [:],
+      removalInjectionsByParent:
+        [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
+    ) {
+      self.interpolatedByNodeID = interpolatedByNodeID
+      self.interpolatedIdentityByNodeID = interpolatedIdentityByNodeID
+      self.interpolatedByIdentity = interpolatedByIdentity
+      self.parentByIdentity = parentByIdentity
+      self.childIndexByIdentity = childIndexByIdentity
+      self.removalInjectionsByParent = removalInjectionsByParent
     }
   }
 
@@ -109,6 +149,8 @@ extension AnimationController {
     /// Completion closures registered by `withAnimation` overloads, keyed by
     /// batch ID; fired once every animation tagged with the batch ID drains.
     package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void] = [:]
+    /// Barrier selected by the matching completion registration.
+    package var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier] = [:]
     /// Animation boxes registered for the current frame, keyed by box.
     package var registeredAnimations: [AnimationBox: Animation] = [:]
 
@@ -117,6 +159,7 @@ extension AnimationController {
     /// Clears the async-writable registration set, preserving allocated capacity.
     package mutating func reset() {
       completionClosures.removeAll(keepingCapacity: true)
+      completionBarriers.removeAll(keepingCapacity: true)
       registeredAnimations.removeAll(keepingCapacity: true)
     }
 
@@ -131,6 +174,10 @@ extension AnimationController {
           live: completionClosures,
           baseline: baseline.completionClosures
         ),
+        completionBarriers: ConcurrentRegistrationCarry.sinceBaseline(
+          live: completionBarriers,
+          baseline: baseline.completionBarriers
+        ),
         registeredAnimations: ConcurrentRegistrationCarry.sinceBaseline(
           live: registeredAnimations,
           baseline: baseline.registeredAnimations
@@ -142,12 +189,14 @@ extension AnimationController {
     /// draft) ledger, never overwriting an entry the restored draft already holds.
     package mutating func reapply(_ carried: ConcurrentRegistrations) {
       ConcurrentRegistrationCarry.reapply(carried.completionClosures, into: &completionClosures)
+      ConcurrentRegistrationCarry.reapply(carried.completionBarriers, into: &completionBarriers)
       ConcurrentRegistrationCarry.reapply(carried.registeredAnimations, into: &registeredAnimations)
     }
 
     /// The carried async registrations between two ledger snapshots.
     package struct ConcurrentRegistrations: Sendable {
       package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void]
+      package var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier]
       package var registeredAnimations: [AnimationBox: Animation]
     }
   }

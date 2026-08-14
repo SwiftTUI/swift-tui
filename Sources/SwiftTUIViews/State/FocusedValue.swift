@@ -181,6 +181,14 @@ public struct FocusedValueWritingModifier<Value: Sendable>: PrimitiveViewModifie
   }
 }
 
-extension FocusedValue: DynamicProperty {}
+extension FocusedValue: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}
 
-extension FocusedBinding: DynamicProperty {}
+extension FocusedBinding: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}

@@ -40,6 +40,15 @@ extension ViewNode {
     package var nextNavigationDestinationModifierOrdinal: Int = 0
     package var nextTaskModifierOrdinal: Int = 0
     package var nextValueAnimationModifierOrdinal: Int = 0
+    /// Dynamic-property lease registrations observed during the current
+    /// direct update. A successful reuse or outermost fresh evaluation
+    /// reconciles the retained token map to this set, revoking wrappers that
+    /// disappeared even when one node evaluates more than once in a frame.
+    package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey> = []
+    /// Stable traversal occurrence within one direct-update census. This
+    /// disambiguates repeated same-type wrappers collapsed onto one graph node
+    /// (for example two transparent modifiers with the same stored field).
+    package var nextDynamicPropertyLeaseOccurrenceOrdinal: Int = 0
   }
 
   /// Internal node bookkeeping that persists across frames (unlike
@@ -125,5 +134,9 @@ extension ViewNode {
     /// without it, a remount under a new `.id` reads the departed content's
     /// final `@State` values (the 0.8.7 counter-ripple wedge).
     package var lastHomedEntityIdentity: EntityIdentity? = nil
+    /// Current async invalidation token for each dynamic-property field. This
+    /// lives in checkpointed node state so rollback restores the prior lease
+    /// and leaves every token issued by an aborted draft inert.
+    package var dynamicPropertyLeaseTokens: [DynamicPropertyLeaseRegistrationKey: UInt64] = [:]
   }
 }

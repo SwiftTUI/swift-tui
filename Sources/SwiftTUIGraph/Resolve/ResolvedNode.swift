@@ -54,6 +54,7 @@ package struct ResolvedNode: Equatable, Sendable {
       recomputePreferenceValues()
       recomputeSubtreeNodeCount()
       recomputeCustomLayoutFallbackSummary()
+      recomputeSubtreeDynamicPropertyReuseCertification()
       recomputeSupportsRetainedReuse()
       recomputeSubtreeRuntimeNodeIDsStamped()
     }
@@ -133,6 +134,19 @@ package struct ResolvedNode: Equatable, Sendable {
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   package private(set) var customLayoutFallbackSummary: CustomLayoutFallbackSummary
+  /// Whether this node's own dynamic-property update is reusable on a later
+  /// frame. `.uncertified` clears this bit; `.unchanged` and `.changed` both
+  /// describe certified storage (the latter denies only the current serve).
+  package var directDynamicPropertyReuseCertified: Bool {
+    didSet {
+      recomputeSubtreeDynamicPropertyReuseCertification()
+      recomputeSupportsRetainedReuse()
+    }
+  }
+  /// Transitive dynamic-property certification kept independently from layout
+  /// reuse capability so child/layout recomputes cannot launder a direct
+  /// uncertified result back to reusable.
+  package private(set) var subtreeDynamicPropertyReuseCertified: Bool
   package var supportsRetainedReuse: Bool
   /// Derived cache: `true` when this node and every descendant in
   /// `_storedChildren` carry a non-nil `viewNodeID`.  `ViewNode`'s runtime-ID
@@ -220,10 +234,13 @@ package struct ResolvedNode: Equatable, Sendable {
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
+    directDynamicPropertyReuseCertified = true
+    subtreeDynamicPropertyReuseCertified = true
     self.supportsRetainedReuse = true
     subtreeRuntimeNodeIDsStamped = false
     recomputeSubtreeNodeCount()
     recomputeCustomLayoutFallbackSummary()
+    recomputeSubtreeDynamicPropertyReuseCertification()
     recomputeSupportsRetainedReuse()
     recomputeSubtreeRuntimeNodeIDsStamped()
   }
@@ -279,10 +296,13 @@ package struct ResolvedNode: Equatable, Sendable {
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     customLayoutFallbackSummary = .init()
+    directDynamicPropertyReuseCertified = true
+    subtreeDynamicPropertyReuseCertified = true
     self.supportsRetainedReuse = true
     subtreeRuntimeNodeIDsStamped = false
     recomputeSubtreeNodeCount()
     recomputeCustomLayoutFallbackSummary()
+    recomputeSubtreeDynamicPropertyReuseCertification()
     recomputeSupportsRetainedReuse()
     recomputeSubtreeRuntimeNodeIDsStamped()
   }
@@ -305,12 +325,19 @@ package struct ResolvedNode: Equatable, Sendable {
     )
   }
 
+  private mutating func recomputeSubtreeDynamicPropertyReuseCertification() {
+    subtreeDynamicPropertyReuseCertified =
+      directDynamicPropertyReuseCertified
+      && children.allSatisfy(\.subtreeDynamicPropertyReuseCertified)
+  }
+
   private mutating func recomputeSupportsRetainedReuse() {
     supportsRetainedReuse = Self.computeSupportsRetainedReuse(
       layoutBehavior: layoutBehavior,
       children: children,
       structuralEdgeRole: structuralEdgeRole,
-      layoutRealizedContent: layoutRealizedContent
+      layoutRealizedContent: layoutRealizedContent,
+      subtreeDynamicPropertyReuseCertified: subtreeDynamicPropertyReuseCertified
     )
   }
 
@@ -481,8 +508,12 @@ package struct ResolvedNode: Equatable, Sendable {
     layoutBehavior: LayoutBehavior,
     children: [ResolvedNode],
     structuralEdgeRole: StructuralEdgeRole,
-    layoutRealizedContent: LayoutRealizedContentBoundary?
+    layoutRealizedContent: LayoutRealizedContentBoundary?,
+    subtreeDynamicPropertyReuseCertified: Bool
   ) -> Bool {
+    if !subtreeDynamicPropertyReuseCertified {
+      return false
+    }
     // A `.viewportBarrier` edge (Stage 4) marks a lazy/indexed source whose
     // placed children are a viewport-clipped subset — its interior is never
     // retained-reusable. Driven off the typed edge role rather than re-deriving

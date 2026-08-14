@@ -449,7 +449,8 @@ struct WebSurfaceWireTotalityTests {
           bounds: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
           source: .data(Self.redPixelPNGBytes()),
           resolvedReference: .embeddedImage(Self.redPixelPNGBytes()),
-          pixelSize: PixelSize(width: 1, height: 1)
+          pixelSize: PixelSize(width: 1, height: 1),
+          opacity: 0.375
         )
       ]
     )
@@ -476,6 +477,7 @@ struct WebSurfaceWireTotalityTests {
             pixelSize: PixelSize(width: 2, height: 2),
             cellPixelSize: PixelSize(width: 2, height: 2),
             scalingMode: .fit,
+            opacity: 0.5,
             compositing: RasterImageCompositing(
               blendMode: .normal,
               destinationBackdrop: RasterImageBackdrop(

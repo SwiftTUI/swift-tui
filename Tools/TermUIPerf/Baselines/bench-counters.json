@@ -16,7 +16,7 @@
           "full_repaint_frames" : 0,
           "measured_computed" : 2067,
           "present_cells" : 1224,
-          "resolved_computed" : 523,
+          "resolved_computed" : 524,
           "resolved_reused" : 0
         }
       },
@@ -34,27 +34,65 @@
           "draw_nodes" : 134,
           "full_repaint_frames" : 0,
           "measured_computed" : 266,
-          "present_cells" : 3192,
-          "resolved_computed" : 171,
+          "present_cells" : 3187,
+          "resolved_computed" : 172,
+          "resolved_reused" : 0
+        }
+      },
+      "dynamic-property-heavy" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 134,
+          "builtin_child_measure_requests_probe" : 66,
+          "builtin_container_measures" : 3,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 69,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 135,
+          "present_cells" : 1108,
+          "resolved_computed" : 71,
+          "resolved_reused" : 0
+        }
+      },
+      "gallery-tab-switch" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 532,
+          "builtin_child_measure_requests_probe" : 402,
+          "builtin_container_measures" : 162,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 208,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 492,
+          "present_cells" : 2606,
+          "resolved_computed" : 336,
           "resolved_reused" : 0
         }
       },
       "lazy-vstack-scroll" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 621,
-          "builtin_child_measure_requests_probe" : 469,
-          "builtin_container_measures" : 88,
+          "builtin_child_measure_requests" : 567,
+          "builtin_child_measure_requests_probe" : 467,
+          "builtin_container_measures" : 89,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 5,
           "custom_child_measure_requests_probe" : 3,
           "custom_container_measures" : 1,
           "custom_placement_child_measure_requests" : 1,
-          "draw_nodes" : 103,
+          "draw_nodes" : 100,
           "full_repaint_frames" : 0,
-          "measured_computed" : 417,
-          "present_cells" : 549,
-          "resolved_computed" : 139,
+          "measured_computed" : 412,
+          "present_cells" : 515,
+          "resolved_computed" : 140,
           "resolved_reused" : 0
         }
       },
@@ -72,8 +110,28 @@
           "draw_nodes" : 318,
           "full_repaint_frames" : 0,
           "measured_computed" : 1210,
-          "present_cells" : 2796,
-          "resolved_computed" : 321,
+          "present_cells" : 652,
+          "resolved_computed" : 322,
+          "resolved_reused" : 0
+        }
+      },
+      "still-image-presentation" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 27,
+          "builtin_child_measure_requests_probe" : 14,
+          "builtin_container_measures" : 14,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 14,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 25,
+          "present_cells" : 70,
+          "raster_image_attachments" : 1,
+          "resolved_computed" : 20,
           "resolved_reused" : 0
         }
       },
@@ -92,7 +150,7 @@
           "full_repaint_frames" : 0,
           "measured_computed" : 6,
           "present_cells" : 16,
-          "resolved_computed" : 7,
+          "resolved_computed" : 8,
           "resolved_reused" : 0
         }
       }
@@ -113,7 +171,7 @@
           "full_repaint_frames" : 0,
           "measured_computed" : 2067,
           "present_cells" : 1224,
-          "resolved_computed" : 523,
+          "resolved_computed" : 524,
           "resolved_reused" : 0
         }
       },
@@ -131,27 +189,65 @@
           "draw_nodes" : 134,
           "full_repaint_frames" : 0,
           "measured_computed" : 266,
-          "present_cells" : 3192,
-          "resolved_computed" : 171,
+          "present_cells" : 3187,
+          "resolved_computed" : 172,
+          "resolved_reused" : 0
+        }
+      },
+      "dynamic-property-heavy" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 134,
+          "builtin_child_measure_requests_probe" : 66,
+          "builtin_container_measures" : 3,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 69,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 135,
+          "present_cells" : 1108,
+          "resolved_computed" : 71,
+          "resolved_reused" : 0
+        }
+      },
+      "gallery-tab-switch" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 532,
+          "builtin_child_measure_requests_probe" : 402,
+          "builtin_container_measures" : 162,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 208,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 492,
+          "present_cells" : 2606,
+          "resolved_computed" : 336,
           "resolved_reused" : 0
         }
       },
       "lazy-vstack-scroll" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 621,
-          "builtin_child_measure_requests_probe" : 469,
-          "builtin_container_measures" : 88,
+          "builtin_child_measure_requests" : 567,
+          "builtin_child_measure_requests_probe" : 467,
+          "builtin_container_measures" : 89,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 5,
           "custom_child_measure_requests_probe" : 3,
           "custom_container_measures" : 1,
           "custom_placement_child_measure_requests" : 1,
-          "draw_nodes" : 103,
+          "draw_nodes" : 100,
           "full_repaint_frames" : 0,
-          "measured_computed" : 417,
-          "present_cells" : 549,
-          "resolved_computed" : 139,
+          "measured_computed" : 412,
+          "present_cells" : 515,
+          "resolved_computed" : 140,
           "resolved_reused" : 0
         }
       },
@@ -169,8 +265,28 @@
           "draw_nodes" : 318,
           "full_repaint_frames" : 0,
           "measured_computed" : 1210,
-          "present_cells" : 2796,
-          "resolved_computed" : 321,
+          "present_cells" : 652,
+          "resolved_computed" : 322,
+          "resolved_reused" : 0
+        }
+      },
+      "still-image-presentation" : {
+        "cold" : {
+          "answered_inputs" : 0,
+          "builtin_child_measure_requests" : 27,
+          "builtin_child_measure_requests_probe" : 14,
+          "builtin_container_measures" : 14,
+          "committed_frames" : 1,
+          "custom_child_measure_requests" : 0,
+          "custom_child_measure_requests_probe" : 0,
+          "custom_container_measures" : 0,
+          "custom_placement_child_measure_requests" : 0,
+          "draw_nodes" : 14,
+          "full_repaint_frames" : 0,
+          "measured_computed" : 25,
+          "present_cells" : 70,
+          "raster_image_attachments" : 1,
+          "resolved_computed" : 20,
           "resolved_reused" : 0
         }
       },
@@ -189,7 +305,7 @@
           "full_repaint_frames" : 0,
           "measured_computed" : 6,
           "present_cells" : 16,
-          "resolved_computed" : 7,
+          "resolved_computed" : 8,
           "resolved_reused" : 0
         }
       }

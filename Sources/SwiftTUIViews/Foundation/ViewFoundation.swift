@@ -328,6 +328,10 @@ func resolveView<V: View>(
   authoringContextOverride: AuthoringContext?,
   structuralChildCutEligible: Bool = false
 ) -> ResolvedNode {
+  let forwardedPreparation = ForwardedDynamicPropertyPreparationScope.begin()
+  defer {
+    ForwardedDynamicPropertyPreparationScope.end(forwardedPreparation)
+  }
   // Reused evaluator closures may have captured this context on a prior frame.
   // Refresh the pass-owned inputs before resolving so invalidation helpers and
   // transaction-aware reuse checks observe the current frame.
@@ -353,6 +357,12 @@ func resolveView<V: View>(
     }
   }
   let routeIdentity = entityRouteIdentity(for: view, in: context)
+  let dynamicPropertyUpdateResult = prepareDynamicProperties(
+    of: view,
+    in: context,
+    routeIdentity: routeIdentity,
+    authoringContextOverride: authoringContextOverride
+  )
   context.viewGraph?.setSuppressesStructuralLifecycle(
     context.suppressesStructuralLifecycle,
     for: context.identity
@@ -387,7 +397,8 @@ func resolveView<V: View>(
       suppressesValueVerifiedReuse: suppressesValueVerifiedReuse,
       withinChurnedSubtree: context.withinChurnedSubtree,
       structuralPath: context.structuralPath,
-      runtimeRegistrations: context.runtimeRegistrations
+      runtimeRegistrations: context.runtimeRegistrations,
+      dynamicPropertyUpdateResult: dynamicPropertyUpdateResult
     ),
     viewValue: view
   ) {
@@ -472,7 +483,12 @@ func resolveView<V: View>(
     // Captured before the body runs, while `graphNode.committed` still holds the
     // prior frame's output. In release this is sampled and opt-in via
     // `SWIFTTUI_MEMO_TRACE`; when unsampled it is a single Bool guard.
-    let memoObservation = beginMemoObservation(view, graphNode: graphNode, context: context)
+    let memoObservation = beginMemoObservation(
+      view,
+      graphNode: graphNode,
+      context: context,
+      dynamicPropertyUpdateResult: dynamicPropertyUpdateResult
+    )
     let erased: Any = view
     var accessedStateSlots = 0
     var resolved = ViewUpdateGuard.withViewUpdate {
@@ -519,6 +535,11 @@ func resolveView<V: View>(
       }
     }
     assignEntityIdentityOccurrences(to: &resolved._storedChildren)
+    if case .uncertified = dynamicPropertyUpdateResult {
+      // Direct certification is authoritative input to the subtree summary;
+      // layout and child recomputes cannot launder it back to reusable.
+      resolved.directDynamicPropertyReuseCertified = false
+    }
     if let graphNode {
       if let committed = context.viewGraph?.finishEvaluation(
         graphNode,
@@ -592,11 +613,15 @@ struct MemoComputationObservation {
 func beginMemoObservation<V: View>(
   _ view: V,
   graphNode: SwiftTUICore.ViewNode?,
-  context: ResolveContext
+  context: ResolveContext,
+  dynamicPropertyUpdateResult: DynamicPropertyUpdateResult
 ) -> MemoComputationObservation? {
   guard MemoSkipTrace.shouldObserve, let graphNode else { return nil }
   MemoSkipTrace.recordComputed()
   MemoSkipTrace.recordPlanTier(MemoComparisonPlanCache.diagnosticTier(for: V.self))
+  // Mirror the production reuse door: changed/uncertified updates are not
+  // would-skip candidates and must not feed a false soundness alarm.
+  guard case .unchanged = dynamicPropertyUpdateResult else { return nil }
   // A self-invalidated node must re-run; only nodes reached under a re-run
   // ancestor are memoization candidates.
   guard !context.effectiveInvalidatedIdentities.contains(context.identity),
@@ -793,7 +818,7 @@ private func deferResolveDescent<V: View>(
 }
 
 @MainActor
-private func rebasedAuthoringContext(
+package func rebasedAuthoringContext(
   _ authoringContext: AuthoringContext,
   viewNode: SwiftTUICore.ViewNode?
 ) -> AuthoringContext {
@@ -804,6 +829,7 @@ private func rebasedAuthoringContext(
     focusedValues: authoringContext.focusedValues,
     viewNode: viewNode,
     ownerNodeID: authoringContext.ownerNodeID,
+    stateOwnerHandle: authoringContext.stateOwnerHandle,
     stateGraphScope: authoringContext.stateGraphScope,
     ordinalTracker: authoringContext.ordinalTracker
   )

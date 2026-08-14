@@ -848,7 +848,7 @@ struct ViewGraphTests {
 
     graph.beginFrame()
     let node = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
-    let stateKey = StateSlotKey(owner: node.viewNodeID, ordinal: 0)
+    let stateKey = StateSlotKey(owner: node.ownerLifetimeID, ordinal: 0)
     _ = node.stateSlot(ordinal: 0, seed: 0)
     node.recordEnvironmentRead(environmentKeyA)
     node.recordObservableRead(observableID)
@@ -1942,7 +1942,7 @@ private func recordPortalRuntimeRegistrations(
     FocusBindingRegistrationSnapshot(
       identity: identity,
       bindingKey: FocusBindingKey(
-        ownerNodeID: node.viewNodeID,
+        owner: node.stateOwnerHandle,
         suffix: .stateSlot(ordinal: 0)
       ),
       bindingID: "binding-\(identity.path)",

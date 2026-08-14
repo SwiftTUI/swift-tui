@@ -31,9 +31,11 @@ extension RuntimeConfiguration {
     // Glyphs: directly mirror TerminalCapabilityProfile.detect.
     let glyphs: GlyphMode = profile.glyphLevel == .ascii ? .ascii : .unicode
 
-    // Motion: non-TTY or CI implies reduced motion.
+    // Stable output: non-TTY or CI suppresses built-in motion for deterministic
+    // capture, but it is not exposed to app code as an accessibility preference.
     let isCI = environment["CI"].map { !$0.isEmpty && $0 != "false" && $0 != "0" } ?? false
-    var motion: MotionMode = (isCI || !isStdoutTTY) ? .reduced : .normal
+    var stableOutput = isCI || !isStdoutTTY
+    var motion: MotionMode = .normal
 
     // Output mode.
     var output: OutputMode = .tui
@@ -45,6 +47,9 @@ extension RuntimeConfiguration {
     }
     if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty {
       motion = (v != "0") ? .reduced : .normal
+    }
+    if let v = environment["SWIFTTUI_STABLE_OUTPUT"], !v.isEmpty {
+      stableOutput = v != "0"
     }
     var cursorFollowsFocus = false
     if let v = environment["SWIFTTUI_CURSOR_FOLLOWS_FOCUS"], !v.isEmpty, v != "0" {
@@ -89,6 +94,7 @@ extension RuntimeConfiguration {
       color: color,
       glyphs: glyphsResolved,
       motion: motion,
+      stableOutput: stableOutput,
       output: output,
       verbosity: verbosity,
       web: web,

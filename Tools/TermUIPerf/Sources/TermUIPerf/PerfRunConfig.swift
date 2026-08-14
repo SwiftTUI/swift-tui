@@ -108,6 +108,8 @@ public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case memoEquatableBoundary = "memo-equatable-boundary"
   case canvasPartialReuse = "canvas-partial-reuse"
   case gifPlayback = "gif-playback"
+  case dynamicPropertyHeavy = "dynamic-property-heavy"
+  case stillImagePresentation = "still-image-presentation"
   case lazyList1K = "lazy-list-1k"
   case table1Kx4 = "table-1kx4"
   case lazyVStackScroll = "lazy-vstack-scroll"

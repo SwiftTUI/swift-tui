@@ -208,8 +208,8 @@ struct ResolveContextStorageTotalityTests {
       draft: .survives("resolve-scope marker, not a registration")
     ),
     "gestureSuppressionScopes": notEquated(
-      "registration-time suppression currency; documented as not retro-applied "
-        + "without re-resolve",
+      "registration-time suppression currency mirrored into equated private "
+        + "environment-snapshot currency by GestureAttachmentModifier",
       draft: .survives("resolve-scope currency, not a registration")
     ),
     "requestDeadline": notEquated(

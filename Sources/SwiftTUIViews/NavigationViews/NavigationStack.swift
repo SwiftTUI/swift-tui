@@ -791,18 +791,22 @@ private func updateNavigationDestinationActivation(
   }
 
   let slotOrdinal = navigationDestinationActivationStateSlot(modifierOrdinal)
-  var state = ownerNode.stateSlot(
-    ordinal: slotOrdinal,
-    seed: NavigationDestinationActivationState.inactive
-  )
+  var state = withPersistentDormantStateSlot {
+    ownerNode.stateSlot(
+      ordinal: slotOrdinal,
+      seed: NavigationDestinationActivationState.inactive
+    )
+  }
 
   guard let activeKey else {
     state.activeKey = nil
     state.activeOrdinal = -1
-    ownerNode.setStateSlotSilently(
-      ordinal: slotOrdinal,
-      value: state
-    )
+    withPersistentDormantStateSlot {
+      ownerNode.setStateSlotSilently(
+        ordinal: slotOrdinal,
+        value: state
+      )
+    }
     return nil
   }
 
@@ -813,10 +817,12 @@ private func updateNavigationDestinationActivation(
   state.activeKey = activeKey
   state.activeOrdinal = state.nextOrdinal
   state.nextOrdinal += 1
-  ownerNode.setStateSlotSilently(
-    ordinal: slotOrdinal,
-    value: state
-  )
+  withPersistentDormantStateSlot {
+    ownerNode.setStateSlotSilently(
+      ordinal: slotOrdinal,
+      value: state
+    )
+  }
   return state.activeOrdinal
 }
 

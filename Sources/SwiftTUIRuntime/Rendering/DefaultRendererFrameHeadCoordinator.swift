@@ -187,6 +187,8 @@ struct DefaultRendererFrameHeadCoordinator {
         surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
         resolvedNodesComputed: draft.resolveContext.resolveWorkTracker?
           .snapshot.resolvedNodesComputed,
+        evaluatedNodeIDs: draft.frameTailInput.evaluatedNodeIDs,
+        graphAnimationInputToken: draft.frameTailInput.graphAnimationInputToken,
         frameHeadTransaction: draft.transaction
       )
     }
@@ -635,11 +637,14 @@ struct DefaultRendererFrameHeadCoordinator {
     )
     let frameTailInput = FrameTailInput(
       generation: renderGeneration,
+      canonicalResolved: resolved,
       resolved: resolved,
       proposal: resolveInputs.proposal,
       rootIdentity: resolveContext.identity,
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext,
+      graphAnimationInputToken: viewGraph.animationInputMutationToken,
+      evaluatedNodeIDs: viewGraph.evaluatedNodeIDsThisFrame,
       animationSegmentTargetIdentities: AnimationInvalidationSegments.identityUnion(
         resolveInputs.animationSegments
       ),
@@ -752,6 +757,8 @@ private struct AnimationInjectionStage {
     timestamp: MonotonicInstant,
     surfaceSize: CellSize?,
     resolvedNodesComputed: Int?,
+    evaluatedNodeIDs: Set<ViewNodeID>,
+    graphAnimationInputToken: UInt64,
     frameHeadTransaction: FrameHeadTransaction
   ) -> Set<Identity> {
     let controller = animationDraft.controller
@@ -763,14 +770,19 @@ private struct AnimationInjectionStage {
       // Animation-process equivalence deliberately ignores transaction changes
       // when the animatable target snapshot itself is unchanged.
       if resolvedNodesComputed == 0,
-        controller.canSkipResolvedTreeProcessing(transactionPlan: transactionPlan)
+        evaluatedNodeIDs.isEmpty,
+        controller.canSkipResolvedTreeProcessing(
+          transactionPlan: transactionPlan,
+          graphAnimationInputToken: graphAnimationInputToken
+        )
       {
         controller.noteSkippedResolvedTreeProcessing(resolved: resolved)
       } else {
         controller.processResolvedTree(
           resolved,
           transactionPlan: transactionPlan,
-          timestamp: timestamp
+          timestamp: timestamp,
+          graphAnimationInputToken: graphAnimationInputToken
         )
       }
     }

@@ -145,6 +145,10 @@ set.
 `knownImageIDs` records which payloads were transmitted within one encoding
 state. The first appearance of an image ID includes `dataBase64`. Later
 appearances retain the image's geometry and metadata but omit the payload.
+The additive `opacity` field is a normalized `0...1` placement value. It is
+metadata, not image content: an opacity-only update retains the same image ID
+and does not retransmit `dataBase64`; every host reapplies the current value
+when it paints the placement.
 Reconstructing the encoding state empties the set and causes payloads to be
 sent again.
 

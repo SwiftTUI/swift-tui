@@ -127,11 +127,20 @@ struct RetainedFrameTailPhaseProducts: Sendable {
 /// in-flight candidate.
 struct FrameTailInput {
   var generation: RenderGeneration
+  /// Canonical pre-animation resolved product. Tail stages that write back to
+  /// ViewGraph must consume this value, never transient presentation overrides.
+  var canonicalResolved: ResolvedNode
+  /// Presentation tree for measure/place/draw.
   var resolved: ResolvedNode
   var proposal: ProposedSize
   var rootIdentity: Identity
   var retained: FrameTailRetainedInput
   var layoutPassContext: LayoutPassContext
+  /// O(1) ViewGraph animation-input currency captured with the canonical tree.
+  var graphAnimationInputToken: UInt64
+  /// Declarations freshly evaluated while producing the canonical tree. This
+  /// complements the resolve work tracker in the animation skip proof.
+  var evaluatedNodeIDs: Set<ViewNodeID>
   /// Identities whose rendered cells the head's animation-injection stage
   /// rewrote *after* resolve, from ``AnimationTickResult/redrawIdentities``.
   ///

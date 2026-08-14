@@ -35,14 +35,19 @@ package struct NodeCheckpointImageStore {
   /// variant was measured 2.5× worse on checkpoint create for identical
   /// whole-frame CPU).
   private var capturedGenerations: [ViewNodeID: UInt64] = [:]
+  /// Immutable owner currency paired with each raw node ID. A raw ID and
+  /// checkpoint-mutation generation can both repeat after graph checkpoint
+  /// rollback; generation equality is therefore consulted only when this
+  /// lifetime token also matches.
+  private var capturedOwnerLifetimeIDs: [ViewNodeID: NodeOwnerLifetimeID] = [:]
 
   package init() {}
 
   /// Refreshes stale entries and returns the full image set for a checkpoint.
   ///
-  /// One pass over the live nodes: an entry is stale iff its captured
-  /// generation differs from the node's live generation (covers minted nodes —
-  /// no entry means `nil != generation`). Departed nodes are pruned when the
+  /// One pass over the live nodes: an entry is stale iff its captured owner
+  /// lifetime or generation differs from the live node (covers minted nodes —
+  /// no entry means unequal currency). Departed nodes are pruned when the
   /// counts diverge; after the refresh loop `images.keys ⊇ live keys`, so
   /// equal counts imply equal key sets.
   ///
@@ -54,15 +59,19 @@ package struct NodeCheckpointImageStore {
     of nodesByNodeID: [ViewNodeID: ViewNode]
   ) -> [ViewNodeID: ViewNode.Checkpoint] {
     for (viewNodeID, node) in nodesByNodeID
-    where capturedGenerations[viewNodeID] != node.currentCheckpointMutationGeneration {
+    where capturedOwnerLifetimeIDs[viewNodeID] != node.ownerLifetimeID
+      || capturedGenerations[viewNodeID] != node.currentCheckpointMutationGeneration
+    {
       images[viewNodeID] = node.makeCheckpoint()
       capturedGenerations[viewNodeID] = node.currentCheckpointMutationGeneration
+      capturedOwnerLifetimeIDs[viewNodeID] = node.ownerLifetimeID
     }
     if images.count != nodesByNodeID.count {
       let departedNodeIDs = images.keys.filter { nodesByNodeID[$0] == nil }
       for viewNodeID in departedNodeIDs {
         images.removeValue(forKey: viewNodeID)
         capturedGenerations.removeValue(forKey: viewNodeID)
+        capturedOwnerLifetimeIDs.removeValue(forKey: viewNodeID)
       }
     }
     return images
@@ -87,9 +96,16 @@ package struct NodeCheckpointImageStore {
       Set(images.keys) == Set(nodesByNodeID.keys),
       "NodeCheckpointImageStore.adopt: images/nodesByNodeID key sets diverge"
     )
+    precondition(
+      images.allSatisfy { viewNodeID, image in
+        nodesByNodeID[viewNodeID]?.ownerLifetimeID == image.ownerLifetimeID
+      },
+      "NodeCheckpointImageStore.adopt: raw node ID reused by a different owner lifetime"
+    )
     self.images = images
     capturedGenerations = nodesByNodeID.mapValues { node in
       node.currentCheckpointMutationGeneration
     }
+    capturedOwnerLifetimeIDs = nodesByNodeID.mapValues(\.ownerLifetimeID)
   }
 }

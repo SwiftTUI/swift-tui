@@ -51,6 +51,12 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   public var reduceMotion: Bool = false
 
   @Flag(
+    name: .customLong("stable-output"),
+    help: "Suppress built-in motion for deterministic capture. [env: SWIFTTUI_STABLE_OUTPUT]"
+  )
+  public var stableOutput: Bool = false
+
+  @Flag(
     name: .customLong("cursor-follows-focus"),
     help: "Move the terminal cursor to focus in TUI output. [env: SWIFTTUI_CURSOR_FOLLOWS_FOCUS]"
   )

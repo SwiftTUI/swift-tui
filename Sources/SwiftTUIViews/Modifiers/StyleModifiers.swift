@@ -220,14 +220,12 @@ extension View {
 
   /// Draws a border around this view.
   ///
-  /// The default chrome is `BorderSet.rounded` in `StrokeStyle.Placement.outset` placement.
-  /// The wrapped view frame grows by the display widths for each border side.
-  /// Thus,
-  /// content is never occluded.
+  /// The default chrome is `BorderSet.rounded` in
+  /// `StrokeStyle.Placement.inset` placement. The border draws into the
+  /// outermost cells of the content frame without changing layout allocation.
   ///
-  /// Pass `placement: .inset` to draw the border into the outermost
-  /// cells of the content frame instead of reserving extra space. Use
-  /// this with inset-style border sets like `BorderSet.innerHalfBlock`.
+  /// Pass `placement: .outset` to reserve additional cells outside the
+  /// content frame so the border does not occlude its outermost cells.
   ///
   /// For other glyph palettes (single-line, half-block, double-line,
   /// or heavy) pass an explicit `set:`. See `BorderSet` for the
@@ -235,7 +233,7 @@ extension View {
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
     set: BorderSet = .rounded,
-    placement: StrokeStyle.Placement = .outset,
+    placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -253,7 +251,7 @@ extension View {
   public func border(
     _ style: BorderEdgeStyle,
     set: BorderSet = .rounded,
-    placement: StrokeStyle.Placement = .outset,
+    placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -279,7 +277,7 @@ extension View {
   public func border(
     blend: BorderBlend,
     set: BorderSet = .rounded,
-    placement: StrokeStyle.Placement = .outset,
+    placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all,
     phase: Double = 0
   ) -> some View {

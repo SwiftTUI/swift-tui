@@ -8,8 +8,9 @@
 ///   cells of the content frame).
 ///
 /// The default (``init(lineWidth:borderSet:placement:)`` with no
-/// arguments) produces ``BorderSet/rounded`` glyphs in `.outset`
-/// placement. Use this for the framework-canonical look.
+/// arguments) produces ``BorderSet/rounded`` glyphs in `.inset`
+/// placement, so a stroke does not change layout allocation. Request
+/// `.outset` explicitly when the border must reserve cells around content.
 ///
 /// For a single-line look matching pre-2026-04 framework defaults,
 /// pass `borderSet: .single` explicitly. For the half-block look
@@ -29,7 +30,7 @@ public struct StrokeStyle: Equatable, Sendable {
   public init(
     lineWidth: Int = 1,
     borderSet: BorderSet = .rounded,
-    placement: Placement = .outset
+    placement: Placement = .inset
   ) {
     self.lineWidth = max(1, lineWidth)
     self.borderSet = borderSet

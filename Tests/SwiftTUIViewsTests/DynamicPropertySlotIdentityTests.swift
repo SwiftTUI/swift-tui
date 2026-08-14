@@ -22,6 +22,10 @@ private struct QualifiedCounter: DynamicProperty {
     state = State(wrappedValue: 0, line: 600, column: 6)
   }
 
+  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+
   var wrappedValue: Int {
     state.wrappedValue
   }
@@ -60,6 +64,11 @@ private final class SlotIdentityCapture {
   var snapshot: ImperativeAuthoringContextSnapshot?
 }
 
+@MainActor
+private enum UndiscoveredSlotCapture {
+  static var current: SlotIdentityCapture?
+}
+
 private struct QualifiedHost: View {
   @QualifiedCounter private var first: Int
   @QualifiedCounter private var second: Int
@@ -83,6 +92,21 @@ private struct UndiscoveredHost: View {
   @UndiscoveredCounter private var second: Int
 
   var body: some View {
+    Text("\(first) \(second)")
+  }
+}
+
+private struct CapturedUndiscoveredHost: View {
+  @UndiscoveredCounter private var first: Int
+  @UndiscoveredCounter private var second: Int
+
+  var body: some View {
+    if let capture = UndiscoveredSlotCapture.current {
+      capture.writeFirst = { [_first] value in _first.write(value) }
+      capture.readFirst = { [_first] in _first.wrappedValue }
+      capture.readSecond = { [_second] in _second.wrappedValue }
+      capture.snapshot = currentImperativeAuthoringContextSnapshot()
+    }
     Text("\(first) \(second)")
   }
 }
@@ -157,8 +181,33 @@ struct DynamicPropertySlotIdentityTests {
   }
 
   @Test("undiscovered composition reports a duplicate-slot-claim RuntimeIssue")
-  func undiscoveredCompositionReportsDuplicateClaim() {
-    let graph = resolve(UndiscoveredHost(), identity: testIdentity("DuplicateClaim"))
+  func undiscoveredCompositionReportsDuplicateClaim() throws {
+    let capture = SlotIdentityCapture()
+    UndiscoveredSlotCapture.current = capture
+    defer { UndiscoveredSlotCapture.current = nil }
+    let plainHost = UndiscoveredHost()
+    let graph = resolve(plainHost, identity: testIdentity("DuplicateClaim"))
+    _ = resolve(
+      CapturedUndiscoveredHost(),
+      identity: testIdentity("DuplicateClaimStorageProof")
+    )
+    #expect(
+      DynamicPropertyDescriptorCache.diagnosticPlanKind(reflecting: plainHost) == .empty,
+      "a concrete non-DynamicProperty struct must remain outside descriptor discovery"
+    )
+    let snapshot = try #require(capture.snapshot)
+
+    withImperativeAuthoringContext(snapshot) {
+      capture.writeFirst?(7)
+    }
+    let first = try #require(
+      withImperativeAuthoringContext(snapshot) { capture.readFirst?() }
+    )
+    let second = try #require(
+      withImperativeAuthoringContext(snapshot) { capture.readSecond?() }
+    )
+    #expect(first == 7)
+    #expect(second == 7, "the legacy undiscovered composition no longer shared its slot")
     #expect(
       graph.frameRuntimeIssues.contains { $0.code == "state.duplicateSlotClaim" },
       "two distinct boxes claimed one slot silently; issues: \(graph.frameRuntimeIssues)"

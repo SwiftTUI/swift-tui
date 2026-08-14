@@ -127,7 +127,6 @@ enum FrameTailPresentationDamageResolver {
       current: draw,
       into: &textRowRanges
     )
-
     return .init(
       damage: PresentationDamage(
         textRows: textRowRanges.keys.sorted().map { row in

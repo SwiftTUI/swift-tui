@@ -1,5 +1,4 @@
 public import SwiftTUICore
-import Synchronization
 
 @MainActor
 package final class AuthoringOrdinalTracker {
@@ -33,6 +32,7 @@ package enum StateSlotOrdinals {
   private static let navigationDestinationActivationBase = -6_000_000
   private static let tabOptionSignatureBase = -7_000_000
   private static let collectionScrollAnchorBase = -8_000_000
+  private static let tabDormantArchiveBase = -9_000_000
 
   package static func authored(
     line: UInt,
@@ -75,6 +75,10 @@ package enum StateSlotOrdinals {
     collectionScrollAnchorBase
   }
 
+  package static var tabDormantArchive: Int {
+    tabDormantArchiveBase
+  }
+
   package static func navigationDestinationActivation(
     _ ordinal: Int
   ) -> Int {
@@ -97,18 +101,9 @@ private struct DynamicStateLocation<Value> {
 
 @MainActor
 private final class StateBox<Value> {
-  /// A remembered location plus how it was bound: a path-qualified binding
-  /// comes from the dynamic-property update pass (refreshed before every
-  /// body evaluation) and must win over access-time re-binding, which has
-  /// no ambient path and would silently re-claim the unqualified slot.
-  private struct BoundLocation {
-    var location: DynamicStateLocation<Value>
-    var isPathQualified: Bool
-  }
-
   private let slotOrdinal: Int
   private var seedValue: Value
-  private var boundLocationsByOwner: [StateStorageOwner: BoundLocation]
+  private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner: [StateStorageOwner: Value]
 
   init(
@@ -121,10 +116,6 @@ private final class StateBox<Value> {
     retainedValuesByOwner = [:]
   }
 
-  deinit {
-    StateGraphBindingRegistry.shared.forget(boxID: ObjectIdentifier(self))
-  }
-
   func currentSeedValue() -> Value {
     seedValue
   }
@@ -135,47 +126,48 @@ private final class StateBox<Value> {
 
   func remember(
     _ location: DynamicStateLocation<Value>,
-    for owner: StateStorageOwner,
-    pathQualified: Bool = false
+    for owner: StateStorageOwner
   ) {
-    boundLocationsByOwner[owner] = BoundLocation(
-      location: location,
-      isPathQualified: pathQualified
-    )
-    if let graphID = owner.graphScope {
-      StateGraphBindingRegistry.shared.remember(
-        owner,
-        for: ObjectIdentifier(self),
-        graphID: graphID
-      )
+    if boundLocationsByOwner[owner] == nil {
+      pruneRetiredBoundLocations()
     }
+    boundLocationsByOwner[owner] = location
   }
 
   func rememberedLocation(for owner: StateStorageOwner) -> DynamicStateLocation<Value>? {
-    boundLocationsByOwner[owner]?.location
+    return boundLocationsByOwner[owner]
   }
 
-  func rememberedPathQualifiedLocation(
-    for owner: StateStorageOwner
+  /// Finds this box's nearest already-bound owner on the exact live dispatch
+  /// owner's parent chain. This is the imperative callback seam for an action
+  /// closure authored by an ancestor and forwarded through arbitrary custom
+  /// views before reaching a control: each captured StateBox selects its own
+  /// bound ancestor rather than minting storage on the forwarding leaf.
+  ///
+  /// The search is deliberately handle- and relation-only. The registry first
+  /// resolves the exact graph/lifetime pair, then the walk follows only that
+  /// node's live parents. It never scans graph identities, sibling branches,
+  /// raw node IDs, or a retired owner's retained object.
+  func rememberedAncestorLocation(
+    for dispatchOwner: StateStorageOwner
   ) -> DynamicStateLocation<Value>? {
-    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
+    guard let dispatchNode = LiveViewGraphRegistry.node(for: dispatchOwner) else {
       return nil
     }
-    return bound.location
-  }
-
-  func currentLocation(
-    in viewGraphID: StateGraphScopeID
-  ) -> DynamicStateLocation<Value>? {
-    guard
-      let owner = StateGraphBindingRegistry.shared.currentOwner(
-        for: ObjectIdentifier(self),
-        graphID: viewGraphID
-      )
-    else {
-      return nil
+    let dispatchGraph = dispatchNode.ownerGraph
+    var ancestor = dispatchNode.parent
+    while let candidate = ancestor {
+      guard candidate.ownerGraph === dispatchGraph else {
+        return nil
+      }
+      if let candidateOwner = candidate.stateOwnerHandle,
+        let location = boundLocationsByOwner[candidateOwner]
+      {
+        return location
+      }
+      ancestor = candidate.parent
     }
-    return boundLocationsByOwner[owner]?.location
+    return nil
   }
 
   func retainedValue(
@@ -191,57 +183,31 @@ private final class StateBox<Value> {
     retainedValuesByOwner[owner] = value
   }
 
+  /// Releases graph-location closures for owner lifetimes the live registry can
+  /// no longer resolve. This scans only this box's previously bound handles;
+  /// it never searches a graph or substitutes identity/raw node addressing.
+  /// A separately retained `Binding` owns its location closure directly, and
+  /// `retainedValuesByOwner` intentionally remains available to that stale
+  /// binding after retirement.
+  private func pruneRetiredBoundLocations() {
+    let retiredOwners = boundLocationsByOwner.keys.filter {
+      LiveViewGraphRegistry.node(for: $0) == nil
+    }
+    for owner in retiredOwners {
+      boundLocationsByOwner.removeValue(forKey: owner)
+    }
+  }
+
   var currentOrdinal: Int {
     slotOrdinal
   }
+
+  #if DEBUG
+    var rememberedOwnerCount: Int {
+      boundLocationsByOwner.count
+    }
+  #endif
 }
-
-private final class StateGraphBindingRegistry: Sendable {
-  static let shared = StateGraphBindingRegistry()
-
-  private let currentOwnerByBoxAndGraph = Mutex<
-    [ObjectIdentifier: [StateGraphScopeID: StateStorageOwner]]
-  >([:])
-
-  func remember(
-    _ owner: StateStorageOwner,
-    for boxID: ObjectIdentifier,
-    graphID: StateGraphScopeID
-  ) {
-    currentOwnerByBoxAndGraph.withLock { owners in
-      owners[boxID, default: [:]][graphID] = owner
-    }
-  }
-
-  func currentOwner(
-    for boxID: ObjectIdentifier,
-    graphID: StateGraphScopeID
-  ) -> StateStorageOwner? {
-    currentOwnerByBoxAndGraph.withLock { owners in
-      owners[boxID]?[graphID]
-    }
-  }
-
-  func forget(boxID: ObjectIdentifier) {
-    currentOwnerByBoxAndGraph.withLock { owners in
-      owners[boxID] = nil
-    }
-  }
-}
-
-#if DEBUG
-  /// Test-only observation of degraded `@State` locations: a seed-backed
-  /// location minted — or an imperative access left location-less — while the
-  /// authoring scope still carried a state-graph scope. That is the silent-
-  /// write failure mode of the style-seam regression (input-driven writes
-  /// landing in the detached seed box: no dirt, no invalidation, stale
-  /// retained reuse). Production behavior is unchanged; tests install the
-  /// hook to assert input-driven writes stay graph-backed.
-  @MainActor
-  package enum StateSeedFallbackProbe {
-    package static var onDegradedLocation: ((Identity) -> Void)?
-  }
-#endif
 
 @propertyWrapper
 @MainActor
@@ -251,9 +217,9 @@ private final class StateGraphBindingRegistry: Sendable {
 /// Interactive runtime callbacks, bindings, and local actions use a graph-scoped storage identity.
 /// Thus, reuse of the same view value in another live graph does not leak mutations between sessions.
 ///
-/// Snapshot-style renders without an invalidating runtime graph retain the same-instance fallback.
-/// One-shot tests and previews use this fallback.
-/// If you reuse one stateful view instance with `DefaultRenderer`, imperative writes can change a later snapshot of that instance.
+/// Construction-time, graphless accesses retain the wrapper's local seed.
+/// Once graph-backed, mutations remain scoped to the exact graph-owner lifetime;
+/// a later snapshot or mount never inherits a retired owner's fallback value.
 public struct State<Value> {
   private let box: StateBox<Value>
 
@@ -307,6 +273,12 @@ public struct State<Value> {
       )
   }
 
+  #if DEBUG
+    package var rememberedOwnerCountForTesting: Int {
+      box.rememberedOwnerCount
+    }
+  #endif
+
   private func activeLocation() -> DynamicStateLocation<Value>? {
     guard let context = AuthoringContextStorage.current else {
       return nil
@@ -316,13 +288,12 @@ public struct State<Value> {
     }
 
     if ViewNodeContext.current != nil {
-      // A path-qualified binding made by this evaluation's update pass wins:
-      // re-making here has no ambient path and would re-claim (and prime)
-      // the unqualified slot, resurrecting the silent-sharing collision the
-      // qualification exists to fix. The pass re-binds before every body
-      // evaluation, so the remembered location is never stale.
-      if let qualified = box.rememberedPathQualifiedLocation(for: storageOwner) {
-        return qualified
+      // The update pass refreshes both top-level and path-qualified bindings
+      // immediately before body evaluation. Reuse that exact binding: making
+      // another unqualified location here would duplicate closure/claim work,
+      // and would erase a composed wrapper's qualified slot identity.
+      if let refreshed = box.rememberedLocation(for: storageOwner) {
+        return refreshed
       }
       let location = makeLocation(
         for: context,
@@ -342,39 +313,20 @@ public struct State<Value> {
       return location
     }
 
-    if let viewGraphID = storageOwner.graphScope,
-      let location = box.currentLocation(in: viewGraphID)
-    {
+    if let location = box.rememberedAncestorLocation(for: storageOwner) {
       return location
     }
 
-    // Outside a resolve pass with no remembered location: the body never read
-    // this property during resolve, so no box was ever taught to reach the
-    // graph slot. Recover the live owner node from the captured graph scope so
-    // imperative reads and writes (a `.task` loop, a gesture callback) land on
-    // the graph-backed slot instead of a stale per-box seed. Remembered so a
-    // later imperative access on this same box short-circuits here.
-    if let location = makeImperativeLocation(
-      for: context,
-      storageOwner: storageOwner
-    ) {
-      box.remember(
-        location,
-        for: storageOwner
-      )
-      return location
-    }
-    #if DEBUG
-      // Fire only while the scope's graph is still live: a callback outliving
-      // its torn-down graph falls to the seed by long-standing design and is
-      // not the degradation this probe exists to catch.
-      if let scope = context.stateGraphScope,
-        LiveViewGraphRegistry.graph(for: scope) != nil
-      {
-        StateSeedFallbackProbe.onDegradedLocation?(context.viewIdentity)
-      }
-    #endif
-    return nil
+    // A legacy/undiscovered imperative path may arrive without an update-pass
+    // binding. Preserve the exact captured owner handle in a location whose
+    // closures revalidate liveness on every access; never substitute identity
+    // or raw node addressing.
+    let location = makeImperativeLocation(storageOwner: storageOwner)
+    box.remember(
+      location,
+      for: storageOwner
+    )
+    return location
   }
 
   private func makeLocation(
@@ -382,17 +334,7 @@ public struct State<Value> {
     storageOwner: StateStorageOwner,
     path: StateSlotPath = .root
   ) -> DynamicStateLocation<Value> {
-    // Captured authoring snapshots keep the owner node ID but drop the
-    // ViewNode reference. During a resolve pass, recover the live owner so
-    // scoped subtrees do not replace graph-backed state with seed storage.
-    let resolvedViewNode =
-      context.viewNode
-      ?? liveOwnerNode(
-        ownerNodeID: context.ownerNodeID,
-        stateGraphScope: context.stateGraphScope
-      )
-
-    if let viewNode = resolvedViewNode {
+    if let viewNode = liveAuthoringOwnerNode(stateOwnerHandle: storageOwner) {
       if ViewNodeContext.current != nil {
         // Resolve-time claim bookkeeping: a second distinct box claiming
         // this slot identity in one evaluation is the silent-sharing
@@ -402,53 +344,22 @@ public struct State<Value> {
           claimant: ObjectIdentifier(box)
         )
       }
-      return graphSlotLocation(
-        viewNode: viewNode,
-        storageOwner: storageOwner,
-        invalidationIdentity: context.viewIdentity,
-        path: path
-      )
     }
-
-    #if DEBUG
-      // Fire only while the scope's graph is still live (see the imperative
-      // fallback's probe note above).
-      if let scope = context.stateGraphScope,
-        LiveViewGraphRegistry.graph(for: scope) != nil
-      {
-        StateSeedFallbackProbe.onDegradedLocation?(context.viewIdentity)
-      }
-    #endif
-    return DynamicStateLocation(
-      getValue: { box.currentSeedValue() },
-      setValue: { newValue in
-        box.updateSeedValue(newValue)
-      }
+    return graphSlotLocation(
+      storageOwner: storageOwner,
+      path: path
     )
   }
 
-  /// Builds a graph-backed location for an imperative access (a `.task` loop, a
-  /// gesture callback) that ran outside any resolve pass. Returns `nil` when the
-  /// captured scope's graph is gone or the owner node cannot be found, so the
-  /// caller falls back to the per-box seed exactly as it did before — the
-  /// graph-scoped fallback never substitutes a different live graph's state.
+  /// Builds an exact-handle location for imperative access outside a resolve
+  /// pass. Construction does not require the node to be live: each read/write
+  /// resolves the owner handle again, and a retired owner uses only its own
+  /// retained value (then the authored seed), never another graph or identity.
   private func makeImperativeLocation(
-    for context: AuthoringContext,
     storageOwner: StateStorageOwner
-  ) -> DynamicStateLocation<Value>? {
-    guard
-      let viewNode = liveOwnerNode(
-        ownerNodeID: context.ownerNodeID,
-        stateGraphScope: context.stateGraphScope,
-        ownerIdentity: context.viewIdentity
-      )
-    else {
-      return nil
-    }
+  ) -> DynamicStateLocation<Value> {
     return graphSlotLocation(
-      viewNode: viewNode,
-      storageOwner: storageOwner,
-      invalidationIdentity: context.viewIdentity
+      storageOwner: storageOwner
     )
   }
 
@@ -457,9 +368,7 @@ public struct State<Value> {
   /// location built once stays valid across reuse, and degrade to the retained
   /// value (then the seed) if the node is gone.
   private func graphSlotLocation(
-    viewNode: SwiftTUICore.ViewNode,
     storageOwner: StateStorageOwner,
-    invalidationIdentity: Identity,
     path: StateSlotPath = .root
   ) -> DynamicStateLocation<Value> {
     let slotIdentifier = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
@@ -468,50 +377,34 @@ public struct State<Value> {
     // a new slot from carried mutation would resurrect state across committed
     // removal and leak writes into replacement identities.
     let authoredSeed = box.currentSeedValue()
-    // Access-time re-resolution is identity-aware: if the registration-time
-    // node was displaced by a fresh mint at the same identity (a lazy-tab
-    // revisit, a mid-frame eviction), the closures follow the identity to the
-    // live occupant instead of writing the orphaned node's slots.
     return DynamicStateLocation(
-      getValue: { [weak viewNode, weak box] in
-        guard let viewNode else {
+      getValue: { [weak box] in
+        guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
           if let retainedValue = box?.retainedValue(for: storageOwner) {
             return retainedValue
           }
           return authoredSeed
         }
-        let liveViewNode =
-          viewNode.ownerGraph?.liveStateOwnerNode(
-            registeredOwner: viewNode.viewNodeID,
-            identity: invalidationIdentity
-          ) ?? viewNode
-        return liveViewNode.stateSlot(
-          slotIdentifier,
-          seed: authoredSeed
-        )
+        return withPersistentDormantStateSlot {
+          liveViewNode.stateSlot(
+            slotIdentifier,
+            seed: authoredSeed
+          )
+        }
       },
-      setValue: { [weak viewNode, weak box] newValue in
+      setValue: { [weak box] newValue in
         // Graph-backed writes stay owner-scoped: the slot holds the mutation
         // and the per-owner retained value backs the node-gone read fallback.
-        // Live (invalidator-backed) graphs never mirror writes into the
-        // box-global seed — that leaked one owner's mutation into every
-        // future owner seeded from the same box. No-invalidator snapshot
-        // graphs (one-shot `DefaultRenderer` renders) keep the same-instance
-        // seed fallback so an imperative write feeds a later snapshot of the
-        // same view value.
-        if let viewNode {
-          let liveViewNode =
-            viewNode.ownerGraph?.liveStateOwnerNode(
-              registeredOwner: viewNode.viewNodeID,
-              identity: invalidationIdentity
-            ) ?? viewNode
-          liveViewNode.setStateSlot(
-            slotIdentifier,
-            value: newValue,
-            invalidationIdentity: invalidationIdentity
-          )
-          if liveViewNode.invalidator == nil {
-            box?.updateSeedValue(newValue)
+        // Never mirror a graph-backed write into the box-global seed: even a
+        // no-invalidator snapshot graph is a distinct owner lifetime, and
+        // carrying its mutation into a later mount would cross that boundary.
+        if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
+          withPersistentDormantStateSlot {
+            liveViewNode.setStateSlot(
+              slotIdentifier,
+              value: newValue,
+              invalidationIdentity: liveViewNode.identity
+            )
           }
           box?.storeRetainedValue(newValue, for: storageOwner)
         } else {
@@ -520,38 +413,23 @@ public struct State<Value> {
       }
     )
   }
-
-  private func liveOwnerNode(
-    ownerNodeID: ViewNodeID?,
-    stateGraphScope: StateGraphScopeID?,
-    ownerIdentity: Identity? = nil
-  ) -> SwiftTUICore.ViewNode? {
-    liveAuthoringOwnerNode(
-      ownerNodeID: ownerNodeID,
-      stateGraphScope: stateGraphScope,
-      ownerIdentity: ownerIdentity
-    )
-  }
 }
 
 extension State: DynamicProperty {
-  /// Binds the graph location eagerly when the dynamic-property update pass
-  /// reached this wrapper through a discovered dynamic property (a non-root
-  /// ambient path): the claim is qualified by that path, so two instances of
-  /// one composed wrapper get distinct slots even though their authored
-  /// ordinals coincide. Top-level wrappers (root ambient path) keep their
-  /// legacy lazy access-time binding and exact slot identity.
-  public mutating func update() {
+  /// Binds the graph location during the dynamic-property update pass without
+  /// reading or materializing the slot. A top-level wrapper keeps the legacy
+  /// unqualified slot identity, but remembering its exact authored owner here
+  /// lets a forwarded imperative action route back from a descendant even when
+  /// the owning body never read or projected the state. Composed wrappers are
+  /// qualified by their ambient path so distinct instances cannot share slots.
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     let path = DynamicPropertyPathScope.current
-    guard !path.isEmpty else {
-      return
-    }
     guard
       ViewNodeContext.current != nil,
       let context = AuthoringContextStorage.current,
       let storageOwner = stateStorageOwner(for: context)
     else {
-      return
+      return .unchanged
     }
     let location = makeLocation(
       for: context,
@@ -560,9 +438,9 @@ extension State: DynamicProperty {
     )
     box.remember(
       location,
-      for: storageOwner,
-      pathQualified: true
+      for: storageOwner
     )
+    return .unchanged
   }
 }
 
@@ -586,8 +464,7 @@ extension View {
     if let authoringContext = currentAuthoringContext() {
       // The update pass runs under the same ambient scope the body closure
       // observes (the ambient-wins rule above): wrapper bindings made during
-      // update() and during the body must name the same owner.
-      runDynamicPropertyUpdatePass(on: self)
+      // update(in:) and during the body must name the same owner.
       let body = context.trackingObservableAccess {
         makeBody()
       }
@@ -598,7 +475,6 @@ extension View {
 
     let authoringContext = makeAuthoringContext(for: context)
     return withAuthoringContext(authoringContext) {
-      runDynamicPropertyUpdatePass(on: self)
       let body = context.trackingObservableAccess {
         makeBody()
       }

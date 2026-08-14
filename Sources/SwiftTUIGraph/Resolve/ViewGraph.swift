@@ -148,6 +148,9 @@ package final class ViewGraph {
   // checkpoint coverage. makeCheckpoint/restoreCheckpoint move whole groups,
   // so the groups carry the totality contract by construction.
   package private(set) var root: ViewNode?
+  /// Immutable graph-lifetime identity used by callback-facing state handles.
+  /// Issued globally and deliberately excluded from checkpoint restore.
+  package let stateGraphScopeID: StateGraphScopeID
 
   /// Chunked-resolve driver (WASI stack-lean profile; test-forced on native).
   /// Deliberately outside the checkpointed field groups: its state is
@@ -196,10 +199,32 @@ package final class ViewGraph {
   private var dependencyIndex: DependencyIndex
   private var frameCommit: FrameCommitState
 
+  /// Graph-local monotonic owner-lifetime allocator. Deliberately outside
+  /// `GraphIndex`: checkpoint restore may rewind raw `ViewNodeID` allocation,
+  /// but can never make a distinct owner reuse a lifetime token.
+  private var nextNodeOwnerLifetimeRawValue: UInt64 = 0
+
+  /// Monotonic allocator for graph animation-input tokens. Deliberately not
+  /// checkpointed: restoring an older graph state restores its content token,
+  /// while the allocator continues forward so divergent drafts cannot reuse a
+  /// token for different canonical content.
+  private var nextAnimationInputMutationToken: UInt64 = 0
+
+  func issueNodeOwnerLifetimeID() -> NodeOwnerLifetimeID {
+    precondition(nextNodeOwnerLifetimeRawValue < .max, "NodeOwnerLifetimeID exhausted")
+    nextNodeOwnerLifetimeRawValue += 1
+    return NodeOwnerLifetimeID(rawValue: nextNodeOwnerLifetimeRawValue)
+  }
+
   var nodesByNodeID: [ViewNodeID: ViewNode] {
     get { index.nodesByNodeID }
     set { index.nodesByNodeID = newValue }
     _modify { yield &index.nodesByNodeID }
+  }
+  var nodesByOwnerLifetimeID: [NodeOwnerLifetimeID: ViewNode] {
+    get { index.nodesByOwnerLifetimeID }
+    set { index.nodesByOwnerLifetimeID = newValue }
+    _modify { yield &index.nodesByOwnerLifetimeID }
   }
   var nodeIDByIdentity: [Identity: ViewNodeID] {
     get { index.nodeIDByIdentity }
@@ -325,10 +350,10 @@ package final class ViewGraph {
     set { dirtyState.stateMutationKeys = newValue }
     _modify { yield &dirtyState.stateMutationKeys }
   }
-  var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>] {
-    get { dirtyState.stateMutationNodeIDsByKey }
-    set { dirtyState.stateMutationNodeIDsByKey = newValue }
-    _modify { yield &dirtyState.stateMutationNodeIDsByKey }
+  var stateMutationOwnerLifetimeIDsByKey: [StateSlotKey: Set<NodeOwnerLifetimeID>] {
+    get { dirtyState.stateMutationOwnerLifetimeIDsByKey }
+    set { dirtyState.stateMutationOwnerLifetimeIDsByKey = newValue }
+    _modify { yield &dirtyState.stateMutationOwnerLifetimeIDsByKey }
   }
   var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID] {
     get { lifecycleEvaluation.lifecycleEvaluationOwnersByNodeID }
@@ -369,7 +394,7 @@ package final class ViewGraph {
     set { taskDescriptors.nextTaskDescriptorIdentityToken = newValue }
     _modify { yield &taskDescriptors.nextTaskDescriptorIdentityToken }
   }
-  private var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>] {
+  private var stateSlotDependents: [StateSlotKey: Set<NodeOwnerLifetimeID>] {
     get { dependencyIndex.stateSlotDependents }
     set { dependencyIndex.stateSlotDependents = newValue }
     _modify { yield &dependencyIndex.stateSlotDependents }
@@ -397,6 +422,9 @@ package final class ViewGraph {
     get { frameCommit.currentFrameID }
     set { frameCommit.currentFrameID = newValue }
     _modify { yield &frameCommit.currentFrameID }
+  }
+  package var animationInputMutationToken: UInt64 {
+    frameCommit.animationInputMutationToken
   }
   var liveNodeIDs: Set<ViewNodeID> {
     get { frameCommit.liveNodeIDs }
@@ -606,6 +634,14 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    if animationProcessInputsDiffer(
+      previous: node.committed,
+      previousChildren: node.children,
+      next: resolved,
+      nextChildren: children
+    ) {
+      advanceAnimationInputMutationToken()
+    }
     let previousStructuralPath = node.committed.structuralPath
     let previousResolvedIdentity = node.resolvedIdentity
     node.apply(
@@ -621,6 +657,40 @@ package final class ViewGraph {
       for: node,
       previous: previousStructuralPath
     )
+  }
+
+  private func advanceAnimationInputMutationToken() {
+    nextAnimationInputMutationToken &+= 1
+    frameCommit.animationInputMutationToken = nextAnimationInputMutationToken
+  }
+
+  /// Direct-node animation-process equivalence. Every graph apply already owns
+  /// an O(direct-children) reconciliation; this adds no tree walk. The broad
+  /// direct visual/layout comparison is intentionally conservative: a false
+  /// positive merely processes a genuinely written node, while a false
+  /// negative could let a tail graph write hide behind a zero-work frame.
+  private func animationProcessInputsDiffer(
+    previous: ResolvedNode,
+    previousChildren: [ViewNode],
+    next: ResolvedNode,
+    nextChildren: [ViewNode]
+  ) -> Bool {
+    if (next.viewNodeID != nil && previous.viewNodeID != next.viewNodeID)
+      || previous.identity != next.identity
+      || previous.layoutBehavior != next.layoutBehavior
+      || previous.drawMetadata != next.drawMetadata
+      || previous.drawPayload != next.drawPayload
+      || previous.environmentSnapshot.style != next.environmentSnapshot.style
+      || previous.matchedGeometry != next.matchedGeometry
+      || previousChildren.count != nextChildren.count
+    {
+      return true
+    }
+    for (oldChild, newChild) in zip(previousChildren, nextChildren)
+    where oldChild !== newChild {
+      return true
+    }
+    return false
   }
 
   private func reindexIdentity(
@@ -724,6 +794,7 @@ package final class ViewGraph {
   }
 
   package init() {
+    stateGraphScopeID = StateGraphScopeID.issue()
     index = GraphIndex()
     rootEvaluation = RootEvaluation()
     viewportLifecycle = ViewportLifecycleState()
@@ -745,6 +816,7 @@ package final class ViewGraph {
       nodesByNodeID: nodesByNodeID.mapValues { node in
         node.debugTotalStateSnapshot()
       },
+      nodesByOwnerLifetimeID: nodesByOwnerLifetimeID.mapValues(\.viewNodeID),
       nodeIDByIdentity: nodeIDByIdentity,
       identityByNodeID: identityByNodeID,
       nodeIDsByStructuralPath: nodeIDsByStructuralPath,
@@ -769,7 +841,7 @@ package final class ViewGraph {
       graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
       latestLifecycleEvents: latestLifecycleEvents,
       stateMutationKeys: stateMutationKeys,
-      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey,
+      stateMutationOwnerLifetimeIDsByKey: stateMutationOwnerLifetimeIDsByKey,
       lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
       lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
       lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
@@ -781,11 +853,18 @@ package final class ViewGraph {
         }
       ),
       nextTaskDescriptorIdentityToken: nextTaskDescriptorIdentityToken,
-      stateSlotDependents: stateSlotDependents,
+      stateSlotDependents: stateSlotDependents.mapValues { ownerLifetimeIDs in
+        Set(
+          ownerLifetimeIDs.compactMap {
+            nodesByOwnerLifetimeID[$0]?.viewNodeID
+          }
+        )
+      },
       environmentDependents: debugObjectDependencySnapshot(environmentDependents),
       observableDependents: debugObjectDependencySnapshot(observableDependents),
       environmentKeyWriters: debugObjectDependencySnapshot(environmentKeyWriters),
       currentFrameID: currentFrameID,
+      animationInputMutationToken: animationInputMutationToken,
       liveNodeIDs: liveNodeIDs,
       resolvedNodeReuseCache: resolvedNodeReuseCache,
       changeObservationValues: changeObservationValues.mapValues {
@@ -958,77 +1037,20 @@ package final class ViewGraph {
     nodeIfExists(for: viewNodeID)
   }
 
+  /// The node currently serving an immutable authored-owner lifetime.
+  /// Checkpoint restore swaps this index atomically with the raw-node and
+  /// identity indices, so inactive checkpoint nodes never resolve here.
+  package func nodeForOwnerLifetimeID(
+    _ ownerLifetimeID: NodeOwnerLifetimeID
+  ) -> ViewNode? {
+    nodesByOwnerLifetimeID[ownerLifetimeID]
+  }
+
   package func nodeForEntityIdentity(_ entityIdentity: EntityIdentity) -> ViewNode? {
     guard let viewNodeID = entityRoutingTable.route(entityIdentity) else {
       return nil
     }
     return nodeIfExists(for: viewNodeID)
-  }
-
-  /// Resolves the live node that owns imperative state registered against
-  /// `viewNodeID` at `identity`. The registration-time node wins while it is
-  /// still the live occupant of its identity; when the identity has been
-  /// re-minted to a fresh node after registration (a lazy-tab revisit, a
-  /// displacement eviction), the fresh occupant is returned instead, so
-  /// closure-held `@State` projections (`.task` loops, `.onAppear`, gesture
-  /// callbacks) keep reading and writing the state the committed graph
-  /// serves. Without the identity re-key the closures write the orphaned
-  /// node's slots: the writes invalidate the identity (dirtying the fresh
-  /// node), the fresh node re-resolves its unchanged slots, and every frame
-  /// completes empty — the gallery Life-tab revisit freeze. Like `onChange`
-  /// ownership, this follows the live runtime lifetime rather than a retired
-  /// node object.
-  package func liveStateOwnerNode(
-    registeredOwner viewNodeID: ViewNodeID,
-    identity: Identity
-  ) -> ViewNode? {
-    let registered = nodeIfExists(for: viewNodeID)
-    if let registered {
-      let occupant = nodeIfExists(for: registered.identity)
-      if occupant === registered {
-        return registered
-      }
-      // Single-child flattening: the occupant is the absorber that claimed
-      // the registered node's identity at commit, but the registered node
-      // stays the live slot host (authoring-host resolution keeps hosting
-      // there). Deferring to the occupant would land imperative writes in
-      // slots the child's body never reads again.
-      if flattenedStateOwnerNodeIDByIdentity[registered.identity] == registered.viewNodeID {
-        return registered
-      }
-      // Duplicate occurrences: the identity index names the last-resolved
-      // sibling, but a live registered node carrying a *different* entity
-      // lifetime is a distinct occurrence (the second `7` in
-      // `ForEach([7, 7])`), not a superseded mint. Redirecting to the index
-      // occupant would fold every duplicate's reads and writes into one row.
-      let registeredEntity =
-        registered.committed.entityIdentity
-        ?? entityRoutingTable.entityByNodeID[registered.viewNodeID]
-      if let registeredEntity,
-        let occupant,
-        registeredEntity
-          != (occupant.committed.entityIdentity
-            ?? entityRoutingTable.entityByNodeID[occupant.viewNodeID])
-      {
-        return registered
-      }
-      // The registered node's own identity is the exact index key its
-      // successor occupies; the authoring identity below can name a different
-      // node when state slots live on a wrapper (a capture-host or modifier
-      // node) rather than the authored view's node.
-      if let occupant {
-        return occupant
-      }
-    }
-    // A re-minted identity's index entry can name a flattening absorber;
-    // the authored successor holding the live slots wins over it.
-    if let stateOwner = flattenedStateOwnerNode(for: identity) {
-      return stateOwner
-    }
-    if let reminted = nodeIfExists(for: identity) {
-      return reminted
-    }
-    return registered
   }
 
   /// The action registration recorded on the exact node that produced a hit
@@ -1438,16 +1460,28 @@ package final class ViewGraph {
   package func queueDirtyForStateChange(
     _ key: StateSlotKey
   ) {
-    stateMutationKeys.insert(key)
-    stateMutationNodeIDsByKey[key, default: []].insert(key.owner)
-    ViewGraphInvalidationPlanner.queueDirty(
-      ViewGraphInvalidationPlanner.stateChangeDirtyNodeIDs(
+    recordStateMutation(key)
+    let dirtyNodeIDs = Set(
+      ViewGraphInvalidationPlanner.stateChangeDirtyOwnerLifetimeIDs(
         for: key,
         stateSlotDependents: stateSlotDependents
-      ),
+      ).compactMap { nodesByOwnerLifetimeID[$0]?.viewNodeID }
+    )
+    ViewGraphInvalidationPlanner.queueDirty(
+      dirtyNodeIDs,
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
       nodesByNodeID: nodesByNodeID
     )
+  }
+
+  /// Records state-slot mutation currency for checkpoint overlays without
+  /// scheduling any reader. Runtime synchronization paths use this when their
+  /// own value-level policy decides whether and where to invalidate.
+  package func recordStateMutation(
+    _ key: StateSlotKey
+  ) {
+    stateMutationKeys.insert(key)
+    stateMutationOwnerLifetimeIDsByKey[key, default: []].insert(key.owner)
   }
 
   package func stateMutationOverlay(
@@ -1461,32 +1495,14 @@ package final class ViewGraph {
     // Carrying it only trips the vanished-owner drop alarm (F93) on a write
     // that was never preservable, drowning the alarm's real signal — a
     // baseline-present owner vanishing across a restore.
-    let baselineNodes = checkpoint.index.nodesByNodeID
+    let baselineNodes = checkpoint.index.nodesByOwnerLifetimeID
+    let preservableMutationKeys = stateMutationKeys.filter {
+      baselineNodes[$0.owner] != nil
+    }
     var stateSlots: [StateMutationSlotKey: AnyStateSlot] = [:]
-    for key in stateMutationKeys {
-      var capturedSlot = false
-      for viewNodeID in stateMutationNodeIDsByKey[key] ?? [] {
-        guard
-          baselineNodes[viewNodeID] != nil,
-          let slot = nodeIfExists(for: viewNodeID)?.stateSlotStorage(
-            key.slot
-          )
-        else {
-          continue
-        }
-        stateSlots[
-          StateMutationSlotKey(
-            key: StateSlotKey(
-              owner: viewNodeID,
-              slot: key.slot
-            )
-          )
-        ] = slot
-        capturedSlot = true
-      }
-      guard !capturedSlot,
-        baselineNodes[key.owner] != nil,
-        let slot = nodeIfExists(for: key.owner)?.stateSlotStorage(
+    for key in preservableMutationKeys {
+      guard
+        let slot = nodeForOwnerLifetimeID(key.owner)?.stateSlotStorage(
           key.slot
         )
       else {
@@ -1498,12 +1514,33 @@ package final class ViewGraph {
         )
       ] = slot
     }
+    let invalidatedOwnerLifetimeIDs = Set(
+      invalidatedNodeIDs.compactMap {
+        nodesByNodeID[$0]?.ownerLifetimeID
+      }.filter { baselineNodes[$0] != nil }
+    )
+    let graphLocalDirtyOwnerLifetimeIDs = Set(
+      graphLocalDirtyNodeIDs.compactMap {
+        nodesByNodeID[$0]?.ownerLifetimeID
+      }.filter { baselineNodes[$0] != nil }
+    )
+    let mutationOwnersByKey = stateMutationOwnerLifetimeIDsByKey.reduce(
+      into: [StateSlotKey: Set<NodeOwnerLifetimeID>]()
+    ) { result, entry in
+      guard preservableMutationKeys.contains(entry.key) else {
+        return
+      }
+      let owners = entry.value.filter { baselineNodes[$0] != nil }
+      if !owners.isEmpty {
+        result[entry.key] = owners
+      }
+    }
     return StateMutationOverlay(
       stateSlots: stateSlots,
-      invalidatedNodeIDs: invalidatedNodeIDs,
-      graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
-      stateMutationKeys: stateMutationKeys,
-      stateMutationNodeIDsByKey: stateMutationNodeIDsByKey
+      invalidatedOwnerLifetimeIDs: invalidatedOwnerLifetimeIDs,
+      graphLocalDirtyOwnerLifetimeIDs: graphLocalDirtyOwnerLifetimeIDs,
+      stateMutationKeys: Set(preservableMutationKeys),
+      stateMutationOwnerLifetimeIDsByKey: mutationOwnersByKey
     )
   }
 
@@ -1514,7 +1551,7 @@ package final class ViewGraph {
       return
     }
     for (key, slot) in overlay.stateSlots {
-      let node = nodeIfExists(for: key.key.owner)
+      let node = nodeForOwnerLifetimeID(key.key.owner)
       guard let node else {
         // The overlay exists to carry in-flight state writes across a
         // discarded async frame draft; a vanished owner means the write is
@@ -1528,11 +1565,29 @@ package final class ViewGraph {
       node.restoreStateSlot(key.key.slot, slot: slot)
       node.markDirty()
     }
-    invalidatedNodeIDs.formUnion(overlay.invalidatedNodeIDs)
-    graphLocalDirtyNodeIDs.formUnion(overlay.graphLocalDirtyNodeIDs)
+    let overlayInvalidatedNodeIDs = Set(
+      overlay.invalidatedOwnerLifetimeIDs.compactMap {
+        nodesByOwnerLifetimeID[$0]?.viewNodeID
+      }
+    )
+    let overlayGraphLocalDirtyNodeIDs = Set(
+      overlay.graphLocalDirtyOwnerLifetimeIDs.compactMap {
+        nodesByOwnerLifetimeID[$0]?.viewNodeID
+      }
+    )
+    ViewGraphInvalidationPlanner.invalidate(
+      overlayInvalidatedNodeIDs,
+      invalidatedNodeIDs: &invalidatedNodeIDs,
+      nodesByNodeID: nodesByNodeID
+    )
+    ViewGraphInvalidationPlanner.queueDirty(
+      overlayGraphLocalDirtyNodeIDs,
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
+    )
     stateMutationKeys.formUnion(overlay.stateMutationKeys)
-    for (key, viewNodeIDs) in overlay.stateMutationNodeIDsByKey {
-      stateMutationNodeIDsByKey[key, default: []].formUnion(viewNodeIDs)
+    for (key, ownerLifetimeIDs) in overlay.stateMutationOwnerLifetimeIDsByKey {
+      stateMutationOwnerLifetimeIDsByKey[key, default: []].formUnion(ownerLifetimeIDs)
     }
   }
 
@@ -1898,6 +1953,20 @@ package final class ViewGraph {
     if node.isAtOutermostEvaluationDepth {
       lifecycleEvaluationTargetsRecordedByOwner[node.viewNodeID] = []
     }
+    return node
+  }
+
+  /// Resolves (or creates) the graph node whose authoring scope is installed
+  /// while dynamic properties update ahead of the reuse door. Unlike
+  /// ``beginEvaluation``, this does not mark the node visited or clear its
+  /// committed freshness, so a certified update may still take reuse.
+  package func prepareDynamicPropertyUpdate(
+    identity: Identity,
+    entityIdentity: EntityIdentity? = nil
+  ) -> ViewNode {
+    let node = nodeForIdentity(for: identity, entityIdentity: entityIdentity)
+    node.prepareForFrame(currentFrameID)
+    node.beginDynamicPropertyUpdate()
     return node
   }
 
@@ -3325,7 +3394,7 @@ package final class ViewGraph {
     invalidatedNodeIDs.removeAll(keepingCapacity: true)
     graphLocalDirtyNodeIDs.removeAll(keepingCapacity: true)
     stateMutationKeys.removeAll(keepingCapacity: true)
-    stateMutationNodeIDsByKey.removeAll(keepingCapacity: true)
+    stateMutationOwnerLifetimeIDsByKey.removeAll(keepingCapacity: true)
     if SoundnessProbeConfiguration.isSampledFrame,
       let violation = teardownCoherenceViolation()
     {
@@ -3529,7 +3598,14 @@ package final class ViewGraph {
   package func stateDependentIdentities(
     for key: StateSlotKey
   ) -> Set<Identity> {
-    identities(for: stateSlotDependents[key] ?? [])
+    Set(
+      (stateSlotDependents[key] ?? []).compactMap { ownerLifetimeID in
+        guard let node = nodesByOwnerLifetimeID[ownerLifetimeID] else {
+          return nil
+        }
+        return identityByNodeID[node.viewNodeID] ?? node.resolvedIdentity
+      }
+    )
   }
 
   package func environmentDependentIdentities(
@@ -4264,6 +4340,7 @@ package final class ViewGraph {
   ) {
     ViewGraphDependencyIndex.reindex(
       viewNodeID: node.viewNodeID,
+      ownerLifetimeID: node.ownerLifetimeID,
       previous: previous,
       current: node.dependencies,
       index: &dependencyIndex
@@ -4275,6 +4352,7 @@ package final class ViewGraph {
   ) {
     ViewGraphDependencyIndex.remove(
       viewNodeID: node.viewNodeID,
+      ownerLifetimeID: node.ownerLifetimeID,
       dependencies: node.dependencies,
       index: &dependencyIndex
     )

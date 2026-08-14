@@ -38,6 +38,45 @@ struct MotionAndProgressPolicyTests {
     #expect(context.transaction.animationBatchID == nil)
   }
 
+  @Test("stable output suppresses rendering without exposing an accessibility preference")
+  func stableOutputDoesNotImplyAccessibilityReduceMotion() throws {
+    let rootIdentity = testIdentity("RuntimeStableOutputPolicyRoot")
+    let scheduler = FrameScheduler()
+    let animation = Animation.linear(duration: .seconds(1))
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: MotionPolicyTestSurface(),
+      terminalInputReader: MotionPolicyInputReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      runtimeConfiguration: RuntimeConfiguration(motion: .normal, stableOutput: true),
+      viewBuilder: ScopedMapper { _ in Text("Ready") }
+    )
+
+    scheduler.requestInvalidation(
+      of: [rootIdentity],
+      animation: .animate(animation.animationBox),
+      batchID: nil
+    )
+    let frame = try #require(scheduler.consumeReadyFrame())
+    let context = runLoop.resolveContext(for: frame)
+
+    #expect(context.environmentValues.accessibilityReduceMotion == false)
+    #expect(context.environmentValues.stableOutput == true)
+    #expect(context.environmentValues.renderingReduceMotion == true)
+    #expect(context.transaction.animationRequest == .disabled)
+
+    let tasks = LocalTaskRegistry()
+    _ = renderArtifacts(
+      Spinner(),
+      environmentValues: policyEnvironment(stableOutput: true),
+      taskRegistry: tasks,
+      identity: testIdentity("StableOutputSpinner")
+    )
+    #expect(tasks.snapshot().isEmpty)
+  }
+
   @Test("reduced motion renders indeterminate progress as static status text")
   func reducedMotionRendersIndeterminateProgressAsStaticStatus() {
     let surface = renderedSurface(
@@ -151,6 +190,22 @@ struct MotionAndProgressPolicyTests {
     #expect(normalRegistry.snapshot().count == 1)
     #expect(reducedRegistry.snapshot().isEmpty)
     #expect(reducedSurface.contains("rest"))
+  }
+
+  @Test("stable output suppresses PhaseAnimator without setting accessibility motion")
+  func stableOutputSuppressesPhaseAnimatorTaskTicks() {
+    let registry = LocalTaskRegistry()
+    let values = policyEnvironment(stableOutput: true)
+    let surface = renderedSurface(
+      phaseAnimatorProbe(),
+      environmentValues: values,
+      taskRegistry: registry,
+      identity: testIdentity("StableOutputPhaseAnimator")
+    )
+
+    #expect(values.accessibilityReduceMotion == false)
+    #expect(registry.snapshot().isEmpty)
+    #expect(surface.contains("rest"))
   }
 
   @Test("reduced motion suppresses transition intermediates")
@@ -329,10 +384,12 @@ private func renderArtifacts<V: View>(
 }
 
 private func policyEnvironment(
-  accessibilityReduceMotion: Bool = false
+  accessibilityReduceMotion: Bool = false,
+  stableOutput: Bool = false
 ) -> EnvironmentValues {
   var values = EnvironmentValues()
   values.accessibilityReduceMotion = accessibilityReduceMotion
+  values.stableOutput = stableOutput
   return values
 }
 

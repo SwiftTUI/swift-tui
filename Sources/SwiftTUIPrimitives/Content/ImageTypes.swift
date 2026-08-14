@@ -49,6 +49,10 @@ public struct ImagePayload: Equatable, Sendable {
   public var resolvedAsset: ResolvedImageAsset?
   public var isResizable: Bool
   public var scalingMode: ImageScalingMode
+  /// Effective opacity accumulated by draw extraction. Authored image values
+  /// start at `1`; ancestor and local opacity modifiers multiply into this
+  /// value before the raster attachment boundary clamps it.
+  package var opacity: Double
 
   public init(
     source: ImageSource,
@@ -60,6 +64,7 @@ public struct ImagePayload: Equatable, Sendable {
     self.resolvedAsset = resolvedAsset
     self.isResizable = isResizable
     self.scalingMode = scalingMode
+    self.opacity = 1
   }
 
   public var intrinsicCellSize: CellSize {
@@ -148,6 +153,11 @@ public struct RasterImageAttachment: Equatable, Sendable {
   public var cellPixelSize: PixelSize?
   public var isResizable: Bool
   public var scalingMode: ImageScalingMode
+  /// Effective placement opacity after multiplying the authored ancestor
+  /// chain. The value is normalized to `0...1` at this host boundary.
+  public var opacity: Double {
+    didSet { opacity = Self.normalizedOpacity(opacity) }
+  }
   public var compositing: RasterImageCompositing?
 
   public init(
@@ -160,6 +170,7 @@ public struct RasterImageAttachment: Equatable, Sendable {
     cellPixelSize: PixelSize? = nil,
     isResizable: Bool = false,
     scalingMode: ImageScalingMode = .stretch,
+    opacity: Double = 1,
     compositing: RasterImageCompositing? = nil
   ) {
     self.identity = identity
@@ -172,7 +183,13 @@ public struct RasterImageAttachment: Equatable, Sendable {
     self.cellPixelSize = cellPixelSize
     self.isResizable = isResizable
     self.scalingMode = scalingMode
+    self.opacity = Self.normalizedOpacity(opacity)
     self.compositing = compositing
+  }
+
+  private static func normalizedOpacity(_ value: Double) -> Double {
+    guard !value.isNaN else { return 1 }
+    return min(1, max(0, value))
   }
 
   /// The rect a non-layering host should draw: ``visibleBounds`` minus any

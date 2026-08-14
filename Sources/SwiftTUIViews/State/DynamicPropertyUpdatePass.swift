@@ -4,7 +4,7 @@ package import SwiftTUIGraph
 //
 // Views (and dynamic properties) declare wrappers as stored properties; the
 // framework discovers the ones conforming to `DynamicProperty` with a
-// reflect-once-per-type descriptor and runs `update()` on each before the
+// reflect-once-per-type descriptor and runs `update(in:)` on each before the
 // body evaluates, under the same ambient authoring context the body will
 // observe. Wrapper-free types pay one dictionary lookup per evaluation and no
 // reflection after the first (the `.empty`-plan fast path).
@@ -19,10 +19,8 @@ package import SwiftTUIGraph
 // `Any`-typed field boxing a wrapper) keep the legacy `Mirror` walk, so
 // discovery semantics are unchanged; only the extraction mechanism differs.
 //
-// `update()` runs on an extracted copy of the property: effects that go
-// through reference-backed storage (every built-in wrapper) persist; mutations
-// to plain stored fields are discarded — the ratified copy-semantics
-// divergence recorded in the SwiftTUIViews divergence register.
+// The public contract is nonmutating and reference-backed, so extracting a
+// property value cannot silently discard a promised value mutation.
 
 /// A type's discovered dynamic-property layout: the stored-property indices
 /// (in `Mirror` child order) whose values conform to ``DynamicProperty``.
@@ -88,9 +86,11 @@ package enum DynamicPropertyPlanKind: String, Sendable {
 
 /// Reflect-once-per-type cache of ``DynamicPropertyUpdatePlan``s.
 ///
-/// Struct and class layouts are fixed per type, so their plans cache
-/// permanently. Enum values (whose reflected children vary by case) are
-/// rebuilt per value and never cached — no view or wrapper in the framework
+/// Struct and class layouts are fixed per type, so their plans normally cache
+/// permanently. Static fields that permit dynamically conforming values are
+/// included proactively in a stable Mirror-walk plan even when the first
+/// instance is plain. Enum values (whose reflected children vary by case)
+/// are rebuilt per value and never cached — no view or wrapper in the framework
 /// is enum-shaped, so this is a correctness backstop, not a hot path.
 /// Computed properties are invisible to `Mirror` and to the runtime field
 /// metadata — discovery sees stored properties only, matching SwiftUI.
@@ -111,7 +111,10 @@ package enum DynamicPropertyDescriptorCache {
       return unsafe cached
     }
     let mirror = Mirror(reflecting: value)
-    let descriptor = buildDescriptor(from: mirror)
+    let descriptor = descriptorIncludingValueDependentStorage(
+      buildDescriptor(from: mirror),
+      containerType: type(of: value)
+    )
     switch mirror.displayStyle {
     case .struct:
       if descriptor.isEmpty {
@@ -126,10 +129,10 @@ package enum DynamicPropertyDescriptorCache {
       // Object fields offset from the object base, not a value pointer —
       // out of the offset tier's scope (no class-shaped view or wrapper in
       // the framework).
-      return unsafe cachePlan(
-        descriptor.isEmpty ? .empty : .mirrorWalk(descriptor),
-        key: key
-      )
+      if descriptor.isEmpty {
+        return unsafe cachePlan(.empty, key: key)
+      }
+      return unsafe cachePlan(.mirrorWalk(descriptor), key: key)
     default:
       return descriptor.isEmpty ? unsafe .empty : unsafe .mirrorWalk(descriptor)
     }
@@ -173,6 +176,38 @@ package enum DynamicPropertyDescriptorCache {
       return .empty
     }
     return DynamicPropertyDescriptor(fields: fields)
+  }
+
+  /// Adds every stored field whose concrete value can change type and gain a
+  /// DynamicProperty conformance without changing the container type. The
+  /// resulting stable Mirror plan runtime-checks those fields each evaluation,
+  /// so both plain-first and DynamicProperty-first orderings are sound.
+  private static func descriptorIncludingValueDependentStorage(
+    _ descriptor: DynamicPropertyDescriptor,
+    containerType: Any.Type
+  ) -> DynamicPropertyDescriptor {
+    var fieldsByIndex = Dictionary(
+      uniqueKeysWithValues: descriptor.fields.map { ($0.index, $0) }
+    )
+    let fieldCount = RuntimeFieldReflection.fieldCount(of: containerType)
+    for index in 0..<fieldCount {
+      let field = RuntimeFieldReflection.fieldInfo(
+        of: containerType,
+        at: index
+      )
+      switch RuntimeFieldReflection.metadataKind(of: field.fieldType) {
+      case 0, 0x203, 0x303, 0x305:
+        // Native/foreign classes, existential storage (`Any`, `AnyObject`,
+        // protocol values), and Objective-C class wrappers can all carry a
+        // later concrete value whose conformance differs from this instance.
+        fieldsByIndex[index] = .init(index: index, label: field.name)
+      default:
+        continue
+      }
+    }
+    return DynamicPropertyDescriptor(
+      fields: fieldsByIndex.values.sorted { $0.index < $1.index }
+    )
   }
 
   /// Binds one extractor per discovered field, or `nil` when any field
@@ -222,6 +257,311 @@ package enum DynamicPropertyDescriptorCache {
   }
 }
 
+@MainActor
+package protocol AdditionalDynamicPropertyUpdating {
+  /// True when this transparent container forwards the stored field itself.
+  /// Outer discovery must not also traverse that field under the container's
+  /// scope and path.
+  func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool
+
+  func updateAdditionalDynamicProperties(
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult
+
+  /// Whether the explicitly forwarded payload currently carries any update
+  /// surface. Containers answer recursively so a wrapper-free transparent
+  /// value does not turn a local fail-closed policy into an enclosing reuse
+  /// denial merely because it participates in forwarding.
+  func hasAdditionalDynamicPropertyUpdateSurface() -> Bool
+}
+
+@MainActor
+package struct AdditionalDynamicPropertyUpdateContext {
+  package let resolveContext: ResolveContext
+  package let graphNode: SwiftTUICore.ViewNode?
+
+  package var destinationAuthoringContext: AuthoringContext {
+    makeAuthoringContext(for: resolveContext, viewNode: graphNode)
+  }
+}
+
+/// One synchronous `resolveView` invocation's forwarded-preparation entries.
+///
+/// Transparent primitive modifiers prepare their base before the modifier's
+/// own reuse door. The later nested central resolve consumes that preparation
+/// instead of clearing the same node's lease census and walking the value a
+/// second time. Frames form a strict synchronous stack: an entry is scoped to
+/// the exact graph node, resolve identity/path, value type, producer
+/// generation, and LIFO occurrence. Unconsumed entries disappear with the
+/// producer frame on memo service, early return, or abort.
+@MainActor
+package enum ForwardedDynamicPropertyPreparationScope {
+  private final class Frame {
+    let generation: UInt64
+    var entries: [Entry] = []
+
+    init(generation: UInt64) {
+      self.generation = generation
+    }
+  }
+
+  private struct Entry {
+    let producerGeneration: UInt64
+    let occurrence: UInt64
+    let graphID: ObjectIdentifier?
+    let graphNodeID: ViewNodeID?
+    let identity: Identity
+    let structuralPath: StructuralPath
+    let valueType: ObjectIdentifier
+    let context: ResolveContext
+    let result: DynamicPropertyUpdateResult
+  }
+
+  package struct Token {
+    fileprivate let generation: UInt64
+  }
+
+  private static var frames: [Frame] = []
+  private static var nextGeneration: UInt64 = 0
+  private static var nextOccurrence: UInt64 = 0
+
+  package static func begin() -> Token {
+    nextGeneration &+= 1
+    let frame = Frame(generation: nextGeneration)
+    frames.append(frame)
+    return Token(generation: frame.generation)
+  }
+
+  package static func end(_ token: Token) {
+    precondition(frames.last?.generation == token.generation)
+    _ = frames.popLast()
+  }
+
+  package static func record<V>(
+    _ value: V,
+    context: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?,
+    result: DynamicPropertyUpdateResult
+  ) {
+    guard let frame = frames.last else { return }
+    nextOccurrence &+= 1
+    frame.entries.append(
+      Entry(
+        producerGeneration: frame.generation,
+        occurrence: nextOccurrence,
+        graphID: context.viewGraph.map(ObjectIdentifier.init),
+        graphNodeID: graphNode?.viewNodeID,
+        identity: context.identity,
+        structuralPath: context.structuralPath,
+        valueType: ObjectIdentifier(type(of: value)),
+        context: context,
+        result: result
+      )
+    )
+  }
+
+  package static func preparedContext<V>(
+    for value: V,
+    fallback: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?
+  ) -> ResolveContext? {
+    matchingProducerEntry(
+      value,
+      context: fallback,
+      graphNode: graphNode
+    )?.context
+  }
+
+  package static func take<V>(
+    _ value: V,
+    context: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?
+  ) -> DynamicPropertyUpdateResult? {
+    guard
+      let index = matchingFrameIndex(
+        value,
+        context: context,
+        graphNode: graphNode
+      )
+    else { return nil }
+    // Strict LIFO is the occurrence proof for nested same-identity/same-type
+    // transparent layers. Never search past a mismatching latest entry.
+    return frames[index].entries.removeLast().result
+  }
+
+  private static func matchingProducerEntry<V>(
+    _ value: V,
+    context: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?
+  ) -> Entry? {
+    guard
+      let index = matchingFrameIndex(
+        value,
+        context: context,
+        graphNode: graphNode,
+        includesCurrentFrame: true
+      )
+    else { return nil }
+    return frames[index].entries.last
+  }
+
+  private static func matchingFrameIndex<V>(
+    _ value: V,
+    context: ResolveContext,
+    graphNode: SwiftTUICore.ViewNode?,
+    includesCurrentFrame: Bool = false
+  ) -> Int? {
+    let start = frames.count - (includesCurrentFrame ? 1 : 2)
+    guard start >= 0 else { return nil }
+    let graphID = context.viewGraph.map(ObjectIdentifier.init)
+    let valueType = ObjectIdentifier(type(of: value))
+    // The current frame is the consumer. Only an active ancestor may have
+    // prepared it, and the nearest ancestor with pending work owns the next
+    // occurrence.
+    for index in stride(from: start, through: 0, by: -1) {
+      guard let entry = frames[index].entries.last else { continue }
+      guard entry.producerGeneration == frames[index].generation,
+        entry.occurrence <= nextOccurrence,
+        entry.graphID == graphID,
+        entry.graphNodeID == graphNode?.viewNodeID,
+        entry.identity == context.identity,
+        entry.structuralPath == context.structuralPath,
+        entry.valueType == valueType
+      else {
+        return nil
+      }
+      return index
+    }
+    return nil
+  }
+}
+
+@MainActor
+package func prepareDynamicProperties<V>(
+  of view: V,
+  in context: ResolveContext,
+  routeIdentity: EntityIdentity?,
+  authoringContextOverride: AuthoringContext?
+) -> DynamicPropertyUpdateResult {
+  let existingGraphNode: SwiftTUICore.ViewNode?
+  if let routeIdentity,
+    let routed = context.viewGraph?.nodeForEntityIdentity(routeIdentity)
+  {
+    existingGraphNode = routed
+  } else {
+    existingGraphNode = context.viewGraph?.nodeForIdentity(context.identity)
+  }
+  if let prepared = ForwardedDynamicPropertyPreparationScope.take(
+    view,
+    context: context,
+    graphNode: existingGraphNode
+  ) {
+    return prepared
+  }
+  let plan =
+    unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: type(of: view))
+    ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: view)
+  let hasDirectProperties: Bool
+  switch unsafe plan {
+  case .empty: hasDirectProperties = false
+  case .offsets, .mirrorWalk: hasDirectProperties = true
+  }
+  let additional = view as? any AdditionalDynamicPropertyUpdating
+  let graphNode = context.viewGraph?.prepareDynamicPropertyUpdate(
+    identity: context.identity,
+    entityIdentity: routeIdentity
+  )
+  guard hasDirectProperties || additional != nil else {
+    return .unchanged
+  }
+  let scope =
+    authoringContextOverride.map { rebasedAuthoringContext($0, viewNode: graphNode) }
+    ?? dynamicPropertyAuthoringContext(
+      for: context,
+      current: currentAuthoringContext(),
+      viewNode: graphNode
+    )
+  let additionalContext = AdditionalDynamicPropertyUpdateContext(
+    resolveContext: context,
+    graphNode: graphNode
+  )
+
+  return EnvironmentValuesStorage.binding(context.environmentValues) {
+    ViewNodeContext.withCurrentValue(graphNode) {
+      withAuthoringContext(scope) {
+        runDynamicPropertyUpdates(on: view, in: additionalContext)
+      }
+    }
+  }
+}
+
+/// Runs every update source carried directly by `value`: discovered stored
+/// properties plus a transparent container's explicitly forwarded payload.
+/// Callers own graph preparation and the authoring scope.
+@MainActor
+package func runDynamicPropertyUpdates<V>(
+  on value: V,
+  in context: AdditionalDynamicPropertyUpdateContext
+) -> DynamicPropertyUpdateResult {
+  let additional = value as? any AdditionalDynamicPropertyUpdating
+  var result = runDynamicPropertyUpdatePass(
+    on: value,
+    excludingFieldsOwnedBy: additional
+  )
+  if let additional {
+    result = result.merging(
+      additional.updateAdditionalDynamicProperties(in: context)
+    )
+  }
+  return result
+}
+
+/// Whether `value` has a direct or explicitly forwarded update surface.
+///
+/// Containers use this before conservatively denying an enclosing reuse door.
+/// Wrapper-free values must not turn a local fail-closed traversal policy into
+/// a global reuse shutdown.
+@MainActor
+package func hasDynamicPropertyUpdateSurface<V>(_ value: V) -> Bool {
+  if value is any DynamicProperty {
+    return true
+  }
+  if let additional = value as? any AdditionalDynamicPropertyUpdating {
+    return additional.hasAdditionalDynamicPropertyUpdateSurface()
+  }
+  let plan =
+    unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: type(of: value))
+    ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: value)
+  switch unsafe plan {
+  case .empty:
+    return false
+  case .offsets, .mirrorWalk:
+    return true
+  }
+}
+
+/// Runs a transparent payload as its own root value. Its stored properties use
+/// root-relative paths, and a payload that is itself DynamicProperty receives
+/// its own update after those nested properties.
+@MainActor
+package func runForwardedDynamicPropertyUpdates<V>(
+  on value: V,
+  in context: AdditionalDynamicPropertyUpdateContext
+) -> DynamicPropertyUpdateResult {
+  var result = runDynamicPropertyUpdates(on: value, in: context)
+  if let property = value as? any DynamicProperty {
+    result = result.merging(
+      updateDynamicPropertyValue(
+        property,
+        containerType: type(of: value),
+        propertyPath: .root,
+        updatePath: .root
+      )
+    )
+  }
+  return result
+}
+
 /// Conditional-conformance shim: `DynamicPropertyFieldShim<F>` conforms only
 /// when `F: DynamicProperty`, so an `as? any ...Extracting.Type` cast is the
 /// runtime conformance test — and inside the conformance, `T` is bound with
@@ -242,7 +582,7 @@ extension DynamicPropertyFieldShim: DynamicPropertyFieldExtracting where T: Dyna
 }
 
 #if DEBUG
-  /// Test-only observation of the update pass: fires once per `update()` call
+  /// Test-only observation of the update pass: fires once per `update(in:)` call
   /// with the container type hosting the property and the property's own type.
   /// Production behavior is unchanged; tests install the hook to pin pass
   /// coverage on every body-evaluation surface.
@@ -254,7 +594,7 @@ extension DynamicPropertyFieldShim: DynamicPropertyFieldExtracting where T: Dyna
 
 /// The ambient discovered-property path while the update pass runs: the
 /// field-index path of the dynamic property whose nested properties are
-/// currently updating. Built-in wrappers' `update()` implementations read it
+/// currently updating. Built-in wrappers' `update(in:)` implementations read it
 /// to claim path-qualified slot identities; it is `.root` outside the pass
 /// (and for top-level properties, whose identity must stay the legacy
 /// ordinal-only key). A plain save/restore slot, not a task-local: the pass
@@ -279,7 +619,16 @@ package enum DynamicPropertyPathScope {
 /// observe — the pass must see exactly the scope the body's own wrapper
 /// accesses will bind against (the ambient-wins rule).
 @MainActor
-package func runDynamicPropertyUpdatePass<V>(on view: V) {
+@discardableResult
+package func runDynamicPropertyUpdatePass<V>(on view: V) -> DynamicPropertyUpdateResult {
+  runDynamicPropertyUpdatePass(on: view, excludingFieldsOwnedBy: nil)
+}
+
+@MainActor
+private func runDynamicPropertyUpdatePass<V>(
+  on view: V,
+  excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)?
+) -> DynamicPropertyUpdateResult {
   // Plans key on the DYNAMIC type: for a concrete `V` (every current caller)
   // it equals `V.self`; an existential `V` boxes a differently-typed value,
   // and its plan describes the boxed value's layout — see the offsets case.
@@ -289,32 +638,39 @@ package func runDynamicPropertyUpdatePass<V>(on view: V) {
     ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: view)
   switch unsafe plan {
   case .empty:
-    return
+    return .unchanged
   case .offsets(let fields):
     if V.self == concreteType {
-      unsafe withUnsafePointer(to: view) { base in
+      return unsafe withUnsafePointer(to: view) { base in
         unsafe updatePlannedDynamicProperties(
           atBase: UnsafeRawPointer(base),
           containerType: concreteType,
           fields: fields,
-          path: .root
+          path: .root,
+          excludingFieldsOwnedBy: owner
         )
       }
     } else {
       // Existential `V`: `withUnsafePointer(to: view)` would point at the
       // existential BOX, not the boxed value the plan's offsets describe —
       // open it first.
-      unsafe withOpenedValue(view) { base, openedType in
+      return unsafe withOpenedValue(view) { base, openedType in
         unsafe updatePlannedDynamicProperties(
           atBase: base,
           containerType: openedType,
           fields: fields,
-          path: .root
+          path: .root,
+          excludingFieldsOwnedBy: owner
         )
       }
     }
   case .mirrorWalk(let descriptor):
-    updateDiscoveredDynamicProperties(of: view, descriptor: descriptor, path: .root)
+    return updateDiscoveredDynamicProperties(
+      of: view,
+      descriptor: descriptor,
+      path: .root,
+      excludingFieldsOwnedBy: owner
+    )
   }
 }
 
@@ -331,7 +687,6 @@ package func withDynamicPropertyUpdateScope<V, Result>(
 ) -> Result {
   let scope = dynamicPropertyAuthoringContext(for: context)
   return withAuthoringContext(scope) {
-    runDynamicPropertyUpdatePass(on: view)
     return apply()
   }
 }
@@ -341,71 +696,88 @@ private func updatePlannedDynamicProperties(
   atBase base: UnsafeRawPointer,
   containerType: Any.Type,
   fields: [DynamicPropertyFieldExtractor],
-  path: StateSlotPath
-) {
+  path: StateSlotPath,
+  excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
+) -> DynamicPropertyUpdateResult {
+  var result = DynamicPropertyUpdateResult.unchanged
   for unsafe field in unsafe fields {
-    var property = unsafe field.extract(base)
-    updateDynamicProperty(
-      &property,
-      containerType: containerType,
-      containerPath: path,
-      fieldIndex: unsafe field.index
-    )
+    if owner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: unsafe field.index) == true {
+      continue
+    }
+    let property = unsafe field.extract(base)
+    result = result.merging(
+      updateDynamicProperty(
+        property,
+        containerType: containerType,
+        containerPath: path,
+        fieldIndex: unsafe field.index
+      ))
   }
+  return result
 }
 
 @MainActor
 private func updateDiscoveredDynamicProperties(
   of container: Any,
   descriptor: DynamicPropertyDescriptor,
-  path: StateSlotPath
-) {
+  path: StateSlotPath,
+  excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
+) -> DynamicPropertyUpdateResult {
   let containerType = type(of: container)
   let mirror = Mirror(reflecting: container)
+  var result = DynamicPropertyUpdateResult.unchanged
   var fieldIterator = descriptor.fields.makeIterator()
   var pendingField = fieldIterator.next()
   var index = 0
   for child in mirror.children {
     guard let field = pendingField else {
-      return
+      return result
     }
     if index == field.index {
-      if var property = child.value as? any DynamicProperty {
-        updateDynamicProperty(
-          &property,
-          containerType: containerType,
-          containerPath: path,
-          fieldIndex: field.index
-        )
+      if owner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: field.index) == true {
+        pendingField = fieldIterator.next()
+        index += 1
+        continue
+      }
+      if let property = child.value as? any DynamicProperty {
+        result = result.merging(
+          updateDynamicProperty(
+            property,
+            containerType: containerType,
+            containerPath: path,
+            fieldIndex: field.index
+          ))
       }
       pendingField = fieldIterator.next()
     }
     index += 1
   }
+  return result
 }
 
 @MainActor
 private func updateDynamicProperty(
-  _ property: inout any DynamicProperty,
+  _ property: any DynamicProperty,
   containerType: Any.Type,
   containerPath: StateSlotPath,
   fieldIndex: Int
-) {
+) -> DynamicPropertyUpdateResult {
   // Nested dynamic properties update before their container so the
-  // container's own update() observes live composed state. The nested pass
+  // container's own update(in:) observes live composed state. The nested pass
   // runs under this property's own field path — that qualification is what
   // gives two instances of one composed wrapper distinct nested slots. The
-  // property's own update() runs under the CONTAINER's path: a top-level
+  // property's own update(in:) runs under the CONTAINER's path: a top-level
   // built-in must bind the legacy empty-path identity.
   let nestedPlan =
     unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: type(of: property))
     ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: property)
+  let nestedResult: DynamicPropertyUpdateResult
   switch unsafe nestedPlan {
   case .empty:
-    break
+    nestedResult = .unchanged
   case .offsets(let fields):
     let nestedPath = containerPath.appending(fieldIndex)
-    unsafe withOpenedValue(property) { base, concreteType in
+    nestedResult = unsafe withOpenedValue(property) { base, concreteType in
       unsafe updatePlannedDynamicProperties(
         atBase: base,
         containerType: concreteType,
@@ -414,19 +786,48 @@ private func updateDynamicProperty(
       )
     }
   case .mirrorWalk(let descriptor):
-    updateDiscoveredDynamicProperties(
+    nestedResult = updateDiscoveredDynamicProperties(
       of: property,
       descriptor: descriptor,
       path: containerPath.appending(fieldIndex)
     )
   }
-  var updating = property
-  DynamicPropertyPathScope.withPath(containerPath) {
-    updating.update()
+  let propertyPath = containerPath.appending(fieldIndex)
+  let ownResult = updateDynamicPropertyValue(
+    property,
+    containerType: containerType,
+    propertyPath: propertyPath,
+    updatePath: containerPath
+  )
+  return nestedResult.merging(ownResult)
+}
+
+@MainActor
+private func updateDynamicPropertyValue(
+  _ property: any DynamicProperty,
+  containerType: Any.Type,
+  propertyPath: StateSlotPath,
+  updatePath: StateSlotPath
+) -> DynamicPropertyUpdateResult {
+  let result = DynamicPropertyPathScope.withPath(updatePath) {
+    let context: DynamicPropertyContext
+    if property is any DynamicPropertyLeaseIndependent {
+      context = .leaseIndependent
+    } else {
+      context = DynamicPropertyContext.current(
+        containerType: containerType,
+        structuralPath: currentAuthoringContext()?.structuralPath.description ?? "",
+        fieldPath: propertyPath.description
+      )
+    }
+    return property.update(
+      in: context
+    )
   }
   #if DEBUG
     DynamicPropertyUpdatePassProbe.onUpdate?(containerType, type(of: property))
   #endif
+  return result
 }
 
 /// Opens the existential (or re-monomorphizes a generic value) so the offset
@@ -435,12 +836,12 @@ private func updateDynamicProperty(
 @MainActor
 private func withOpenedValue<V>(
   _ value: V,
-  _ body: (UnsafeRawPointer, Any.Type) -> Void
-) {
-  func open<P>(_ concrete: P) {
+  _ body: (UnsafeRawPointer, Any.Type) -> DynamicPropertyUpdateResult
+) -> DynamicPropertyUpdateResult {
+  func open<P>(_ concrete: P) -> DynamicPropertyUpdateResult {
     unsafe withUnsafePointer(to: concrete) { pointer in
       unsafe body(UnsafeRawPointer(pointer), P.self)
     }
   }
-  _openExistential(value as Any, do: open)
+  return _openExistential(value as Any, do: open)
 }

@@ -7,17 +7,20 @@ package enum ViewGraphDependencyIndex {
   // enforcement is per stored property, not per sub-path).
   package static func reindex(
     viewNodeID: ViewNodeID,
+    ownerLifetimeID: NodeOwnerLifetimeID,
     previous: DependencySet,
     current: DependencySet,
     index: inout ViewGraph.DependencyIndex
   ) {
     remove(
       viewNodeID: viewNodeID,
+      ownerLifetimeID: ownerLifetimeID,
       dependencies: previous,
       index: &index
     )
     insert(
       viewNodeID: viewNodeID,
+      ownerLifetimeID: ownerLifetimeID,
       dependencies: current,
       index: &index
     )
@@ -25,11 +28,12 @@ package enum ViewGraphDependencyIndex {
 
   package static func remove(
     viewNodeID: ViewNodeID,
+    ownerLifetimeID: NodeOwnerLifetimeID,
     dependencies: DependencySet,
     index: inout ViewGraph.DependencyIndex
   ) {
     remove(
-      viewNodeID,
+      ownerLifetimeID,
       from: dependencies.stateSlotReads,
       in: &index.stateSlotDependents
     )
@@ -91,11 +95,12 @@ package enum ViewGraphDependencyIndex {
 
   private static func insert(
     viewNodeID: ViewNodeID,
+    ownerLifetimeID: NodeOwnerLifetimeID,
     dependencies: DependencySet,
     index: inout ViewGraph.DependencyIndex
   ) {
     insert(
-      viewNodeID,
+      ownerLifetimeID,
       into: dependencies.stateSlotReads,
       in: &index.stateSlotDependents
     )
@@ -116,26 +121,26 @@ package enum ViewGraphDependencyIndex {
     )
   }
 
-  private static func remove<Key: Hashable>(
-    _ viewNodeID: ViewNodeID,
+  private static func remove<Key: Hashable, Dependent: Hashable>(
+    _ dependent: Dependent,
     from keys: Set<Key>,
-    in index: inout [Key: Set<ViewNodeID>]
+    in index: inout [Key: Set<Dependent>]
   ) {
     for key in keys {
-      index[key]?.remove(viewNodeID)
+      index[key]?.remove(dependent)
       if index[key]?.isEmpty == true {
         index.removeValue(forKey: key)
       }
     }
   }
 
-  private static func insert<Key: Hashable>(
-    _ viewNodeID: ViewNodeID,
+  private static func insert<Key: Hashable, Dependent: Hashable>(
+    _ dependent: Dependent,
     into keys: Set<Key>,
-    in index: inout [Key: Set<ViewNodeID>]
+    in index: inout [Key: Set<Dependent>]
   ) {
     for key in keys {
-      index[key, default: []].insert(viewNodeID)
+      index[key, default: []].insert(dependent)
     }
   }
 }

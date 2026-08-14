@@ -69,6 +69,53 @@ struct ImageBlendCompositorTests {
     )
   }
 
+  @Test("terminal precomposition applies placement opacity and keys cached variants by alpha")
+  func terminalPrecompositionAppliesPlacementOpacity() throws {
+    // The embedded PNG stores full-intensity sRGB red. `Color.red` is the
+    // framework's semantic palette red (#E05757), so using it as the oracle
+    // would test a different source colour than the bytes below.
+    let source = Color(red: 1, green: 0, blue: 0)
+    let destination = Color.blue
+    let pngBytes = try makePNGBytes(
+      width: 1,
+      height: 1,
+      pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]
+    )
+    let compositor = ImageBlendCompositor()
+    let opaque = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(blendMode: .normal, destination: destination)
+    )
+    let translucent = blendedAttachment(
+      pngBytes: pngBytes,
+      compositing: imageCompositing(blendMode: .normal, destination: destination),
+      opacity: 0.5
+    )
+
+    let opaqueVariant = try #require(
+      compositor.decodedVariant(
+        for: opaque,
+        fallbackBackground: .black,
+        precompositePlacementOpacity: true
+      )
+    )
+    let translucentVariant = try #require(
+      compositor.decodedVariant(
+        for: translucent,
+        fallbackBackground: .black,
+        precompositePlacementOpacity: true
+      )
+    )
+
+    #expect(opaqueVariant.image.pixels == [expectedPixel(source)])
+    #expect(
+      translucentVariant.image.pixels
+        == [expectedPixel(source.withAlpha(0.5).composited(over: destination))]
+    )
+    #expect(opaqueVariant.id != translucentVariant.id)
+    #expect(compositor.cacheSnapshot().entryCount == 2)
+  }
+
   @Test("post-group image blend flattens source backdrop before blending with destination")
   func postGroupImageBlendFlattensSourceBackdropBeforeDestinationBlend() throws {
     let source = Color(red: 1, green: 0, blue: 0, alpha: 0)
@@ -556,7 +603,8 @@ private func byte(
 private func blendedAttachment(
   pngBytes: [UInt8],
   compositing: RasterImageCompositing,
-  bounds: CellRect = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+  bounds: CellRect = CellRect(origin: .zero, size: .init(width: 1, height: 1)),
+  opacity: Double = 1
 ) -> RasterImageAttachment {
   let cellPixelSize = compositing.cellPixelSize
   return RasterImageAttachment(
@@ -569,6 +617,7 @@ private func blendedAttachment(
       height: bounds.size.height * max(1, cellPixelSize.height)
     ),
     cellPixelSize: cellPixelSize,
+    opacity: opacity,
     compositing: compositing
   )
 }

@@ -11,6 +11,25 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.color == .auto)
     #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale
     #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == false)
+  }
+
+  @Test("--stable-output suppresses capture motion without changing accessibility")
+  func cliStableOutputIsIndependent() throws {
+    var options = try SwiftTUIOptions.parse([])
+    options.stableOutput = true
+    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == true)
+  }
+
+  @Test("CI baseline remains stable when --reduce-motion is absent")
+  func ciStableOutputIsIndependent() throws {
+    let options = try SwiftTUIOptions.parse([])
+    let configuration = options.runtimeConfiguration(
+      environment: ["CI": "true"], isStdoutTTY: true)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == true)
   }
 
   @Test("--no-color flag wins regardless of env or TTY")

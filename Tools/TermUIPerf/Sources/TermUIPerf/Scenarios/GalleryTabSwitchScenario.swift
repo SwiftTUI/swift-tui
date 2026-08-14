@@ -3,20 +3,16 @@
 /// Reconstructs the gallery's tab / sidebar switch flow without depending on
 /// `swift-tui-examples`.
 ///
-/// A stable tab bar of buttons sits above a content pane that is swapped
-/// wholesale on each switch. Clicking a tab changes the `@State` selection, so
-/// every switch frame carries both a focus/press change (the click target) and a
-/// structural content swap (a different per-tab subtree resolves while the tab
-/// bar and chrome stay reuse-eligible). This is the committed framework-only
-/// stand-in for the missing "real gallery tab-switch path" called out in the
-/// 2026-06-16 perf signal representativeness pass — the most common
-/// chrome-driven focus-navigation interaction in the example apps.
+/// A real `TabView` uses the gallery's literal-tab style and swaps among six
+/// content panes. Clicking a tab changes the `@State` selection, so every switch
+/// frame carries both a focus/press change and the dormant-tab archive/restore
+/// work whose cost Stage 0 must keep bounded.
 ///
-/// The switch sequence revisits earlier tabs so reuse of an already-built tab
-/// body can be observed (`resolved_reused`). The per-tab content row count is
-/// fixed by default (smoke-test friendly) but can be overridden with
-/// `SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS` to sweep content size, and the tab
-/// count with `SWIFTTUI_PERF_TAB_SWITCH_TABS`.
+/// The switch sequence revisits earlier tabs so reuse/restoration of an
+/// already-built tab body can be observed (`resolved_reused`). The per-tab
+/// content row count is fixed by default (smoke-test friendly) but can be
+/// overridden with `SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS` to sweep content
+/// size.
 public struct GalleryTabSwitchScenario: PerfScenario {
   public let name: PerfScenarioName = .galleryTabSwitch
   public let defaultTerminalSize = PerfTerminalSize(columns: 100, rows: 36)
@@ -26,24 +22,22 @@ public struct GalleryTabSwitchScenario: PerfScenario {
   public let visualMarkers = ["tab 0 body"]
   public let settlingDescription = "first frame that shows tab 0 body"
 
-  private static let defaultTabCount = 6
   private static let defaultContentRows = 24
   /// Tabs visited in order, including revisits so reuse of an already-built tab
-  /// body is exercised. Filtered to the resolved tab count at run time.
+  /// body is exercised.
   private static let switchSequence = [1, 2, 3, 4, 5, 2, 0, 3]
 
   public init() {}
 
   @MainActor
   public func run(options: PerfScenarioRunOptions) async throws -> PerfScenarioRunResult {
-    let tabCount = Self.resolvedTabCount()
     let contentRows = Self.resolvedContentRows()
-    let sequence = Self.switchSequence.filter { $0 < tabCount }
+    let sequence = Self.switchSequence
     return try await PerfScenarioRunner.runWindow(
       scenario: self,
       options: options
     ) {
-      PerfGalleryTabSwitchView(tabCount: tabCount, contentRows: contentRows)
+      PerfGalleryTabSwitchView(contentRows: contentRows)
     } drive: { driver in
       _ = try await driver.waitForFrame(containing: "tab 0 body")
       let dispatchTime = monotonicSeconds()
@@ -76,10 +70,6 @@ public struct GalleryTabSwitchScenario: PerfScenario {
     }
   }
 
-  private static func resolvedTabCount() -> Int {
-    resolvedPositiveInt("SWIFTTUI_PERF_TAB_SWITCH_TABS", default: defaultTabCount)
-  }
-
   private static func resolvedContentRows() -> Int {
     resolvedPositiveInt("SWIFTTUI_PERF_TAB_SWITCH_CONTENT_ROWS", default: defaultContentRows)
   }
@@ -92,50 +82,44 @@ public struct GalleryTabSwitchScenario: PerfScenario {
   }
 }
 
-private struct PerfGalleryTabSwitchView: View {
-  let tabCount: Int
+extension GalleryTabSwitchScenario: BenchColdRenderable {
+  func makeColdRoot() -> PerfGalleryTabSwitchView {
+    PerfGalleryTabSwitchView(contentRows: Self.defaultContentRows)
+  }
+}
+
+struct PerfGalleryTabSwitchView: View {
   let contentRows: Int
 
   @State private var selectedTab = 0
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text("Gallery tab switch workload")
-        .foregroundStyle(.tint)
-      tabBar
-      Divider()
-      // Swapped wholesale on each selection: the per-tab body is a distinct
-      // subtree, so a switch re-resolves the content while the tab bar above
-      // stays reuse-eligible.
-      tabContent
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    TabView(selection: $selectedTab) {
+      Tab("[T0]", value: 0) { PerfGalleryTabBody(tab: 0, contentRows: contentRows) }
+      Tab("[T1]", value: 1) { PerfGalleryTabBody(tab: 1, contentRows: contentRows) }
+      Tab("[T2]", value: 2) { PerfGalleryTabBody(tab: 2, contentRows: contentRows) }
+      Tab("[T3]", value: 3) { PerfGalleryTabBody(tab: 3, contentRows: contentRows) }
+      Tab("[T4]", value: 4) { PerfGalleryTabBody(tab: 4, contentRows: contentRows) }
+      Tab("[T5]", value: 5) { PerfGalleryTabBody(tab: 5, contentRows: contentRows) }
     }
-    .padding(1)
+    .tabViewStyle(.literalTabs)
     .panel(id: "perf-tab-switch")
   }
+}
 
-  private var tabBar: some View {
-    HStack(spacing: 1) {
-      ForEach(0..<tabCount, id: \.self) { index in
-        Button("[T\(index)]\(index == selectedTab ? "*" : "")") {
-          selectedTab = index
-        }
-      }
-      Spacer(minLength: 1)
-      Text("on \(selectedTab)")
-        .foregroundStyle(.muted)
-    }
-  }
+private struct PerfGalleryTabBody: View {
+  let tab: Int
+  let contentRows: Int
 
-  private var tabContent: some View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("tab \(selectedTab) body")
+      Text("tab \(tab) body")
         .foregroundStyle(.tint)
       ForEach(0..<contentRows, id: \.self) { row in
         HStack(spacing: 1) {
-          Text("t\(selectedTab) row \(row)")
+          Text("t\(tab) row \(row)")
           Spacer(minLength: 1)
-          Text("v\(selectedTab * 1000 + row)")
+          Text("v\(tab * 1000 + row)")
             .foregroundStyle(.separator)
         }
         .border(.separator)

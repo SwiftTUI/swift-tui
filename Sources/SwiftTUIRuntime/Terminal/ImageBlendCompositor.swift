@@ -344,7 +344,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   func decodedVariant(
     for attachment: RasterImageAttachment,
     outputSize requestedOutputSize: PixelSize? = nil,
-    fallbackBackground: Color
+    fallbackBackground: Color,
+    precompositePlacementOpacity: Bool = false
   ) -> BlendedImageVariant? {
     guard
       let reference = imageReference(for: attachment),
@@ -360,6 +361,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       return nil
     }
 
+    let placementOpacity = precompositePlacementOpacity ? attachment.opacity : 1
     let key = ImageBlendCacheKey(
       source: sourceCacheKey(for: reference),
       bounds: attachment.bounds,
@@ -369,7 +371,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       blendMode: compositing.blendMode,
       cellPixelSize: compositing.cellPixelSize,
       backdropSignature: compositing.backdropSignature,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      placementOpacity: placementOpacity
     )
     let lookup = storage.withLockUnchecked { $0.decodedLookup(for: key) }
     if let cached = lookup.variant {
@@ -385,7 +388,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       attachment: attachment,
       compositing: compositing,
       outputSize: outputSize,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      placementOpacity: placementOpacity
     )
     guard pixels.count == outputSize.width * outputSize.height else {
       return nil
@@ -447,7 +451,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       blendMode: compositing.blendMode,
       cellPixelSize: compositing.cellPixelSize,
       backdropSignature: compositing.backdropSignature,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      placementOpacity: 1
     )
     if let cached = storage.withLockUnchecked({ $0.encodedLookup(for: key) }) {
       return cached
@@ -462,7 +467,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       attachment: attachment,
       compositing: compositing,
       outputSize: outputSize,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      placementOpacity: 1
     )
     guard pixels.count == outputSize.width * outputSize.height else {
       return nil
@@ -508,7 +514,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     attachment: RasterImageAttachment,
     compositing: RasterImageCompositing,
     outputSize: PixelSize,
-    fallbackBackground: Color
+    fallbackBackground: Color,
+    placementOpacity: Double
   ) -> [RGBAImagePixel] {
     let bounds = attachment.bounds
     let visibleBounds = attachment.visibleBounds
@@ -551,7 +558,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       hiddenLeftPixels: hiddenLeftPixels,
       hiddenTopPixels: hiddenTopPixels,
       cellPixelSize: clampedCellPixelSize,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      placementOpacity: placementOpacity
     ) {
       return fastPixels
     }
@@ -601,6 +609,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           cellPixelSize: clampedCellPixelSize,
           fallbackBackground: fallbackBackground
         )
+        let composited: Color
         if let sourceBackdrop = compositing.sourceBackdrop {
           let groupBackdrop = backdropPixelColor(
             sourceBackdrop,
@@ -612,24 +621,22 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
             fallbackBackground: fallbackBackground
           )
           let flattenedSource = source.composited(over: groupBackdrop)
-          pixels.append(
-            pixel(
-              from: flattenedSource.composited(
-                over: destination,
-                mode: compositing.blendMode
-              )
-            )
+          composited = flattenedSource.composited(
+            over: destination,
+            mode: compositing.blendMode
           )
         } else {
-          pixels.append(
-            pixel(
-              from: source.composited(
-                over: destination,
-                mode: compositing.blendMode
-              )
-            )
+          composited = source.composited(
+            over: destination,
+            mode: compositing.blendMode
           )
         }
+        let presented =
+          placementOpacity < 1
+          ? composited.withAlpha(composited.alpha * placementOpacity)
+            .composited(over: destination, mode: .normal)
+          : composited
+        pixels.append(pixel(from: presented))
       }
     }
 
@@ -650,7 +657,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     hiddenLeftPixels: Int,
     hiddenTopPixels: Int,
     cellPixelSize: PixelSize,
-    fallbackBackground: Color
+    fallbackBackground: Color,
+    placementOpacity: Double
   ) -> [RGBAImagePixel]? {
     guard
       let fallbackLinear = ImageBlendFastPixels.linear(from: fallbackBackground),
@@ -728,6 +736,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           cellPixelSize: cellPixelSize,
           fallbackBackground: fallbackLinear
         )
+        let composited: ImageBlendLinearRGBA
         if let sourceCells {
           let groupBackdrop = ImageBlendFastPixels.backdropLinear(
             cells: sourceCells,
@@ -744,26 +753,28 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
             over: groupBackdrop,
             mode: .normal
           )
-          pixels.append(
-            ImageBlendFastPixels.pixel(
-              from: ImageBlendFastPixels.composited(
-                flattenedSource,
-                over: destination,
-                mode: blendMode
-              )
-            )
+          composited = ImageBlendFastPixels.composited(
+            flattenedSource,
+            over: destination,
+            mode: blendMode
           )
         } else {
-          pixels.append(
-            ImageBlendFastPixels.pixel(
-              from: ImageBlendFastPixels.composited(
-                source,
-                over: destination,
-                mode: blendMode
-              )
-            )
+          composited = ImageBlendFastPixels.composited(
+            source,
+            over: destination,
+            mode: blendMode
           )
         }
+        var presented = composited
+        if placementOpacity < 1 {
+          presented.alpha *= placementOpacity
+          presented = ImageBlendFastPixels.composited(
+            presented,
+            over: destination,
+            mode: .normal
+          )
+        }
+        pixels.append(ImageBlendFastPixels.pixel(from: presented))
       }
     }
 
@@ -888,6 +899,7 @@ private struct ImageBlendCacheKey: Hashable, Sendable {
   var cellPixelSize: PixelSize
   var backdropSignature: UInt64
   var fallbackBackground: Color
+  var placementOpacity: Double
 
   var retainedByteEstimate: Int {
     source.retainedByteEstimate
@@ -976,6 +988,7 @@ private func blendedImageID(
   hasher.combine(key.cellPixelSize.height)
   hasher.combine(key.backdropSignature)
   hasher.combine(key.fallbackBackground)
+  hasher.combine(key.placementOpacity.bitPattern)
   return "blend:png:\(hexString(hasher.value))"
 }
 

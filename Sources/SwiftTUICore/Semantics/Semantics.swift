@@ -186,12 +186,16 @@ package struct SemanticExtractor: Sendable {
     let activeCommandScopePath = resolveActiveCommandScopePath(from: commandHostScopePaths)
 
     let scrollTargets = scrollTargets(from: placed)
-    let accessibilityNodes = accessibilityNodes(
+    let accessibilityExtraction = accessibilityNodesAndVisualLabelRoutes(
       from: placed,
       focusRegions: focusRegions
     )
     let accessibilityWarnings =
-      extractsAccessibilityWarnings ? accessibilityWarnings(from: placed) : []
+      extractsAccessibilityWarnings
+      ? accessibilityWarnings(
+        from: placed,
+        visualLabelRoutes: accessibilityExtraction.visualLabelRoutes
+      ) : []
 
     return SemanticSnapshot(
       interactionRegions: interactionRegions,
@@ -200,7 +204,7 @@ package struct SemanticExtractor: Sendable {
       scrollTargets: scrollTargets,
       selectionRoutes: selectionRoutes,
       namedCoordinateSpaces: namedCoordinateSpaces,
-      accessibilityNodes: accessibilityNodes,
+      accessibilityNodes: accessibilityExtraction.nodes,
       accessibilityWarnings: accessibilityWarnings,
       activeCommandScopePath: activeCommandScopePath
     )

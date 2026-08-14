@@ -16,6 +16,7 @@ public struct EventModifiers: OptionSet, Equatable, Hashable, Sendable {
 
   public static let shift = Self(rawValue: 1 << 0)
   public static let alt = Self(rawValue: 1 << 1)
+  /// The primary editing modifier: Control in terminals, and Control or Command in native hosts.
   public static let ctrl = Self(rawValue: 1 << 2)
 }
 

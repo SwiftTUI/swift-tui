@@ -36,6 +36,8 @@ package struct ReuseDecisionInputs {
   /// The pass's registration intake; a served subtree's runtime registrations
   /// are restored into it before the door returns.
   package var runtimeRegistrations: RuntimeRegistrationSet
+  /// The current value's direct dynamic-property update certification.
+  package var dynamicPropertyUpdateResult: DynamicPropertyUpdateResult
 
   package init(
     identity: Identity,
@@ -50,7 +52,8 @@ package struct ReuseDecisionInputs {
     suppressesValueVerifiedReuse: Bool,
     withinChurnedSubtree: Bool,
     structuralPath: StructuralPath,
-    runtimeRegistrations: RuntimeRegistrationSet
+    runtimeRegistrations: RuntimeRegistrationSet,
+    dynamicPropertyUpdateResult: DynamicPropertyUpdateResult = .unchanged
   ) {
     self.identity = identity
     self.invalidatedIdentities = invalidatedIdentities
@@ -65,6 +68,7 @@ package struct ReuseDecisionInputs {
     self.withinChurnedSubtree = withinChurnedSubtree
     self.structuralPath = structuralPath
     self.runtimeRegistrations = runtimeRegistrations
+    self.dynamicPropertyUpdateResult = dynamicPropertyUpdateResult
   }
 }
 
@@ -100,6 +104,18 @@ extension ViewGraph {
     inputs: ReuseDecisionInputs,
     viewValue: @autoclosure () -> Any
   ) -> ReuseDecision? {
+    // Dynamic properties update before this door. A changed or uncertified
+    // result must never serve either reuse layer.
+    switch inputs.dynamicPropertyUpdateResult {
+    case .unchanged:
+      break
+    case .changed:
+      ReuseDenialTrace.record("dynamic-property-changed")
+      return nil
+    case .uncertified:
+      ReuseDenialTrace.record("dynamic-property-uncertified")
+      return nil
+    }
     // A boundary that once served over a tolerated environment change may have
     // come back into agreement with its committed snapshot (the key reverted).
     // Its recorded drift is now the stale value, not the fresh one — repay it

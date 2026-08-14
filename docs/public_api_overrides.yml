@@ -265,10 +265,6 @@ classifications:
     - SwiftTUIViews.AnyTransition
     - SwiftTUIViews.Transaction
     - SwiftTUIViews.TransactionKey
-    - SwiftTUIViews.Transition
-    - SwiftTUIViews.TransitionContent
-    - SwiftTUIViews.TransitionPhase
-    - SwiftTUIViews.TransitionProperties
     - "SwiftTUIViews.withAnimation(_:_:)"
     - "SwiftTUIViews.withAnimation(_:completionCriteria:_:completion:)"
     - "SwiftTUIViews.withTransaction(_:_:)"
@@ -606,6 +602,10 @@ classifications:
     - SwiftTUICore.InteractionRegion
     - "SwiftTUIPrimitives.interpolateHue(from:to:t:path:)"
     - SwiftTUIGraph.Invalidating
+    - SwiftTUIGraph.DynamicProperty
+    - SwiftTUIGraph.DynamicPropertyContext
+    - SwiftTUIGraph.DynamicPropertyInvalidationLease
+    - SwiftTUIGraph.DynamicPropertyUpdateResult
     - SwiftTUIGraph.ThreadSafeInvalidating
     - SwiftTUIGraph.KeyEvent
     - SwiftTUIGraph.KeyPress
@@ -787,6 +787,13 @@ classifications:
     - SwiftTUIRuntime.FileOpenError
     - SwiftTUIRuntime.Standard
     - SwiftTUIViews.ErrorToastStyle
+    # Retired before the 0.9 preview cut: the generic custom-transition body
+    # could express arbitrary modifiers while the runtime silently extracted
+    # only opacity and offset. Built-in AnyTransition effects remain canonical.
+    - SwiftTUIViews.Transition
+    - SwiftTUIViews.TransitionContent
+    - SwiftTUIViews.TransitionPhase
+    - SwiftTUIViews.TransitionProperties
     # NOTE: the control-style A2 spinner break retired the nested
     # `Spinner.SpinnerSet` vocabulary and the declaration-scoped spinner
     # initializer. Nested declarations are not top-level names, so their

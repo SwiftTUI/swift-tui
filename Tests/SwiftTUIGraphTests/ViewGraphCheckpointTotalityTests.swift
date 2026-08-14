@@ -41,6 +41,46 @@ private func debugProjectionMemberNames() throws -> [String] {
 @MainActor
 @Suite("ViewGraph checkpoint totality")
 struct ViewGraphCheckpointTotalityTests {
+  @Test("animation-input token changes only with canonical animation inputs and stays ABA-safe")
+  func animationInputTokenTracksCanonicalInputsAndStaysABASafe() {
+    let graph = ViewGraph()
+    let identity = testIdentity("AnimationInputToken")
+
+    func snapshot(color: Color) -> ResolvedNode {
+      var metadata = DrawMetadata()
+      metadata.baseStyle.foregroundStyle = .color(color)
+      return ResolvedNode(
+        identity: identity,
+        kind: .view("Leaf"),
+        drawMetadata: metadata
+      )
+    }
+
+    _ = graph.applySnapshot(snapshot(color: .red))
+    let redToken = graph.animationInputMutationToken
+    #expect(redToken > 0)
+
+    _ = graph.applySnapshot(snapshot(color: .red))
+    #expect(
+      graph.animationInputMutationToken == redToken,
+      "an equivalent graph apply must not defeat the deadline-frame fast path"
+    )
+
+    let redCheckpoint = graph.makeCheckpoint()
+    _ = graph.applySnapshot(snapshot(color: .green))
+    let greenToken = graph.animationInputMutationToken
+    #expect(greenToken > redToken)
+
+    _ = graph.restoreCheckpoint(redCheckpoint)
+    #expect(graph.animationInputMutationToken == redToken)
+
+    _ = graph.applySnapshot(snapshot(color: .blue))
+    #expect(
+      graph.animationInputMutationToken > greenToken,
+      "restoring an older checkpoint must not reuse a token for different canonical content"
+    )
+  }
+
   @Test("ViewGraph and ViewNode mutable fields are checkpoint-covered")
   func mutableFieldsAreCheckpointCovered() throws {
     // ViewGraph and its checkpoint store the field groups by value; the source
@@ -89,7 +129,11 @@ struct ViewGraphCheckpointTotalityTests {
     // `debugReachabilityContextBuildCount` and
     // `debugReuseCacheEvictionFlushCount` diagnostics, whose monotonic
     // observation counts are deliberately not graph state and are not rewound
-    // by restore.
+    // by restore — plus the immutable `stateGraphScopeID` and
+    // `nextNodeOwnerLifetimeRawValue`, which form the lifetime-addressing
+    // domain and must never rewind — plus `nextAnimationInputMutationToken`,
+    // the ABA-safe monotonic allocator whose current content token is
+    // checkpointed in frame commit state.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -106,6 +150,8 @@ struct ViewGraphCheckpointTotalityTests {
         == groupPropertyNames.union([
           "root", "nodeCheckpointImageStore", "detachedHostedRootsRecordedThisFrame",
           "frameRuntimeIssues", "deferredResolveDriver",
+          "stateGraphScopeID", "nextNodeOwnerLifetimeRawValue",
+          "nextAnimationInputMutationToken",
           "debugReachabilityContextBuildCount",
           "debugReuseCacheEvictionFlushCount",
         ])
@@ -154,14 +200,14 @@ struct ViewGraphCheckpointTotalityTests {
         relativePath: "Sources/SwiftTUIGraph/Resolve/ViewNodeFieldGroups.swift"
       )
     }
-    // 12 FrameState + 7 EvaluationState + 2 ReuseState + 6 PersistentState.
+    // 14 FrameState + 7 EvaluationState + 2 ReuseState + 7 PersistentState.
     // ReuseState nests the three freshness stamps inside its single
     // `freshness: CommittedFreshness` member; the whole-struct copy keeps
     // them checkpoint-complete, and the flat debug snapshot still mirrors
     // each stamp by reading through `reuseState.freshness`. (The checkpoint
     // mutation generation is tracker metadata stored outside the groups; see
     // ViewNode.checkpointMutationGeneration.)
-    #expect(groupMembers.count == 27)
+    #expect(groupMembers.count == 30)
 
     let snapshotBody = SourceParsingTestSupport.functionBodyText(
       named: "debugTotalStateSnapshot",

@@ -120,6 +120,7 @@ Lowering helpers remain package-only implementation details.
 - <doc:Geometry-And-Preferences>
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
+- <doc:Dormant-Tab-State>
 - <doc:Custom-Dynamic-Properties>
 - <doc:Focus>
 - <doc:Accessibility>

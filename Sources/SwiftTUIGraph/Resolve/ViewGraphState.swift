@@ -108,15 +108,16 @@ extension ViewGraph {
 
   package struct StateMutationOverlay {
     package var stateSlots: [StateMutationSlotKey: AnyStateSlot]
-    package var invalidatedNodeIDs: Set<ViewNodeID>
-    package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
+    package var invalidatedOwnerLifetimeIDs: Set<NodeOwnerLifetimeID>
+    package var graphLocalDirtyOwnerLifetimeIDs: Set<NodeOwnerLifetimeID>
     package var stateMutationKeys: Set<StateSlotKey>
-    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+    package var stateMutationOwnerLifetimeIDsByKey:
+      [StateSlotKey: Set<NodeOwnerLifetimeID>]
 
     package var isEmpty: Bool {
-      stateSlots.isEmpty && invalidatedNodeIDs.isEmpty
-        && graphLocalDirtyNodeIDs.isEmpty && stateMutationKeys.isEmpty
-        && stateMutationNodeIDsByKey.isEmpty
+      stateSlots.isEmpty && invalidatedOwnerLifetimeIDs.isEmpty
+        && graphLocalDirtyOwnerLifetimeIDs.isEmpty && stateMutationKeys.isEmpty
+        && stateMutationOwnerLifetimeIDsByKey.isEmpty
     }
   }
 }

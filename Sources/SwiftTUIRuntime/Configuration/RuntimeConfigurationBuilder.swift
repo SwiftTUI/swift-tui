@@ -34,6 +34,14 @@ extension RuntimeConfiguration {
       return copy
     }
 
+    /// Selects deterministic capture output independently of the user's
+    /// accessibility reduce-motion preference.
+    public func stableOutput(_ value: Bool) -> Self {
+      var copy = self
+      copy.configuration.stableOutput = value
+      return copy
+    }
+
     public func output(_ value: OutputMode) -> Self {
       var copy = self
       copy.configuration.output = value

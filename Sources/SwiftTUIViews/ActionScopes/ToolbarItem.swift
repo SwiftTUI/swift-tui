@@ -105,6 +105,43 @@ package enum ToolbarItemsPreferenceKey: PreferenceKey {
   }
 }
 
+private enum DirectToolbarItemContributionsKey {}
+
+private let directToolbarItemContributionsMetadataKey = ObjectIdentifier(
+  DirectToolbarItemContributionsKey.self
+)
+
+private struct DirectToolbarItemContributions: Sendable {
+  var items: [ToolbarItemConfig]
+}
+
+extension ResolvedNode {
+  /// Toolbar preferences attached to this node rather than inherited from a
+  /// child. `ResolvedNode.children` correctly rebuilds aggregate preferences
+  /// from the replacement children, so late toolbar reconciliation reapplies
+  /// these authored contributions afterward instead of silently dropping
+  /// them on a retained-snapshot rebuild.
+  package var directToolbarItemContributions: [ToolbarItemConfig] {
+    layoutMetadata.layoutValue(
+      for: directToolbarItemContributionsMetadataKey,
+      as: DirectToolbarItemContributions.self
+    )?.items ?? []
+  }
+
+  package mutating func appendDirectToolbarItemContribution(
+    _ item: ToolbarItemConfig
+  ) {
+    var items = directToolbarItemContributions
+    items.append(item)
+    layoutMetadata = layoutMetadata.settingLayoutValue(
+      DirectToolbarItemContributions(items: items),
+      for: directToolbarItemContributionsMetadataKey,
+      debugName: "toolbar-item-contributions",
+      debugValue: items.map(\.title).joined(separator: "|")
+    )
+  }
+}
+
 extension View {
   /// Contributes a single toolbar item to the nearest enclosing
   /// ActionScope that has declared a `.toolbar()` modifier.
@@ -133,14 +170,17 @@ public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
     var node = content.resolve(in: context)
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     var wrappedConfig = config
     wrappedConfig.sourceIdentity = node.identity
     // Nested wrap: the config's own construction-time capture (if any) stays
     // innermost and wins at dispatch; this attachment-scope wrap is the
-    // fallback for configs constructed outside any authoring context.
+    // fallback for configs constructed outside any authoring context. The
+    // attachment itself is authored in the enclosing body, so that captured
+    // owner wins over the lower node where this contribution resolves.
     wrappedConfig.action = intake.wrappingSendable(config.action)
+    node.appendDirectToolbarItemContribution(wrappedConfig)
     node.preferenceValues.merge(
       ToolbarItemsPreferenceKey.self,
       value: [wrappedConfig]

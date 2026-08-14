@@ -38,6 +38,11 @@ public struct Text: PrimitiveView, ResolvableView {
   // rather than being passed as an opaque metadata bag at construction.
   // See `Sources/View/Primitives/TextStyles.swift` for the modifier set.
 
+  /// Creates text that displays the supplied string literally.
+  ///
+  /// SwiftTUI does not reinterpret this initializer as a localization-key
+  /// lookup. Any future localization API will use an explicit additive
+  /// spelling.
   @_disfavoredOverload
   public init(
     _ content: String,
@@ -52,11 +57,9 @@ public struct Text: PrimitiveView, ResolvableView {
 
   /// Creates text that displays the given string with no localization.
   ///
-  /// SwiftTUI text is always literal today, so this is equivalent to
-  /// ``init(_:semanticMetadata:)-(String,_)``. The spelling reserves
-  /// SwiftUI's explicit-verbatim form: callers that state the intent now
-  /// keep exactly this behavior if a key-resolving `Text(_:)` ever
-  /// arrives.
+  /// This is an explicit alias of
+  /// ``init(_:semanticMetadata:)-(String,_)``; both initializers permanently
+  /// display their string argument literally.
   public init(verbatim content: String) {
     self.init(content)
   }

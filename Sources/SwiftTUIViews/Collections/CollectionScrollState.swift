@@ -336,10 +336,12 @@ private let collectionScrollAnchorStateSlot = StateSlotOrdinals.collectionScroll
 package func storedCollectionScrollAnchor(
   in ownerNode: SwiftTUICore.ViewNode?
 ) -> CollectionScrollAnchor? {
-  ownerNode?.stateSlot(
-    ordinal: collectionScrollAnchorStateSlot,
-    seed: nil as CollectionScrollAnchor?
-  ) ?? nil
+  withPersistentDormantStateSlot {
+    ownerNode?.stateSlot(
+      ordinal: collectionScrollAnchorStateSlot,
+      seed: nil as CollectionScrollAnchor?
+    ) ?? nil
+  }
 }
 
 @MainActor
@@ -348,11 +350,13 @@ package func setStoredCollectionScrollAnchor(
   in ownerNode: SwiftTUICore.ViewNode?,
   invalidationIdentity: Identity? = nil
 ) {
-  ownerNode?.setStateSlot(
-    ordinal: collectionScrollAnchorStateSlot,
-    value: anchor,
-    invalidationIdentity: invalidationIdentity
-  )
+  withPersistentDormantStateSlot {
+    ownerNode?.setStateSlot(
+      ordinal: collectionScrollAnchorStateSlot,
+      value: anchor,
+      invalidationIdentity: invalidationIdentity
+    )
+  }
 }
 
 /// Maps a key event to a scroll movement on a collection, mirroring the

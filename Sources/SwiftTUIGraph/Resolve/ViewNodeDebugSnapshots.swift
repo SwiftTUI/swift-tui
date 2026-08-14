@@ -37,6 +37,7 @@ extension ViewNode {
     }
 
     package var viewNodeID: ViewNodeID
+    package var ownerLifetimeID: NodeOwnerLifetimeID
     package var invalidatorInstalled: Bool
     package var ownerGraphInstalled: Bool
     package var parentIdentity: Identity?
@@ -58,6 +59,9 @@ extension ViewNode {
     package var bodyStateSlotCount: Int?
     package var currentBodyStateSlotCount: Int
     package var pendingChangeHandlerIDs: [String]
+    package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey>
+    package var nextDynamicPropertyLeaseOccurrenceOrdinal: Int
+    package var dynamicPropertyLeaseTokens: [DynamicPropertyLeaseRegistrationKey: UInt64]
     package var dependencyTracker: DependencySet
     package var registrationCaptureDepth: Int
     package var runtimeRegistrationMutationGeneration: UInt64

@@ -71,7 +71,7 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
     }
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerKeyCommand(
       at: node.identity,

@@ -7,6 +7,7 @@ extension ViewGraph {
   package struct DebugTotalStateSnapshot: Equatable {
     package var root: Identity?
     package var nodesByNodeID: [ViewNodeID: ViewNode.DebugTotalStateSnapshot]
+    package var nodesByOwnerLifetimeID: [NodeOwnerLifetimeID: ViewNodeID]
     package var nodeIDByIdentity: [Identity: ViewNodeID]
     package var identityByNodeID: [ViewNodeID: Identity]
     package var nodeIDsByStructuralPath: [StructuralPath: Set<ViewNodeID>]
@@ -31,17 +32,22 @@ extension ViewGraph {
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var latestLifecycleEvents: [LifecycleEvent]
     package var stateMutationKeys: Set<StateSlotKey>
-    package var stateMutationNodeIDsByKey: [StateSlotKey: Set<ViewNodeID>]
+    package var stateMutationOwnerLifetimeIDsByKey:
+      [StateSlotKey: Set<NodeOwnerLifetimeID>]
     package var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
     package var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
     package var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]
     package var taskDescriptorNodeSlots: [String: String]
     package var nextTaskDescriptorIdentityToken: UInt64
+    /// Debug-facing projection of lifetime-keyed dependency readers onto the
+    /// raw node IDs in this same snapshot. The production index remains
+    /// lifetime-keyed; this shape keeps diagnostics readable and comparable.
     package var stateSlotDependents: [StateSlotKey: Set<ViewNodeID>]
     package var environmentDependents: [ObjectDependencySnapshot]
     package var observableDependents: [ObjectDependencySnapshot]
     package var environmentKeyWriters: [ObjectDependencySnapshot]
     package var currentFrameID: UInt64
+    package var animationInputMutationToken: UInt64
     package var liveNodeIDs: Set<ViewNodeID>
     package var resolvedNodeReuseCache: [ResolvedNodeReuseCacheKey: ResolvedNodeReuseCacheEntry]
     package var changeObservationValues: [ChangeObservationValueKey: String]

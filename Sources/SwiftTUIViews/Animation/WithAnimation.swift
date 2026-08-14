@@ -5,18 +5,14 @@ import SwiftTUICore
 ///
 /// Matches SwiftUI's `AnimationCompletionCriteria`.
 public struct AnimationCompletionCriteria: Equatable, Sendable {
-  private enum Kind: Sendable {
-    case logicallyComplete
-    case removed
-  }
-  private let kind: Kind
+  package let barrier: AnimationCompletionBarrier
 
   /// Fires when the animation reaches its final value, even if visual
   /// overshoot is still in progress.
-  public static let logicallyComplete = AnimationCompletionCriteria(kind: .logicallyComplete)
+  public static let logicallyComplete = AnimationCompletionCriteria(barrier: .logicallyComplete)
 
   /// Fires after the system fully removes the animation.
-  public static let removed = AnimationCompletionCriteria(kind: .removed)
+  public static let removed = AnimationCompletionCriteria(barrier: .removed)
 }
 
 /// Monotonic allocator for `AnimationBatchID` values.  Each call to
@@ -124,9 +120,9 @@ private func withTransactionRequestScope<Result>(
 ///
 /// `completionCriteria` is carried on the registration so the
 /// controller can distinguish `.logicallyComplete` (curve returned nil)
-/// from `.removed` (removal overlay purged). The current controller treats both as
-/// "curve returned nil for every animation in the
-/// batch." For a state change that does not remove content, `.removed` fires with `.logicallyComplete`.
+/// from `.removed` (removal overlay purged). For a state change that does not
+/// remove content, `.removed` fires with `.logicallyComplete` because there is
+/// no retained removal overlay to drain.
 ///
 /// `completion` is main-actor isolated, matching every other authored
 /// action closure on this surface (``Button``'s `action`, `.onAppear`,
@@ -156,7 +152,6 @@ public func withAnimation<Result>(
   _ body: () throws -> Result,
   completion: @escaping @MainActor @Sendable () -> Void
 ) rethrows -> Result {
-  _ = completionCriteria  // reserved for when logically/removed diverge
   let batchID = AnimationBatchIDAllocator.next()
   let scopedCompletion: @MainActor @Sendable () -> Void
   if let snapshot = currentImperativeAuthoringContextSnapshot() {
@@ -166,6 +161,7 @@ public func withAnimation<Result>(
   }
   AnimationCompletionStorage.effectiveSink?.registerCompletion(
     batchID: batchID,
+    barrier: completionCriteria.barrier,
     closure: scopedCompletion
   )
   return try AnimationContextStorage.$currentBatchID.withValue(batchID) {

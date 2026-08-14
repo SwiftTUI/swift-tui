@@ -79,12 +79,49 @@ struct TabStripValueVerifiedSlotTests {
     }
     defer { harness.tearDown() }
 
-    // Regression pin for the existing focus-presentation-inert content slot:
-    // the value-verified strip slots must not disturb it.
+    let topology = try #require(harness.tabContentProbeTopology)
+    #expect(topology.directDynamicPropertyReuseCertified)
+    #expect(topology.subtreeDynamicPropertyReuseCertified)
+    #expect(topology.authoredSlot.path.hasSuffix("/TabBody/VStack[1]"))
+    #expect(topology.routedSlot.path.hasSuffix("/TabContentPayload"))
+    #expect(topology.payloadRoot.path.contains("/TabContentValue[tag="))
+    #expect(topology.payloadRoot.path.contains(";optional=true;occurrence=0;generation=0]"))
+    #expect(topology.routedSlot.isDescendant(of: topology.authoredSlot))
+    #expect(topology.payloadRoot.isDescendant(of: topology.routedSlot))
+
+    // Both the style-owned slot and the actual entity-routed payload root are
+    // declared below the TabView's focus-presentation member. Focus arrival
+    // and departure must therefore reuse the descriptor-empty probe body.
     let contentEvaluationsBefore = harness.counters.contentCount
     try harness.moveFocusNext()
     try harness.moveFocusPrevious()
     #expect(harness.counters.contentCount == contentEvaluationsBefore)
+  }
+
+  @Test("a stored-reference tab payload remains fail-closed under focus reuse")
+  func storedReferenceContentRemainsFailClosed() throws {
+    let model = StoredReferenceContentModel(value: "before")
+    let harness = try ValueVerifiedSlotHarness(
+      rootLabel: "ValueVerifiedReferenceContentRoot"
+    ) { counters in
+      StoredReferenceStripProbeRoot(counters: counters, model: model)
+    }
+    defer { harness.tearDown() }
+
+    let topology = try #require(harness.tabContentProbeTopology)
+    #expect(!topology.directDynamicPropertyReuseCertified)
+    #expect(!topology.subtreeDynamicPropertyReuseCertified)
+    #expect(try #require(harness.lastFrame).contains("before"))
+
+    let contentEvaluationsBefore = harness.counters.contentCount
+    // This reference is intentionally neither Observable nor a DynamicProperty.
+    // A focus move is the only frame trigger; treating the stored class field
+    // as descriptor-empty would reuse stale output and hide this mutation.
+    model.value = "after"
+    try harness.moveFocusNext()
+    try harness.moveFocusPrevious()
+    #expect(harness.counters.contentCount > contentEvaluationsBefore)
+    #expect(try #require(harness.lastFrame).contains("after"))
   }
 
   @Test("a wholesale focus reader inside a strip item keeps its cone")
@@ -140,12 +177,47 @@ private final class StripEvaluationCounters {
   }
 }
 
+@MainActor
+private enum DescriptorEmptyContentProbe {
+  private static weak var counters: StripEvaluationCounters?
+
+  static func install(_ counters: StripEvaluationCounters) {
+    self.counters = counters
+  }
+
+  static func reset(ifInstalled installed: StripEvaluationCounters) {
+    if counters === installed {
+      counters = nil
+    }
+  }
+
+  static func record() {
+    counters?.record(index: contentProbeIndex)
+  }
+}
+
 private struct ContentProbeView: View {
+  var body: some View {
+    DescriptorEmptyContentProbe.record()
+    return Text("content probe")
+  }
+}
+
+private struct StoredReferenceContentProbeView: View {
   let counters: StripEvaluationCounters
+  let model: StoredReferenceContentModel
 
   var body: some View {
     counters.record(index: contentProbeIndex)
-    return Text("content probe")
+    return Text("stored-reference content probe \(model.value)")
+  }
+}
+
+private final class StoredReferenceContentModel {
+  var value: String
+
+  init(value: String) {
+    self.value = value
   }
 }
 
@@ -161,13 +233,34 @@ private struct StripProbeRoot: View {
       Text("outside").focusable()
       TabView(selection: $selection) {
         Tab("Zero", value: 0) {
-          ContentProbeView(counters: counters)
+          ContentProbeView()
         }
         Tab("One", value: 1) {
           Text("second tab content")
         }
         Tab("Two", value: 2) {
           Text("third tab content")
+        }
+      }
+      .tabViewStyle(ProbeTabViewStyle(counters: counters))
+    }
+  }
+}
+
+private struct StoredReferenceStripProbeRoot: View {
+  let counters: StripEvaluationCounters
+  let model: StoredReferenceContentModel
+  @State private var selection = 0
+
+  var body: some View {
+    VStack {
+      Text("outside").focusable()
+      TabView(selection: $selection) {
+        Tab("Zero", value: 0) {
+          StoredReferenceContentProbeView(counters: counters, model: model)
+        }
+        Tab("One", value: 1) {
+          Text("second tab content")
         }
       }
       .tabViewStyle(ProbeTabViewStyle(counters: counters))
@@ -368,6 +461,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
     environmentValues.terminalSize = terminalSize
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let counters = counters
+    DescriptorEmptyContentProbe.install(counters)
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
@@ -395,7 +489,9 @@ private final class ValueVerifiedSlotHarness<Root: View> {
     try settle()
   }
 
-  func tearDown() {}
+  func tearDown() {
+    DescriptorEmptyContentProbe.reset(ifInstalled: counters)
+  }
 
   var focusedIdentity: Identity? {
     runLoop.focusTracker.currentFocusIdentity
@@ -403,6 +499,35 @@ private final class ValueVerifiedSlotHarness<Root: View> {
 
   var lastFrame: String? {
     terminal.frames.last
+  }
+
+  var tabContentProbeTopology: TabContentProbeTopology? {
+    let nodes = runLoop.renderer.viewGraph.debugTotalStateSnapshot().nodesByNodeID.values
+    guard
+      let control = nodes.first(where: { $0.committed.kind == .view("TabView") }),
+      let authoredSlot = control.focusPresentationInertSlotIdentities.first(where: {
+        $0.path.hasSuffix("/TabBody/VStack[1]")
+      }),
+      let routedSlot = control.focusPresentationInertSlotIdentities.first(where: {
+        $0.path.hasSuffix("/TabContentPayload")
+      }),
+      let payloadRoot = nodes.first(where: {
+        let identity = $0.committed.identity
+        return identity.path.contains("/TabContentPayload/TabContentValue[")
+          && identity.lastComponent?.hasPrefix("TabContentValue[") == true
+      })
+    else {
+      return nil
+    }
+    return TabContentProbeTopology(
+      authoredSlot: authoredSlot,
+      routedSlot: routedSlot,
+      payloadRoot: payloadRoot.committed.identity,
+      directDynamicPropertyReuseCertified:
+        payloadRoot.committed.directDynamicPropertyReuseCertified,
+      subtreeDynamicPropertyReuseCertified:
+        payloadRoot.committed.subtreeDynamicPropertyReuseCertified
+    )
   }
 
   func settle(maxDrains: Int = 5) throws {
@@ -424,6 +549,14 @@ private final class ValueVerifiedSlotHarness<Root: View> {
     runLoop.focusTracker.focusPrevious()
     try settle()
   }
+}
+
+private struct TabContentProbeTopology {
+  var authoredSlot: Identity
+  var routedSlot: Identity
+  var payloadRoot: Identity
+  var directDynamicPropertyReuseCertified: Bool
+  var subtreeDynamicPropertyReuseCertified: Bool
 }
 
 private final class ValueVerifiedSlotInputReader: TerminalInputReading {

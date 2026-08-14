@@ -1,4 +1,5 @@
 import SwiftTUICore
+import SwiftTUIViews
 
 extension DefaultRenderer {
   @MainActor
@@ -13,6 +14,12 @@ extension DefaultRenderer {
       @MainActor @Sendable (FrameArtifacts) -> Bool = { _ in false }
   ) -> CompletedFrameCandidate {
     let resolved = tailOutput.resolved
+    let dormantTabArchiveRefreshes = captureDormantTabArchiveCommitRefreshes(
+      in: viewGraph,
+      requests: tailOutput.frameTailInput.canonicalResolved.preferenceValues[
+        DormantTabArchiveRefreshPreferenceKey.self
+      ]
+    )
     let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
       draft: draft,
       tailOutput: tailOutput
@@ -20,6 +27,7 @@ extension DefaultRenderer {
     let preview = previewCompletedFrameCommit(
       draft: draft,
       tailOutput: tailOutput,
+      canonicalResolved: tailOutput.frameTailInput.canonicalResolved,
       resolved: resolved
     )
     let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
@@ -42,6 +50,7 @@ extension DefaultRenderer {
       tailOutput: tailOutput,
       resolved: resolved,
       workerTimings: workerTimings,
+      dormantTabArchiveRefreshes: dormantTabArchiveRefreshes,
       previewArtifacts: artifacts,
       previewLifecyclePlan: preview.lifecyclePlan,
       eligibility: eligibility,
@@ -112,10 +121,12 @@ extension DefaultRenderer {
     candidate.draft.transaction.materializePreparedState()
     let effects = commitFrameEffects(
       draft: candidate.draft,
+      canonicalResolved: candidate.tailOutput.frameTailInput.canonicalResolved,
       resolved: candidate.resolved,
       placed: tail.placed,
       semantics: tail.semantics,
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates,
+      dormantTabArchiveRefreshes: candidate.dormantTabArchiveRefreshes,
       preview: (
         lifecyclePlan: candidate.previewLifecyclePlan,
         commitPlan: candidate.previewArtifacts.commitPlan
@@ -153,17 +164,23 @@ extension DefaultRenderer {
   @MainActor
   func commitFrameEffects(
     draft: FrameHeadDraft,
+    canonicalResolved: ResolvedNode,
     resolved: ResolvedNode,
     placed: PlacedNode,
     semantics: SemanticSnapshot,
     workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate],
+    dormantTabArchiveRefreshes: [DormantTabArchiveCommitRefresh] = [],
     preview: (lifecyclePlan: ViewGraphFrameLifecycleEventPlan, commitPlan: CommitPlan)? = nil
   ) -> CommittedFrameEffects {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
+      applyDormantTabArchiveCommitRefreshes(
+        dormantTabArchiveRefreshes,
+        in: viewGraph
+      )
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.graphRootIdentity,
-        resolved: resolved,
+        resolved: canonicalResolved,
         placed: placed.viewportVisibilitySummary,
         previewedPlan: preview?.lifecyclePlan
       )
@@ -254,6 +271,7 @@ extension DefaultRenderer {
   func previewCompletedFrameCommit(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
+    canonicalResolved: ResolvedNode,
     resolved: ResolvedNode
   ) -> (
     commit: CommitPlan, lifecyclePlan: ViewGraphFrameLifecycleEventPlan, duration: Duration
@@ -266,7 +284,7 @@ extension DefaultRenderer {
 
     let (planned, duration) = measurePhase(clock: draft.clock) {
       let lifecyclePlan = viewGraph.previewLifecycleEventPlan(
-        resolved: resolved,
+        resolved: canonicalResolved,
         placed: tail.placed.viewportVisibilitySummary
       )
       let commit = commitPlanner.plan(

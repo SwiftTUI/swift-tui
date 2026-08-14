@@ -88,6 +88,7 @@ import SwiftTUICore
       "configuration: color=\(configuration.color.rawValue)"
         + " glyphs=\(configuration.glyphs.rawValue)"
         + " motion=\(configuration.motion.rawValue)"
+        + " stableOutput=\(configuration.stableOutput)"
         + " output=\(configuration.output.rawValue)"
         + " verbosity=\(configuration.verbosity.rawLevel)"
         + " debug=\(configuration.debug)"

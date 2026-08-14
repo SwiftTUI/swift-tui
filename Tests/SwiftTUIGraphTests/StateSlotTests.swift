@@ -56,17 +56,19 @@ struct StateSlotTests {
     SoundnessProbeConfiguration.isEnabled = false
     SoundnessProbeConfiguration.isTraceEnabled = false
 
-    let liveKey = StateMutationSlotKey(key: StateSlotKey(owner: node.viewNodeID, ordinal: 0))
+    let liveKey = StateMutationSlotKey(
+      key: StateSlotKey(owner: node.ownerLifetimeID, ordinal: 0)
+    )
     let vanishedKey = StateMutationSlotKey(
-      key: StateSlotKey(owner: ViewNodeID(rawValue: 999_999), ordinal: 0)
+      key: StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 999_999), ordinal: 0)
     )
     graph.applyStateMutationOverlay(
       ViewGraph.StateMutationOverlay(
         stateSlots: [liveKey: AnyStateSlot(7), vanishedKey: AnyStateSlot(9)],
-        invalidatedNodeIDs: [],
-        graphLocalDirtyNodeIDs: [],
+        invalidatedOwnerLifetimeIDs: [],
+        graphLocalDirtyOwnerLifetimeIDs: [],
         stateMutationKeys: [],
-        stateMutationNodeIDsByKey: [:]
+        stateMutationOwnerLifetimeIDsByKey: [:]
       )
     )
 
@@ -109,21 +111,27 @@ struct StateSlotTests {
     _ = draftNode.stateSlot(ordinal: 0, seed: draftSeed)
     baselineNode.restoreStateSlot(ordinal: 0, slot: AnyStateSlot(42))
     graph.queueDirtyForStateChange(
-      StateSlotKey(owner: baselineNode.viewNodeID, ordinal: 0)
+      StateSlotKey(owner: baselineNode.ownerLifetimeID, ordinal: 0)
     )
     draftNode.restoreStateSlot(ordinal: 0, slot: AnyStateSlot(99))
     graph.queueDirtyForStateChange(
-      StateSlotKey(owner: draftNode.viewNodeID, ordinal: 0)
+      StateSlotKey(owner: draftNode.ownerLifetimeID, ordinal: 0)
     )
 
     let overlay = graph.stateMutationOverlay(restorableInto: checkpoint)
     let baselineKey = StateMutationSlotKey(
-      key: StateSlotKey(owner: baselineNode.viewNodeID, ordinal: 0)
+      key: StateSlotKey(owner: baselineNode.ownerLifetimeID, ordinal: 0)
     )
     let draftKey = StateMutationSlotKey(
-      key: StateSlotKey(owner: draftNode.viewNodeID, ordinal: 0)
+      key: StateSlotKey(owner: draftNode.ownerLifetimeID, ordinal: 0)
     )
     #expect(overlay.stateSlots[baselineKey] != nil)
+    #expect(
+      overlay.stateSlots.keys.allSatisfy {
+        $0.key.owner == baselineNode.ownerLifetimeID
+      },
+      "the overlay must preserve exact owner currency, not raw node IDs"
+    )
     #expect(
       overlay.stateSlots[draftKey] == nil,
       "a draft-minted owner's write must die with the draft, not ride the overlay"
@@ -138,6 +146,10 @@ struct StateSlotTests {
       SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
     }
     _ = graph.restoreCheckpoint(checkpoint)
+    #expect(
+      graph.nodeForOwnerLifetimeID(baselineNode.ownerLifetimeID) === baselineNode,
+      "checkpoint restore must reinstall the same owner lifetime route"
+    )
     graph.applyStateMutationOverlay(overlay)
 
     #expect(
@@ -168,22 +180,24 @@ struct StateSlotTests {
     graph.beginFrame()
     let identity = testIdentity("Root", "Owner")
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
-    let key = StateSlotKey(owner: node.viewNodeID, ordinal: 0)
+    let key = StateSlotKey(owner: node.ownerLifetimeID, ordinal: 0)
 
     graph.applyStateMutationOverlay(
       ViewGraph.StateMutationOverlay(
         stateSlots: [:],
-        invalidatedNodeIDs: [node.viewNodeID],
-        graphLocalDirtyNodeIDs: [node.viewNodeID],
+        invalidatedOwnerLifetimeIDs: [node.ownerLifetimeID],
+        graphLocalDirtyOwnerLifetimeIDs: [node.ownerLifetimeID],
         stateMutationKeys: [key],
-        stateMutationNodeIDsByKey: [key: [node.viewNodeID]]
+        stateMutationOwnerLifetimeIDsByKey: [key: [node.ownerLifetimeID]]
       )
     )
 
     #expect(graph.invalidatedNodeIDs.contains(node.viewNodeID))
     #expect(graph.graphLocalDirtyNodeIDs.contains(node.viewNodeID))
     #expect(graph.stateMutationKeys.contains(key))
-    #expect(graph.stateMutationNodeIDsByKey[key]?.contains(node.viewNodeID) == true)
+    #expect(
+      graph.stateMutationOwnerLifetimeIDsByKey[key]?.contains(node.ownerLifetimeID) == true
+    )
   }
 }
 

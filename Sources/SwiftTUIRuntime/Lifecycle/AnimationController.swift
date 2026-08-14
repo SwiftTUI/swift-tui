@@ -23,6 +23,9 @@ package final class AnimationController: Sendable {
 
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var removingNodes: [ViewNodeID: RemovalEntry] = [:]
+  /// Presentation values sampled by the most recent `applyInterpolations`.
+  /// Reused by late-preference reconciliation without advancing curves again.
+  private var currentResolvedPresentationProjection = ResolvedPresentationProjection()
   package private(set) var lastTickResult: AnimationTickResult = .init()
   /// Nodes visited by the most recent resolved-tree snapshot/diff census.
   /// Deadline-only F149 skips report zero.
@@ -179,6 +182,10 @@ package final class AnimationController: Sendable {
     get { completionLedger.completionClosures }
     set { completionLedger.completionClosures = newValue }
   }
+  private var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier] {
+    get { completionLedger.completionBarriers }
+    set { completionLedger.completionBarriers = newValue }
+  }
   /// Animation boxes registered for the current frame. Forwarded to the
   /// ``CompletionLedger`` so the per-tick logic reads the original name while the
   /// async-writable set checkpoints and carries as a unit.
@@ -320,6 +327,7 @@ package final class AnimationController: Sendable {
       completionLedger: completionLedger,
       activeAnimations: activeAnimations,
       removingNodes: removingNodes,
+      currentResolvedPresentationProjection: currentResolvedPresentationProjection,
       lastTickResult: lastTickResult,
       resolvedTreeProcessingSkipCount: resolvedTreeProcessingSkipCount,
       lastResolvedTreeProcessedNodeCount: lastResolvedTreeProcessedNodeCount,
@@ -335,6 +343,7 @@ package final class AnimationController: Sendable {
     completionLedger = checkpoint.completionLedger
     activeAnimations = checkpoint.activeAnimations
     removingNodes = checkpoint.removingNodes
+    currentResolvedPresentationProjection = checkpoint.currentResolvedPresentationProjection
     lastTickResult = checkpoint.lastTickResult
     resolvedTreeProcessingSkipCount = checkpoint.resolvedTreeProcessingSkipCount
     lastResolvedTreeProcessedNodeCount = checkpoint.lastResolvedTreeProcessedNodeCount
@@ -500,12 +509,27 @@ package final class AnimationController: Sendable {
         releaseBatch(entry.batchID)
       }
     }
-    // The placed pass owns placed-removal completion (016): purge each removal
-    // whose exit curve finished this pass. Removals carry no batch refcount, so
-    // there is nothing to release — the resolved tick already kept the frame
-    // alive for this removal, so no extra redraw signal is owed here.
+    // Keep the final visual for one committed turn so logical completion and
+    // overlay removal are observably distinct barriers.
     for viewNodeID in result.completedRemovalNodeIDs {
-      removingNodes.removeValue(forKey: viewNodeID)
+      guard var entry = removingNodes[viewNodeID] else { continue }
+      guard entry.completionBatchID != nil else {
+        removingNodes.removeValue(forKey: viewNodeID)
+        continue
+      }
+      if !entry.isLogicallyComplete {
+        entry.isLogicallyComplete = true
+        if let batchID = entry.completionBatchID,
+          completionBarriers[batchID] == .logicallyComplete
+        {
+          entry.completionBatchID = nil
+          releaseBatch(batchID)
+        }
+        removingNodes[viewNodeID] = entry
+      } else {
+        removingNodes.removeValue(forKey: viewNodeID)
+        releaseBatch(entry.completionBatchID)
+      }
     }
 
     return result.snapshot
@@ -867,7 +891,8 @@ package final class AnimationController: Sendable {
   /// no changed animatable snapshot and no new root animation batch, changing
   /// inherited transaction intent cannot enqueue work.
   package func canSkipResolvedTreeProcessing(
-    transactionPlan: FrameAnimationTransactionPlan
+    transactionPlan: FrameAnimationTransactionPlan,
+    graphAnimationInputToken: UInt64? = nil
   ) -> Bool {
     // `isContinuous` is deliberately not consulted: continuity is
     // resolve-side metadata with no animation intent, so a
@@ -877,6 +902,8 @@ package final class AnimationController: Sendable {
       && !transactionPlan.hasExplicitTransactions
       && transactionPlan.base.animationRequest.animationBoxIfAny == nil
       && transactionPlan.base.animationBatchID == nil
+      && (graphAnimationInputToken == nil
+        || graphAnimationInputToken == previousFrame.graphAnimationInputToken)
   }
 
   /// Direct-test convenience for a frame with one base transaction and no
@@ -1030,7 +1057,8 @@ package final class AnimationController: Sendable {
   package func processResolvedTree(
     _ node: ResolvedNode,
     transactionPlan: FrameAnimationTransactionPlan,
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    graphAnimationInputToken: UInt64? = nil
   ) {
     let transaction = transactionPlan.base
     lastFrameHeadCompletionCount = 0
@@ -1140,7 +1168,9 @@ package final class AnimationController: Sendable {
         newIdentities.contains(entry.identity)
       }
       for viewNodeID in supersededRemovals.keys {
-        removingNodes.removeValue(forKey: viewNodeID)
+        if let entry = removingNodes.removeValue(forKey: viewNodeID) {
+          releaseBatch(entry.completionBatchID)
+        }
       }
     }
 
@@ -1359,6 +1389,7 @@ package final class AnimationController: Sendable {
     previousTreeRoot = node
     previousParentByIdentity = newParentByIdentity
     previousChildIndexByIdentity = newChildIndexByIdentity
+    previousFrame.graphAnimationInputToken = graphAnimationInputToken
 
     // Drain stranded completions.  Any batch that has a registered
     // completion closure but no live ref count (no property, no
@@ -1381,12 +1412,14 @@ package final class AnimationController: Sendable {
   package func processResolvedTree(
     _ node: ResolvedNode,
     transaction: TransactionSnapshot,
-    timestamp: MonotonicInstant
+    timestamp: MonotonicInstant,
+    graphAnimationInputToken: UInt64? = nil
   ) {
     processResolvedTree(
       node,
       transactionPlan: FrameAnimationTransactionPlan(base: transaction),
-      timestamp: timestamp
+      timestamp: timestamp,
+      graphAnimationInputToken: graphAnimationInputToken
     )
   }
 
@@ -1428,7 +1461,7 @@ package final class AnimationController: Sendable {
     case .schedule(let batchID, let deadline):
       pendingEmptyBatchCompletions[batchID] = deadline
     case .dropCompletion(let batchID):
-      completionClosures.removeValue(forKey: batchID)
+      _ = takeCompletion(for: batchID)
     }
   }
 
@@ -1589,6 +1622,15 @@ package final class AnimationController: Sendable {
     // filter, so they would tick to natural completion (or be purged
     // later by the placed-overlay loop's "registration missing" path)
     // even after the exit animation started.
+    let removalTransaction = transactionForDepartedIdentity(
+      identity,
+      transactionPlan: transactionPlan
+    )
+    let completionBatchID = removalTransaction.animationBatchID.flatMap { batchID in
+      completionClosures[batchID] == nil ? nil : batchID
+    }
+    retainBatch(completionBatchID)
+
     let supersededEntries = activeAnimations.filter {
       injectedIdentities.contains($0.key.identity)
     }
@@ -1618,13 +1660,10 @@ package final class AnimationController: Sendable {
       parentIdentity: injectionParent,
       childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
       transition: transition,
-      animationBox: transactionForDepartedIdentity(
-        identity,
-        transactionPlan: transactionPlan
-      )
-      .animationRequest.animationBoxIfAny,
+      animationBox: removalTransaction.animationRequest.animationBoxIfAny,
       startTime: timestamp,
       startOpacity: initialOpacity,
+      completionBatchID: completionBatchID,
       placedSnapshot: placedSnapshot
     )
   }
@@ -1902,7 +1941,7 @@ package final class AnimationController: Sendable {
     let newCount = count - 1
     if newCount <= 0 {
       batchRefCounts.removeValue(forKey: batchID)
-      if let closure = completionClosures.removeValue(forKey: batchID),
+      if let closure = takeCompletion(for: batchID),
         firingCompletion
       {
         fireOrDeferCompletion(closure)
@@ -1910,6 +1949,13 @@ package final class AnimationController: Sendable {
     } else {
       batchRefCounts[batchID] = newCount
     }
+  }
+
+  private func takeCompletion(
+    for batchID: AnimationBatchID
+  ) -> (@MainActor @Sendable () -> Void)? {
+    completionBarriers.removeValue(forKey: batchID)
+    return completionClosures.removeValue(forKey: batchID)
   }
 
   private func fireOrDeferCompletion(_ completion: @escaping @MainActor @Sendable () -> Void) {
@@ -1933,6 +1979,7 @@ package final class AnimationController: Sendable {
         || !removingNodes.isEmpty
         || !pendingEmptyBatchCompletions.isEmpty
     else {
+      currentResolvedPresentationProjection = .init()
       lastTickResult = AnimationTickResult()
       lastPropertyInterpolationVisitedNodeCount = 0
       return lastTickResult
@@ -2105,7 +2152,29 @@ package final class AnimationController: Sendable {
       }
 
       if animationComplete {
-        removalsToPurge.append(viewNodeID)
+        // A cached placed snapshot is still a live exit overlay. Its sampling
+        // pass owns both the logical endpoint and the later removal barrier;
+        // resolving must not advance the same entry first and collapse the two
+        // criteria inside one committed frame.
+        if entry.placedSnapshot != nil {
+          redrawIdentities.insert(entry.identity)
+          latestDeadline = timestamp.advanced(by: frameInterval)
+          hasPendingWork = true
+          continue
+        }
+        if entry.completionBatchID == nil || entry.isLogicallyComplete {
+          removalsToPurge.append(viewNodeID)
+        } else {
+          removingNodes[viewNodeID]?.isLogicallyComplete = true
+          if let batchID = entry.completionBatchID,
+            completionBarriers[batchID] == .logicallyComplete
+          {
+            removingNodes[viewNodeID]?.completionBatchID = nil
+            releaseBatch(batchID)
+          }
+          latestDeadline = timestamp.advanced(by: frameInterval)
+          hasPendingWork = true
+        }
         redrawIdentities.insert(entry.identity)
         continue
       }
@@ -2139,10 +2208,21 @@ package final class AnimationController: Sendable {
     }
 
     for viewNodeID in removalsToPurge {
-      removingNodes.removeValue(forKey: viewNodeID)
+      if let entry = removingNodes.removeValue(forKey: viewNodeID) {
+        releaseBatch(entry.completionBatchID)
+      }
     }
 
     pruneCompletedAnimationRegistrations(completedAnimationBoxes)
+
+    currentResolvedPresentationProjection = ResolvedPresentationProjection(
+      interpolatedByNodeID: interpolatedByNodeID,
+      interpolatedIdentityByNodeID: interpolatedIdentityByNodeID,
+      interpolatedByIdentity: interpolatedByIdentity,
+      parentByIdentity: previousParentByIdentity,
+      childIndexByIdentity: previousChildIndexByIdentity,
+      removalInjectionsByParent: injectionsByParent
+    )
 
     // Apply interpolated values for in-tree animations.
     var appliedIdentities: Set<Identity> = []
@@ -2191,7 +2271,7 @@ package final class AnimationController: Sendable {
       }
       for batchID in pendingDrain.drainedBatchIDs {
         pendingEmptyBatchCompletions.removeValue(forKey: batchID)
-        if let closure = completionClosures.removeValue(forKey: batchID) {
+        if let closure = takeCompletion(for: batchID) {
           fireOrDeferCompletion(closure)
         }
       }
@@ -2204,6 +2284,36 @@ package final class AnimationController: Sendable {
     )
     lastTickResult = result
     return result
+  }
+
+  /// Re-applies the resolved presentation sampled by the most recent tick to a
+  /// freshly reconciled canonical tree. This does not sample time, advance
+  /// custom animation state, mutate active-animation bookkeeping, or dispatch
+  /// completions.
+  @discardableResult
+  package func reapplyCurrentResolvedPresentation(
+    to tree: inout ResolvedNode
+  ) -> Set<Identity> {
+    let projection = currentResolvedPresentationProjection
+    var visitedNodeCount = 0
+    var appliedIdentities: Set<Identity> = []
+    tree = AnimationPropertyValueApplication.applyInterpolatedValues(
+      tree: tree,
+      interpolatedByNodeID: projection.interpolatedByNodeID,
+      interpolatedIdentityByNodeID: projection.interpolatedIdentityByNodeID,
+      interpolatedByIdentity: projection.interpolatedByIdentity,
+      parentByIdentity: projection.parentByIdentity,
+      childIndexByIdentity: projection.childIndexByIdentity,
+      visitedNodeCount: &visitedNodeCount,
+      appliedIdentities: &appliedIdentities
+    )
+    if !projection.removalInjectionsByParent.isEmpty {
+      tree = AnimationTransitionOverlay.injectResolvedRemovals(
+        into: tree,
+        injectionsByParent: projection.removalInjectionsByParent
+      )
+    }
+    return appliedIdentities
   }
 
   /// Samples the current interpolated value of a property-scoped
@@ -2269,6 +2379,7 @@ package final class AnimationController: Sendable {
     frameHead.reset()
     activeAnimations.removeAll(keepingCapacity: true)
     removingNodes.removeAll(keepingCapacity: true)
+    currentResolvedPresentationProjection = .init()
     lastTickResult = .init()
     resolvedTreeProcessingSkipCount = 0
     lastResolvedTreeProcessedNodeCount = 0
@@ -2359,6 +2470,7 @@ extension AnimationController: AnimationCompletionSink {
 
   package func registerCompletion(
     batchID: AnimationBatchID,
+    barrier: AnimationCompletionBarrier = .logicallyComplete,
     closure: @escaping @MainActor @Sendable () -> Void
   ) {
     // Store the closure; it fires when the batch's ref count hits zero
@@ -2366,6 +2478,7 @@ extension AnimationController: AnimationCompletionSink {
     // batch ID replaces the first, matching SwiftUI's last-writer-wins
     // behavior when overlapping ``withAnimation`` calls collide.
     completionClosures[batchID] = closure
+    completionBarriers[batchID] = barrier
   }
 }
 

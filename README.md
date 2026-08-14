@@ -17,6 +17,8 @@ terminal itself. Terminal first, not terminal only: the same view tree also
 ships as a static WASI bundle, a localhost WebHost, a native SwiftUI surface,
 or a native Android surface, with no rewrite per target. Both browser paths
 paint to the DOM with a real accessibility tree, not a terminal emulator.
+That tree is a one-way semantic presentation preview: assistive-origin focus,
+activation, adjustment, and editing are not routed back into SwiftTUI in 0.9.
 
 SwiftTUI uses no global constraint solver, no virtual DOM, and no `curses`.
 Every view is lowered through a strict, inspectable pipeline (resolve →
@@ -164,7 +166,7 @@ DocC article for the full platform-by-product matrix.
 **Standard CLI flags.** Conform your `App` to `SwiftTUICommand`. This protocol
 adds the
 framework's standard flag surface (`--accessible`, `--no-color`, `--ascii`,
-`--reduce-motion`, `--json`, `--debug`, …) alongside your own
+`--reduce-motion`, `--stable-output`, `--json`, `--debug`, …) alongside your own
 options:
 
 ```swift

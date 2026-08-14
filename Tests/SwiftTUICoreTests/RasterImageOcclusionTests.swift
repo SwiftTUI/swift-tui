@@ -140,6 +140,172 @@ struct RasterImageOcclusionTests {
     #expect(recorded.unoccludedVisibleBounds == nil)
     #expect(surface.imageAttachments.first?.unoccludedVisibleBounds != nil)
   }
+
+  @Test("an image repainted through one dirty row stays beneath retained occluders")
+  func incrementallyRepaintedImageStaysBeneathRetainedOccluders() throws {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    let imageBounds = CellRect(
+      origin: .zero,
+      size: .init(width: 4, height: 4)
+    )
+    let retainedOccluderBounds = CellRect(
+      origin: .init(x: 0, y: 2),
+      size: .init(width: 4, height: 1)
+    )
+    let repaintedOccluderBounds = CellRect(
+      origin: .init(x: 0, y: 3),
+      size: .init(width: 4, height: 1)
+    )
+
+    func draw(repaintedColor: Color) -> DrawNode {
+      occlusionRoot(
+        width: 4,
+        height: 4,
+        children: [
+          occlusionImageNode(id: "incremental-underlay", bounds: imageBounds),
+          occlusionFillNode(
+            id: "retained-occluder",
+            bounds: retainedOccluderBounds
+          ),
+          occlusionFillNode(
+            id: "repainted-occluder",
+            bounds: repaintedOccluderBounds,
+            color: repaintedColor
+          ),
+        ]
+      )
+    }
+
+    let previous = rasterizer.rasterize(draw(repaintedColor: .red))
+    let currentDraw = draw(repaintedColor: .blue)
+    let fresh = rasterizer.rasterize(currentDraw)
+    let incremental = rasterizer.rasterize(
+      currentDraw,
+      minimumSize: .zero,
+      previousSurface: previous,
+      damage: .init(dirtyRows: [3])
+    )
+
+    let freshImage = try #require(fresh.imageAttachments.first)
+    let incrementalImage = try #require(incremental.imageAttachments.first)
+    #expect(incremental.cells == fresh.cells)
+    #expect(
+      incrementalImage.unoccludedVisibleBounds == freshImage.unoccludedVisibleBounds,
+      "a retained overlay row must remain above an image that was re-emitted for another dirty row"
+    )
+    #expect(incremental == fresh)
+  }
+
+  @Test("a dirty layer below an image does not move above a retained occluder")
+  func incrementallyRepaintedUnderlayPreservesImageStackOrder() throws {
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    let imageBounds = CellRect(
+      origin: .zero,
+      size: .init(width: 4, height: 4)
+    )
+    let retainedOccluderBounds = CellRect(
+      origin: .init(x: 0, y: 3),
+      size: .init(width: 4, height: 1)
+    )
+    let repaintedUnderlayBounds = CellRect(
+      origin: .init(x: 0, y: 2),
+      size: .init(width: 4, height: 1)
+    )
+
+    func draw(underlayColor: Color) -> DrawNode {
+      occlusionRoot(
+        width: 4,
+        height: 4,
+        children: [
+          occlusionFillNode(
+            id: "repainted-underlay",
+            bounds: repaintedUnderlayBounds,
+            color: underlayColor
+          ),
+          occlusionImageNode(id: "incremental-overlay", bounds: imageBounds),
+          occlusionFillNode(
+            id: "retained-occluder-over-overlay",
+            bounds: retainedOccluderBounds
+          ),
+        ]
+      )
+    }
+
+    let previous = rasterizer.rasterize(draw(underlayColor: .red))
+    let currentDraw = draw(underlayColor: .blue)
+    let fresh = rasterizer.rasterize(currentDraw)
+    let incremental = rasterizer.rasterize(
+      currentDraw,
+      minimumSize: .zero,
+      previousSurface: previous,
+      damage: .init(dirtyRows: [2])
+    )
+
+    let freshImage = try #require(fresh.imageAttachments.first)
+    let incrementalImage = try #require(incremental.imageAttachments.first)
+    #expect(incremental.cells == fresh.cells)
+    #expect(incrementalImage.unoccludedVisibleBounds == freshImage.unoccludedVisibleBounds)
+    #expect(incremental == fresh)
+  }
+
+  @Test("paint-order closure indexes tall overlapping layers once")
+  func paintOrderClosureBoundsTallLayerWork() {
+    let surfaceHeight = 32_768
+    let layerCount = 1_024
+    let earlyBounds = CellRect(
+      origin: .init(x: 0, y: 1_024),
+      size: .init(width: 1, height: 2_048)
+    )
+    let bridgeBounds = CellRect(
+      origin: .init(x: 0, y: 2_048),
+      size: .init(width: 1, height: 4_096)
+    )
+    let imageBounds = CellRect(
+      origin: .init(x: 0, y: 4_096),
+      size: .init(width: 1, height: surfaceHeight - 8_192)
+    )
+    let imageIndex = layerCount / 2
+    let image = RasterImageAttachment(
+      identity: testIdentity("ImageOcclusion", "tall-work-guard"),
+      bounds: imageBounds,
+      source: .path("tall-work-guard.png")
+    )
+    let layers = (0...layerCount).map { order in
+      if order == imageIndex {
+        return RasterPresentationLayer(
+          order: order,
+          bounds: imageBounds,
+          content: .image(image)
+        )
+      }
+      let bounds =
+        if order == imageIndex - 1 {
+          bridgeBounds
+        } else if order < imageIndex {
+          earlyBounds
+        } else {
+          imageBounds
+        }
+      return RasterPresentationLayer(
+        order: order,
+        bounds: bounds,
+        content: .cells(RasterSurfaceFragment(bounds: bounds, cells: []))
+      )
+    }
+
+    let closure = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+      .presentationOrderDamageClosure(
+        [surfaceHeight / 2],
+        previousLayers: layers,
+        surfaceHeight: surfaceHeight
+      )
+
+    #expect(closure.indexedLayerCount == layers.count)
+    #expect(closure.queriedLayerCount == layers.count)
+    let expectedRows = earlyBounds.origin.y..<imageBounds.maxY
+    #expect(closure.materializedSurfaceRowCount == expectedRows.count)
+    #expect(closure.dirtyRows == Set(expectedRows))
+  }
 }
 
 private func occlusionRoot(
@@ -175,7 +341,8 @@ private func occlusionImageNode(
 private func occlusionFillNode(
   id: String,
   bounds: CellRect,
-  drawEffects: DrawEffects = .init()
+  drawEffects: DrawEffects = .init(),
+  color: Color = .red
 ) -> DrawNode {
   DrawNode(
     identity: testIdentity("ImageOcclusionFill", id),
@@ -186,7 +353,7 @@ private func occlusionFillNode(
         bounds: bounds,
         geometry: .rectangle,
         insetAmount: 0,
-        style: .color(.red),
+        style: .color(color),
         mode: .full
       )
     ]

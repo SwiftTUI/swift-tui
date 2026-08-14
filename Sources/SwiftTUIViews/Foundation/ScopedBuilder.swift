@@ -3,6 +3,7 @@ import SwiftTUICore
 /// A typed scoped view wrapper that preserves the original authoring scope.
 package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
   private let output: Output
+  private let authoringContext: AuthoringContext?
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
   private static func resolveWithAuthoringContext(
@@ -24,6 +25,7 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
     authoringContext: AuthoringContext?
   ) {
     self.output = output
+    self.authoringContext = authoringContext
     let erased: Any = output
 
     if let resolvable = erased as? any ResolvableView {
@@ -61,6 +63,31 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
 
   package var body: Never {
     fatalError("ScopedBuilder is a typed scoped view wrapper.")
+  }
+}
+
+extension ScopedBuilder: AdditionalDynamicPropertyUpdating {
+  package func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool {
+    index == 0  // `output`
+  }
+
+  /// `ScopedBuilder` is transparent to its authored output: its resolve
+  /// closure intentionally lowers that value without passing through another
+  /// graph identity. Forward the pre-reuse update/certification for the same
+  /// reason, under the scope that the closure will install for body access.
+  package func updateAdditionalDynamicProperties(
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult {
+    // `nil` is an explicit fresh-destination capture. It must not inherit an
+    // enclosing builder's ambient capture when transparent builders nest.
+    let scope = authoringContext ?? context.destinationAuthoringContext
+    return withAuthoringContext(scope) {
+      runForwardedDynamicPropertyUpdates(on: output, in: context)
+    }
+  }
+
+  package func hasAdditionalDynamicPropertyUpdateSurface() -> Bool {
+    hasDynamicPropertyUpdateSurface(output)
   }
 }
 

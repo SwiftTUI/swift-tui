@@ -815,7 +815,11 @@ extension Rasterizer {
         }
         let compositing =
           imageCompositing(
-            blendMode: blendMode,
+            // Terminal graphics protocols cannot all apply placement opacity.
+            // Capture the same backdrop used by blend compositing so the
+            // terminal presenter can precompose a normal-blend alpha variant.
+            // Layered hosts still consume `attachment.opacity` directly.
+            blendMode: blendMode ?? (payload.opacity < 1 ? .normal : nil),
             visibleBounds: visibleBounds,
             sourceBackdrop: nil,
             cellPixelSize: payload.resolvedAsset?.cellPixelSize,
@@ -841,6 +845,7 @@ extension Rasterizer {
           cellPixelSize: payload.resolvedAsset?.cellPixelSize,
           isResizable: payload.isResizable,
           scalingMode: payload.scalingMode,
+          opacity: payload.opacity,
           compositing: compositing
         )
         imageAttachments.append(attachment)

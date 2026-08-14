@@ -44,6 +44,16 @@ extension Picker {
     var label: String
   }
 
+  private struct ResolvedOptions {
+    var options: [Option] = []
+    var runtimeIssues: [RuntimeIssue] = []
+  }
+
+  private enum OptionContentRepresentation {
+    case representable(label: String)
+    case unrepresentable(label: String, reasons: [String])
+  }
+
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
@@ -54,7 +64,10 @@ extension Picker {
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let options = resolvedOptions(in: context.child(component: .named("PickerOptions")))
+    let resolvedOptions = resolvedOptions(
+      in: context.child(component: .named("PickerOptions"))
+    )
+    let options = resolvedOptions.options
     let selectedIndex = options.firstIndex { option in
       pickerSelectionMatches(
         option.tag,
@@ -145,7 +158,7 @@ extension Picker {
       in: context.child(component: .named("PickerBody"))
     )
 
-    return ResolvedNode(
+    var node = ResolvedNode(
       identity: context.identity,
       kind: .view("Picker"),
       children: [child],
@@ -156,11 +169,18 @@ extension Picker {
         accessibilityRole: .picker
       )
     )
+    if !resolvedOptions.runtimeIssues.isEmpty {
+      node.preferenceValues.merge(
+        RuntimeIssuePreferenceKey.self,
+        value: resolvedOptions.runtimeIssues
+      )
+    }
+    return node
   }
 
   private func resolvedOptions(
     in context: ResolveContext
-  ) -> [Option] {
+  ) -> ResolvedOptions {
     let nodes = content.resolveElements(in: context)
 
     // The authored options resolve ONLY to extract tags/labels — the style
@@ -173,26 +193,117 @@ extension Picker {
       context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
     }
 
-    var options: [Option] = []
-    collectOptions(from: nodes, into: &options)
-    return options
+    var result = ResolvedOptions()
+    collectOptions(
+      from: nodes,
+      expectedEnvironment: context.environment,
+      expectedTransaction: context.transaction,
+      into: &result
+    )
+    return result
   }
 
   private func collectOptions(
     from nodes: [ResolvedNode],
-    into options: inout [Option]
+    expectedEnvironment: EnvironmentSnapshot,
+    expectedTransaction: TransactionSnapshot,
+    into result: inout ResolvedOptions
   ) {
     for node in nodes {
       if let tag = node.semanticMetadata.selectionTag {
-        options.append(
-          Option(
-            tag: tag,
-            label: resolvedNodeLabelText(from: node)
-          )
+        let representation = optionContentRepresentation(
+          for: node,
+          expectedEnvironment: expectedEnvironment,
+          expectedTransaction: expectedTransaction
         )
+        let label: String
+        switch representation {
+        case .representable(let extractedLabel):
+          label = extractedLabel
+        case .unrepresentable(let extractedLabel, let reasons):
+          label = extractedLabel
+          let issue = RuntimeIssue(
+            severity: .warning,
+            code: "picker.unrepresentableOptionContent",
+            message:
+              "Picker option content cannot be represented by the text-only option metadata "
+              + "model (discarded: \(reasons.joined(separator: ", "))). "
+              + "The extracted text and tag remain active; use a single unmodified Text value "
+              + "for deterministic picker chrome.",
+            identity: node.identity,
+            source: "Picker"
+          )
+          if !result.runtimeIssues.contains(issue) {
+            result.runtimeIssues.append(issue)
+          }
+        }
+        result.options.append(Option(tag: tag, label: label))
       } else {
-        collectOptions(from: node.children, into: &options)
+        collectOptions(
+          from: node.children,
+          expectedEnvironment: expectedEnvironment,
+          expectedTransaction: expectedTransaction,
+          into: &result
+        )
       }
     }
+  }
+
+  /// Classifies the exact boundary the Picker metadata model can preserve.
+  /// A tagged, unmodified `Text` leaf is lossless. Everything else still
+  /// contributes its recursively extracted text and tag, but reports which
+  /// authored structure or behavior was discarded.
+  private func optionContentRepresentation(
+    for node: ResolvedNode,
+    expectedEnvironment: EnvironmentSnapshot,
+    expectedTransaction: TransactionSnapshot
+  ) -> OptionContentRepresentation {
+    let label = resolvedNodeLabelText(from: node)
+    var reasons: [String] = []
+
+    if case .view("Text") = node.kind {
+      // Expected primitive shape.
+    } else {
+      reasons.append("non-Text structure")
+    }
+
+    if !node.children.isEmpty {
+      reasons.append("child layout structure")
+    }
+    if node.layoutBehavior != .intrinsic || node.layoutMetadata != .init() {
+      reasons.append("layout modifier")
+    }
+    if node.drawMetadata != .init() || !node.drawEffects.isEmpty {
+      reasons.append("visual modifier")
+    }
+    if node.environmentSnapshot != expectedEnvironment {
+      reasons.append("environment modifier")
+    }
+    if !node.transactionSnapshot.isReuseEquivalent(to: expectedTransaction) {
+      reasons.append("transaction modifier")
+    }
+
+    var unsupportedSemantics = node.semanticMetadata
+    unsupportedSemantics.selectionTag = nil
+    if unsupportedSemantics != .init() {
+      reasons.append("semantic modifier")
+    }
+    if !node.lifecycleMetadata.isEmpty
+      || node.handlerInventory != .init()
+      || !node.preferenceValues.isEmpty
+    {
+      reasons.append("behavior modifier")
+    }
+    if node.surfaceComposition != .normal || node.matchedGeometry != nil {
+      reasons.append("composition modifier")
+    }
+
+    if reasons.isEmpty {
+      return .representable(label: label)
+    }
+    return .unrepresentable(
+      label: label,
+      reasons: Array(Set(reasons)).sorted()
+    )
   }
 }

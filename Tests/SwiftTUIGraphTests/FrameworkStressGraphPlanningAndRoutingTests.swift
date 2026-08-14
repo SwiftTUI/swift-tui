@@ -274,20 +274,22 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
   @Test("stress graph planning 017 dependency reindex replaces every family atomically")
   func graphPlanning017DependencyReindexReplacesEveryFamilyAtomically() {
     let nodeID = ViewNodeID(rawValue: 7)
-    let stateA = StateSlotKey(owner: ViewNodeID(rawValue: 1), ordinal: 0)
-    let stateB = StateSlotKey(owner: ViewNodeID(rawValue: 2), ordinal: 1)
+    let ownerLifetimeID = NodeOwnerLifetimeID(rawValue: 7)
+    let stateA = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 1), ordinal: 0)
+    let stateB = StateSlotKey(owner: NodeOwnerLifetimeID(rawValue: 2), ordinal: 1)
     let environmentShared = ObjectIdentifier(GraphPlanningEnvironmentKeyA.self)
     let observableOld = ObjectIdentifier(GraphPlanningObservableA.self)
     let observableNew = ObjectIdentifier(GraphPlanningObservableB.self)
     let writtenOld = ObjectIdentifier(GraphPlanningEnvironmentKeyB.self)
     var index = ViewGraph.DependencyIndex()
-    index.stateSlotDependents = [stateA: Set([nodeID])]
+    index.stateSlotDependents = [stateA: Set([ownerLifetimeID])]
     index.environmentDependents = [environmentShared: Set([nodeID])]
     index.observableDependents = [observableOld: Set([nodeID])]
     index.environmentKeyWriters = [writtenOld: Set([nodeID])]
 
     ViewGraphDependencyIndex.reindex(
       viewNodeID: nodeID,
+      ownerLifetimeID: ownerLifetimeID,
       previous: .init(
         stateSlotReads: [stateA],
         environmentReads: [environmentShared],
@@ -303,7 +305,7 @@ struct FrameworkStressGraphPlanningAndRoutingTests {
       index: &index
     )
 
-    #expect(index.stateSlotDependents == [stateB: [nodeID]])
+    #expect(index.stateSlotDependents == [stateB: [ownerLifetimeID]])
     #expect(index.environmentDependents == [environmentShared: [nodeID]])
     #expect(index.observableDependents == [observableNew: [nodeID]])
     // A node that stopped writing a key must drop out of the writer index

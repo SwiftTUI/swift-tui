@@ -9,14 +9,16 @@ struct EnvironmentResolverTests {
     #expect(configuration.color == .auto)
     #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale → ascii fallback (matches TerminalCapabilityProfile.detect)
     #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == false)
     #expect(configuration.debug == false)
   }
 
-  @Test("Empty environment + non-TTY suppresses color and motion")
+  @Test("Empty environment + non-TTY suppresses color and uses stable output")
   func emptyEnvironmentNoTTY() {
     let configuration = RuntimeConfiguration.detect(environment: [:], isStdoutTTY: false)
     #expect(configuration.color == .never)
-    #expect(configuration.motion == .reduced)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == true)
   }
 
   @Test("NO_COLOR forces color off")
@@ -54,10 +56,11 @@ struct EnvironmentResolverTests {
     #expect(configuration.color == .always)
   }
 
-  @Test("CI=true triggers reduce-motion while output stays TUI")
-  func ciTriggersReducedMotion() {
+  @Test("CI=true triggers stable output without changing accessibility motion")
+  func ciTriggersStableOutput() {
     let configuration = RuntimeConfiguration.detect(environment: ["CI": "true"], isStdoutTTY: true)
-    #expect(configuration.motion == .reduced)
+    #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == true)
     #expect(configuration.output == .tui)
   }
 
@@ -146,11 +149,28 @@ struct EnvironmentResolverTests {
     #expect(configuration.cursorFollowsFocus == true)
   }
 
-  @Test("CI=true SWIFTTUI_REDUCE_MOTION=0 turns motion back on (explicit env override)")
+  @Test("CI stable output remains independent of an explicit accessibility opt-out")
   func ciWithExplicitMotionOff() {
     let configuration = RuntimeConfiguration.detect(
       environment: ["CI": "true", "SWIFTTUI_REDUCE_MOTION": "0"], isStdoutTTY: true)
     #expect(configuration.motion == .normal)
+    #expect(configuration.stableOutput == true)
+  }
+
+  @Test("SWIFTTUI_STABLE_OUTPUT overrides automatic capture policy")
+  func explicitStableOutputOverride() {
+    let disabled = RuntimeConfiguration.detect(
+      environment: ["CI": "true", "SWIFTTUI_STABLE_OUTPUT": "0"],
+      isStdoutTTY: false
+    )
+    let enabled = RuntimeConfiguration.detect(
+      environment: ["SWIFTTUI_STABLE_OUTPUT": "1"],
+      isStdoutTTY: true
+    )
+    #expect(disabled.motion == .normal)
+    #expect(disabled.stableOutput == false)
+    #expect(enabled.motion == .normal)
+    #expect(enabled.stableOutput == true)
   }
 
   @Test("SWIFTTUI_JSON and SWIFTTUI_ACCESSIBLE compose when both set")

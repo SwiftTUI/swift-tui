@@ -315,6 +315,23 @@ package struct Rasterizer: Sendable {
         }
       }
     }
+    let orderClosure = presentationOrderDamageClosure(
+      dirtyRows,
+      previousLayers: previousSurface.presentationLayers,
+      surfaceHeight: surfaceSize.height
+    )
+    let orderClosedDirtyRows = orderClosure.dirtyRows
+    let presentationOrderRows = orderClosedDirtyRows.subtracting(dirtyRows)
+    if !presentationOrderRows.isEmpty {
+      dirtyRows = orderClosedDirtyRows
+      damage = PresentationDamage(
+        textRows: damage.textRows
+          + presentationOrderRows.sorted().map { PresentationDamage.TextRow(row: $0) },
+        graphicsInvalidation: damage.graphicsInvalidation,
+        requiresFullTextRepaint: damage.requiresFullTextRepaint,
+        requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay
+      )
+    }
     var imageAttachments = previousSurface.imageAttachments.filter { attachment in
       !visibleBounds(attachment.visibleBounds, intersectsAnyOf: dirtyRows)
     }

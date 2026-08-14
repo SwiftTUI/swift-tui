@@ -51,6 +51,7 @@ private struct PerfVerticalScrollProbeView: View {
             Text("row \(index)")
           }
         }
+        .padding(1)
       }
       .frame(height: 8)
       .border(.separator)

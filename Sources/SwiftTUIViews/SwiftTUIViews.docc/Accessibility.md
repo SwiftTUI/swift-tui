@@ -47,9 +47,14 @@ The runtime resolves a motion policy that authored views can read as
 it: `Spinner` renders static text, `PhaseAnimator` renders only its first
 phase without cycling, and `AnimatedImage` renders its first frame.
 
+Automatic capture detection is separate from that accessibility preference.
+`CI=true`, redirected stdout, `SWIFTTUI_STABLE_OUTPUT=1`, and
+`--stable-output` select deterministic rendering for built-in animation, but
+they do not change `accessibilityReduceMotion` as observed by app code.
+
 ## Output-Mode Detection
 
-The output, glyph, and motion policy is resolved from the process environment
+The output, glyph, motion, and stable-output policies are resolved from the process environment
 and the TTY state at session start. The precedence is fixed:
 
 1. `NO_COLOR` / `CLICOLOR=0`, then `FORCE_COLOR` / `CLICOLOR_FORCE`.
@@ -57,9 +62,9 @@ and the TTY state at session start. The precedence is fixed:
 3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus
    `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0` values on
    those two variables.
-4. `CI=true` implies reduced motion (which also renders progress views as
-   static status text).
-5. A non-TTY stdout implies reduced motion.
+4. `SWIFTTUI_STABLE_OUTPUT` explicitly controls deterministic capture output.
+5. `CI=true` and a non-TTY stdout imply stable output, without changing the
+   accessibility preference.
 
 The full environment-variable reference lives in the `SwiftTUIRuntime` article
 [Environment Variables](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables).

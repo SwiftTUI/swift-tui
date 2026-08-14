@@ -42,7 +42,7 @@ public struct AnimatedImage: View {
   }
 
   public var body: some View {
-    EnvironmentReader(\.accessibilityReduceMotion) { accessibilityReduceMotion in
+    EnvironmentReader(\.renderingReduceMotion) { accessibilityReduceMotion in
       animatedImageBody(accessibilityReduceMotion: accessibilityReduceMotion)
     }
   }

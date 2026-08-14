@@ -164,12 +164,13 @@ package enum MemoComparisonPlanCache {
       guard info.isStrong else {
         return nil
       }
-      // Property-wrapper storage (`_`-prefixed `DynamicProperty` field) is
-      // slot identity, not data: its value classes are covered by the memo
-      // gate's dependency guards (`hasNoMemoUncoveredDependencies` and the
-      // environment-snapshot compare), exactly as the diagnostic comparator
-      // skips them.
-      if info.name.hasPrefix("_"), info.fieldType is any DynamicProperty.Type {
+      // Only graph-slot-only wrapper storage may be omitted. Binding closures,
+      // Bindable model references, Environment/Focused key paths, and custom
+      // wrapper configuration are authored inputs; treating every
+      // DynamicProperty as slot identity can false-equal a replacement value.
+      if info.name.hasPrefix("_"),
+        info.fieldType is any DynamicPropertyMemoStorageOnly.Type
+      {
         continue
       }
       guard

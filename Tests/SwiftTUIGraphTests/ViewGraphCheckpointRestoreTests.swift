@@ -88,6 +88,36 @@ struct ViewGraphCheckpointRestoreTests {
     #expect(nodeA.isDirty == true && nodeB.isDirty == true)
   }
 
+  @Test("checkpoint image cache rejects raw-ID plus generation ABA")
+  func checkpointImageCacheUsesOwnerLifetimeCurrency() {
+    let rawID = ViewNodeID(rawValue: 1)
+    let first = ViewNode(
+      viewNodeID: rawID,
+      identity: testIdentity("ImageABA", "First"),
+      ownerLifetimeID: NodeOwnerLifetimeID(rawValue: 10)
+    )
+    let replacement = ViewNode(
+      viewNodeID: rawID,
+      identity: testIdentity("ImageABA", "Replacement"),
+      ownerLifetimeID: NodeOwnerLifetimeID(rawValue: 11)
+    )
+    #expect(
+      first.currentCheckpointMutationGeneration
+        == replacement.currentCheckpointMutationGeneration
+    )
+
+    var store = NodeCheckpointImageStore()
+    let firstImages = store.currentImages(of: [rawID: first])
+    #expect(firstImages[rawID]?.ownerLifetimeID == first.ownerLifetimeID)
+
+    // Raw ID and mutation generation are equal. Only owner currency can force
+    // this cache entry to refresh instead of lending the first node's image to
+    // an unrelated replacement.
+    let replacementImages = store.currentImages(of: [rawID: replacement])
+    #expect(replacementImages[rawID]?.ownerLifetimeID == replacement.ownerLifetimeID)
+    #expect(replacementImages[rawID]?.committed.identity == replacement.identity)
+  }
+
   @Test("gen-gated restore round-trips baseline and prepared state")
   func restoreRoundTripsBaselineAndPreparedState() {
     let graph = ViewGraph()

@@ -67,4 +67,8 @@ public struct Namespace: Sendable {
 /// sub-keying plus forwarded `line:`/`column:` init defaults) rather than
 /// binding through the update pass; folding it onto path-qualified slot
 /// identity is a recorded follow-up.
-extension Namespace: DynamicProperty {}
+extension Namespace: DynamicProperty {
+  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    .unchanged
+  }
+}

@@ -81,6 +81,12 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var glyphs: GlyphMode
   /// Animation/motion policy.
   public var motion: MotionMode
+  /// Whether renderers should produce deterministic captured output.
+  ///
+  /// Stable output suppresses built-in animation without claiming that the
+  /// user enabled an accessibility preference. Environment detection enables
+  /// it for CI and redirected stdout.
+  public var stableOutput: Bool
   /// Top-level output strategy (TUI render or JSON).
   public var output: OutputMode
   /// Log verbosity level for framework-internal diagnostics.
@@ -97,6 +103,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     color: ColorMode = .auto,
     glyphs: GlyphMode = .unicode,
     motion: MotionMode = .normal,
+    stableOutput: Bool = false,
     output: OutputMode = .tui,
     verbosity: Verbosity = .normal,
     web: WebConfig? = nil,
@@ -106,6 +113,7 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     self.color = color
     self.glyphs = glyphs
     self.motion = motion
+    self.stableOutput = stableOutput
     self.output = output
     self.verbosity = verbosity
     self.web = web

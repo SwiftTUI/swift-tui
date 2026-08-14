@@ -69,6 +69,10 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   public var resolvedReused: Int?
   public var measuredComputed: Int?
   public var drawNodes: Int?
+  /// Raster image attachments produced by the cold one-shot surface. Warm
+  /// frame diagnostics do not currently carry this column, so it stays absent
+  /// there rather than fabricating a zero.
+  public var rasterImageAttachments: Int?
   /// UTF-8 bytes presented. Meaningful as a wire number only when the
   /// emission lane was armed; the in-process host's byte count is still
   /// deterministic and still ratchets. `nil` in the cold lane — the one-shot
@@ -102,6 +106,7 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     resolvedReused: Int? = nil,
     measuredComputed: Int? = nil,
     drawNodes: Int? = nil,
+    rasterImageAttachments: Int? = nil,
     presentBytes: Int? = nil,
     presentCells: Int? = nil,
     damageCells: Int? = nil,
@@ -123,6 +128,7 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     self.resolvedReused = resolvedReused
     self.measuredComputed = measuredComputed
     self.drawNodes = drawNodes
+    self.rasterImageAttachments = rasterImageAttachments
     self.presentBytes = presentBytes
     self.presentCells = presentCells
     self.damageCells = damageCells
@@ -146,6 +152,7 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     case resolvedReused = "resolved_reused"
     case measuredComputed = "measured_computed"
     case drawNodes = "draw_nodes"
+    case rasterImageAttachments = "raster_image_attachments"
     case presentBytes = "present_bytes"
     case presentCells = "present_cells"
     case damageCells = "damage_cells"
@@ -223,6 +230,7 @@ extension PerfDeterministicCounters {
     append("resolved_reused", resolvedReused)
     append("measured_computed", measuredComputed)
     append("draw_nodes", drawNodes)
+    append("raster_image_attachments", rasterImageAttachments)
     append("present_bytes", presentBytes)
     append("present_cells", presentCells)
     append("damage_cells", damageCells)

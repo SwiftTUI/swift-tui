@@ -78,7 +78,7 @@ struct MemoComparisonPlanTests {
     var label: String
   }
 
-  private struct FakeWrapper: DynamicProperty {
+  private struct FakeWrapper: DynamicPropertyMemoStorageOnly {
     var onChange: () -> Void
   }
 

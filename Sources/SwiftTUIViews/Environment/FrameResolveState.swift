@@ -151,7 +151,7 @@ package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
   package var theme: Theme?
   package var cellPixelMetrics: CellPixelMetrics
   package var pointerInputCapabilities: PointerInputCapabilities
-  package var accessibilityReduceMotion: Bool
+  package var renderingReduceMotion: Bool
   package var cursorFollowsFocus: Bool
 
   package init(environmentValues: EnvironmentValues) {
@@ -159,7 +159,7 @@ package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
     theme = environmentValues.theme
     cellPixelMetrics = environmentValues.cellPixelMetrics
     pointerInputCapabilities = environmentValues.pointerInputCapabilities
-    accessibilityReduceMotion = environmentValues.accessibilityReduceMotion
+    renderingReduceMotion = environmentValues.renderingReduceMotion
     cursorFollowsFocus = environmentValues.cursorFollowsFocus
   }
 }

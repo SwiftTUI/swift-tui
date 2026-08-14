@@ -23,9 +23,15 @@ enum ViewGraphNodeCheckpointing {
   ) -> Int {
     var restoredNodeCount = 0
     for (viewNodeID, node) in nodesByNodeID {
-      guard let nodeCheckpoint = nodeCheckpoints[viewNodeID],
-        node.currentCheckpointMutationGeneration
-          != nodeCheckpoint.checkpointMutationGeneration
+      guard let nodeCheckpoint = nodeCheckpoints[viewNodeID] else {
+        continue
+      }
+      precondition(
+        nodeCheckpoint.ownerLifetimeID == node.ownerLifetimeID,
+        "Checkpoint raw node ID is occupied by a different owner lifetime"
+      )
+      guard node.currentCheckpointMutationGeneration
+        != nodeCheckpoint.checkpointMutationGeneration
       else {
         continue
       }
@@ -49,6 +55,10 @@ enum ViewGraphNodeCheckpointing {
       guard let nodeCheckpoint = nodeCheckpoints[viewNodeID] else {
         continue
       }
+      precondition(
+        nodeCheckpoint.ownerLifetimeID == node.ownerLifetimeID,
+        "Checkpoint raw node ID is occupied by a different owner lifetime"
+      )
       node.restoreCheckpoint(nodeCheckpoint)
     }
   }

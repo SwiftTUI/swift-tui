@@ -155,14 +155,14 @@ package enum MemoValueComparator {
 
     var result: MemoComparison = .equal
     for (lhsChild, rhsChild) in zip(lhsMirror.children, rhsMirror.children) {
-      // Property-wrapper storage (`@State`/`@Binding`/`@Environment` … and
-      // every custom `DynamicProperty`) is exposed under a `_`-prefixed
-      // label; it is slot identity, not data, and its value is handled by
-      // the dependency gate — skip it. Conformance is the classifier: a
-      // hard-coded type-name list drifted (it omitted four of the nine
-      // built-ins) and could never see third-party wrappers.
+      // Only graph-slot-only property-wrapper storage is safe to omit.
+      // Binding closures, authored model references/key paths, and custom
+      // wrapper configuration remain part of the value comparison.
       if let label = lhsChild.label, label.hasPrefix("_"),
-        lhsChild.value is any DynamicProperty
+        rhsChild.label == label,
+        lhsChild.value is any DynamicPropertyMemoStorageOnly,
+        rhsChild.value is any DynamicPropertyMemoStorageOnly,
+        type(of: lhsChild.value) == type(of: rhsChild.value)
       {
         continue
       }
