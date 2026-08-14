@@ -170,6 +170,30 @@ private final class StateBox<Value> {
     return nil
   }
 
+  /// This box's only live binding, when exactly one remains.
+  ///
+  /// ``rememberedAncestorLocation(for:)`` walks the dispatch node's live
+  /// parent chain, which covers an action closure forwarded down a single
+  /// subtree. It cannot cover a closure forwarded into a *detached* subtree —
+  /// `.background`, `.overlay`, and presentation layers mount content whose
+  /// ancestry never reaches the authoring view — so the walk misses even
+  /// though the author's slot is bound and live.
+  ///
+  /// Minting fresh storage on the foreign dispatch owner is never the right
+  /// answer for an already-bound box: it silently forks the state, so the
+  /// author's reads keep seeing the authored seed while writes land in a
+  /// second slot nobody observes. A single remaining binding is unambiguous —
+  /// it is the author's own slot — so prefer it. Boxes shared across several
+  /// live owners stay ambiguous and fall through to the imperative path,
+  /// which keeps its exact-handle behaviour.
+  func soleRememberedLocation() -> DynamicStateLocation<Value>? {
+    pruneRetiredBoundLocations()
+    guard boundLocationsByOwner.count == 1 else {
+      return nil
+    }
+    return boundLocationsByOwner.values.first
+  }
+
   func retainedValue(
     for owner: StateStorageOwner
   ) -> Value? {
@@ -314,6 +338,16 @@ public struct State<Value> {
     }
 
     if let location = box.rememberedAncestorLocation(for: storageOwner) {
+      return location
+    }
+
+    // The ancestor walk cannot see across a detached subtree: `.background`,
+    // `.overlay`, and presentation layers dispatch from nodes whose live
+    // ancestry never reaches the authoring view. An already-bound box with a
+    // single live owner is unambiguous, so use that binding rather than
+    // minting a second slot on the foreign dispatch owner below — which would
+    // fork the state and make the author's write a silent no-op.
+    if let location = box.soleRememberedLocation() {
       return location
     }
 
