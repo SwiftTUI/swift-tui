@@ -412,7 +412,7 @@ docker build \
   -f Scripts/linux/Dockerfile \
   -t ghcr.io/swifttui/swift-tui-linux:latest \
   --build-arg SWIFT_VERSION=6.3.3 \
-  --build-arg SWIFTLY_VERSION=1.1.1 \
+  --build-arg SWIFTLY_VERSION=1.1.3 \
   Scripts/linux
 ```
 

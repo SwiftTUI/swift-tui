@@ -41,8 +41,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUN_VERSION: "1.3.13"
-  SWIFTLY_VERSION: "1.1.1"
+  BUN_VERSION: "1.3.14"
+  SWIFTLY_VERSION: "1.1.3"
 
 jobs:
   public-api-baseline:
@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Linux policy dependencies
         shell: bash
@@ -67,7 +67,7 @@ jobs:
             unzip
 
       - name: Cache Swiftly toolchain
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.local/share/swiftly
@@ -110,7 +110,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache SwiftPM
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/org.swift.swiftpm
@@ -121,7 +121,7 @@ jobs:
             ${{ runner.os }}-swiftpm-
 
       - name: Cache Bun deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache

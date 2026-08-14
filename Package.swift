@@ -53,23 +53,24 @@ let packagePlatforms: [SupportedPlatform]? = {
 let packageDependencies: [Package.Dependency] = [
   .package(
     url: "https://github.com/swiftlang/swift-docc-plugin.git",
-    from: "1.4.6"
-  ),
-  .package(
-    url: "https://github.com/apple/swift-collections.git",
-    from: "1.4.1"
-  ),
-  .package(
-    url: "https://github.com/apple/swift-async-algorithms.git",
-    from: "1.1.3"
-  ),
-  .package(
-    url: "https://github.com/apple/swift-argument-parser.git",
     from: "1.5.0"
   ),
   .package(
+    url: "https://github.com/apple/swift-collections.git",
+    from: "1.6.0"
+  ),
+  .package(
+    url: "https://github.com/apple/swift-async-algorithms.git",
+    // 1.1.5 is rejected by SwiftPM 6.3.3 because it disables undeclared default traits.
+    exact: "1.1.4"
+  ),
+  .package(
+    url: "https://github.com/apple/swift-argument-parser.git",
+    from: "1.8.2"
+  ),
+  .package(
     url: "https://github.com/migueldeicaza/SwiftTerm.git",
-    from: "1.2.0"
+    from: "1.18.0"
   ),
 ]
 

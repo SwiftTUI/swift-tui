@@ -19,7 +19,7 @@ ARG SWIFT_VERSION=6.3.3
 FROM swift:${SWIFT_VERSION}
 
 ARG SWIFT_VERSION=6.3.3
-ARG SWIFTLY_VERSION=1.1.1
+ARG SWIFTLY_VERSION=1.1.3
 ARG WASM_SDK_URL=https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz
 ARG WASM_SDK_CHECKSUM=cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
 ARG BUN_INSTALL=/usr/local/bun

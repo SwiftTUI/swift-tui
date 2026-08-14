@@ -8,7 +8,7 @@ REPO_BASENAME="$(basename "$REPO_DIR")"
 WASM_SDK_ID="${WASM_SDK_ID:-swift-6.3.3-RELEASE_wasm}"
 WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz}"
 WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7}"
-SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.1}"
+SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.3}"
 
 CONTAINER_TOOL=""
 # Default to the prebuilt image published by .github/workflows/build-linux-image.yml.

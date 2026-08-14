@@ -46,7 +46,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  SWIFTLY_VERSION: "1.1.1"
+  SWIFTLY_VERSION: "1.1.3"
   # GHCR requires lowercase namespaces; hard-code the org rather than
   # toLower'ing github.repository_owner so a fork doesn't accidentally try
   # to push to its own namespace without packages:write being set up.
@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Read Swift version
         id: swift
@@ -196,7 +196,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -209,7 +209,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download image digests
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
           pattern: digests-*
