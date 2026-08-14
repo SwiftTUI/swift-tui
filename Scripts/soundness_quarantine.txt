@@ -18,5 +18,21 @@
 # provenance, what its residual actually is, its burn-down expectation, and its
 # reconciliation against the Program-5-S0 findings census (whose published
 # figures are pre-S1).
-registration-publication 2026-07-28 Program-5-S0 count=1194 post-suppression scoped-restore residual
+# Re-measured 2026-08-14 after the detached-subtree @State fix. These three
+# rows are NOT new defects introduced by that fix: the runtime lane had been
+# deadlocking in BranchMountTaskSingleStartTests and dying to the 1200s
+# watchdog, so every trace after that suite went unobserved. With the lane
+# completing again the scanner sees the whole runtime surface for the first
+# time since the deadlock landed, and these are the residuals it finds.
+#
+# registration-publication rose 1194 -> 1216 for the same reason: the count is
+# coverage-sensitive, and the prior figure was taken from a truncated lane.
+# This raises a burn-down ratchet, which is against this ledger's purpose --
+# it is a re-measurement, not an allowance, and it should be driven back down.
+# The two count=1 rows are each tied to an already-failing pre-existing test
+# (FrameworkStressGestureScrollTests 026, and the DormantIncrement probe), so
+# they burn down when those tests are fixed rather than needing separate work.
+registration-publication 2026-08-14 runtime-lane-unmasked count=1216 scoped-restore residual re-measured on a completing runtime lane
 teardown-coherence-leak 2026-07-28 Program-5-S0 count=478 existing unreachable-node residual
+action-dispatch-miss 2026-08-14 runtime-lane-unmasked count=1 DormantIncrement-inner-B has no published handler; first observable once the lane completed
+handler-resolution-gesture 2026-08-14 runtime-lane-unmasked count=1 GestureScroll026 committed tree names gesture handlers absent from the published registry
