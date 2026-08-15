@@ -6,6 +6,22 @@ package final class LifecycleCoordinator {
   private let assertsOnTaskStartSkip: Bool
   private(set) var previousLifecycleHandlers = LifecycleHandlerSnapshot()
 
+  /// Retained task-registration store, the task twin of
+  /// ``previousLifecycleHandlers``. Same loss shape, same remedy: a re-minted
+  /// node that adopts a reused resolved artifact never re-runs registration
+  /// capture, so publication can drop a task registration frames before the
+  /// committed tree stops naming its descriptor — and the committed
+  /// `.taskStart` then finds "no task registration at commit". Retention is
+  /// bounded the same way, by the framework's own departure signal: an
+  /// identity's entry is pruned once its disappear dispatches.
+  private var retainedTaskRegistrations: [Identity: [TaskRegistration]] = [:]
+
+  /// Cumulative count of committed `.taskStart` entries served from
+  /// ``retainedTaskRegistrations`` because the live registry no longer carried
+  /// them. Mirrors `changeHandlerSnapshotFallbackCount`; read by tests as the
+  /// oracle that the fallback is load-bearing rather than dead.
+  package private(set) var taskStartSnapshotFallbackCount = 0
+
   /// Cumulative count of committed `.taskStart` entries dropped because the
   /// registration or view-node lookup failed at commit time. The commit plan
   /// only carries `.taskStart` for work the graph decided must run, so every
@@ -122,6 +138,12 @@ package final class LifecycleCoordinator {
     // fresh registrations survive their identity's disappear.
     previousLifecycleHandlers.prune(under: disappearedIdentities)
     previousLifecycleHandlers.absorbNewer(currentLifecycleRegistry.snapshot())
+    for identity in disappearedIdentities {
+      retainedTaskRegistrations.removeValue(forKey: identity)
+    }
+    for (identity, registrations) in currentTaskRegistry.snapshot() {
+      retainedTaskRegistrations[identity] = registrations
+    }
     return skipIssues
   }
 
@@ -196,10 +218,20 @@ package final class LifecycleCoordinator {
         recordHandlerSkip(.change, entry: entry, handlerID: handlerID, into: &skipIssues)
       }
     case .taskStart(let descriptor):
-      let registration = currentTaskRegistry.registration(
+      var registration = currentTaskRegistry.registration(
         for: entry.identity,
         descriptor: descriptor
       )
+      if registration == nil,
+        let retained = retainedTaskRegistrations[entry.identity]?
+          .first(where: { $0.descriptor == descriptor })
+      {
+        // Mirror the change path's snapshot fallback: the graph committed this
+        // start, so content whose registration publication dropped before the
+        // committed tree stopped naming the descriptor still owes its task.
+        taskStartSnapshotFallbackCount += 1
+        registration = retained
+      }
       guard let registration, let viewNodeID = entry.viewNodeID else {
         recordTaskStartSkip(
           entry: entry,
