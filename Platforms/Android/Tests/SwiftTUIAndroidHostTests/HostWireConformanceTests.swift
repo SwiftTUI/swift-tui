@@ -22,6 +22,36 @@ struct HostWireConformanceTests {
     }
   }
 
+  @Test("strict JSON classifies an integral wire number identically on every platform")
+  func strictJSONClassifiesIntegralNumbersIdentically() throws {
+    // Darwin renders an integral `Double` as "1" while swift-corelibs-foundation
+    // renders "1.0". Classifying by `stringValue` therefore accepted
+    // `"opacity":1.0` on the macOS lane and rejected the identical recorded bytes
+    // on the Linux lane. Both lanes must land on `.integer(1)`.
+    let parsed = try HostWireConformanceJSON.parse(
+      Data(#"{"opacity":1.0}"#.utf8), context: "number-meta")
+    let fields = try parsed.object(keys: ["opacity"], context: "number-meta")
+    #expect(fields["opacity"] == .integer(1))
+  }
+
+  @Test("strict JSON admits fractional numbers only at declared wire keys")
+  func strictJSONAdmitsFractionalNumbersOnlyAtDeclaredKeys() throws {
+    // `opacity` is a `Double` on the Kotlin and TypeScript hosts, including when
+    // it is nested inside the emitted image array.
+    let parsed = try HostWireConformanceJSON.parse(
+      Data(#"{"images":[{"opacity":0.375}]}"#.utf8), context: "number-meta")
+    let images = try parsed.object(keys: ["images"], context: "number-meta")["images"]
+    let image = try #require(images).array(context: "number-meta.images")[0]
+    let opacity = try image.object(keys: ["opacity"], context: "number-meta.images[0]")["opacity"]
+    #expect(opacity == .number(0.375))
+    #expect(try #require(opacity).number(context: "number-meta.images[0].opacity") == 0.375)
+
+    // Every other number stays host-`Int`-representable.
+    #expect(throws: HostWireConformanceError.self) {
+      try HostWireConformanceJSON.parse(Data(#"{"span":0.375}"#.utf8), context: "number-meta")
+    }
+  }
+
   @Test("manifest census is exact and every host adapter owns its stage")
   func manifestCensusIsExactAndEveryHostAdapterOwnsItsStage() throws {
     let corpus = try HostWireConformanceCorpus.load(

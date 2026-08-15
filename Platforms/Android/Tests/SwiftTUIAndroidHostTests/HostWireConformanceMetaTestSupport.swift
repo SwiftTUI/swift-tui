@@ -151,6 +151,8 @@ extension HostWireConformanceTests {
         return .string(string + "-corrupt")
       case .integer(let integer):
         return .integer(integer + 1)
+      case .number(let double):
+        return .number(double + 1)
       case .bool(let bool):
         return .bool(!bool)
       case .null:

@@ -17,8 +17,14 @@ indirect enum HostWireConformanceJSON: Equatable {
   case array([HostWireConformanceJSON])
   case string(String)
   case integer(Int)
+  case number(Double)
   case bool(Bool)
   case null
+
+  /// Keys whose wire values are genuinely fractional. Every other number on the
+  /// host wire must stay host-`Int`-representable so Kotlin and TypeScript hosts
+  /// can decode it without widening. `opacity` is a `Double` on both hosts.
+  static let fractionalKeys: Set<String> = ["opacity"]
 
   static func parse(
     _ data: Data,
@@ -35,7 +41,8 @@ indirect enum HostWireConformanceJSON: Equatable {
 
   private static func convert(
     _ value: Any,
-    context: String
+    context: String,
+    key: String? = nil
   ) throws -> Self {
     if value is NSNull {
       return .null
@@ -47,27 +54,47 @@ indirect enum HostWireConformanceJSON: Equatable {
       if CFGetTypeID(number) == CFBooleanGetTypeID() {
         return .bool(number.boolValue)
       }
-      guard let integer = Int(number.stringValue) else {
-        throw HostWireConformanceError.invalid(
-          "\(context): every number must be a host-Int-representable integer")
-      }
-      return .integer(integer)
+      return try convertNumber(number, context: context, key: key)
     }
     if let array = value as? [Any] {
       return .array(
         try array.enumerated().map { index, element in
-          try convert(element, context: "\(context)[\(index)]")
+          try convert(element, context: "\(context)[\(index)]", key: key)
         })
     }
     if let object = value as? [String: Any] {
       var converted: [String: Self] = [:]
       converted.reserveCapacity(object.count)
       for (key, element) in object {
-        converted[key] = try convert(element, context: "\(context).\(key)")
+        converted[key] = try convert(element, context: "\(context).\(key)", key: key)
       }
       return .object(converted)
     }
     throw HostWireConformanceError.invalid("\(context): unsupported JSON value")
+  }
+
+  /// Classifies a wire number by its *value*, never by `NSNumber.stringValue`.
+  /// Darwin renders an integral `Double` as `1` while swift-corelibs-foundation
+  /// renders `1.0`, so a string-based test accepts `"opacity":1.0` on macOS and
+  /// rejects the identical bytes on Linux.
+  private static func convertNumber(
+    _ number: NSNumber,
+    context: String,
+    key: String?
+  ) throws -> Self {
+    // Exact integers first, so values beyond `Double`'s 2^53 precision survive.
+    if let integer = Int(number.stringValue) {
+      return .integer(integer)
+    }
+    let double = number.doubleValue
+    if let integer = Int(exactly: double) {
+      return .integer(integer)
+    }
+    guard let key, fractionalKeys.contains(key), double.isFinite else {
+      throw HostWireConformanceError.invalid(
+        "\(context): every number must be a host-Int-representable integer")
+    }
+    return .number(double)
   }
 
   func object(
@@ -110,6 +137,21 @@ indirect enum HostWireConformanceJSON: Equatable {
       throw HostWireConformanceError.invalid("\(context): expected integer")
     }
     return integer
+  }
+
+  /// Accepts either wire spelling of a fractional field: an integral value
+  /// arrives as `.integer` so integer-only consumers keep matching.
+  func number(
+    context: String
+  ) throws -> Double {
+    switch self {
+    case .number(let double):
+      return double
+    case .integer(let integer):
+      return Double(integer)
+    default:
+      throw HostWireConformanceError.invalid("\(context): expected number")
+    }
   }
 
   func bool(

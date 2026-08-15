@@ -93,6 +93,8 @@ enum HostWireConformanceExactComparator {
       return "\"\(string)\""
     case .integer(let integer):
       return "\(integer)"
+    case .number(let double):
+      return "\(double)"
     case .bool(let bool):
       return "\(bool)"
     case .null:
