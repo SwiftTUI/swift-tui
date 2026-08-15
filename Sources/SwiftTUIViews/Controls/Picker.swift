@@ -198,6 +198,10 @@ extension Picker {
       from: nodes,
       expectedEnvironment: context.environment,
       expectedTransaction: context.transaction,
+      // An unmodified `Text` still carries the ambient text-layout attributes
+      // every text node inherits, so the representable baseline is the ambient
+      // metadata for this context — not a default-initialized `LayoutMetadata`.
+      expectedLayoutMetadata: ambientTextLayoutMetadata(in: context),
       into: &result
     )
     return result
@@ -207,6 +211,7 @@ extension Picker {
     from nodes: [ResolvedNode],
     expectedEnvironment: EnvironmentSnapshot,
     expectedTransaction: TransactionSnapshot,
+    expectedLayoutMetadata: LayoutMetadata,
     into result: inout ResolvedOptions
   ) {
     for node in nodes {
@@ -214,7 +219,8 @@ extension Picker {
         let representation = optionContentRepresentation(
           for: node,
           expectedEnvironment: expectedEnvironment,
-          expectedTransaction: expectedTransaction
+          expectedTransaction: expectedTransaction,
+          expectedLayoutMetadata: expectedLayoutMetadata
         )
         let label: String
         switch representation {
@@ -243,6 +249,7 @@ extension Picker {
           from: node.children,
           expectedEnvironment: expectedEnvironment,
           expectedTransaction: expectedTransaction,
+          expectedLayoutMetadata: expectedLayoutMetadata,
           into: &result
         )
       }
@@ -256,7 +263,8 @@ extension Picker {
   private func optionContentRepresentation(
     for node: ResolvedNode,
     expectedEnvironment: EnvironmentSnapshot,
-    expectedTransaction: TransactionSnapshot
+    expectedTransaction: TransactionSnapshot,
+    expectedLayoutMetadata: LayoutMetadata
   ) -> OptionContentRepresentation {
     let label = resolvedNodeLabelText(from: node)
     var reasons: [String] = []
@@ -270,7 +278,7 @@ extension Picker {
     if !node.children.isEmpty {
       reasons.append("child layout structure")
     }
-    if node.layoutBehavior != .intrinsic || node.layoutMetadata != .init() {
+    if node.layoutBehavior != .intrinsic || node.layoutMetadata != expectedLayoutMetadata {
       reasons.append("layout modifier")
     }
     if node.drawMetadata != .init() || !node.drawEffects.isEmpty {
