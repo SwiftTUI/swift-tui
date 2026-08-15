@@ -1165,7 +1165,11 @@ extension FrameworkStressSceneHostTests {
           "CI": "true",
           "SWIFTTUI_REDUCE_MOTION": "0",
         ]) { _, new in new }
-        expected = .default
+        // `CI` enables stable output by contract: environment detection
+        // suppresses built-in motion for deterministic capture without
+        // claiming an accessibility preference. The generation still must not
+        // inherit the prior case's `.json` output or cursor-follows-focus.
+        expected = .init(stableOutput: true)
       default:
         environment = base.merging(["SWIFTTUI_REDUCE_MOTION": "1"]) { _, new in new }
         expected = .init(motion: .reduced)
