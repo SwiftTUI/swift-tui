@@ -241,6 +241,27 @@ package struct GestureNodeRecord: RuntimeNodeRecord {
     recognizers.isEmpty
   }
 
+  /// Re-points owner keys naming `departing` at the adopting node.
+  ///
+  /// ``absorbAdopted(_:)`` merges the departing node's `owners` forward
+  /// verbatim, so an adopted recognizer keeps an owner key naming a node that
+  /// is no longer live. `LocalGestureRegistry.prune(keeping:)` proves
+  /// departure from that key's `viewNodeID` alone, so the adopted recognizer
+  /// is torn down on the next liveness pass even though a live node now
+  /// carries its record. Adoption IS the ownership transfer: the key has to
+  /// follow the record.
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    for (identity, owner) in owners where owner.viewNodeID == departing {
+      owners[identity] = RuntimeRegistrationOwnerKey(
+        viewNodeID: adopter,
+        identity: owner.identity
+      )
+    }
+  }
+
   package mutating func absorbAdopted(_ departing: GestureNodeRecord) {
     recognizers.merge(departing.recognizers, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
