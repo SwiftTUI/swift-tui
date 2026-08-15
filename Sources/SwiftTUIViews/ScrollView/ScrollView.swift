@@ -144,8 +144,14 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
         )
 
         let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+        // `RouteID` carries the registering node's `ownerNodeID`, so a re-minted
+        // owner mints a NEW key instead of replacing the previous one. The
+        // structural key is the authored site, which lets
+        // `PointerNodeRecord.absorbAdopted` retire the site's previous route
+        // instead of accumulating one per generation.
         intake.registerPointerHandler(
           routeID: rootRouteID,
+          structuralKey: context.identity,
           handler: makeScrollBodyPointerHandler(
             scrollAxes: axes,
             allowsPanning: allowsPanning,
@@ -159,6 +165,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           let routeID = runtimePrimaryRouteID(for: identity)
           intake.registerPointerHandler(
             routeID: routeID,
+            structuralKey: identity,
             handler: makeIndicatorPointerHandler(
               axis: axis,
               binding: binding
