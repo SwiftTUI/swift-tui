@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"693171bb8999a2959437930f0033e4ca6232ba4a505ea5e62eed3eec0e9e9091","bodySHA256":"86f91a23618624a306493f5692ee84fcd45d385a6919beb1eab4afbcf9435311"}
+{"formatVersion":1,"manifestSHA256":"8c94aaea8629f2f3ced5eb704b2289399f77087a9af6c33aaa8da01050295c0b","bodySHA256":"86f91a23618624a306493f5692ee84fcd45d385a6919beb1eab4afbcf9435311"}
 {"androidABI":{"action":"publish","damage":null,"height":1,"rows":[{"cells":[{"column":0,"span":1,"text":"A"},{"column":2,"span":1,"text":"Z"}],"row":0}],"sequence":1,"width":3}}
 {"androidABI":{"action":"sizeQuery","label":"q1"}}
 {"androidABI":{"action":"publish","damage":{"rows":[{"ranges":[[0,1]],"row":0}]},"height":1,"rows":[{"cells":[{"column":0,"span":1,"text":"B"},{"column":2,"span":1,"text":"Z"}],"row":0}],"sequence":2,"width":3}}

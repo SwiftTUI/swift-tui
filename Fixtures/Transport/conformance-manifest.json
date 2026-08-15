@@ -54,7 +54,7 @@
       "scenario" : "epoch-reanchor-and-style-budget-full"
     },
     {
-      "bodySHA256" : "acdce60c546c0a9af521bd0bf952a7cedddc1041c62b800d10d3d239bb09c370",
+      "bodySHA256" : "cb2522f9f0b6a5771d8017c224b48c9c7d5510b2cfb9985f990bfbfae3bb6279",
       "file" : "conformance-image-decode-failure.jsonl",
       "kind" : "web-painter",
       "mutationClass" : "image-decode-failure",
@@ -65,7 +65,7 @@
       "scenario" : "canvas-decode-failure-retries-deterministically"
     },
     {
-      "bodySHA256" : "dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199",
+      "bodySHA256" : "7e265bad71741fbb4ccd13f704cf04da9dea1a4a63b095376bb20d1a540894cc",
       "file" : "conformance-image-forget-record.jsonl",
       "kind" : "record",
       "mutationClass" : "image-forget",
@@ -77,7 +77,7 @@
       "scenario" : "image-forget-requests-and-reapplies"
     },
     {
-      "bodySHA256" : "dcf383028552ba94b8565371c53512cffb132ea02d700b21606a4221fbf14199",
+      "bodySHA256" : "7e265bad71741fbb4ccd13f704cf04da9dea1a4a63b095376bb20d1a540894cc",
       "file" : "conformance-image-forget-web-painter.jsonl",
       "kind" : "web-painter",
       "mutationClass" : "image-forget",
