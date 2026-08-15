@@ -55,10 +55,23 @@ struct KeyboardScrollCoalescedFramePinTests {
     // pending-SET equality misfired a root sweep here, and that sweep was
     // what masked the Stage-1 seam). The coalesced frame now runs selectively
     // in BOTH flag states — plan formed, frontier = the covering `/content`
-    // target, recorded at 20 computed vs the sweep's 22–29 — and must stay
-    // correct without the sweep. Update the recorded value only with
-    // evidence (a trace attribution).
-    #expect(observation.maxResolvedNodesComputed <= 20)
+    // target — and must stay correct without the sweep. Update the recorded
+    // value only with evidence (a trace attribution).
+    //
+    // Recorded at 22 with the attribution below; do not raise it without a
+    // fresh one. `SWIFTTUI_INVAL_TRACE=1` shows the coalesced frame is
+    // selective and the backstop never fires — no `[INVAL-SRC]
+    // dispatch-backstop` line is emitted and the root identity never enters
+    // the raw set:
+    //   [INVAL-TRACE] seq=1 raw={.../Button,.../Scroll} selective=true
+    // `SWIFTTUI_REUSE_TRACE=1` attributes every computed node:
+    //   frame=1 recompute-reasons: not-present=20 no-node=2
+    //   no-node-paths: .../Button,.../Scroll
+    // So 22 = the 20-node covering `/content` subtree plus the two coalesced
+    // target identities, which hold no ViewNode of their own. The sweep's
+    // 22-29 band is NOT the cause: a sweep puts the root identity in the raw
+    // set and disables selective evaluation, and neither happens here.
+    #expect(observation.maxResolvedNodesComputed <= 22)
   }
 
   @Test("Flag-on: the coalesced selective frame must render the scrolled viewport")
