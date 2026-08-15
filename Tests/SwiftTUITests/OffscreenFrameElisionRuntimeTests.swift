@@ -904,6 +904,17 @@ struct OffscreenFrameElisionRuntimeTests {
         OffscreenCompletingProbe(completion: completion)
       }
     )
+    // Spend the probe's 80 ms animation schedule in VIRTUAL time. On the real
+    // clock the mount frame alone costs more than 80 ms on an ordinary machine
+    // (measured: ~126 ms for this 50-row probe), so the finite animation had
+    // already completed before the first assertion — `activeAnimationCount`
+    // back to 0, `completion.count` already 1, and the tick loop below never
+    // entered, leaving `elidedFrameCount` at 0. That is not a race a rerun can
+    // win: setup cost is a fixed overrun of a fixed budget, which is why the
+    // amd64 lane was deterministically red. With the frame clock virtual, setup
+    // costs zero animation time and every tick advances exactly one step.
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
@@ -922,7 +933,10 @@ struct OffscreenFrameElisionRuntimeTests {
       // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
-      while scheduler.hasPendingFrame(at: .now()) {
+      // Probed at the virtual instant, so the animation's own rescheduled
+      // deadline (armed one cadence into the virtual future) stays invisible to
+      // the settle loop and only the mount follow-up frames run.
+      while scheduler.hasPendingFrame(at: clock.now) {
         try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       }
 
@@ -938,23 +952,21 @@ struct OffscreenFrameElisionRuntimeTests {
       let elidedBefore = runLoop.renderer.elidedFrameCount
       let presentsBefore = terminal.presentCount
 
-      // Drive deadline-only tick frames until the finite animation's real-time
-      // schedule elapses and the completion fires. The injection stamps every
-      // frame with MonotonicInstant.now(), so the curve returns nil once the
-      // 80 ms duration has passed; the carrier tick is off-screen-only, so it
-      // elides instead of presenting. Bounded by elapsed real time — the same
-      // currency the animation schedule consumes; a bare tick cap encodes an
-      // assumption about per-tick cost that faster frames invalidate (400
-      // ticks ran under 80 ms after the environment-write reflection removal).
-      // The tick cap stays as a wedge backstop; never a wall-clock sleep, so a
-      // hung completion still fails the test fast.
+      // Drive deadline-only tick frames until the finite animation's schedule
+      // elapses and the completion fires. Each tick advances the virtual frame
+      // clock by one 16 ms step and requests its deadline at the new instant,
+      // so `deriveFrameInstant` stamps the frame with exactly that instant and
+      // the 80 ms curve completes on step 5 — the same step on every machine.
+      // The carrier tick is off-screen-only, so it elides instead of presenting.
+      //
+      // The cap is now a wedge backstop rather than the termination condition:
+      // in virtual time ticks convert to duration exactly, so it can be a tight
+      // multiple of the steps the animation actually needs. It replaces the old
+      // wall-clock bound, which measured the machine rather than the animation.
       var ticks = 0
-      let maxTicks = 100_000
-      let tickDeadline = MonotonicInstant.now().advanced(by: .seconds(2))
-      while completion.count == 0 && ticks < maxTicks
-        && MonotonicInstant.now() < tickDeadline
-      {
-        scheduler.requestDeadline(.now())
+      let maxTicks = 32
+      while completion.count == 0 && ticks < maxTicks {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
         _ = try await runLoop.renderPendingFramesAsync(
           renderedFrames: &renderedFrames,
           eventPump: nil
@@ -1060,6 +1072,14 @@ struct OffscreenFrameElisionRuntimeTests {
         OnScreenAnimatedProbe()
       }
     )
+    // Same virtual-clock discipline as the off-screen tests. This one is green
+    // today only because its probe is a single on-screen row (a cheap frame),
+    // but its settle loop probes `hasPendingFrame` against a live
+    // `repeatForever` re-arm — the identical livelock shape that took down
+    // `removalTransitionInterleavedWithElisionDrains` on the amd64 lane. Held
+    // still, the re-arm cannot be due at the re-check.
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
@@ -1075,7 +1095,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
-      while scheduler.hasPendingFrame(at: .now()) {
+      while scheduler.hasPendingFrame(at: clock.now) {
         try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       }
 
@@ -1089,8 +1109,9 @@ struct OffscreenFrameElisionRuntimeTests {
 
       // Drive a pure animation-deadline frame. The animated border is INSIDE the
       // viewport, so the tick's redrawIdentities overlap drawnIdentities; the gate
-      // must therefore NOT fire.
-      scheduler.requestDeadline(.now())
+      // must therefore NOT fire. One virtual step, so the tick lands on an
+      // instant the animation has genuinely advanced to.
+      scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
       _ = try await runLoop.renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: nil
@@ -1181,6 +1202,12 @@ struct OffscreenFrameElisionRuntimeTests {
         OffscreenLayoutAnimatedProbe()
       }
     )
+    // Same virtual-clock discipline as the off-screen tests: this probe carries
+    // the same 50-row filler as the two that failed on amd64, so its settle
+    // loop has the same live-`repeatForever` livelock exposure. Green today,
+    // latent tomorrow.
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
@@ -1199,7 +1226,7 @@ struct OffscreenFrameElisionRuntimeTests {
       // swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
-      while scheduler.hasPendingFrame(at: .now()) {
+      while scheduler.hasPendingFrame(at: clock.now) {
         try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       }
 
@@ -1223,8 +1250,9 @@ struct OffscreenFrameElisionRuntimeTests {
       let presentsBefore = terminal.presentCount
 
       // Drive a pure animation-deadline frame for the off-screen LAYOUT
-      // animation: this is the case the gate must elide.
-      scheduler.requestDeadline(.now())
+      // animation: this is the case the gate must elide. One virtual step, so
+      // the frameHeight curve has genuinely advanced when the tick lands.
+      scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
       _ = try await runLoop.renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: nil
@@ -1315,13 +1343,31 @@ struct OffscreenFrameElisionRuntimeTests {
         InterleavedRemovalProbe()
       }
     )
+    // Virtual frame clock, for two reasons this test needs at once. (1) The
+    // removal's 80 ms schedule must be spent by ticks, not by setup cost — see
+    // `offscreenCompletionFiresAcrossElidedFrames`. (2) The settle loop between
+    // the phases probes readiness with `hasPendingFrame`, and once the
+    // off-screen border's `repeatForever` is live it re-arms a deadline one
+    // 33 ms cadence out on every frame. On the real clock, any machine whose
+    // per-frame cost reaches that cadence finds the re-arm already due at the
+    // re-check and the loop never exits — the slow-machine livelock
+    // `drainPassReturnsWhenFrameCostExceedsAnimationCadence` documents. It
+    // spun until the shared tick cap was exhausted, which starved Phase 2 of
+    // its budget and left `elidedFrameCount` at 0 on the amd64 lane. Held
+    // still, the re-arm lands in the virtual future and stays invisible.
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-      // Mount + the onAppear-triggered follow-up frame: the panel's removal
-      // transition starts. The off-screen border has not yet appeared (it is
-      // gated behind `!showPanel`), so the only animation in flight is the
-      // unambiguous finite removal.
+      // Mount + the onAppear-triggered follow-up frames: the panel's removal
+      // transition starts. The two animation populations are registered on
+      // SEPARATE frames (the panel's removal on the follow-up, the border's
+      // `repeatForever` on the frame after it flips `showPanel`), so they never
+      // share an animation transaction — that separation, not their ordering,
+      // is what keeps the removal's box unambiguous. By the time this drain
+      // returns BOTH are live: `removingIdentities` holds the departing panel
+      // and `activeAnimationKeys` holds the border's `borderBlendPhase`.
       //
       // This setup MUST use the SYNCHRONOUS driver. The async driver suspends at
       // `acquireFrameArtifactsAsync` and can drop a committed frame's tail under
@@ -1346,35 +1392,50 @@ struct OffscreenFrameElisionRuntimeTests {
       // Phase 1: drive deadline ticks until the removal transition has fully
       // drained (its overlay purged). While the removal is in flight its identity
       // is on-screen and in the tick's redrawIdentities, so those frames render
-      // and present — they do NOT elide. Bounded by an iteration cap so a stuck
-      // removal fails fast rather than hanging.
-      var ticks = 0
-      let maxTicks = 400
-      while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < maxTicks {
-        scheduler.requestDeadline(.now())
+      // and present — they do NOT elide. One 16 ms virtual step per tick, so the
+      // 80 ms removal drains on step 5 on every machine.
+      //
+      // Each phase carries its OWN budget. The single shared counter this
+      // replaced meant an overrun in any earlier loop silently consumed the
+      // budget of every later one, so Phase 2 reported "nothing elided" when
+      // the real fault was upstream. Per-phase caps make each failure name its
+      // own phase.
+      let maxTicks = 32
+      var removalTicks = 0
+      while !controller.debugStateSnapshot().removingIdentities.isEmpty
+        && removalTicks < maxTicks
+      {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
         _ = try await runLoop.renderPendingFramesAsync(
           renderedFrames: &renderedFrames,
           eventPump: nil
         )
-        ticks += 1
+        removalTicks += 1
       }
 
       // The removal must have drained — no crash, overlay purged.
       #expect(
         controller.debugStateSnapshot().removingIdentities.isEmpty,
-        "the removal overlay must drain to completion; ticks=\(ticks)"
+        "the removal overlay must drain to completion; removalTicks=\(removalTicks)"
       )
 
-      // The off-screen border now appears (it was gated behind `!showPanel`); run
-      // any pending follow-up frames so its onAppear starts the repeatForever
-      // animation on a frame distinct from the removal. Synchronous driver again:
-      // the async path could drop the border's onAppear-follow-up frame under
-      // contention, leaving its repeatForever unregistered. The elided ticks under
-      // test are driven via the ASYNC path in Phase 2 below.
-      while scheduler.hasPendingFrame(at: .now()) && ticks < maxTicks {
+      // Settle any frames the removal's final tick left pending, so the graph is
+      // quiescent before Phase 2 measures elision. Synchronous driver again: the
+      // async path could drop a follow-up frame's tail under contention. The
+      // elided ticks under test are driven via the ASYNC path in Phase 2 below.
+      // The clock is held still across this settle loop: the border's
+      // `repeatForever` re-arm lands one cadence into the virtual future, so
+      // readiness drains to false instead of livelocking (see the clock's note
+      // at the top of this test).
+      var settleFrames = 0
+      while scheduler.hasPendingFrame(at: clock.now) && settleFrames < maxTicks {
         try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-        ticks += 1
+        settleFrames += 1
       }
+      #expect(
+        settleFrames < maxTicks,
+        "the post-removal settle must reach quiescence; settleFrames=\(settleFrames)"
+      )
       #expect(
         controller.activeAnimationCount > 0,
         "the off-screen repeatForever border must be in flight after the removal drains"
@@ -1385,19 +1446,21 @@ struct OffscreenFrameElisionRuntimeTests {
       // path (capturePlacedTree skipped) left the post-removal placed-tree
       // bookkeeping intact.
       let elidedBefore = runLoop.renderer.elidedFrameCount
-      while runLoop.renderer.elidedFrameCount == elidedBefore && ticks < maxTicks {
-        scheduler.requestDeadline(.now())
+      var elisionTicks = 0
+      while runLoop.renderer.elidedFrameCount == elidedBefore && elisionTicks < maxTicks {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
         _ = try await runLoop.renderPendingFramesAsync(
           renderedFrames: &renderedFrames,
           eventPump: nil
         )
-        ticks += 1
+        elisionTicks += 1
       }
       #expect(
         runLoop.renderer.elidedFrameCount > elidedBefore,
         """
         off-screen ticks must elide on the post-removal graph; \
-        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount) ticks=\(ticks)
+        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount) \
+        elisionTicks=\(elisionTicks)
         """
       )
 
@@ -1470,15 +1533,24 @@ struct OffscreenFrameElisionRuntimeTests {
 
     try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
 
-      // Mount + settle the onAppear follow-up on the real clock so the
-      // repeatForever registration is deterministic (synchronous driver — same
+      // Mount + settle the onAppear follow-up (synchronous driver — same
       // rationale as the tests above; see swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md).
+      //
+      // The settle probe is pinned to an instant captured before mount so the
+      // repeatForever's re-arm can never be due at the re-check. Probed against
+      // the real clock it was the same livelock this test exists to guard
+      // against, one loop earlier: on a machine at or past the 33 ms cadence
+      // the settle spins to its own cap, and 400 emulated frames overrun the
+      // one-minute limit before the drain pass under test even starts.
+      // Invalidation causes are instant-independent, so the onAppear follow-up
+      // still runs — only deadline readiness is held out.
+      let settleNow = MonotonicInstant.now()
       scheduler.requestInvalidation(of: [rootIdentity])
       var renderedFrames = 0
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
       runLoop.renderer.enableSelectiveEvaluation()
       var settleFrames = 0
-      while scheduler.hasPendingFrame(at: .now()) && settleFrames < 400 {
+      while scheduler.hasPendingFrame(at: settleNow) && settleFrames < 400 {
         try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
         settleFrames += 1
       }
@@ -1760,14 +1832,18 @@ private struct OnScreenAnimatedProbe: View {
 ///   1. Mount: an ON-SCREEN panel (top of a 2-row viewport) is visible; the
 ///      off-screen border is not yet present.
 ///   2. The panel's `onAppear` animates its own removal via
-///      `.transition(.opacity)` with a finite `withAnimation`. This is the only
-///      animation in flight, so its box is unambiguous and the removal drains
-///      cleanly on its real-time schedule. While it drains the panel identity is
-///      on-screen, so those frames render and present (no elision).
-///   3. Once the panel is gone, the off-screen `InterleavedOffscreenBorder`
-///      conditionally appears (clipped far below the viewport). Its own
-///      `onAppear` — firing on a later frame — starts a perpetual `repeatForever`
-///      phase animation whose deadline ticks elide.
+///      `.transition(.opacity)` with a finite `withAnimation`. It is the only
+///      animation registered on THAT frame, so its box is unambiguous. While it
+///      drains the panel identity is on-screen, so those frames render and
+///      present (no elision). The schedule is spent in virtual time — the test
+///      drives it a step per tick.
+///   3. Flipping `showPanel` also swaps in the off-screen
+///      `InterleavedOffscreenBorder` (clipped far below the viewport), whose own
+///      `onAppear` — firing on a LATER frame than the removal, which is what
+///      keeps the two transactions separate — starts a perpetual `repeatForever`
+///      phase animation whose deadline ticks elide. It is therefore already live
+///      while the removal is still draining; the removal's identity is what
+///      keeps those frames rendering until its overlay is purged.
 ///
 /// Asserts that skipping `capturePlacedTree` on the post-removal elided frames
 /// did not corrupt the removal/placed-tree bookkeeping: the removal completes

@@ -75,6 +75,16 @@ extension RunLoop {
           ? rerenderScheduledFrame(from: scheduledFrame, convergence: convergence)
           : scheduledFrame
         convergence.pendingInvalidationsAtPassStart = schedulerPendingInvalidations()
+        // `frameInstant` must reach BOTH the resolve context and the render
+        // itself. Omitted, the render took `renderArtifacts`' `.now()` default
+        // and stamped the frame head — and through it every animation
+        // timestamp — with the wall clock, while the async driver passed the
+        // frame's instant. So under this driver the injectable `frameClock`
+        // never reached animation at all: a pinned-clock test still aged its
+        // animations at real speed, and any finite animation whose schedule
+        // was shorter than the real cost of the frames around it completed
+        // early. That is what purged the removal overlay in
+        // `OffscreenFrameElisionRuntimeTests` on slow/loaded machines.
         let renderedArtifacts = renderer.renderArtifacts(
           viewBuilder(
             (
@@ -82,7 +92,8 @@ extension RunLoop {
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
           context: resolveContext(for: passScheduledFrame, frameInstant: frameInstant),
-          proposal: proposal()
+          proposal: proposal(),
+          frameInstant: frameInstant
         )
         artifacts = renderedArtifacts
         // This pass COMMITTED — its registration publication just rewrote the

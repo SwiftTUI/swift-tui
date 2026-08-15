@@ -35,14 +35,19 @@ import Testing
 ///
 /// **Why the deadline waits are real sleeps, not virtual time.** The
 /// animation clock is the injectable `RunLoop.frameClock`, but warping it
-/// cannot cross an in-flight deadline: a deadline-triggered frame pins its
-/// instant to the STORED deadline (`deriveFrameInstant`), and stored
+/// cannot cross an in-flight deadline on its own: a deadline-triggered frame
+/// pins its instant to the STORED deadline (`deriveFrameInstant`), and stored
 /// deadlines derive from pre-warp instants, so a mid-test clock jump
 /// desynchronizes from every armed deadline instead of crossing it. The
 /// sleeps are wall-clock deadline passage with the pump halted — there is no
 /// concurrent work to race, so they are not timeout-driven synchronisation
 /// (they are counted in the sync-policy baseline as such; see
 /// `Scripts/check_test_sync_policies.sh`).
+///
+/// Crossing the deadline takes the sleep AND `armPostSleepDeadline`: the
+/// stale armed deadline would otherwise remain the frame's instant no matter
+/// how long the sleep was. Arming a fresh one makes the post-sleep instant
+/// the latest due deadline, and therefore the instant the frame animates at.
 @MainActor
 struct AnimationCompletionLifecycleOrderTests {
   @Test("a same-frame onChange cannot swallow a withAnimation completion's guard-flag write")
@@ -91,6 +96,7 @@ struct AnimationCompletionLifecycleOrderTests {
     // Let the completion deadline expire without pumping a frame. The margin
     // over the 1 s animation only needs to be positive; more is safer.
     try await Task.sleep(for: .milliseconds(1500))
+    armPostSleepDeadline(harness)
 
     // The colliding press: both events dispatch before one render, so the
     // same frame carries the count change (planning its onChange) AND
@@ -132,6 +138,7 @@ struct AnimationCompletionLifecycleOrderTests {
       "a fresh press after the collision must re-mount the ripple branch\n\(harness.frame)"
     )
     try await Task.sleep(for: .milliseconds(1500))
+    armPostSleepDeadline(harness)
     try interact {
       _ = try harness.render()
       _ = try harness.render()
@@ -140,6 +147,28 @@ struct AnimationCompletionLifecycleOrderTests {
       harness.frame.contains("ripple=off"),
       "the re-armed ripple's own completion must lower the guard\n\(harness.frame)"
     )
+  }
+
+  /// Arms a deadline at the instant the preceding sleep reached, so the frame
+  /// driven next answers *that* instant.
+  ///
+  /// A frame animates at `deriveFrameInstant` — `triggeredDeadline ?? consumedAt`
+  /// — so a frame woken by a deadline armed before the sleep animates at that
+  /// STALE deadline, one 33 ms cadence step past the animation's start,
+  /// however long the sleep was. Sleeping therefore does not cross a 1 s
+  /// completion deadline by itself. `consumeReadyFrame` triggers on the LATEST
+  /// due deadline, so arming one now makes the post-sleep instant the frame's
+  /// instant and the elapsed sleep becomes the animation's elapsed time.
+  ///
+  /// This was invisible until the synchronous frame driver was fixed to thread
+  /// its `frameInstant` into the render (`RunLoop+Rendering.swift`): it used to
+  /// let `renderArtifacts` default the instant to `.now()`, so animation always
+  /// advanced at wall-clock speed under this driver regardless of the frame's
+  /// own instant — and no pinned `frameClock` could reach it.
+  private func armPostSleepDeadline<Content: View>(
+    _ harness: StressRuntimeHarness<Content>
+  ) {
+    harness.runLoop.scheduler.requestDeadline(.now())
   }
 }
 
