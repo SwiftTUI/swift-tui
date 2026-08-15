@@ -429,9 +429,18 @@ public struct State<Value> {
       setValue: { [weak box] newValue in
         // Graph-backed writes stay owner-scoped: the slot holds the mutation
         // and the per-owner retained value backs the node-gone read fallback.
-        // Never mirror a graph-backed write into the box-global seed: even a
-        // no-invalidator snapshot graph is a distinct owner lifetime, and
-        // carrying its mutation into a later mount would cross that boundary.
+        // A live (invalidator-backed) graph never mirrors a write into the
+        // box-global seed — that leaked one owner's mutation into every future
+        // owner seeded from the same box.
+        //
+        // A no-invalidator graph is the one-shot `DefaultRenderer` snapshot
+        // path, and it is not a mount lifetime at all: the graph is discarded
+        // when `render` returns, so there is no later owner for a seed write
+        // to leak into. Its only reader is a subsequent snapshot of the same
+        // view value, which is exactly the same-instance continuity an
+        // imperative dispatch between two renders depends on. Without this,
+        // such a write lands in a graph that no longer exists and the next
+        // render silently re-seeds from the authored value.
         if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
           withPersistentDormantStateSlot {
             liveViewNode.setStateSlot(
@@ -439,6 +448,9 @@ public struct State<Value> {
               value: newValue,
               invalidationIdentity: liveViewNode.identity
             )
+          }
+          if liveViewNode.invalidator == nil {
+            box?.updateSeedValue(newValue)
           }
           box?.storeRetainedValue(newValue, for: storageOwner)
         } else {
