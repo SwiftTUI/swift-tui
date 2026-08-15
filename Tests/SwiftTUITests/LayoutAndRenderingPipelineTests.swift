@@ -294,7 +294,10 @@ private func zStackSizingProbe<Content: View>(
     ZStack(alignment: .topLeading) {
       content()
     }
-    .border(.separator)
+    // The painted ring is this probe's only evidence of the ZStack's
+    // allocation, so the border must be layout-bearing. The default
+    // placement is `.inset`, which paints into the content's own cells.
+    .border(.separator, placement: .outset)
   }
   .padding(1)
 }

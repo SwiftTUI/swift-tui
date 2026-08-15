@@ -122,7 +122,7 @@ struct GeometryReaderSurfaceTests {
       GeometryReader { proxy in
         Text(proxy.size == CellSize(width: 8, height: 3) ? "Y" : "N")
       }
-      .border(set: .single),
+      .border(set: .single, placement: .outset),
       context: .init(
         identity: testIdentity("Root"),
         environmentValues: environmentValues

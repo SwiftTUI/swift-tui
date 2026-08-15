@@ -6340,10 +6340,10 @@ struct SwiftUISurfaceTests {
           HStack(spacing: 0) {
             Text("A")
               .frame(width: 3, height: 1, alignment: .topLeading)
-              .border(.separator, set: .single)
+              .border(.separator, set: .single, placement: .outset)
             Text("B")
               .frame(width: 3, height: 1, alignment: .topLeading)
-              .border(.separator, set: .single)
+              .border(.separator, set: .single, placement: .outset)
           }
         }.scrollIndicators(.hidden)
       },
