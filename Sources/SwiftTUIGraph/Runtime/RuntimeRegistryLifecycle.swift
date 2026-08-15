@@ -125,8 +125,15 @@ package protocol RuntimeRegistry: AnyObject {
   /// registries, whose restore order is not observable.
   func normalizeOrderByIdentity()
 
-  /// Drops registrations owned by nodes that are no longer live. Overridden
-  /// only by the gesture registries; no-op elsewhere. NOTE (F101): the
+  /// Drops registrations owned by nodes that are no longer live. Overridden by
+  /// the gesture registries and by ``LocalKeyHandlerRegistry``; no-op
+  /// elsewhere. The key registry's leg was added after reviewing the F101
+  /// sequencing below and does not disturb it: that hazard is the pointer
+  /// registry's live captures and hover recency, while key handlers are
+  /// stateless dispatch closures with no interaction state to strand. Its
+  /// buckets are otherwise unreachable — `removeSubtrees(rootedAt:)` matches
+  /// the owner's identity, which an `.id(_:)`-re-rooted control holds stable
+  /// while its registering node re-mints. NOTE (F101): the
   /// pointer registry also carries node-liveness-coupled interaction state
   /// (hover recency eviction, owner-paired route resolution) but deliberately
   /// does NOT override this — its stale capture/hover routes are re-keyed or

@@ -8,8 +8,8 @@ import Testing
 /// every family is *wired into* the fan-outs; this suite pins what the
 /// fan-outs *do* for each family: empty-snapshot restores are no-ops
 /// (the F105 family dimension), subtree removal splits child from sibling,
-/// reset empties, and the node-liveness prune drops exactly the gesture
-/// families' unowned state (the F100/F101 contract, family-wide).
+/// reset empties, and the node-liveness prune drops exactly the families that
+/// participate in it (the F100/F101 contract, family-wide).
 @MainActor
 @Suite("Registry lifecycle per kind")
 struct RuntimeRegistryLifecycleParameterizedTests {
@@ -107,15 +107,25 @@ struct RuntimeRegistryLifecycleParameterizedTests {
   }
 
   @Test(
-    "node-liveness prune drops exactly the gesture families' unowned state",
+    "node-liveness prune drops exactly the participating families' departed state",
     arguments: RuntimeRegistrationKind.allCases
   )
   func pruneContractPerKind(_ kind: RuntimeRegistrationKind) {
-    // Scratch-recorded owners carry no viewNodeID (no live graph in a unit
-    // test) — the exact shape the gesture registries force-drop and every
-    // other family deliberately ignores: the pointer registry's cleanup is
-    // the run loop's paired-region pass (F101), and the rest carry no
-    // node-liveness-coupled interaction state at all.
+    // The gesture registries force-drop unowned state outright. The key
+    // handler registry participates too, but only for a bucket whose owner
+    // node has provably departed: it buckets stacked handlers per contributing
+    // owner, and `removeSubtrees(rootedAt:)` matches on the owner's IDENTITY,
+    // which an `.id(_:)`-re-rooted control holds stable while its registering
+    // node re-mints — so nothing else could ever reach those buckets and they
+    // accumulated one per generation.
+    //
+    // F101 sequencing was reviewed for that addition and does not bind here:
+    // the hazard it protects is the POINTER registry's live captures and hover
+    // recency, which the paired-region pass re-keys immediately after this
+    // fan-out. Key handlers are stateless dispatch closures with no
+    // interaction state to strand, so evicting a departed owner's bucket
+    // cannot release a live capture. The pointer registry still deliberately
+    // abstains.
     let set = populatedSet(kind, identity: testIdentity("Root", "Leaf"))
     let before = set.publicationOracleFingerprint()
     #expect(!before.isEmpty)
@@ -123,10 +133,10 @@ struct RuntimeRegistryLifecycleParameterizedTests {
     set.pruneOrphanedGestures(keeping: [])
 
     let after = set.publicationOracleFingerprint()
-    if kind == .gesture || kind == .gestureState {
+    if kind == .gesture || kind == .gestureState || kind == .keyHandler {
       #expect(
         after != before,
-        "\(kind): unowned interaction state must be force-dropped by prune"
+        "\(kind): state owned by a departed node must be dropped by prune"
       )
     } else {
       #expect(

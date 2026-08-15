@@ -346,6 +346,47 @@ package final class LocalKeyHandlerRegistry: Equatable {
     (ownersByIdentity[identity] ?? .init(identity: identity)).matchesAnySubtreeRoot(roots)
   }
 
+  /// Evicts contributed buckets whose owning node has departed.
+  ///
+  /// One identity's handlers are contributed by several *live* nodes, so a
+  /// bucket keyed to a node that is no longer live is garbage. Nothing else
+  /// reaches it: `removeSubtrees(rootedAt:)` matches on the owner's identity,
+  /// which an `.id(_:)`-re-rooted control keeps stable across generations
+  /// while its registering node re-mints — so without this leg the control
+  /// accumulates one bucket per generation and `flattened` grows without
+  /// bound. Buckets whose owner carries no node ID are kept: departure cannot
+  /// be proven for them (the pointer family's `removeUnpairedGestureFamilyRoutes`
+  /// keeps them for the same reason).
+  package func prune(keeping liveNodeIDs: Set<ViewNodeID>) {
+    pruneContributions(&keyPressHandlers, keeping: liveNodeIDs)
+    pruneContributions(&pasteHandlers, keeping: liveNodeIDs)
+    pruneOwnerMap()
+  }
+
+  private func pruneContributions<H>(
+    _ contributions: inout [Identity: ContributedHandlers<H>],
+    keeping liveNodeIDs: Set<ViewNodeID>
+  ) {
+    for (identity, contribution) in contributions {
+      let surviving = contribution.byOwner.filter { owner, _ in
+        guard let viewNodeID = owner.viewNodeID else {
+          return true
+        }
+        return liveNodeIDs.contains(viewNodeID)
+      }
+      guard surviving.count != contribution.byOwner.count else {
+        continue
+      }
+      if surviving.isEmpty {
+        contributions.removeValue(forKey: identity)
+      } else {
+        var pruned = contribution
+        pruned.byOwner = surviving
+        contributions[identity] = pruned
+      }
+    }
+  }
+
   private func pruneOwnerMap() {
     let liveIdentities = Set(handlers.keys)
       .union(keyPressHandlers.keys)
