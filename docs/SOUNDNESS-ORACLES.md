@@ -46,11 +46,11 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `checkpoint-store` — stored node images remain coherent with owner generations and membership | Capture/store verification in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG zero-census assertion | Sampled checkpoint path | Assertion, trace scan, serialized snapshot delta | `NodeCheckpointImageStoreTests`, `SoundnessAssertPromotionTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: checkpoint-store ; recordCheckpointStoreViolation ; checkpointStoreViolationCount --> |
 | `raster-damage` — incremental damage equals a fresh raster | [`DefaultRendererFrameTailCoordinator.swift`](../Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift) reports the fresh-raster shadow comparison from `Rasterizer` | T-fail. The renderer repairs the mismatch before publication | Every DEBUG raster with a shadow comparison. Sampled release raster | Trace scan and serialized snapshot delta | `SoundnessProbeConfigurationTests`, `SoundnessFailureChannelTests`, raster stress fixtures | None. Repair preserves output but does not excuse the alarm  <!-- oracle-map: raster-damage ; recordRasterDamageMismatch ; rasterDamageMismatchCount --> |
 | `teardown-coherence` — no committed node is over-removed | Post-finalize reachability audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | teardown/presentation/framework stress suites, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-coherence ; recordTeardownCoherenceViolation ; teardownCoherenceViolationCount --> |
-| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-ratchet | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | Quarantined at 478 (`Program-5-S0`). Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
+| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-ratchet | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | Quarantined at 499 (re-measured 2026-08-14; `Program-5-S0` first quarantined it at 478). Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
 | `teardown-barrier-non-convergence` — teardown reaches a fixed point within its derived bound | Fixed-point barrier in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `TeardownBarrierFixedPointTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-barrier-non-convergence ; recordBarrierNonConvergence ; barrierNonConvergenceCount --> |
 | `automatic-lifetime-anchor` — detached results requiring inferred durable ownership | Resolve-scope classification in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-info. Counter only | Event | Snapshot/reporting only. Deliberately no trace | `ResolveLifetimeScopeTests`, `SoundnessProbeConfigurationTests` | Informational adoption currency, not a violation  <!-- oracle-map: automatic-lifetime-anchor ; recordAutomaticLifetimeAnchor ; automaticLifetimeAnchorCount --> |
 | `resolve-lifetime-scope-unclassified` — every observed live resolved node has a durable lifetime classification | Resolve-scope close audit in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-fail. DEBUG scope assertion | Event | Assertion, trace scan, serialized snapshot delta | `ResolveLifetimeScopeTests`, `DroppedElementAnchoringTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: resolve-lifetime-scope-unclassified ; recordUnclassifiedResolvedNode ; unclassifiedResolvedNodeCount --> |
-| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-ratchet | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | Quarantined at 1,194 (`Program-5-S0`)  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
+| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-ratchet | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | Quarantined at 1,237 (re-measured 2026-08-14; `Program-5-S0` first quarantined it at 1,194)  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
 | `memo-unsound-skip` — a memo candidate never skips when fresh output differs in content | Shadow recomputation in [`MemoSkipTrace.swift`](../Sources/SwiftTUIGraph/Resolve/MemoSkipTrace.swift) | T-fail. DEBUG zero-census assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `MemoSoundnessAlarmTests`, `EquatableViewReuseTests`, `SoundnessAssertPromotionTests` | None  <!-- oracle-map: memo-unsound-skip ; recordMemoUnsoundSkip ; memoUnsoundSkipCount --> |
 | `duplicate-registration` — one capture session does not overwrite a single-slot identity | Registration capture guard in [`ViewNode.swift`](../Sources/SwiftTUIGraph/Resolve/ViewNode.swift) | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `DuplicateRegistrationProbeTests`, `SoundnessFailureChannelTests` | Key-command carry-over is an intentional exemption tested at HEAD  <!-- oracle-map: duplicate-registration ; recordDuplicateRegistrationOverwrite ; duplicateRegistrationOverwriteCount --> |
 | `planner-targetless-frontier` — dirty work is never silently discarded for lack of a stitchable evaluator | Root-escalation alarm in [`ViewGraphDirtyEvaluationPlanning.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphDirtyEvaluationPlanning.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `FrameworkStressGraphPlanningAndRoutingTests`, `SoundnessFailureChannelTests` | Safe root fallback preserves output. Alarm still fails  <!-- oracle-map: planner-targetless-frontier ; recordPlannerTargetlessFrontierEscalation ; plannerTargetlessFrontierEscalationCount --> |
@@ -62,8 +62,8 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `handler-resolution-key` — committed key/paste identity resolves in the live key registry | Key/paste leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | Either key or paste registration satisfies the inventory  <!-- oracle-map: handler-resolution-key ; recordInteractiveHandlerResolutionViolation ; keyHandlerResolutionViolationCount --> |
 | `handler-resolution-command` — committed command scope resolves in the live command registry | Command leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: handler-resolution-command ; recordInteractiveHandlerResolutionViolation ; commandScopeResolutionViolationCount --> |
 | `handler-resolution-drop` — committed drop scope resolves in the live drop registry | Drop leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: handler-resolution-drop ; recordInteractiveHandlerResolutionViolation ; dropScopeResolutionViolationCount --> |
-| `handler-resolution-gesture` — committed gesture route resolves both recognizer and pointer handler | Gesture leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A present partial pair fails. An absent optional registry is outside caller scope  <!-- oracle-map: handler-resolution-gesture ; recordInteractiveHandlerResolutionViolation ; gestureRouteResolutionViolationCount --> |
-| `action-dispatch-miss` — dispatch never targets a missing published action | Failed lookup in [`LocalActionRegistry.swift`](../Sources/SwiftTUIGraph/Runtime/LocalActionRegistry.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A found handler returning `false` is not a lookup miss  <!-- oracle-map: action-dispatch-miss ; recordActionDispatchMiss ; actionDispatchMissCount --> |
+| `handler-resolution-gesture` — committed gesture route resolves both recognizer and pointer handler | Gesture leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A present partial pair fails. An absent optional registry is outside caller scope. **Temporarily quarantined at 1** (2026-08-14): `GestureScroll026` names gesture handlers absent from the published registry. The row burns down when that already-failing test is fixed — it is not an allowance for a second instance  <!-- oracle-map: handler-resolution-gesture ; recordInteractiveHandlerResolutionViolation ; gestureRouteResolutionViolationCount --> |
+| `action-dispatch-miss` — dispatch never targets a missing published action | Failed lookup in [`LocalActionRegistry.swift`](../Sources/SwiftTUIGraph/Runtime/LocalActionRegistry.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A found handler returning `false` is not a lookup miss. **Temporarily quarantined at 1** (2026-08-14): the `DormantIncrement-inner-B` probe has no published handler. The row burns down when that already-failing test is fixed — it is not an allowance for a second instance  <!-- oracle-map: action-dispatch-miss ; recordActionDispatchMiss ; actionDispatchMissCount --> |
 | `stranded-listing` — a node never claims a child seated under another live parent | Post-finalize listing audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `StrandedListingProbeTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: stranded-listing ; recordStrandedListingViolation ; strandedListingViolationCount --> |
 | `layout-shadow-divergence` — sampled cached measure/place geometry equals a fresh all-reuse-disabled pass | Shadow layout comparison in [`LayoutShadowOracle.swift`](../Sources/SwiftTUICore/Measure/LayoutShadowOracle.swift), run by the frame tail's layout stage and recorded by [`DefaultRendererFrameTailCoordinator.swift`](../Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift) | T-fail. DEBUG call-site assertion. The production value is never repaired before recording | Every DEBUG layout stage. Sampled release frame | Assertion, trace scan, serialized snapshot delta | `LayoutShadowOracleTests`, `SoundnessProbeConfigurationTests`, `SoundnessAssertPromotionTests`, `SoundnessFailureChannelTests` | Windowed lazy/hosted subtrees are excluded (cold shadow stride) and counted by the T-info exclusion counter; the placed walk applies the same skip-and-count at estimate-carrying lazy containers (`lazyChildScrollEstimates`) and at ancestors whose bounds absorbed the estimate, because a lazy product measured inside a custom scroll layout's subview walk is invisible to the measured-tree carve-out (the 2026-08-11 mrkdwn `ScrollContent` false-alarm class); a frame whose SHADOW pass hits the engine re-entry depth budget is excluded whole and counted by the T-info depth-exclusion counter (the all-fresh shadow consumes more re-entry depth than production's serve-assisted pass, so at the budget boundary it truncates geometry production computed); the shadow re-evaluates in-pass-verified hysteresis seeds instead of re-deciding bistable fixed points  <!-- oracle-map: layout-shadow-divergence ; recordLayoutShadowDivergence,recordLayoutShadowWindowedExclusions,recordLayoutShadowDepthExclusions ; layoutShadowDivergenceCount,layoutShadowWindowedExclusionCount,layoutShadowDepthExclusionCount --> |
 
@@ -86,29 +86,58 @@ update combined and class-specific counters, as teardown leak does.
 
 ## Quarantined residuals
 
-Two kinds are `T-ratchet` rather than `T-fail`. This section is their durable
-tracking reference. Before this section existed, a stage tag (`Program-5-S0`)
-in [`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) was the
-only record of *why* the team quarantined them. The tag names a program but does
-not explain the reason.
+Four kinds carry a ledger row and are therefore ratcheted rather than failing
+outright. This section is their durable tracking reference. Before this section
+existed, a stage tag (`Program-5-S0`) in
+[`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) was the only
+record of *why* the team quarantined them. The tag names a program but does not
+explain the reason.
 
-| Kind | Baseline | Measured 2026-07-30 | Provenance | What the residual is | Burn-down expectation |
+| Kind | Baseline | Measured 2026-08-14 | Provenance | What the residual is | Burn-down expectation |
 | --- | --: | --: | --- | --- | --- |
-| `registration-publication` | 1194 | **1122** | `Program-5-S0` | Post-suppression scoped-restore residual | Reduce with the next scoped-restore fix. Not expected to reach zero on its own |
-| `teardown-coherence-leak` | 478 | 478 | `Program-5-S0` | Existing unreachable-node residual (under-removal arm) | Reduce with teardown-lifetime work. See the leak census currency |
+| `registration-publication` | 1237 | 1237 | `Program-5-S0`, re-measured `runtime-lane-unmasked` | Post-suppression scoped-restore residual | Reduce with the next scoped-restore fix. Not expected to reach zero on its own |
+| `teardown-coherence-leak` | 499 | 499 | `Program-5-S0`, re-measured `runtime-lane-unmasked` | Existing unreachable-node residual (under-removal arm) | Reduce with teardown-lifetime work. See the leak census currency |
+| `action-dispatch-miss` | 1 | 1 | `runtime-lane-unmasked` (2026-08-14) | `DormantIncrement-inner-B` has no published handler | Burns down with its already-failing test. Designed as `T-fail`; the row is a temporary hold, not an allowance |
+| `handler-resolution-gesture` | 1 | 1 | `runtime-lane-unmasked` (2026-08-14) | `GestureScroll026` names gesture handlers absent from the published registry | Burns down with its already-failing test. Designed as `T-fail`; the row is a temporary hold, not an allowance |
 
-`registration-publication` is **72 below its baseline** at HEAD. The gate
-reports this as a warning in every passing run:
+Every row currently sits exactly on its baseline:
 
 ```
-WARNING: registration-publication count=1122 is below baseline=1194; reduce the ledger
-WARNING: teardown-coherence-leak count=478 matches baseline=478
+WARNING: action-dispatch-miss count=1 matches baseline=1
+WARNING: handler-resolution-gesture count=1 matches baseline=1
+WARNING: registration-publication count=1237 matches baseline=1237
+WARNING: teardown-coherence-leak count=499 matches baseline=499
 PASS: soundness trace counts are within their exact quarantine baselines
 ```
 
-The ratchet works, but the ledger is stale. When the next change touches this
-area, reduce the ledger row to the measured count. A baseline that is 72 too
-high allows 72 regressions before the gate fails.
+### These counts are coverage-sensitive — read this before calling one a regression
+
+A count measures violations *observed*, so it scales with how much of the suite
+actually ran. A lane that dies partway makes every downstream figure read low,
+and the next person to record a baseline writes that low number down. This has
+now happened twice, from two different causes:
+
+1. **2026-08-14, deadlock.** The runtime lane was hanging and dying to the
+   1200s watchdog, so traces after that suite went unobserved. Fixing it moved
+   `registration-publication` 1194 → 1216 and `teardown-coherence-leak`
+   478 → 497, and first surfaced `action-dispatch-miss` and
+   `handler-resolution-gesture` at 1 each.
+2. **2026-08-14, crash.** The figures from (1) were *themselves* truncated. A
+   test subscripted past the end of a raster row after a failed bounds
+   `#expect`, so a failing assertion killed the test process and aborted the
+   lane. Before that fix no run with ≥1000 tests completed at all; after it the
+   lane reports 3247 tests in 357 suites, and the honest figures are 1237 and
+   499.
+
+Neither move was a new defect — in both cases the only change was to test code.
+Before treating a moved count as a regression, ask whether lane coverage
+changed. Two cheap checks: `grep` the gate log for
+`exited with unexpected signal`, and compare the runtime lane's reported test
+total against a known-good run.
+
+An unguarded subscript after a bounds `#expect` is the specific hazard: Swift
+Testing's `#expect` does not stop execution, so the next line runs anyway and
+one failing test becomes a lane-wide coverage hole.
 
 ### What a green scan does and does not prove
 
@@ -138,26 +167,31 @@ The S0 findings report and this ledger disagree, and the disagreement is
 expected rather than a defect. The report is a **pre-S1** census. The ledger is
 **post-S1**:
 
-There are **three** numbers in play, not two, and only the third is current:
+The S0 columns below are a **dated snapshot** and are kept as history. Only the
+last column is current:
 
-| Kind | S0 raw | S0 injected | S0 residual | Ledger (post-S1) | **Measured at HEAD** |
-| --- | --: | --: | --: | --: | --: |
-| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | **1122** |
-| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | **478** |
+| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | **Ledger and measured 2026-08-14** |
+| --- | --: | --: | --: | --: | --: | --: |
+| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | **1237** |
+| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | **499** |
 
-`teardown-coherence-leak` reconciles exactly across all three: S1's suppression
-work removed none of its lines, and nothing since has either.
+Read that 2026-07-30 column as a *floor observed under partial coverage*, not as
+a truth the later figures contradict. `registration-publication`'s apparent
+drop to 1122 and its later rise to 1237 are the same phenomenon seen from two
+sides: how much of the runtime lane completed on the day of the measurement.
+See the coverage-sensitivity note above for the two truncations involved.
 
-`registration-publication` moved twice. S1's scoped-restore suppression changed
-the S0 report's 1,196 to the ledger's 1194. The ledger row records this as
-"post-suppression scoped-restore residual". Later work removed another 72
-lines and produced the measured 1122, but nobody reduced the ledger. The
-scanner only warns below the baseline, so this drift remained easy to miss.
+S1's scoped-restore suppression is the one genuine movement in this table: it
+changed the S0 report's 1,196 to the ledger's 1194, which the ledger row records
+as "post-suppression scoped-restore residual".
 
-**None of the three documents was the current authority. Only a fresh
-trace-armed run is.** The S0 report is a dated snapshot and is not maintained.
-The ledger is a ceiling that has drifted 72 above reality. Read the ledger as
-"what will fail the gate", not "what is true".
+**No document here is the authority. Only a fresh trace-armed full-gate run
+is.** The S0 report is a dated snapshot and is not maintained. The ledger is a
+ceiling; read it as "what will fail the gate", not "what is true". A standalone
+`scan_soundness_traces.sh` is not a substitute either — it reads whatever
+`.build/soundness-trace` has accumulated from ad-hoc `swift test` runs and
+reports inflated counts, whereas a full `bun run test` clears that directory
+first.
 
 ## Layout branching ledger
 

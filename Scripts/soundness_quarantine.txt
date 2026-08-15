@@ -9,10 +9,12 @@
 #
 # Enforcement is asymmetric, so a green gate proves only count <= N -- NOT that
 # N is current. A baseline left too high after a fix merely warns, and that is
-# not hypothetical: measured 2026-07-30, registration-publication is 1122, so
-# the 1194 below is 72 too high and the gate has been printing "is below
-# baseline; reduce the ledger" inside a passing run. Reduce it with the next
-# change that touches this area.
+# not hypothetical: through 2026-07-30 registration-publication measured 1122
+# against a 1194 baseline, 72 too high, and the gate printed "is below baseline;
+# reduce the ledger" inside every passing run for weeks without anyone acting on
+# it. Every row below currently sits EXACTLY on its baseline; if one starts
+# printing "is below baseline", reduce it with the next change that touches
+# that area rather than letting the slack accumulate.
 #
 # See "Quarantined residuals" in docs/SOUNDNESS-ORACLES.md for each row's
 # provenance, what its residual actually is, its burn-down expectation, and its
