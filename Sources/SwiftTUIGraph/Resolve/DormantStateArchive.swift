@@ -184,15 +184,14 @@ extension ViewGraph {
     _ archive: DormantStateArchive
   ) {
     for record in archive.records {
-      let node =
-        if let entityIdentity = record.entityIdentity {
-          prepareEntityRoutedOwnerPreservingCoResidentIdentity(
-            identity: record.identity,
-            entityIdentity: entityIdentity
-          )
-        } else {
-          prepareDynamicPropertyUpdate(identity: record.identity)
-        }
+      // A record seeds a placeholder only. Binding the record's entity route
+      // here would make that placeholder the routed owner for the entity, and
+      // an authored node that resolves this frame under the same entity at a
+      // DIFFERENT structural identity (the payload's `.id` moved while the tab
+      // was dormant) then loses co-residency to it and is retired in the frame
+      // that built it -- taking its `.task`/lifecycle registrations with it.
+      // Routing is authored adoption's to decide; seeding is not adoption.
+      let node = prepareDynamicPropertyUpdate(identity: record.identity)
       for (identifier, slot) in record.stateSlots {
         node.restoreStateSlot(
           identifier,

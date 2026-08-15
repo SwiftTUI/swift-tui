@@ -1125,6 +1125,79 @@ struct DormantTabStateTests {
     #expect(archive.archivedTabCount == 1)
     #expect(archive.archivedNodeCount < 20)
   }
+
+  @Test("a returning dormant tab whose content .id moved keeps its task registration")
+  func returningDormantTabWithMovedContentIDKeepsItsTask() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DormantTabTaskIdentityChurn"),
+      size: .init(width: 48, height: 12)
+    ) {
+      DormantTaskIdentityChurnFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.activeTaskCount == 1)
+
+    // Generation 1 activates a tab that has never been dormant, so there is no
+    // archive to seed. Generation 2 is the first RETURN to a tab that has one,
+    // and its content `.id` moved while it was away — the archive's records
+    // name the departed identity. Seeding them must not claim the arriving
+    // content's entity route, or the arriving node loses co-residency to the
+    // placeholder and is retired in the frame that built it, taking its task
+    // registration with it. The start is then dropped as superseded, which is
+    // silent: `taskStartSkipCount` stays 0, so assert the superseded counter.
+    for generation in 1...4 {
+      _ = try harness.clickText("Cycle")
+      #expect(
+        harness.activeTaskCount == 1,
+        "generation \(generation) lost its task registration"
+      )
+      #expect(
+        harness.runLoop.lifecycleCoordinator.taskStartSupersededCount == 0,
+        "generation \(generation) had a genuine task start dropped as superseded"
+      )
+    }
+  }
+}
+
+private struct DormantTaskIdentityChurnFixture: View {
+  @State private var selection = "left"
+  @State private var generation = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Cycle") {
+        generation += 1
+        selection = selection == "left" ? "right" : "left"
+      }
+
+      TabView(selection: $selection) {
+        Tab("Left", value: "left") {
+          DormantTaskIdentityChurnPane(label: "left", generation: generation)
+            .id("left-\(generation)")
+        }
+
+        Tab("Right", value: "right") {
+          DormantTaskIdentityChurnPane(label: "right", generation: generation)
+            .id("right-\(generation)")
+        }
+      }
+      .tabViewStyle(.literalTabs)
+    }
+    .frame(width: 48, height: 12, alignment: .topLeading)
+  }
+}
+
+private struct DormantTaskIdentityChurnPane: View {
+  let label: String
+  let generation: Int
+
+  var body: some View {
+    Text("task \(label) generation \(generation)")
+      .task(id: generation) {
+        await suspendUntilCancelled()
+      }
+  }
 }
 
 @MainActor
@@ -1396,7 +1469,8 @@ private struct DormantEditorContent: View {
       }
       .id(testIdentity("DormantJourneyPointer"))
       Button("Copy journey token") {
-        clipboardStatus = clipboardWriteAction("token")
+        clipboardStatus =
+          clipboardWriteAction("token")
           ? "Clipboard: copied" : "Clipboard: unavailable"
       }
       Text(clipboardStatus)
