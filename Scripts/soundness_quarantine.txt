@@ -33,11 +33,31 @@
 # already-failing pre-existing test (FrameworkStressGestureScrollTests 026, and
 # the DormantIncrement probe), so they burn down when those are fixed.
 #
-# Every figure here was confirmed identical on macOS, the local Linux container
-# lane, and the amd64 CI lane. Take a baseline only from a full `bun run test`
+# Re-measured AGAIN 2026-08-14 (b85cc68d), because the figures directly above
+# were themselves taken from a truncated lane -- a second, different truncation
+# that the first re-measurement could not have seen. The tight horizontal-scroll
+# border test subscripted `cells[6][0]` after a failed bounds `#expect`, so a
+# failing assertion killed the whole test process ("exited with unexpected
+# signal code 5") and aborted the runtime lane partway. Before that fix NO run
+# with >=1000 tests completed at all; after it the lane reports 3247 tests in
+# 357 suites. registration-publication 1216 -> 1237 and
+# teardown-coherence-leak 497 -> 499 are that restored coverage, not new
+# defects: the only source change was adding `placement: .outset` to three test
+# call sites. The two count=1 rows were unchanged at 1, which is the control
+# that makes the coverage explanation credible.
+#
+# Lesson for the next reader: an unguarded subscript after a bounds `#expect`
+# converts one failing test into a lane-wide coverage hole, and every count
+# measured downstream of it silently understates. Grep a gate log for
+# "exited with unexpected signal" before trusting any figure here.
+#
+# The pre-2026-08-14 figures were each confirmed identical on macOS, the local
+# Linux container lane, and the amd64 CI lane. The two counts raised in this
+# re-measurement are so far confirmed on macOS only and still want a Linux
+# cross-check. Take a baseline only from a full `bun run test`
 # (it clears .build/soundness-trace first); a standalone scan reads whatever
 # ad-hoc `swift test` runs have accumulated there and reports inflated counts.
-registration-publication 2026-08-14 runtime-lane-unmasked count=1216 scoped-restore residual re-measured on a completing runtime lane
-teardown-coherence-leak 2026-08-14 runtime-lane-unmasked count=497 existing unreachable-node residual re-measured on a completing runtime lane
+registration-publication 2026-08-14 runtime-lane-unmasked count=1237 scoped-restore residual re-measured on a runtime lane completing all 3247 tests
+teardown-coherence-leak 2026-08-14 runtime-lane-unmasked count=499 existing unreachable-node residual re-measured on a runtime lane completing all 3247 tests
 action-dispatch-miss 2026-08-14 runtime-lane-unmasked count=1 DormantIncrement-inner-B has no published handler; first observable once the lane completed
 handler-resolution-gesture 2026-08-14 runtime-lane-unmasked count=1 GestureScroll026 committed tree names gesture handlers absent from the published registry
