@@ -196,7 +196,28 @@ extension RunLoop {
     )
   }
 
+  /// Drains and renders whatever the pump holds, synchronously.
+  ///
+  /// This is the run loop's only re-entry point from outside its own task (the
+  /// Android host's `directWake`), so it re-establishes the ambient
+  /// registration scope itself rather than inheriting one — see
+  /// ``RunLoop/withRuntimeRegistrationScope(_:)`` for what silently breaks
+  /// without it.
   package func processPendingEventsSynchronously(
+    from eventPump: EventPump,
+    renderedFrames: inout Int
+  ) throws -> RunLoopExitReason? {
+    var frames = renderedFrames
+    defer { renderedFrames = frames }
+    return try withRuntimeRegistrationScope {
+      try processPendingEventsSynchronouslyInScope(
+        from: eventPump,
+        renderedFrames: &frames
+      )
+    }
+  }
+
+  private func processPendingEventsSynchronouslyInScope(
     from eventPump: EventPump,
     renderedFrames: inout Int
   ) throws -> RunLoopExitReason? {

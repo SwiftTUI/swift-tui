@@ -358,6 +358,48 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     }
   }
 
+  /// Re-establishes, synchronously, the ambient registration scope ``run()``
+  /// installs — for a caller that re-enters this run loop's work from OUTSIDE
+  /// the run task.
+  ///
+  /// ``run()`` binds the animation / transition / completion sinks, the
+  /// accessibility-announcement sink, and the terminal-handoff action as
+  /// **task-locals of its own task**, so everything it drives inherits them:
+  /// event dispatch, frames, and — because an unstructured `Task` copies the
+  /// creating task's locals — the `.task` bodies those frames start.
+  ///
+  /// A synchronous re-entry has no such task to inherit from. The Android host
+  /// is the one that does this: with `renderMode == .sync` an input arrives
+  /// through the JNI `send_input` call on the Android main thread and reaches
+  /// `directWake` directly, not through the loop's `await`ing event pump. Every
+  /// registration made under that call — a `withAnimation` in a button action,
+  /// or one in a `.task` body belonging to a view the frame just mounted —
+  /// then read its sink as `nil`. The registrations are optional-chained, so
+  /// they were dropped in silence: the authored `Animation` never reached the
+  /// controller (the default curve played instead) and the completion closure
+  /// was never registered, so nothing ever fired it. In the counter demo that
+  /// wedged the "one ripple at a time" guard closed for the life of the
+  /// process — one ripple per launch, no error anywhere.
+  ///
+  /// Any future synchronous re-entry point belongs inside this scope too.
+  @MainActor
+  package func withRuntimeRegistrationScope<Result>(
+    _ operation: () throws -> Result
+  ) rethrows -> Result {
+    let animationController = renderer.internalAnimationController
+    return try TerminalHandoffAction.$current.withValue(runtimeTerminalHandoffAction()) {
+      try AccessibilityAnnouncementStorage.withSink(self) {
+        try AnimationRegistrationStorage.withSink(animationController) {
+          try TransitionRegistrationStorage.withSink(animationController) {
+            try AnimationCompletionStorage.withSink(animationController) {
+              try operation()
+            }
+          }
+        }
+      }
+    }
+  }
+
   /// Installs the focus tracker's invalidator: the scheduler, behind a filter
   /// that drops move notifications for identities whose recompute the
   /// retained-reuse suppression scope already covers (or that need none):

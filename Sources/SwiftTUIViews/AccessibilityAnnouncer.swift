@@ -38,4 +38,16 @@ package enum AccessibilityAnnouncementStorage {
       try await operation()
     }
   }
+
+  /// Synchronous companion, so a host that re-enters the run loop off its own
+  /// task (`RunLoop.withRuntimeRegistrationScope`) can re-establish this sink
+  /// alongside the animation family's.
+  package static func withSink<Result>(
+    _ sink: any AccessibilityAnnouncementSink,
+    operation: () throws -> Result
+  ) rethrows -> Result {
+    try $currentTaskSink.withValue(sink) {
+      try operation()
+    }
+  }
 }
