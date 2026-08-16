@@ -9,39 +9,28 @@
 
 > Run the live demo and read the API reference at **<https://swifttui.sh>**.
 
-SwiftTUI borrows the declarative model SwiftUI has proven at platform scale
-(the interface is a function of state) and aims it at terminal cells. Declare
+SwiftTUI borrows the take model SwiftUI has proven at scale — that interface is a function of state — and aims it at terminal cells. Declare
 views with `View`, `Scene`, `@State`, `@FocusState`, `VStack`, `ProgressView`,
 and custom `Layout` types; the framework owns layout, focus, redraw, and the
 terminal itself. Terminal first, not terminal only: the same view tree also
 ships as a static WASI bundle, a localhost WebHost, a native SwiftUI surface,
 or a native Android surface, with no rewrite per target. Both browser paths
 paint to the DOM with a real accessibility tree, not a terminal emulator.
-That tree is a one-way semantic presentation preview: assistive-origin focus,
-activation, adjustment, and editing are not routed back into SwiftTUI in 0.9.
 
 SwiftTUI uses no global constraint solver, no virtual DOM, and no `curses`.
 Every view is lowered through a strict, inspectable pipeline (resolve →
 measure → place → semantics → draw → raster → commit), so layout is
 deterministic and every frame is snapshot-testable.
 
-## Pre-release
+## Project State
 
 > [!IMPORTANT]
-> SwiftTUI is actively being developed and is currently both _pre-release_ and _pre-SemVer-1.0.0_.  
-> I strongly caution against using SwiftTUI for anything mission critical at the moment, but bug reports and contributions are warmly welcomed!
->
-> Current state: **_pre-release_**
-> * The framework has not yet been publicised because its shape is undecided. It should be considered a research project. 
-> * CI stability is not yet a goal.
-> * Supporting external consumers is not yet a goal.
-> * Stable APIs are an active non-goal.
-> * The [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md) is not yet reliable.
->
-> Next milestone: **_pre-SemVer-1.0.0_**
-> 
-> The first 'released' version considered to support external consumers will be `0.9.0`.
-> Breaking changes may still happen until `1.0.0`, but a full CHANGELOG and migration guide will be published.
+> SwiftTUI is being developed and is pre-SemVer `1.0.0`.  
+
+The API has now stabilized but there may still be breaking changes made
+before `1.0.0`. These will be documented in the [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md).
+
+Please [open a github issue](https://github.com/SwiftTUI/swift-tui/issues/new/choose) for SwiftUI-style APIs that you notice are missing — as well as any bugs, behavior questions, or difficulties you hit.
 
 ## Why SwiftTUI
 
