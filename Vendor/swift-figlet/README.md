@@ -8,7 +8,7 @@ layout proposals without external font files.
 
 ## Provenance and license
 
-Upstream: GoodHats LLC's `swift-figlet`. Licensed under the MIT License — see
+Upstream: OPTIONAL.DEV's `swift-figlet`. Licensed under the MIT License — see
 [LICENSE](LICENSE) in this directory. The `Fonts/` directory carries the
 curated FIGlet font set; individual FIGfonts retain their original headers.
 These targets stay Foundation-free because the Foundation-free `SwiftTUIViews`
