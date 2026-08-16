@@ -6,7 +6,7 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
-## [Unreleased]
+## [0.9.0] - 2026-08-15
 
 ### Changed — source-breaking (0.9 preview readiness)
 
@@ -708,6 +708,7 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.3.4...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.9.0...HEAD
+[0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
 [0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18
