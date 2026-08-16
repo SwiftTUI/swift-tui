@@ -1,4 +1,4 @@
-// © GoodHatsLLC
+// © OPTIONAL.DEV
 
 #if canImport(Darwin)
   import Darwin

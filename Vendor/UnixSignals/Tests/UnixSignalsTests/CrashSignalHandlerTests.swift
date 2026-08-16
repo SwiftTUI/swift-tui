@@ -1,4 +1,4 @@
-// © GoodHatsLLC
+// © OPTIONAL.DEV
 
 #if !os(Windows) && !os(WASI)
 

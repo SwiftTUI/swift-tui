@@ -1,4 +1,4 @@
-// © GoodHatsLLC
+// © OPTIONAL.DEV
 
 // SwiftTUI addition to the vendored UnixSignals package.
 //

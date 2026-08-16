@@ -1,4 +1,4 @@
-// © GoodHatsLLC
+// © OPTIONAL.DEV
 //
 // Synchronous crash signal handler for terminal reset on fatal signals.
 // Unlike UnixSignalsSequence (which uses Dispatch for async delivery),
