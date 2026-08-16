@@ -6,6 +6,34 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.9.1] - 2026-08-16
+
+Android tooling fixes only; no framework behaviour change.
+
+### Fixed
+
+- **The `sh.swifttui.android` Gradle plugin no longer requires `swiftly` on
+  `PATH`.** Both Swift tasks ran a bare `swiftly` command line, so an IDE
+  launched from the desktop — which inherits the login daemon's `PATH`, not a
+  shell profile's — failed with `Cannot run program "swiftly"` on machines
+  where swiftly is installed and the same build succeeds from a terminal. The
+  plugin now resolves an absolute launcher (`SWIFTLY_BIN_DIR`, then
+  `~/.swiftly/bin`, then `PATH`) and reports the cause instead of surfacing the
+  raw `IOException` when none is found. New `swiftTuiAndroidHost.swiftlyExecutable`
+  names a launcher explicitly; it is never silently overridden by a discovered one.
+
+- **The plugin no longer mirrors a swift-tui checkout it happened to find.**
+  `swiftTuiCheckout` defaulted to the relative path `../../../swift-tui`, which
+  resolves *outside* the consumer's project — so an unrelated clone sitting
+  there silently replaced the tagged dependency the app's `Package.swift`
+  declares. It is now opt-in through `SWIFTTUI_LOCAL_CHECKOUT`.
+
+### Known issue
+
+- The counter demo's `AndroidExample/SwiftPackage/Package.resolved` ships
+  pinning `0.9.0`. The manifest requires `exact: "0.9.1"`, so SwiftPM
+  re-resolves on first build; the tag was not moved to correct it.
+
 ## [0.9.0] - 2026-08-15
 
 ### Changed — source-breaking (0.9 preview readiness)
