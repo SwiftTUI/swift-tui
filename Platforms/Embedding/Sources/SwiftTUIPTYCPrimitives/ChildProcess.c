@@ -1,3 +1,6 @@
+/* Compiled out on Windows: forkpty/ioctl have no Win32 equivalent and the
+   consuming targets drop this dependency edge there. */
+#if !defined(_WIN32)
 #include "SwiftTUIPTYCPrimitives.h"
 
 #include <signal.h>
@@ -81,3 +84,4 @@ pid_t swift_tui_pty_fork_exec(
   execve(argv[0], argv, envp);
   swift_tui_pty_exit_127();
 }
+#endif

@@ -213,19 +213,22 @@ classifications:
     - SwiftTUIPTYPrimitives.PTYPair
     - "SwiftTUIPTYPrimitives.ptyResize(masterFD:cols:rows:)"
     - SwiftTUITerminal.ChildProcessPty
-    - SwiftTUITerminal.TerminalBufferKind
-    - SwiftTUITerminal.TerminalEmulator
-    - SwiftTUITerminal.TerminalEmulatorEvent
-    - SwiftTUITerminal.TerminalEmulatorKey
-    - SwiftTUITerminal.TerminalEmulatorMouse
     - SwiftTUITerminal.TerminalExitReason
     - SwiftTUITerminal.TerminalLifecycle
-    - SwiftTUITerminal.TerminalMouseMode
     - SwiftTUITerminal.TerminalProcessSession
     - SwiftTUITerminal.TerminalSession
     - SwiftTUITerminal.TerminalView
     - SwiftTUITerminal.TerminalViewKeyDisposition
     - SwiftTUITerminal.View
+    # The emulation layer moved to its own module (Stage 1.2 of the Windows
+    # plan); SwiftTUITerminal re-exports it, so the consumer surface is
+    # unchanged.
+    - SwiftTUITerminalEmulation.TerminalBufferKind
+    - SwiftTUITerminalEmulation.TerminalEmulator
+    - SwiftTUITerminalEmulation.TerminalEmulatorEvent
+    - SwiftTUITerminalEmulation.TerminalEmulatorKey
+    - SwiftTUITerminalEmulation.TerminalEmulatorMouse
+    - SwiftTUITerminalEmulation.TerminalMouseMode
     - SwiftTUICLI.App
     - SwiftTUICLI.RenderOnce
     - SwiftTUICLI.ScenePty

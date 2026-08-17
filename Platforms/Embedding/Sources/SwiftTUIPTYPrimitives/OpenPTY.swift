@@ -1,86 +1,91 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#endif
-
-public struct PTYHandles: Sendable {
-  public let masterFD: Int32
-  public let slaveFD: Int32
-  public let slavePath: String
-
-  public init(masterFD: Int32, slaveFD: Int32, slavePath: String) {
-    self.masterFD = masterFD
-    self.slaveFD = slaveFD
-    self.slavePath = slavePath
-  }
-}
-
-public func openPTY() throws(PTYError) -> PTYHandles {
-  var masterFD: Int32 = -1
-  var slaveFD: Int32 = -1
-
-  guard unsafe openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
-    throw .allocationFailed(errno: errno)
-  }
-
-  configureNoSigPipe(masterFD)
-  configureNoSigPipe(slaveFD)
-
-  guard let slavePath = ttyName(slaveFD) else {
-    closeFD(masterFD)
-    closeFD(slaveFD)
-    throw .slavePathUnavailable
-  }
-
-  return PTYHandles(masterFD: masterFD, slaveFD: slaveFD, slavePath: slavePath)
-}
-
-public func ptyResize(masterFD: Int32, cols: Int, rows: Int) throws(PTYError) {
-  var windowSize = winsize(
-    ws_row: UInt16(rows),
-    ws_col: UInt16(cols),
-    ws_xpixel: 0,
-    ws_ypixel: 0
-  )
-
-  guard unsafe ioctl(masterFD, UInt(TIOCSWINSZ), &windowSize) == 0 else {
-    throw .resizeFailed(errno: errno)
-  }
-}
-
-public func closeFD(_ fd: Int32) {
-  if fd >= 0 {
-    _ = close(fd)
-  }
-}
-
-private func configureNoSigPipe(_ fd: Int32) {
+// This whole module is compiled out on Windows: the dependency edges to
+// SwiftTerm and the PTY layer are platform-conditional in Package.swift, so
+// the target must compile to an empty module there.
+#if !os(Windows)
   #if canImport(Darwin)
-    _ = fcntl(fd, F_SETNOSIGPIPE, 1)
+    import Darwin
+  #elseif canImport(Glibc)
+    import Glibc
   #endif
-}
 
-private func ttyName(_ fd: Int32) -> String? {
-  var buffer = [CChar](repeating: 0, count: 4096)
-  let result = unsafe buffer.withUnsafeMutableBufferPointer { storage in
-    guard let baseAddress = storage.baseAddress else {
-      return ERANGE
+  public struct PTYHandles: Sendable {
+    public let masterFD: Int32
+    public let slaveFD: Int32
+    public let slavePath: String
+
+    public init(masterFD: Int32, slaveFD: Int32, slavePath: String) {
+      self.masterFD = masterFD
+      self.slaveFD = slaveFD
+      self.slavePath = slavePath
+    }
+  }
+
+  public func openPTY() throws(PTYError) -> PTYHandles {
+    var masterFD: Int32 = -1
+    var slaveFD: Int32 = -1
+
+    guard unsafe openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
+      throw .allocationFailed(errno: errno)
     }
 
-    return unsafe ttyname_r(fd, baseAddress, storage.count)
+    configureNoSigPipe(masterFD)
+    configureNoSigPipe(slaveFD)
+
+    guard let slavePath = ttyName(slaveFD) else {
+      closeFD(masterFD)
+      closeFD(slaveFD)
+      throw .slavePathUnavailable
+    }
+
+    return PTYHandles(masterFD: masterFD, slaveFD: slaveFD, slavePath: slavePath)
   }
 
-  guard result == 0 else {
-    return nil
+  public func ptyResize(masterFD: Int32, cols: Int, rows: Int) throws(PTYError) {
+    var windowSize = winsize(
+      ws_row: UInt16(rows),
+      ws_col: UInt16(cols),
+      ws_xpixel: 0,
+      ws_ypixel: 0
+    )
+
+    guard unsafe ioctl(masterFD, UInt(TIOCSWINSZ), &windowSize) == 0 else {
+      throw .resizeFailed(errno: errno)
+    }
   }
 
-  return unsafe buffer.withUnsafeBufferPointer { storage in
-    guard let baseAddress = storage.baseAddress else {
+  public func closeFD(_ fd: Int32) {
+    if fd >= 0 {
+      _ = close(fd)
+    }
+  }
+
+  private func configureNoSigPipe(_ fd: Int32) {
+    #if canImport(Darwin)
+      _ = fcntl(fd, F_SETNOSIGPIPE, 1)
+    #endif
+  }
+
+  private func ttyName(_ fd: Int32) -> String? {
+    var buffer = [CChar](repeating: 0, count: 4096)
+    let result = unsafe buffer.withUnsafeMutableBufferPointer { storage in
+      guard let baseAddress = storage.baseAddress else {
+        return ERANGE
+      }
+
+      return unsafe ttyname_r(fd, baseAddress, storage.count)
+    }
+
+    guard result == 0 else {
       return nil
     }
 
-    let path = unsafe String(cString: baseAddress)
-    return path.isEmpty ? nil : path
+    return unsafe buffer.withUnsafeBufferPointer { storage in
+      guard let baseAddress = storage.baseAddress else {
+        return nil
+      }
+
+      let path = unsafe String(cString: baseAddress)
+      return path.isEmpty ? nil : path
+    }
   }
-}
+#endif

@@ -244,13 +244,47 @@ let package = Package(
       path: "Platforms/Embedding/Sources/SwiftTUIPTYPrimitives",
       swiftSettings: swiftSettings()
     ),
+    // The PTY layer and SwiftTerm cannot build on Windows. The dependency
+    // *edges* are conditional — a source-level `#if` alone would still make
+    // SwiftPM build SwiftTerm there — and the condition is an allowlist with
+    // no negation, so it must name every platform the edge serves today:
+    // macOS/Catalyst/iOS (declared package platforms), Linux, and Android
+    // (the CLI stack cross-compiles for Android). WASI is deliberately
+    // absent — the PTY targets have never built there (the WASI lane builds
+    // `--target SwiftTUIWASI` precisely to avoid them).
+    // The emulation layer is the ONLY target depending on SwiftTerm, so the
+    // POSIX-bound dependency stays legible and a future package move is
+    // mechanical. `SwiftTUITerminal` re-exports it, keeping the split
+    // invisible to consumers.
+    .target(
+      name: "SwiftTUITerminalEmulation",
+      dependencies: [
+        "SwiftTUIRuntime",
+        .product(
+          name: "SwiftTerm",
+          package: "SwiftTerm",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+      ],
+      path: "Platforms/Embedding/Sources/SwiftTUITerminalEmulation",
+      swiftSettings: swiftSettings()
+    ),
     .target(
       name: "SwiftTUITerminal",
       dependencies: [
         "SwiftTUIRuntime",
-        "SwiftTUIPTYPrimitives",
-        "SwiftTUIPTYCPrimitives",
-        .product(name: "SwiftTerm", package: "SwiftTerm"),
+        .target(
+          name: "SwiftTUITerminalEmulation",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIPTYCPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/Embedding/Sources/SwiftTUITerminal",
       swiftSettings: swiftSettings()

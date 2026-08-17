@@ -14,6 +14,7 @@ SwiftTUI|Sources/SwiftTUI/SwiftTUI.docc
 SwiftTUIArguments|Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIArguments.docc
 SwiftTUICLI|Platforms/CLI/Sources/SwiftTUICLI/SwiftTUICLI.docc
 SwiftTUIPTYPrimitives|Platforms/Embedding/Sources/SwiftTUIPTYPrimitives/SwiftTUIPTYPrimitives.docc
+SwiftTUITerminalEmulation|Platforms/Embedding/Sources/SwiftTUITerminalEmulation/SwiftTUITerminalEmulation.docc
 SwiftTUITerminal|Platforms/Embedding/Sources/SwiftTUITerminal/SwiftTUITerminal.docc
 SwiftTUIWASI|Platforms/WASI/Sources/SwiftTUIWASI/SwiftTUIWASI.docc
 SwiftTUIWebHost|Platforms/WebHost/Sources/SwiftTUIWebHost/SwiftTUIWebHost.docc

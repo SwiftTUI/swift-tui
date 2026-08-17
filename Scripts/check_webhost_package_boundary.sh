@@ -11,10 +11,12 @@ fail() {
 
 target_block() {
   target_name=$1
+  # Anchor to declaration-level `.target(` (4-space indent): conditional
+  # dependency entries also spell `.target(` but sit deeper in the block.
   awk -v target_name="$target_name" '
-    /\.target\(/ { collecting = 1; block = $0; wanted = 0; next }
+    /^    \.target\(/ { collecting = 1; block = $0; wanted = 0; next }
     collecting { block = block "\n" $0 }
-    collecting && $0 ~ "name: \"" target_name "\"" { wanted = 1 }
+    collecting && $0 ~ "name: \"" target_name "\",$" { wanted = 1 }
     wanted && /swiftSettings: swiftSettings\(\)/ { print block; exit }
   ' Package.swift
 }

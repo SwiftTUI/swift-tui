@@ -58,7 +58,7 @@ conversion and session delivery while participating in the host's single focus
 binding.
 
 The closure receives the original `KeyPress` before conversion to
-``TerminalEmulatorKey``, so it can distinguish characters, navigation keys,
+`TerminalEmulatorKey`, so it can distinguish characters, navigation keys,
 and modifier combinations. Returning
 ``TerminalViewKeyDisposition/forwardToChild`` retains normal conversion and
 delivery. Input that the emulator cannot map remains available to other
@@ -81,7 +81,8 @@ focused-key handlers.
 
 ### Emulator
 
-- ``TerminalEmulator``
-- ``TerminalEmulatorEvent``
-- ``TerminalEmulatorKey``
-- ``TerminalEmulatorMouse``
+The emulator layer — `TerminalEmulator`, `TerminalEmulatorEvent`,
+`TerminalEmulatorKey`, and `TerminalEmulatorMouse` — ships in the
+`SwiftTUITerminalEmulation` module, the only SwiftTUI module that depends on
+SwiftTerm. This module re-exports it, so existing imports keep resolving
+those symbols; their reference documentation lives with that module.

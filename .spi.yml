@@ -13,6 +13,7 @@ builder:
         - SwiftTUIArguments
         - SwiftTUICLI
         - SwiftTUIPTYPrimitives
+        - SwiftTUITerminalEmulation
         - SwiftTUITerminal
         - SwiftTUIWASI
         - SwiftTUIWebHost

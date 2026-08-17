@@ -19,6 +19,7 @@ for module in \
   SwiftTUIAnimatedImage \
   SwiftTUIArguments \
   SwiftTUIPTYPrimitives \
+  SwiftTUITerminalEmulation \
   SwiftTUITerminal \
   SwiftTUICLI \
   SwiftTUIWASI \
