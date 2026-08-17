@@ -15,12 +15,31 @@
     import Glibc
   #endif
 
+  /// Installs the web-launch arm into the portable launcher's registry.
+  ///
+  /// Called explicitly at launch by every entry that links this module (the
+  /// umbrella's `App.main()` and the facade entries below) — never via
+  /// module-load side effects, which Swift does not guarantee. Idempotent:
+  /// installing again replaces the arm with an identical one.
+  package func installWebHostRunner() {
+    SwiftTUILaunchRegistry.installWebRunner { app, configuration in
+      try await WebHostRunner.run(app, configuration: configuration)
+    }
+  }
+
   /// Routes a SwiftTUI app between terminal-native and localhost WebHost launch.
+  ///
+  /// Legacy spelling: the router itself is `SwiftTUITerminalCLI.SwiftTUILauncher`
+  /// (Stage 5.2 of the Windows plan), which this facade installs the web arm
+  /// into and delegates to. Prefer `SwiftTUILauncher` in new code; a formal
+  /// deprecation of this name waits for a release boundary so in-repo
+  /// coverage keeps building under warnings-as-errors.
   public enum WebHostCLIRunner {
     /// Constructs an app on the main actor and launches it using parsed CLI options.
     @MainActor
     public static func run<A: App>(_ appType: A.Type) async throws {
-      try await run(appType.init())
+      installWebHostRunner()
+      try await SwiftTUILauncher.run(appType)
     }
 
     /// Constructs an app on the main actor and launches it with explicit configuration.
@@ -29,14 +48,15 @@
       _ appType: A.Type,
       configuration: RuntimeConfiguration
     ) async throws {
-      try await run(appType.init(), configuration: configuration)
+      installWebHostRunner()
+      try await SwiftTUILauncher.run(appType, configuration: configuration)
     }
 
     /// Parses CLI options and launches an app through terminal or WebHost mode.
     @MainActor
     public static func run<A: App>(_ app: A) async throws {
-      let options = try SwiftTUIOptions.parse(Array(CommandLine.arguments.dropFirst()))
-      try await run(app, configuration: options.runtimeConfiguration())
+      installWebHostRunner()
+      try await SwiftTUILauncher.run(app)
     }
 
     /// Launches an app through terminal or WebHost mode with explicit configuration.
@@ -45,12 +65,8 @@
       _ app: A,
       configuration: RuntimeConfiguration
     ) async throws {
-      try await run(
-        app,
-        configuration: configuration,
-        webRunner: WebHostRunner.run,
-        terminalRunner: TerminalRunner.run
-      )
+      installWebHostRunner()
+      try await SwiftTUILauncher.run(app, configuration: configuration)
     }
 
     @MainActor
@@ -60,12 +76,12 @@
       webRunner: @MainActor (A, RuntimeConfiguration) async throws -> Void,
       terminalRunner: @MainActor (A, RuntimeConfiguration) async throws -> Void
     ) async throws {
-      if configuration.web != nil {
-        try await webRunner(app, configuration)
-        return
-      }
-
-      try await terminalRunner(app, configuration)
+      try await SwiftTUILauncher.run(
+        app,
+        configuration: configuration,
+        webRunner: webRunner,
+        terminalRunner: terminalRunner
+      )
     }
 
     package static func runtimeConfiguration(
@@ -73,8 +89,11 @@
       environment: [String: String],
       isStdoutTTY: Bool
     ) throws -> RuntimeConfiguration {
-      try SwiftTUIOptions.parse(arguments)
-        .runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
+      try SwiftTUILauncher.runtimeConfiguration(
+        arguments: arguments,
+        environment: environment,
+        isStdoutTTY: isStdoutTTY
+      )
     }
   }
 

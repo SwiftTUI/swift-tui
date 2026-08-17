@@ -2869,6 +2869,11 @@ SwiftTUITerminalCLI.RenderOnce.standardOutputIsTTY()
 SwiftTUITerminalCLI.SignalReader
 SwiftTUITerminalCLI.SignalReader.events()
 SwiftTUITerminalCLI.SignalReader.init(signals:)
+SwiftTUITerminalCLI.SwiftTUILauncher
+SwiftTUITerminalCLI.SwiftTUILauncher.run(_:)
+SwiftTUITerminalCLI.SwiftTUILauncher.run(_:)
+SwiftTUITerminalCLI.SwiftTUILauncher.run(_:configuration:)
+SwiftTUITerminalCLI.SwiftTUILauncher.run(_:configuration:)
 SwiftTUITerminalCLI.TerminalRunner
 SwiftTUITerminalCLI.TerminalRunner.run(_:)
 SwiftTUITerminalCLI.TerminalRunner.run(_:)

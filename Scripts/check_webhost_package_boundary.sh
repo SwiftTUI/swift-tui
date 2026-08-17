@@ -23,8 +23,8 @@ target_block() {
 
 if rg -n --fixed-strings 'SwiftTUIWebHost' Platforms/CLI/Sources Sources \
   --glob '*.swift' \
-  | rg -v '^Sources/SwiftTUI/SwiftTUI\.swift:.*SwiftTUIWebHostCLI$' \
-  | rg -v '^Sources/SwiftTUI/App\.swift:.*SwiftTUIWebHostCLI$'
+  | rg -v '^Sources/SwiftTUI/SwiftTUI\.swift:.*SwiftTUIWebHostCLI' \
+  | rg -v '^Sources/SwiftTUI/App\.swift:.*SwiftTUIWebHostCLI'
 then
   fail 'Only the SwiftTUI convenience target may reference SwiftTUIWebHostCLI outside Platforms/WebHost.'
 fi

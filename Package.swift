@@ -194,8 +194,16 @@ let package = Package(
       dependencies: [
         "SwiftTUIAnimatedImage",
         "SwiftTUIArguments",
+        "SwiftTUIPlatformIO",
         "SwiftTUIRuntime",
-        "SwiftTUIWebHostCLI",
+        "SwiftTUITerminalCLI",
+        // Stage 5.3 of the Windows plan, option (i): the first Windows
+        // release ships without the web host; the ratified allowlist from
+        // Stage 1 names everything the edge serves today.
+        .target(
+          name: "SwiftTUIWebHostCLI",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Sources/SwiftTUI",
       swiftSettings: swiftSettings()

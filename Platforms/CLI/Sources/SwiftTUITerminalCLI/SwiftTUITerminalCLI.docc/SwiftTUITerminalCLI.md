@@ -19,6 +19,7 @@ diagnostic while the ordinary launch path is unaffected. Most apps import
 
 ### Launching
 
+- ``SwiftTUILauncher``
 - ``TerminalRunner``
 - ``TerminalRunnerError``
 - ``RenderOnce``

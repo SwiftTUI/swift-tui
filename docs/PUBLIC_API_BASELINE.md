@@ -26,7 +26,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminalEmulation` | 6 | 75 |
 | `SwiftTUITerminal` | 8 | 56 |
-| `SwiftTUITerminalCLI` | 5 | 19 |
+| `SwiftTUITerminalCLI` | 6 | 24 |
 | `SwiftTUICLIAttach` | 1 | 6 |
 | `SwiftTUICLI` | 0 | 0 |
 | `SwiftTUIWASI` | 3 | 8 |
@@ -484,11 +484,12 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUITerminalCLI
 
-### Canonical surface (5)
+### Canonical surface (6)
 
 - `App` — extension — 2 members
 - `RenderOnce` — enum — 4 members
 - `SignalReader` — class — 2 members
+- `SwiftTUILauncher` — enum — 4 members
 - `TerminalRunner` — enum — 4 members
 - `TerminalRunnerError` — enum — 2 members
 

@@ -4,6 +4,6 @@
 // consumers keep the combined surface unchanged.
 @_exported import SwiftTUITerminalCLI
 
-#if canImport(SwiftTUICLIAttach)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
   @_exported import SwiftTUICLIAttach
 #endif

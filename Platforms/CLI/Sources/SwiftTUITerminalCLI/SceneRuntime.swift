@@ -4,7 +4,7 @@ import Foundation
 // Secondary (attachable) scenes render into a PTY, which only exists where
 // the POSIX-only attach subsystem is linked (its dependency edge is
 // platform-conditional).
-#if canImport(SwiftTUICLIAttach)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
   import SwiftTUICLIAttach
 #endif
 
@@ -34,7 +34,7 @@ final class SceneRuntime {
   let selection: SelectedWindowScene
   let isPrimary: Bool
   private(set) var lifecycle: SceneLifecycle
-  #if canImport(SwiftTUICLIAttach)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     private let ptyPair: ScenePty?
   #endif
   private let resources: SceneSessionResources
@@ -64,12 +64,12 @@ final class SceneRuntime {
       }
 
     if let resources {
-      #if canImport(SwiftTUICLIAttach)
+      #if os(macOS) || os(iOS) || os(Linux) || os(Android)
         ptyPair = nil
       #endif
       self.resources = resources
     } else if isPrimary {
-      #if canImport(SwiftTUICLIAttach)
+      #if os(macOS) || os(iOS) || os(Linux) || os(Android)
         ptyPair = nil
       #endif
       let environment = ProcessInfo.processInfo.environment
@@ -108,7 +108,7 @@ final class SceneRuntime {
       resources.runtimeIssueSink = .standardError
       self.resources = resources
     } else {
-      #if canImport(SwiftTUICLIAttach)
+      #if os(macOS) || os(iOS) || os(Linux) || os(Android)
         let pty = try ScenePty()
         ptyPair = pty
         let environment = ProcessInfo.processInfo.environment
@@ -153,7 +153,7 @@ final class SceneRuntime {
       }
   }
 
-  #if canImport(SwiftTUICLIAttach)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     /// The slave path of the PTY an attach client would connect to, or `nil`
     /// for the primary scene (which owns the real tty).
     var attachPtyPath: String? {
@@ -219,7 +219,7 @@ final class SceneRuntime {
   }
 
   func shutdown() {
-    #if canImport(SwiftTUICLIAttach)
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       guard let ptyPair else { return }
       Task {
         await ptyPair.close()
@@ -329,7 +329,7 @@ final class SceneRuntime {
   private func waitForClient(
     onAttachmentChanged: @escaping @Sendable (Bool) -> Void
   ) async -> Bool {
-    #if canImport(SwiftTUICLIAttach)
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       guard let pty = ptyPair else { return true }
 
       while !Task.isCancelled {

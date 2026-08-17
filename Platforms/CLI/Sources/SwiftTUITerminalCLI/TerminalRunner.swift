@@ -3,8 +3,11 @@ public import SwiftTUIArguments
 @_spi(Runners) import SwiftTUIRuntime
 
 // The attach subsystem (PTY + Unix sockets) is POSIX-only; its dependency
-// edge is platform-conditional, so its availability is a compile-time fact.
-#if canImport(SwiftTUICLIAttach)
+// edge is platform-conditional, and these gates mirror that allowlist as a
+// platform test rather than `canImport`: the whole-file-guarded attach
+// module still builds (empty) on excluded platforms, so a stale module in
+// the shared build directory makes `canImport` answer by build history.
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
   import SwiftTUICLIAttach
 #endif
 
@@ -154,7 +157,7 @@ public enum TerminalRunner {
       sceneRuntimes.append(runtime)
     }
 
-    #if canImport(SwiftTUICLIAttach)
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       let registry = SceneInfoRegistry(
         entries: sceneRuntimes.map { runtime in
           .init(
@@ -184,7 +187,7 @@ public enum TerminalRunner {
     for runtime in sceneRuntimes {
       let sceneID = runtime.selection.identifier.rawValue
       let task = Task { @MainActor in
-        #if canImport(SwiftTUICLIAttach)
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
           try await runtime.run(
             sessionName: sessionName,
             onAttachmentChanged: { isAttached in
@@ -213,7 +216,7 @@ public enum TerminalRunner {
     }
 
     try await withThrowingTaskGroup(of: Void.self) { group in
-      #if canImport(SwiftTUICLIAttach)
+      #if os(macOS) || os(iOS) || os(Linux) || os(Android)
         group.addTask {
           try await server.run()
         }
@@ -275,7 +278,7 @@ public enum TerminalRunner {
     )
   }
 
-  #if canImport(SwiftTUICLIAttach)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     private static func listInstances(appName: String) {
       let instances = SocketClient.discoverInstances(appName: appName)
       if instances.isEmpty {
@@ -424,7 +427,7 @@ public enum TerminalRunner {
     }
   }
 
-  #if canImport(SwiftTUICLIAttach)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     /// Parses the JSON array of SceneInfo objects returned by the LIST command.
     ///
     /// Expected format: `[{"id":"...","title":...,"ptyPath":...,"isAttached":...}, ...]`

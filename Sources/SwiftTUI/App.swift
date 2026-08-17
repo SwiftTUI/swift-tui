@@ -1,13 +1,10 @@
 public import SwiftTUIArguments
+import SwiftTUIPlatformIO
 public import SwiftTUIRuntime
-import SwiftTUIWebHostCLI
+import SwiftTUITerminalCLI
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#elseif canImport(ucrt)
-  import CRT
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
+  import SwiftTUIWebHostCLI
 #endif
 
 /// The batteries-included SwiftTUI app protocol.
@@ -28,6 +25,13 @@ extension App {
 
   /// Default entry point for batteries-included apps.
   public static func main() async {
+    // Wire the web arm into the portable launcher before anything can
+    // launch: explicit and testable, never a module-load side effect. On
+    // platforms without the web host the launcher simply has no web arm and
+    // `--web` fails with the clear not-linked diagnostic.
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
+      installWebHostRunner()
+    #endif
     var dispatchedCommandType: (any ParsableCommand.Type)?
     do {
       if usesStoredSwiftTUIOptions {
@@ -45,7 +49,7 @@ extension App {
           try await runDispatchedRootSubcommand(subcommand)
           return
         }
-        try await WebHostCLIRunner.run(Self.self)
+        try await SwiftTUILauncher.run(Self.self)
       }
     } catch {
       exitAttributingDispatchedSubcommand(
@@ -103,7 +107,7 @@ extension App {
       return
     }
     if let appCommand = command as? Self {
-      try await WebHostCLIRunner.run(
+      try await SwiftTUILauncher.run(
         appCommand,
         configuration: appCommand.runtimeConfiguration()
       )
@@ -118,13 +122,16 @@ extension App {
 }
 
 /// Writes UTF-8 text to standard output without Foundation, keeping the
-/// batteries-included layer free of `import Foundation`.
+/// batteries-included layer free of `import Foundation`. Routed through the
+/// SwiftTUIPlatformIO facade (Stage 5.4 of the Windows plan) so this layer
+/// carries no libc import ladder of its own.
 private func writeToStandardOutput(_ text: String) {
+  let standardOutputFileDescriptor: Int32 = 1
   var text = text
   text.withUTF8 { buffer in
     guard let base = buffer.baseAddress, buffer.count > 0 else {
       return
     }
-    _ = unsafe write(STDOUT_FILENO, base, buffer.count)
+    _ = unsafe sceneWrite(standardOutputFileDescriptor, base, buffer.count)
   }
 }
