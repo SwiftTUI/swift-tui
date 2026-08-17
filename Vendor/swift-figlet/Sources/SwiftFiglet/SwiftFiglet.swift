@@ -4,6 +4,8 @@
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 public enum FigletError: Error, CustomStringConvertible, Sendable {
@@ -1698,6 +1700,57 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
 
   private func environmentValue(named name: String) -> String? {
     nil
+  }
+#elseif canImport(ucrt)
+  // Windows: path-based file I/O works through the shared CRT symbols;
+  // directory enumeration has no ucrt spelling, so font-directory browsing
+  // degrades to embedded fonts plus explicit font paths.
+  private func fileExists(at path: String) -> Bool {
+    unsafe path.withCString { unsafe _access($0, 0) == 0 }
+  }
+
+  private func isDirectory(at path: String) -> Bool {
+    false
+  }
+
+  private func directoryEntries(at path: String) -> [String] {
+    []
+  }
+
+  private func readFile(at path: String) throws -> [UInt8] {
+    guard let file = unsafe fopen(path, "rb") else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+    defer { unsafe fclose(file) }
+
+    guard unsafe fseek(file, 0, SEEK_END) == 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    let size = unsafe ftell(file)
+    guard size >= 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    unsafe rewind(file)
+
+    var buffer = [UInt8](repeating: 0, count: Int(size))
+    let bufferCount = buffer.count
+    guard bufferCount > 0 else {
+      return []
+    }
+    let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
+      unsafe fread(bytes.baseAddress!, 1, bufferCount, file)
+    }
+
+    return Array(buffer.prefix(bytesRead))
+  }
+
+  private func environmentValue(named name: String) -> String? {
+    guard let value = unsafe getenv(name) else {
+      return nil
+    }
+    return unsafe String(cString: value)
   }
 #else
   private func fileExists(at path: String) -> Bool {
