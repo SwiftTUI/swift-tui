@@ -3,6 +3,7 @@ import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
+import SwiftTUIViews
 
 #if canImport(Darwin)
   import Darwin
@@ -15,7 +16,7 @@ import Testing
 struct TerminalPresentationTests {
   @Test("capability detection prefers true color under UTF-8 terminals")
   func capabilityDetectionPrefersTrueColor() {
-    let profile = TerminalCapabilityProfile.detect(
+    let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "COLORTERM": "truecolor",
@@ -39,7 +40,7 @@ struct TerminalPresentationTests {
 
   @Test("capability detection disables styling for no-color and non-tty outputs")
   func capabilityDetectionDisablesStylingWhenRequested() {
-    let noColorProfile = TerminalCapabilityProfile.detect(
+    let noColorProfile = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "NO_COLOR": "1",
@@ -47,7 +48,7 @@ struct TerminalPresentationTests {
       ],
       isTTY: true
     )
-    let redirectedProfile = TerminalCapabilityProfile.detect(
+    let redirectedProfile = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "C",
@@ -78,21 +79,21 @@ struct TerminalPresentationTests {
 
   @Test("capability detection enables scroll regions for any non-dumb tty")
   func capabilityDetectionTracksScrollRegionSupport() {
-    let supported = TerminalCapabilityProfile.detect(
+    let supported = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "vt100",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let dumb = TerminalCapabilityProfile.detect(
+    let dumb = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "dumb",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let redirected = TerminalCapabilityProfile.detect(
+    let redirected = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
@@ -112,21 +113,21 @@ struct TerminalPresentationTests {
 
   @Test("capability detection enables mouse reporting only for supported tty terminals")
   func capabilityDetectionTracksMouseReportingSupport() {
-    let supported = TerminalCapabilityProfile.detect(
+    let supported = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let dumb = TerminalCapabilityProfile.detect(
+    let dumb = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "dumb",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let redirected = TerminalCapabilityProfile.detect(
+    let redirected = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
@@ -141,21 +142,21 @@ struct TerminalPresentationTests {
 
   @Test("capability detection enables hyperlinks only for supported tty terminals")
   func capabilityDetectionTracksHyperlinkSupport() {
-    let supported = TerminalCapabilityProfile.detect(
+    let supported = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "wezterm",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let dumb = TerminalCapabilityProfile.detect(
+    let dumb = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "dumb",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let redirected = TerminalCapabilityProfile.detect(
+    let redirected = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "wezterm",
         "LANG": "en_US.UTF-8",
@@ -170,21 +171,21 @@ struct TerminalPresentationTests {
 
   @Test("capability detection enables synchronized output only for supported tty terminals")
   func capabilityDetectionTracksSynchronizedOutputSupport() {
-    let supported = TerminalCapabilityProfile.detect(
+    let supported = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let dumb = TerminalCapabilityProfile.detect(
+    let dumb = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "dumb",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
     )
-    let redirected = TerminalCapabilityProfile.detect(
+    let redirected = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
@@ -195,6 +196,161 @@ struct TerminalPresentationTests {
     #expect(supported.supportsSynchronizedOutput)
     #expect(!dumb.supportsSynchronizedOutput)
     #expect(!redirected.supportsSynchronizedOutput)
+  }
+
+  @Test("ascii degradation is total over box drawing and block elements")
+  func asciiDegradationCoversBoxDrawingAndBlockElements() {
+    // U+2500–U+257F box drawing plus U+2580–U+259F block elements: the two
+    // ranges the framework's chrome and the embedded figlet fonts draw from.
+    // Every scalar must degrade to a drawing character, never to "?".
+    let glyphs = (0x2500...0x259F).compactMap(Unicode.Scalar.init).map(Character.init)
+    let content = String(glyphs) + "■"
+    let frame = DefaultRenderer().render(
+      Text(content),
+      proposal: .init(width: glyphs.count + 8, height: nil)
+    )
+    let profile = TerminalCapabilityProfile(
+      glyphLevel: .ascii,
+      colorLevel: .none,
+      emitsStyleEscapeSequences: false
+    )
+    let rendered = TerminalSurfaceRenderer(capabilityProfile: profile)
+      .render(frame.rasterSurface)
+
+    let allASCII = rendered.allSatisfy(\.isASCII)
+    #expect(!rendered.contains("?"))
+    #expect(allASCII)
+  }
+
+  @Test("figure-font strokes degrade to their drawing ascii")
+  func figureFontStrokesDegradeToDrawingASCII() {
+    // The exact glyphs the embedded `future` figlet font draws digits with
+    // that the named degradation cases do not cover: heavy half-stubs, heavy
+    // tees/crossings, and the filled square.
+    let frame = DefaultRenderer().render(
+      Text("╻╹╸╺┣┫┳┻╋■"),
+      proposal: .init(width: 10, height: nil)
+    )
+    let profile = TerminalCapabilityProfile(
+      glyphLevel: .ascii,
+      colorLevel: .none,
+      emitsStyleEscapeSequences: false
+    )
+    let rendered = TerminalSurfaceRenderer(capabilityProfile: profile)
+      .render(frame.rasterSurface)
+
+    #expect(rendered.contains("||--+++++#"))
+  }
+
+  @Test("windows console detection defaults to true color and unicode")
+  func windowsConsoleDetectionDefaultsToTrueColorAndUnicode() {
+    // No Windows shell sets TERM, COLORTERM, or a locale: the console-host
+    // floor (VT-enabled ≥ 1809, controller-owned UTF-8 codepages) carries
+    // the defaults. Bare conhost gets no hyperlinks or synchronized output.
+    let profile = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: [:],
+      isTTY: true
+    )
+
+    var expected = TerminalCapabilityProfile(
+      glyphLevel: .unicode,
+      colorLevel: .trueColor,
+      emitsStyleEscapeSequences: true,
+      supportsHyperlinks: false,
+      supportsMouseReporting: true,
+      supportsSynchronizedOutput: false
+    )
+    expected.supportsScrollRegions = true
+    #expect(profile == expected)
+  }
+
+  @Test("windows terminal sessions add hyperlinks and synchronized output")
+  func windowsConsoleDetectionRecognizesWindowsTerminal() {
+    let profile = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["WT_SESSION": "1a2b3c"],
+      isTTY: true
+    )
+
+    #expect(profile.colorLevel == .trueColor)
+    #expect(profile.glyphLevel == .unicode)
+    #expect(profile.supportsHyperlinks)
+    #expect(profile.supportsSynchronizedOutput)
+    #expect(profile.supportsMouseReporting)
+  }
+
+  @Test("windows console detection honors an explicit foreign TERM")
+  func windowsConsoleDetectionHonorsForeignTERM() {
+    // WezTerm and ssh-into-Windows sessions export their own TERM; those
+    // read like the POSIX arm rather than the console-host floor.
+    let wezterm = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": "xterm-256color", "COLORTERM": "truecolor"],
+      isTTY: true
+    )
+    let ansi256 = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": "xterm-256color"],
+      isTTY: true
+    )
+    let conservative = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": "vt100"],
+      isTTY: true
+    )
+
+    #expect(wezterm.colorLevel == .trueColor)
+    #expect(wezterm.supportsHyperlinks)
+    #expect(ansi256.colorLevel == .ansi256)
+    #expect(ansi256.supportsMouseReporting)
+    #expect(conservative.colorLevel == .ansi16)
+    #expect(!conservative.supportsHyperlinks)
+    #expect(!conservative.supportsMouseReporting)
+  }
+
+  @Test("windows console detection respects NO_COLOR, dumb, and redirects")
+  func windowsConsoleDetectionRespectsOptOutsAndRedirects() {
+    let noColor = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["NO_COLOR": "1"],
+      isTTY: true
+    )
+    let dumb = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": "dumb"],
+      isTTY: true
+    )
+    let redirected = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: [:],
+      isTTY: false
+    )
+
+    #expect(noColor.colorLevel == .none)
+    #expect(!noColor.emitsStyleEscapeSequences)
+    #expect(noColor.glyphLevel == .unicode)
+    #expect(dumb.colorLevel == .none)
+    #expect(redirected.colorLevel == .none)
+    #expect(redirected.glyphLevel == .unicode)
+    #expect(!redirected.supportsScrollRegions)
+  }
+
+  @Test("capability detection dispatches to the platform arm")
+  func capabilityDetectionDispatchesToPlatformArm() {
+    // An environment the two arms disagree on (no locale: the POSIX arm
+    // degrades glyphs to ascii, the Windows arm stays unicode) proves the
+    // public entry point serves the compiled platform's arm.
+    let environment = ["TERM": "xterm-256color"]
+    #if os(Windows)
+      let expected = TerminalCapabilityProfile.detectWindowsConsole(
+        environment: environment,
+        isTTY: true
+      )
+    #else
+      let expected = TerminalCapabilityProfile.detectPOSIXTerminal(
+        environment: environment,
+        isTTY: true
+      )
+    #endif
+
+    let detected = TerminalCapabilityProfile.detect(
+      environment: environment,
+      isTTY: true
+    )
+    #expect(detected == expected)
   }
 
   @Test("appearance detection derives defaults from COLORFGBG heuristics")

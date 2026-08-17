@@ -385,9 +385,68 @@ struct TerminalCellTextRenderer {
     default:
       let scalarView = String(character).unicodeScalars
       guard scalarView.allSatisfy(\.isASCII) else {
+        if scalarView.count == 1, let scalar = scalarView.first,
+          let degraded = degradedBoxDrawingASCII(scalar)
+        {
+          return degraded
+        }
         return String(repeating: "?", count: max(1, spanWidth))
       }
       return String(character)
+    }
+  }
+
+  /// Total ASCII degradations for the box-drawing (U+2500–U+257F) and
+  /// block-elements (U+2580–U+259F) ranges — the two Unicode blocks the
+  /// framework's chrome and the embedded figlet fonts draw from — plus the
+  /// filled square the `future` figure font uses. The named cases in
+  /// `degradedASCIIText` win first and stay byte-stable; this table serves
+  /// only the scalars they do not name, so no glyph in either range ever
+  /// degrades to `?`.
+  private func degradedBoxDrawingASCII(
+    _ scalar: UnicodeScalar
+  ) -> String? {
+    switch scalar.value {
+    case 0x2500...0x257F:
+      switch scalar {
+      // Horizontal-only strokes: dashed runs and half-line stubs.
+      case "┄", "┅", "┈", "┉", "╌", "╍", "╴", "╶", "╸", "╺", "╼", "╾":
+        return "-"
+      // Vertical-only strokes: dashed runs and half-line stubs.
+      case "┆", "┇", "┊", "┋", "╎", "╏", "╵", "╷", "╹", "╻", "╽", "╿":
+        return "|"
+      case "╱":
+        return "/"
+      case "╲":
+        return "\\"
+      case "╳":
+        return "X"
+      default:
+        // Corners, tees, and crossings, in every weight and doubling.
+        return "+"
+      }
+    case 0x2580...0x259F:
+      switch scalar {
+      case "▁":
+        return "_"
+      case "▃", "▔":
+        return "-"
+      case "░":
+        return "."
+      case "▒":
+        return ":"
+      case "▅", "▆", "▇", "▉", "▊", "▋", "▓":
+        return "#"
+      case "▍", "▎", "▏", "▕":
+        return "|"
+      default:
+        // The quadrant pairs (▚, ▞) and any remainder.
+        return "+"
+      }
+    case 0x25A0:  // ■
+      return "#"
+    default:
+      return nil
     }
   }
 
