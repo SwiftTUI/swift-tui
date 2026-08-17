@@ -127,13 +127,13 @@ struct PackageGraphIsolationTests {
     while let markerRange = manifest.range(of: targetStart, range: searchRange) {
       let suffix = manifest[markerRange.lowerBound...]
       let searchStart = suffix.index(markerRange.lowerBound, offsetBy: targetStart.count)
+      // Only declaration-level entries (4-space indent) end a block:
+      // platform-conditional DEPENDENCY entries also spell `.target(`, at
+      // deeper indentation inside the dependencies array, and treating them
+      // as block ends truncates every conditional-dep target's block.
       let endCandidates = [
         suffix[searchStart...].range(of: "\n    .target(")?.lowerBound,
-        suffix[searchStart...].range(of: "\n      .target(")?.lowerBound,
-        suffix[searchStart...].range(of: "\n        .target(")?.lowerBound,
         suffix[searchStart...].range(of: "\n    .testTarget(")?.lowerBound,
-        suffix[searchStart...].range(of: "\n      .testTarget(")?.lowerBound,
-        suffix[searchStart...].range(of: "\n        .testTarget(")?.lowerBound,
       ].compactMap { $0 }
 
       let blockEnd = endCandidates.min() ?? suffix.endIndex
