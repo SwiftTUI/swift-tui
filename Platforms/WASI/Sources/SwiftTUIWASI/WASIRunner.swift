@@ -319,12 +319,9 @@ private func integerEnvironmentValue(
 private func environmentValue(
   named name: String
 ) -> String? {
-  unsafe name.withCString { cName in
-    guard let rawValue = unsafe getenv(cName) else {
-      return nil
-    }
-    return unsafe String(cString: rawValue)
-  }
+  // Routed through the shared reader so the Windows secure-CRT spelling
+  // (`_dupenv_s`) lives in exactly one place.
+  FeatureFlags.environmentValue(named: name)
 }
 
 extension App {

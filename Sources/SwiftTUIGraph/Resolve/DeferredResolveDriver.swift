@@ -110,8 +110,8 @@ package final class DeferredResolveDriver {
   private static var profileDefaultDepthLimit: Int? {
     // `SWIFTTUI_RESOLVE_DEPTH_LIMIT` tunes the cap on WASI and force-enables
     // the driver on native for composed-runtime debugging and tests.
-    if let raw = unsafe getenv("SWIFTTUI_RESOLVE_DEPTH_LIMIT"),
-      let parsed = Int(unsafe String(cString: raw))
+    if let raw = FeatureFlags.environmentValue(named: "SWIFTTUI_RESOLVE_DEPTH_LIMIT"),
+      let parsed = Int(raw)
     {
       return parsed > 0 ? parsed : nil
     }

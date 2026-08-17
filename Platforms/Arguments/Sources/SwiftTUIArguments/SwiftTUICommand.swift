@@ -8,7 +8,21 @@ public import SwiftTUIRuntime
   import Glibc
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
+
+/// Whether stdout is a terminal, spelled per platform: `_isatty` is the
+/// non-deprecated CRT name on Windows (the bare POSIX alias warns C4996).
+/// Public because it serves as the `isStdoutTTY` default argument on the
+/// public `runtimeConfiguration(environment:isStdoutTTY:)` overloads.
+public func standardOutputIsATTY() -> Bool {
+  #if os(Windows)
+    _isatty(STDOUT_FILENO) != 0
+  #else
+    isatty(STDOUT_FILENO) != 0
+  #endif
+}
 
 /// A SwiftTUI command with framework-managed argument parsing.
 ///
@@ -89,7 +103,7 @@ extension SwiftTUICommand {
 
   public func runtimeConfiguration(
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
+    isStdoutTTY: Bool = standardOutputIsATTY()
   ) -> RuntimeConfiguration {
     swiftTUIOptions.runtimeConfiguration(environment: environment, isStdoutTTY: isStdoutTTY)
   }

@@ -27,7 +27,11 @@ final class FrameDiagnosticsFileSink: FrameDiagnosticSink {
   }
 
   deinit {
-    close(fileDescriptor)
+    #if os(Windows)
+      _close(fileDescriptor)
+    #else
+      close(fileDescriptor)
+    #endif
   }
 
   func record(_ sample: RuntimeFrameSample) {

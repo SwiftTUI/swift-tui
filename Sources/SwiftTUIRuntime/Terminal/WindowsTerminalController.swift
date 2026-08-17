@@ -46,17 +46,17 @@ import SwiftTUICore
     func isATTY(_ fileDescriptor: Int32) -> Bool {
       // GetConsoleMode failing is the reliable console test; _isatty alone
       // returns true for character devices that are not consoles.
-      guard let handle = win32Handle(for: fileDescriptor) else { return false }
+      guard let handle = unsafe win32Handle(for: fileDescriptor) else { return false }
       var mode: DWORD = 0
-      return GetConsoleMode(handle, &mode)
+      return unsafe GetConsoleMode(handle, &mode)
     }
 
     func windowSize(of fileDescriptor: Int32) throws -> CellSize {
-      guard let handle = win32Handle(for: fileDescriptor) else {
+      guard let handle = unsafe win32Handle(for: fileDescriptor) else {
         throw TerminalHostError.failedToReadWindowSize(errno: lastWin32Errno())
       }
       var info = CONSOLE_SCREEN_BUFFER_INFO()
-      guard GetConsoleScreenBufferInfo(handle, &info) else {
+      guard unsafe GetConsoleScreenBufferInfo(handle, &info) else {
         throw TerminalHostError.failedToReadWindowSize(errno: lastWin32Errno())
       }
       // srWindow is the visible viewport; dwSize is the scrollback buffer
@@ -68,15 +68,15 @@ import SwiftTUICore
     }
 
     func enterRawMode(input: Int32, output: Int32) throws -> TerminalModeSnapshot {
-      guard let inputHandle = win32Handle(for: input),
-        let outputHandle = win32Handle(for: output)
+      guard let inputHandle = unsafe win32Handle(for: input),
+        let outputHandle = unsafe win32Handle(for: output)
       else {
         throw TerminalHostError.notATTY(fileDescriptor: input)
       }
       var inputMode: DWORD = 0
       var outputMode: DWORD = 0
-      guard GetConsoleMode(inputHandle, &inputMode),
-        GetConsoleMode(outputHandle, &outputMode)
+      guard unsafe GetConsoleMode(inputHandle, &inputMode),
+        unsafe GetConsoleMode(outputHandle, &outputMode)
       else {
         throw TerminalHostError.notATTY(fileDescriptor: input)
       }
@@ -111,8 +111,8 @@ import SwiftTUICore
           ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
             | DISABLE_NEWLINE_AUTO_RETURN)
 
-      guard SetConsoleMode(inputHandle, rawInputMode),
-        SetConsoleMode(outputHandle, rawOutputMode)
+      guard unsafe SetConsoleMode(inputHandle, rawInputMode),
+        unsafe SetConsoleMode(outputHandle, rawOutputMode)
       else {
         throw TerminalHostError.failedToSetAttributes(errno: lastWin32Errno())
       }
@@ -124,14 +124,14 @@ import SwiftTUICore
     }
 
     func restore(_ snapshot: TerminalModeSnapshot, input: Int32, output: Int32) throws {
-      guard let inputHandle = win32Handle(for: input),
-        let outputHandle = win32Handle(for: output)
+      guard let inputHandle = unsafe win32Handle(for: input),
+        let outputHandle = unsafe win32Handle(for: output)
       else {
         throw TerminalHostError.failedToSetAttributes(errno: lastWin32Errno())
       }
       var failed = false
-      if !SetConsoleMode(inputHandle, snapshot.consoleInputMode) { failed = true }
-      if !SetConsoleMode(outputHandle, snapshot.consoleOutputMode) { failed = true }
+      if unsafe !SetConsoleMode(inputHandle, snapshot.consoleInputMode) { failed = true }
+      if unsafe !SetConsoleMode(outputHandle, snapshot.consoleOutputMode) { failed = true }
       if snapshot.inputCodePage != 0 {
         SetConsoleCP(snapshot.inputCodePage)
       }
@@ -146,7 +146,7 @@ import SwiftTUICore
     // MARK: - Write path
 
     func write(_ output: String, to fileDescriptor: Int32) throws {
-      guard let handle = win32Handle(for: fileDescriptor) else {
+      guard let handle = unsafe win32Handle(for: fileDescriptor) else {
         throw TerminalHostError.failedToWrite(errno: lastWin32Errno())
       }
       let bytes = Array(output.utf8)
@@ -216,10 +216,10 @@ import SwiftTUICore
         return buffered
       }
 
-      guard let handle = win32Handle(for: fileDescriptor) else {
+      guard let handle = unsafe win32Handle(for: fileDescriptor) else {
         return []
       }
-      guard WaitForSingleObject(handle, DWORD(max(0, timeoutMilliseconds))) == WAIT_OBJECT_0
+      guard unsafe WaitForSingleObject(handle, DWORD(max(0, timeoutMilliseconds))) == WAIT_OBJECT_0
       else {
         return []
       }
@@ -238,11 +238,11 @@ import SwiftTUICore
           let record = records[index]
           switch Int32(record.EventType) {
           case KEY_EVENT:
-            appendKeyEventBytes(record.Event.KeyEvent, state: &state, into: &bytes)
+            unsafe appendKeyEventBytes(record.Event.KeyEvent, state: &state, into: &bytes)
           case WINDOW_BUFFER_SIZE_EVENT:
             resized = true
           case MOUSE_EVENT:
-            appendSyntheticSGR(record.Event.MouseEvent, state: &state, into: &bytes)
+            unsafe appendSyntheticSGR(record.Event.MouseEvent, state: &state, into: &bytes)
           default:
             // FOCUS_EVENT / MENU_EVENT are documented as internal-use.
             break
@@ -272,7 +272,7 @@ import SwiftTUICore
       into bytes: inout [UInt8]
     ) {
       let isKeyDown = key.bKeyDown.boolValue
-      let unit = key.uChar.UnicodeChar
+      let unit = unsafe key.uChar.UnicodeChar
       if !isKeyDown {
         guard key.wVirtualKeyCode == WORD(VK_MENU), unit != 0 else {
           return
@@ -385,7 +385,7 @@ import SwiftTUICore
     // swift-corelibs-foundation use.
     let raw = _get_osfhandle(fileDescriptor)
     guard raw != -1, raw != -2 else { return nil }
-    return HANDLE(bitPattern: raw)
+    return unsafe HANDLE(bitPattern: raw)
   }
 
   @inline(__always)

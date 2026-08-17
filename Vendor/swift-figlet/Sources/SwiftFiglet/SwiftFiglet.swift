@@ -1718,7 +1718,11 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
   }
 
   private func readFile(at path: String) throws -> [UInt8] {
-    guard let file = unsafe fopen(path, "rb") else {
+    // fopen is CRT-deprecated on Windows (C4996); fopen_s is the conformant
+    // spelling.
+    var openedFile: UnsafeMutablePointer<FILE>? = nil
+    _ = unsafe fopen_s(&openedFile, path, "rb")
+    guard let file = unsafe openedFile else {
       throw FigletError.invalidFont("unable to read font at \(path)")
     }
     defer { unsafe fclose(file) }
@@ -1747,10 +1751,20 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
   }
 
   private func environmentValue(named name: String) -> String? {
-    guard let value = unsafe getenv(name) else {
-      return nil
+    // getenv is CRT-deprecated on Windows (C4996); _dupenv_s is the
+    // conformant spelling. Success with a nil buffer means the variable is
+    // unset; the CRT mallocs the buffer and this side frees it.
+    unsafe name.withCString { cName in
+      var buffer: UnsafeMutablePointer<CChar>? = nil
+      var length: size_t = 0
+      guard unsafe _dupenv_s(&buffer, &length, cName) == 0,
+        let value = unsafe buffer
+      else {
+        return nil
+      }
+      defer { unsafe free(value) }
+      return unsafe String(cString: value)
     }
-    return unsafe String(cString: value)
   }
 #else
   private func fileExists(at path: String) -> Bool {

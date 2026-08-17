@@ -33,9 +33,14 @@ extension App {
   /// `RuntimeConfiguration` and passes it through. Bare-mode apps gain
   /// env-var honoring without code change.
   public static func main() async {
+    #if os(Windows)
+      let isStdoutTTY = _isatty(STDOUT_FILENO) != 0
+    #else
+      let isStdoutTTY = isatty(STDOUT_FILENO) != 0
+    #endif
     let configuration = RuntimeConfiguration.detect(
       environment: ProcessInfo.processInfo.environment,
-      isStdoutTTY: isatty(STDOUT_FILENO) != 0
+      isStdoutTTY: isStdoutTTY
     )
     do {
       try await TerminalRunner.run(Self.self, configuration: configuration)

@@ -22,7 +22,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 299 | 1682 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
-| `SwiftTUIArguments` | 4 | 47 |
+| `SwiftTUIArguments` | 5 | 48 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminalEmulation` | 6 | 75 |
 | `SwiftTUITerminal` | 8 | 56 |
@@ -440,9 +440,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIArguments
 
-### Canonical surface (4)
+### Canonical surface (5)
 
 - `CompletionsCommand` — struct — 13 members
+- `standardOutputIsATTY()` — func
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 11 members
 - `SwiftTUIOptions` — struct — 19 members

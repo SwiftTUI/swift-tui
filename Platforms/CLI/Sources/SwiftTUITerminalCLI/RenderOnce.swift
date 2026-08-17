@@ -116,6 +116,8 @@ public enum RenderOnce {
   public static func standardOutputIsTTY() -> Bool {
     #if canImport(WASILibc)
       return false
+    #elseif os(Windows)
+      return _isatty(STDOUT_FILENO) != 0
     #else
       return isatty(STDOUT_FILENO) != 0
     #endif

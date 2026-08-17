@@ -73,7 +73,11 @@ final class SceneRuntime {
         ptyPair = nil
       #endif
       let environment = ProcessInfo.processInfo.environment
-      let isTTY = isatty(STDOUT_FILENO) != 0
+      #if os(Windows)
+        let isTTY = _isatty(STDOUT_FILENO) != 0
+      #else
+        let isTTY = isatty(STDOUT_FILENO) != 0
+      #endif
       let capabilityProfile = TerminalCapabilityProfile.detect(
         environment: environment,
         isTTY: isTTY
@@ -106,6 +110,12 @@ final class SceneRuntime {
         runtimeConfiguration: configuration
       )
       resources.runtimeIssueSink = .standardError
+      // Windows plan Stage 6 item 9: a below-floor main-thread stack reserve
+      // silently degrades the engine — debug builds must say so, loudly,
+      // with the /STACK remedy. Nil everywhere else.
+      if let stackFloorIssue = WindowsStackFloorDiagnostic.sessionIssue() {
+        RuntimeIssueSink.standardError.report(stackFloorIssue)
+      }
       self.resources = resources
     } else {
       #if os(macOS) || os(iOS) || os(Linux) || os(Android)

@@ -225,10 +225,9 @@ public final class ProfileActivation {
     #if canImport(WASILibc)
       return nil
     #else
-      guard let value = unsafe getenv(name) else {
-        return nil
-      }
-      return unsafe String(cString: value)
+      // Routed through the shared reader so the Windows secure-CRT spelling
+      // (`_dupenv_s`) lives in exactly one place.
+      return FeatureFlags.environmentValue(named: name)
     #endif
   }
 }

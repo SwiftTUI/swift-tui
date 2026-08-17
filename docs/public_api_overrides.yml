@@ -206,6 +206,10 @@ classifications:
     - SwiftTUIArguments.SwiftTUIApp
     - SwiftTUIArguments.SwiftTUICommand
     - SwiftTUIArguments.SwiftTUIOptions
+    # Public because it serves as the isStdoutTTY default argument on the
+    # public runtimeConfiguration overloads (a default argument cannot
+    # reference a package symbol); carries the Windows `_isatty` spelling.
+    - "SwiftTUIArguments.standardOutputIsATTY()"
     - "SwiftTUIPTYPrimitives.closeFD(_:)"
     - "SwiftTUIPTYPrimitives.openPTY()"
     - SwiftTUIPTYPrimitives.PTYError

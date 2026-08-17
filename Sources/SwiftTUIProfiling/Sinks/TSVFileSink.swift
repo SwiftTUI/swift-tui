@@ -46,7 +46,11 @@
   }
 
   deinit {
-    #if !canImport(WASILibc)
+    #if os(Windows)
+      if ownsDescriptor {
+        _close(fileDescriptor)
+      }
+    #elseif !canImport(WASILibc)
       if ownsDescriptor {
         close(fileDescriptor)
       }

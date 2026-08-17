@@ -1,3 +1,7 @@
+#if os(Windows)
+  import WinSDK
+#endif
+
 /// Whether this process runs the stack-lean resolve profile.
 ///
 /// JavaScriptCore executes wasm calls on the host thread's native stack, and
@@ -25,25 +29,70 @@
 /// composed-runtime debugging and profile-shaped gate lanes.
 @MainActor
 package let stackLeanResolveProfile: Bool = {
-  // Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
-  // boolean rule): only the exact values `0` / `1` are respected, so a typo
-  // can never flip a whole engine profile.
-  if let raw = FeatureFlags.environmentValue(named: "SWIFTTUI_STACK_LEAN_PROFILE") {
-    switch raw {
-    case "0":
-      return false
-    case "1":
-      return true
-    default:
-      break
-    }
+  if let explicit = stackLeanExplicitEnvironmentChoice {
+    return explicit
   }
   #if os(WASI) && canImport(WASILibc)
     return true
+  #elseif os(Windows)
+    return stackLeanArmedByWindowsStackFloor
   #else
     return false
   #endif
 }()
+
+/// The operator's explicit `SWIFTTUI_STACK_LEAN_PROFILE` choice, if any.
+///
+/// Documented grammar exception (unlike the shared `FeatureFlags.isEnabled`
+/// boolean rule): only the exact values `0` / `1` are respected, so a typo
+/// can never flip a whole engine profile.
+package let stackLeanExplicitEnvironmentChoice: Bool? = {
+  switch FeatureFlags.environmentValue(named: "SWIFTTUI_STACK_LEAN_PROFILE") {
+  case "0":
+    false
+  case "1":
+    true
+  default:
+    nil
+  }
+}()
+
+/// The smallest main-thread stack reserve the full engine profile is safe
+/// under. POSIX main threads get 8 MiB; the engine's resolve descent is
+/// budgeted against that, and the Windows default reserve — 1 MiB from the
+/// PE header unless the link sets `/STACK` — overflows it in debug builds
+/// (`0xC00000FD`, the plan's Stage 6 item-9 finding). Anything below this
+/// floor runs the stack-lean profile instead of crashing.
+package let fullEngineStackReserveFloor = 8 << 20
+
+/// Whether a below-floor Windows main-thread stack reserve armed the lean
+/// profile (as opposed to WASI's default or an explicit environment choice).
+/// The session launch path reads this to emit the loud debug diagnostic
+/// naming the `/STACK:16777216` remedy.
+@MainActor
+package let stackLeanArmedByWindowsStackFloor: Bool = {
+  #if os(Windows)
+    return stackLeanExplicitEnvironmentChoice == nil
+      && windowsMainThreadStackReserve() < fullEngineStackReserveFloor
+  #else
+    return false
+  #endif
+}()
+
+#if os(Windows)
+  /// The calling thread's full stack reserve in bytes
+  /// (`GetCurrentThreadStackLimits`, Windows 8+ — inside the declared
+  /// Windows 10 1809 platform floor). `@MainActor` so the lazy globals above
+  /// measure the main thread, whose reserve is the one the resolve descent
+  /// runs against.
+  @MainActor
+  package func windowsMainThreadStackReserve() -> Int {
+    var lowLimit: ULONG_PTR = 0
+    var highLimit: ULONG_PTR = 0
+    unsafe GetCurrentThreadStackLimits(&lowLimit, &highLimit)
+    return Int(highLimit &- lowLimit)
+  }
+#endif
 
 /// Opt-in: retained reuse under the stack-lean profile
 /// (`SWIFTTUI_LEAN_RETAINED_REUSE=1`; bounded-depth-reuse program).

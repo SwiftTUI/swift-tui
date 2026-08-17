@@ -123,6 +123,7 @@ SwiftTUIArguments.SwiftTUIOptions.scene
 SwiftTUIArguments.SwiftTUIOptions.stableOutput
 SwiftTUIArguments.SwiftTUIOptions.verbose
 SwiftTUIArguments.SwiftTUIOptions.web
+SwiftTUIArguments.standardOutputIsATTY()
 SwiftTUICLIAttach.ScenePty
 SwiftTUICLIAttach.ScenePty.close()
 SwiftTUICLIAttach.ScenePty.hasAttachedClient()

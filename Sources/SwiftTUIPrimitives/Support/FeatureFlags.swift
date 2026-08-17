@@ -206,10 +206,25 @@ package enum FeatureFlags {
   /// latched by each gate's `static var`), matching the prior getenv semantics.
   package static func environmentValue(named name: String) -> String? {
     unsafe name.withCString { cName in
-      guard let rawValue = unsafe getenv(cName) else {
-        return nil
-      }
-      return unsafe String(cString: rawValue)
+      #if os(Windows)
+        // getenv is CRT-deprecated on Windows (C4996); _dupenv_s is the
+        // conformant spelling. Success with a nil buffer means the variable
+        // is unset; the CRT mallocs the buffer and this side frees it.
+        var buffer: UnsafeMutablePointer<CChar>? = nil
+        var length: size_t = 0
+        guard unsafe _dupenv_s(&buffer, &length, cName) == 0,
+          let rawValue = unsafe buffer
+        else {
+          return nil
+        }
+        defer { unsafe free(rawValue) }
+        return unsafe String(cString: rawValue)
+      #else
+        guard let rawValue = unsafe getenv(cName) else {
+          return nil
+        }
+        return unsafe String(cString: rawValue)
+      #endif
     }
   }
 

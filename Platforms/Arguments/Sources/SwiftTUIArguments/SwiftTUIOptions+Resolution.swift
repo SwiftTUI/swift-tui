@@ -9,7 +9,7 @@ extension SwiftTUIOptions {
   /// `--reduce-motion --cursor-follows-focus`.
   public func runtimeConfiguration(
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    isStdoutTTY: Bool = isatty(STDOUT_FILENO) != 0
+    isStdoutTTY: Bool = standardOutputIsATTY()
   ) -> RuntimeConfiguration {
     // Step 1: Establish the env-var-derived baseline.
     let baseline = RuntimeConfiguration.detect(

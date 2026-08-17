@@ -83,7 +83,9 @@ import SwiftTUICore
 
   private static func manifest(configuration: RuntimeConfiguration) -> String {
     var lines: [String] = ["SwiftTUI debug bundle manifest"]
-    #if !canImport(WASILibc)
+    #if os(Windows)
+      lines.append("pid: \(_getpid())")
+    #elseif !canImport(WASILibc)
       lines.append("pid: \(getpid())")
     #endif
     lines.append(
@@ -133,7 +135,9 @@ import SwiftTUICore
         name += "-" + sanitized
       }
     }
-    #if !canImport(WASILibc)
+    #if os(Windows)
+      name += "-\(_getpid())"
+    #elseif !canImport(WASILibc)
       name += "-\(getpid())"
     #endif
     return base + "/" + name
