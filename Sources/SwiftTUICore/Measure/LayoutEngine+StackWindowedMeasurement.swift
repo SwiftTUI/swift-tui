@@ -728,6 +728,16 @@ extension LayoutEngine {
       let previousResolved,
       let previousSource = previousResolved.indexedChildSource,
       let source = node.indexedChildSource,
+      // The retained frame can hold a LIVE source (the one-shot/sync commit
+      // path stores it without worker-snapshot conversion — the "benign
+      // byproduct" of the 2026-05-30 flake-#12 trace), and this function
+      // also runs on the frame-tail worker, where reading a live source's
+      // MainActor-checked signature trips the release isolation guard. A
+      // live CURRENT source proves the pass is on the main actor (live
+      // sources are offload-ineligible), so the retained read is safe
+      // exactly when the retained source is a snapshot or the current one
+      // is live; otherwise skip reuse and measure fresh.
+      previousSource.canRunOnWorker || !source.canRunOnWorker,
       previousSource.measurementSignature == source.measurementSignature,
       snapshot.childMainLengths.count == source.count
     else {
