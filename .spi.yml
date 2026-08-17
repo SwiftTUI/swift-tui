@@ -11,6 +11,8 @@ builder:
         - SwiftTUIGraph
         - SwiftTUIPrimitives
         - SwiftTUIArguments
+        - SwiftTUITerminalCLI
+        - SwiftTUICLIAttach
         - SwiftTUICLI
         - SwiftTUIPTYPrimitives
         - SwiftTUITerminalEmulation

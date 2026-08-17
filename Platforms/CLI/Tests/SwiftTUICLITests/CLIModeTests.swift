@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUITerminalCLI
 
 struct CLIModeTests {
   // MARK: - Default subcommand (`Run`)

@@ -229,12 +229,15 @@ classifications:
     - SwiftTUITerminalEmulation.TerminalEmulatorKey
     - SwiftTUITerminalEmulation.TerminalEmulatorMouse
     - SwiftTUITerminalEmulation.TerminalMouseMode
-    - SwiftTUICLI.App
-    - SwiftTUICLI.RenderOnce
-    - SwiftTUICLI.ScenePty
-    - SwiftTUICLI.SignalReader
-    - SwiftTUICLI.TerminalRunner
-    - SwiftTUICLI.TerminalRunnerError
+    # The CLI split (Stage 2 of the Windows plan): the portable launch half
+    # is SwiftTUITerminalCLI, the POSIX-only attach half SwiftTUICLIAttach;
+    # SwiftTUICLI re-exports both, so the consumer surface is unchanged.
+    - SwiftTUITerminalCLI.App
+    - SwiftTUITerminalCLI.RenderOnce
+    - SwiftTUICLIAttach.ScenePty
+    - SwiftTUITerminalCLI.SignalReader
+    - SwiftTUITerminalCLI.TerminalRunner
+    - SwiftTUITerminalCLI.TerminalRunnerError
     - SwiftTUIWASI.App
     - SwiftTUIWASI.WASIRunner
     - SwiftTUIWASI.WASIRunnerError

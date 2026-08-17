@@ -1,7 +1,7 @@
 import SwiftTUIPTYPrimitives
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
 
 @Suite("ScenePty characterization", .serialized)
 struct ScenePtyCharacterizationTests {

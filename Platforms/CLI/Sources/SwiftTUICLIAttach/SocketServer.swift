@@ -1,14 +1,23 @@
-// MARK: - SceneInfo
+#if !canImport(WASILibc) && !os(Windows)
+  // MARK: - SceneInfo
 
-/// Describes a scene that can be attached to.
-struct SceneInfo: Sendable {
-  let id: String
-  let title: String?
-  let ptyPath: String?
-  let isAttached: Bool
-}
+  /// Describes a scene that can be attached to.
+  package struct SceneInfo: Sendable {
+    package let id: String
+    package let title: String?
+    package let ptyPath: String?
+    package let isAttached: Bool
 
-#if !canImport(WASILibc)
+    package init(id: String, title: String?, ptyPath: String?, isAttached: Bool) {
+      self.id = id
+      self.title = title
+      self.ptyPath = ptyPath
+      self.isAttached = isAttached
+    }
+  }
+
+  import SwiftTUIPlatformIO
+
   #if canImport(Darwin)
     import Darwin
   #elseif canImport(Glibc)
@@ -68,7 +77,7 @@ struct SceneInfo: Sendable {
 
   // MARK: - SocketProtocolError
 
-  enum SocketProtocolError: Error, Sendable {
+  package enum SocketProtocolError: Error, Sendable {
     case unknownCommand(String)
     case missingSceneID
     case encodingFailed(String)
@@ -98,12 +107,12 @@ struct SceneInfo: Sendable {
 
   // MARK: - SocketResponse
 
-  enum SocketResponse: Sendable {
+  package enum SocketResponse: Sendable {
     case sceneList([SceneInfo])
     case attachOK(ptyPath: String)
     case error(String)
 
-    func encode() throws(SocketProtocolError) -> String {
+    package func encode() throws(SocketProtocolError) -> String {
       switch self {
       case .sceneList(let scenes):
         let items = scenes.map { $0.jsonString() }.joined(separator: ",")
@@ -143,13 +152,13 @@ struct SceneInfo: Sendable {
   ///
   /// The server listens at `/tmp/swifttui/<appName>/<identifier>.sock`.
   /// Clients send `LIST\n` or `ATTACH <sceneID>\n`.
-  final class SceneDiscoveryServer: Sendable {
-    let socketPath: String
+  package final class SceneDiscoveryServer: Sendable {
+    package let socketPath: String
 
     private let sceneProvider: @Sendable () -> [SceneInfo]
     private let attachHandler: @Sendable (String) -> SocketResponse
 
-    init(
+    package init(
       appName: String,
       identifier: String,
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
@@ -168,7 +177,7 @@ struct SceneInfo: Sendable {
     ///   listening socket is bound and accepting — i.e. the precise instant a
     ///   client connect would succeed. Lets callers (and tests) `await` server
     ///   readiness directly instead of polling for it.
-    func run(onReady: (@Sendable () -> Void)? = nil) async throws {
+    package func run(onReady: (@Sendable () -> Void)? = nil) async throws {
       // Create directory structure recursively (pure stdlib — no Foundation)
       let parts = socketPath.split(separator: "/" as Character, omittingEmptySubsequences: true)
       let dirParts = parts.dropLast()

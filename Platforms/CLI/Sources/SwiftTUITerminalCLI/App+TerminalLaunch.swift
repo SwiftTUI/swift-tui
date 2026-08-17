@@ -6,6 +6,8 @@ public import SwiftTUIArguments
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 // The `App` terminal launch entry points.
@@ -101,6 +103,8 @@ private func exitLaunch(withError error: any Error) -> Never {
     Darwin.exit(1)
   #elseif canImport(Glibc)
     Glibc.exit(1)
+  #elseif canImport(ucrt)
+    CRT.exit(1)
   #else
     fatalError(String(describing: error))
   #endif

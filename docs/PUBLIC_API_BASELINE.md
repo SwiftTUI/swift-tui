@@ -26,7 +26,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
 | `SwiftTUITerminalEmulation` | 6 | 75 |
 | `SwiftTUITerminal` | 8 | 56 |
-| `SwiftTUICLI` | 6 | 25 |
+| `SwiftTUITerminalCLI` | 5 | 19 |
+| `SwiftTUICLIAttach` | 1 | 6 |
+| `SwiftTUICLI` | 0 | 0 |
 | `SwiftTUIWASI` | 3 | 8 |
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
@@ -35,6 +37,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIPrimitives` | 168 | 1464 |
 | `SwiftTUIGraph` | 59 | 349 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
+| `SwiftTUIPlatformIO` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
 
 ## SwiftTUI
@@ -479,16 +482,23 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalViewKeyDisposition` — enum — 2 members
 - `View` — extension — 2 members
 
-## SwiftTUICLI
+## SwiftTUITerminalCLI
 
-### Canonical surface (6)
+### Canonical surface (5)
 
 - `App` — extension — 2 members
 - `RenderOnce` — enum — 4 members
-- `ScenePty` — class — 5 members
 - `SignalReader` — class — 2 members
 - `TerminalRunner` — enum — 4 members
 - `TerminalRunnerError` — enum — 2 members
+
+## SwiftTUICLIAttach
+
+### Canonical surface (1)
+
+- `ScenePty` — class — 5 members
+
+## SwiftTUICLI
 
 ## SwiftTUIWASI
 
@@ -839,6 +849,12 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 ## SwiftTUIPTYCPrimitives
 
 > `SwiftTUIPTYCPrimitives` is not shipped as a library product. Symbols here
+> are package-internal but carry `public` access for re-export through
+> other targets.
+
+## SwiftTUIPlatformIO
+
+> `SwiftTUIPlatformIO` is not shipped as a library product. Symbols here
 > are package-internal but carry `public` access for re-export through
 > other targets.
 

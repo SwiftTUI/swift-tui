@@ -1,7 +1,8 @@
 @_spi(Runners) import SwiftTUIRuntime
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
+@testable import SwiftTUITerminalCLI
 
 @Suite
 @MainActor
@@ -22,7 +23,17 @@ struct SceneInfoRegistryTests {
 
     let primary = try SceneRuntime(selection: selections[0], isPrimary: true)
     let secondary = try SceneRuntime(selection: selections[1], isPrimary: false)
-    let registry = SceneInfoRegistry(runtimes: [primary, secondary])
+    // The same runtime → entry mapping TerminalRunner.launchApp performs.
+    let registry = SceneInfoRegistry(
+      entries: [primary, secondary].map { runtime in
+        .init(
+          id: runtime.selection.identifier.rawValue,
+          title: runtime.selection.title,
+          ptyPath: runtime.attachPtyPath,
+          isPrimary: runtime.isPrimary
+        )
+      }
+    )
 
     let initial = registry.scenes()
     #expect(initial.first(where: { $0.id == "primary" })?.isAttached == true)

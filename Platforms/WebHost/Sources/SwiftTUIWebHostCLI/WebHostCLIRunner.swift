@@ -1,7 +1,7 @@
 import Foundation
 import SwiftTUIArguments
-import SwiftTUICLI
 public import SwiftTUIRuntime
+import SwiftTUITerminalCLI
 import SwiftTUIWebHost
 
 #if canImport(Darwin)

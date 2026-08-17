@@ -2,10 +2,18 @@ import Foundation
 public import SwiftTUIArguments
 @_spi(Runners) import SwiftTUIRuntime
 
+// The attach subsystem (PTY + Unix sockets) is POSIX-only; its dependency
+// edge is platform-conditional, so its availability is a compile-time fact.
+#if canImport(SwiftTUICLIAttach)
+  import SwiftTUICLIAttach
+#endif
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Orchestrates scene-based app launch, CLI mode routing, and scene lifecycle.
@@ -146,35 +154,51 @@ public enum TerminalRunner {
       sceneRuntimes.append(runtime)
     }
 
-    let registry = SceneInfoRegistry(runtimes: sceneRuntimes)
+    #if canImport(SwiftTUICLIAttach)
+      let registry = SceneInfoRegistry(
+        entries: sceneRuntimes.map { runtime in
+          .init(
+            id: runtime.selection.identifier.rawValue,
+            title: runtime.selection.title,
+            ptyPath: runtime.attachPtyPath,
+            isPrimary: runtime.isPrimary
+          )
+        }
+      )
 
-    // Start socket server
-    let identifier = instanceName ?? String(getpid())
-    let server = SceneDiscoveryServer(
-      appName: appName,
-      identifier: identifier,
-      sceneProvider: {
-        registry.scenes()
-      },
-      attachHandler: { sceneID in
-        registry.attachResponse(for: sceneID)
-      }
-    )
+      // Start socket server
+      let identifier = instanceName ?? String(getpid())
+      let server = SceneDiscoveryServer(
+        appName: appName,
+        identifier: identifier,
+        sceneProvider: {
+          registry.scenes()
+        },
+        attachHandler: { sceneID in
+          registry.attachResponse(for: sceneID)
+        }
+      )
+    #endif
 
     var sceneTasks: [Task<RunLoopResult<SceneSessionState>, any Error>] = []
     for runtime in sceneRuntimes {
       let sceneID = runtime.selection.identifier.rawValue
       let task = Task { @MainActor in
-        try await runtime.run(
-          sessionName: sessionName,
-          onAttachmentChanged: { isAttached in
-            if isAttached {
-              registry.markAttached(sceneID: sceneID)
-            } else {
-              registry.markDetached(sceneID: sceneID)
+        #if canImport(SwiftTUICLIAttach)
+          try await runtime.run(
+            sessionName: sessionName,
+            onAttachmentChanged: { isAttached in
+              if isAttached {
+                registry.markAttached(sceneID: sceneID)
+              } else {
+                registry.markDetached(sceneID: sceneID)
+              }
             }
-          }
-        )
+          )
+        #else
+          _ = sceneID
+          try await runtime.run(sessionName: sessionName)
+        #endif
       }
       sceneTasks.append(task)
     }
@@ -189,9 +213,11 @@ public enum TerminalRunner {
     }
 
     try await withThrowingTaskGroup(of: Void.self) { group in
-      group.addTask {
-        try await server.run()
-      }
+      #if canImport(SwiftTUICLIAttach)
+        group.addTask {
+          try await server.run()
+        }
+      #endif
       for sceneTask in sceneTasks {
         group.addTask {
           _ = try await sceneTask.value
@@ -249,74 +275,127 @@ public enum TerminalRunner {
     )
   }
 
-  private static func listInstances(appName: String) {
-    let instances = SocketClient.discoverInstances(appName: appName)
-    if instances.isEmpty {
-      print("No running instances found.")
-      return
-    }
+  #if canImport(SwiftTUICLIAttach)
+    private static func listInstances(appName: String) {
+      let instances = SocketClient.discoverInstances(appName: appName)
+      if instances.isEmpty {
+        print("No running instances found.")
+        return
+      }
 
-    for instance in instances {
-      if let name = instance.name {
-        print("  \(name)  (PID \(instance.pid.map(String.init) ?? "?"))")
-      } else {
-        print("  PID \(instance.identifier)")
+      for instance in instances {
+        if let name = instance.name {
+          print("  \(name)  (PID \(instance.pid.map(String.init) ?? "?"))")
+        } else {
+          print("  PID \(instance.identifier)")
+        }
       }
     }
-  }
 
-  private static func listScenes(
-    appName: String,
-    selector: InstanceSelector
-  ) throws {
-    let instance = try SocketClient.selectInstance(
-      appName: appName,
-      selector: selector
-    )
+    /// Selects a specific instance by selector strategy.
+    ///
+    /// Lives on the portable side (moved out of `SocketClient`) because the
+    /// selector vocabulary is CLI-parsing state this module owns; the attach
+    /// module only discovers instances. Internal (not private) so the
+    /// selection strategy stays testable.
+    static func selectInstance(
+      appName: String,
+      selector: InstanceSelector
+    ) throws(SocketClientError) -> InstanceInfo {
+      let instances = SocketClient.discoverInstances(appName: appName)
+      guard !instances.isEmpty else { throw .noRunningInstances }
 
-    let response = try SocketClient.sendRequest(
-      socketPath: instance.socketPath,
-      request: "LIST\n"
-    )
-
-    guard response.hasPrefix("OK ") else {
-      print(response)
-      return
+      switch selector {
+      case .mostRecent:
+        guard let instance = instances.last else { throw .noRunningInstances }
+        return instance
+      case .pid(let pid):
+        let pidString = String(pid)
+        guard let instance = instances.first(where: { $0.identifier == pidString }) else {
+          throw .instanceNotFound("pid:\(pid)")
+        }
+        return instance
+      case .name(let name):
+        guard let instance = instances.first(where: { $0.identifier == name || $0.name == name })
+        else {
+          throw .instanceNotFound(name)
+        }
+        return instance
+      }
     }
 
-    let json = String(response.dropFirst(3))
-    let scenes = parseSceneList(json)
+    private static func listScenes(
+      appName: String,
+      selector: InstanceSelector
+    ) throws {
+      let instance = try selectInstance(
+        appName: appName,
+        selector: selector
+      )
 
-    for scene in scenes {
-      let status = scene.isAttached ? "(attached)" : "(no client)"
-      let title = scene.title.map { " — \($0)" } ?? ""
-      print("  \(scene.id)\(title)  \(status)")
+      let response = try SocketClient.sendRequest(
+        socketPath: instance.socketPath,
+        request: "LIST\n"
+      )
+
+      guard response.hasPrefix("OK ") else {
+        print(response)
+        return
+      }
+
+      let json = String(response.dropFirst(3))
+      let scenes = parseSceneList(json)
+
+      for scene in scenes {
+        let status = scene.isAttached ? "(attached)" : "(no client)"
+        let title = scene.title.map { " — \($0)" } ?? ""
+        print("  \(scene.id)\(title)  \(status)")
+      }
     }
-  }
 
-  private static func attach(
-    appName: String,
-    sceneID: String,
-    selector: InstanceSelector
-  ) async throws {
-    let instance = try SocketClient.selectInstance(
-      appName: appName,
-      selector: selector
-    )
+    private static func attach(
+      appName: String,
+      sceneID: String,
+      selector: InstanceSelector
+    ) async throws {
+      let instance = try selectInstance(
+        appName: appName,
+        selector: selector
+      )
 
-    let response = try SocketClient.sendRequest(
-      socketPath: instance.socketPath,
-      request: "ATTACH \(sceneID)\n"
-    )
+      let response = try SocketClient.sendRequest(
+        socketPath: instance.socketPath,
+        request: "ATTACH \(sceneID)\n"
+      )
 
-    guard response.hasPrefix("OK ") else {
-      print(trimmed(response))
-      return
+      guard response.hasPrefix("OK ") else {
+        print(trimmed(response))
+        return
+      }
+
+      let ptyPath = trimmed(String(response.dropFirst(3)))
+      try await AttachProxy.run(slavePath: ptyPath)
+    }
+  #else
+    private static func listInstances(appName: String) {
+      print(SceneAttachUnavailableError().description)
     }
 
-    let ptyPath = trimmed(String(response.dropFirst(3)))
-    try await AttachProxy.run(slavePath: ptyPath)
-  }
+    private static func listScenes(
+      appName: String,
+      selector: InstanceSelector
+    ) throws {
+      throw SceneAttachUnavailableError()
+    }
+
+    private static func attach(
+      appName: String,
+      sceneID: String,
+      selector: InstanceSelector
+    ) async throws {
+      throw SceneAttachUnavailableError()
+    }
+  #endif
 
   // MARK: - Helpers
 
@@ -345,138 +424,149 @@ public enum TerminalRunner {
     }
   }
 
-  /// Parses the JSON array of SceneInfo objects returned by the LIST command.
-  ///
-  /// Expected format: `[{"id":"...","title":...,"ptyPath":...,"isAttached":...}, ...]`
-  ///
-  /// Minimal hand-rolled JSON parser. Foundation is imported in this file (for ProcessInfo) and
-  /// JSONDecoder could replace this, but the parser is small and tested; deferred to avoid scope creep.
-  private static func parseSceneList(_ json: String) -> [SceneInfo] {
-    // Tokenise the JSON into a flat stream of tokens, then extract objects.
-    var scenes: [SceneInfo] = []
-    var index = json.startIndex
+  #if canImport(SwiftTUICLIAttach)
+    /// Parses the JSON array of SceneInfo objects returned by the LIST command.
+    ///
+    /// Expected format: `[{"id":"...","title":...,"ptyPath":...,"isAttached":...}, ...]`
+    ///
+    /// Minimal hand-rolled JSON parser. Foundation is imported in this file (for ProcessInfo) and
+    /// JSONDecoder could replace this, but the parser is small and tested; deferred to avoid scope creep.
+    private static func parseSceneList(_ json: String) -> [SceneInfo] {
+      // Tokenise the JSON into a flat stream of tokens, then extract objects.
+      var scenes: [SceneInfo] = []
+      var index = json.startIndex
 
-    func skipWhitespace() {
-      while index < json.endIndex, isAsciiWhitespace(json.unicodeScalars[index]) {
-        index = json.index(after: index)
-      }
-    }
-
-    func peek() -> Character? {
-      guard index < json.endIndex else { return nil }
-      return json[index]
-    }
-
-    func consume(_ ch: Character) -> Bool {
-      guard peek() == ch else { return false }
-      index = json.index(after: index)
-      return true
-    }
-
-    func parseString() -> String? {
-      skipWhitespace()
-      guard consume("\"") else { return nil }
-      var result = ""
-      while index < json.endIndex {
-        let ch = json[index]
-        index = json.index(after: index)
-        if ch == "\"" { return result }
-        if ch == "\\" {
-          guard index < json.endIndex else { break }
-          let escaped = json[index]
+      func skipWhitespace() {
+        while index < json.endIndex, isAsciiWhitespace(json.unicodeScalars[index]) {
           index = json.index(after: index)
-          switch escaped {
-          case "\"": result.append("\"")
-          case "\\": result.append("\\")
-          case "/": result.append("/")
-          case "n": result.append("\n")
-          case "r": result.append("\r")
-          case "t": result.append("\t")
-          default: result.append(escaped)
-          }
-        } else {
-          result.append(ch)
         }
       }
-      return nil  // unterminated string
-    }
 
-    func parseBool() -> Bool? {
-      if json[index...].hasPrefix("true") {
-        index = json.index(index, offsetBy: 4)
+      func peek() -> Character? {
+        guard index < json.endIndex else { return nil }
+        return json[index]
+      }
+
+      func consume(_ ch: Character) -> Bool {
+        guard peek() == ch else { return false }
+        index = json.index(after: index)
         return true
       }
-      if json[index...].hasPrefix("false") {
-        index = json.index(index, offsetBy: 5)
+
+      func parseString() -> String? {
+        skipWhitespace()
+        guard consume("\"") else { return nil }
+        var result = ""
+        while index < json.endIndex {
+          let ch = json[index]
+          index = json.index(after: index)
+          if ch == "\"" { return result }
+          if ch == "\\" {
+            guard index < json.endIndex else { break }
+            let escaped = json[index]
+            index = json.index(after: index)
+            switch escaped {
+            case "\"": result.append("\"")
+            case "\\": result.append("\\")
+            case "/": result.append("/")
+            case "n": result.append("\n")
+            case "r": result.append("\r")
+            case "t": result.append("\t")
+            default: result.append(escaped)
+            }
+          } else {
+            result.append(ch)
+          }
+        }
+        return nil  // unterminated string
+      }
+
+      func parseBool() -> Bool? {
+        if json[index...].hasPrefix("true") {
+          index = json.index(index, offsetBy: 4)
+          return true
+        }
+        if json[index...].hasPrefix("false") {
+          index = json.index(index, offsetBy: 5)
+          return false
+        }
+        return nil
+      }
+
+      func parseNull() -> Bool {
+        if json[index...].hasPrefix("null") {
+          index = json.index(index, offsetBy: 4)
+          return true
+        }
         return false
       }
-      return nil
-    }
 
-    func parseNull() -> Bool {
-      if json[index...].hasPrefix("null") {
-        index = json.index(index, offsetBy: 4)
-        return true
+      func parseObject() -> SceneInfo? {
+        skipWhitespace()
+        guard consume("{") else { return nil }
+
+        var id: String?
+        var title: String?
+        var ptyPath: String?
+        var isAttached = false
+
+        while true {
+          skipWhitespace()
+          if consume("}") { break }
+          _ = consume(",")
+          skipWhitespace()
+
+          guard let key = parseString() else { break }
+          skipWhitespace()
+          guard consume(":") else { break }
+          skipWhitespace()
+
+          switch key {
+          case "id":
+            id = parseString()
+          case "title":
+            if !parseNull() { title = parseString() }
+          case "ptyPath":
+            if !parseNull() { ptyPath = parseString() }
+          case "isAttached":
+            isAttached = parseBool() ?? false
+          default:
+            // Skip unknown value (simple: read until , or })
+            break
+          }
+        }
+
+        guard let resolvedID = id else { return nil }
+        return SceneInfo(id: resolvedID, title: title, ptyPath: ptyPath, isAttached: isAttached)
       }
-      return false
-    }
 
-    func parseObject() -> SceneInfo? {
+      // Expect outer array
       skipWhitespace()
-      guard consume("{") else { return nil }
-
-      var id: String?
-      var title: String?
-      var ptyPath: String?
-      var isAttached = false
+      guard consume("[") else { return [] }
 
       while true {
         skipWhitespace()
-        if consume("}") { break }
+        if consume("]") { break }
         _ = consume(",")
         skipWhitespace()
-
-        guard let key = parseString() else { break }
-        skipWhitespace()
-        guard consume(":") else { break }
-        skipWhitespace()
-
-        switch key {
-        case "id":
-          id = parseString()
-        case "title":
-          if !parseNull() { title = parseString() }
-        case "ptyPath":
-          if !parseNull() { ptyPath = parseString() }
-        case "isAttached":
-          isAttached = parseBool() ?? false
-        default:
-          // Skip unknown value (simple: read until , or })
+        if let scene = parseObject() {
+          scenes.append(scene)
+        } else {
           break
         }
       }
 
-      guard let resolvedID = id else { return nil }
-      return SceneInfo(id: resolvedID, title: title, ptyPath: ptyPath, isAttached: isAttached)
+      return scenes
     }
+  #endif
+}
 
-    // Expect outer array
-    skipWhitespace()
-    guard consume("[") else { return [] }
-
-    while true {
-      skipWhitespace()
-      if consume("]") { break }
-      _ = consume(",")
-      skipWhitespace()
-      if let scene = parseObject() {
-        scenes.append(scene)
-      } else {
-        break
-      }
-    }
-
-    return scenes
+/// Thrown (or printed, for the non-throwing verb) when an attach-bearing verb
+/// runs on a platform without the POSIX-only `SwiftTUICLIAttach` module.
+private struct SceneAttachUnavailableError: Error, CustomStringConvertible {
+  var description: String {
+    "Scene attach is not supported on this platform: instance discovery and "
+      + "attachment need the POSIX-only attach subsystem (PTY + Unix sockets)."
   }
 }
 

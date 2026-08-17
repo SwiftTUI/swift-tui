@@ -1,10 +1,12 @@
 import Dispatch
 @_spi(Runners) import SwiftTUI
+import SwiftTUIPlatformIO
 @_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
+@testable import SwiftTUITerminalCLI
 
 #if canImport(Darwin)
   import Darwin

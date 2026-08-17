@@ -1,5 +1,6 @@
-#if !canImport(WASILibc)
+#if !canImport(WASILibc) && !os(Windows)
 
+  import SwiftTUIPlatformIO
   import SwiftTUIVendorUnixSignals
 
   #if canImport(Darwin)
@@ -22,13 +23,13 @@
     }
   }
 
-  enum AttachProxy {
+  package enum AttachProxy {
     /// Proxy the current terminal's stdio to a pty slave.
     ///
     /// This puts the current terminal into raw mode, forwards stdin to the slave,
     /// forwards slave output to stdout, and relays SIGWINCH.
     /// Returns when the slave closes or the task is cancelled.
-    static func run(slavePath: String) async throws {
+    package static func run(slavePath: String) async throws {
       let slaveFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
       guard slaveFD >= 0 else {
         throw AttachProxyError.failedToOpenSlave(

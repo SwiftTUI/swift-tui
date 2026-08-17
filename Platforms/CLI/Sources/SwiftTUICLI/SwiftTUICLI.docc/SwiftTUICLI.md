@@ -13,18 +13,13 @@ The `SwiftTUI` convenience product launches the terminal through
 terminal-only custom launch path around `SwiftTUIRuntime`, import
 `SwiftTUICLI` directly.
 
-## Topics
+This module is a compatibility facade over two halves, both re-exported so
+one `import SwiftTUICLI` keeps serving the combined surface:
 
-### Terminal Launch
-
-- ``TerminalRunner``
-- ``TerminalRunnerError``
-
-### One-Shot Output
-
-- ``RenderOnce``
-
-### PTY-Backed Scenes
-
-- ``ScenePty``
-- ``SignalReader``
+- `SwiftTUITerminalCLI` — the portable launch half: `TerminalRunner`,
+  `TerminalRunnerError`, `RenderOnce`, `SignalReader`, and the `App.main()`
+  entry points. Its reference documentation lives with that module.
+- `SwiftTUICLIAttach` — the POSIX-only attach subsystem: `ScenePty`, the
+  instance-discovery sockets, and the attach proxy. Its dependency edge is
+  platform-conditional; on platforms without it, the attach-bearing verbs
+  fail with a clear diagnostic while ordinary launches are unaffected.

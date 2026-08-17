@@ -3,7 +3,7 @@
 import Synchronization
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUITerminalCLI
 
 #if canImport(Darwin)
   import Darwin
@@ -69,6 +69,42 @@ struct SignalReaderArmingTests {
 
     _ = try await runtime.run(sessionName: "signal-arming")
     #expect(armedWhenSessionRan.withLock { $0 } == true)
+  }
+
+  /// The launch path must tolerate a `nil` signal reader (Stage 2.2 of the
+  /// Windows plan): on Windows there is no SIGINT/SIGTERM/SIGWINCH source at
+  /// all, so `defaultSignalReader()` returns `nil` and a primary scene has to
+  /// launch and complete without one.
+  @Test("Primary scene launches and completes with a nil signal reader")
+  func primarySceneToleratesNilSignalReader() async throws {
+    let selection = collectWindowSceneSelections(
+      from: WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        Text("Primary")
+      }
+    )[0]
+
+    let sessionRan = Mutex<Bool>(false)
+    let runtime = try SceneRuntime(
+      selection: selection,
+      isPrimary: true,
+      resources: SceneSessionResources(
+        presentationSurface: MetricsOnlyPresentationSurface(),
+        terminalInputReader: EmptyTerminalInputReader(),
+        signalReader: nil
+      ),
+      sessionRunner: { _, _ in
+        sessionRan.withLock { $0 = true }
+        return RunLoopResult(
+          finalState: SceneSessionState(),
+          renderedFrames: 0,
+          exitReason: .inputEnded
+        )
+      }
+    )
+
+    let result = try await runtime.run(sessionName: "nil-signal-reader")
+    #expect(sessionRan.withLock { $0 } == true)
+    #expect(result.exitReason == .inputEnded)
   }
 }
 

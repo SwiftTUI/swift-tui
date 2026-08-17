@@ -1,10 +1,14 @@
-#if !canImport(WASILibc)
+// The POSIX arm of the SwiftTUIPlatformIO syscall facade. The Windows arm
+// (PlatformWindows.swift) mirrors the path/fd file-I/O subset; the socket
+// and directory-enumeration functions are POSIX-only because their sole
+// consumers live in the POSIX-only attach subsystem.
+#if !canImport(WASILibc) && !canImport(ucrt)
   #if canImport(Darwin)
-    import Darwin
+    package import Darwin
   #elseif canImport(Glibc)
-    import Glibc
+    package import Glibc
   #elseif canImport(Android)
-    import Android
+    package import Android
   #endif
 
   #if canImport(Darwin) || canImport(Android)
@@ -14,13 +18,13 @@
   #endif
 
   #if canImport(Darwin)
-    typealias SceneDirectoryHandle = UnsafeMutablePointer<DIR>
+    package typealias SceneDirectoryHandle = UnsafeMutablePointer<DIR>
   #else
-    typealias SceneDirectoryHandle = OpaquePointer
+    package typealias SceneDirectoryHandle = OpaquePointer
   #endif
 
   @inline(__always)
-  func sceneConfigureNoSigPipe(
+  package func sceneConfigureNoSigPipe(
     _ fileDescriptor: Int32
   ) {
     #if canImport(Darwin)
@@ -30,7 +34,7 @@
   }
 
   @inline(__always)
-  func sceneOpenDirectory(
+  package func sceneOpenDirectory(
     _ path: String
   ) -> SceneDirectoryHandle? {
     unsafe path.withCString { cPath in
@@ -39,21 +43,21 @@
   }
 
   @inline(__always)
-  func sceneCloseDirectory(
+  package func sceneCloseDirectory(
     _ directory: SceneDirectoryHandle
   ) {
     unsafe closedir(directory)
   }
 
   @inline(__always)
-  func sceneReadDirectory(
+  package func sceneReadDirectory(
     _ directory: SceneDirectoryHandle
   ) -> UnsafeMutablePointer<dirent>? {
     unsafe readdir(directory)
   }
 
   @inline(__always)
-  func sceneUnlink(
+  package func sceneUnlink(
     _ path: String
   ) -> Int32 {
     unsafe path.withCString { cPath in
@@ -62,14 +66,14 @@
   }
 
   @inline(__always)
-  func sceneSocket() -> Int32 {
+  package func sceneSocket() -> Int32 {
     let fileDescriptor = socket(AF_UNIX, sceneSocketStreamType, 0)
     sceneConfigureNoSigPipe(fileDescriptor)
     return fileDescriptor
   }
 
   @inline(__always)
-  func sceneOpen(
+  package func sceneOpen(
     _ path: String,
     _ flags: Int32
   ) -> Int32 {
@@ -81,14 +85,14 @@
   }
 
   @inline(__always)
-  func sceneClose(
+  package func sceneClose(
     _ fileDescriptor: Int32
   ) {
     close(fileDescriptor)
   }
 
   @inline(__always)
-  func sceneRead(
+  package func sceneRead(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
@@ -97,7 +101,7 @@
   }
 
   @inline(__always)
-  func sceneWrite(
+  package func sceneWrite(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeRawPointer?,
     _ count: Int
@@ -112,7 +116,7 @@
   }
 
   @inline(__always)
-  func sceneAccess(
+  package func sceneAccess(
     _ path: String,
     _ mode: Int32
   ) -> Int32 {
@@ -122,7 +126,7 @@
   }
 
   @inline(__always)
-  func sceneSocketAddress(
+  package func sceneSocketAddress(
     for path: String
   ) -> sockaddr_un {
     var address = sockaddr_un()
@@ -143,7 +147,7 @@
   }
 
   @inline(__always)
-  func sceneBind(
+  package func sceneBind(
     _ fileDescriptor: Int32,
     _ address: inout sockaddr_un
   ) -> Int32 {
@@ -157,7 +161,7 @@
   }
 
   @inline(__always)
-  func sceneConnect(
+  package func sceneConnect(
     _ fileDescriptor: Int32,
     _ address: inout sockaddr_un
   ) -> Int32 {
@@ -171,7 +175,7 @@
   }
 
   @inline(__always)
-  func sceneListen(
+  package func sceneListen(
     _ fileDescriptor: Int32,
     _ backlog: Int32
   ) -> Int32 {
@@ -179,7 +183,7 @@
   }
 
   @inline(__always)
-  func sceneAccept(
+  package func sceneAccept(
     _ fileDescriptor: Int32
   ) -> Int32 {
     let clientFileDescriptor = unsafe accept(

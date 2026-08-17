@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUITerminalCLI
 
 @MainActor
 struct SceneLifecycleTests {

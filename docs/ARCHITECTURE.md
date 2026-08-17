@@ -53,7 +53,13 @@ flowchart TD
     SwiftTUIViews --> SwiftTUIRuntime
 
     SwiftTUIArguments
-    SwiftTUICLI --> SwiftTUIRuntime
+    SwiftTUITerminalCLI["SwiftTUITerminalCLI<br/>(portable launch)"] --> SwiftTUIRuntime
+    SwiftTUITerminalCLI -.->|POSIX only| SwiftTUICLIAttach
+    SwiftTUICLIAttach["SwiftTUICLIAttach<br/>(POSIX-only: PTY + sockets)"] --> SwiftTUIPlatformIO
+    SwiftTUICLIAttach --> SwiftTUIPTYPrimitives
+    SwiftTUIPlatformIO["SwiftTUIPlatformIO<br/>(syscall facade)"]
+    SwiftTUICLI["SwiftTUICLI<br/>(compatibility facade)"] --> SwiftTUITerminalCLI
+    SwiftTUICLI -.->|POSIX only| SwiftTUICLIAttach
     SwiftTUI["SwiftTUI<br/>(convenience re-export)"]
     SwiftTUI --> SwiftTUIWebHostCLI
     SwiftTUI --> SwiftTUIAnimatedImage
@@ -61,7 +67,7 @@ flowchart TD
     SwiftTUIWASI --> SwiftTUIRuntime
     SwiftTUIWebHost --> SwiftTUIRuntime
     SwiftTUIWebHostCLI --> SwiftTUIWebHost
-    SwiftTUIWebHostCLI --> SwiftTUICLI
+    SwiftTUIWebHostCLI --> SwiftTUITerminalCLI
     SwiftTUIWebHostCLI --> SwiftTUIArguments
     SwiftTUITerminal --> SwiftTUIRuntime
     SwiftTUITerminal --> SwiftTUITerminalEmulation
@@ -151,7 +157,11 @@ Except for the explicitly external SwiftUI host, these live in the **root
 package** (`Package.swift`). The `Platforms/` directory holds their sources but
 contains no nested Swift packages.
 
-- **In-package integrations** — `SwiftTUICLI` (`TerminalRunner`),
+- **In-package integrations** — `SwiftTUITerminalCLI` (`TerminalRunner`, the
+  portable launch half) with `SwiftTUICLIAttach` (the POSIX-only attach
+  subsystem: PTYs, Unix sockets, instance discovery) behind a
+  platform-conditional edge, re-exported together by the `SwiftTUICLI`
+  compatibility facade over the `SwiftTUIPlatformIO` syscall facade;
   `SwiftTUIWASI` (`WASIRunner`), `SwiftTUIWebHost` (`WebHostRunner`),
   `SwiftTUIWebHostCLI` (`WebHostCLIRunner`), `SwiftTUIAndroidHost`, and
   `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).

@@ -1,8 +1,10 @@
 import Foundation
+import SwiftTUIPlatformIO
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
+@testable import SwiftTUITerminalCLI
 
 #if canImport(Darwin)
   import Darwin
@@ -112,7 +114,7 @@ struct SocketDiscoveryTests {
     let instances = SocketClient.discoverInstances(appName: appName)
     #expect(instances.map(\.identifier) == ["first", "second"])
 
-    let selected = try SocketClient.selectInstance(
+    let selected = try TerminalRunner.selectInstance(
       appName: appName,
       selector: .mostRecent
     )

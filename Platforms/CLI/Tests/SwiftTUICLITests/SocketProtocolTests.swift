@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
 
 struct SceneInfoTests {
   @Test("SceneInfo encodes to JSON")

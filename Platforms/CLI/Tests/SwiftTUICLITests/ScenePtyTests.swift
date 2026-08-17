@@ -1,7 +1,8 @@
 import SwiftTUIPTYPrimitives
+import SwiftTUIPlatformIO
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUICLIAttach
 
 #if canImport(Darwin)
   import Darwin

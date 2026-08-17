@@ -127,6 +127,8 @@ const PRIMARY_MODULES = [
   "SwiftTUIPTYPrimitives",
   "SwiftTUITerminalEmulation",
   "SwiftTUITerminal",
+  "SwiftTUITerminalCLI",
+  "SwiftTUICLIAttach",
   "SwiftTUICLI",
   "SwiftTUIWASI",
   "SwiftTUIWebHost",
@@ -138,6 +140,7 @@ const PACKAGE_ONLY_MODULES = [
   "SwiftTUIPrimitives",
   "SwiftTUIGraph",
   "SwiftTUIPTYCPrimitives",
+  "SwiftTUIPlatformIO",
 ] as const;
 const TEST_SUPPORT_MODULES = ["SwiftTUITestSupport"] as const;
 const ALL_MODULES = [

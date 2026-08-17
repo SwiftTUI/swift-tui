@@ -289,14 +289,63 @@ let package = Package(
       path: "Platforms/Embedding/Sources/SwiftTUITerminal",
       swiftSettings: swiftSettings()
     ),
+    // Low-level syscall facade (Stage 2.1 of the Windows plan): free
+    // functions with identical signatures per platform, so call sites
+    // compile unchanged everywhere.
     .target(
-      name: "SwiftTUICLI",
+      name: "SwiftTUIPlatformIO",
+      path: "Sources/SwiftTUIPlatformIO",
+      swiftSettings: swiftSettings()
+    ),
+    // POSIX-only attach half of the old SwiftTUICLI: PTY plumbing, Unix
+    // sockets, instance discovery, and the attach proxy.
+    .target(
+      name: "SwiftTUICLIAttach",
+      dependencies: [
+        "SwiftTUIPlatformIO",
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIVendorUnixSignals",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+      ],
+      path: "Platforms/CLI/Sources/SwiftTUICLIAttach",
+      swiftSettings: swiftSettings()
+    ),
+    // Portable launch half of the old SwiftTUICLI. The attach edge is
+    // platform-conditional; TerminalRunner gates the attach verbs on
+    // `canImport(SwiftTUICLIAttach)` (the SignalReader/UnixSignals pattern).
+    .target(
+      name: "SwiftTUITerminalCLI",
       dependencies: [
         "SwiftTUIRuntime",
         "SwiftTUIArguments",
-        "SwiftTUIPTYPrimitives",
-        "SwiftTUIVendorUnixSignals",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .target(
+          name: "SwiftTUICLIAttach",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIVendorUnixSignals",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+      ],
+      path: "Platforms/CLI/Sources/SwiftTUITerminalCLI",
+      swiftSettings: swiftSettings()
+    ),
+    // Compatibility facade (Stage 2.5): existing `import SwiftTUICLI`
+    // consumers keep the combined launch + attach surface.
+    .target(
+      name: "SwiftTUICLI",
+      dependencies: [
+        "SwiftTUITerminalCLI",
+        .target(
+          name: "SwiftTUICLIAttach",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/CLI/Sources/SwiftTUICLI",
       swiftSettings: swiftSettings()
@@ -334,7 +383,9 @@ let package = Package(
       name: "SwiftTUIWebHostCLI",
       dependencies: [
         "SwiftTUIRuntime",
-        "SwiftTUICLI",
+        // Stage 2.4 of the Windows plan: the web-host runner needs only the
+        // portable launch half, not the PTY-bound attach subsystem.
+        "SwiftTUITerminalCLI",
         "SwiftTUIArguments",
         "SwiftTUIWebHost",
       ],
@@ -554,6 +605,9 @@ let package = Package(
         "SwiftTUI",
         "SwiftTUIArguments",
         "SwiftTUICLI",
+        "SwiftTUICLIAttach",
+        "SwiftTUITerminalCLI",
+        "SwiftTUIPlatformIO",
         "SwiftTUIPTYPrimitives",
         "SwiftTUITestSupport",
       ],

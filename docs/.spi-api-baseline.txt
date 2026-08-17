@@ -1,4 +1,3 @@
-SwiftTUICLI.defaultSignalReader()
 SwiftTUIPrimitives.DrawPayload
 SwiftTUIPrimitives.DrawPayload.==(_:_:)
 SwiftTUIPrimitives.DrawPayload.canvas(_:)
@@ -175,6 +174,7 @@ SwiftTUIRuntime.WindowSceneConfiguration.title
 SwiftTUIRuntime.ZeroArtifactFrameSample
 SwiftTUIRuntime.collectWindowSceneDescriptors(from:)
 SwiftTUIRuntime.collectWindowSceneSelections(from:)
+SwiftTUITerminalCLI.defaultSignalReader()
 SwiftTUITestSupport.ANSIVisibleScreen
 SwiftTUITestSupport.ANSIVisibleScreen.feed(_:)
 SwiftTUITestSupport.ANSIVisibleScreen.init(size:)

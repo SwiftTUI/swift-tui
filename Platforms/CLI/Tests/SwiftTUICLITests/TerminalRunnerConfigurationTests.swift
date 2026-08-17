@@ -1,7 +1,7 @@
 import SwiftTUIRuntime
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUITerminalCLI
 
 struct TerminalRunnerConfigurationTests {
   @Test("TerminalRunner.run(_:configuration:) overload exists and accepts RuntimeConfiguration")

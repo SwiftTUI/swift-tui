@@ -4,6 +4,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Writes per-frame diagnostics as tab-separated values to a file, for the

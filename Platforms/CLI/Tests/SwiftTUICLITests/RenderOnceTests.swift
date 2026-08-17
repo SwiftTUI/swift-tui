@@ -2,7 +2,7 @@ import SwiftTUI
 import SwiftTUIArguments
 import Testing
 
-@testable import SwiftTUICLI
+@testable import SwiftTUITerminalCLI
 
 @MainActor
 struct RenderOnceTests {

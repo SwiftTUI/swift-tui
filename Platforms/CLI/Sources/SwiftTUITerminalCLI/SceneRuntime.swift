@@ -1,11 +1,25 @@
 import Foundation
 @_spi(Runners) import SwiftTUIRuntime
-import SwiftTUIVendorUnixSignals
+
+// Secondary (attachable) scenes render into a PTY, which only exists where
+// the POSIX-only attach subsystem is linked (its dependency edge is
+// platform-conditional).
+#if canImport(SwiftTUICLIAttach)
+  import SwiftTUICLIAttach
+#endif
+
+// The sigaction-based vendor module carries CrashSignalHandler; its edge is
+// platform-conditional (it can never build on Windows).
+#if canImport(SwiftTUIVendorUnixSignals)
+  import SwiftTUIVendorUnixSignals
+#endif
 
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Manages the runtime for a single scene within a multi-scene app.
@@ -20,7 +34,9 @@ final class SceneRuntime {
   let selection: SelectedWindowScene
   let isPrimary: Bool
   private(set) var lifecycle: SceneLifecycle
-  private let ptyPair: ScenePty?
+  #if canImport(SwiftTUICLIAttach)
+    private let ptyPair: ScenePty?
+  #endif
   private let resources: SceneSessionResources
   private let stateContainer: StateContainer<SceneSessionState>
   private let focusTracker: FocusTracker
@@ -48,10 +64,14 @@ final class SceneRuntime {
       }
 
     if let resources {
-      ptyPair = nil
+      #if canImport(SwiftTUICLIAttach)
+        ptyPair = nil
+      #endif
       self.resources = resources
     } else if isPrimary {
-      ptyPair = nil
+      #if canImport(SwiftTUICLIAttach)
+        ptyPair = nil
+      #endif
       let environment = ProcessInfo.processInfo.environment
       let isTTY = isatty(STDOUT_FILENO) != 0
       let capabilityProfile = TerminalCapabilityProfile.detect(
@@ -75,30 +95,36 @@ final class SceneRuntime {
       resources.runtimeIssueSink = .standardError
       self.resources = resources
     } else {
-      let pty = try ScenePty()
-      ptyPair = pty
-      let environment = ProcessInfo.processInfo.environment
-      let isTTY = isatty(pty.masterFD) != 0
-      let capabilityProfile = TerminalCapabilityProfile.detect(
-        environment: environment,
-        isTTY: isTTY
-      )
-      .applying(configuration)
-      let terminalHost = TerminalHost(
-        inputFileDescriptor: pty.masterFD,
-        outputFileDescriptor: pty.masterFD,
-        capabilityProfile: capabilityProfile
-      )
-      let inputReader = InputReader(fileDescriptor: pty.masterFD)
-      // Same shared-descriptor probe race as the primary path (F42).
-      terminalHost.inputSuspensionGate = inputReader
-      let resources = SceneSessionResources(
-        presentationSurface: terminalHost,
-        terminalInputReader: inputReader,
-        runtimeConfiguration: configuration
-      )
-      resources.runtimeIssueSink = .standardError
-      self.resources = resources
+      #if canImport(SwiftTUICLIAttach)
+        let pty = try ScenePty()
+        ptyPair = pty
+        let environment = ProcessInfo.processInfo.environment
+        let isTTY = isatty(pty.masterFD) != 0
+        let capabilityProfile = TerminalCapabilityProfile.detect(
+          environment: environment,
+          isTTY: isTTY
+        )
+        .applying(configuration)
+        let terminalHost = TerminalHost(
+          inputFileDescriptor: pty.masterFD,
+          outputFileDescriptor: pty.masterFD,
+          capabilityProfile: capabilityProfile
+        )
+        let inputReader = InputReader(fileDescriptor: pty.masterFD)
+        // Same shared-descriptor probe race as the primary path (F42).
+        terminalHost.inputSuspensionGate = inputReader
+        let resources = SceneSessionResources(
+          presentationSurface: terminalHost,
+          terminalInputReader: inputReader,
+          runtimeConfiguration: configuration
+        )
+        resources.runtimeIssueSink = .standardError
+        self.resources = resources
+      #else
+        // Secondary scenes are PTY-backed and only serve `--attach` clients;
+        // without the attach subsystem there is nothing they could render to.
+        throw SceneRuntimeError.secondaryScenesRequireAttachSubsystem
+      #endif
     }
 
     stateContainer = StateContainer(
@@ -114,14 +140,22 @@ final class SceneRuntime {
       }
   }
 
-  var sceneInfo: SceneInfo {
-    SceneInfo(
-      id: selection.identifier.rawValue,
-      title: selection.title,
-      ptyPath: ptyPair?.slavePath,
-      isAttached: lifecycle.state == .rendering
-    )
-  }
+  #if canImport(SwiftTUICLIAttach)
+    /// The slave path of the PTY an attach client would connect to, or `nil`
+    /// for the primary scene (which owns the real tty).
+    var attachPtyPath: String? {
+      ptyPair?.slavePath
+    }
+
+    var sceneInfo: SceneInfo {
+      SceneInfo(
+        id: selection.identifier.rawValue,
+        title: selection.title,
+        ptyPath: ptyPair?.slavePath,
+        isAttached: lifecycle.state == .rendering
+      )
+    }
+  #endif
 
   func run(
     sessionName: String,
@@ -129,7 +163,11 @@ final class SceneRuntime {
   ) async throws -> RunLoopResult<SceneSessionState> {
     if isPrimary {
       installCrashGuard()
-      defer { CrashSignalHandler.uninstall() }
+      defer {
+        #if canImport(SwiftTUIVendorUnixSignals)
+          CrashSignalHandler.uninstall()
+        #endif
+      }
       // Arm the OS signal sources before the session renders its first
       // frame: when registration instead rides the run loop's lazy startup
       // path it races the initial render, and a SIGTERM/SIGINT landing in
@@ -168,10 +206,12 @@ final class SceneRuntime {
   }
 
   func shutdown() {
-    guard let ptyPair else { return }
-    Task {
-      await ptyPair.close()
-    }
+    #if canImport(SwiftTUICLIAttach)
+      guard let ptyPair else { return }
+      Task {
+        await ptyPair.close()
+      }
+    #endif
   }
 
   // ---------------------------------------------------------------------------
@@ -183,31 +223,43 @@ final class SceneRuntime {
   ///
   /// Only meaningful for the primary scene, which owns the real tty via stdio.
   private func installCrashGuard() {
-    // Read the current terminal attributes before the session enters raw mode.
-    // These are the attributes we want to restore on crash.
-    var savedTermios = termios()
-    let hasTermios = unsafe tcgetattr(STDIN_FILENO, &savedTermios) == 0
-
-    // Build the reset sequence: disable mouse reporting, show cursor,
-    // reset style, exit alternate screen.
-    let resetSequence =
-      "\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1016l\u{1B}[?1006l"  // disable mouse reporting
-      + "\u{1B}[?25h"  // show cursor
-      + "\u{1B}[0m"  // reset style
-      + "\u{1B}[?1049l"  // exit alternate screen
-    let resetBytes = Array(resetSequence.utf8)
-
-    let resetAction = CrashSignalHandler.ResetAction(
-      outputFileDescriptor: STDOUT_FILENO,
-      resetBytes: resetBytes,
-      termiosFileDescriptor: hasTermios ? STDIN_FILENO : nil,
-      savedTermios: hasTermios ? savedTermios : nil
-    )
-    CrashSignalHandler.install(
-      for: CrashSignalHandler.fatalSignals,
-      reset: resetAction
-    )
+    #if canImport(SwiftTUIVendorUnixSignals)
+      installPOSIXCrashGuard()
+    #else
+      // No POSIX fatal-signal delivery without the sigaction-based vendor
+      // module (Windows); console-mode restoration on the normal exit paths
+      // is Stage 4 of the Windows plan.
+    #endif
   }
+
+  #if canImport(SwiftTUIVendorUnixSignals)
+    private func installPOSIXCrashGuard() {
+      // Read the current terminal attributes before the session enters raw mode.
+      // These are the attributes we want to restore on crash.
+      var savedTermios = termios()
+      let hasTermios = unsafe tcgetattr(STDIN_FILENO, &savedTermios) == 0
+
+      // Build the reset sequence: disable mouse reporting, show cursor,
+      // reset style, exit alternate screen.
+      let resetSequence =
+        "\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1016l\u{1B}[?1006l"  // disable mouse reporting
+        + "\u{1B}[?25h"  // show cursor
+        + "\u{1B}[0m"  // reset style
+        + "\u{1B}[?1049l"  // exit alternate screen
+      let resetBytes = Array(resetSequence.utf8)
+
+      let resetAction = CrashSignalHandler.ResetAction(
+        outputFileDescriptor: STDOUT_FILENO,
+        resetBytes: resetBytes,
+        termiosFileDescriptor: hasTermios ? STDIN_FILENO : nil,
+        savedTermios: hasTermios ? savedTermios : nil
+      )
+      CrashSignalHandler.install(
+        for: CrashSignalHandler.fatalSignals,
+        reset: resetAction
+      )
+    }
+  #endif
 
   private func runSceneSession(
     sessionName: String
@@ -264,18 +316,36 @@ final class SceneRuntime {
   private func waitForClient(
     onAttachmentChanged: @escaping @Sendable (Bool) -> Void
   ) async -> Bool {
-    guard let pty = ptyPair else { return true }
+    #if canImport(SwiftTUICLIAttach)
+      guard let pty = ptyPair else { return true }
 
-    while !Task.isCancelled {
-      if await pty.hasAttachedClient() {
-        if lifecycle.clientAttached() {
-          onAttachmentChanged(true)
+      while !Task.isCancelled {
+        if await pty.hasAttachedClient() {
+          if lifecycle.clientAttached() {
+            onAttachmentChanged(true)
+          }
+          return true
         }
-        return true
+        try? await Task.sleep(nanoseconds: 100_000_000)
       }
-      try? await Task.sleep(nanoseconds: 100_000_000)
-    }
 
-    return false
+      return false
+    #else
+      // Secondary scenes cannot construct without the attach subsystem, so
+      // this path is unreachable; primaries never wait.
+      return true
+    #endif
+  }
+}
+
+enum SceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {
+  case secondaryScenesRequireAttachSubsystem
+
+  var description: String {
+    switch self {
+    case .secondaryScenesRequireAttachSubsystem:
+      return "Secondary scenes are PTY-backed and require the POSIX-only attach subsystem; "
+        + "this platform supports single-scene apps only."
+    }
   }
 }

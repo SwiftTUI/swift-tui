@@ -1,4 +1,6 @@
-#if !canImport(WASILibc)
+#if !canImport(WASILibc) && !os(Windows)
+  import SwiftTUIPlatformIO
+
   #if canImport(Darwin)
     import Darwin
   #elseif canImport(Glibc)
@@ -7,7 +9,7 @@
 
   // MARK: - SocketClientError
 
-  enum SocketClientError: Error, Sendable {
+  package enum SocketClientError: Error, Sendable {
     case noRunningInstances
     case instanceNotFound(String)
     case unexpectedResponse(String)
@@ -21,16 +23,16 @@
   // MARK: - InstanceInfo
 
   /// Describes a running SwiftTUI CLI app instance discovered via socket files.
-  struct InstanceInfo: Sendable {
-    let identifier: String
-    let socketPath: String
-    let pid: Int?
-    let name: String?
+  package struct InstanceInfo: Sendable {
+    package let identifier: String
+    package let socketPath: String
+    package let pid: Int?
+    package let name: String?
   }
 
   // MARK: - SocketClient
 
-  enum SocketClient {
+  package enum SocketClient {
     private struct DiscoveredInstance {
       let info: InstanceInfo
       let sortKey: InstanceSortKey
@@ -53,7 +55,7 @@
     }
 
     /// Scans the socket directory for live instances, removes stale sockets.
-    static func discoverInstances(appName: String) -> [InstanceInfo] {
+    package static func discoverInstances(appName: String) -> [InstanceInfo] {
       let dir = "/tmp/swifttui/\(appName)"
       guard let dp = unsafe sceneOpenDirectory(dir) else { return [] }
       defer { unsafe sceneCloseDirectory(dp) }
@@ -95,35 +97,8 @@
         .map(\.info)
     }
 
-    /// Selects a specific instance by selector strategy.
-    static func selectInstance(appName: String, selector: InstanceSelector)
-      throws(SocketClientError)
-      -> InstanceInfo
-    {
-      let instances = discoverInstances(appName: appName)
-      guard !instances.isEmpty else { throw .noRunningInstances }
-
-      switch selector {
-      case .mostRecent:
-        guard let instance = instances.last else { throw .noRunningInstances }
-        return instance
-      case .pid(let pid):
-        let pidString = String(pid)
-        guard let instance = instances.first(where: { $0.identifier == pidString }) else {
-          throw .instanceNotFound("pid:\(pid)")
-        }
-        return instance
-      case .name(let name):
-        guard let instance = instances.first(where: { $0.identifier == name || $0.name == name })
-        else {
-          throw .instanceNotFound(name)
-        }
-        return instance
-      }
-    }
-
     /// Connects to a socket, sends a request line, reads the response.
-    static func sendRequest(
+    package static func sendRequest(
       socketPath: String,
       request: String,
       timeoutMilliseconds: Int32 = 500

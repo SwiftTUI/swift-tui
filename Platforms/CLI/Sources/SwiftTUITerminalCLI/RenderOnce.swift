@@ -8,6 +8,8 @@ import SwiftTUIRuntime
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// One-shot rendering of a SwiftTUI view tree to stdout (or to a string).

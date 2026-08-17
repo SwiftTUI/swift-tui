@@ -1,28 +1,32 @@
-#if !canImport(WASILibc)
-  @_spi(Runners) import SwiftTUIRuntime
+#if !canImport(WASILibc) && !os(Windows)
   import Synchronization
 
-  final class SceneInfoRegistry: Sendable {
-    struct Entry: Sendable {
+  /// Tracks the attachable scenes of a running app for the discovery server.
+  ///
+  /// Constructed from plain `Entry` values rather than the launcher's scene
+  /// runtimes so this module never names the portable launch half — the
+  /// dependency edge runs `SwiftTUITerminalCLI → SwiftTUICLIAttach`, and the
+  /// launcher maps its runtimes into entries at the call site.
+  package final class SceneInfoRegistry: Sendable {
+    package struct Entry: Sendable {
       let id: String
       let title: String?
       let ptyPath: String?
       let isPrimary: Bool
+
+      package init(id: String, title: String?, ptyPath: String?, isPrimary: Bool) {
+        self.id = id
+        self.title = title
+        self.ptyPath = ptyPath
+        self.isPrimary = isPrimary
+      }
     }
 
     private let entries: [Entry]
     private let attachedSceneIDs: Mutex<Set<String>>
 
-    @MainActor
-    init(runtimes: [SceneRuntime]) {
-      self.entries = runtimes.map {
-        Entry(
-          id: $0.selection.identifier.rawValue,
-          title: $0.selection.title,
-          ptyPath: $0.sceneInfo.ptyPath,
-          isPrimary: $0.isPrimary
-        )
-      }
+    package init(entries: [Entry]) {
+      self.entries = entries
       self.attachedSceneIDs = Mutex(
         Set(
           entries
@@ -32,7 +36,7 @@
       )
     }
 
-    func scenes() -> [SceneInfo] {
+    package func scenes() -> [SceneInfo] {
       let attachedSceneIDs = attachedSceneIDs.withLock { $0 }
       return entries.map {
         SceneInfo(
@@ -44,11 +48,11 @@
       }
     }
 
-    func markAttached(sceneID: String) {
+    package func markAttached(sceneID: String) {
       _ = attachedSceneIDs.withLock { $0.insert(sceneID) }
     }
 
-    func markDetached(sceneID: String) {
+    package func markDetached(sceneID: String) {
       attachedSceneIDs.withLock { attachedSceneIDs in
         guard let entry = entries.first(where: { $0.id == sceneID }), !entry.isPrimary else {
           return
@@ -57,7 +61,7 @@
       }
     }
 
-    func attachResponse(for sceneID: String) -> SocketResponse {
+    package func attachResponse(for sceneID: String) -> SocketResponse {
       guard let entry = entries.first(where: { $0.id == sceneID }) else {
         return .error("scene not found: \(sceneID)")
       }

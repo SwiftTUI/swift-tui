@@ -21,6 +21,9 @@ for module in \
   SwiftTUIPTYPrimitives \
   SwiftTUITerminalEmulation \
   SwiftTUITerminal \
+  SwiftTUITerminalCLI \
+  SwiftTUICLIAttach \
+  SwiftTUIPlatformIO \
   SwiftTUICLI \
   SwiftTUIWASI \
   SwiftTUIWebHost \

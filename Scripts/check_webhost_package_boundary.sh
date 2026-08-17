@@ -96,6 +96,33 @@ case "$arguments_target_block" in
     ;;
 esac
 
+# The CLI split (Stage 2 of the Windows plan): SwiftTUITerminalCLI is the
+# portable launch half and carries the real dependency contract;
+# SwiftTUICLI is a compatibility facade re-exporting both halves.
+terminal_cli_target_block=$(target_block SwiftTUITerminalCLI)
+
+case "$terminal_cli_target_block" in
+  *SwiftTUIWebHost*|*FlyingFox*)
+    fail 'The SwiftTUITerminalCLI target must not depend on SwiftTUIWebHost or FlyingFox.'
+    ;;
+esac
+
+case "$terminal_cli_target_block" in
+  *SwiftTUIRuntime*) ;;
+  *) fail 'The SwiftTUITerminalCLI target should depend on SwiftTUIRuntime.' ;;
+esac
+
+case "$terminal_cli_target_block" in
+  *SwiftTUIArguments*) ;;
+  *) fail 'The SwiftTUITerminalCLI target should depend on SwiftTUIArguments.' ;;
+esac
+
+case "$terminal_cli_target_block" in
+  *'"SwiftTUI"'*)
+    fail 'The SwiftTUITerminalCLI target must not depend on the SwiftTUI convenience product.'
+    ;;
+esac
+
 cli_target_block=$(target_block SwiftTUICLI)
 
 case "$cli_target_block" in
@@ -105,13 +132,13 @@ case "$cli_target_block" in
 esac
 
 case "$cli_target_block" in
-  *SwiftTUIRuntime*) ;;
-  *) fail 'The SwiftTUICLI target should depend on SwiftTUIRuntime.' ;;
+  *SwiftTUITerminalCLI*) ;;
+  *) fail 'The SwiftTUICLI facade should depend on SwiftTUITerminalCLI.' ;;
 esac
 
 case "$cli_target_block" in
-  *SwiftTUIArguments*) ;;
-  *) fail 'The SwiftTUICLI target should depend on SwiftTUIArguments.' ;;
+  *SwiftTUICLIAttach*) ;;
+  *) fail 'The SwiftTUICLI facade should depend on SwiftTUICLIAttach (conditionally).' ;;
 esac
 
 case "$cli_target_block" in
