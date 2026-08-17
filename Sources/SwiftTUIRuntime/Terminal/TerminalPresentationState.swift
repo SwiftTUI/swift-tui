@@ -7,6 +7,8 @@ import Synchronization
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 #if canImport(Dispatch)

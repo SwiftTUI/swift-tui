@@ -8,6 +8,8 @@
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// The known process-level performance/soundness feature gates.

@@ -6,6 +6,8 @@
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// A single raw reading of the process's accumulated CPU time and peak resident

@@ -8,6 +8,8 @@ import SwiftTUIRuntime
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// File-backed sink. `tsv` writes the frame signal as the legacy

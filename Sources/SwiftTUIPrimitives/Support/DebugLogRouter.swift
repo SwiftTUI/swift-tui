@@ -10,6 +10,8 @@ import Synchronization
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Central router for the framework's env-gated debug output.
@@ -112,6 +114,43 @@ package enum DebugLogRouter {
   package static func appendToFile(_ message: String, at path: String) -> Bool {
     #if canImport(WASILibc)
       return false
+    #elseif canImport(ucrt)
+      // `open`/`_open` are variadic in ucrt and un-importable; `_sopen_s` is
+      // the non-variadic form. `_O_BINARY` keeps appended bytes faithful —
+      // the CRT's default text mode rewrites "\n" as "\r\n" on every `_write`.
+      var descriptor: CInt = -1
+      let openError = unsafe path.withCString { pathPointer in
+        unsafe _sopen_s(
+          &descriptor,
+          pathPointer,
+          _O_WRONLY | _O_CREAT | _O_APPEND | _O_BINARY,
+          _SH_DENYNO,
+          _S_IREAD | _S_IWRITE
+        )
+      }
+      guard openError == 0, descriptor >= 0 else {
+        return false
+      }
+      defer { _ = _close(descriptor) }
+      var message = message
+      return message.withUTF8 { buffer in
+        guard let base = buffer.baseAddress, buffer.count > 0 else {
+          return true
+        }
+        var offset = 0
+        while offset < buffer.count {
+          let written = unsafe _write(
+            descriptor,
+            base.advanced(by: offset),
+            UInt32(buffer.count - offset)
+          )
+          guard written > 0 else {
+            return false
+          }
+          offset += Int(written)
+        }
+        return true
+      }
     #else
       let descriptor = unsafe path.withCString { pathPointer in
         unsafe open(pathPointer, O_WRONLY | O_CREAT | O_APPEND, 0o644)
@@ -177,8 +216,19 @@ package enum DebugLogRouter {
       var partial = path.hasPrefix("/") ? "/" : ""
       for component in path.split(separator: "/") {
         partial += (partial.isEmpty || partial == "/") ? String(component) : "/" + component
+        #if canImport(ucrt)
+          // A bare drive designator ("C:") is not creatable — skip to its
+          // children.
+          if component.hasSuffix(":") {
+            continue
+          }
+        #endif
         let result = unsafe partial.withCString { pathPointer in
-          unsafe mkdir(pathPointer, 0o755)
+          #if canImport(ucrt)
+            unsafe _mkdir(pathPointer)
+          #else
+            unsafe mkdir(pathPointer, 0o755)
+          #endif
         }
         if result != 0, errno != EEXIST {
           return false

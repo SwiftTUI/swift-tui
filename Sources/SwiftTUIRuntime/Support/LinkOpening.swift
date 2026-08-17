@@ -6,6 +6,8 @@ import SwiftTUIViews
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 package func systemOpenLinkAction() -> OpenLinkAction {

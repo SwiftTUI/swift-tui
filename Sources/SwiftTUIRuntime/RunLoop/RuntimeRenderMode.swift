@@ -8,6 +8,8 @@
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Selects the runtime rendering pipeline used by ``RunLoop``.

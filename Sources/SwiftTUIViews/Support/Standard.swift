@@ -10,6 +10,8 @@ import Synchronization
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #else
   #error("Unsupported platform: this implementation needs POSIX open/write/close.")
 #endif
@@ -49,15 +51,24 @@ private func systemWrite(
     unsafe Musl.write(fd, buffer, count)
   #elseif canImport(WASILibc)
     Int(unsafe WASILibc.write(fd, buffer, count))
+  #elseif canImport(ucrt)
+    Int(unsafe _write(fd, buffer, UInt32(count)))
   #endif
 }
 
 #if !canImport(WASILibc)
+  // `mode_t` does not exist on Windows; `_sopen_s` takes a plain int pmode.
+  #if canImport(ucrt)
+    private typealias FilePermissions = CInt
+  #else
+    private typealias FilePermissions = mode_t
+  #endif
+
   @inline(__always)
   private func systemOpen(
     _ path: UnsafePointer<CChar>,
     _ flags: CInt,
-    _ mode: mode_t
+    _ mode: FilePermissions
   ) -> CInt {
     #if canImport(Darwin)
       unsafe Darwin.open(path, flags, mode)
@@ -67,6 +78,15 @@ private func systemWrite(
       unsafe Android.open(path, flags, mode)
     #elseif canImport(Musl)
       unsafe Musl.open(path, flags, mode)
+    #elseif canImport(ucrt)
+      // `open`/`_open` are variadic in ucrt and un-importable; `_sopen_s` is
+      // the non-variadic form. Its pmode accepts only `_S_IREAD`/`_S_IWRITE`,
+      // so derive them from the owner-write bit rather than passing POSIX
+      // permission bits through.
+      var descriptor: CInt = -1
+      let permissionMode = (mode & 0o200) != 0 ? _S_IREAD | _S_IWRITE : _S_IREAD
+      let openError = unsafe _sopen_s(&descriptor, path, flags, _SH_DENYNO, permissionMode)
+      return openError == 0 ? descriptor : -1
     #endif
   }
 
@@ -80,6 +100,8 @@ private func systemWrite(
       Android.close(fd)
     #elseif canImport(Musl)
       Musl.close(fd)
+    #elseif canImport(ucrt)
+      _close(fd)
     #endif
   }
 #endif
@@ -97,11 +119,21 @@ private func interruptedErrno() -> CInt {
 #if !canImport(WASILibc)
   @inline(__always)
   private func appendOpenFlags(create: Bool) -> CInt {
-    var flags = CInt(O_WRONLY | O_APPEND)
+    #if canImport(ucrt)
+      // `_O_BINARY` keeps appended bytes faithful — the CRT's default text
+      // mode rewrites "\n" as "\r\n" on every `_write`.
+      var flags = CInt(_O_WRONLY | _O_APPEND | _O_BINARY)
 
-    if create {
-      flags |= CInt(O_CREAT)
-    }
+      if create {
+        flags |= CInt(_O_CREAT)
+      }
+    #else
+      var flags = CInt(O_WRONLY | O_APPEND)
+
+      if create {
+        flags |= CInt(O_CREAT)
+      }
+    #endif
 
     return flags
   }
@@ -211,15 +243,16 @@ public enum Standard {
         create: Bool = false,
         permissions: UInt16 = 0o666
       ) throws {
-        // mode_t is platform-typed (UInt16 on Darwin, UInt32 on Linux) and
-        // imported as `internal` under InternalImportsByDefault, so it
-        // can't appear in a public signature. Take a UInt16 publicly and
-        // cast at the call site — both target widths accept it.
+        // The permission type is platform-typed (mode_t: UInt16 on Darwin,
+        // UInt32 on Linux; a plain CInt pmode on Windows) and imported as
+        // `internal` under InternalImportsByDefault, so it can't appear in a
+        // public signature. Take a UInt16 publicly and cast at the call site
+        // — every target width accepts it.
         let fd = unsafe path.withCString { pathPointer in
           unsafe systemOpen(
             pathPointer,
             appendOpenFlags(create: create),
-            mode_t(permissions)
+            FilePermissions(permissions)
           )
         }
 

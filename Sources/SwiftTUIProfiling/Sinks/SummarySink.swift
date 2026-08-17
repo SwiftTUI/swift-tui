@@ -8,6 +8,8 @@ import SwiftTUIRuntime
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Buffers per-signal observations and writes a reduced report to standard

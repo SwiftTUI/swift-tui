@@ -10,6 +10,8 @@ import SwiftTUICore
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// The session debug bundle: the `--debug` / `SWIFTTUI_DEBUG_DIR` umbrella.

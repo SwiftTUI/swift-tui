@@ -6,6 +6,8 @@ import SwiftTUIWebHostCLI
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// The batteries-included SwiftTUI app protocol.

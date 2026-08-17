@@ -9,6 +9,8 @@ import Synchronization
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Env-gated frame-pipeline trace sink.

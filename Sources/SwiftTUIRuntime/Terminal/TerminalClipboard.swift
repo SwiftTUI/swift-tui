@@ -4,6 +4,8 @@
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Host capability for clipboard writes initiated by authored views or embedded clients.

@@ -16,6 +16,8 @@ import SwiftTUICore
   import Android
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 // Internal (not file-private) so the sampled-hash contract below is

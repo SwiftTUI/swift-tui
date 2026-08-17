@@ -4,6 +4,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Frame sink that appends one tab-separated record per frame to a file,

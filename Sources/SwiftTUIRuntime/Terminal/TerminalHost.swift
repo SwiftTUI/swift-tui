@@ -9,6 +9,8 @@ import Synchronization
   import Android
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Errors thrown while configuring or writing to a terminal-backed host.

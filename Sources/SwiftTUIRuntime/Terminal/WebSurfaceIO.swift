@@ -8,6 +8,8 @@
   import Glibc
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 // POSIX shims for the web-surface transport and image encoder. Widened to

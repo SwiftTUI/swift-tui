@@ -6,6 +6,8 @@
   import Android
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 #if canImport(Darwin)

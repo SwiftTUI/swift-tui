@@ -9,6 +9,8 @@ import Synchronization
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Appends one tab-separated row per terminal write submission to a file, the

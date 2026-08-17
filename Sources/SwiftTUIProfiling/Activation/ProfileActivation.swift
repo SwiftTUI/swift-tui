@@ -8,6 +8,8 @@
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Owns the live profiling session.

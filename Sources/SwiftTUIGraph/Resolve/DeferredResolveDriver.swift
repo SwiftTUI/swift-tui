@@ -8,6 +8,8 @@
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// Bounds the resolve descent's native stack depth by chunking deep subtrees.

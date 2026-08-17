@@ -6,6 +6,8 @@ import SwiftTUICore
   package import Glibc
 #elseif canImport(Android)
   package import Android
+#elseif canImport(ucrt)
+  package import CRT
 #endif
 
 #if !canImport(WASILibc)
