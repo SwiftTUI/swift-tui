@@ -1,9 +1,10 @@
 import Dispatch
+@_spi(Testing) import SwiftTUITestSupport
+import SwiftTUIViews
 import Testing
 
 @testable import SwiftTUICore
 @testable import SwiftTUIRuntime
-import SwiftTUIViews
 
 #if canImport(Darwin)
   import Darwin
@@ -1614,83 +1615,88 @@ struct TerminalPresentationTests {
 
   @Test("POSIX terminal controller retries writes after nonblocking backpressure")
   func posixTerminalControllerRetriesWritesAfterBackpressure() throws {
-    var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    // Body excluded from Windows builds (Windows plan, Stage 6 item 3):
+    // drives the POSIX controller through nonblocking-pipe backpressure;
+    // the type and the fd semantics are POSIX-only.
+    #if !os(Windows)
+      var descriptors: [Int32] = [0, 0]
+      #expect(openTestPipe(&descriptors) == 0)
 
-    let readDescriptor = descriptors[0]
-    let writeDescriptor = descriptors[1]
-    var didCloseReadDescriptor = false
-    var didCloseWriteDescriptor = false
-    defer {
-      if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
-      }
-      if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
-      }
-    }
-
-    let currentFlags = fcntl(writeDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(writeDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
-
-    let fillerByte: UInt8 = 0x78
-    try fillPipeUntilWouldBlock(
-      writeDescriptor: writeDescriptor,
-      chunk: Array(repeating: fillerByte, count: 1024)
-    )
-
-    // This is a synchronous test that drives genuine *blocking* POSIX read/
-    // write syscalls on real `DispatchQueue.global()` threads. A blocking
-    // semaphore is the correct primitive to coordinate them — the async
-    // test-sync signals cannot bridge blocking syscall threads — so these four
-    // semaphores are a deliberate, permanent exception to the test-sync ratchet.
-    let drainStarted = DispatchSemaphore(value: 0)
-    let allowDrain = DispatchSemaphore(value: 0)
-    let drainFinished = DispatchSemaphore(value: 0)
-    DispatchQueue.global().async {
-      drainStarted.signal()
-      allowDrain.wait()
-      var buffer = Array(repeating: UInt8(0), count: 8192)
-      _ = unsafe read(readDescriptor, &buffer, buffer.count)
-      drainFinished.signal()
-    }
-
-    drainStarted.wait()
-
-    let controller = POSIXTerminalController()
-    let writeFinished = DispatchSemaphore(value: 0)
-    let writeResult = LockedBox<Result<Void, any Error>?>(nil)
-    DispatchQueue.global().async {
-      writeResult.withLock { result in
-        result = Result {
-          try controller.write("ok", to: writeDescriptor)
+      let readDescriptor = descriptors[0]
+      let writeDescriptor = descriptors[1]
+      var didCloseReadDescriptor = false
+      var didCloseWriteDescriptor = false
+      defer {
+        if !didCloseReadDescriptor {
+          _ = close(readDescriptor)
+        }
+        if !didCloseWriteDescriptor {
+          _ = close(writeDescriptor)
         }
       }
-      writeFinished.signal()
-    }
 
-    // Deliberate negative check: the pipe is full and the drain is gated, so
-    // the write must still be blocked. This asserts a non-event, so it is
-    // necessarily bounded by a short wait rather than an awaitable signal.
-    #expect(writeFinished.wait(timeout: .now() + .milliseconds(50)) == .timedOut)
-    allowDrain.signal()
+      let currentFlags = fcntl(writeDescriptor, F_GETFL)
+      #expect(currentFlags >= 0)
+      #expect(fcntl(writeDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
-    drainFinished.wait()
-    writeFinished.wait()
-    let completedWrite = try #require(writeResult.value)
-    #expect(throws: Never.self) {
-      try completedWrite.get()
-    }
+      let fillerByte: UInt8 = 0x78
+      try fillPipeUntilWouldBlock(
+        writeDescriptor: writeDescriptor,
+        chunk: Array(repeating: fillerByte, count: 1024)
+      )
 
-    _ = close(writeDescriptor)
-    didCloseWriteDescriptor = true
+      // This is a synchronous test that drives genuine *blocking* POSIX read/
+      // write syscalls on real `DispatchQueue.global()` threads. A blocking
+      // semaphore is the correct primitive to coordinate them — the async
+      // test-sync signals cannot bridge blocking syscall threads — so these four
+      // semaphores are a deliberate, permanent exception to the test-sync ratchet.
+      let drainStarted = DispatchSemaphore(value: 0)
+      let allowDrain = DispatchSemaphore(value: 0)
+      let drainFinished = DispatchSemaphore(value: 0)
+      DispatchQueue.global().async {
+        drainStarted.signal()
+        allowDrain.wait()
+        var buffer = Array(repeating: UInt8(0), count: 8192)
+        _ = unsafe read(readDescriptor, &buffer, buffer.count)
+        drainFinished.signal()
+      }
 
-    let remainingBytes = try readAllBytes(from: readDescriptor)
-    _ = close(readDescriptor)
-    didCloseReadDescriptor = true
+      drainStarted.wait()
 
-    #expect(remainingBytes.suffix(2) == Array("ok".utf8))
+      let controller = POSIXTerminalController()
+      let writeFinished = DispatchSemaphore(value: 0)
+      let writeResult = LockedBox<Result<Void, any Error>?>(nil)
+      DispatchQueue.global().async {
+        writeResult.withLock { result in
+          result = Result {
+            try controller.write("ok", to: writeDescriptor)
+          }
+        }
+        writeFinished.signal()
+      }
+
+      // Deliberate negative check: the pipe is full and the drain is gated, so
+      // the write must still be blocked. This asserts a non-event, so it is
+      // necessarily bounded by a short wait rather than an awaitable signal.
+      #expect(writeFinished.wait(timeout: .now() + .milliseconds(50)) == .timedOut)
+      allowDrain.signal()
+
+      drainFinished.wait()
+      writeFinished.wait()
+      let completedWrite = try #require(writeResult.value)
+      #expect(throws: Never.self) {
+        try completedWrite.get()
+      }
+
+      _ = close(writeDescriptor)
+      didCloseWriteDescriptor = true
+
+      let remainingBytes = try readAllBytes(from: readDescriptor)
+      _ = close(readDescriptor)
+      didCloseReadDescriptor = true
+
+      #expect(remainingBytes.suffix(2) == Array("ok".utf8))
+    #endif
   }
 
   @Test("ansi renderer lowers italic plus typed underline and strikethrough decorations")
@@ -1799,8 +1805,6 @@ private final class PresentationMockTerminalController: TerminalControlling {
     .init(width: 80, height: 24)
   }
 
-
-
   func write(_ output: String, to _: Int32) throws {
     writesStorage.withLock { $0.append(output) }
   }
@@ -1814,52 +1818,55 @@ private final class PresentationMockTerminalController: TerminalControlling {
   }
 }
 
-private func fillPipeUntilWouldBlock(
-  writeDescriptor: Int32,
-  chunk: [UInt8]
-) throws {
-  try unsafe chunk.withUnsafeBytes { rawBuffer in
-    guard let baseAddress = rawBuffer.baseAddress else {
-      return
-    }
-
-    while true {
-      let result = unsafe write(writeDescriptor, baseAddress, chunk.count)
-      if result > 0 {
-        continue
-      }
-      if result < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+// POSIX halves of the backpressure test above (Stage 6 item 3).
+#if !os(Windows)
+  private func fillPipeUntilWouldBlock(
+    writeDescriptor: Int32,
+    chunk: [UInt8]
+  ) throws {
+    try unsafe chunk.withUnsafeBytes { rawBuffer in
+      guard let baseAddress = rawBuffer.baseAddress else {
         return
       }
-      if result < 0, errno == EINTR {
+
+      while true {
+        let result = unsafe write(writeDescriptor, baseAddress, chunk.count)
+        if result > 0 {
+          continue
+        }
+        if result < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+          return
+        }
+        if result < 0, errno == EINTR {
+          continue
+        }
+        throw TerminalHostError.failedToWrite(errno: errno)
+      }
+    }
+  }
+
+  private func readAllBytes(
+    from fileDescriptor: Int32
+  ) throws -> [UInt8] {
+    var collected: [UInt8] = []
+
+    while true {
+      var buffer = Array(repeating: UInt8(0), count: 4096)
+      let bytesRead = unsafe read(fileDescriptor, &buffer, buffer.count)
+      if bytesRead > 0 {
+        collected.append(contentsOf: buffer.prefix(Int(bytesRead)))
+        continue
+      }
+      if bytesRead == 0 {
+        return collected
+      }
+      if errno == EINTR {
         continue
       }
       throw TerminalHostError.failedToWrite(errno: errno)
     }
   }
-}
-
-private func readAllBytes(
-  from fileDescriptor: Int32
-) throws -> [UInt8] {
-  var collected: [UInt8] = []
-
-  while true {
-    var buffer = Array(repeating: UInt8(0), count: 4096)
-    let bytesRead = unsafe read(fileDescriptor, &buffer, buffer.count)
-    if bytesRead > 0 {
-      collected.append(contentsOf: buffer.prefix(Int(bytesRead)))
-      continue
-    }
-    if bytesRead == 0 {
-      return collected
-    }
-    if errno == EINTR {
-      continue
-    }
-    throw TerminalHostError.failedToWrite(errno: errno)
-  }
-}
+#endif
 
 private func trueColorBackgroundSequence(
   for color: Color

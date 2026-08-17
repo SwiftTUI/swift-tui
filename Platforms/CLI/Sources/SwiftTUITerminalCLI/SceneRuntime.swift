@@ -10,7 +10,7 @@ import Foundation
 
 // The sigaction-based vendor module carries CrashSignalHandler; its edge is
 // platform-conditional (it can never build on Windows).
-#if canImport(SwiftTUIVendorUnixSignals)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
   import SwiftTUIVendorUnixSignals
 #endif
 
@@ -187,7 +187,7 @@ final class SceneRuntime {
     if isPrimary {
       installCrashGuard()
       defer {
-        #if canImport(SwiftTUIVendorUnixSignals)
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
           CrashSignalHandler.uninstall()
         #endif
       }
@@ -246,7 +246,7 @@ final class SceneRuntime {
   ///
   /// Only meaningful for the primary scene, which owns the real tty via stdio.
   private func installCrashGuard() {
-    #if canImport(SwiftTUIVendorUnixSignals)
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       installPOSIXCrashGuard()
     #else
       // No POSIX fatal-signal delivery without the sigaction-based vendor
@@ -255,7 +255,7 @@ final class SceneRuntime {
     #endif
   }
 
-  #if canImport(SwiftTUIVendorUnixSignals)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     private func installPOSIXCrashGuard() {
       // Read the current terminal attributes before the session enters raw mode.
       // These are the attributes we want to restore on crash.

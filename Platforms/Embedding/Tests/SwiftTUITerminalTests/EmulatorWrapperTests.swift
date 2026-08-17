@@ -1,134 +1,140 @@
-import Foundation
-import SwiftTUIRuntime
-import Testing
+// Excluded from Windows builds (Windows plan, Stage 6 item 3): exercises a
+// POSIX-only subsystem whose modules build empty (or not at all) on Windows.
+#if !os(Windows)
 
-@testable import SwiftTUITerminal
+  import Foundation
+  import SwiftTUIRuntime
+  import Testing
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#endif
+  @testable import SwiftTUITerminal
 
-@Suite("TerminalEmulator wrapper", .serialized)
-struct EmulatorWrapperTests {
-  @Test("emulator initializes at requested size")
-  func initSize() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 80, height: 24))
-    let snapshot = await emulator.snapshot()
-    #expect(snapshot.size == CellSize(width: 80, height: 24))
-  }
+  #if canImport(Darwin)
+    import Darwin
+  #elseif canImport(Glibc)
+    import Glibc
+  #endif
 
-  @Test("empty terminal cells snapshot as raster empties")
-  func emptyCellsSnapshotAsRasterEmpties() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
-    let snapshot = await emulator.snapshot()
-
-    #expect(
-      snapshot.cells.allSatisfy { row in
-        row.allSatisfy { $0 == .empty }
-      })
-  }
-
-  @Test("OSC 133 shell integration markers are ignored quietly")
-  func osc133MarkersAreIgnoredQuietly() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
-    let output = await captureStandardOutput {
-      _ = await emulator.feed(Array("\u{1B}]133;A\u{07}".utf8))
+  @Suite("TerminalEmulator wrapper", .serialized)
+  struct EmulatorWrapperTests {
+    @Test("emulator initializes at requested size")
+    func initSize() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 80, height: 24))
+      let snapshot = await emulator.snapshot()
+      #expect(snapshot.size == CellSize(width: 80, height: 24))
     }
 
-    #expect(output == "")
-  }
+    @Test("empty terminal cells snapshot as raster empties")
+    func emptyCellsSnapshotAsRasterEmpties() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
+      let snapshot = await emulator.snapshot()
 
-  @Test("feeding plain ASCII produces visible cells")
-  func feedAscii() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
-    _ = await emulator.feed(Array("hello".utf8))
-    let snapshot = await emulator.snapshot()
-    let firstRow = snapshot.cells[0].prefix(5).map { $0.character }
-    #expect(firstRow == ["h", "e", "l", "l", "o"])
-  }
+      #expect(
+        snapshot.cells.allSatisfy { row in
+          row.allSatisfy { $0 == .empty }
+        })
+    }
 
-  @Test("OSC 0 title changes are reported as events")
-  func titleEvent() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
-    let oscTitle = Array("\u{1B}]0;hello-world\u{07}".utf8)
-    let events = await emulator.feed(oscTitle)
-    #expect(events.contains(.titleChanged("hello-world")))
-  }
+    @Test("OSC 133 shell integration markers are ignored quietly")
+    func osc133MarkersAreIgnoredQuietly() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 4, height: 2))
+      let output = await captureStandardOutput {
+        _ = await emulator.feed(Array("\u{1B}]133;A\u{07}".utf8))
+      }
 
-  @Test("OSC 7 working directory changes are reported as events")
-  func workingDirectoryEvent() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
-    let oscDirectory = Array("\u{1B}]7;file:///tmp/swift-tui\u{07}".utf8)
-    let events = await emulator.feed(oscDirectory)
-    #expect(events.contains(.workingDirectoryChanged("file:///tmp/swift-tui")))
-  }
+      #expect(output == "")
+    }
 
-  @Test("SGR mouse protocol encodes terminal-coordinate button presses")
-  func sgrMousePress() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
-    let events = await emulator.feed(Array("\u{1B}[?1006h".utf8))
+    @Test("feeding plain ASCII produces visible cells")
+    func feedAscii() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+      _ = await emulator.feed(Array("hello".utf8))
+      let snapshot = await emulator.snapshot()
+      let firstRow = snapshot.cells[0].prefix(5).map { $0.character }
+      #expect(firstRow == ["h", "e", "l", "l", "o"])
+    }
 
-    let bytes = await emulator.send(
-      mouse: TerminalEmulatorMouse(
-        kind: .down(.primary),
-        cell: CellPoint(x: 4, y: 2)
+    @Test("OSC 0 title changes are reported as events")
+    func titleEvent() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+      let oscTitle = Array("\u{1B}]0;hello-world\u{07}".utf8)
+      let events = await emulator.feed(oscTitle)
+      #expect(events.contains(.titleChanged("hello-world")))
+    }
+
+    @Test("OSC 7 working directory changes are reported as events")
+    func workingDirectoryEvent() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+      let oscDirectory = Array("\u{1B}]7;file:///tmp/swift-tui\u{07}".utf8)
+      let events = await emulator.feed(oscDirectory)
+      #expect(events.contains(.workingDirectoryChanged("file:///tmp/swift-tui")))
+    }
+
+    @Test("SGR mouse protocol encodes terminal-coordinate button presses")
+    func sgrMousePress() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+      let events = await emulator.feed(Array("\u{1B}[?1006h".utf8))
+
+      let bytes = await emulator.send(
+        mouse: TerminalEmulatorMouse(
+          kind: .down(.primary),
+          cell: CellPoint(x: 4, y: 2)
+        )
       )
-    )
 
-    #expect(events.contains(.mouseModeChanged(.sgr)))
-    #expect(bytes == Array("\u{1B}[<0;5;3M".utf8))
+      #expect(events.contains(.mouseModeChanged(.sgr)))
+      #expect(bytes == Array("\u{1B}[<0;5;3M".utf8))
+    }
+
+    @Test("paste is bracketed when the child requests bracketed-paste")
+    func bracketedPaste() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+
+      #expect(await emulator.encode(paste: "hello") == Array("hello".utf8))
+
+      _ = await emulator.feed(Array("\u{1B}[?2004h".utf8))
+
+      #expect(
+        await emulator.encode(paste: "hello")
+          == Array("\u{1B}[200~hello\u{1B}[201~".utf8)
+      )
+    }
+
+    @Test("plain ASCII has nil style")
+    func plainCharStyle() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 5, height: 1))
+      _ = await emulator.feed(Array("x".utf8))
+      let cell = (await emulator.snapshot()).cells[0][0]
+      #expect(cell.character == "x")
+      #expect(cell.style == nil)
+    }
+
+    @Test("SGR red foreground produces a red cell")
+    func sgrRedForeground() async {
+      let emulator = TerminalEmulator(size: CellSize(width: 5, height: 1))
+      _ = await emulator.feed(Array("\u{1B}[31mx\u{1B}[0m".utf8))
+      let cell = (await emulator.snapshot()).cells[0][0]
+      #expect(cell.style?.foregroundColor == .red)
+    }
   }
 
-  @Test("paste is bracketed when the child requests bracketed-paste")
-  func bracketedPaste() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 10, height: 3))
+  private func captureStandardOutput(
+    _ operation: () async -> Void
+  ) async -> String {
+    fflush(nil)
 
-    #expect(await emulator.encode(paste: "hello") == Array("hello".utf8))
+    let pipe = Pipe()
+    let original = dup(STDOUT_FILENO)
+    dup2(pipe.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
 
-    _ = await emulator.feed(Array("\u{1B}[?2004h".utf8))
+    await operation()
 
-    #expect(
-      await emulator.encode(paste: "hello")
-        == Array("\u{1B}[200~hello\u{1B}[201~".utf8)
-    )
+    fflush(nil)
+    dup2(original, STDOUT_FILENO)
+    close(original)
+    pipe.fileHandleForWriting.closeFile()
+
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(decoding: data, as: UTF8.self)
   }
 
-  @Test("plain ASCII has nil style")
-  func plainCharStyle() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 5, height: 1))
-    _ = await emulator.feed(Array("x".utf8))
-    let cell = (await emulator.snapshot()).cells[0][0]
-    #expect(cell.character == "x")
-    #expect(cell.style == nil)
-  }
-
-  @Test("SGR red foreground produces a red cell")
-  func sgrRedForeground() async {
-    let emulator = TerminalEmulator(size: CellSize(width: 5, height: 1))
-    _ = await emulator.feed(Array("\u{1B}[31mx\u{1B}[0m".utf8))
-    let cell = (await emulator.snapshot()).cells[0][0]
-    #expect(cell.style?.foregroundColor == .red)
-  }
-}
-
-private func captureStandardOutput(
-  _ operation: () async -> Void
-) async -> String {
-  fflush(nil)
-
-  let pipe = Pipe()
-  let original = dup(STDOUT_FILENO)
-  dup2(pipe.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
-
-  await operation()
-
-  fflush(nil)
-  dup2(original, STDOUT_FILENO)
-  close(original)
-  pipe.fileHandleForWriting.closeFile()
-
-  let data = pipe.fileHandleForReading.readDataToEndOfFile()
-  return String(decoding: data, as: UTF8.self)
-}
+#endif

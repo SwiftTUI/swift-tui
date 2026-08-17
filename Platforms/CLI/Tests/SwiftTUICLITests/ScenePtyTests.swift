@@ -1,98 +1,104 @@
-import SwiftTUIPTYPrimitives
-import SwiftTUIPlatformIO
-import Testing
+// Excluded from Windows builds (Windows plan, Stage 6 item 3): exercises a
+// POSIX-only subsystem whose modules build empty (or not at all) on Windows.
+#if !os(Windows)
 
-@testable import SwiftTUICLIAttach
+  import SwiftTUIPTYPrimitives
+  import SwiftTUIPlatformIO
+  import Testing
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#endif
-
-@Suite(.serialized)
-struct ScenePtyTests {
-  @Test("Allocates a pty pair with valid file descriptors")
-  func allocatesScenePty() async throws {
-    try await withScenePty { pty in
-      #expect(await pty.pair.rawMasterFD >= 0)
-      #expect(pty.slavePath.hasPrefix("/dev/"))
-    }
-  }
-
-  @Test("Close invalidates the master fd")
-  func closeInvalidatesMasterFD() async throws {
-    let pty = try ScenePty()
-    await pty.close()
-    #expect(await pty.pair.rawMasterFD == -1)
-    #expect(await pty.hasAttachedClient() == false)
-  }
-
-  @Test("Multiple allocations produce distinct fds")
-  func multipleAllocationsDistinct() async throws {
-    try await withScenePtyPair { pty1, pty2 in
-      #expect(await pty1.pair.rawMasterFD != pty2.pair.rawMasterFD)
-      #expect(pty1.slavePath != pty2.slavePath)
-    }
-  }
-
-  @Test("Attached client detection tracks slave open and close")
-  func attachedClientDetection() async throws {
-    try await withScenePty { pty in
-      #expect(await pty.hasAttachedClient() == false)
-
-      let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
-      #expect(slaveFD >= 0)
-      #expect(await pty.hasAttachedClient() == true)
-
-      sceneClose(slaveFD)
-      #expect(await pty.hasAttachedClient() == false)
-    }
-  }
+  @testable import SwiftTUICLIAttach
 
   #if canImport(Darwin)
-    @Test("Master fd suppresses SIGPIPE on Darwin")
-    func masterSuppressesSigPipeOnDarwin() async throws {
+    import Darwin
+  #elseif canImport(Glibc)
+    import Glibc
+  #endif
+
+  @Suite(.serialized)
+  struct ScenePtyTests {
+    @Test("Allocates a pty pair with valid file descriptors")
+    func allocatesScenePty() async throws {
       try await withScenePty { pty in
-        let fd = await pty.pair.rawMasterFD
-        #expect(fcntl(fd, F_GETNOSIGPIPE) == 1)
+        #expect(await pty.pair.rawMasterFD >= 0)
+        #expect(pty.slavePath.hasPrefix("/dev/"))
       }
     }
-  #endif
-}
 
-private func withScenePty<R>(
-  _ body: (ScenePty) async throws -> R
-) async throws -> R {
-  let pty = try ScenePty()
-  do {
-    let result = try await body(pty)
-    await pty.close()
-    return result
-  } catch {
-    await pty.close()
-    throw error
+    @Test("Close invalidates the master fd")
+    func closeInvalidatesMasterFD() async throws {
+      let pty = try ScenePty()
+      await pty.close()
+      #expect(await pty.pair.rawMasterFD == -1)
+      #expect(await pty.hasAttachedClient() == false)
+    }
+
+    @Test("Multiple allocations produce distinct fds")
+    func multipleAllocationsDistinct() async throws {
+      try await withScenePtyPair { pty1, pty2 in
+        #expect(await pty1.pair.rawMasterFD != pty2.pair.rawMasterFD)
+        #expect(pty1.slavePath != pty2.slavePath)
+      }
+    }
+
+    @Test("Attached client detection tracks slave open and close")
+    func attachedClientDetection() async throws {
+      try await withScenePty { pty in
+        #expect(await pty.hasAttachedClient() == false)
+
+        let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
+        #expect(slaveFD >= 0)
+        #expect(await pty.hasAttachedClient() == true)
+
+        sceneClose(slaveFD)
+        #expect(await pty.hasAttachedClient() == false)
+      }
+    }
+
+    #if canImport(Darwin)
+      @Test("Master fd suppresses SIGPIPE on Darwin")
+      func masterSuppressesSigPipeOnDarwin() async throws {
+        try await withScenePty { pty in
+          let fd = await pty.pair.rawMasterFD
+          #expect(fcntl(fd, F_GETNOSIGPIPE) == 1)
+        }
+      }
+    #endif
   }
-}
 
-private func withScenePtyPair<R>(
-  _ body: (ScenePty, ScenePty) async throws -> R
-) async throws -> R {
-  let pty1 = try ScenePty()
-  do {
-    let pty2 = try ScenePty()
+  private func withScenePty<R>(
+    _ body: (ScenePty) async throws -> R
+  ) async throws -> R {
+    let pty = try ScenePty()
     do {
-      let result = try await body(pty1, pty2)
-      await pty2.close()
-      await pty1.close()
+      let result = try await body(pty)
+      await pty.close()
       return result
     } catch {
-      await pty2.close()
+      await pty.close()
+      throw error
+    }
+  }
+
+  private func withScenePtyPair<R>(
+    _ body: (ScenePty, ScenePty) async throws -> R
+  ) async throws -> R {
+    let pty1 = try ScenePty()
+    do {
+      let pty2 = try ScenePty()
+      do {
+        let result = try await body(pty1, pty2)
+        await pty2.close()
+        await pty1.close()
+        return result
+      } catch {
+        await pty2.close()
+        await pty1.close()
+        throw error
+      }
+    } catch {
       await pty1.close()
       throw error
     }
-  } catch {
-    await pty1.close()
-    throw error
   }
-}
+
+#endif

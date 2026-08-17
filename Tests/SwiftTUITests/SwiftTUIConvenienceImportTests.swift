@@ -5,7 +5,11 @@ import Testing
 struct SwiftTUIConvenienceImportTests {
   @Test("SwiftTUI import exposes WebHost and animated image conveniences")
   func swiftTUIImportExposesWebHostAndAnimatedImageConveniences() {
-    _ = WebHostCLIRunner.self
+    // The umbrella deliberately serves no WebHost surface on Windows
+    // (Stage 5.3: one launch surface per platform).
+    #if !os(Windows)
+      _ = WebHostCLIRunner.self
+    #endif
     _ = AnimatedGIF.self
     _ = AnimatedImageFrame(
       width: 1,
@@ -62,14 +66,18 @@ struct SwiftTUIConvenienceImportTests {
 
   @Test("Plain SwiftTUI App runtime options still parse through WebHost CLI")
   func plainSwiftTUIAppRuntimeOptionsStillParseThroughWebHostCLI() throws {
-    let configuration = try WebHostCLIRunner.runtimeConfiguration(
-      arguments: ["--web", "--port", "2468", "--bind", "127.0.0.1"],
-      environment: [:],
-      isStdoutTTY: true
-    )
+    // The umbrella deliberately serves no WebHost surface on Windows
+    // (Stage 5.3: one launch surface per platform).
+    #if !os(Windows)
+      let configuration = try WebHostCLIRunner.runtimeConfiguration(
+        arguments: ["--web", "--port", "2468", "--bind", "127.0.0.1"],
+        environment: [:],
+        isStdoutTTY: true
+      )
 
-    #expect(configuration.web?.port == 2468)
-    #expect(configuration.web?.bind == "127.0.0.1")
+      #expect(configuration.web?.port == 2468)
+      #expect(configuration.web?.bind == "127.0.0.1")
+    #endif
   }
 }
 

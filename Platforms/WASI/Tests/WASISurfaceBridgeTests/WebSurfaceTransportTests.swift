@@ -1,1692 +1,1702 @@
-import Foundation
-@_spi(Runners) import SwiftTUI
-import Testing
+// Excluded from Windows builds (Stage 6 item 3): every suite here drives the
+// transport through `Pipe().fileHandleForWriting.fileDescriptor`, and
+// `FileHandle.fileDescriptor` is `@available(Windows, unavailable)` — there
+// is no non-owning HANDLE→fd conversion. The browser transport never ships
+// on Windows, so the POSIX CI lanes keep full coverage.
+#if !os(Windows)
 
-@testable import SwiftTUIWASISurfaceBridge
+  import Foundation
+  @_spi(Runners) import SwiftTUI
+  import Testing
 
-@Suite(.serialized)
-struct WebSurfaceTransportTests {
-  @Test("encoder emits the shared basic web-surface fixture")
-  func encoderEmitsBasicFixture() throws {
-    let fixture = try Self.fixture("web-surface-basic")
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    #expect(WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state) == fixture)
-  }
+  @testable import SwiftTUIWASISurfaceBridge
 
-  @Test("encoder preserves styles, spans, escaping, and skips continuation cells")
-  func encoderEmitsStyledFixture() throws {
-    let fixture = try Self.fixture("web-surface-styled")
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    #expect(WebSurfaceFrameEncoder.encode(Self.styledSurface(), state: &state) == fixture)
-  }
+  @Suite(.serialized)
+  struct WebSurfaceTransportTests {
+    @Test("encoder emits the shared basic web-surface fixture")
+    func encoderEmitsBasicFixture() throws {
+      let fixture = try Self.fixture("web-surface-basic")
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      #expect(WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state) == fixture)
+    }
 
-  @Test("host writes one complete surface record and reports full repaint metrics")
-  func hostPresentWritesSurfaceRecord() throws {
-    let pipe = Pipe()
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-      renderStyle: .init(appearance: .fallback)
-    )
+    @Test("encoder preserves styles, spans, escaping, and skips continuation cells")
+    func encoderEmitsStyledFixture() throws {
+      let fixture = try Self.fixture("web-surface-styled")
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      #expect(WebSurfaceFrameEncoder.encode(Self.styledSurface(), state: &state) == fixture)
+    }
 
-    let metrics = try host.present(Self.basicSurface())
-    pipe.fileHandleForWriting.closeFile()
-    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    pipe.fileHandleForReading.closeFile()
-
-    let fixture = try Self.fixture("web-surface-basic")
-    let frame = try Self.decodedSurfaceFrame(output)
-    let epoch = try #require(frame["epoch"] as? Int)
-    let normalized = output.replacingOccurrences(
-      of: "\"epoch\":\(epoch)",
-      with: "\"epoch\":1"
-    )
-    #expect(normalized == fixture)
-    #expect(metrics.bytesWritten == output.utf8.count)
-    #expect(metrics.linesTouched == 2)
-    #expect(metrics.cellsChanged == 4)
-    #expect(metrics.strategy == .fullRepaint)
-  }
-
-  @Test("host semantic present writes damage and incremental metrics")
-  func hostSemanticPresentWritesDamageAndIncrementalMetrics() throws {
-    let pipe = Pipe()
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-      renderStyle: .init(appearance: .fallback)
-    )
-    let damage = PresentationDamage(
-      textRows: [.init(row: 1, columnRanges: [0..<1])]
-    )
-
-    let metrics = try host.present(
-      SemanticHostFrame(
-        sequence: 31,
-        raster: Self.basicSurface(),
-        semantics: .init(),
-        focusedIdentity: nil,
-        rasterDamage: damage
-      )
-    )
-
-    pipe.fileHandleForWriting.closeFile()
-    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    pipe.fileHandleForReading.closeFile()
-    let frame = try Self.decodedSurfaceFrame(output)
-    let decodedDamage = try #require(frame["damage"] as? [String: Any])
-
-    #expect(decodedDamage["requiresFullTextRepaint"] as? Bool == false)
-    #expect(decodedDamage["requiresFullGraphicsReplay"] as? Bool == false)
-    #expect(metrics.linesTouched == 1)
-    #expect(metrics.cellsChanged == 1)
-    #expect(metrics.strategy == .incremental)
-  }
-
-  @Test("encoder emits frame diagnostics as typed records")
-  func encoderEmitsFrameDiagnosticRecords() throws {
-    let output = WebSurfaceFrameEncoder.encodeFrameDiagnostic(
-      Self.frameDiagnosticRecord(frameNumber: 42, causeSummary: "render \"tick\"")
-    )
-    let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
-
-    #expect(record["format"] as? String == "swift-tui-frame-diagnostics-v1")
-    let header = try #require(record["header"] as? [String])
-    let fields = try #require(record["fields"] as? [String])
-    #expect(header.first == "frame")
-    #expect(fields.first == "42")
-    #expect(header.contains("causes"))
-    #expect(fields[header.firstIndex(of: "causes") ?? 0] == "render \"tick\"")
-  }
-
-  @Test("host writes frame diagnostic records")
-  func hostWritesFrameDiagnosticRecords() throws {
-    let pipe = Pipe()
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-      renderStyle: .init(appearance: .fallback)
-    )
-
-    try host.notifyFrameDiagnostic(Self.frameDiagnosticRecord(frameNumber: 7))
-    pipe.fileHandleForWriting.closeFile()
-    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    pipe.fileHandleForReading.closeFile()
-    let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
-    let fields = try #require(record["fields"] as? [String])
-
-    #expect(fields.first == "7")
-  }
-
-  @Test("transport emission follows the declaration it was handed")
-  func transportEmissionFollowsTheDeclaration() throws {
-    // The end-to-end half of the negotiation contract, and the regression
-    // shape for the defect this pins: the transport once took its delta
-    // switch from a second, independently resolved source, so emission could
-    // disagree with the declaration. Asserted on emitted bytes rather than
-    // internal state, because bytes are what the host has to decode.
-    func steadyFrameOutput(declaring capabilities: HostWireCapabilities) throws -> String {
+    @Test("host writes one complete surface record and reports full repaint metrics")
+    func hostPresentWritesSurfaceRecord() throws {
       let pipe = Pipe()
       let host = WebSurfaceTransport(
         surfaceSize: .init(width: 2, height: 2),
         outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-        renderStyle: .init(appearance: .fallback),
-        wireCapabilities: capabilities
+        renderStyle: .init(appearance: .fallback)
       )
-      // First frame always establishes the baseline as a full record; the
-      // second is the one whose shape the declaration decides.
-      _ = try host.present(Self.basicSurface())
-      _ = try host.present(
+
+      let metrics = try host.present(Self.basicSurface())
+      pipe.fileHandleForWriting.closeFile()
+      let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      pipe.fileHandleForReading.closeFile()
+
+      let fixture = try Self.fixture("web-surface-basic")
+      let frame = try Self.decodedSurfaceFrame(output)
+      let epoch = try #require(frame["epoch"] as? Int)
+      let normalized = output.replacingOccurrences(
+        of: "\"epoch\":\(epoch)",
+        with: "\"epoch\":1"
+      )
+      #expect(normalized == fixture)
+      #expect(metrics.bytesWritten == output.utf8.count)
+      #expect(metrics.linesTouched == 2)
+      #expect(metrics.cellsChanged == 4)
+      #expect(metrics.strategy == .fullRepaint)
+    }
+
+    @Test("host semantic present writes damage and incremental metrics")
+    func hostSemanticPresentWritesDamageAndIncrementalMetrics() throws {
+      let pipe = Pipe()
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+        renderStyle: .init(appearance: .fallback)
+      )
+      let damage = PresentationDamage(
+        textRows: [.init(row: 1, columnRanges: [0..<1])]
+      )
+
+      let metrics = try host.present(
+        SemanticHostFrame(
+          sequence: 31,
+          raster: Self.basicSurface(),
+          semantics: .init(),
+          focusedIdentity: nil,
+          rasterDamage: damage
+        )
+      )
+
+      pipe.fileHandleForWriting.closeFile()
+      let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      pipe.fileHandleForReading.closeFile()
+      let frame = try Self.decodedSurfaceFrame(output)
+      let decodedDamage = try #require(frame["damage"] as? [String: Any])
+
+      #expect(decodedDamage["requiresFullTextRepaint"] as? Bool == false)
+      #expect(decodedDamage["requiresFullGraphicsReplay"] as? Bool == false)
+      #expect(metrics.linesTouched == 1)
+      #expect(metrics.cellsChanged == 1)
+      #expect(metrics.strategy == .incremental)
+    }
+
+    @Test("encoder emits frame diagnostics as typed records")
+    func encoderEmitsFrameDiagnosticRecords() throws {
+      let output = WebSurfaceFrameEncoder.encodeFrameDiagnostic(
+        Self.frameDiagnosticRecord(frameNumber: 42, causeSummary: "render \"tick\"")
+      )
+      let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
+
+      #expect(record["format"] as? String == "swift-tui-frame-diagnostics-v1")
+      let header = try #require(record["header"] as? [String])
+      let fields = try #require(record["fields"] as? [String])
+      #expect(header.first == "frame")
+      #expect(fields.first == "42")
+      #expect(header.contains("causes"))
+      #expect(fields[header.firstIndex(of: "causes") ?? 0] == "render \"tick\"")
+    }
+
+    @Test("host writes frame diagnostic records")
+    func hostWritesFrameDiagnosticRecords() throws {
+      let pipe = Pipe()
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+        renderStyle: .init(appearance: .fallback)
+      )
+
+      try host.notifyFrameDiagnostic(Self.frameDiagnosticRecord(frameNumber: 7))
+      pipe.fileHandleForWriting.closeFile()
+      let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      pipe.fileHandleForReading.closeFile()
+      let record = try Self.decodedTypedRecord(output, prefix: "\u{001E}frameDiagnostic:")
+      let fields = try #require(record["fields"] as? [String])
+
+      #expect(fields.first == "7")
+    }
+
+    @Test("transport emission follows the declaration it was handed")
+    func transportEmissionFollowsTheDeclaration() throws {
+      // The end-to-end half of the negotiation contract, and the regression
+      // shape for the defect this pins: the transport once took its delta
+      // switch from a second, independently resolved source, so emission could
+      // disagree with the declaration. Asserted on emitted bytes rather than
+      // internal state, because bytes are what the host has to decode.
+      func steadyFrameOutput(declaring capabilities: HostWireCapabilities) throws -> String {
+        let pipe = Pipe()
+        let host = WebSurfaceTransport(
+          surfaceSize: .init(width: 2, height: 2),
+          outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+          renderStyle: .init(appearance: .fallback),
+          wireCapabilities: capabilities
+        )
+        // First frame always establishes the baseline as a full record; the
+        // second is the one whose shape the declaration decides.
+        _ = try host.present(Self.basicSurface())
+        _ = try host.present(
+          SemanticHostFrame(
+            sequence: 2,
+            raster: Self.changedSurface(),
+            semantics: .init(),
+            focusedIdentity: nil,
+            rasterDamage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])])
+          )
+        )
+        pipe.fileHandleForWriting.closeFile()
+        let output = String(
+          decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        pipe.fileHandleForReading.closeFile()
+        return output
+      }
+
+      let deltaMarker = "\"encoding\":\"delta\""
+      #expect(
+        try steadyFrameOutput(declaring: HostWireCapabilities(acceptsDeltaFrames: true))
+          .contains(deltaMarker)
+      )
+      #expect(
+        try !steadyFrameOutput(declaring: HostWireCapabilities())
+          .contains(deltaMarker)
+      )
+    }
+
+    @Test("delta-enabled encoder sends the first frame as a full frame")
+    func deltaEnabledEncoderSendsFirstFrameFull() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.basicSurface(),
+          damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])]),
+          state: &state
+        )
+      )
+
+      #expect(frame["version"] as? Int == 1)
+      #expect(frame["encoding"] == nil)
+      #expect(frame["rows"] != nil)
+      #expect(frame["deltaRows"] == nil)
+    }
+
+    @Test("delta-disabled encoder does not populate baseline state")
+    func deltaDisabledEncoderDoesNotPopulateBaselineState() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: false, epochID: 17)
+
+      let first = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.imageSurface(),
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+      let second = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.imageSurface(),
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+
+      #expect(first["encoding"] == nil)
+      #expect(first["rows"] != nil)
+      #expect(first["deltaRows"] == nil)
+      #expect(first["epoch"] as? Int == 17)
+      #expect(first["gen"] as? Int == 1)
+      #expect(second["epoch"] as? Int == 17)
+      #expect(second["gen"] as? Int == 2)
+      #expect(state.knownImageIDs.isEmpty == false)
+      #expect(state.hasBaseline == false)
+      #expect(state.baselineSize == nil)
+      #expect(state.recordsEncoded == 2)
+    }
+
+    @Test("delta-enabled encoder emits dirty rows after a baseline")
+    func deltaEnabledEncoderEmitsDirtyRowsAfterBaseline() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+      let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.changedSurface(),
+          sequence: 2,
+          semanticSnapshot: .init(),
+          focusedIdentity: nil,
+          damage: damage,
+          state: &state
+        )
+      )
+
+      #expect(frame["version"] as? Int == 3)
+      #expect(frame["encoding"] as? String == "delta")
+      #expect(frame["sequence"] as? Int == 2)
+      #expect(frame["rows"] == nil)
+      let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
+      #expect(deltaRows.count == 1)
+      #expect(deltaRows.first?.first as? Int == 1)
+      let decodedDamage = try #require(frame["damage"] as? [String: Any])
+      let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
+      #expect(textRows.first?.first as? Int == 1)
+      #expect(textRows.first?.dropFirst().first as? [[Int]] == [[1, 2]])
+    }
+
+    @Test("WASI transport keyframe resync forces a full record in the same epoch")
+    func wasiTransportKeyframeResyncForcesFullRecord() throws {
+      let pipe = Pipe()
+      let transport = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+        renderStyle: .init(appearance: .fallback),
+        wireCapabilities: .init(acceptsDeltaFrames: true)
+      )
+
+      _ = try transport.present(Self.basicSurface())
+      _ = try transport.present(
         SemanticHostFrame(
           sequence: 2,
           raster: Self.changedSurface(),
           semantics: .init(),
           focusedIdentity: nil,
-          rasterDamage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])])
+          rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
+        )
+      )
+      transport.requestResync(.init(scope: .keyframe))
+      _ = try transport.present(
+        SemanticHostFrame(
+          sequence: 3,
+          raster: Self.changedSurface(),
+          semantics: .init(),
+          focusedIdentity: nil,
+          rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
         )
       )
       pipe.fileHandleForWriting.closeFile()
+
+      let records = try Self.decodedSurfaceFrames(
+        String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      )
+      pipe.fileHandleForReading.closeFile()
+      #expect(records.count == 3)
+      #expect(records[1]["encoding"] as? String == "delta")
+      #expect(records[2]["encoding"] == nil)
+      #expect(records[2]["epoch"] as? Int == records[0]["epoch"] as? Int)
+      #expect(records[2]["gen"] as? Int == 3)
+    }
+
+    @Test("encoder stamps one epoch and monotonic generations across full and delta records")
+    func encoderStampsEpochAndMonotonicGenerations() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 41)
+
+      let full = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+      )
+      let delta = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.changedSurface(),
+          damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])]),
+          state: &state
+        )
+      )
+
+      #expect(full["epoch"] as? Int == 41)
+      #expect(full["gen"] as? Int == 1)
+      #expect(full["baselineGen"] == nil)
+      #expect(delta["epoch"] as? Int == 41)
+      #expect(delta["gen"] as? Int == 2)
+      #expect(delta["baselineGen"] as? Int == 1)
+      #expect(state.recordsEncoded == 2)
+    }
+
+    @Test("delta-enabled encoder emits duplicate damaged rows once")
+    func deltaEnabledEncoderEmitsDuplicateDamagedRowsOnce() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+      var damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+      damage.textRows.append(.init(row: 1, columnRanges: [0..<1]))
+      damage.textRows.append(.init(row: -1))
+      damage.textRows.append(.init(row: 2))
+
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.changedSurface(),
+          damage: damage,
+          state: &state
+        )
+      )
+
+      let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
+      #expect(deltaRows.count == 1)
+      #expect(deltaRows.first?.first as? Int == 1)
+    }
+
+    @Test("delta-enabled encoder falls back to full frames for full repaint damage")
+    func deltaEnabledEncoderFallsBackForFullRepaintDamage() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.changedSurface(),
+          damage: PresentationDamage(
+            textRows: [.init(row: 1, columnRanges: [1..<2])],
+            requiresFullTextRepaint: true
+          ),
+          state: &state
+        )
+      )
+
+      #expect(frame["encoding"] == nil)
+      #expect(frame["rows"] != nil)
+      #expect(frame["deltaRows"] == nil)
+    }
+
+    @Test("delta-enabled encoder falls back to full frames when surface size changes")
+    func deltaEnabledEncoderFallsBackWhenSurfaceSizeChanges() throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.wideSurface(),
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+
+      #expect(frame["width"] as? Int == 4)
+      #expect(frame["encoding"] == nil)
+      #expect(frame["rows"] != nil)
+      #expect(frame["deltaRows"] == nil)
+    }
+
+    @Test("delta frame is smaller than an equivalent full frame for one dirty row")
+    func deltaFrameIsSmallerThanEquivalentFullFrameForOneDirtyRow() throws {
+      let base = Self.largeSurface(dirtyRowText: "unchanged")
+      let changed = Self.largeSurface(dirtyRowText: "changed  ")
+      let damage = PresentationDamage(textRows: [.init(row: 5, columnRanges: [0..<8])])
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(base, state: &state)
+
+      let delta = WebSurfaceFrameEncoder.encode(changed, damage: damage, state: &state)
+      let full = WebSurfaceFrameEncoder.encode(changed, damage: damage)
+
+      #expect(delta.utf8.count < full.utf8.count)
+    }
+
+    @Test("a below-budget delta keeps the established byte shape")
+    func belowBudgetDeltaKeepsEstablishedByteShape() {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 1)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+      let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
+
+      let output = WebSurfaceFrameEncoder.encode(
+        Self.changedSurface(),
+        damage: damage,
+        state: &state
+      )
+
+      #expect(
+        output
+          == "\u{001E}surface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":1,"
+          + "\"gen\":2,\"baselineGen\":1,\"width\":2,\"height\":2,\"styles\":[null],"
+          + "\"deltaRows\":[[1,[[0,\" \",1,0],"
+          + "[1,\"!\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[1,2]]]],"
+          + "\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"
+      )
+    }
+
+    @Test("wire style indexes follow first encoded appearance")
+    func wireStyleIndexesFollowFirstEncodedAppearance() {
+      var state = HostWireEncodingState(deltaEnabled: true)
+      let blue = ResolvedTextStyle(foregroundColor: .blue)
+      let red = ResolvedTextStyle(foregroundColor: .red)
+
+      #expect(state.persistentStyles.index(for: blue) == 1)
+      #expect(state.persistentStyles.index(for: red) == 2)
+      #expect(state.persistentStyles.index(for: blue) == 1)
+      #expect(
+        state.persistentStyles.encodedElements == [
+          "null",
+          "{\"fg\":\"#5BA3FFFF\"}",
+          "{\"fg\":\"#E05757FF\"}",
+        ])
+    }
+
+    @Test("every encoded style field participates in wire interning")
+    func everyEncodedStyleFieldParticipatesInWireInterning() {
+      var state = HostWireEncodingState(deltaEnabled: true)
+      let styles = [
+        ResolvedTextStyle(foregroundColor: .red),
+        ResolvedTextStyle(backgroundColor: .red),
+        ResolvedTextStyle(emphasis: .bold),
+        ResolvedTextStyle(underlineStyle: .init(pattern: .dash, color: .red)),
+        ResolvedTextStyle(strikethroughStyle: .init(pattern: .dash, color: .red)),
+        ResolvedTextStyle(opacity: 0.5),
+      ]
+
+      let indexes = styles.compactMap { state.persistentStyles.index(for: $0) }
+
+      #expect(indexes == [1, 2, 3, 4, 5, 6])
+      #expect(state.persistentStyles.count == 7)
+    }
+
+    @Test("colors that quantize to the same wire bytes share a style index")
+    func quantizedEquivalentColorsShareAStyleIndex() {
+      var state = HostWireEncodingState(deltaEnabled: true)
+      let first = ResolvedTextStyle(
+        foregroundColor: Color(red: 0.5, green: 0.25, blue: 0.75)
+      )
+      let second = ResolvedTextStyle(
+        foregroundColor: Color(red: 0.500_01, green: 0.250_01, blue: 0.750_01)
+      )
+
+      #expect(state.persistentStyles.index(for: first) == 1)
+      #expect(state.persistentStyles.index(for: second) == 1)
+      #expect(state.persistentStyles.count == 2)
+    }
+
+    @Test("an overflowing style epoch rekeys with a full v2 frame")
+    func overflowingStyleEpochRekeysWithAFullV2Frame() throws {
+      let size = CellSize(width: 1, height: 1)
+      var state = HostWireEncodingState(
+        deltaEnabled: true,
+        hasBaseline: true,
+        baselineSize: size,
+        epochID: 23
+      )
+      for identifier in 0..<1_023 {
+        #expect(
+          state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+        )
+      }
+      #expect(state.persistentStyles.count == 1_024)
+
+      let full = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.singleCellSurface(
+            size: size,
+            style: Self.wireStyle(identifier: 10_000)
+          ),
+          sequence: 2,
+          semanticSnapshot: nil,
+          focusedIdentity: nil,
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+
+      #expect(full["version"] as? Int == 2)
+      #expect(full["encoding"] == nil)
+      #expect(full["rows"] != nil)
+      #expect(full["epoch"] as? Int == 23)
+      #expect(full["gen"] as? Int == 1)
+      #expect(full["baselineGen"] == nil)
+      #expect(state.recordsEncoded == 1)
+      #expect(state.persistentStyles.count == 2)
+
+      let next = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.singleCellSurface(
+            size: size,
+            style: Self.wireStyle(identifier: 10_001)
+          ),
+          sequence: 3,
+          semanticSnapshot: nil,
+          focusedIdentity: nil,
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+      #expect(next["version"] as? Int == 3)
+      #expect(next["encoding"] as? String == "delta")
+      #expect(next["epoch"] as? Int == 23)
+      #expect(next["gen"] as? Int == 2)
+      #expect(next["baselineGen"] as? Int == 1)
+      #expect(state.recordsEncoded == 2)
+      #expect(state.persistentStyles.count == 3)
+    }
+
+    @Test("style overflow preserves image payload state for the replacement full frame")
+    func styleOverflowPreservesImagePayloadState() throws {
+      let size = CellSize(width: 4, height: 2)
+      var state = HostWireEncodingState(
+        deltaEnabled: true,
+        hasBaseline: true,
+        baselineSize: size
+      )
+      for identifier in 0..<1_023 {
+        #expect(
+          state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+        )
+      }
+      var surface = Self.imageSurface()
+      surface.cells[0][0].style = Self.wireStyle(identifier: 10_000)
+
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          surface,
+          sequence: 2,
+          semanticSnapshot: nil,
+          focusedIdentity: nil,
+          damage: PresentationDamage(textRows: [.init(row: 0)]),
+          state: &state
+        )
+      )
+      let image = try #require((frame["images"] as? [[String: Any]])?.first)
+      let imageID = try #require(image["id"] as? String)
+
+      #expect(frame["version"] as? Int == 2)
+      #expect(image["dataBase64"] as? String == "iVBORw==")
+      #expect(state.knownImageIDs == Set([imageID]))
+    }
+
+    @Test("300 animated 80x24 frames keep style epochs and record bytes bounded")
+    func animatedFramesKeepStyleEpochsAndRecordBytesBounded() throws {
+      let size = CellSize(width: 80, height: 24)
+      let damage = PresentationDamage(
+        textRows: (0..<size.height).map { .init(row: $0) }
+      )
+      var state = HostWireEncodingState(deltaEnabled: true)
+      var maximumStyleCount = 0
+      var maximumRecordBytes = 0
+      var fullFrameCount = 0
+
+      for frameIndex in 0..<300 {
+        let output = WebSurfaceFrameEncoder.encode(
+          Self.animatedStyleSurface(frameIndex: frameIndex, size: size),
+          sequence: UInt64(frameIndex + 1),
+          semanticSnapshot: nil,
+          focusedIdentity: nil,
+          damage: damage,
+          state: &state
+        )
+        let frame = try Self.decodedSurfaceFrame(output)
+        maximumStyleCount = max(maximumStyleCount, state.persistentStyles.count)
+        maximumRecordBytes = max(maximumRecordBytes, output.utf8.count)
+        if frame["encoding"] == nil {
+          fullFrameCount += 1
+        }
+      }
+
+      #expect(maximumStyleCount <= (size.width * size.height) + 1)
+      #expect(state.persistentStyles.count <= (size.width * size.height) + 1)
+      #expect(maximumRecordBytes < 150_000)
+      #expect(fullFrameCount > 1)
+    }
+
+    @Test(
+      "[characterization D10] accumulated styles dominate late delta bytes during opacity churn"
+    )
+    func accumulatedStylesDominateLateDeltaBytesDuringOpacityChurn() throws {
+      let size = CellSize(width: 80, height: 24)
+      let frameCount = 300
+      let styledCellCount = 200
+      let damage = PresentationDamage(
+        textRows: [
+          .init(row: 0, columnRanges: [0..<80]),
+          .init(row: 1, columnRanges: [0..<80]),
+          .init(row: 2, columnRanges: [0..<40]),
+        ]
+      )
+      var state = HostWireEncodingState(deltaEnabled: true)
+      var lateSamples: [(recordBytes: Int, stylesBytes: Int, styleCount: Int)] = []
+
+      for frameIndex in 0..<frameCount {
+        let output = WebSurfaceFrameEncoder.encode(
+          Self.opacityChurnSurface(
+            frameIndex: frameIndex,
+            frameCount: frameCount,
+            styledCellCount: styledCellCount,
+            size: size
+          ),
+          sequence: UInt64(frameIndex + 1),
+          semanticSnapshot: nil,
+          focusedIdentity: nil,
+          damage: damage,
+          state: &state
+        )
+        guard frameIndex > 0 else {
+          continue
+        }
+
+        let frame = try Self.decodedSurfaceFrame(output)
+        #expect(frame["encoding"] as? String == "delta")
+        if frameIndex >= frameCount - 50 {
+          lateSamples.append(
+            (
+              recordBytes: output.utf8.count,
+              stylesBytes: try Self.encodedStylesFieldByteCount(inDelta: output),
+              styleCount: state.persistentStyles.count
+            )
+          )
+        }
+      }
+
+      let firstLate = try #require(lateSamples.first)
+      let lastLate = try #require(lateSamples.last)
+      let totalLateRecordBytes = lateSamples.reduce(0) { $0 + $1.recordBytes }
+      let totalLateStylesBytes = lateSamples.reduce(0) { $0 + $1.stylesBytes }
+      let minimumLateSharePermille =
+        try #require(
+          lateSamples.map { sample in
+            sample.stylesBytes * 1_000 / sample.recordBytes
+          }.min()
+        )
+
+      // Known defect D10: the unchanged accumulated style epoch is the majority
+      // of every late delta record. S3d replaces that retransmission with the
+      // capability-negotiated styleAppend shape; until then this passing
+      // characterization makes the cost visible without weakening the gate.
+      #expect(lateSamples.count == 50)
+      #expect(lateSamples.allSatisfy { $0.stylesBytes > $0.recordBytes - $0.stylesBytes })
+      #expect(lastLate.styleCount == frameCount + 1)
+      print(
+        "[wire-epoch-sv][D10] frames=\(frameCount) styledCells=\(styledCellCount) "
+          + "lateFrames=\(lateSamples.count) "
+          + "firstLateRecordBytes=\(firstLate.recordBytes) "
+          + "firstLateStylesBytes=\(firstLate.stylesBytes) "
+          + "lastLateRecordBytes=\(lastLate.recordBytes) "
+          + "lastLateStylesBytes=\(lastLate.stylesBytes) "
+          + "lateStylesSharePermille=\(totalLateStylesBytes * 1_000 / totalLateRecordBytes) "
+          + "minimumLateStylesSharePermille=\(minimumLateSharePermille) "
+          + "finalStyleCount=\(lastLate.styleCount)"
+      )
+    }
+
+    @Test("a resized full frame starts a grid-sized style epoch")
+    func resizedFullFrameStartsGridSizedStyleEpoch() {
+      var state = HostWireEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+      let resizedSize = CellSize(width: 40, height: 40)
+
+      _ = WebSurfaceFrameEncoder.encode(
+        Self.singleCellSurface(size: resizedSize, style: Self.wireStyle(identifier: 20_000)),
+        damage: PresentationDamage(textRows: [.init(row: 0)]),
+        state: &state
+      )
+
+      for identifier in 0..<1_599 {
+        #expect(
+          state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
+        )
+      }
+      #expect(state.persistentStyles.count == 1_601)
+      #expect(state.persistentStyles.index(for: Self.wireStyle(identifier: 30_000)) == nil)
+    }
+
+    @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
+    func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        renderStyle: .init(appearance: .fallback)
+      )
+
+      #expect(
+        host.pointerInputCapabilities
+          == PointerInputCapabilities(
+            precision: .subCell(source: .webPixels, metrics: .estimated),
+            supportsHover: true
+          ))
+
+      host.updateSurfaceSize(.init(width: 4, height: 2), cellPixelSize: nil)
+
+      #expect(
+        host.pointerInputCapabilities
+          == PointerInputCapabilities(
+            precision: .subCell(source: .webPixels, metrics: .estimated),
+            supportsHover: true
+          ))
+    }
+
+    @MainActor
+    @Test("host writes typed clipboard records")
+    func hostWritesTypedClipboardRecords() throws {
+      let pipe = Pipe()
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 2),
+        outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
+        renderStyle: .init(appearance: .fallback)
+      )
+
+      try host.writeClipboard("copy \"this\"")
+      pipe.fileHandleForWriting.closeFile()
       let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
       pipe.fileHandleForReading.closeFile()
-      return output
+
+      #expect(output == "\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n")
     }
 
-    let deltaMarker = "\"encoding\":\"delta\""
-    #expect(
-      try steadyFrameOutput(declaring: HostWireCapabilities(acceptsDeltaFrames: true))
-        .contains(deltaMarker)
-    )
-    #expect(
-      try !steadyFrameOutput(declaring: HostWireCapabilities())
-        .contains(deltaMarker)
-    )
-  }
-
-  @Test("delta-enabled encoder sends the first frame as a full frame")
-  func deltaEnabledEncoderSendsFirstFrameFull() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.basicSurface(),
-        damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<1])]),
-        state: &state
+    @Test("encoder emits typed runtime issue records")
+    func encoderEmitsRuntimeIssueRecords() throws {
+      let issue = RuntimeIssue(
+        severity: .warning,
+        code: "toolbar.unhostedItems",
+        message: "Toolbar item was not rendered",
+        identity: Identity(components: ["root", "body"]),
+        source: ".toolbarItem(...)"
       )
-    )
-
-    #expect(frame["version"] as? Int == 1)
-    #expect(frame["encoding"] == nil)
-    #expect(frame["rows"] != nil)
-    #expect(frame["deltaRows"] == nil)
-  }
-
-  @Test("delta-disabled encoder does not populate baseline state")
-  func deltaDisabledEncoderDoesNotPopulateBaselineState() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: false, epochID: 17)
-
-    let first = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.imageSurface(),
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
+      let output = WebSurfaceFrameEncoder.encodeRuntimeIssue(issue)
+      let prefix = "\u{001E}runtimeIssue:"
+      let line = output.trimmingCharacters(in: .newlines)
+      #expect(line.hasPrefix(prefix))
+      let decoded = try JSONSerialization.jsonObject(
+        with: Data(String(line.dropFirst(prefix.count)).utf8)
       )
-    )
-    let second = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.imageSurface(),
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
-      )
-    )
-
-    #expect(first["encoding"] == nil)
-    #expect(first["rows"] != nil)
-    #expect(first["deltaRows"] == nil)
-    #expect(first["epoch"] as? Int == 17)
-    #expect(first["gen"] as? Int == 1)
-    #expect(second["epoch"] as? Int == 17)
-    #expect(second["gen"] as? Int == 2)
-    #expect(state.knownImageIDs.isEmpty == false)
-    #expect(state.hasBaseline == false)
-    #expect(state.baselineSize == nil)
-    #expect(state.recordsEncoded == 2)
-  }
-
-  @Test("delta-enabled encoder emits dirty rows after a baseline")
-  func deltaEnabledEncoderEmitsDirtyRowsAfterBaseline() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-
-    let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.changedSurface(),
-        sequence: 2,
-        semanticSnapshot: .init(),
-        focusedIdentity: nil,
-        damage: damage,
-        state: &state
-      )
-    )
-
-    #expect(frame["version"] as? Int == 3)
-    #expect(frame["encoding"] as? String == "delta")
-    #expect(frame["sequence"] as? Int == 2)
-    #expect(frame["rows"] == nil)
-    let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
-    #expect(deltaRows.count == 1)
-    #expect(deltaRows.first?.first as? Int == 1)
-    let decodedDamage = try #require(frame["damage"] as? [String: Any])
-    let textRows = try #require(decodedDamage["textRows"] as? [[Any]])
-    #expect(textRows.first?.first as? Int == 1)
-    #expect(textRows.first?.dropFirst().first as? [[Int]] == [[1, 2]])
-  }
-
-  @Test("WASI transport keyframe resync forces a full record in the same epoch")
-  func wasiTransportKeyframeResyncForcesFullRecord() throws {
-    let pipe = Pipe()
-    let transport = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-      renderStyle: .init(appearance: .fallback),
-      wireCapabilities: .init(acceptsDeltaFrames: true)
-    )
-
-    _ = try transport.present(Self.basicSurface())
-    _ = try transport.present(
-      SemanticHostFrame(
-        sequence: 2,
-        raster: Self.changedSurface(),
-        semantics: .init(),
-        focusedIdentity: nil,
-        rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
-      )
-    )
-    transport.requestResync(.init(scope: .keyframe))
-    _ = try transport.present(
-      SemanticHostFrame(
-        sequence: 3,
-        raster: Self.changedSurface(),
-        semantics: .init(),
-        focusedIdentity: nil,
-        rasterDamage: PresentationDamage(textRows: [.init(row: 1)])
-      )
-    )
-    pipe.fileHandleForWriting.closeFile()
-
-    let records = try Self.decodedSurfaceFrames(
-      String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    )
-    pipe.fileHandleForReading.closeFile()
-    #expect(records.count == 3)
-    #expect(records[1]["encoding"] as? String == "delta")
-    #expect(records[2]["encoding"] == nil)
-    #expect(records[2]["epoch"] as? Int == records[0]["epoch"] as? Int)
-    #expect(records[2]["gen"] as? Int == 3)
-  }
-
-  @Test("encoder stamps one epoch and monotonic generations across full and delta records")
-  func encoderStampsEpochAndMonotonicGenerations() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 41)
-
-    let full = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-    )
-    let delta = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.changedSurface(),
-        damage: PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])]),
-        state: &state
-      )
-    )
-
-    #expect(full["epoch"] as? Int == 41)
-    #expect(full["gen"] as? Int == 1)
-    #expect(full["baselineGen"] == nil)
-    #expect(delta["epoch"] as? Int == 41)
-    #expect(delta["gen"] as? Int == 2)
-    #expect(delta["baselineGen"] as? Int == 1)
-    #expect(state.recordsEncoded == 2)
-  }
-
-  @Test("delta-enabled encoder emits duplicate damaged rows once")
-  func deltaEnabledEncoderEmitsDuplicateDamagedRowsOnce() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-    var damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
-    damage.textRows.append(.init(row: 1, columnRanges: [0..<1]))
-    damage.textRows.append(.init(row: -1))
-    damage.textRows.append(.init(row: 2))
-
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.changedSurface(),
-        damage: damage,
-        state: &state
-      )
-    )
-
-    let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
-    #expect(deltaRows.count == 1)
-    #expect(deltaRows.first?.first as? Int == 1)
-  }
-
-  @Test("delta-enabled encoder falls back to full frames for full repaint damage")
-  func deltaEnabledEncoderFallsBackForFullRepaintDamage() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.changedSurface(),
-        damage: PresentationDamage(
-          textRows: [.init(row: 1, columnRanges: [1..<2])],
-          requiresFullTextRepaint: true
-        ),
-        state: &state
-      )
-    )
-
-    #expect(frame["encoding"] == nil)
-    #expect(frame["rows"] != nil)
-    #expect(frame["deltaRows"] == nil)
-  }
-
-  @Test("delta-enabled encoder falls back to full frames when surface size changes")
-  func deltaEnabledEncoderFallsBackWhenSurfaceSizeChanges() throws {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.wideSurface(),
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
-      )
-    )
-
-    #expect(frame["width"] as? Int == 4)
-    #expect(frame["encoding"] == nil)
-    #expect(frame["rows"] != nil)
-    #expect(frame["deltaRows"] == nil)
-  }
-
-  @Test("delta frame is smaller than an equivalent full frame for one dirty row")
-  func deltaFrameIsSmallerThanEquivalentFullFrameForOneDirtyRow() throws {
-    let base = Self.largeSurface(dirtyRowText: "unchanged")
-    let changed = Self.largeSurface(dirtyRowText: "changed  ")
-    let damage = PresentationDamage(textRows: [.init(row: 5, columnRanges: [0..<8])])
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(base, state: &state)
-
-    let delta = WebSurfaceFrameEncoder.encode(changed, damage: damage, state: &state)
-    let full = WebSurfaceFrameEncoder.encode(changed, damage: damage)
-
-    #expect(delta.utf8.count < full.utf8.count)
-  }
-
-  @Test("a below-budget delta keeps the established byte shape")
-  func belowBudgetDeltaKeepsEstablishedByteShape() {
-    var state = WebSurfaceFrameEncodingState(deltaEnabled: true, epochID: 1)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-    let damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
-
-    let output = WebSurfaceFrameEncoder.encode(
-      Self.changedSurface(),
-      damage: damage,
-      state: &state
-    )
-
-    #expect(
-      output
-        == "\u{001E}surface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":1,"
-        + "\"gen\":2,\"baselineGen\":1,\"width\":2,\"height\":2,\"styles\":[null],"
-        + "\"deltaRows\":[[1,[[0,\" \",1,0],"
-        + "[1,\"!\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[1,2]]]],"
-        + "\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"
-    )
-  }
-
-  @Test("wire style indexes follow first encoded appearance")
-  func wireStyleIndexesFollowFirstEncodedAppearance() {
-    var state = HostWireEncodingState(deltaEnabled: true)
-    let blue = ResolvedTextStyle(foregroundColor: .blue)
-    let red = ResolvedTextStyle(foregroundColor: .red)
-
-    #expect(state.persistentStyles.index(for: blue) == 1)
-    #expect(state.persistentStyles.index(for: red) == 2)
-    #expect(state.persistentStyles.index(for: blue) == 1)
-    #expect(
-      state.persistentStyles.encodedElements == [
-        "null",
-        "{\"fg\":\"#5BA3FFFF\"}",
-        "{\"fg\":\"#E05757FF\"}",
-      ])
-  }
-
-  @Test("every encoded style field participates in wire interning")
-  func everyEncodedStyleFieldParticipatesInWireInterning() {
-    var state = HostWireEncodingState(deltaEnabled: true)
-    let styles = [
-      ResolvedTextStyle(foregroundColor: .red),
-      ResolvedTextStyle(backgroundColor: .red),
-      ResolvedTextStyle(emphasis: .bold),
-      ResolvedTextStyle(underlineStyle: .init(pattern: .dash, color: .red)),
-      ResolvedTextStyle(strikethroughStyle: .init(pattern: .dash, color: .red)),
-      ResolvedTextStyle(opacity: 0.5),
-    ]
-
-    let indexes = styles.compactMap { state.persistentStyles.index(for: $0) }
-
-    #expect(indexes == [1, 2, 3, 4, 5, 6])
-    #expect(state.persistentStyles.count == 7)
-  }
-
-  @Test("colors that quantize to the same wire bytes share a style index")
-  func quantizedEquivalentColorsShareAStyleIndex() {
-    var state = HostWireEncodingState(deltaEnabled: true)
-    let first = ResolvedTextStyle(
-      foregroundColor: Color(red: 0.5, green: 0.25, blue: 0.75)
-    )
-    let second = ResolvedTextStyle(
-      foregroundColor: Color(red: 0.500_01, green: 0.250_01, blue: 0.750_01)
-    )
-
-    #expect(state.persistentStyles.index(for: first) == 1)
-    #expect(state.persistentStyles.index(for: second) == 1)
-    #expect(state.persistentStyles.count == 2)
-  }
-
-  @Test("an overflowing style epoch rekeys with a full v2 frame")
-  func overflowingStyleEpochRekeysWithAFullV2Frame() throws {
-    let size = CellSize(width: 1, height: 1)
-    var state = HostWireEncodingState(
-      deltaEnabled: true,
-      hasBaseline: true,
-      baselineSize: size,
-      epochID: 23
-    )
-    for identifier in 0..<1_023 {
-      #expect(
-        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
-      )
-    }
-    #expect(state.persistentStyles.count == 1_024)
-
-    let full = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.singleCellSurface(
-          size: size,
-          style: Self.wireStyle(identifier: 10_000)
-        ),
-        sequence: 2,
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
-      )
-    )
-
-    #expect(full["version"] as? Int == 2)
-    #expect(full["encoding"] == nil)
-    #expect(full["rows"] != nil)
-    #expect(full["epoch"] as? Int == 23)
-    #expect(full["gen"] as? Int == 1)
-    #expect(full["baselineGen"] == nil)
-    #expect(state.recordsEncoded == 1)
-    #expect(state.persistentStyles.count == 2)
-
-    let next = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.singleCellSurface(
-          size: size,
-          style: Self.wireStyle(identifier: 10_001)
-        ),
-        sequence: 3,
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
-      )
-    )
-    #expect(next["version"] as? Int == 3)
-    #expect(next["encoding"] as? String == "delta")
-    #expect(next["epoch"] as? Int == 23)
-    #expect(next["gen"] as? Int == 2)
-    #expect(next["baselineGen"] as? Int == 1)
-    #expect(state.recordsEncoded == 2)
-    #expect(state.persistentStyles.count == 3)
-  }
-
-  @Test("style overflow preserves image payload state for the replacement full frame")
-  func styleOverflowPreservesImagePayloadState() throws {
-    let size = CellSize(width: 4, height: 2)
-    var state = HostWireEncodingState(
-      deltaEnabled: true,
-      hasBaseline: true,
-      baselineSize: size
-    )
-    for identifier in 0..<1_023 {
-      #expect(
-        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
-      )
-    }
-    var surface = Self.imageSurface()
-    surface.cells[0][0].style = Self.wireStyle(identifier: 10_000)
-
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        surface,
-        sequence: 2,
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: PresentationDamage(textRows: [.init(row: 0)]),
-        state: &state
-      )
-    )
-    let image = try #require((frame["images"] as? [[String: Any]])?.first)
-    let imageID = try #require(image["id"] as? String)
-
-    #expect(frame["version"] as? Int == 2)
-    #expect(image["dataBase64"] as? String == "iVBORw==")
-    #expect(state.knownImageIDs == Set([imageID]))
-  }
-
-  @Test("300 animated 80x24 frames keep style epochs and record bytes bounded")
-  func animatedFramesKeepStyleEpochsAndRecordBytesBounded() throws {
-    let size = CellSize(width: 80, height: 24)
-    let damage = PresentationDamage(
-      textRows: (0..<size.height).map { .init(row: $0) }
-    )
-    var state = HostWireEncodingState(deltaEnabled: true)
-    var maximumStyleCount = 0
-    var maximumRecordBytes = 0
-    var fullFrameCount = 0
-
-    for frameIndex in 0..<300 {
-      let output = WebSurfaceFrameEncoder.encode(
-        Self.animatedStyleSurface(frameIndex: frameIndex, size: size),
-        sequence: UInt64(frameIndex + 1),
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: damage,
-        state: &state
-      )
-      let frame = try Self.decodedSurfaceFrame(output)
-      maximumStyleCount = max(maximumStyleCount, state.persistentStyles.count)
-      maximumRecordBytes = max(maximumRecordBytes, output.utf8.count)
-      if frame["encoding"] == nil {
-        fullFrameCount += 1
-      }
+      let record = try #require(decoded as? [String: Any])
+      #expect(record["severity"] as? String == "warning")
+      #expect(record["code"] as? String == "toolbar.unhostedItems")
+      #expect(record["message"] as? String == "Toolbar item was not rendered")
+      #expect(record["identity"] as? String == "root/body")
+      #expect(record["source"] as? String == ".toolbarItem(...)")
     }
 
-    #expect(maximumStyleCount <= (size.width * size.height) + 1)
-    #expect(state.persistentStyles.count <= (size.width * size.height) + 1)
-    #expect(maximumRecordBytes < 150_000)
-    #expect(fullFrameCount > 1)
-  }
-
-  @Test(
-    "[characterization D10] accumulated styles dominate late delta bytes during opacity churn"
-  )
-  func accumulatedStylesDominateLateDeltaBytesDuringOpacityChurn() throws {
-    let size = CellSize(width: 80, height: 24)
-    let frameCount = 300
-    let styledCellCount = 200
-    let damage = PresentationDamage(
-      textRows: [
-        .init(row: 0, columnRanges: [0..<80]),
-        .init(row: 1, columnRanges: [0..<80]),
-        .init(row: 2, columnRanges: [0..<40]),
-      ]
-    )
-    var state = HostWireEncodingState(deltaEnabled: true)
-    var lateSamples: [(recordBytes: Int, stylesBytes: Int, styleCount: Int)] = []
-
-    for frameIndex in 0..<frameCount {
-      let output = WebSurfaceFrameEncoder.encode(
-        Self.opacityChurnSurface(
-          frameIndex: frameIndex,
-          frameCount: frameCount,
-          styledCellCount: styledCellCount,
-          size: size
-        ),
-        sequence: UInt64(frameIndex + 1),
-        semanticSnapshot: nil,
-        focusedIdentity: nil,
-        damage: damage,
-        state: &state
-      )
-      guard frameIndex > 0 else {
-        continue
-      }
-
-      let frame = try Self.decodedSurfaceFrame(output)
-      #expect(frame["encoding"] as? String == "delta")
-      if frameIndex >= frameCount - 50 {
-        lateSamples.append(
-          (
-            recordBytes: output.utf8.count,
-            stylesBytes: try Self.encodedStylesFieldByteCount(inDelta: output),
-            styleCount: state.persistentStyles.count
-          )
-        )
-      }
-    }
-
-    let firstLate = try #require(lateSamples.first)
-    let lastLate = try #require(lateSamples.last)
-    let totalLateRecordBytes = lateSamples.reduce(0) { $0 + $1.recordBytes }
-    let totalLateStylesBytes = lateSamples.reduce(0) { $0 + $1.stylesBytes }
-    let minimumLateSharePermille =
-      try #require(
-        lateSamples.map { sample in
-          sample.stylesBytes * 1_000 / sample.recordBytes
-        }.min()
-      )
-
-    // Known defect D10: the unchanged accumulated style epoch is the majority
-    // of every late delta record. S3d replaces that retransmission with the
-    // capability-negotiated styleAppend shape; until then this passing
-    // characterization makes the cost visible without weakening the gate.
-    #expect(lateSamples.count == 50)
-    #expect(lateSamples.allSatisfy { $0.stylesBytes > $0.recordBytes - $0.stylesBytes })
-    #expect(lastLate.styleCount == frameCount + 1)
-    print(
-      "[wire-epoch-sv][D10] frames=\(frameCount) styledCells=\(styledCellCount) "
-        + "lateFrames=\(lateSamples.count) "
-        + "firstLateRecordBytes=\(firstLate.recordBytes) "
-        + "firstLateStylesBytes=\(firstLate.stylesBytes) "
-        + "lastLateRecordBytes=\(lastLate.recordBytes) "
-        + "lastLateStylesBytes=\(lastLate.stylesBytes) "
-        + "lateStylesSharePermille=\(totalLateStylesBytes * 1_000 / totalLateRecordBytes) "
-        + "minimumLateStylesSharePermille=\(minimumLateSharePermille) "
-        + "finalStyleCount=\(lastLate.styleCount)"
-    )
-  }
-
-  @Test("a resized full frame starts a grid-sized style epoch")
-  func resizedFullFrameStartsGridSizedStyleEpoch() {
-    var state = HostWireEncodingState(deltaEnabled: true)
-    _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
-    let resizedSize = CellSize(width: 40, height: 40)
-
-    _ = WebSurfaceFrameEncoder.encode(
-      Self.singleCellSurface(size: resizedSize, style: Self.wireStyle(identifier: 20_000)),
-      damage: PresentationDamage(textRows: [.init(row: 0)]),
-      state: &state
-    )
-
-    for identifier in 0..<1_599 {
-      #expect(
-        state.persistentStyles.index(for: Self.wireStyle(identifier: identifier)) != nil
-      )
-    }
-    #expect(state.persistentStyles.count == 1_601)
-    #expect(state.persistentStyles.index(for: Self.wireStyle(identifier: 30_000)) == nil)
-  }
-
-  @Test("host exposes web sub-cell pointer capabilities before reported metrics arrive")
-  func hostExposesWebSubCellPointerCapabilitiesBeforeMetrics() {
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      renderStyle: .init(appearance: .fallback)
-    )
-
-    #expect(
-      host.pointerInputCapabilities
-        == PointerInputCapabilities(
-          precision: .subCell(source: .webPixels, metrics: .estimated),
-          supportsHover: true
-        ))
-
-    host.updateSurfaceSize(.init(width: 4, height: 2), cellPixelSize: nil)
-
-    #expect(
-      host.pointerInputCapabilities
-        == PointerInputCapabilities(
-          precision: .subCell(source: .webPixels, metrics: .estimated),
-          supportsHover: true
-        ))
-  }
-
-  @MainActor
-  @Test("host writes typed clipboard records")
-  func hostWritesTypedClipboardRecords() throws {
-    let pipe = Pipe()
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 2, height: 2),
-      outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
-      renderStyle: .init(appearance: .fallback)
-    )
-
-    try host.writeClipboard("copy \"this\"")
-    pipe.fileHandleForWriting.closeFile()
-    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    pipe.fileHandleForReading.closeFile()
-
-    #expect(output == "\u{001E}clipboard:{\"text\":\"copy \\\"this\\\"\"}\n")
-  }
-
-  @Test("encoder emits typed runtime issue records")
-  func encoderEmitsRuntimeIssueRecords() throws {
-    let issue = RuntimeIssue(
-      severity: .warning,
-      code: "toolbar.unhostedItems",
-      message: "Toolbar item was not rendered",
-      identity: Identity(components: ["root", "body"]),
-      source: ".toolbarItem(...)"
-    )
-    let output = WebSurfaceFrameEncoder.encodeRuntimeIssue(issue)
-    let prefix = "\u{001E}runtimeIssue:"
-    let line = output.trimmingCharacters(in: .newlines)
-    #expect(line.hasPrefix(prefix))
-    let decoded = try JSONSerialization.jsonObject(
-      with: Data(String(line.dropFirst(prefix.count)).utf8)
-    )
-    let record = try #require(decoded as? [String: Any])
-    #expect(record["severity"] as? String == "warning")
-    #expect(record["code"] as? String == "toolbar.unhostedItems")
-    #expect(record["message"] as? String == "Toolbar item was not rendered")
-    #expect(record["identity"] as? String == "root/body")
-    #expect(record["source"] as? String == ".toolbarItem(...)")
-  }
-
-  @Test("encoder emits v2 accessibility tree with focus and live-region fields")
-  func encoderEmitsAccessibilityTree() throws {
-    let root = Identity(components: ["root"])
-    let group = root.child("group")
-    let button = group.child("button")
-    let live = group.child("live")
-    let mixed = group.child("mixed")
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        SemanticHostFrame(
-          sequence: 11,
-          raster: Self.basicSurface(),
-          semantics: SemanticSnapshot(
-            accessibilityNodes: [
-              AccessibilityNode(
-                identity: group,
-                parentIdentity: root,
-                rect: .init(origin: .zero, size: .init(width: 2, height: 2)),
-                role: .group,
-                label: "Actions"
-              ),
-              AccessibilityNode(
-                identity: button,
-                parentIdentity: group,
-                rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
-                role: .button,
-                label: "Save",
-                hint: "Writes the file",
-                cursorAnchor: .init(x: 1, y: 0)
-              ),
-              AccessibilityNode(
-                identity: live,
-                parentIdentity: group,
-                rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
-                role: .status,
-                label: "Saved",
-                liveRegion: .polite
-              ),
-              AccessibilityNode(
-                identity: mixed,
-                parentIdentity: group,
-                rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
-                role: .group,
-                label: "Mixed",
-                hidden: true
-              ),
-            ]
-          ),
-          focusedIdentity: button
-        )
-      )
-    )
-
-    #expect(frame["version"] as? Int == 2)
-    #expect(frame["sequence"] as? Int == 11)
-    let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
-    #expect(tree.count == 4)
-
-    let groupNode = try #require(tree.first)
-    #expect(groupNode["id"] as? String == "root/group")
-    #expect(groupNode["parentId"] as? String == "root")
-    #expect(groupNode["rect"] as? [Int] == [0, 0, 2, 2])
-    #expect(groupNode["role"] as? String == "group")
-    #expect(groupNode["label"] as? String == "Actions")
-    #expect(groupNode["isFocused"] as? Bool == false)
-
-    let buttonNode = try #require(tree.dropFirst().first)
-    #expect(buttonNode["id"] as? String == "root/group/button")
-    #expect(buttonNode["parentId"] as? String == "root/group")
-    #expect(buttonNode["role"] as? String == "button")
-    #expect(buttonNode["label"] as? String == "Save")
-    #expect(buttonNode["hint"] as? String == "Writes the file")
-    #expect(buttonNode["cursorAnchor"] as? [Int] == [1, 0])
-    #expect(buttonNode["isFocused"] as? Bool == true)
-
-    let liveNode = try #require(tree.dropFirst(2).first)
-    #expect(liveNode["id"] as? String == "root/group/live")
-    #expect(liveNode["role"] as? String == "status")
-    #expect(liveNode["liveRegion"] as? String == "polite")
-    #expect(liveNode["isFocused"] as? Bool == false)
-
-    let mixedNode = try #require(tree.dropFirst(3).first)
-    #expect(mixedNode["id"] as? String == "root/group/mixed")
-    #expect(mixedNode["role"] as? String == "group")
-    #expect(mixedNode["hidden"] as? Bool == true)
-  }
-
-  @Test("encoder emits v2 imperative accessibility announcements")
-  func encoderEmitsAccessibilityAnnouncements() throws {
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        SemanticHostFrame(
-          sequence: 12,
-          raster: Self.basicSurface(),
-          semantics: SemanticSnapshot(
-            accessibilityAnnouncements: [
-              AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
-              AccessibilityAnnouncement(message: "Queued", politeness: .polite),
-            ]
-          ),
-          focusedIdentity: nil
-        )
-      )
-    )
-
-    #expect(frame["version"] as? Int == 2)
-    #expect(frame["sequence"] as? Int == 12)
-    let announcements = try #require(frame["accessibilityAnnouncements"] as? [[String: Any]])
-    #expect(announcements.count == 2)
-    #expect(announcements[0]["message"] as? String == "Saved")
-    #expect(announcements[0]["politeness"] as? String == "assertive")
-    #expect(announcements[1]["message"] as? String == "Queued")
-    #expect(announcements[1]["politeness"] as? String == "polite")
-  }
-
-  @Test("encoder emits per-region scroll extents for scroll-chaining")
-  func encoderEmitsScrollRegions() throws {
-    let root = Identity(components: ["root"])
-    let list = root.child("list")
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        SemanticHostFrame(
-          sequence: 13,
-          raster: Self.basicSurface(),
-          semantics: SemanticSnapshot(
-            scrollRoutes: [
-              ScrollRoute(
-                identity: list,
-                viewportRect: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 3)),
-                contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10)),
-                contentOffset: .init(x: 0, y: 2)
-              )
-            ]
-          ),
-          focusedIdentity: nil
-        )
-      )
-    )
-
-    #expect(frame["version"] as? Int == 2)
-    let regions = try #require(frame["scrollRegions"] as? [[String: Any]])
-    #expect(regions.count == 1)
-    let region = try #require(regions.first)
-    #expect(region["id"] as? String == "root/list")
-    #expect(region["rect"] as? [Int] == [0, 1, 4, 3])
-    #expect(region["offset"] as? [Int] == [0, 2])
-    #expect(region["content"] as? [Int] == [4, 10])
-  }
-
-  @Test("encoder omits scrollRegions when there are no scrollable regions")
-  func encoderOmitsScrollRegionsWhenEmpty() throws {
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        SemanticHostFrame(
-          sequence: 14,
-          raster: Self.basicSurface(),
-          semantics: SemanticSnapshot(),
-          focusedIdentity: nil
-        )
-      )
-    )
-
-    #expect(frame["scrollRegions"] == nil)
-  }
-
-  @Test("encoder emits image data once and then reuses the cached image id")
-  func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let firstFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.imageSurface(),
-        state: &state
-      )
-    )
-    let secondFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.imageSurface(),
-        state: &state
-      )
-    )
-
-    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
-    let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
-
-    #expect(firstImage["format"] as? String == "png")
-    #expect(firstImage["bounds"] as? [Int] == [1, 0, 3, 2])
-    #expect(firstImage["visibleBounds"] as? [Int] == [2, 0, 2, 2])
-    #expect(firstImage["pixelSize"] as? [Int] == [3, 2])
-    #expect(firstImage["scalingMode"] as? String == "stretch")
-    #expect(firstImage["opacity"] as? Double == 1)
-    #expect(firstImage["dataBase64"] as? String == "iVBORw==")
-
-    #expect(secondImage["id"] as? String == firstImage["id"] as? String)
-    #expect(secondImage["dataBase64"] == nil)
-  }
-
-  @Test("an opacity-only image update reuses payload bytes and carries new placement alpha")
-  func opacityOnlyImageUpdateDoesNotRetransmitPayload() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let firstFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 1), state: &state)
-    )
-    let fadedFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 0.25), state: &state)
-    )
-    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
-    let fadedImage = try #require((fadedFrame["images"] as? [[String: Any]])?.first)
-
-    #expect(firstImage["id"] as? String == fadedImage["id"] as? String)
-    #expect(firstImage["opacity"] as? Double == 1)
-    #expect(fadedImage["opacity"] as? Double == 0.25)
-    #expect(firstImage["dataBase64"] != nil)
-    #expect(fadedImage["dataBase64"] == nil)
-  }
-
-  @Test("encoder emits blended image payloads as cached png variants")
-  func encoderEmitsBlendedImagePayloadsAsCachedPNGVariants() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let firstFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(background: .blue, signature: 1),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-    let secondFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(background: .blue, signature: 1),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-    let changedBackdropFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(background: .red, signature: 2),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-
-    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
-    let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
-    let changedImage = try #require((changedBackdropFrame["images"] as? [[String: Any]])?.first)
-
-    let firstID = try #require(firstImage["id"] as? String)
-    let changedID = try #require(changedImage["id"] as? String)
-
-    #expect(firstID.hasPrefix("blend:png:"))
-    #expect(firstImage["format"] as? String == "png")
-    #expect(firstImage["bounds"] as? [Int] == [1, 0, 1, 1])
-    #expect(firstImage["visibleBounds"] as? [Int] == [1, 0, 1, 1])
-    #expect(firstImage["pixelSize"] as? [Int] == [1, 1])
-    #expect(firstImage["dataBase64"] != nil)
-
-    #expect(secondImage["id"] as? String == firstID)
-    #expect(secondImage["dataBase64"] == nil)
-
-    #expect(changedID.hasPrefix("blend:png:"))
-    #expect(changedID != firstID)
-    #expect(changedImage["dataBase64"] != nil)
-  }
-
-  @Test("encoder emits a new blended png variant when backdrop glyph changes")
-  func encoderEmitsNewBlendedPNGVariantWhenBackdropGlyphChanges() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let firstFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(
-          background: nil,
-          foreground: .blue,
-          glyph: "A",
-          signature: 1
-        ),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-    let stableFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(
-          background: nil,
-          foreground: .blue,
-          glyph: "A",
-          signature: 1
-        ),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-    let changedGlyphFrame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(
-          background: nil,
-          foreground: .blue,
-          glyph: "B",
-          signature: 2
-        ),
-        fallbackBackground: .black,
-        state: &state
-      )
-    )
-
-    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
-    let stableImage = try #require((stableFrame["images"] as? [[String: Any]])?.first)
-    let changedImage = try #require((changedGlyphFrame["images"] as? [[String: Any]])?.first)
-    let firstID = try #require(firstImage["id"] as? String)
-    let changedID = try #require(changedImage["id"] as? String)
-
-    #expect(firstID.hasPrefix("blend:png:"))
-    #expect(firstImage["dataBase64"] != nil)
-    #expect(stableImage["id"] as? String == firstID)
-    #expect(stableImage["dataBase64"] == nil)
-    #expect(changedID.hasPrefix("blend:png:"))
-    #expect(changedID != firstID)
-    #expect(changedImage["dataBase64"] != nil)
-  }
-
-  @Test("encoder process compositor evicts blended payloads under the default policy")
-  func encoderProcessCompositorEvictsBlendedPayloadsUnderDefaultPolicy() throws {
-    let before = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-
-    for index in 0..<300 {
-      _ = WebSurfaceFrameEncoder.encode(
-        Self.blendedImageSurface(
-          background: .blue,
-          signature: UInt64(10_000 + index)
-        ),
-        fallbackBackground: .black,
-        state: &state
-      )
-    }
-
-    let after = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
-    #expect(after.entryCount <= 256)
-    #expect(after.evictionCount > before.evictionCount)
-    #expect(state.knownImageIDs.count == 300)
-  }
-
-  @Test("encoder emits presentation damage for browser partial redraws")
-  func encoderEmitsPresentationDamage() throws {
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.basicSurface(),
-        damage: PresentationDamage(
-          textRows: [
-            .init(row: 1, columnRanges: [0..<1, 1..<2])
-          ]
-        )
-      )
-    )
-
-    let damage = try #require(frame["damage"] as? [String: Any])
-    #expect(damage["requiresFullTextRepaint"] as? Bool == false)
-    #expect(damage["requiresFullGraphicsReplay"] as? Bool == false)
-    let textRows = try #require(damage["textRows"] as? [[Any]])
-    let textRow = try #require(textRows.first)
-    #expect(textRow.first as? Int == 1)
-    #expect(textRow.dropFirst().first as? [[Int]] == [[0, 2]])
-  }
-
-  @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
-  func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.gifSurface(compositing: nil),
-        state: &state
-      )
-    )
-    let image = try #require((frame["images"] as? [[String: Any]])?.first)
-
-    #expect(image["format"] as? String == "gif")
-    let id = try #require(image["id"] as? String)
-    #expect(id.hasPrefix("gif:"))
-    #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
-  }
-
-  @Test("encoder leaves blended raw GIF bytes as GIF pass-through when no frame decoder exists")
-  func encoderLeavesBlendedRawGIFBytesAsGIFPassThroughWhenNoFrameDecoderExists() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
-    let frame = try Self.decodedSurfaceFrame(
-      WebSurfaceFrameEncoder.encode(
-        Self.gifSurface(
-          compositing: RasterImageCompositing(
-            blendMode: .multiply,
-            destinationBackdrop: RasterImageBackdrop(
-              bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
-              cells: Array(repeating: .init(backgroundColor: .blue), count: 6)
+    @Test("encoder emits v2 accessibility tree with focus and live-region fields")
+    func encoderEmitsAccessibilityTree() throws {
+      let root = Identity(components: ["root"])
+      let group = root.child("group")
+      let button = group.child("button")
+      let live = group.child("live")
+      let mixed = group.child("mixed")
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          SemanticHostFrame(
+            sequence: 11,
+            raster: Self.basicSurface(),
+            semantics: SemanticSnapshot(
+              accessibilityNodes: [
+                AccessibilityNode(
+                  identity: group,
+                  parentIdentity: root,
+                  rect: .init(origin: .zero, size: .init(width: 2, height: 2)),
+                  role: .group,
+                  label: "Actions"
+                ),
+                AccessibilityNode(
+                  identity: button,
+                  parentIdentity: group,
+                  rect: .init(origin: .zero, size: .init(width: 2, height: 1)),
+                  role: .button,
+                  label: "Save",
+                  hint: "Writes the file",
+                  cursorAnchor: .init(x: 1, y: 0)
+                ),
+                AccessibilityNode(
+                  identity: live,
+                  parentIdentity: group,
+                  rect: .init(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1)),
+                  role: .status,
+                  label: "Saved",
+                  liveRegion: .polite
+                ),
+                AccessibilityNode(
+                  identity: mixed,
+                  parentIdentity: group,
+                  rect: .init(origin: .zero, size: .init(width: 1, height: 1)),
+                  role: .group,
+                  label: "Mixed",
+                  hidden: true
+                ),
+              ]
             ),
-            cellPixelSize: .init(width: 1, height: 1),
-            backdropSignature: 42
+            focusedIdentity: button
           )
-        ),
-        fallbackBackground: .black,
-        state: &state
+        )
       )
-    )
-    let image = try #require((frame["images"] as? [[String: Any]])?.first)
 
-    #expect(image["format"] as? String == "gif")
-    let id = try #require(image["id"] as? String)
-    #expect(id.hasPrefix("gif:"))
-    #expect(!id.hasPrefix("blend:png:"))
-    #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
-    #expect(state.knownImageIDs == Set([id]))
-  }
+      #expect(frame["version"] as? Int == 2)
+      #expect(frame["sequence"] as? Int == 11)
+      let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
+      #expect(tree.count == 4)
 
-  @Test("parser handles resize and style commands split across chunks")
-  func parserHandlesChunkedControlCommands() throws {
-    var parser = WebSurfaceInputParser()
-    let style = TerminalRenderStyle(
-      appearance: .init(
-        foregroundColor: try! .hex("#102030"),
-        backgroundColor: try! .hex("#405060"),
-        tintColor: try! .hex("#708090"),
-        source: .override
-      )
-    )
-    let encodedStyle = try #require(TerminalRenderStyleCodec.encodeBase64(style))
+      let groupNode = try #require(tree.first)
+      #expect(groupNode["id"] as? String == "root/group")
+      #expect(groupNode["parentId"] as? String == "root")
+      #expect(groupNode["rect"] as? [Int] == [0, 0, 2, 2])
+      #expect(groupNode["role"] as? String == "group")
+      #expect(groupNode["label"] as? String == "Actions")
+      #expect(groupNode["isFocused"] as? Bool == false)
 
-    let first = parser.feed(bytes("\u{001E}resize:12"))
-    #expect(first.events.isEmpty)
-    #expect(first.controlMessages.isEmpty)
+      let buttonNode = try #require(tree.dropFirst().first)
+      #expect(buttonNode["id"] as? String == "root/group/button")
+      #expect(buttonNode["parentId"] as? String == "root/group")
+      #expect(buttonNode["role"] as? String == "button")
+      #expect(buttonNode["label"] as? String == "Save")
+      #expect(buttonNode["hint"] as? String == "Writes the file")
+      #expect(buttonNode["cursorAnchor"] as? [Int] == [1, 0])
+      #expect(buttonNode["isFocused"] as? Bool == true)
 
-    let second = parser.feed(bytes(":3:8:16\n\u{001E}style:\(encodedStyle)\n"))
+      let liveNode = try #require(tree.dropFirst(2).first)
+      #expect(liveNode["id"] as? String == "root/group/live")
+      #expect(liveNode["role"] as? String == "status")
+      #expect(liveNode["liveRegion"] as? String == "polite")
+      #expect(liveNode["isFocused"] as? Bool == false)
 
-    #expect(
-      second.controlMessages == [
-        .resize(.init(width: 12, height: 3), cellPixelSize: .init(width: 8, height: 16)),
-        .style(style),
-      ]
-    )
-    #expect(second.events.isEmpty)
-  }
+      let mixedNode = try #require(tree.dropFirst(3).first)
+      #expect(mixedNode["id"] as? String == "root/group/mixed")
+      #expect(mixedNode["role"] as? String == "group")
+      #expect(mixedNode["hidden"] as? Bool == true)
+    }
 
-  @Test("parser emits key, paste, mouse, and ordinary terminal input")
-  func parserEmitsInputEvents() throws {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes(
-        "a\u{001E}key:character:%E2%9C%93:5\n"
-          + "\u{001E}paste:hello%20world\n"
-          + "\u{001E}mouse:scrolled:2:3:none:0:-1:2\n"
-      )
-    )
-
-    #expect(parsed.controlMessages.isEmpty)
-    #expect(
-      parsed.events == [
-        .key(.init(.character("a"))),
-        .key(.init(.character("✓"), modifiers: [.shift, .ctrl])),
-        .paste(.init(content: "hello world")),
-        .mouse(
-          .init(
-            kind: .scrolled(deltaX: 0, deltaY: -1),
-            location: .subCell(
-              location: Point(x: 2, y: 3),
-              source: .webPixels,
-              metrics: .estimated
+    @Test("encoder emits v2 imperative accessibility announcements")
+    func encoderEmitsAccessibilityAnnouncements() throws {
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          SemanticHostFrame(
+            sequence: 12,
+            raster: Self.basicSurface(),
+            semantics: SemanticSnapshot(
+              accessibilityAnnouncements: [
+                AccessibilityAnnouncement(message: "Saved", politeness: .assertive),
+                AccessibilityAnnouncement(message: "Queued", politeness: .polite),
+              ]
             ),
-            modifiers: [.alt]
+            focusedIdentity: nil
           )
-        ),
-      ]
-    )
-  }
-
-  @Test("parser maps fractional mouse coordinates to web sub-cell pointer locations")
-  func parserMapsFractionalMouseToSubCellPointerLocation() throws {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes(
-        "\u{001E}resize:12:3:10:20\n"
-          + "\u{001E}mouse:dragged:2.75:1.25:primary:0:0:0\n"
-      )
-    )
-
-    #expect(
-      parsed.controlMessages == [
-        .resize(.init(width: 12, height: 3), cellPixelSize: .init(width: 10, height: 20))
-      ])
-
-    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
-      Issue.record("expected mouse event")
-      return
-    }
-
-    #expect(mouse.kind == .dragged(.primary))
-    #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
-    #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
-    #expect(mouse.location.rawPixel == PixelPoint(x: 27.5, y: 25))
-    #expect(
-      mouse.location.precision
-        == .subCell(
-          source: .webPixels,
-          metrics: .init(width: 10, height: 20, source: .reported)
-        ))
-  }
-
-  @Test("parser preserves out-of-grid fractional coordinates for hit-test rejection")
-  func parserPreservesOutOfGridFractionalCoordinates() throws {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes(
-        "\u{001E}resize:12:3:10:20\n"
-          + "\u{001E}mouse:moved:-0.25:3.10:none:0:0:0\n"
-      )
-    )
-
-    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
-      Issue.record("expected mouse event")
-      return
-    }
-
-    #expect(mouse.location.location == Point(x: -0.25, y: 3.10))
-    #expect(mouse.location.cell == CellPoint(x: -1, y: 3))
-    #expect(mouse.location.precision.isSubCell)
-  }
-
-  @Test("parser preserves fractional web coordinates before cell metrics are reported")
-  func parserPreservesFractionalWebCoordinatesBeforeMetrics() throws {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes("\u{001E}mouse:moved:2.75:1.25:none:0:0:0\n")
-    )
-
-    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
-      Issue.record("expected mouse event")
-      return
-    }
-
-    #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
-    #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
-    #expect(mouse.location.rawPixel == nil)
-    #expect(
-      mouse.location.precision
-        == .subCell(source: .webPixels, metrics: .estimated))
-  }
-
-  @Test("parser decodes the pointer paradigm declaration")
-  func parserDecodesPointerCapabilities() {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes(
-        "\u{001E}pointer:panning=1\n"
-          + "\u{001E}pointer:panning=0\n"
-          // Unknown keys are skipped, so a later key can join the record
-          // without changing its arity; `panning` is still read beside one.
-          + "\u{001E}pointer:hovering=1:panning=1\n"
-      )
-    )
-
-    #expect(
-      parsed.controlMessages == [
-        .pointerCapabilities(supportsScrollPanning: true),
-        .pointerCapabilities(supportsScrollPanning: false),
-        .pointerCapabilities(supportsScrollPanning: true),
-      ]
-    )
-    #expect(parsed.events.isEmpty)
-  }
-
-  @Test("the pointer declaration survives a resize and reaches the surface")
-  func pointerCapabilitiesSurviveResize() {
-    let host = WebSurfaceTransport(
-      surfaceSize: .init(width: 4, height: 2),
-      renderStyle: .init(appearance: .fallback)
-    )
-    // Absence of the record means the desktop paradigm: a page bundle that
-    // predates it must not start panning.
-    #expect(!host.pointerInputCapabilities.supportsScrollPanning)
-
-    host.updatePointerCapabilities(supportsScrollPanning: true)
-    #expect(host.pointerInputCapabilities.supportsScrollPanning)
-
-    // A resize recomputes precision from fresh cell metrics; it must not
-    // discard the paradigm the page declared earlier.
-    host.updateSurfaceSize(.init(width: 8, height: 4), cellPixelSize: .init(width: 9, height: 18))
-    #expect(host.pointerInputCapabilities.supportsScrollPanning)
-    #expect(host.pointerInputCapabilities.supportsSubCellLocation)
-
-    host.updatePointerCapabilities(supportsScrollPanning: false)
-    #expect(!host.pointerInputCapabilities.supportsScrollPanning)
-  }
-
-  @Test("parser ignores malformed web-surface commands")
-  func parserIgnoresMalformedCommands() {
-    var parser = WebSurfaceInputParser()
-    let parsed = parser.feed(
-      bytes(
-        "\u{001E}resize:not-a-number:4\n"
-          + "\u{001E}key:unknown:0\n"
-          + "\u{001E}paste:%ZZ\n"
-          + "\u{001E}mouse:down:1:2:none:0:0:0\n"
-          // No recognized key, so no declaration and no state change — not a
-          // silent `panning=false`.
-          + "\u{001E}pointer:hovering=1\n"
-          + "\u{001E}pointer\n"
-      )
-    )
-
-    #expect(parsed.events.isEmpty)
-    #expect(parsed.controlMessages.isEmpty)
-  }
-
-  private static func basicSurface() -> RasterSurface {
-    RasterSurface(
-      size: .init(width: 2, height: 2),
-      lines: [
-        "OK",
-        " ✓",
-      ]
-    )
-  }
-
-  private static func styledSurface() -> RasterSurface {
-    let primary = ResolvedTextStyle(
-      foregroundColor: .red,
-      backgroundColor: .black,
-      emphasis: [.bold, .italic, .reverse],
-      underlineStyle: .init(pattern: .dash, color: .yellow),
-      strikethroughStyle: .init(pattern: .dot, color: .red),
-      opacity: 0.75
-    )
-    let wide = ResolvedTextStyle(
-      foregroundColor: .blue,
-      backgroundColor: .green,
-      emphasis: [.faint],
-      underlineStyle: .init(pattern: .curly),
-      opacity: 0.5
-    )
-    let escaped = ResolvedTextStyle(
-      foregroundColor: .cyan,
-      strikethroughStyle: .init(pattern: .double, color: .magenta)
-    )
-
-    return RasterSurface(
-      size: .init(width: 4, height: 2),
-      cells: [
-        [
-          .init(character: "A", style: primary),
-          .init(character: "界", spanWidth: 2, style: wide),
-          .init(character: " ", spanWidth: 0, continuationLeadX: 1, style: wide),
-          .init(character: "\"", style: primary),
-        ],
-        [
-          .init(character: "\\", style: escaped),
-          .init(character: "\n", style: escaped),
-          .init(character: "B"),
-          .init(character: " "),
-        ],
-      ]
-    )
-  }
-
-  private static func changedSurface() -> RasterSurface {
-    RasterSurface(
-      size: .init(width: 2, height: 2),
-      lines: [
-        "OK",
-        " !",
-      ]
-    )
-  }
-
-  private static func wideSurface() -> RasterSurface {
-    RasterSurface(
-      size: .init(width: 4, height: 2),
-      lines: [
-        "OK  ",
-        " !  ",
-      ]
-    )
-  }
-
-  private static func singleCellSurface(
-    size: CellSize,
-    style: ResolvedTextStyle
-  ) -> RasterSurface {
-    RasterSurface(
-      size: size,
-      cells: [[RasterCell(character: "X", style: style)]]
-    )
-  }
-
-  private static func animatedStyleSurface(
-    frameIndex: Int,
-    size: CellSize
-  ) -> RasterSurface {
-    let styles = (0..<16).map { offset in
-      Self.wireStyle(identifier: frameIndex * 16 + offset)
-    }
-    return RasterSurface(
-      size: size,
-      cells: (0..<size.height).map { y in
-        (0..<size.width).map { x in
-          RasterCell(
-            character: " ",
-            style: styles[(y * size.width + x) % styles.count]
-          )
-        }
-      }
-    )
-  }
-
-  private static func opacityChurnSurface(
-    frameIndex: Int,
-    frameCount: Int,
-    styledCellCount: Int,
-    size: CellSize
-  ) -> RasterSurface {
-    let style = ResolvedTextStyle(
-      opacity: Double(frameIndex + 1) / Double(frameCount + 1)
-    )
-    return RasterSurface(
-      size: size,
-      cells: (0..<size.height).map { y in
-        (0..<size.width).map { x in
-          let cellIndex = y * size.width + x
-          return RasterCell(
-            character: " ",
-            style: cellIndex < styledCellCount ? style : nil
-          )
-        }
-      }
-    )
-  }
-
-  private static func encodedStylesFieldByteCount(
-    inDelta output: String
-  ) throws -> Int {
-    let stylesStart = try #require(output.range(of: "\"styles\":["))
-    let stylesEnd = try #require(
-      output.range(
-        of: "],\"deltaRows\":",
-        range: stylesStart.upperBound..<output.endIndex
-      )
-    )
-    return output[stylesStart.lowerBound...stylesEnd.lowerBound].utf8.count
-  }
-
-  private static func wireStyle(
-    identifier: Int
-  ) -> ResolvedTextStyle {
-    let red = Double(identifier & 0xFF) / 255
-    let green = Double((identifier >> 8) & 0xFF) / 255
-    let blue = Double((identifier >> 16) & 0xFF) / 255
-    return ResolvedTextStyle(
-      foregroundColor: Color(red: red, green: green, blue: blue)
-    )
-  }
-
-  private static func largeSurface(dirtyRowText: String) -> RasterSurface {
-    let paddedDirtyRow = String(dirtyRowText.prefix(8)).padding(
-      toLength: 8, withPad: " ", startingAt: 0)
-    return RasterSurface(
-      size: .init(width: 8, height: 10),
-      lines: (0..<10).map { row in
-        row == 5 ? paddedDirtyRow : "row\(row)    ".prefix(8).description
-      }
-    )
-  }
-
-  private static func imageSurface(opacity: Double = 1) -> RasterSurface {
-    let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
-    return RasterSurface(
-      size: .init(width: 4, height: 2),
-      lines: [
-        "    ",
-        "    ",
-      ],
-      imageAttachments: [
-        RasterImageAttachment(
-          identity: .init(components: [.named("image")]),
-          bounds: .init(origin: .init(x: 1, y: 0), size: .init(width: 3, height: 2)),
-          visibleBounds: .init(origin: .init(x: 2, y: 0), size: .init(width: 2, height: 2)),
-          source: .data(bytes),
-          resolvedReference: .embeddedImage(bytes),
-          pixelSize: .init(width: 3, height: 2),
-          isResizable: true,
-          opacity: opacity
         )
-      ]
-    )
-  }
+      )
 
-  private static func gifSurface(
-    compositing: RasterImageCompositing?
-  ) -> RasterSurface {
-    let gifBytes = gifHeaderBytes()
-    return RasterSurface(
-      size: .init(width: 4, height: 2),
-      lines: ["    ", "    "],
-      imageAttachments: [
-        RasterImageAttachment(
-          identity: .init(components: [.named("gif")]),
-          bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
-          visibleBounds: nil,
-          source: .data(gifBytes),
-          resolvedReference: .embeddedImage(gifBytes),
-          pixelSize: .init(width: 1, height: 1),
-          isResizable: false,
-          compositing: compositing
-        )
-      ]
-    )
-  }
+      #expect(frame["version"] as? Int == 2)
+      #expect(frame["sequence"] as? Int == 12)
+      let announcements = try #require(frame["accessibilityAnnouncements"] as? [[String: Any]])
+      #expect(announcements.count == 2)
+      #expect(announcements[0]["message"] as? String == "Saved")
+      #expect(announcements[0]["politeness"] as? String == "assertive")
+      #expect(announcements[1]["message"] as? String == "Queued")
+      #expect(announcements[1]["politeness"] as? String == "polite")
+    }
 
-  private static func gifHeaderBytes() -> [UInt8] {
-    // GIF89a header followed by a few palette/data bytes, long enough
-    // to trip the 6-byte magic check so the encoder picks .gif over
-    // the .png default.
-    [
-      0x47, 0x49, 0x46, 0x38, 0x39, 0x61,  // GIF89a
-      0x01, 0x00, 0x01, 0x00,  // 1x1 logical screen
-      0x80, 0x00, 0x00,
-    ]
-  }
-
-  private static func blendedImageSurface(
-    background: Color?,
-    foreground: Color? = nil,
-    glyph: Character? = nil,
-    spanWidth: Int = 1,
-    signature: UInt64
-  ) -> RasterSurface {
-    let bytes = redPixelPNGBytes()
-    let bounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
-    let visibleBounds = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 1, height: 1))
-    return RasterSurface(
-      size: .init(width: 2, height: 1),
-      lines: ["  "],
-      imageAttachments: [
-        RasterImageAttachment(
-          identity: .init(components: [.named("blended-image")]),
-          bounds: bounds,
-          visibleBounds: visibleBounds,
-          source: .data(bytes),
-          resolvedReference: .embeddedImage(bytes),
-          pixelSize: .init(width: 1, height: 1),
-          cellPixelSize: .init(width: 1, height: 1),
-          compositing: RasterImageCompositing(
-            blendMode: .multiply,
-            destinationBackdrop: RasterImageBackdrop(
-              bounds: visibleBounds,
-              cells: [
-                .init(
-                  backgroundColor: background,
-                  foregroundColor: foreground,
-                  glyph: glyph,
-                  spanWidth: spanWidth
+    @Test("encoder emits per-region scroll extents for scroll-chaining")
+    func encoderEmitsScrollRegions() throws {
+      let root = Identity(components: ["root"])
+      let list = root.child("list")
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          SemanticHostFrame(
+            sequence: 13,
+            raster: Self.basicSurface(),
+            semantics: SemanticSnapshot(
+              scrollRoutes: [
+                ScrollRoute(
+                  identity: list,
+                  viewportRect: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 3)),
+                  contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10)),
+                  contentOffset: .init(x: 0, y: 2)
                 )
               ]
             ),
-            cellPixelSize: .init(width: 1, height: 1),
-            backdropSignature: signature
+            focusedIdentity: nil
           )
         )
+      )
+
+      #expect(frame["version"] as? Int == 2)
+      let regions = try #require(frame["scrollRegions"] as? [[String: Any]])
+      #expect(regions.count == 1)
+      let region = try #require(regions.first)
+      #expect(region["id"] as? String == "root/list")
+      #expect(region["rect"] as? [Int] == [0, 1, 4, 3])
+      #expect(region["offset"] as? [Int] == [0, 2])
+      #expect(region["content"] as? [Int] == [4, 10])
+    }
+
+    @Test("encoder omits scrollRegions when there are no scrollable regions")
+    func encoderOmitsScrollRegionsWhenEmpty() throws {
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          SemanticHostFrame(
+            sequence: 14,
+            raster: Self.basicSurface(),
+            semantics: SemanticSnapshot(),
+            focusedIdentity: nil
+          )
+        )
+      )
+
+      #expect(frame["scrollRegions"] == nil)
+    }
+
+    @Test("encoder emits image data once and then reuses the cached image id")
+    func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let firstFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.imageSurface(),
+          state: &state
+        )
+      )
+      let secondFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.imageSurface(),
+          state: &state
+        )
+      )
+
+      let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+      let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
+
+      #expect(firstImage["format"] as? String == "png")
+      #expect(firstImage["bounds"] as? [Int] == [1, 0, 3, 2])
+      #expect(firstImage["visibleBounds"] as? [Int] == [2, 0, 2, 2])
+      #expect(firstImage["pixelSize"] as? [Int] == [3, 2])
+      #expect(firstImage["scalingMode"] as? String == "stretch")
+      #expect(firstImage["opacity"] as? Double == 1)
+      #expect(firstImage["dataBase64"] as? String == "iVBORw==")
+
+      #expect(secondImage["id"] as? String == firstImage["id"] as? String)
+      #expect(secondImage["dataBase64"] == nil)
+    }
+
+    @Test("an opacity-only image update reuses payload bytes and carries new placement alpha")
+    func opacityOnlyImageUpdateDoesNotRetransmitPayload() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let firstFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 1), state: &state)
+      )
+      let fadedFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(Self.imageSurface(opacity: 0.25), state: &state)
+      )
+      let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+      let fadedImage = try #require((fadedFrame["images"] as? [[String: Any]])?.first)
+
+      #expect(firstImage["id"] as? String == fadedImage["id"] as? String)
+      #expect(firstImage["opacity"] as? Double == 1)
+      #expect(fadedImage["opacity"] as? Double == 0.25)
+      #expect(firstImage["dataBase64"] != nil)
+      #expect(fadedImage["dataBase64"] == nil)
+    }
+
+    @Test("encoder emits blended image payloads as cached png variants")
+    func encoderEmitsBlendedImagePayloadsAsCachedPNGVariants() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let firstFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(background: .blue, signature: 1),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+      let secondFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(background: .blue, signature: 1),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+      let changedBackdropFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(background: .red, signature: 2),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+
+      let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+      let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
+      let changedImage = try #require((changedBackdropFrame["images"] as? [[String: Any]])?.first)
+
+      let firstID = try #require(firstImage["id"] as? String)
+      let changedID = try #require(changedImage["id"] as? String)
+
+      #expect(firstID.hasPrefix("blend:png:"))
+      #expect(firstImage["format"] as? String == "png")
+      #expect(firstImage["bounds"] as? [Int] == [1, 0, 1, 1])
+      #expect(firstImage["visibleBounds"] as? [Int] == [1, 0, 1, 1])
+      #expect(firstImage["pixelSize"] as? [Int] == [1, 1])
+      #expect(firstImage["dataBase64"] != nil)
+
+      #expect(secondImage["id"] as? String == firstID)
+      #expect(secondImage["dataBase64"] == nil)
+
+      #expect(changedID.hasPrefix("blend:png:"))
+      #expect(changedID != firstID)
+      #expect(changedImage["dataBase64"] != nil)
+    }
+
+    @Test("encoder emits a new blended png variant when backdrop glyph changes")
+    func encoderEmitsNewBlendedPNGVariantWhenBackdropGlyphChanges() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let firstFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(
+            background: nil,
+            foreground: .blue,
+            glyph: "A",
+            signature: 1
+          ),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+      let stableFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(
+            background: nil,
+            foreground: .blue,
+            glyph: "A",
+            signature: 1
+          ),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+      let changedGlyphFrame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(
+            background: nil,
+            foreground: .blue,
+            glyph: "B",
+            signature: 2
+          ),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+
+      let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+      let stableImage = try #require((stableFrame["images"] as? [[String: Any]])?.first)
+      let changedImage = try #require((changedGlyphFrame["images"] as? [[String: Any]])?.first)
+      let firstID = try #require(firstImage["id"] as? String)
+      let changedID = try #require(changedImage["id"] as? String)
+
+      #expect(firstID.hasPrefix("blend:png:"))
+      #expect(firstImage["dataBase64"] != nil)
+      #expect(stableImage["id"] as? String == firstID)
+      #expect(stableImage["dataBase64"] == nil)
+      #expect(changedID.hasPrefix("blend:png:"))
+      #expect(changedID != firstID)
+      #expect(changedImage["dataBase64"] != nil)
+    }
+
+    @Test("encoder process compositor evicts blended payloads under the default policy")
+    func encoderProcessCompositorEvictsBlendedPayloadsUnderDefaultPolicy() throws {
+      let before = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+
+      for index in 0..<300 {
+        _ = WebSurfaceFrameEncoder.encode(
+          Self.blendedImageSurface(
+            background: .blue,
+            signature: UInt64(10_000 + index)
+          ),
+          fallbackBackground: .black,
+          state: &state
+        )
+      }
+
+      let after = WebSurfaceFrameEncoder.imageBlendCacheSnapshot()
+      #expect(after.entryCount <= 256)
+      #expect(after.evictionCount > before.evictionCount)
+      #expect(state.knownImageIDs.count == 300)
+    }
+
+    @Test("encoder emits presentation damage for browser partial redraws")
+    func encoderEmitsPresentationDamage() throws {
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.basicSurface(),
+          damage: PresentationDamage(
+            textRows: [
+              .init(row: 1, columnRanges: [0..<1, 1..<2])
+            ]
+          )
+        )
+      )
+
+      let damage = try #require(frame["damage"] as? [String: Any])
+      #expect(damage["requiresFullTextRepaint"] as? Bool == false)
+      #expect(damage["requiresFullGraphicsReplay"] as? Bool == false)
+      let textRows = try #require(damage["textRows"] as? [[Any]])
+      let textRow = try #require(textRows.first)
+      #expect(textRow.first as? Int == 1)
+      #expect(textRow.dropFirst().first as? [[Int]] == [[0, 2]])
+    }
+
+    @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
+    func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.gifSurface(compositing: nil),
+          state: &state
+        )
+      )
+      let image = try #require((frame["images"] as? [[String: Any]])?.first)
+
+      #expect(image["format"] as? String == "gif")
+      let id = try #require(image["id"] as? String)
+      #expect(id.hasPrefix("gif:"))
+      #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
+    }
+
+    @Test("encoder leaves blended raw GIF bytes as GIF pass-through when no frame decoder exists")
+    func encoderLeavesBlendedRawGIFBytesAsGIFPassThroughWhenNoFrameDecoderExists() throws {
+      var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.gifSurface(
+            compositing: RasterImageCompositing(
+              blendMode: .multiply,
+              destinationBackdrop: RasterImageBackdrop(
+                bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
+                cells: Array(repeating: .init(backgroundColor: .blue), count: 6)
+              ),
+              cellPixelSize: .init(width: 1, height: 1),
+              backdropSignature: 42
+            )
+          ),
+          fallbackBackground: .black,
+          state: &state
+        )
+      )
+      let image = try #require((frame["images"] as? [[String: Any]])?.first)
+
+      #expect(image["format"] as? String == "gif")
+      let id = try #require(image["id"] as? String)
+      #expect(id.hasPrefix("gif:"))
+      #expect(!id.hasPrefix("blend:png:"))
+      #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
+      #expect(state.knownImageIDs == Set([id]))
+    }
+
+    @Test("parser handles resize and style commands split across chunks")
+    func parserHandlesChunkedControlCommands() throws {
+      var parser = WebSurfaceInputParser()
+      let style = TerminalRenderStyle(
+        appearance: .init(
+          foregroundColor: try! .hex("#102030"),
+          backgroundColor: try! .hex("#405060"),
+          tintColor: try! .hex("#708090"),
+          source: .override
+        )
+      )
+      let encodedStyle = try #require(TerminalRenderStyleCodec.encodeBase64(style))
+
+      let first = parser.feed(bytes("\u{001E}resize:12"))
+      #expect(first.events.isEmpty)
+      #expect(first.controlMessages.isEmpty)
+
+      let second = parser.feed(bytes(":3:8:16\n\u{001E}style:\(encodedStyle)\n"))
+
+      #expect(
+        second.controlMessages == [
+          .resize(.init(width: 12, height: 3), cellPixelSize: .init(width: 8, height: 16)),
+          .style(style),
+        ]
+      )
+      #expect(second.events.isEmpty)
+    }
+
+    @Test("parser emits key, paste, mouse, and ordinary terminal input")
+    func parserEmitsInputEvents() throws {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes(
+          "a\u{001E}key:character:%E2%9C%93:5\n"
+            + "\u{001E}paste:hello%20world\n"
+            + "\u{001E}mouse:scrolled:2:3:none:0:-1:2\n"
+        )
+      )
+
+      #expect(parsed.controlMessages.isEmpty)
+      #expect(
+        parsed.events == [
+          .key(.init(.character("a"))),
+          .key(.init(.character("✓"), modifiers: [.shift, .ctrl])),
+          .paste(.init(content: "hello world")),
+          .mouse(
+            .init(
+              kind: .scrolled(deltaX: 0, deltaY: -1),
+              location: .subCell(
+                location: Point(x: 2, y: 3),
+                source: .webPixels,
+                metrics: .estimated
+              ),
+              modifiers: [.alt]
+            )
+          ),
+        ]
+      )
+    }
+
+    @Test("parser maps fractional mouse coordinates to web sub-cell pointer locations")
+    func parserMapsFractionalMouseToSubCellPointerLocation() throws {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes(
+          "\u{001E}resize:12:3:10:20\n"
+            + "\u{001E}mouse:dragged:2.75:1.25:primary:0:0:0\n"
+        )
+      )
+
+      #expect(
+        parsed.controlMessages == [
+          .resize(.init(width: 12, height: 3), cellPixelSize: .init(width: 10, height: 20))
+        ])
+
+      guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+        Issue.record("expected mouse event")
+        return
+      }
+
+      #expect(mouse.kind == .dragged(.primary))
+      #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
+      #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
+      #expect(mouse.location.rawPixel == PixelPoint(x: 27.5, y: 25))
+      #expect(
+        mouse.location.precision
+          == .subCell(
+            source: .webPixels,
+            metrics: .init(width: 10, height: 20, source: .reported)
+          ))
+    }
+
+    @Test("parser preserves out-of-grid fractional coordinates for hit-test rejection")
+    func parserPreservesOutOfGridFractionalCoordinates() throws {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes(
+          "\u{001E}resize:12:3:10:20\n"
+            + "\u{001E}mouse:moved:-0.25:3.10:none:0:0:0\n"
+        )
+      )
+
+      guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+        Issue.record("expected mouse event")
+        return
+      }
+
+      #expect(mouse.location.location == Point(x: -0.25, y: 3.10))
+      #expect(mouse.location.cell == CellPoint(x: -1, y: 3))
+      #expect(mouse.location.precision.isSubCell)
+    }
+
+    @Test("parser preserves fractional web coordinates before cell metrics are reported")
+    func parserPreservesFractionalWebCoordinatesBeforeMetrics() throws {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes("\u{001E}mouse:moved:2.75:1.25:none:0:0:0\n")
+      )
+
+      guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+        Issue.record("expected mouse event")
+        return
+      }
+
+      #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
+      #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
+      #expect(mouse.location.rawPixel == nil)
+      #expect(
+        mouse.location.precision
+          == .subCell(source: .webPixels, metrics: .estimated))
+    }
+
+    @Test("parser decodes the pointer paradigm declaration")
+    func parserDecodesPointerCapabilities() {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes(
+          "\u{001E}pointer:panning=1\n"
+            + "\u{001E}pointer:panning=0\n"
+            // Unknown keys are skipped, so a later key can join the record
+            // without changing its arity; `panning` is still read beside one.
+            + "\u{001E}pointer:hovering=1:panning=1\n"
+        )
+      )
+
+      #expect(
+        parsed.controlMessages == [
+          .pointerCapabilities(supportsScrollPanning: true),
+          .pointerCapabilities(supportsScrollPanning: false),
+          .pointerCapabilities(supportsScrollPanning: true),
+        ]
+      )
+      #expect(parsed.events.isEmpty)
+    }
+
+    @Test("the pointer declaration survives a resize and reaches the surface")
+    func pointerCapabilitiesSurviveResize() {
+      let host = WebSurfaceTransport(
+        surfaceSize: .init(width: 4, height: 2),
+        renderStyle: .init(appearance: .fallback)
+      )
+      // Absence of the record means the desktop paradigm: a page bundle that
+      // predates it must not start panning.
+      #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+
+      host.updatePointerCapabilities(supportsScrollPanning: true)
+      #expect(host.pointerInputCapabilities.supportsScrollPanning)
+
+      // A resize recomputes precision from fresh cell metrics; it must not
+      // discard the paradigm the page declared earlier.
+      host.updateSurfaceSize(.init(width: 8, height: 4), cellPixelSize: .init(width: 9, height: 18))
+      #expect(host.pointerInputCapabilities.supportsScrollPanning)
+      #expect(host.pointerInputCapabilities.supportsSubCellLocation)
+
+      host.updatePointerCapabilities(supportsScrollPanning: false)
+      #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+    }
+
+    @Test("parser ignores malformed web-surface commands")
+    func parserIgnoresMalformedCommands() {
+      var parser = WebSurfaceInputParser()
+      let parsed = parser.feed(
+        bytes(
+          "\u{001E}resize:not-a-number:4\n"
+            + "\u{001E}key:unknown:0\n"
+            + "\u{001E}paste:%ZZ\n"
+            + "\u{001E}mouse:down:1:2:none:0:0:0\n"
+            // No recognized key, so no declaration and no state change — not a
+            // silent `panning=false`.
+            + "\u{001E}pointer:hovering=1\n"
+            + "\u{001E}pointer\n"
+        )
+      )
+
+      #expect(parsed.events.isEmpty)
+      #expect(parsed.controlMessages.isEmpty)
+    }
+
+    private static func basicSurface() -> RasterSurface {
+      RasterSurface(
+        size: .init(width: 2, height: 2),
+        lines: [
+          "OK",
+          " ✓",
+        ]
+      )
+    }
+
+    private static func styledSurface() -> RasterSurface {
+      let primary = ResolvedTextStyle(
+        foregroundColor: .red,
+        backgroundColor: .black,
+        emphasis: [.bold, .italic, .reverse],
+        underlineStyle: .init(pattern: .dash, color: .yellow),
+        strikethroughStyle: .init(pattern: .dot, color: .red),
+        opacity: 0.75
+      )
+      let wide = ResolvedTextStyle(
+        foregroundColor: .blue,
+        backgroundColor: .green,
+        emphasis: [.faint],
+        underlineStyle: .init(pattern: .curly),
+        opacity: 0.5
+      )
+      let escaped = ResolvedTextStyle(
+        foregroundColor: .cyan,
+        strikethroughStyle: .init(pattern: .double, color: .magenta)
+      )
+
+      return RasterSurface(
+        size: .init(width: 4, height: 2),
+        cells: [
+          [
+            .init(character: "A", style: primary),
+            .init(character: "界", spanWidth: 2, style: wide),
+            .init(character: " ", spanWidth: 0, continuationLeadX: 1, style: wide),
+            .init(character: "\"", style: primary),
+          ],
+          [
+            .init(character: "\\", style: escaped),
+            .init(character: "\n", style: escaped),
+            .init(character: "B"),
+            .init(character: " "),
+          ],
+        ]
+      )
+    }
+
+    private static func changedSurface() -> RasterSurface {
+      RasterSurface(
+        size: .init(width: 2, height: 2),
+        lines: [
+          "OK",
+          " !",
+        ]
+      )
+    }
+
+    private static func wideSurface() -> RasterSurface {
+      RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: [
+          "OK  ",
+          " !  ",
+        ]
+      )
+    }
+
+    private static func singleCellSurface(
+      size: CellSize,
+      style: ResolvedTextStyle
+    ) -> RasterSurface {
+      RasterSurface(
+        size: size,
+        cells: [[RasterCell(character: "X", style: style)]]
+      )
+    }
+
+    private static func animatedStyleSurface(
+      frameIndex: Int,
+      size: CellSize
+    ) -> RasterSurface {
+      let styles = (0..<16).map { offset in
+        Self.wireStyle(identifier: frameIndex * 16 + offset)
+      }
+      return RasterSurface(
+        size: size,
+        cells: (0..<size.height).map { y in
+          (0..<size.width).map { x in
+            RasterCell(
+              character: " ",
+              style: styles[(y * size.width + x) % styles.count]
+            )
+          }
+        }
+      )
+    }
+
+    private static func opacityChurnSurface(
+      frameIndex: Int,
+      frameCount: Int,
+      styledCellCount: Int,
+      size: CellSize
+    ) -> RasterSurface {
+      let style = ResolvedTextStyle(
+        opacity: Double(frameIndex + 1) / Double(frameCount + 1)
+      )
+      return RasterSurface(
+        size: size,
+        cells: (0..<size.height).map { y in
+          (0..<size.width).map { x in
+            let cellIndex = y * size.width + x
+            return RasterCell(
+              character: " ",
+              style: cellIndex < styledCellCount ? style : nil
+            )
+          }
+        }
+      )
+    }
+
+    private static func encodedStylesFieldByteCount(
+      inDelta output: String
+    ) throws -> Int {
+      let stylesStart = try #require(output.range(of: "\"styles\":["))
+      let stylesEnd = try #require(
+        output.range(
+          of: "],\"deltaRows\":",
+          range: stylesStart.upperBound..<output.endIndex
+        )
+      )
+      return output[stylesStart.lowerBound...stylesEnd.lowerBound].utf8.count
+    }
+
+    private static func wireStyle(
+      identifier: Int
+    ) -> ResolvedTextStyle {
+      let red = Double(identifier & 0xFF) / 255
+      let green = Double((identifier >> 8) & 0xFF) / 255
+      let blue = Double((identifier >> 16) & 0xFF) / 255
+      return ResolvedTextStyle(
+        foregroundColor: Color(red: red, green: green, blue: blue)
+      )
+    }
+
+    private static func largeSurface(dirtyRowText: String) -> RasterSurface {
+      let paddedDirtyRow = String(dirtyRowText.prefix(8)).padding(
+        toLength: 8, withPad: " ", startingAt: 0)
+      return RasterSurface(
+        size: .init(width: 8, height: 10),
+        lines: (0..<10).map { row in
+          row == 5 ? paddedDirtyRow : "row\(row)    ".prefix(8).description
+        }
+      )
+    }
+
+    private static func imageSurface(opacity: Double = 1) -> RasterSurface {
+      let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
+      return RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: [
+          "    ",
+          "    ",
+        ],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: .init(components: [.named("image")]),
+            bounds: .init(origin: .init(x: 1, y: 0), size: .init(width: 3, height: 2)),
+            visibleBounds: .init(origin: .init(x: 2, y: 0), size: .init(width: 2, height: 2)),
+            source: .data(bytes),
+            resolvedReference: .embeddedImage(bytes),
+            pixelSize: .init(width: 3, height: 2),
+            isResizable: true,
+            opacity: opacity
+          )
+        ]
+      )
+    }
+
+    private static func gifSurface(
+      compositing: RasterImageCompositing?
+    ) -> RasterSurface {
+      let gifBytes = gifHeaderBytes()
+      return RasterSurface(
+        size: .init(width: 4, height: 2),
+        lines: ["    ", "    "],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: .init(components: [.named("gif")]),
+            bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
+            visibleBounds: nil,
+            source: .data(gifBytes),
+            resolvedReference: .embeddedImage(gifBytes),
+            pixelSize: .init(width: 1, height: 1),
+            isResizable: false,
+            compositing: compositing
+          )
+        ]
+      )
+    }
+
+    private static func gifHeaderBytes() -> [UInt8] {
+      // GIF89a header followed by a few palette/data bytes, long enough
+      // to trip the 6-byte magic check so the encoder picks .gif over
+      // the .png default.
+      [
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61,  // GIF89a
+        0x01, 0x00, 0x01, 0x00,  // 1x1 logical screen
+        0x80, 0x00, 0x00,
       ]
-    )
-  }
+    }
 
-  private static func redPixelPNGBytes() -> [UInt8] {
-    Array(
-      Data(
-        base64Encoded:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEElEQVR4AQEFAPr/AP8AAP8FAAH/+lyI0QAAAABJRU5ErkJggg=="
-      )!
-    )
-  }
+    private static func blendedImageSurface(
+      background: Color?,
+      foreground: Color? = nil,
+      glyph: Character? = nil,
+      spanWidth: Int = 1,
+      signature: UInt64
+    ) -> RasterSurface {
+      let bytes = redPixelPNGBytes()
+      let bounds = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+      let visibleBounds = CellRect(origin: .init(x: 1, y: 0), size: .init(width: 1, height: 1))
+      return RasterSurface(
+        size: .init(width: 2, height: 1),
+        lines: ["  "],
+        imageAttachments: [
+          RasterImageAttachment(
+            identity: .init(components: [.named("blended-image")]),
+            bounds: bounds,
+            visibleBounds: visibleBounds,
+            source: .data(bytes),
+            resolvedReference: .embeddedImage(bytes),
+            pixelSize: .init(width: 1, height: 1),
+            cellPixelSize: .init(width: 1, height: 1),
+            compositing: RasterImageCompositing(
+              blendMode: .multiply,
+              destinationBackdrop: RasterImageBackdrop(
+                bounds: visibleBounds,
+                cells: [
+                  .init(
+                    backgroundColor: background,
+                    foregroundColor: foreground,
+                    glyph: glyph,
+                    spanWidth: spanWidth
+                  )
+                ]
+              ),
+              cellPixelSize: .init(width: 1, height: 1),
+              backdropSignature: signature
+            )
+          )
+        ]
+      )
+    }
 
-  private static func decodedSurfaceFrame(
-    _ output: String
-  ) throws -> [String: Any] {
-    let prefix = "\u{001E}surface:"
-    let line = output.trimmingCharacters(in: .newlines)
-    #expect(line.hasPrefix(prefix))
-    let json = String(line.dropFirst(prefix.count))
-    let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
-    return try #require(decoded as? [String: Any])
-  }
+    private static func redPixelPNGBytes() -> [UInt8] {
+      Array(
+        Data(
+          base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAEElEQVR4AQEFAPr/AP8AAP8FAAH/+lyI0QAAAABJRU5ErkJggg=="
+        )!
+      )
+    }
 
-  private static func decodedSurfaceFrames(
-    _ output: String
-  ) throws -> [[String: Any]] {
-    try output.split(separator: "\n").map {
-      try decodedSurfaceFrame(String($0) + "\n")
+    private static func decodedSurfaceFrame(
+      _ output: String
+    ) throws -> [String: Any] {
+      let prefix = "\u{001E}surface:"
+      let line = output.trimmingCharacters(in: .newlines)
+      #expect(line.hasPrefix(prefix))
+      let json = String(line.dropFirst(prefix.count))
+      let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
+      return try #require(decoded as? [String: Any])
+    }
+
+    private static func decodedSurfaceFrames(
+      _ output: String
+    ) throws -> [[String: Any]] {
+      try output.split(separator: "\n").map {
+        try decodedSurfaceFrame(String($0) + "\n")
+      }
+    }
+
+    private static func decodedTypedRecord(
+      _ output: String,
+      prefix: String
+    ) throws -> [String: Any] {
+      let line = output.trimmingCharacters(in: .newlines)
+      #expect(line.hasPrefix(prefix))
+      let json = String(line.dropFirst(prefix.count))
+      let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
+      return try #require(decoded as? [String: Any])
+    }
+
+    private static func frameDiagnosticRecord(
+      frameNumber: Int,
+      causeSummary: String = "render"
+    ) -> FrameDiagnosticRecord {
+      FrameDiagnosticRecord(
+        frameNumber: frameNumber,
+        causeSummary: causeSummary,
+        renderGenerations: .init(render: .init(UInt64(frameNumber))),
+        desiredGeneration: UInt64(frameNumber),
+        presentationStrategy: "incremental",
+        presentationDuration: .zero,
+        totalFrameDuration: .zero
+      )
+    }
+
+    private static func fixture(
+      _ basename: String
+    ) throws -> String {
+      let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Fixtures")
+        .appendingPathComponent("Transport")
+        .appendingPathComponent("\(basename).txt")
+      return try String(contentsOf: url, encoding: .utf8)
+        .replacingOccurrences(of: "\\u001E", with: "\u{001E}")
     }
   }
 
-  private static func decodedTypedRecord(
-    _ output: String,
-    prefix: String
-  ) throws -> [String: Any] {
-    let line = output.trimmingCharacters(in: .newlines)
-    #expect(line.hasPrefix(prefix))
-    let json = String(line.dropFirst(prefix.count))
-    let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
-    return try #require(decoded as? [String: Any])
+  private func bytes(
+    _ string: String
+  ) -> [UInt8] {
+    Array(string.utf8)
   }
 
-  private static func frameDiagnosticRecord(
-    frameNumber: Int,
-    causeSummary: String = "render"
-  ) -> FrameDiagnosticRecord {
-    FrameDiagnosticRecord(
-      frameNumber: frameNumber,
-      causeSummary: causeSummary,
-      renderGenerations: .init(render: .init(UInt64(frameNumber))),
-      desiredGeneration: UInt64(frameNumber),
-      presentationStrategy: "incremental",
-      presentationDuration: .zero,
-      totalFrameDuration: .zero
-    )
-  }
-
-  private static func fixture(
-    _ basename: String
-  ) throws -> String {
-    let url = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appendingPathComponent("Fixtures")
-      .appendingPathComponent("Transport")
-      .appendingPathComponent("\(basename).txt")
-    return try String(contentsOf: url, encoding: .utf8)
-      .replacingOccurrences(of: "\\u001E", with: "\u{001E}")
-  }
-}
-
-private func bytes(
-  _ string: String
-) -> [UInt8] {
-  Array(string.utf8)
-}
+#endif

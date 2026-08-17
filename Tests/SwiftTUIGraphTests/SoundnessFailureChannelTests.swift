@@ -11,6 +11,8 @@ import Testing
   import Android
 #elseif canImport(Musl)
   import Musl
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 @MainActor
@@ -264,15 +266,21 @@ struct SoundnessFailureChannelTests {
   }
 
   private func setEnvironmentVariable(_ name: String, value: String?) {
-    unsafe name.withCString { namePointer in
-      if let value {
-        unsafe value.withCString { valuePointer in
-          _ = unsafe setenv(namePointer, valuePointer, 1)
+    #if os(Windows)
+      // Windows CRT has no setenv/unsetenv; _putenv_s sets, and an empty
+      // value removes the variable.
+      _ = unsafe _putenv_s(name, value ?? "")
+    #else
+      unsafe name.withCString { namePointer in
+        if let value {
+          unsafe value.withCString { valuePointer in
+            _ = unsafe setenv(namePointer, valuePointer, 1)
+          }
+        } else {
+          _ = unsafe unsetenv(namePointer)
         }
-      } else {
-        _ = unsafe unsetenv(namePointer)
       }
-    }
+    #endif
   }
 }
 

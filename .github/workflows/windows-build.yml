@@ -1,0 +1,68 @@
+name: Windows Build
+
+# Build-only Windows lane (swift-tui-org Windows plan, Stage 6 item 2).
+#
+# Builds every target plus the test bundles on both Windows architectures
+# via the swift.org installer route: arm64 matches the development VM's
+# aarch64-unknown-windows-msvc exactly (and the Swift Windows Docker images
+# are amd64-only, so arm64 has no container route); x64 covers the
+# ecosystem's dominant runner class. Test EXECUTION stays off until the
+# Stage 6 item-3 runtime survey lands — this lane exists so regressions in
+# the portable code are caught at build level while that survey is in
+# flight. SwiftPM dependency checkouts need the symlink privilege; hosted
+# GitHub runners have it (the dev-VM provisioning note from the plan).
+#
+# Deliberately NOT wired into the org-root gates: the operator keeps
+# Windows on the child repo's native `swift build` while per-repo version
+# drift lands.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: windows-11-arm
+          - arch: amd64
+            runner: windows-2022
+    steps:
+      - name: Install Swift
+        uses: compnerd/gha-setup-swift@v0.4.0
+        with:
+          source: swift.org
+          swift-version: swift-6.3.3-release
+          swift-build: 6.3.3-RELEASE
+          build_arch: ${{ matrix.arch }}
+
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: windows-${{ matrix.arch }}-swift-6.3.3-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: |
+            windows-${{ matrix.arch }}-swift-6.3.3-
+
+      - name: Build all targets
+        run: swift build
+
+      - name: Build test bundles
+        run: swift build --build-tests

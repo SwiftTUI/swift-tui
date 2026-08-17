@@ -613,11 +613,24 @@ let package = Package(
         "SwiftTUI",
         "SwiftTUIArguments",
         "SwiftTUICLI",
-        "SwiftTUICLIAttach",
         "SwiftTUITerminalCLI",
-        "SwiftTUIPlatformIO",
-        "SwiftTUIPTYPrimitives",
         "SwiftTUITestSupport",
+        // POSIX-only edges stay conditional: an unconditional test edge
+        // builds the (whole-file-guarded) module EMPTY on Windows, and the
+        // stale swiftmodule flips every `canImport` gate on it — the Stage 5
+        // build-history trap, measured live at Stage 6 item 3.
+        .target(
+          name: "SwiftTUICLIAttach",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIPlatformIO",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/CLI/Tests/SwiftTUICLITests",
       swiftSettings: swiftSettings()
@@ -626,7 +639,10 @@ let package = Package(
       name: "SwiftTUIPTYPrimitivesTests",
       dependencies: [
         "SwiftTUI",
-        "SwiftTUIPTYPrimitives",
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests",
       swiftSettings: swiftSettings()
@@ -637,8 +653,14 @@ let package = Package(
         "SwiftTUI",
         "SwiftTUICore",
         "SwiftTUITestSupport",
-        "SwiftTUIPTYPrimitives",
-        "SwiftTUITerminal",
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUITerminal",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/Embedding/Tests/SwiftTUITerminalTests",
       swiftSettings: swiftSettings()
@@ -699,8 +721,14 @@ let package = Package(
       dependencies: [
         "SwiftTUIArguments",
         "SwiftTUICore",
-        "SwiftTUIPTYPrimitives",
-        "SwiftTUITerminal",
+        .target(
+          name: "SwiftTUIPTYPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
+        .target(
+          name: "SwiftTUITerminal",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
         "CEntryPointImageLocator",
         // The EntryPointFixture* executables are deliberately NOT
         // dependencies. Depending on an executable target links its `main`
@@ -720,7 +748,10 @@ let package = Package(
     .testTarget(
       name: "SwiftTUIVendorUnixSignalsTests",
       dependencies: [
-        "SwiftTUIVendorUnixSignals",
+        .target(
+          name: "SwiftTUIVendorUnixSignals",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
       ],
       path: "Vendor/UnixSignals/Tests/UnixSignalsTests",

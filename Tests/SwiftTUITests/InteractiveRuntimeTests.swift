@@ -424,7 +424,7 @@ struct InteractiveRuntimeTests {
   @Test("input reader drains nonblocking pointer bursts across multiple reads")
   func inputReaderDrainsPointerBurstsAcrossMultipleReads() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -438,10 +438,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let scrollSequence: [UInt8] = [
       0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
@@ -481,7 +477,7 @@ struct InteractiveRuntimeTests {
   @Test("input reader coalesces staggered pointer bursts before yielding")
   func inputReaderCoalescesStaggeredPointerBursts() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -495,10 +491,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let scrollSequence: [UInt8] = [
       0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
@@ -3169,7 +3161,7 @@ struct InteractiveRuntimeTests {
   @Test("a second pointer scroll after settling still updates a WindowGroup-hosted scroll pane")
   func secondPointerScrollAfterSettleUpdatesWindowGroupHostedScrollPane() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -3183,10 +3175,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let terminalSize = CellSize(width: 36, height: 10)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -3448,7 +3436,7 @@ struct InteractiveRuntimeTests {
   @Test("animation frames keep a TabView-hosted pane's surface stable")
   func animationFramesKeepTabHostedPaneSurfaceStable() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -3462,10 +3450,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -3517,7 +3501,7 @@ struct InteractiveRuntimeTests {
   @Test("real InputReader scroll bursts update the visible gallery pane before any follow-up click")
   func realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -3531,10 +3515,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -3946,7 +3926,7 @@ struct InteractiveRuntimeTests {
   @Test("ScrollViewReader proxy commands survive strip-click tab entry")
   func scrollViewReaderProxyCommandsSurviveStripClickTabEntry() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -3960,10 +3940,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let terminalSize = CellSize(width: 40, height: 14)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -4172,7 +4148,7 @@ struct InteractiveRuntimeTests {
   @Test("navigation push after strip-click tab entry leaves no teardown-coherence strand")
   func navigationPushAfterStripClickTabEntryLeavesNoStrand() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(unsafe pipe(&descriptors) == 0)
+    #expect(openTestPipe(&descriptors, nonblockingRead: true) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -4186,10 +4162,6 @@ struct InteractiveRuntimeTests {
         _ = close(writeDescriptor)
       }
     }
-
-    let currentFlags = fcntl(readDescriptor, F_GETFL)
-    #expect(currentFlags >= 0)
-    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
     let terminalSize = CellSize(width: 76, height: 40)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -4567,7 +4539,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(
       surfaceSizeProvider: { terminalSize },
       presentObserver: {
-        usleep(5_000)
+        testSleep(microseconds: 5_000)
       }
     )
     let rootIdentity = testIdentity("BurstScrollFixture")
@@ -4637,7 +4609,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(
       surfaceSizeProvider: { terminalSize },
       presentObserver: {
-        usleep(5_000)
+        testSleep(microseconds: 5_000)
       }
     )
     let rootIdentity = testIdentity("BurstLazyScrollFixture")
@@ -5085,7 +5057,12 @@ private func writeAllBytes(
     while totalBytesWritten < bytes.count {
       let nextAddress = unsafe baseAddress.advanced(by: totalBytesWritten)
       let bytesRemaining = bytes.count - totalBytesWritten
-      let bytesWritten = unsafe write(fileDescriptor, nextAddress, bytesRemaining)
+      // The Windows CRT write takes a UInt32 count and returns Int32.
+      #if os(Windows)
+        let bytesWritten = Int(unsafe _write(fileDescriptor, nextAddress, UInt32(bytesRemaining)))
+      #else
+        let bytesWritten = unsafe write(fileDescriptor, nextAddress, bytesRemaining)
+      #endif
       guard bytesWritten >= 0 else {
         throw TerminalHostError.failedToWrite(errno: errno)
       }
@@ -6017,7 +5994,6 @@ private struct ImperativeAlertPresentationHarnessView: View {
     }
   }
 }
-
 
 /// A touch-style host declaration for direct-manipulation tests: identical to
 /// `.cellOnly` except that it opts into drag-to-pan, the way Android, iOS, and

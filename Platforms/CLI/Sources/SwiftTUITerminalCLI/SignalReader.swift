@@ -1,4 +1,4 @@
-#if canImport(SwiftTUIVendorUnixSignals)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
   public import SwiftTUIVendorUnixSignals
   import Synchronization
 
@@ -54,7 +54,7 @@
 #endif
 
 @_spi(Runners) public func defaultSignalReader() -> (any SignalReading)? {
-  #if canImport(SwiftTUIVendorUnixSignals)
+  #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     SignalReader()
   #else
     nil

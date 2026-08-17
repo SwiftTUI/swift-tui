@@ -795,14 +795,14 @@ private final class SlowPresentTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
-  let presentDelayMicroseconds: useconds_t
+  let presentDelayMicroseconds: UInt32
   private(set) var presentCount = 0
 
   /// Notified after every present, so the input reader can quit on a frame
   /// count instead of a wall-clock delay.
   let frameSignal = MainActorConditionSignal()
 
-  init(surfaceSize: CellSize, presentDelayMicroseconds: useconds_t) {
+  init(surfaceSize: CellSize, presentDelayMicroseconds: UInt32) {
     self.surfaceSize = surfaceSize
     self.presentDelayMicroseconds = presentDelayMicroseconds
   }
@@ -815,7 +815,7 @@ private final class SlowPresentTerminalHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     if presentDelayMicroseconds > 0 {
-      usleep(presentDelayMicroseconds)
+      testSleep(microseconds: presentDelayMicroseconds)
     }
     presentCount += 1
     // The run loop only ever presents on the MainActor; `assumeIsolated`
