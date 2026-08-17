@@ -1,3 +1,7 @@
+/* Compiled out on Windows: dladdr has no Win32 spelling and the
+   entry-point launch tests that consume this shim are POSIX-only
+   until the Stage 6 test survey of the Windows plan. */
+#if !defined(_WIN32)
 // `dladdr`/`Dl_info` are GNU extensions on Linux: <dlfcn.h> only declares them
 // when `_GNU_SOURCE` is defined. Define it before any include so the symbol is
 // visible here even though Swift's `Glibc` overlay does not surface it. Darwin
@@ -18,3 +22,4 @@ const char *swift_tui_image_path_containing(const void *address) {
   }
   return info.dli_fname;
 }
+#endif

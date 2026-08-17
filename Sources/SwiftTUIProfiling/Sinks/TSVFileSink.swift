@@ -25,7 +25,14 @@
 
   @_spi(Runners) public init?(path: String) {
     #if !canImport(WASILibc)
-      let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      #if canImport(ucrt)
+        var fd: CInt = -1
+        _ = unsafe _sopen_s(
+          &fd, path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _SH_DENYNO,
+          _S_IREAD | _S_IWRITE)
+      #else
+        let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      #endif
       guard fd >= 0 else {
         return nil
       }
@@ -62,7 +69,11 @@
       }
       var data = line + "\n"
       data.withUTF8 { buffer in
-        _ = unsafe write(fileDescriptor, buffer.baseAddress, buffer.count)
+        #if canImport(ucrt)
+          _ = unsafe _write(fileDescriptor, buffer.baseAddress, UInt32(buffer.count))
+        #else
+          _ = unsafe write(fileDescriptor, buffer.baseAddress, buffer.count)
+        #endif
       }
     #endif
   }

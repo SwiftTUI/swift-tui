@@ -90,4 +90,22 @@
   ) -> Int {
     Int(unsafe WASILibc.write(fileDescriptor, buffer, count))
   }
+#elseif canImport(ucrt)
+  // No poll on Windows: readiness comes from WaitForSingleObject inside the
+  // WindowsTerminalController record pump, which owns the console handle.
+  func terminalPlatformWrite(
+    _ fileDescriptor: Int32,
+    _ buffer: UnsafeRawPointer?,
+    _ count: Int
+  ) -> Int {
+    Int(unsafe _write(fileDescriptor, buffer, UInt32(count)))
+  }
+
+  func terminalPlatformRead(
+    _ fileDescriptor: Int32,
+    _ buffer: UnsafeMutableRawPointer?,
+    _ count: Int
+  ) -> Int {
+    Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
+  }
 #endif

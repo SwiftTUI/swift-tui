@@ -645,6 +645,12 @@ private func openReadOnlyFile(
       unsafe Android.open(cPath, O_RDONLY)
     #elseif canImport(WASILibc)
       unsafe WASILibc.open(cPath, O_RDONLY)
+    #elseif canImport(ucrt)
+      {
+        var descriptor: CInt = -1
+        _ = unsafe _sopen_s(&descriptor, cPath, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
+        return descriptor
+      }()
     #endif
   }
 }
@@ -660,6 +666,8 @@ private func closeFile(
     _ = Android.close(fileDescriptor)
   #elseif canImport(WASILibc)
     _ = WASILibc.close(fileDescriptor)
+  #elseif canImport(ucrt)
+    _ = _close(fileDescriptor)
   #endif
 }
 
@@ -676,5 +684,7 @@ private func readFileChunk(
     unsafe Android.read(fileDescriptor, buffer, count)
   #elseif canImport(WASILibc)
     Int(unsafe WASILibc.read(fileDescriptor, buffer, count))
+  #elseif canImport(ucrt)
+    Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
   #endif
 }

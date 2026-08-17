@@ -34,6 +34,14 @@
   ) -> Int {
     unsafe Android.read(fileDescriptor, buffer, count)
   }
+#elseif canImport(ucrt)
+  private func platformRead(
+    _ fileDescriptor: Int32,
+    _ buffer: UnsafeMutableRawPointer?,
+    _ count: Int
+  ) -> Int {
+    Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
+  }
 #elseif canImport(WASILibc)
   private func platformRead(
     _ fileDescriptor: Int32,

@@ -41,7 +41,17 @@ import Synchronization
   #if !canImport(WASILibc)
     private init?(path: String) {
       let fd = unsafe path.withCString { pathPointer in
-        unsafe open(pathPointer, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+        #if canImport(ucrt)
+          {
+            var descriptor: CInt = -1
+            _ = unsafe _sopen_s(
+              &descriptor, pathPointer, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY,
+              _SH_DENYNO, _S_IREAD | _S_IWRITE)
+            return descriptor
+          }()
+        #else
+          unsafe open(pathPointer, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+        #endif
       }
       guard fd >= 0 else { return nil }
       descriptor = Mutex(fd)
@@ -139,12 +149,20 @@ import Synchronization
           }
           var offset = 0
           while offset < buffer.count {
-            let written = unsafe write(fd, base.advanced(by: offset), buffer.count - offset)
+            #if canImport(ucrt)
+              let written = Int(
+                unsafe _write(fd, base.advanced(by: offset), UInt32(buffer.count - offset)))
+            #else
+              let written = unsafe write(fd, base.advanced(by: offset), buffer.count - offset)
+            #endif
             if written > 0 {
               offset += written
-            } else if written == -1, errno == EINTR {
-              continue
             } else {
+              #if !canImport(ucrt)
+                if written == -1, errno == EINTR {
+                  continue
+                }
+              #endif
               return
             }
           }

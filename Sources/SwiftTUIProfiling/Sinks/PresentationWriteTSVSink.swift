@@ -44,7 +44,14 @@ import Synchronization
 
   @_spi(Runners) public init?(path: String) {
     #if !canImport(WASILibc)
-      let descriptor = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      #if canImport(ucrt)
+        var descriptor: CInt = -1
+        _ = unsafe _sopen_s(
+          &descriptor, path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, _SH_DENYNO,
+          _S_IREAD | _S_IWRITE)
+      #else
+        let descriptor = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      #endif
       guard descriptor >= 0 else {
         return nil
       }
@@ -109,7 +116,11 @@ import Synchronization
         guard let base = buffer.baseAddress, buffer.count > 0 else {
           return
         }
-        _ = unsafe write(fileDescriptor, base, buffer.count)
+        #if canImport(ucrt)
+          _ = unsafe _write(fileDescriptor, base, UInt32(buffer.count))
+        #else
+          _ = unsafe write(fileDescriptor, base, buffer.count)
+        #endif
       }
     #endif
   }

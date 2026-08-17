@@ -197,7 +197,7 @@ public enum TerminalRunner {
           )
         #else
           _ = sceneID
-          try await runtime.run(sessionName: sessionName)
+          return try await runtime.run(sessionName: sessionName)
         #endif
       }
       sceneTasks.append(task)

@@ -106,7 +106,11 @@ package final class SummarySink: ProfileSink {
         guard let base = buffer.baseAddress, buffer.count > 0 else {
           return
         }
-        _ = unsafe write(STDERR_FILENO, base, buffer.count)
+        #if canImport(ucrt)
+          _ = unsafe _write(STDERR_FILENO, base, UInt32(buffer.count))
+        #else
+          _ = unsafe write(STDERR_FILENO, base, buffer.count)
+        #endif
       }
     #endif
   }

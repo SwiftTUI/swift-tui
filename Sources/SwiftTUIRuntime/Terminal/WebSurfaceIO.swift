@@ -137,6 +137,38 @@
   ) -> Int {
     unsafe Glibc.write(fileDescriptor, buffer, count)
   }
+#elseif canImport(ucrt)
+  package func webSurfaceOpenRead(
+    _ path: String
+  ) -> Int32 {
+    unsafe path.withCString { pathPointer in
+      var descriptor: CInt = -1
+      _ = unsafe _sopen_s(&descriptor, pathPointer, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
+      return descriptor
+    }
+  }
+
+  package func webSurfaceClose(
+    _ fileDescriptor: Int32
+  ) -> Int32 {
+    _close(fileDescriptor)
+  }
+
+  package func webSurfaceRead(
+    _ fileDescriptor: Int32,
+    _ buffer: UnsafeMutableRawPointer?,
+    _ count: Int
+  ) -> Int {
+    Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
+  }
+
+  package func webSurfaceWrite(
+    _ fileDescriptor: Int32,
+    _ buffer: UnsafeRawPointer?,
+    _ count: Int
+  ) -> Int {
+    Int(unsafe _write(fileDescriptor, buffer, UInt32(count)))
+  }
 #elseif canImport(WASILibc)
   package func webSurfaceOpenRead(
     _ path: String
@@ -169,7 +201,7 @@
   }
 #endif
 
-#if canImport(Darwin) || canImport(Android) || canImport(Musl) || canImport(Glibc) || canImport(WASILibc)
+#if canImport(Darwin) || canImport(Android) || canImport(Musl) || canImport(Glibc) || canImport(WASILibc) || canImport(ucrt)
   package let webSurfaceStandardInputFileDescriptor: Int32 = STDIN_FILENO
   package let webSurfaceStandardOutputFileDescriptor: Int32 = STDOUT_FILENO
 

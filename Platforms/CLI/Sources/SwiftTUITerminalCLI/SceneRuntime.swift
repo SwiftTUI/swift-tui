@@ -85,10 +85,23 @@ final class SceneRuntime {
       // dispatch source owns; the gate suspends the reader for each probe's
       // write→read cycle so the reply cannot be consumed by the reader (F42).
       terminalHost.inputSuspensionGate = inputReader
+      #if canImport(ucrt)
+        // Windows has no SIGWINCH: resize arrives as records in the console
+        // input queue, which the reader's pump owns. Route it through the
+        // injectable signal reader so the run loop's existing "SIGWINCH"
+        // dispatch serves both platforms.
+        let windowsSignalReader = InProcessSignalReader()
+        inputReader.setWindowsResizeObserver { [windowsSignalReader] in
+          windowsSignalReader.send("SIGWINCH")
+        }
+        let sessionSignalReader: (any SignalReading)? = windowsSignalReader
+      #else
+        let sessionSignalReader = defaultSignalReader()
+      #endif
       let resources = SceneSessionResources(
         presentationSurface: terminalHost,
         terminalInputReader: inputReader,
-        signalReader: defaultSignalReader(),
+        signalReader: sessionSignalReader,
         frameSink: frameSink,
         runtimeConfiguration: configuration
       )

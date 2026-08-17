@@ -876,11 +876,12 @@ package func currentProcessEnvironment() -> [String: String] {
     }
 
     return environment
-  #elseif canImport(Android)
+  #elseif canImport(Android) || canImport(ucrt)
     // Android imports `environ` as shared mutable global state, which trips
-    // strict concurrency checking in Swift 6. Falling back to an empty map keeps
-    // cross-compilation working and preserves the terminal runtime's default
-    // capability detection behavior.
+    // strict concurrency checking in Swift 6, and Windows has no `environ`
+    // convention worth honoring — console capabilities come from the console
+    // API, not TERM-style variables. The empty map preserves the terminal
+    // runtime's default capability detection behavior on both.
     [:]
   #else
     var environment: [String: String] = [:]

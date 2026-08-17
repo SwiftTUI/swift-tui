@@ -14,7 +14,7 @@ public final class InputReader: InputReading, TerminalInputReading,
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
   private let controlChannelEnabled: Bool
 
-  #if !canImport(WASILibc)
+  #if !canImport(WASILibc) && !canImport(ucrt)
     /// Live dispatch read-sources, registered so ``withInputSuspended(_:)``
     /// can pause them around a capability probe's reads of the shared input
     /// descriptor (F42).
@@ -42,6 +42,19 @@ public final class InputReader: InputReading, TerminalInputReading,
       suspendableSources.withLockUnchecked { registry in
         _ = registry.sources.removeValue(forKey: id)
       }
+    }
+  #endif
+
+  #if canImport(ucrt)
+    /// The single reader of the console input queue: a second concurrent
+    /// reader on one console handle is unsupported and loses input. Holds
+    /// the record pump's cross-read state (pending surrogate, queued bytes).
+    private let windowsController = WindowsTerminalController()
+    /// Points the pump's WINDOW_BUFFER_SIZE_EVENT dispatch at the session's
+    /// injectable signal reader — resize on Windows arrives in the console
+    /// input queue, and the run loop already listens for "SIGWINCH" strings.
+    package func setWindowsResizeObserver(_ observer: (@Sendable () -> Void)?) {
+      windowsController.resizeObserver.withLock { $0 = observer }
     }
   #endif
 
@@ -243,6 +256,140 @@ extension InputReader {
             continuation.finish()
             return
           }
+        }
+      }
+    }
+  #elseif canImport(ucrt)
+    private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
+      let controller = self.windowsController
+      let fileDescriptor = self.fileDescriptor
+      let controlHandler = self.controlHandler
+      let controlChannelEnabled = self.controlChannelEnabled
+      let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
+
+      return makeTaskBackedAsyncStream(
+        launch: { operation in
+          Task.detached {
+            await operation()
+          }
+        }
+      ) { continuation in
+        var decoder = TerminalInputEventDecoder<InputEvent>(
+          mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
+          transform: { parser, input in parser.feed(input) },
+          flushTransform: { parser in parser.flush() }
+        )
+        var pendingMouseEvents: [InputEvent] = []
+
+        func flushPendingMouseEvents() {
+          guard !pendingMouseEvents.isEmpty else {
+            return
+          }
+
+          let flushedEvents = coalescedInputEvents(pendingMouseEvents)
+          pendingMouseEvents.removeAll(keepingCapacity: true)
+          for event in flushedEvents {
+            continuation.yield(event)
+          }
+        }
+
+        var backoff = InputPollBackoff()
+
+        while !Task.isCancelled {
+          if controller.suspensionDepth.withLock({ $0 > 0 }) {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+            continue
+          }
+          let chunk =
+            (try? controller.read(
+              from: fileDescriptor, maxBytes: 512, timeoutMilliseconds: 0)) ?? []
+          if !chunk.isEmpty {
+            backoff.recordInput()
+            let decoded = decoder.decode(chunk)
+
+            for message in decoded.controlMessages {
+              flushPendingMouseEvents()
+              controlHandler(message)
+            }
+
+            for event in decoded.events {
+              switch event {
+              case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
+                pendingMouseEvents.append(.mouse(mouseEvent))
+              default:
+                flushPendingMouseEvents()
+                continuation.yield(event)
+              }
+            }
+            continue
+          }
+          // Console input has no EOF: an empty poll is idle (or a spurious
+          // wakeup after a filtered record run), never end-of-stream.
+          if !pendingMouseEvents.isEmpty {
+            flushPendingMouseEvents()
+          }
+          for event in decoder.flushEscape() {
+            continuation.yield(event)
+          }
+          try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
+          backoff.recordIdlePoll()
+        }
+      }
+    }
+
+    private func makeEventStream<Event: Sendable>(
+      transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
+      flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
+    ) -> AsyncStream<Event> {
+      let controller = self.windowsController
+      let fileDescriptor = self.fileDescriptor
+      let controlHandler = self.controlHandler
+      let controlChannelEnabled = self.controlChannelEnabled
+      let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
+
+      return makeTaskBackedAsyncStream(
+        launch: { operation in
+          Task.detached {
+            await operation()
+          }
+        }
+      ) { continuation in
+        var decoder = TerminalInputEventDecoder<Event>(
+          mouseCoordinateMode: mouseCoordinateMode,
+          controlChannelEnabled: controlChannelEnabled,
+          transform: transform,
+          flushTransform: flushTransform
+        )
+        var backoff = InputPollBackoff()
+
+        while !Task.isCancelled {
+          if controller.suspensionDepth.withLock({ $0 > 0 }) {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+            continue
+          }
+          let chunk =
+            (try? controller.read(
+              from: fileDescriptor, maxBytes: 512, timeoutMilliseconds: 0)) ?? []
+          if !chunk.isEmpty {
+            backoff.recordInput()
+            let decoded = decoder.decode(chunk)
+
+            for message in decoded.controlMessages {
+              controlHandler(message)
+            }
+
+            for event in decoded.events {
+              continuation.yield(event)
+            }
+            await Task.yield()
+            continue
+          }
+          for event in decoder.flushEscape() {
+            continuation.yield(event)
+          }
+          try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
+          backoff.recordIdlePoll()
         }
       }
     }
@@ -497,6 +644,10 @@ extension InputReader: TerminalInputHandoffSuspending {
   package func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
     #if canImport(WASILibc)
       return try body()
+    #elseif canImport(ucrt)
+      windowsController.suspensionDepth.withLock { $0 += 1 }
+      defer { windowsController.suspensionDepth.withLock { $0 -= 1 } }
+      return try body()
     #else
       let entries = suspendableSources.withLockUnchecked { registry in
         Array(registry.sources.values)
@@ -523,6 +674,10 @@ extension InputReader: TerminalInputHandoffSuspending {
     _ body: @MainActor @Sendable () async throws -> T
   ) async rethrows -> T {
     #if canImport(WASILibc)
+      return try await body()
+    #elseif canImport(ucrt)
+      windowsController.suspensionDepth.withLock { $0 += 1 }
+      defer { windowsController.suspensionDepth.withLock { $0 -= 1 } }
       return try await body()
     #else
       let entries = suspendableSources.withLockUnchecked { registry in

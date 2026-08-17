@@ -45,7 +45,11 @@ final class FrameDiagnosticsFileSink: FrameDiagnosticSink {
       guard let base = buffer.baseAddress, buffer.count > 0 else {
         return
       }
-      _ = unsafe write(fileDescriptor, base, buffer.count)
+      #if canImport(ucrt)
+        _ = unsafe _write(fileDescriptor, base, UInt32(buffer.count))
+      #else
+        _ = unsafe write(fileDescriptor, base, buffer.count)
+      #endif
     }
   }
 }
