@@ -111,7 +111,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         inputFileDescriptor: inputFileDescriptor,
         outputFileDescriptor: outputFileDescriptor,
         fallbackSize: fallbackSize,
-        controller: POSIXTerminalController(),
+        controller: PlatformTerminalController.make(),
         capabilityProfile: capabilityProfile,
         environment: environment ?? currentProcessEnvironment(),
         usesTerminalEditOperations: usesTerminalEditOperations,
@@ -201,21 +201,15 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         throw TerminalHostError.notATTY(fileDescriptor: inputFileDescriptor)
       }
 
-      let currentAttributes = try controller.getAttributes(from: inputFileDescriptor)
-      var rawAttributes = currentAttributes
-      unsafe cfmakeraw(&rawAttributes)
-      rawAttributes.c_cc.16 = 1
-      rawAttributes.c_cc.17 = 0
-
-      try controller.setAttributes(rawAttributes, on: inputFileDescriptor)
-      let currentFileStatusFlags = try controller.getFileStatusFlags(of: inputFileDescriptor)
-      try controller.setFileStatusFlags(
-        currentFileStatusFlags | Int32(O_NONBLOCK),
-        on: inputFileDescriptor
+      // What "raw mode" means — cfmakeraw, VMIN/VTIME, O_NONBLOCK on POSIX —
+      // is owned by the platform controller; this caller only holds the
+      // opaque snapshot to restore (Stage 3.2 of the Windows plan).
+      let snapshot = try controller.enterRawMode(
+        input: inputFileDescriptor,
+        output: outputFileDescriptor
       )
       rawModeSession.activate(
-        savedAttributes: currentAttributes,
-        inputFileStatusFlags: currentFileStatusFlags,
+        snapshot: snapshot,
         mouseCoordinateMode: resolvedMouseCoordinateMode(),
         inputFileDescriptor: inputFileDescriptor,
         outputFileDescriptor: outputFileDescriptor
@@ -227,14 +221,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         if shouldRestoreOnFailure {
           let restorePlan = rawModeSession.deactivate()
           presentationSession.reset()
-          if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
-            try? controller.setFileStatusFlags(
-              savedInputFileStatusFlags,
-              on: inputFileDescriptor
+          if let savedSnapshot = restorePlan.savedSnapshot {
+            try? controller.restore(
+              savedSnapshot,
+              input: inputFileDescriptor,
+              output: outputFileDescriptor
             )
-          }
-          if let savedAttributes = restorePlan.savedAttributes {
-            try? controller.setAttributes(savedAttributes, on: inputFileDescriptor)
           }
         }
       }
@@ -277,14 +269,14 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       let restorePlan = rawModeSession.deactivate()
       presentationSession.reset()
 
-      var attributesToRestore = restorePlan.savedAttributes
-      var fileStatusFlagsToRestore = restorePlan.savedInputFileStatusFlags
+      var snapshotToRestore = restorePlan.savedSnapshot
       defer {
-        if let fileStatusFlagsToRestore {
-          try? controller.setFileStatusFlags(fileStatusFlagsToRestore, on: inputFileDescriptor)
-        }
-        if let attributesToRestore {
-          try? controller.setAttributes(attributesToRestore, on: inputFileDescriptor)
+        if let snapshotToRestore {
+          try? controller.restore(
+            snapshotToRestore,
+            input: inputFileDescriptor,
+            output: outputFileDescriptor
+          )
         }
       }
 
@@ -312,13 +304,13 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       try writeSynchronously(TerminalHostEscapeSequences.showCursor)
       try writeSynchronously(TerminalHostEscapeSequences.exitAlternateScreen)
 
-      if let savedInputFileStatusFlags = restorePlan.savedInputFileStatusFlags {
-        try controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
-        fileStatusFlagsToRestore = nil
-      }
-      if let savedAttributes = restorePlan.savedAttributes {
-        try controller.setAttributes(savedAttributes, on: inputFileDescriptor)
-        attributesToRestore = nil
+      if let savedSnapshot = restorePlan.savedSnapshot {
+        try controller.restore(
+          savedSnapshot,
+          input: inputFileDescriptor,
+          output: outputFileDescriptor
+        )
+        snapshotToRestore = nil
       }
     }
 

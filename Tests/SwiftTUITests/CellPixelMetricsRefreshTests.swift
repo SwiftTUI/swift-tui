@@ -26,12 +26,12 @@ struct CellPixelMetricsRefreshTests {
     }
 
     func isATTY(_: Int32) -> Bool { true }
-    func getAttributes(from _: Int32) throws -> termios { termios() }
-    func setAttributes(_: termios, on _: Int32) throws {}
+    func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
+      TerminalModeSnapshot()
+    }
+    func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {}
     func windowSize(of _: Int32) throws -> CellSize { CellSize(width: 80, height: 24) }
     func cellPixelSize(of _: Int32) throws -> PixelSize? { pixelSize }
-    func getFileStatusFlags(of _: Int32) throws -> Int32 { 0 }
-    func setFileStatusFlags(_: Int32, on _: Int32) throws {}
     func write(_: String, to _: Int32) throws {}
     func read(from _: Int32, maxBytes _: Int, timeoutMilliseconds _: Int) throws -> [UInt8] { [] }
   }

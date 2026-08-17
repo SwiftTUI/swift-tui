@@ -1,21 +1,23 @@
 import Synchronization
 
+// Plain (internal) imports: with the reset action holding an opaque
+// TerminalModeSnapshot, no libc type appears in this file's package surface.
 #if canImport(Darwin)
-  package import Darwin
+  import Darwin
 #elseif canImport(Glibc)
-  package import Glibc
+  import Glibc
 #elseif canImport(Android)
-  package import Android
+  import Android
 #elseif canImport(ucrt)
-  package import CRT
+  import CRT
 #endif
 
-#if !canImport(WASILibc)
+// Positive host test, not "not WASI" (Stage 3.5 of the Windows plan).
+#if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(ucrt)
   package struct TerminalProcessExitResetAction: Sendable {
     package let inputFileDescriptor: Int32
     package let outputFileDescriptor: Int32
-    package let inputFileStatusFlags: Int32
-    package let savedAttributes: termios
+    package let savedSnapshot: TerminalModeSnapshot
     package let resetBytes: [UInt8]
 
     package func perform() {
@@ -40,9 +42,16 @@ import Synchronization
         }
       }
 
-      _ = fcntl(inputFileDescriptor, F_SETFL, inputFileStatusFlags)
-      var attributes = savedAttributes
-      _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
+      // Restores inline rather than through a controller: this runs from an
+      // atexit handler, where allocation and actor hops are off-limits.
+      #if canImport(ucrt)
+        // The Windows console-mode/code-page restore arrives with Stage 4 of
+        // the Windows plan.
+      #else
+        _ = fcntl(inputFileDescriptor, F_SETFL, savedSnapshot.inputFileStatusFlags)
+        var attributes = savedSnapshot.attributes
+        _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
+      #endif
     }
   }
 

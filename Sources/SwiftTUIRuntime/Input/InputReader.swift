@@ -70,7 +70,7 @@ public final class InputReader: InputReading, TerminalInputReading,
     #if canImport(WASILibc)
       self.controlChannelEnabled = true
     #else
-      self.controlChannelEnabled = !POSIXTerminalController().isATTY(fileDescriptor)
+      self.controlChannelEnabled = !PlatformTerminalController.make().isATTY(fileDescriptor)
     #endif
   }
 

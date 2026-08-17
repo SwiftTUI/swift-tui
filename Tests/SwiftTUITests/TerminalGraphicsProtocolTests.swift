@@ -2104,11 +2104,11 @@ private final class GraphicsProtocolMockTerminalController:
     isTTYValue
   }
 
-  func getAttributes(from _: Int32) throws -> termios {
-    termios()
+  func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
+    TerminalModeSnapshot()
   }
 
-  func setAttributes(_: termios, on _: Int32) throws {}
+  func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {}
 
   func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
@@ -2118,11 +2118,7 @@ private final class GraphicsProtocolMockTerminalController:
     cellPixelSizeValue
   }
 
-  func getFileStatusFlags(of _: Int32) throws -> Int32 {
-    0
-  }
 
-  func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
     writesStorage.withLock { $0.append(output) }

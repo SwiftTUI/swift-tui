@@ -10,18 +10,17 @@ import SwiftTUICore
   import CRT
 #endif
 
-#if !canImport(WASILibc)
+// Positive host test, not "not WASI" (Stage 3.5 of the Windows plan).
+#if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(ucrt)
   struct TerminalRawModeRestorePlan {
-    var savedAttributes: termios?
-    var savedInputFileStatusFlags: Int32?
+    var savedSnapshot: TerminalModeSnapshot?
     var mouseCoordinateMode: MouseCoordinateMode
     var pointerHoverEnabled: Bool
     var kittyKeyboardPushed: Bool
   }
 
   struct TerminalRawModeSession {
-    private var savedAttributes: termios?
-    private var savedInputFileStatusFlags: Int32?
+    private var savedSnapshot: TerminalModeSnapshot?
     private var processExitCleanupToken: UInt64?
 
     var isEnabled = false
@@ -30,14 +29,12 @@ import SwiftTUICore
     var kittyKeyboardPushed = false
 
     mutating func activate(
-      savedAttributes: termios,
-      inputFileStatusFlags: Int32,
+      snapshot: TerminalModeSnapshot,
       mouseCoordinateMode: MouseCoordinateMode,
       inputFileDescriptor: Int32,
       outputFileDescriptor: Int32
     ) {
-      self.savedAttributes = savedAttributes
-      savedInputFileStatusFlags = inputFileStatusFlags
+      savedSnapshot = snapshot
       self.mouseCoordinateMode = mouseCoordinateMode
       isEnabled = true
       refreshProcessExitCleanupRegistration(
@@ -49,8 +46,7 @@ import SwiftTUICore
     mutating func deactivate() -> TerminalRawModeRestorePlan {
       unregisterProcessExitCleanup()
       let restorePlan = TerminalRawModeRestorePlan(
-        savedAttributes: savedAttributes,
-        savedInputFileStatusFlags: savedInputFileStatusFlags,
+        savedSnapshot: savedSnapshot,
         mouseCoordinateMode: mouseCoordinateMode,
         pointerHoverEnabled: pointerHoverEnabled,
         kittyKeyboardPushed: kittyKeyboardPushed
@@ -65,8 +61,7 @@ import SwiftTUICore
     ) {
       unregisterProcessExitCleanup()
       guard isEnabled,
-        let savedAttributes,
-        let savedInputFileStatusFlags
+        let savedSnapshot
       else {
         return
       }
@@ -75,8 +70,7 @@ import SwiftTUICore
         .init(
           inputFileDescriptor: inputFileDescriptor,
           outputFileDescriptor: outputFileDescriptor,
-          inputFileStatusFlags: savedInputFileStatusFlags,
-          savedAttributes: savedAttributes,
+          savedSnapshot: savedSnapshot,
           resetBytes: processExitResetBytes()
         )
       )
@@ -88,8 +82,7 @@ import SwiftTUICore
     }
 
     private mutating func reset() {
-      savedAttributes = nil
-      savedInputFileStatusFlags = nil
+      savedSnapshot = nil
       isEnabled = false
       mouseCoordinateMode = .cells
       pointerHoverEnabled = false

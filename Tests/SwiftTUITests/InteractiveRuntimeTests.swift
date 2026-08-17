@@ -580,9 +580,11 @@ struct InteractiveRuntimeTests {
     try host.enableRawMode()
     try host.disableRawMode()
 
-    #expect(controller.setAttributesCalls.count == 2)
-    #expect(termiosEqual(controller.setAttributesCalls[1], controller.originalAttributes))
-    #expect(!termiosEqual(controller.setAttributesCalls[0], controller.originalAttributes))
+    // Raw mode entered exactly once and its snapshot restored exactly once;
+    // what "raw" means bit-for-bit is the platform controller's own
+    // behavior now, covered by the real-PTY journeys.
+    #expect(controller.enterRawModeCalls == 1)
+    #expect(controller.restoreCalls == 1)
     #expect(
       controller.writes == [
         "\u{001B}]10;?\u{0007}",
@@ -4750,14 +4752,16 @@ private final class RecordingInvalidator: Invalidating {
 }
 
 private final class MockTerminalController: TerminalControlling {
-  let originalAttributes: termios
-  private let setAttributesCallsStorage = LockedBox<[termios]>([])
+  private let enterRawModeCallsStorage = LockedBox<Int>(0)
+  private let restoreCallsStorage = LockedBox<Int>(0)
   private let writesStorage = LockedBox<[String]>([])
-  private let fileStatusFlagsStorage = LockedBox<Int32>(0)
 
-  private(set) var setAttributesCalls: [termios] {
-    get { setAttributesCallsStorage.value }
-    set { setAttributesCallsStorage.value = newValue }
+  var enterRawModeCalls: Int {
+    enterRawModeCallsStorage.value
+  }
+
+  var restoreCalls: Int {
+    restoreCallsStorage.value
   }
 
   private(set) var writes: [String] {
@@ -4765,42 +4769,21 @@ private final class MockTerminalController: TerminalControlling {
     set { writesStorage.value = newValue }
   }
 
-  private(set) var fileStatusFlags: Int32 {
-    get { fileStatusFlagsStorage.value }
-    set { fileStatusFlagsStorage.value = newValue }
-  }
-
-  init() {
-    var attributes = termios()
-    attributes.c_iflag = tcflag_t(ICRNL | IXON)
-    attributes.c_oflag = tcflag_t(OPOST)
-    attributes.c_cflag = tcflag_t(CS8)
-    attributes.c_lflag = tcflag_t(ECHO | ICANON | IEXTEN | ISIG)
-    originalAttributes = attributes
-  }
-
   func isATTY(_: Int32) -> Bool {
     true
   }
 
-  func getAttributes(from _: Int32) throws -> termios {
-    originalAttributes
+  func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
+    enterRawModeCallsStorage.withLock { $0 += 1 }
+    return TerminalModeSnapshot()
   }
 
-  func setAttributes(_ attributes: termios, on _: Int32) throws {
-    setAttributesCallsStorage.withLock { $0.append(attributes) }
+  func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {
+    restoreCallsStorage.withLock { $0 += 1 }
   }
 
   func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
-  }
-
-  func getFileStatusFlags(of _: Int32) throws -> Int32 {
-    fileStatusFlags
-  }
-
-  func setFileStatusFlags(_ flags: Int32, on _: Int32) throws {
-    fileStatusFlagsStorage.value = flags
   }
 
   func write(_ output: String, to _: Int32) throws {
@@ -6035,13 +6018,6 @@ private struct ImperativeAlertPresentationHarnessView: View {
   }
 }
 
-private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
-  unsafe withUnsafeBytes(of: lhs) { lhsBytes in
-    unsafe withUnsafeBytes(of: rhs) { rhsBytes in
-      unsafe lhsBytes.elementsEqual(rhsBytes)
-    }
-  }
-}
 
 /// A touch-style host declaration for direct-manipulation tests: identical to
 /// `.cellOnly` except that it opts into drag-to-pan, the way Android, iOS, and

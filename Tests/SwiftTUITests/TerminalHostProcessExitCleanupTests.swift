@@ -152,16 +152,11 @@ private final class ProcessExitCleanupController: TerminalControlling {
     true
   }
 
-  func getAttributes(from _: Int32) throws -> termios {
-    var attributes = termios()
-    attributes.c_iflag = tcflag_t(ICRNL | IXON)
-    attributes.c_oflag = tcflag_t(OPOST)
-    attributes.c_cflag = tcflag_t(CS8)
-    attributes.c_lflag = tcflag_t(ECHO | ICANON | IEXTEN | ISIG)
-    return attributes
+  func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
+    TerminalModeSnapshot()
   }
 
-  func setAttributes(_: termios, on _: Int32) throws {}
+  func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {}
 
   func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
@@ -171,11 +166,7 @@ private final class ProcessExitCleanupController: TerminalControlling {
     cellPixelSizeValue
   }
 
-  func getFileStatusFlags(of _: Int32) throws -> Int32 {
-    0
-  }
 
-  func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_: String, to _: Int32) throws {}
 
